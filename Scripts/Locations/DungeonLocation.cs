@@ -1303,7 +1303,15 @@ public class DungeonLocation : BaseLocation
     }
 
     /// <summary>
-    /// Sync current NPC teammates to GameEngine for persistence
+    /// Sync the current dungeon party to GameEngine for persistence.
+    ///
+    /// Player report: removing a player echo from the party did NOT remove their name
+    /// from `DungeonPartyPlayerNames` (this method only synced NPC IDs). On next
+    /// dungeon entry `RestorePlayerTeammates` re-read the still-present name list and
+    /// the echo materialized again. Now both lists — NPC IDs and player-echo names —
+    /// are rebuilt from the live `teammates` collection so removals stick.
+    /// Companions and grouped players are excluded; companions persist via
+    /// `CompanionSystem`, grouped players join live and aren't echoes.
     /// </summary>
     private void SyncNPCTeammatesToGameEngine()
     {
@@ -1312,6 +1320,13 @@ public class DungeonLocation : BaseLocation
             .Select(n => n.ID)
             .ToList();
         GameEngine.Instance?.SetDungeonPartyNPCs(npcIds);
+
+        var echoNames = teammates
+            .Where(t => t.IsEcho && !t.IsCompanion && !t.IsGroupedPlayer)
+            .Select(t => t.DisplayName)
+            .Where(n => !string.IsNullOrEmpty(n))
+            .ToList();
+        GameEngine.Instance?.SetDungeonPartyPlayers(echoNames);
     }
 
     /// <summary>
@@ -15931,7 +15946,9 @@ public class DungeonLocation : BaseLocation
         if (ctx == null) return;
         var group = GroupSystem.Instance?.GetGroupFor(ctx.Username);
         if (group == null || !group.IsLeader(ctx.Username)) return;
-        GroupSystem.Instance!.BroadcastToAllGroupSessions(group, message, excludeUsername: ctx.Username);
+        // inDungeonOnly: members who left to town shouldn't see dungeon events.
+        GroupSystem.Instance!.BroadcastToAllGroupSessions(group, message,
+            excludeUsername: ctx.Username, inDungeonOnly: true);
     }
 
     /// <summary>

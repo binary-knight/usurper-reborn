@@ -692,6 +692,8 @@ public class Character
     public int DesecrationsToday { get; set; } = 0;             // Daily desecration counter (max 2)
     public int ConfessionsToday { get; set; } = 0;              // v0.57.0: Daily confession counter (max 2, matches desecration cadence)
     public int MurdersToday { get; set; } = 0;                  // v0.57.6: Daily non-bounty NPC-murder counter (cap: GameConfig.MaxMurdersPerDay)
+    public int TeamWarsToday { get; set; } = 0;                 // v0.57.17: Team Corner team-war daily counter (cap: GameConfig.MaxTeamWarsPerDay). Plugs the "find a beatable team, spam wars for free 2x wager gold" exploit reported by a Lv.100 Barbarian.
+    public int DrinkingGamesToday { get; set; } = 0;            // v0.57.17: Inn drinking-game daily counter (cap: GameConfig.MaxDrinkingGamesPerDay). Player report: high STR/CON = consistent wins for level*700 XP per ~30s, no limit, free leveling.
     public DateTime LastPartnerBondingUtc { get; set; } = DateTime.MinValue;  // v0.57.7: Wall-clock gate on Home "quality time with partner" rewards (XP/HP/Mana). Shared across dinner/walk/cuddle — one bonding event per 20 real hours. Rage reported "romantic dinner is infinite XP" — was looping Level*50 with no cooldown.
     public long LoanAmount { get; set; } = 0;                   // Active loan balance (principal + interest)
     public int LoanDaysRemaining { get; set; } = 0;             // Days until enforcer attack

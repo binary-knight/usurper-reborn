@@ -381,8 +381,6 @@ public class ChildBonuses
     public int BonusStrength { get; set; }
     public int BonusCharisma { get; set; }
     public int DailyGoldBonus { get; set; }
-    public int ChivalryBonus { get; set; }
-    public int DarknessBonus { get; set; }
 
     /// <summary>
     /// Get a summary of all bonuses for display
@@ -398,8 +396,6 @@ public class ChildBonuses
         if (BonusCharisma > 0) summary += $"  +{BonusCharisma} Charisma\n";
         if (XPMultiplier > 1.0f) summary += $"  +{(XPMultiplier - 1) * 100:F0}% XP Bonus\n";
         if (DailyGoldBonus > 0) summary += $"  +{DailyGoldBonus} Gold/day\n";
-        if (ChivalryBonus > 0) summary += $"  +{ChivalryBonus} Chivalry (good children)\n";
-        if (DarknessBonus > 0) summary += $"  +{DarknessBonus} Darkness (evil children)\n";
         return summary;
     }
 }

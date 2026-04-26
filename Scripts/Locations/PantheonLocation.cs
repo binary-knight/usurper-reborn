@@ -1203,23 +1203,34 @@ public class PantheonLocation : BaseLocation
         currentPlayer.DeedsLeft = 0;
         currentPlayer.GodAlignment = "";
 
-        // Migration: players who ascended before v0.47.0 have CurrentCycle=1 and
-        // empty CompletedEndings because the ending wasn't recorded at ascension time.
-        // Infer the ending from their god alignment and record it now.
+        // v0.57.17: replaced the legacy-only migration block with a proper StartNewCycle
+        // call. Previously this only ran for cycle-1 players (CurrentCycle <= 1 ||
+        // CompletedEndings.Count == 0) and even then it only fixed up the cycle
+        // counter / endings list — it never reset god states. NG+ via renounce was
+        // effectively broken: Manwe and every other resolved god carried over in
+        // Defeated/Saved/Allied/Consumed state, and CanEncounterBoss refuses to
+        // spawn gods in those states (OldGodBossSystem.cs:136-140), so the player
+        // entered the new cycle with no Old God encounters available — Manwe at
+        // floor 100 was already "dead" with no way to retrigger him. Cycle-2+
+        // renouncers got it worse: the legacy migration's `if` guard skipped them
+        // entirely, so they got ZERO state reset.
+        // Fix: route through StoryProgressionSystem.StartNewCycle(EndingType), which
+        // is the same method the normal post-Manwe-ascension NG+ path uses. It
+        // calls InitializeOldGods() (resets every god to Corrupted/Dying/etc) and
+        // InitializeKeyNPCs() (resets relationships), in addition to the cycle and
+        // ending bookkeeping the old block did.
         var story = StoryProgressionSystem.Instance;
-        if (story.CurrentCycle <= 1 || story.CompletedEndings.Count == 0)
+        EndingType inferredEnding = godAlignment switch
         {
-            EndingType inferredEnding = godAlignment switch
-            {
-                "Light" => EndingType.Savior,
-                "Dark" => EndingType.Usurper,
-                _ => EndingType.Defiant
-            };
-            if (!story.CompletedEndings.Contains(inferredEnding))
-                story.CompletedEndings.Add(inferredEnding);
-            if (story.CurrentCycle <= 1)
-                story.CurrentCycle = 2;
-        }
+            "Light" => EndingType.Savior,
+            "Dark" => EndingType.Usurper,
+            _ => EndingType.Defiant
+        };
+        // Dedup so a second renounce of the same alignment doesn't pad CompletedEndings.
+        if (story.CompletedEndings.Contains(inferredEnding))
+            story.StartNewCycle(new List<string>());
+        else
+            story.StartNewCycle(inferredEnding);
 
         terminal.WriteLine("");
         terminal.SetColor("bright_red");

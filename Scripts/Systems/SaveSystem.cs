@@ -922,6 +922,8 @@ namespace UsurperRemake.Systems
                 DesecrationsToday = player.DesecrationsToday,
                 ConfessionsToday = player.ConfessionsToday,
                 MurdersToday = player.MurdersToday,
+                TeamWarsToday = player.TeamWarsToday,
+                DrinkingGamesToday = player.DrinkingGamesToday,
                 LastPartnerBondingUtc = player.LastPartnerBondingUtc,
                 LoanAmount = player.LoanAmount,
                 LoanDaysRemaining = player.LoanDaysRemaining,

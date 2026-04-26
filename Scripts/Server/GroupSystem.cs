@@ -171,11 +171,30 @@ public class GroupSystem
     }
 
     /// <summary>
+    /// True when this group member is currently part of the active dungeon session
+    /// (the leader running combat, or a follower whose GroupFollowerLoop is still
+    /// listening). False for members who are still in the group bookkeeping but have
+    /// retreated to town — by design, leaving the dungeon doesn't disband the group
+    /// (so they can rejoin), but they shouldn't keep receiving combat / loot / dungeon
+    /// event broadcasts in town.
+    /// Player report: "When in a player group, if the non-leader leaves to town,
+    /// the battle still spams the non-leader in town."
+    /// </summary>
+    private static bool IsInDungeonGroupSession(string memberUsername, DungeonGroup group, PlayerSession? session)
+    {
+        if (session == null) return false;
+        if (group.IsLeader(memberUsername)) return group.IsInDungeon;
+        return session.IsGroupFollower;
+    }
+
+    /// <summary>
     /// Broadcast a perspective-correct message to all group members.
     /// The actor sees actorMessage (2nd person), everyone else sees observerMessage (3rd person).
+    /// Pass inDungeonOnly=true for combat / dungeon events so members who retreated
+    /// to town aren't spammed.
     /// </summary>
     public void BroadcastToGroupSessions(DungeonGroup group, string actorUsername,
-        string actorMessage, string observerMessage)
+        string actorMessage, string observerMessage, bool inDungeonOnly = false)
     {
         List<string> members;
         lock (group.MemberUsernames)
@@ -188,6 +207,7 @@ public class GroupSystem
             var session = MudServer.Instance?.ActiveSessions
                 .TryGetValue(member.ToLowerInvariant(), out var s) == true ? s : null;
             if (session == null) continue;
+            if (inDungeonOnly && !IsInDungeonGroupSession(member, group, session)) continue;
 
             if (member.Equals(actorUsername, StringComparison.OrdinalIgnoreCase))
                 session.EnqueueMessage(actorMessage);
@@ -199,9 +219,13 @@ public class GroupSystem
     /// <summary>
     /// Broadcast the same message to all group members.
     /// Sanitizes decorative Unicode for screen reader recipients.
+    /// Pass inDungeonOnly=true for combat / loot / dungeon events so members who
+    /// retreated to town aren't spammed. Defaults to false for backwards compatibility
+    /// with non-dungeon broadcasts (none currently exist via this method, but the
+    /// safer default is "include everyone" — opt in to filtering).
     /// </summary>
     public void BroadcastToAllGroupSessions(DungeonGroup group, string message,
-        string? excludeUsername = null)
+        string? excludeUsername = null, bool inDungeonOnly = false)
     {
         List<string> members;
         lock (group.MemberUsernames)
@@ -216,11 +240,11 @@ public class GroupSystem
 
             var session = MudServer.Instance?.ActiveSessions
                 .TryGetValue(member.ToLowerInvariant(), out var s) == true ? s : null;
-            if (session != null)
-            {
-                var msg = session.ScreenReaderMode ? SanitizeBroadcastForSR(message) : message;
-                session.EnqueueMessage(msg);
-            }
+            if (session == null) continue;
+            if (inDungeonOnly && !IsInDungeonGroupSession(member, group, session)) continue;
+
+            var msg = session.ScreenReaderMode ? SanitizeBroadcastForSR(message) : message;
+            session.EnqueueMessage(msg);
         }
     }
 

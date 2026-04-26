@@ -336,6 +336,8 @@ public class DailySystemManager
         player.DesecrationsToday = 0;
         player.ConfessionsToday = 0;  // v0.57.0
         player.MurdersToday = 0;      // v0.57.6: non-bounty murder daily cap
+        player.TeamWarsToday = 0;     // v0.57.17: Team Corner team-war daily cap
+        player.DrinkingGamesToday = 0; // v0.57.17: Inn drinking-game daily cap
 
         // Reset session XP tracking (prevents bypass by logging out/in to clear diminishing returns)
         player.SessionXPEarned = 0;

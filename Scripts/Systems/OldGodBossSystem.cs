@@ -1328,8 +1328,16 @@ namespace UsurperRemake.Systems
             // v0.57.2: Noctura betrayal is an Old God fight — set BossContext so the
             // 75% teammate damage cap, spell immunity handling, and divine armor
             // protections all apply (same as the main Old God encounters).
+            // v0.57.17: BossData = betrayalData was missing — without it, the round-2
+            // phase transition (when player burst-damages the boss below 50% HP) hit
+            // `ctx.BossData.Phase2Dialogue` → NPE → propagated past the inner
+            // try/catch and hit the outermost LoadSaveByFileName handler with "Error
+            // loading save: Object reference not set...". The regular boss path at
+            // ~line 825 sets BossData; the betrayal path was missing it. Same data
+            // reused, same scaling/dialogue/phase logic now applies.
             combatEngine.BossContext = new BossCombatContext
             {
+                BossData = betrayalData,
                 GodType = OldGodType.Noctura,
                 AttacksPerRound = 1,
                 CanSave = false,

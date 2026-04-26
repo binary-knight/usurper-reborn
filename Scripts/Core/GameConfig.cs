@@ -9,7 +9,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.57.16";
+    public const string Version = "0.57.17";
     public const string VersionName = "Alignment and Shields";
 
     // v0.57.12: Alignment scale cap. Character.Chivalry and Character.Darkness setters clamp to [0, AlignmentCap]
@@ -651,6 +651,25 @@ public static partial class GameConfig
     public const float MurderGoldTheftPercent = 0.50f;       // Steal 50% of NPC's gold on murder
     public const int MurderDarknessGain = 250;                // 50 -> 250 (paired with -125 chivalry).
     public const int MaxMurdersPerDay = 3;                    // v0.57.6: cap non-bounty NPC murders to prevent a dark-aligned player from wiping the town in a single play session.
+
+    // Team Wars (v0.57.17 — anti-exploit caps)
+    // Player report: at Lv.100 the wager is 20k and the win pays 40k (wager * 2 from
+    // thin air). With no daily cap and no opponent cooldown, the moment a challenger
+    // identified a beatable team the system became a free-money printer. These caps
+    // restrict the spam without changing the gambling shape itself; the reward
+    // multiplier is also reduced so net profit per win is +50% of wager instead of
+    // +100%.
+    public const int MaxTeamWarsPerDay = 3;                   // Daily cap on team-war challenges per challenger.
+    public const int TeamWarOpponentCooldownHours = 6;        // Per-opponent cooldown — can't re-challenge the same defender team within this window.
+    public const float TeamWarRewardMultiplier = 1.5f;        // Reward = wager * this on victory (was 2.0). Net profit = (multiplier - 1) * wager = +50% of wager.
+
+    // Inn drinking game (v0.57.17 — anti-grind cap)
+    // Player report: "drinking game at the inn has no limit per day and no carry over.
+    // With enough str/con mid game character can level purely at the inn pretty quickly."
+    // Win pays level * 700 XP for 20g — at Lv.50 that's 35k XP per ~30 seconds, repeatable
+    // forever. The cap allows the minigame to remain a daily activity without being a
+    // dedicated leveling track.
+    public const int MaxDrinkingGamesPerDay = 5;
     public const float MurderGuardInterventionChance = 0.30f; // 30% chance guard joins NPC's side
     public const float MurderGrudgeChance = 1.00f;           // 100% grudge encounter after murder (guaranteed)
     public const float MurderGrudgeRageBonusHP = 0.20f;      // +20% HP for murder revenge NPC

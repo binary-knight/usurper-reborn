@@ -118,11 +118,13 @@ namespace UsurperRemake.Systems
                 bonuses.DailyGoldBonus += royalChildren * 500; // Royal stipend
             }
 
-            // Good/evil children affect alignment bonuses
-            int goodChildren = minorChildren.Count(c => c.Soul > 100);
-            int evilChildren = minorChildren.Count(c => c.Soul < -100);
-            bonuses.ChivalryBonus = goodChildren * 10;
-            bonuses.DarknessBonus = evilChildren * 10;
+            // Children's moral influence on the parent is handled as a one-shot
+            // alignment event when the child is born / reaches a milestone, NOT as a
+            // continuously-applied bonus. The previous Chivalry/Darkness fields here
+            // were applied via += on every RecalculateStats() call without being reset
+            // to base, so they accumulated permanently and slammed both alignment scales
+            // into the v0.57.12 cap. See v0.57.17 release notes: a player report of
+            // Darkness racing to the 1000 cap within hours of NG+ start surfaced this.
 
             return bonuses;
         }
@@ -138,12 +140,15 @@ namespace UsurperRemake.Systems
             var bonuses = CalculateChildBonuses(player);
             if (bonuses.ChildCount == 0) return;
 
-            // Apply stat bonuses (these are temporary, recalculated each time)
+            // Apply stat bonuses. These ARE safe under repeated RecalculateStats()
+            // calls because MaxHP/Strength/Charisma are reset to their Base* values at
+            // the top of RecalculateStats() before this method runs.
+            // Chivalry/Darkness are NOT reset by RecalculateStats() — they're persistent
+            // alignment, not derived stats — so we no longer touch them here. Children
+            // affect alignment through one-shot events, not a recalc bonus.
             player.MaxHP += bonuses.BonusMaxHP;
             player.Strength += bonuses.BonusStrength;
             player.Charisma += bonuses.BonusCharisma;
-            player.Chivalry += bonuses.ChivalryBonus;
-            player.Darkness += bonuses.DarknessBonus;
 
             // Note: XP multiplier and daily gold bonus are applied elsewhere
             // XP: in CombatEngine when awarding XP
@@ -166,6 +171,71 @@ namespace UsurperRemake.Systems
         {
             if (player == null) return 0;
             return CalculateChildBonuses(player).DailyGoldBonus;
+        }
+
+        /// <summary>
+        /// Disown every child currently parented by the named character. Used when
+        /// the player NG+'s in online mode — the new character is a fresh life and
+        /// shouldn't see kids from the previous cycle waiting at home.
+        ///
+        /// In single-player mode FamilySystem.Reset() wipes _children entirely, so
+        /// disown is unnecessary there. In online mode children are world data
+        /// shared across players (settled, registered with NPC parents, possibly
+        /// adopted by other players) — we can't just delete them. Instead we clear
+        /// the matching parent slot. If both parent slots are now empty, the child
+        /// moves to the orphanage so the existing orphan pipeline picks them up.
+        ///
+        /// OriginalMother / OriginalFather are immutable (used by orphan stories
+        /// for narrative continuity) so the child's biological history is preserved.
+        ///
+        /// Returns the number of children disowned for logging.
+        /// </summary>
+        public int DisownChildrenOf(string playerName)
+        {
+            if (string.IsNullOrEmpty(playerName)) return 0;
+
+            var matches = _children
+                .Where(c => !c.Deleted && (c.Mother == playerName || c.Father == playerName))
+                .ToList();
+
+            int disowned = 0;
+            int orphaned = 0;
+            foreach (var child in matches)
+            {
+                bool wasMother = child.Mother == playerName;
+                bool wasFather = child.Father == playerName;
+
+                if (wasMother)
+                {
+                    child.Mother = "";
+                    child.MotherID = "";
+                }
+                if (wasFather)
+                {
+                    child.Father = "";
+                    child.FatherID = "";
+                }
+
+                disowned++;
+
+                // If both parent slots are empty AND child is still a minor, send to orphanage.
+                // Adult children (Age >= ADULT_AGE) are already independent — disown is just bookkeeping.
+                if (string.IsNullOrEmpty(child.Mother) && string.IsNullOrEmpty(child.Father)
+                    && child.Age < ADULT_AGE
+                    && child.Location != GameConfig.ChildLocationOrphanage)
+                {
+                    child.Location = GameConfig.ChildLocationOrphanage;
+                    orphaned++;
+                }
+            }
+
+            if (disowned > 0)
+            {
+                DebugLogger.Instance?.LogInfo("FAMILY",
+                    $"NG+ disown: {disowned} children disowned by {playerName}, {orphaned} sent to orphanage");
+            }
+
+            return disowned;
         }
 
         #endregion

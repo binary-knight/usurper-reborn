@@ -1127,12 +1127,26 @@ public static class TrainingSystem
             }
         }
 
-        // Spells for magic classes
+        // Spells for magic classes — show every spell the player has LEARNED, not
+        // just ones they can currently cast. Player report (Lv.18 Wavecaller): "I do
+        // not see Symphony of the Depths on the list of skills to train." If the
+        // player already learned a spell that's now level-gated above their current
+        // level (rare edge case from the v0.57.17 spell-threshold consolidation, or
+        // from a prior bug), they should still be able to train its proficiency.
+        // The level requirement matters at *cast time* (CanCastSpell enforces it),
+        // not at proficiency-training time.
         if (ClassAbilitySystem.IsSpellcaster(character.Class))
         {
-            var spells = SpellSystem.GetAvailableSpells(character);
-            foreach (var spell in spells)
+            var classSpells = SpellSystem.GetAllSpellsForClass(character.Class);
+            foreach (var spell in classSpells)
             {
+                int idx = spell.Level - 1;
+                bool learned = character.Spell != null
+                    && idx >= 0 && idx < character.Spell.Count
+                    && character.Spell[idx].Count > 0
+                    && character.Spell[idx][0];
+                if (!learned) continue;
+
                 string skillId = GetSpellSkillId(character.Class, spell.Level);
                 skills.Add((skillId, spell.Name));
             }

@@ -3820,6 +3820,14 @@ public partial class GameEngine
         var storyDbg = StoryProgressionSystem.Instance;
         bool isNgPlus = storyDbg.CurrentCycle > 1;
         Console.Error.WriteLine($"[NG+] CreateNewGame: cycle={storyDbg.CurrentCycle}, isNgPlus={isNgPlus}, endings=[{string.Join(",", storyDbg.CompletedEndings)}]");
+
+        // Capture the previous-life character's display name BEFORE we wipe currentPlayer.
+        // We need it for the NG+ child-disown step below in online mode — children are
+        // matched to parents by name, and FamilySystem isn't reset in online mode (world
+        // data is shared across players), so without this step the new NG+ character
+        // walks into Home and sees their previous-cycle kids waiting at the table.
+        string? previousLifeName = isNgPlus ? currentPlayer?.Name : null;
+
         UsurperRemake.Systems.RomanceTracker.Instance.Reset();
         UsurperRemake.Systems.CompanionSystem.Instance?.ResetAllCompanions();
         if (isNgPlus)
@@ -3871,6 +3879,23 @@ public partial class GameEngine
         {
             // Online mode: only clear this player's relationships, preserve NPC-to-NPC
             RelationshipSystem.Instance.ResetPlayerRelationships(playerName);
+
+            // Online NG+ child disown: in single-player mode FamilySystem.Reset() above
+            // wipes _children entirely, but in online mode children are world data and
+            // can't be globally reset. Without this step the new NG+ character would
+            // still be parented to all the previous cycle's kids by name match — see
+            // v0.57.17 release notes for the player report that surfaced this.
+            // Children parented by anyone else (NPC partners, other players) are
+            // untouched. Both-parents-empty minor children move to the orphanage so
+            // the existing orphan pipeline picks them up.
+            if (isNgPlus && !string.IsNullOrEmpty(previousLifeName))
+            {
+                int disowned = UsurperRemake.Systems.FamilySystem.Instance.DisownChildrenOf(previousLifeName);
+                if (disowned > 0)
+                {
+                    DebugLogger.Instance.LogInfo("NG+", $"Online NG+ disowned {disowned} children of {previousLifeName}");
+                }
+            }
         }
 
         // Initialize per-session daily state for new character
@@ -3934,6 +3959,15 @@ public partial class GameEngine
         // Online news: announce new adventurer and update display name
         if (UsurperRemake.Systems.OnlineStateManager.IsActive)
         {
+            // NG+ in online mode: persist the disowned-children change (and other shared
+            // story state mutated during NG+ setup) to world_state immediately. Otherwise
+            // a quick logout / world-sim restart before the next periodic snapshot would
+            // reload the previous-cycle children with parents intact.
+            if (isNgPlus)
+            {
+                _ = UsurperRemake.Systems.OnlineStateManager.Instance!.SaveAllSharedState();
+            }
+
             var displayName = currentPlayer.Name2 ?? currentPlayer.Name1;
             var className = currentPlayer.ClassName;
             _ = UsurperRemake.Systems.OnlineStateManager.Instance!.AddNews(
@@ -4906,6 +4940,8 @@ public partial class GameEngine
         player.DesecrationsToday = playerData.DesecrationsToday;
         player.ConfessionsToday = playerData.ConfessionsToday;
         player.MurdersToday = playerData.MurdersToday;
+        player.TeamWarsToday = playerData.TeamWarsToday;
+        player.DrinkingGamesToday = playerData.DrinkingGamesToday;
         player.LastPartnerBondingUtc = playerData.LastPartnerBondingUtc;
         player.LoanAmount = playerData.LoanAmount;
         player.LoanDaysRemaining = playerData.LoanDaysRemaining;

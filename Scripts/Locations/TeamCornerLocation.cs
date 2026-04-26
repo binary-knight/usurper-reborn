@@ -2631,6 +2631,9 @@ public class TeamCornerLocation : BaseLocation
             WriteBoxHeader(Loc.Get("team_corner.wars_header"), "bright_red");
             terminal.SetColor("white");
             terminal.WriteLine(Loc.Get("team.your_team_war_label", currentPlayer.Team));
+            int warsLeft = Math.Max(0, GameConfig.MaxTeamWarsPerDay - currentPlayer.TeamWarsToday);
+            terminal.SetColor(warsLeft > 0 ? "gray" : "red");
+            terminal.WriteLine($"  {Loc.Get("team.war_daily_remaining", warsLeft, GameConfig.MaxTeamWarsPerDay)}");
             terminal.WriteLine("");
 
             WriteSRMenuOption("C", Loc.Get("team_corner.challenge"));
@@ -2655,6 +2658,18 @@ public class TeamCornerLocation : BaseLocation
             terminal.SetColor("red");
             terminal.WriteLine($"\n  {Loc.Get("team.active_war_exists")}");
             await Task.Delay(2000);
+            return;
+        }
+
+        // v0.57.17 — daily cap on team-war challenges. Player report: at Lv.100 the
+        // wager is 20k and the win pays 40k (wager * 2 from thin air). With no daily
+        // cap and no opponent cooldown the system became a free-money printer the
+        // moment a challenger identified a beatable team.
+        if (currentPlayer.TeamWarsToday >= GameConfig.MaxTeamWarsPerDay)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine($"\n  {Loc.Get("team.war_daily_cap", GameConfig.MaxTeamWarsPerDay)}");
+            await Task.Delay(2500);
             return;
         }
 
@@ -2692,10 +2707,34 @@ public class TeamCornerLocation : BaseLocation
         if (!int.TryParse(input, out int choice) || choice < 1 || choice > opponents.Count) return;
 
         var enemyTeam = opponents[choice - 1];
+
+        // v0.57.17 — per-opponent cooldown. Stops "find a beatable team, farm it
+        // every minute" by enforcing a wait between consecutive challenges against
+        // the same defender. Reads from the team_wars history rather than tracking
+        // separate state — any war (won or lost, by any challenger from our team)
+        // counts toward the cooldown.
+        var recentHistory = await backend.GetTeamWarHistory(myTeam, limit: 20);
+        var cooldownCutoff = DateTime.UtcNow.AddHours(-GameConfig.TeamWarOpponentCooldownHours);
+        var recentVsThisOpponent = recentHistory.FirstOrDefault(w =>
+            w.StartedAt > cooldownCutoff &&
+            ((w.ChallengerTeam == myTeam && w.DefenderTeam == enemyTeam.TeamName) ||
+             (w.DefenderTeam == myTeam && w.ChallengerTeam == enemyTeam.TeamName)));
+        if (recentVsThisOpponent != null)
+        {
+            var hoursLeft = Math.Max(1, (int)Math.Ceiling((recentVsThisOpponent.StartedAt - cooldownCutoff).TotalHours));
+            terminal.SetColor("red");
+            terminal.WriteLine($"\n  {Loc.Get("team.war_opponent_cooldown", enemyTeam.TeamName, hoursLeft)}");
+            await Task.Delay(2500);
+            return;
+        }
+
         long wager = Math.Max(1000, currentPlayer.Level * 200);
 
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("team.war_wager", $"{wager:N0}"));
+        terminal.SetColor("gray");
+        terminal.WriteLine($"  {Loc.Get("team.war_daily_remaining", GameConfig.MaxTeamWarsPerDay - currentPlayer.TeamWarsToday, GameConfig.MaxTeamWarsPerDay)}");
+        terminal.SetColor("yellow");
         terminal.Write(Loc.Get("team.confirm_war", enemyTeam.TeamName));
         string confirm = (await terminal.ReadLineAsync())?.Trim().ToUpper() ?? "";
         if (confirm != "Y") return;
@@ -2776,9 +2815,14 @@ public class TeamCornerLocation : BaseLocation
         string result = weWon ? "challenger_won" : "defender_won";
         await backend.CompleteTeamWar(warId, result);
 
+        // v0.57.17 — increment daily counter regardless of outcome (ran a war = burned a slot)
+        currentPlayer.TeamWarsToday++;
+
         if (weWon)
         {
-            long reward = wager * 2;
+            // v0.57.17 — reduced from wager*2 (net +100% per win) to wager*1.5 (net +50%
+            // per win) so even within the daily cap each win is less of a printer.
+            long reward = (long)(wager * GameConfig.TeamWarRewardMultiplier);
             currentPlayer.Gold += reward;
             WriteSectionHeader(Loc.Get("team_corner.your_team_wins"), "bright_green");
             terminal.SetColor("yellow");

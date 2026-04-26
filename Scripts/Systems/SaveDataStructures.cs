@@ -631,6 +631,8 @@ namespace UsurperRemake.Systems
         public int DesecrationsToday { get; set; }
         public int ConfessionsToday { get; set; }
         public int MurdersToday { get; set; }
+        public int TeamWarsToday { get; set; }
+        public int DrinkingGamesToday { get; set; }
         public DateTime LastPartnerBondingUtc { get; set; }
         public long LoanAmount { get; set; }
         public int LoanDaysRemaining { get; set; }

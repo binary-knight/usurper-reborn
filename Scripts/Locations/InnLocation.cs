@@ -1410,6 +1410,18 @@ public class InnLocation : BaseLocation
     /// </summary>
     private async Task PlayDrinkingGame()
     {
+        // v0.57.17 — daily cap. Player report: high STR/CON wins consistently for
+        // level*700 XP per ~30 seconds, no limit, no carry-over. With the cap each
+        // session is still rewarding (5 plays × level*700 = 3500 × level XP/day max)
+        // but the inn isn't a dedicated leveling track.
+        if (currentPlayer.DrinkingGamesToday >= GameConfig.MaxDrinkingGamesPerDay)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine(Loc.Get("inn.drinking_daily_cap", GameConfig.MaxDrinkingGamesPerDay));
+            await Task.Delay(2000);
+            return;
+        }
+
         if (currentPlayer.Gold < 20)
         {
             terminal.WriteLine(Loc.Get("inn.drinking_need_gold"), "red");
@@ -1433,6 +1445,11 @@ public class InnLocation : BaseLocation
         }
 
         currentPlayer.Gold -= 20;
+        currentPlayer.DrinkingGamesToday++;
+        terminal.SetColor("gray");
+        terminal.WriteLine(Loc.Get("inn.drinking_remaining_today",
+            GameConfig.MaxDrinkingGamesPerDay - currentPlayer.DrinkingGamesToday,
+            GameConfig.MaxDrinkingGamesPerDay));
 
         // --- Intro ---
         terminal.ClearScreen();

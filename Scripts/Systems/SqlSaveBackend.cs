@@ -3735,20 +3735,38 @@ namespace UsurperRemake.Systems
         return null;
     }
 
-    public async Task UpdateTradeOfferStatus(long offerId, string status)
+    /// <summary>
+    /// Atomically resolve a pending trade offer to the given terminal status.
+    /// Returns true if THIS call won the race (offer was 'pending' and is now @status).
+    /// Returns false if the offer was already resolved by someone else (concurrent
+    /// accept/cancel/decline/expire) — caller MUST then skip its gold/item movement
+    /// to avoid duplication.
+    ///
+    /// Player report (gold-dupe exploit): "if one player sends a trade with money,
+    /// then cancels the trade at the same time the other player accepts the trade,
+    /// the money is returned and the receiving player receives the money duplicating
+    /// it." The previous implementation blindly wrote the new status without
+    /// checking the current state, so two concurrent calls both succeeded and both
+    /// proceeded to move gold. The `WHERE status = 'pending'` clause now ensures
+    /// at most one caller wins; the loser's UPDATE affects 0 rows and we return
+    /// false. Same protection covers the expiry-vs-accept race.
+    /// </summary>
+    public async Task<bool> UpdateTradeOfferStatus(long offerId, string status)
     {
         try
         {
             using var connection = OpenConnection();
             using var cmd = connection.CreateCommand();
-            cmd.CommandText = "UPDATE trade_offers SET status = @status, resolved_at = datetime('now') WHERE id = @id;";
+            cmd.CommandText = "UPDATE trade_offers SET status = @status, resolved_at = datetime('now') WHERE id = @id AND status = 'pending';";
             cmd.Parameters.AddWithValue("@id", offerId);
             cmd.Parameters.AddWithValue("@status", status);
-            await Task.Run(() => cmd.ExecuteNonQuery());
+            int rowsAffected = await Task.Run(() => cmd.ExecuteNonQuery());
+            return rowsAffected == 1;
         }
         catch (Exception ex)
         {
             DebugLogger.Instance.LogError("SQL", $"Failed to update trade offer {offerId}: {ex.Message}");
+            return false;
         }
     }
 
@@ -3799,10 +3817,14 @@ namespace UsurperRemake.Systems
                 }
             }
 
-            // Mark expired and return gold + items
+            // Mark expired and return gold + items. Use the atomic compare-and-set
+            // form so we don't refund gold on an offer that a player just accepted /
+            // cancelled in the same tick (gold-dupe vector — see UpdateTradeOfferStatus
+            // doc comment).
             foreach (var (id, fromPlayer, gold, itemsJson) in expiredOffers)
             {
-                await UpdateTradeOfferStatus(id, "expired");
+                bool resolved = await UpdateTradeOfferStatus(id, "expired");
+                if (!resolved) continue; // Someone else resolved it first; their handler did the gold/item work.
                 if (gold > 0) await AddGoldToPlayer(fromPlayer, gold);
                 if (!string.IsNullOrEmpty(itemsJson) && itemsJson != "[]")
                     await AddItemsToPlayerSave(fromPlayer, itemsJson);

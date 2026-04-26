@@ -7531,7 +7531,21 @@ public abstract class BaseLocation
 
     private async Task AcceptTradeOffer(SqlSaveBackend backend, TradeOffer offer)
     {
-        // Add gold to player
+        // Atomic compare-and-set FIRST so a concurrent cancel/decline/expire on
+        // the same offer cannot both fire their gold/item movements (the gold-dupe
+        // exploit reported on the live server: a Lv.9 alt accumulated 1.4B gold
+        // at ratio 113000x earned). UpdateTradeOfferStatus only flips status
+        // when it is currently "pending" and returns true on win.
+        bool resolved = await backend.UpdateTradeOfferStatus(offer.Id, "accepted");
+        if (!resolved)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine(Loc.Get("base.trade_already_resolved"));
+            await Task.Delay(1500);
+            return;
+        }
+
+        // Add gold to player (only after we own the resolution)
         if (offer.Gold > 0)
         {
             currentPlayer.Gold += offer.Gold;
@@ -7570,7 +7584,6 @@ public abstract class BaseLocation
             }
         }
 
-        await backend.UpdateTradeOfferStatus(offer.Id, "accepted");
         await backend.SendMessage("System", offer.FromPlayer, "trade",
             $"{currentPlayer.DisplayName} accepted your package!");
         UsurperRemake.Server.MudServer.Instance?.SendToPlayer(offer.FromPlayer,
@@ -7585,7 +7598,16 @@ public abstract class BaseLocation
 
     private async Task DeclineTradeOffer(SqlSaveBackend backend, TradeOffer offer)
     {
-        await backend.UpdateTradeOfferStatus(offer.Id, "declined");
+        // Atomic compare-and-set: skip the gold/item return if the offer was
+        // already resolved by a concurrent accept/cancel/expire (gold-dupe fix).
+        bool resolved = await backend.UpdateTradeOfferStatus(offer.Id, "declined");
+        if (!resolved)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine(Loc.Get("base.trade_already_resolved"));
+            await Task.Delay(1500);
+            return;
+        }
 
         // Return gold to sender
         if (offer.Gold > 0)
@@ -7615,7 +7637,18 @@ public abstract class BaseLocation
 
     private async Task CancelTradeOffer(SqlSaveBackend backend, TradeOffer offer)
     {
-        await backend.UpdateTradeOfferStatus(offer.Id, "cancelled");
+        // Atomic compare-and-set: if a concurrent accept/decline/expire already
+        // resolved this offer, abort BEFORE returning gold to ourselves. That is
+        // exactly the gold-dupe race the player reported (cancel-while-accepting
+        // returned gold to sender AND credited it to receiver).
+        bool resolved = await backend.UpdateTradeOfferStatus(offer.Id, "cancelled");
+        if (!resolved)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine(Loc.Get("base.trade_already_resolved"));
+            await Task.Delay(1500);
+            return;
+        }
 
         // Return gold to sender (self)
         if (offer.Gold > 0)

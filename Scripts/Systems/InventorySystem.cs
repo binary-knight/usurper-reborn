@@ -1196,9 +1196,18 @@ namespace UsurperRemake.Systems
             // Register in database to get an ID
             EquipmentDatabase.RegisterDynamic(equipment);
 
-            // For one-handed weapons, ask which slot to use
-            EquipmentSlot? finalSlot = null;
-            if (slot == null && Character.RequiresSlotSelection(equipment))
+            // Honor an explicit slot from the caller — the user picked a specific
+            // slot from the [1] MainHand / [2] OffHand / etc. menu, so the equip
+            // should land there. Without this, the type-based `targetSlot` (line
+            // ~1074) hardcoded weapons to MainHand and ignored the caller's pick;
+            // picking [2] OffHand for a one-handed weapon would still replace the
+            // main hand. (Player report Lv.100 Barbarian: "selecting 2 (offhand)
+            // and selecting a single handed item ... replaces the main hand
+            // weapon.") EquipItem still validates — passing OffHand for a
+            // two-handed weapon or MainHand for a shield gets rejected with a
+            // proper error message.
+            EquipmentSlot? finalSlot = slot;
+            if (finalSlot == null && Character.RequiresSlotSelection(equipment))
             {
                 finalSlot = await PromptForWeaponSlot();
                 if (finalSlot == null)

@@ -7432,6 +7432,34 @@ public partial class CombatEngine
         }
     }
 
+    /// <summary>
+    /// Combined class + level eligibility check for the loot prompt UI. Used by all
+    /// three loot prompt paths (leader, grouped follower, cascade-to-other-player) so
+    /// they apply the same gates the actual EquipItem call enforces. Without level
+    /// gating here, the [E] option would be offered for over-leveled drops, the equip
+    /// would silently fail, and the item would just dump to inventory with no clear
+    /// reason — which is what the Lv.20 player report described.
+    /// Returns (canEquip, reason). reason is null when canEquip is true.
+    /// </summary>
+    private (bool canEquip, string? reason) GetLootEquipEligibility(Character recipient, Item lootItem)
+    {
+        // Class restriction first — uses the same matrix the equip path consults.
+        var (classOk, classReason) = LootGenerator.CanClassUseLootItem(recipient.Class, lootItem);
+        if (!classOk)
+            return (false, classReason);
+
+        // Level requirement second. Item.MinLevel is set by LootGenerator and
+        // re-floored to power tier via Item.EnforceMinLevelFromPower at drop time
+        // (v0.57.9), so it matches what Equipment.CanEquip will check after convert.
+        if (lootItem.MinLevel > 0 && recipient.Level < lootItem.MinLevel)
+        {
+            string reason = Loc.Get("ui.requires_level", lootItem.MinLevel);
+            return (false, reason);
+        }
+
+        return (true, null);
+    }
+
     private async Task<(string choice, Character selectedCharacter)> GetEquipmentDropInput(Item lootItem, Monster monster, Character player, System.Text.StringBuilder lootBroadcastSb)
     {
         // Ask player what to do — loop until we get valid E/T/P input
@@ -7441,15 +7469,19 @@ public partial class CombatEngine
         _droppedEquipmentPartyIdx = 0;
         Character selectedCharacter = party[_droppedEquipmentPartyIdx];
 
-        // Check class restrictions for identified weapons/shields
+        // Check class restrictions AND level requirement for identified items.
+        // Player report (Lv.20 Cleric in a live-player party): over-leveled drops
+        // showed the [E] Equip option as if available; pressing E silently failed
+        // and the item just dumped to inventory with no feedback that it was a
+        // level mismatch. Now we gate [E] on both class and level, surface the
+        // actual reason at the top of the prompt, and the </> selector recomputes
+        // both checks for the newly-chosen recipient.
         bool canPlayerUseItem = true;
         string? cantUseReason = null;
 
         if (lootItem.IsIdentified)
         {
-            var (canUse, reason) = LootGenerator.CanClassUseLootItem(selectedCharacter.Class, lootItem);
-            canPlayerUseItem = canUse;
-            cantUseReason = reason;
+            (canPlayerUseItem, cantUseReason) = GetLootEquipEligibility(selectedCharacter, lootItem);
         }
 
         while (true)
@@ -7500,12 +7532,10 @@ public partial class CombatEngine
             {
                 _droppedEquipmentPartyIdx = (_droppedEquipmentPartyIdx + 1) % (party.Count);
                 selectedCharacter = party[_droppedEquipmentPartyIdx];
-                // Recalculate class restrictions for the newly selected character
+                // Recalculate class AND level restrictions for the newly selected character
                 if (lootItem.IsIdentified)
                 {
-                    var (canUse, reason) = LootGenerator.CanClassUseLootItem(selectedCharacter.Class, lootItem);
-                    canPlayerUseItem = canUse;
-                    cantUseReason = reason;
+                    (canPlayerUseItem, cantUseReason) = GetLootEquipEligibility(selectedCharacter, lootItem);
                 }
                 else
                 {
@@ -7520,12 +7550,10 @@ public partial class CombatEngine
             {
                 _droppedEquipmentPartyIdx = _droppedEquipmentPartyIdx <= 0 ? party.Count - 1 : _droppedEquipmentPartyIdx - 1;
                 selectedCharacter = party[_droppedEquipmentPartyIdx];
-                // Recalculate class restrictions for the newly selected character
+                // Recalculate class AND level restrictions for the newly selected character
                 if (lootItem.IsIdentified)
                 {
-                    var (canUse, reason) = LootGenerator.CanClassUseLootItem(selectedCharacter.Class, lootItem);
-                    canPlayerUseItem = canUse;
-                    cantUseReason = reason;
+                    (canPlayerUseItem, cantUseReason) = GetLootEquipEligibility(selectedCharacter, lootItem);
                 }
                 else
                 {
@@ -8204,13 +8232,13 @@ public partial class CombatEngine
         string rarityColor = LootGenerator.GetRarityColor(rarity);
         await RenderEquipment(lootItem, monster, player, lootBroadcastSb);
 
-        // Broadcast loot details to group followers
+        // Broadcast loot details to group followers (in-dungeon only — town members skip)
         {
             var ctx = SessionContext.Current;
             var lootGroup = ctx != null ? GroupSystem.Instance?.GetGroupFor(ctx.Username) : null;
             if (lootGroup != null)
                 GroupSystem.Instance!.BroadcastToAllGroupSessions(lootGroup,
-                    lootBroadcastSb.ToString(), excludeUsername: ctx!.Username);
+                    lootBroadcastSb.ToString(), excludeUsername: ctx!.Username, inDungeonOnly: true);
         }
 
         // GROUP LOOT: Round-robin — primary recipient gets first dibs
@@ -8251,14 +8279,27 @@ public partial class CombatEngine
                 followerTerm.WriteLine(Loc.Get("combat.loot_unidentified"));
             }
 
-            // Check class restrictions for the follower
+            // Check class AND level restrictions for the follower (v0.57.17).
+            // The manual render block above doesn't reuse RenderEquipment, so it
+            // also doesn't surface the MinLevel warning the leader sees — explicitly
+            // emit one here when the item is over the follower's level so the [E]
+            // option being missing has an obvious explanation.
             bool followerCanUse = true;
             string? followerCantUseReason = null;
             if (lootItem.IsIdentified)
             {
-                var (canUse, reason) = LootGenerator.CanClassUseLootItem(player.Class, lootItem);
-                followerCanUse = canUse;
-                followerCantUseReason = reason;
+                (followerCanUse, followerCantUseReason) = GetLootEquipEligibility(player, lootItem);
+            }
+
+            // Always show the level requirement on the follower's terminal when
+            // the item has one — same treatment RenderEquipment gives the leader.
+            if (lootItem.IsIdentified && lootItem.MinLevel > 1)
+            {
+                bool overLevel = player.Level < lootItem.MinLevel;
+                followerTerm.SetColor(overLevel ? "red" : "gray");
+                followerTerm.WriteLine(overLevel
+                    ? Loc.Get("combat.loot_requires_level_too_high", lootItem.MinLevel, player.DisplayName, player.Level)
+                    : Loc.Get("combat.loot_requires_level", lootItem.MinLevel));
             }
 
             followerTerm.WriteLine("");
@@ -8749,7 +8790,10 @@ public partial class CombatEngine
     {
         if (currentTeammates == null || currentTeammates.Count == 0) return null;
 
-        // Determine target slot for this item type
+        // Determine the *default* target slot for this item type. For rings the
+        // best slot is per-teammate (depends on which finger has the weaker ring),
+        // so we recompute it inside the per-teammate loop below instead of locking
+        // it here.
         EquipmentSlot targetSlot = lootItem.Type switch
         {
             global::ObjType.Weapon => EquipmentSlot.MainHand,
@@ -8763,12 +8807,13 @@ public partial class CombatEngine
             global::ObjType.Waist => EquipmentSlot.Waist,
             global::ObjType.Neck => EquipmentSlot.Neck,
             global::ObjType.Face => EquipmentSlot.Face,
-            global::ObjType.Fingers => EquipmentSlot.LFinger,
+            global::ObjType.Fingers => EquipmentSlot.LFinger, // recomputed per teammate below
             global::ObjType.Abody => EquipmentSlot.Cloak,
             _ => EquipmentSlot.Body
         };
 
         bool isWeapon = lootItem.Type == global::ObjType.Weapon;
+        bool isRing = lootItem.Type == global::ObjType.Fingers;
         bool isAccessory = lootItem.Type == global::ObjType.Neck || lootItem.Type == global::ObjType.Fingers;
         int itemPower;
         if (isWeapon)
@@ -8851,6 +8896,58 @@ public partial class CombatEngine
                 // Also check spell weapon requirements (Magician/Sage need Staff)
                 var spellReq = SpellSystem.GetSpellWeaponRequirement(teammate.Class);
                 if (spellReq != null && inferredType != spellReq.Value) continue;
+
+                // Companion signature-weapon guard. Player report: "Is Vex supposed to
+                // grab swords when auto equipping? Melodia grabbed the dagger and moved
+                // the instrument to offhand." Even though Equipment.CanEquip allows
+                // these (Vex/Assassin can equip swords for dual-wield builds per
+                // v0.53.4; Melodia/Bard can equip daggers and rapiers), the auto-pickup
+                // shouldn't push a companion AWAY from their signature weapon when
+                // they're already wielding one. Bard abilities check both hands so the
+                // displaced instrument in off-hand still satisfies requirements — the
+                // upstream `breaksAbilities` check doesn't fire — but it's still a
+                // downgrade in feel and intent. The signature weapon should stay in
+                // main hand.
+                //
+                // Rule: if the companion has a defined preferred-weapon-types list AND
+                // the loot type isn't on it AND the companion already has a preferred
+                // weapon equipped in either hand, skip the auto-pickup. The player can
+                // still manually equip the off-spec weapon from inventory if they want
+                // to deviate from the companion's signature loadout.
+                if (teammate.IsCompanion && teammate.CompanionId.HasValue)
+                {
+                    // Narrowed from "everything the equipment whitelist allows" to
+                    // each companion's *signature* weapon class. Player follow-up:
+                    // "Companions ignore equipment restrictions again. Lyris grabbed
+                    // a sword and Mira a staff when using auto equip." Mira's whitelist
+                    // does allow Staff but a Staff displaces her off-hand shield slot —
+                    // not what a Cleric build wants. Auto-pickup should keep her on
+                    // one-handed healer weapons; the player can still hand-equip a
+                    // staff from inventory if they want to deviate.
+                    WeaponType[]? preferred = teammate.CompanionId.Value switch
+                    {
+                        UsurperRemake.Systems.CompanionId.Aldric =>
+                            new[] { WeaponType.Sword, WeaponType.Axe, WeaponType.Mace, WeaponType.Hammer,
+                                    WeaponType.Flail, WeaponType.Maul },
+                        UsurperRemake.Systems.CompanionId.Mira =>
+                            new[] { WeaponType.Mace, WeaponType.Hammer, WeaponType.Flail },
+                        UsurperRemake.Systems.CompanionId.Lyris =>
+                            new[] { WeaponType.Bow },
+                        UsurperRemake.Systems.CompanionId.Vex =>
+                            new[] { WeaponType.Dagger, WeaponType.Rapier },
+                        UsurperRemake.Systems.CompanionId.Melodia =>
+                            new[] { WeaponType.Instrument },
+                        _ => null
+                    };
+                    if (preferred != null && !preferred.Contains(inferredType))
+                    {
+                        var mainEquip2 = teammate.GetEquipment(EquipmentSlot.MainHand);
+                        var offEquip2 = teammate.GetEquipment(EquipmentSlot.OffHand);
+                        bool hasPreferred = (mainEquip2 != null && preferred.Contains(mainEquip2.WeaponType))
+                                         || (offEquip2 != null && preferred.Contains(offEquip2.WeaponType));
+                        if (hasPreferred) continue;
+                    }
+                }
             }
 
             // Skip shields/off-hand items when teammate is using a two-handed weapon
@@ -8872,6 +8969,13 @@ public partial class CombatEngine
                 // Pick the weaker slot to compare against
                 if (offScore < mainScore)
                     actualSlot = EquipmentSlot.OffHand;
+            }
+            // For rings, pick the per-teammate best slot (empty first, then weaker
+            // ring) so a strong ring on RFinger doesn't make a strictly-better drop
+            // look like a downgrade just because we were comparing against LFinger.
+            else if (isRing)
+            {
+                actualSlot = GetBestRingSlotForComparison(teammate);
             }
 
             var currentEquip = teammate.GetEquipment(actualSlot);
@@ -9064,14 +9168,12 @@ public partial class CombatEngine
             var otherTerm = otherPlayer.RemoteTerminal;
             string otherName = otherPlayer.DisplayName ?? otherPlayer.Name2 ?? "Unknown";
 
-            // Check class restrictions
+            // Check class AND level restrictions (v0.57.17 — same fix as leader/follower paths)
             bool otherCanUse = true;
             string? otherCantUseReason = null;
             if (lootItem.IsIdentified)
             {
-                var (canUse, reason) = LootGenerator.CanClassUseLootItem(otherPlayer.Class, lootItem);
-                otherCanUse = canUse;
-                otherCantUseReason = reason;
+                (otherCanUse, otherCantUseReason) = GetLootEquipEligibility(otherPlayer, lootItem);
             }
 
             // Show item on their terminal
@@ -9100,6 +9202,16 @@ public partial class CombatEngine
                 otherTerm.WriteLine($"  {unidName}");
                 otherTerm.SetColor("gray");
                 otherTerm.WriteLine($"  {Loc.Get("combat.item_unknown")}");
+            }
+
+            // Surface MinLevel on the cascade target's terminal too.
+            if (lootItem.IsIdentified && lootItem.MinLevel > 1)
+            {
+                bool overLevel = otherPlayer.Level < lootItem.MinLevel;
+                otherTerm.SetColor(overLevel ? "red" : "gray");
+                otherTerm.WriteLine(overLevel
+                    ? Loc.Get("combat.loot_requires_level_too_high", lootItem.MinLevel, otherPlayer.DisplayName, otherPlayer.Level)
+                    : Loc.Get("combat.loot_requires_level", lootItem.MinLevel));
             }
 
             otherTerm.WriteLine("");
@@ -9217,7 +9329,7 @@ public partial class CombatEngine
             global::ObjType.Waist => EquipmentSlot.Waist,
             global::ObjType.Neck => EquipmentSlot.Neck,
             global::ObjType.Face => EquipmentSlot.Face,
-            global::ObjType.Fingers => EquipmentSlot.LFinger,
+            global::ObjType.Fingers => GetBestRingSlotForComparison(character),
             global::ObjType.Abody => EquipmentSlot.Cloak,
             _ => EquipmentSlot.Body
         };
@@ -9402,7 +9514,9 @@ public partial class CombatEngine
         terminal.SetColor("gray");
         if (!GameConfig.ScreenReaderMode)
             terminal.WriteLine("  ─────────────────────────────────────");
-        // Determine which slot this item would go in
+        // Determine which slot this item would go in. For rings we pick the
+        // slot the comparison should target — empty slot first, otherwise the
+        // weaker ring — instead of hardcoding LFinger.
         EquipmentSlot targetSlot = lootItem.Type switch
         {
             global::ObjType.Weapon => EquipmentSlot.MainHand,
@@ -9416,18 +9530,19 @@ public partial class CombatEngine
             global::ObjType.Waist => EquipmentSlot.Waist,
             global::ObjType.Neck => EquipmentSlot.Neck,
             global::ObjType.Face => EquipmentSlot.Face,
-            global::ObjType.Fingers => EquipmentSlot.LFinger,
+            global::ObjType.Fingers => GetBestRingSlotForComparison(character),
             global::ObjType.Abody => EquipmentSlot.Cloak,
             _ => EquipmentSlot.Body
         };
 
-        // Show slot name in comparison header
+        // Show slot name in comparison header — distinguish Left/Right Ring so the
+        // player sees which slot the comparison is showing.
         string slotDisplayName = targetSlot switch
         {
             EquipmentSlot.MainHand => "Main Hand",
             EquipmentSlot.OffHand => "Off Hand",
-            EquipmentSlot.LFinger => "Ring",
-            EquipmentSlot.RFinger => "Ring",
+            EquipmentSlot.LFinger => "Left Ring",
+            EquipmentSlot.RFinger => "Right Ring",
             EquipmentSlot.Neck => "Necklace",
             _ => targetSlot.ToString()
         };
@@ -9729,6 +9844,40 @@ public partial class CombatEngine
             "O" => EquipmentSlot.OffHand,
             _ => null // Cancel
         };
+    }
+
+    /// <summary>
+    /// Pick the most-relevant ring slot for a comparison or auto-pickup eligibility check.
+    /// Player report: "when finding a ring, it should compare both right and left slot
+    /// not just one." Previously every loot path defaulted `Fingers => LFinger`, so a
+    /// strong ring on RFinger was invisible (a weaker drop looked like a big upgrade
+    /// because it beat the LFinger weak ring) and a strong drop that didn't beat the
+    /// LFinger ring got dismissed even when it was a clear upgrade for RFinger.
+    ///
+    /// Rule (mirrors how Character.EquipItem actually places rings):
+    ///   1. If LFinger is empty, prefer LFinger (auto-fill).
+    ///   2. If RFinger is empty, prefer RFinger (auto-fill).
+    ///   3. Both occupied — return the slot with the WEAKER ring (lowest stat-total),
+    ///      so the comparison reflects what the user would replace if they accept.
+    /// </summary>
+    private static EquipmentSlot GetBestRingSlotForComparison(Character character)
+    {
+        var leftRing = character.GetEquipment(EquipmentSlot.LFinger);
+        if (leftRing == null) return EquipmentSlot.LFinger;
+        var rightRing = character.GetEquipment(EquipmentSlot.RFinger);
+        if (rightRing == null) return EquipmentSlot.RFinger;
+
+        int leftScore = RingStatScore(leftRing);
+        int rightScore = RingStatScore(rightRing);
+        return rightScore < leftScore ? EquipmentSlot.RFinger : EquipmentSlot.LFinger;
+    }
+
+    private static int RingStatScore(Equipment ring)
+    {
+        return ring.StrengthBonus + ring.DexterityBonus + ring.WisdomBonus
+             + ring.MaxHPBonus + ring.MaxManaBonus + ring.DefenceBonus
+             + ring.AgilityBonus + ring.ConstitutionBonus + ring.IntelligenceBonus
+             + ring.CharismaBonus + ring.ArmorClass + ring.WeaponPower;
     }
 
     private async Task<EquipmentSlot?> PromptForRingSlot(Character player)
@@ -12914,8 +13063,12 @@ public partial class CombatEngine
                 int vanishDef = vanishDefBase + (int)(player.Constitution / 4); // CON scaling
                 player.TempDefenseBonus += vanishDef;
                 player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, abilityResult.Duration > 0 ? abilityResult.Duration : 1);
+                // Hidden = 2 (not 1) so the status survives the start-of-next-round
+                // ProcessStatusEffects tick. See Symphony of the Depths fix in SpellSystem
+                // for the full explanation — every "auto-crit on next attack" Hidden grant
+                // needs duration 2 to actually reach the next attack.
                 if (!player.ActiveStatuses.ContainsKey(StatusEffect.Hidden))
-                    player.ActiveStatuses[StatusEffect.Hidden] = 1;
+                    player.ActiveStatuses[StatusEffect.Hidden] = 2;
                 terminal.SetColor("magenta");
                 terminal.WriteLine(Loc.Get(isPlayer ? "combat.ability_vanish" : "combat.ability_vanish_npc", actorName));
                 terminal.SetColor("cyan");
@@ -13571,8 +13724,9 @@ public partial class CombatEngine
                 player.DodgeNextAttack = true;
                 player.TempAttackBonus += 999; // Guarantee hit
                 player.TempAttackBonusDuration = 1;
+                // Hidden = 2 so it survives the next-round status tick (see Symphony fix).
                 if (!player.ActiveStatuses.ContainsKey(StatusEffect.Hidden))
-                    player.ActiveStatuses[StatusEffect.Hidden] = 1; // Crit bonus from stealth
+                    player.ActiveStatuses[StatusEffect.Hidden] = 2; // Crit bonus from stealth
                 terminal.SetColor("bright_magenta");
                 terminal.WriteLine(Loc.Get("combat.ability_temporal_feint"));
                 break;
@@ -13784,8 +13938,9 @@ public partial class CombatEngine
                 player.DodgeNextAttack = true;
                 player.TempAttackBonus += 999;
                 player.TempAttackBonusDuration = 1;
+                // Hidden = 2 so it survives the next-round status tick (see Symphony fix).
                 if (!player.ActiveStatuses.ContainsKey(StatusEffect.Hidden))
-                    player.ActiveStatuses[StatusEffect.Hidden] = 1;
+                    player.ActiveStatuses[StatusEffect.Hidden] = 2;
                 terminal.SetColor("dark_red");
                 terminal.WriteLine(Loc.Get("combat.ability_umbral_step"));
                 break;
@@ -17231,7 +17386,8 @@ public partial class CombatEngine
                 GroupSystem.Instance!.BroadcastToGroupSessions(group,
                     companion.GroupPlayerUsername,
                     $"\u001b[31m  {monster.Name} hits you for {actualDamage} damage! ({companion.HP}/{companion.MaxHP} HP)\u001b[0m",
-                    $"\u001b[31m  {monster.Name} hits {companion.DisplayName} for {actualDamage} damage!\u001b[0m");
+                    $"\u001b[31m  {monster.Name} hits {companion.DisplayName} for {actualDamage} damage!\u001b[0m",
+                    inDungeonOnly: true);
             }
         }
 
@@ -17251,7 +17407,8 @@ public partial class CombatEngine
                     GroupSystem.Instance!.BroadcastToGroupSessions(deathGroup,
                         companion.GroupPlayerUsername,
                         $"\u001b[1;31m  ══ YOU HAVE FALLEN ══\u001b[0m\n\u001b[31m  {monster.Name} has struck you down!\u001b[0m",
-                        $"\u001b[1;31m  {companion.DisplayName} has been slain by {monster.Name}!\u001b[0m");
+                        $"\u001b[1;31m  {companion.DisplayName} has been slain by {monster.Name}!\u001b[0m",
+                        inDungeonOnly: true);
                 }
             }
 
@@ -20069,8 +20226,9 @@ public partial class CombatEngine
                 int vanishDefSM = vanishDefBaseSM + (int)(player.Constitution / 4); // CON scaling
                 player.TempDefenseBonus += vanishDefSM;
                 player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, abilityResult.Duration > 0 ? abilityResult.Duration : 1);
+                // Hidden = 2 so it survives the next-round status tick (see Symphony fix).
                 if (!player.ActiveStatuses.ContainsKey(StatusEffect.Hidden))
-                    player.ActiveStatuses[StatusEffect.Hidden] = 1;
+                    player.ActiveStatuses[StatusEffect.Hidden] = 2;
                 terminal.SetColor("magenta");
                 terminal.WriteLine(Loc.Get("combat.vanish_completely"));
                 terminal.SetColor("cyan");
@@ -20696,8 +20854,9 @@ public partial class CombatEngine
                 player.DodgeNextAttack = true;
                 player.TempAttackBonus += 999;
                 player.TempAttackBonusDuration = 1;
+                // Hidden = 2 so it survives the next-round status tick (see Symphony fix).
                 if (!player.ActiveStatuses.ContainsKey(StatusEffect.Hidden))
-                    player.ActiveStatuses[StatusEffect.Hidden] = 1;
+                    player.ActiveStatuses[StatusEffect.Hidden] = 2;
                 terminal.SetColor("bright_magenta");
                 terminal.WriteLine(Loc.Get("combat.ability_temporal_feint"));
                 break;
@@ -20900,8 +21059,9 @@ public partial class CombatEngine
                 player.DodgeNextAttack = true;
                 player.TempAttackBonus += 999;
                 player.TempAttackBonusDuration = 1;
+                // Hidden = 2 so it survives the next-round status tick (see Symphony fix).
                 if (!player.ActiveStatuses.ContainsKey(StatusEffect.Hidden))
-                    player.ActiveStatuses[StatusEffect.Hidden] = 1;
+                    player.ActiveStatuses[StatusEffect.Hidden] = 2;
                 terminal.SetColor("dark_red");
                 terminal.WriteLine(Loc.Get("combat.ability_umbral_step"));
                 break;
@@ -23478,7 +23638,10 @@ public partial class CombatEngine
         long roll = player.Dexterity + random.Next(1, 21);
         if (roll >= 15)
         {
-            player.ApplyStatus(StatusEffect.Hidden, 1);
+            // Hidden = 2 so the status survives the next-round ProcessStatusEffects
+            // tick. With duration 1, the hide wore off before the player got their
+            // next attack to consume the auto-crit. (See Symphony of the Depths fix.)
+            player.ApplyStatus(StatusEffect.Hidden, 2);
             terminal.WriteLine(Loc.Get("combat.hide_shadows_strike"), "dark_gray");
             result.CombatLog.Add("Player hides (next attack gains advantage)");
         }
@@ -24926,16 +25089,20 @@ public partial class CombatEngine
         terminal.WriteLine(GameConfig.ScreenReaderMode ? $"PHASE {newPhase}:" : $"═══ PHASE {newPhase} ═══");
         terminal.WriteLine("");
 
+        // Defense in depth: every BossContext SHOULD set BossData (the Noctura
+        // betrayal NPE in v0.57.17 was caused by a missed initialization), but if
+        // a future caller forgets, fall back to no-dialogue + Divine Strike rather
+        // than crashing the combat loop.
         var dialogue = newPhase switch
         {
-            2 => ctx.BossData.Phase2Dialogue,
-            3 => ctx.BossData.Phase3Dialogue,
+            2 => ctx.BossData?.Phase2Dialogue ?? Array.Empty<string>(),
+            3 => ctx.BossData?.Phase3Dialogue ?? Array.Empty<string>(),
             _ => Array.Empty<string>()
         };
 
         foreach (var line in dialogue)
         {
-            OldGodBossSystem.Instance?.PrintDialogueLine(terminal, line, ctx.BossData.ThemeColor);
+            OldGodBossSystem.Instance?.PrintDialogueLine(terminal, line, ctx.BossData?.ThemeColor ?? "red");
             await Task.Delay(200);
         }
 
@@ -24951,7 +25118,7 @@ public partial class CombatEngine
         }
 
         // Update monster's special abilities to include new phase abilities
-        if (ctx.BossData.Abilities != null)
+        if (ctx.BossData?.Abilities != null)
         {
             var phaseAbilities = ctx.BossData.Abilities
                 .Where(a => a.Phase <= newPhase)
@@ -25679,6 +25846,10 @@ public partial class CombatEngine
     /// </summary>
     private string SelectBossAbility(BossCombatContext ctx)
     {
+        // Defense in depth: BossContext should always carry BossData, but if a
+        // caller forgets (Noctura betrayal NPE in v0.57.17 was the symptom), fall
+        // back to "Divine Strike" rather than crashing combat.
+        if (ctx.BossData?.Abilities == null) return "Divine Strike";
         var abilities = ctx.BossData.Abilities.Where(a => a.Phase <= ctx.CurrentPhase).ToList();
         if (abilities.Count == 0) return "Divine Strike";
         return abilities[random.Next(abilities.Count)].Name;
@@ -25692,6 +25863,7 @@ public partial class CombatEngine
         if (BossContext == null) return false;
 
         var boss = BossContext.BossData;
+        if (boss == null) return false; // Save flow needs the full boss data; bail safely.
 
         if (!boss.CanBeSaved)
         {
@@ -26246,7 +26418,7 @@ public partial class CombatEngine
         if (group == null) return;
 
         UsurperRemake.Server.GroupSystem.Instance!.BroadcastToAllGroupSessions(
-            group, capturedOutput, excludeUsername: teammate.GroupPlayerUsername);
+            group, capturedOutput, excludeUsername: teammate.GroupPlayerUsername, inDungeonOnly: true);
     }
 
     /// <summary>
@@ -26572,7 +26744,10 @@ public partial class CombatEngine
         if (ctx == null) return;
         var group = GroupSystem.Instance?.GetGroupFor(ctx.Username);
         if (group == null) return;
-        GroupSystem.Instance!.BroadcastToAllGroupSessions(group, message, excludeUsername: ctx.Username);
+        // inDungeonOnly: skip group members who left the dungeon — combat shouldn't
+        // spam them in town. Group bookkeeping stays intact for regrouping.
+        GroupSystem.Instance!.BroadcastToAllGroupSessions(group, message,
+            excludeUsername: ctx.Username, inDungeonOnly: true);
     }
 
 }

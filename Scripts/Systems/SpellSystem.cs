@@ -309,6 +309,38 @@ public static class SpellSystem
     /// </summary>
     public static int GetLevelRequired(CharacterClass characterClass, int spellLevel)
     {
+        // Two sources of truth historically disagreed:
+        //   1. The hardcoded table below — slow ramp tuned for 25-spell classes
+        //      (Cleric/Magician/Sage), where SpellInfo.LevelRequired is just set
+        //      equal to the spell's index (5, 6, 7, …) and is meaningless. The
+        //      table's `5 => 16` is the real intent.
+        //   2. SpellInfo.LevelRequired — meaningful for prestige 5-spell classes
+        //      (Wavecaller: 1, 6, 11, 16, 22) where each value reflects the
+        //      class's intended ramp. The table's universal `5 => 16` would
+        //      under-gate Symphony of the Depths (intended Lv.22).
+        //
+        // Player report: "I do not see Symphony of the Depths on the list of
+        // skills to train." Lv.18 Wavecaller. The spell library used the table
+        // (16) and let them learn Symphony at Lv.16; the training menu used
+        // `GetAvailableSpells` which read SpellInfo.LevelRequired (22) and
+        // refused to show it. Two thresholds, one confused player.
+        //
+        // Fix: take the stricter of the two — `Math.Max(table, SpellInfo)`. For
+        // 25-spell classes the table wins (table 16 > SpellInfo 5). For prestige
+        // 5-spell classes SpellInfo wins when it's stricter (SpellInfo 22 > table
+        // 16 for Symphony). Single source of truth from the caller's perspective:
+        // the value returned by this function.
+        int tableLevel = TableLevelRequired(spellLevel);
+        if (SpellBook.TryGetValue(characterClass, out var classSpells)
+            && classSpells.TryGetValue(spellLevel, out var spellInfo))
+        {
+            return Math.Max(tableLevel, spellInfo.LevelRequired);
+        }
+        return tableLevel;
+    }
+
+    private static int TableLevelRequired(int spellLevel)
+    {
         return spellLevel switch
         {
             // EARLY TIER - Levels 1-25
@@ -378,8 +410,13 @@ public static class SpellSystem
 
         foreach (var spell in classSpells.Values)
         {
-            // Check level requirement
-            if (character.Level < spell.LevelRequired)
+            // Check level requirement — route through GetLevelRequired so the
+            // training menu and spell library use the same threshold. Reading
+            // spell.LevelRequired directly was wrong: for 25-spell classes that
+            // field equals the spell index (5, 6, 7…) and dramatically under-
+            // gates them; for prestige 5-spell classes it correctly enforces
+            // the steeper ramp. GetLevelRequired takes the stricter of the two.
+            if (character.Level < GetLevelRequired(character.Class, spell.Level))
                 continue;
 
             // Check if spell has been learned (Spell array holds learned status)
@@ -1464,9 +1501,16 @@ public static class SpellSystem
                 result.ProtectionBonus = ScaleProtectionEffect(40 + (caster.Level / 4), caster, profMult);
                 result.Duration = 999;
                 result.IsMultiTarget = true;
-                // Guaranteed crit on next attack via Hidden status (auto-crit mechanic from v0.53.8)
+                // Guaranteed crit on next attack via Hidden status (auto-crit mechanic from v0.53.8).
+                // Player report: "the 'Hid' status seems to wear off before I can choose the next
+                // action after casting the spell." Root: ProcessStatusEffects fires at the start
+                // of the next round (and before each player action prompt in single-monster combat)
+                // and decrements Hidden from 1 → 0, removing it before the player can attack to
+                // consume the auto-crit. Setting it to 2 lets the status survive that one tick so
+                // the player's next attack actually fires the crit. Matches the `shadow` ability
+                // pattern at CombatEngine.cs:13068 / :20225 which already used 2.
                 if (!caster.ActiveStatuses.ContainsKey(StatusEffect.Hidden))
-                    caster.ActiveStatuses[StatusEffect.Hidden] = 1;
+                    caster.ActiveStatuses[StatusEffect.Hidden] = 2;
                 int hpCost = (int)(caster.MaxHP * 0.50);
                 caster.HP = Math.Max(1, caster.HP - hpCost);
                 result.Message += $" The Ocean's full harmonic spectrum unleashed! (+{result.AttackBonus} attack, +{result.ProtectionBonus} defense, guaranteed crit on next hit) {caster.Name2} sacrifices {hpCost} HP!";
@@ -1562,9 +1606,12 @@ public static class SpellSystem
                 caster.HP = Math.Max(1, caster.HP - sacrifice);
                 result.AttackBonus = (int)((50 + (caster.Level / 3)) * profMult);
                 result.Duration = 999;
-                // Grant guaranteed critical strike on next hit via Hidden status (auto-crit mechanic)
+                // Grant guaranteed critical strike on next hit via Hidden status (auto-crit mechanic).
+                // Hidden = 2 so it survives the next-round status tick (see Symphony of the
+                // Depths fix); 1 was decremented to 0 by ProcessStatusEffects before the
+                // player got their next attack.
                 if (!caster.ActiveStatuses.ContainsKey(StatusEffect.Hidden))
-                    caster.ActiveStatuses[StatusEffect.Hidden] = 1;
+                    caster.ActiveStatuses[StatusEffect.Hidden] = 2;
                 result.Message += $" {caster.Name2} sacrifices {sacrifice} HP! (+{result.AttackBonus} attack, guaranteed crit on next hit!)";
                 break;
             case 3: // Void Bolt - 90-120 damage, ignores all defense
