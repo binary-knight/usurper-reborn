@@ -48,9 +48,26 @@ namespace UsurperRemake.Systems
         /// </summary>
         public List<UsurperRemake.Systems.ConversationStateData> GetConversationStatesForSave()
         {
+            // v0.57.18 (third-round audit): cap at serialization time. One entry per NPC
+            // the player has ever spoken to + per-entry TopicsDiscussed HashSet that grows
+            // unbounded with conversation breadth. Long playthroughs talking to many NPCs
+            // about many topics easily reach hundreds of KB. Selection: keep the most
+            // recently spoken-to NPCs (LastConversationDate desc). Topics are unordered
+            // (HashSet) so an arbitrary N is kept — re-discussing an old topic is harmless,
+            // OOM is not.
+            var ordered = npcConversationStates.Count > GameConfig.MaxSerializedConversationStates
+                ? (IEnumerable<KeyValuePair<string, ConversationState>>)npcConversationStates
+                    .OrderByDescending(kvp => kvp.Value.LastConversationDate)
+                    .Take(GameConfig.MaxSerializedConversationStates)
+                : npcConversationStates;
+
             var result = new List<UsurperRemake.Systems.ConversationStateData>();
-            foreach (var kvp in npcConversationStates)
+            foreach (var kvp in ordered)
             {
+                var topics = kvp.Value.TopicsDiscussed.Count > GameConfig.MaxSerializedTopicsDiscussedPerConvo
+                    ? kvp.Value.TopicsDiscussed.Take(GameConfig.MaxSerializedTopicsDiscussedPerConvo).ToList()
+                    : new List<string>(kvp.Value.TopicsDiscussed);
+
                 result.Add(new UsurperRemake.Systems.ConversationStateData
                 {
                     NPCId = kvp.Key,
@@ -60,7 +77,7 @@ namespace UsurperRemake.Systems
                     PersonalQuestionsAsked = kvp.Value.PersonalQuestionsAsked,
                     HasConfessed = kvp.Value.HasConfessed,
                     ConfessionAccepted = kvp.Value.ConfessionAccepted,
-                    TopicsDiscussed = new List<string>(kvp.Value.TopicsDiscussed),
+                    TopicsDiscussed = topics,
                     LastConversationDate = kvp.Value.LastConversationDate
                 });
             }

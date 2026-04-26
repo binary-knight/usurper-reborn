@@ -1548,7 +1548,16 @@ namespace UsurperRemake.Systems
                     DisabledSpells = c.DisabledSpells.ToList(),
                     SkillProficiencies = c.SkillProficiencies?.Count > 0 ? new Dictionary<string, int>(c.SkillProficiencies) : new(),
                     SkillTrainingProgress = c.SkillTrainingProgress?.Count > 0 ? new Dictionary<string, int>(c.SkillTrainingProgress) : new(),
-                    Inventory = c.Inventory?.Where(i => i != null).Select(ItemToData).ToList() ?? new List<InventoryItemData>()
+                    // v0.57.18: cap companion bags at serialization time. Combat loot can
+                    // pile items into a companion bag during a long dungeon run; without a
+                    // cap a companion could be carrying hundreds of items into the save.
+                    // Most-recent-first preserves the items the player just gave them.
+                    Inventory = c.Inventory?.Where(i => i != null)
+                        .Reverse()
+                        .Take(GameConfig.MaxSerializedCompanionInventory)
+                        .Reverse()
+                        .Select(ItemToData)
+                        .ToList() ?? new List<InventoryItemData>()
                 }).ToList(),
                 ActiveCompanions = activeCompanions.ToList(),
                 FallenCompanions = fallenCompanions.Values.ToList()

@@ -733,11 +733,32 @@ namespace UsurperConsole
                 {
                     try
                     {
-                        // Synchronous save for emergency
-                        SaveSystem.Instance.SaveGame("emergency_autosave", player).Wait(TimeSpan.FromSeconds(3));
+                        // v0.57.18: per-character emergency name. Old code wrote to a
+                        // fixed "emergency_autosave" filename which had two problems:
+                        //   (1) different characters would clobber each other's
+                        //       emergency dumps — only the most recent Ctrl+C survived.
+                        //   (2) The recovery flow couldn't tell WHICH character the
+                        //       emergency belonged to (filename had no character info),
+                        //       so it surfaced as a global "emergency_autosave.json"
+                        //       option in every character's recovery menu.
+                        // Now: emergency_<charactername>_<timestamp>.json. The
+                        // FileSaveBackend's emergency-aware listing parses this back
+                        // into a recovery slot for that specific character.
+                        string charName = player.Name2 ?? player.Name1 ?? "unknown";
+                        string sanitized = string.Join("_", charName.Split(System.IO.Path.GetInvalidFileNameChars()));
+                        string ts = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");
+                        string emergencyKey = $"emergency_{sanitized}_{ts}";
+                        SaveSystem.Instance.SaveGame(emergencyKey, player).Wait(TimeSpan.FromSeconds(3));
+
+                        // Keep only the 3 most recent emergency saves per character so
+                        // a player who repeatedly Ctrl+Cs doesn't accumulate hundreds of
+                        // recovery slots in their load menu.
+                        (SaveSystem.Instance.Backend as FileSaveBackend)?.RotateEmergencySaves(charName);
+
                         Console.ForegroundColor = ConsoleColor.Green;
                         Console.WriteLine("  Emergency save completed!");
-                        Console.WriteLine("  Look for 'emergency_autosave' in the save menu.");
+                        Console.WriteLine($"  Look for '{charName}' in the save menu — it will appear");
+                        Console.WriteLine("  marked [EMERGENCY SAVE] (or [RECOVERY] if other saves exist).");
                     }
                     catch
                     {

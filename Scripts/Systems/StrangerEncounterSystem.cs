@@ -999,8 +999,22 @@ namespace UsurperRemake.Systems
                 ResponseHistory = ResponseHistory.ToDictionary(kvp => kvp.Key, kvp => (int)kvp.Value),
                 CompletedScriptedEncounters = CompletedScriptedEncounters.Cast<int>().ToList(),
                 PendingScriptedEncounters = PendingScriptedEncounters.Cast<int>().ToList(),
-                UsedDialogueIds = UsedDialogueIds.ToList(),
-                RecentGameEvents = RecentGameEvents.Cast<int>().ToList()
+                // v0.57.18: cap both at serialization time. UsedDialogueIds is an
+                // unordered HashSet — when over the cap we keep an arbitrary N entries,
+                // which is acceptable here (re-using an old line is preferable to OOM
+                // and the dialogue pool is large enough that most are still novel).
+                // RecentGameEvents is an ordered List, so we keep the last-N actually
+                // appended via reverse-take-reverse. Normally cleared after each
+                // encounter (line 873) but drifts if encounters are interrupted.
+                UsedDialogueIds = UsedDialogueIds.Count > GameConfig.MaxSerializedStrangerDialogueIds
+                    ? UsedDialogueIds.Take(GameConfig.MaxSerializedStrangerDialogueIds).ToList()
+                    : UsedDialogueIds.ToList(),
+                RecentGameEvents = RecentGameEvents.Count > GameConfig.MaxSerializedStrangerRecentEvents
+                    ? RecentGameEvents
+                        .Skip(RecentGameEvents.Count - GameConfig.MaxSerializedStrangerRecentEvents)
+                        .Cast<int>()
+                        .ToList()
+                    : RecentGameEvents.Cast<int>().ToList()
             };
         }
 

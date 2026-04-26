@@ -1183,11 +1183,23 @@ public class NPCMarriageRegistry
     }
 
     /// <summary>
-    /// Get all affairs for saving (snapshot)
+    /// Get all affairs for saving (snapshot). v0.57.18 (third-round audit): cap at
+    /// serialization time. Every flirt-on-married-NPC creates an entry; only ClearAffair
+    /// removes them, but few callers actually do so. Active affairs (IsActive=true) get
+    /// priority — those are narratively load-bearing — then most-recently-touched are
+    /// kept up to the cap. Older inactive affairs are dropped from the persisted snapshot.
     /// </summary>
     public List<AffairState> GetAllAffairs()
     {
-        return affairs.Values.ToList();
+        var all = affairs.Values;
+        if (all.Count <= GameConfig.MaxSerializedAffairs)
+            return all.ToList();
+
+        return all
+            .OrderByDescending(a => a.IsActive)
+            .ThenByDescending(a => a.LastInteraction)
+            .Take(GameConfig.MaxSerializedAffairs)
+            .ToList();
     }
 
     /// <summary>

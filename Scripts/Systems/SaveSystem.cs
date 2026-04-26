@@ -1192,8 +1192,14 @@ namespace UsurperRemake.Systems
                     PregnancyDueDate = npc.PregnancyDueDate,
                     PregnancyFatherName = npc.PregnancyFatherName,
 
-                    // Dialogue tracking
-                    RecentDialogueIds = NPCDialogueDatabase.GetRecentlyUsedIds(npc.Name2 ?? npc.Name1 ?? ""),
+                    // Dialogue tracking. v0.57.18: cap at serialization time. The
+                    // database tracks every dialogue line ever delivered to this NPC
+                    // with no in-memory cap — across hundreds of sessions and 130+
+                    // NPCs that's a per-save bloat surface. We only need recent IDs
+                    // (to avoid repetition); the tail is irrelevant.
+                    RecentDialogueIds = (NPCDialogueDatabase.GetRecentlyUsedIds(npc.Name2 ?? npc.Name1 ?? "") ?? new List<string>())
+                        .TakeLast(GameConfig.MaxSerializedDialogueIdsPerNpc)
+                        .ToList(),
 
                     // Social emergence
                     EmergentRole = npc.EmergentRole ?? "",
@@ -1224,8 +1230,13 @@ namespace UsurperRemake.Systems
                     // Relationships
                     Relationships = SerializeNPCRelationships(npc),
 
-                    // Enemies
-                    Enemies = npc.Enemies?.ToList() ?? new List<string>(),
+                    // Enemies (grudges). v0.57.18: capped at serialization. NPCs
+                    // accumulate grudges with no decay and no cap — every NPC who
+                    // ever wronged them stays on the list forever. Keep the most
+                    // recent N (the tail of the list, since grudges are appended).
+                    Enemies = (npc.Enemies ?? new List<string>())
+                        .TakeLast(GameConfig.MaxSerializedEnemiesPerNpc)
+                        .ToList(),
 
                     // Inventory
                     Gold = npc.Gold,
@@ -1352,7 +1363,13 @@ namespace UsurperRemake.Systems
 
                     // Hostility, social graph, and gang affiliation
                     IsHostile = npc.IsHostile,
-                    KnownCharacters = npc.KnownCharacters?.ToList() ?? new List<string>(),
+                    // v0.57.18: cap at serialization. NPCs accumulate KnownCharacters
+                    // entries as they meet other NPCs; never trimmed. With 130+ NPCs
+                    // each potentially knowing every other, the social-graph footprint
+                    // grows unboundedly. Keep the most recent N (the tail).
+                    KnownCharacters = (npc.KnownCharacters ?? new List<string>())
+                        .TakeLast(GameConfig.MaxSerializedKnownCharactersPerNpc)
+                        .ToList(),
                     GangId = npc.GangId ?? "",
 
                     // Class specialization
@@ -1643,9 +1660,20 @@ namespace UsurperRemake.Systems
         
         private Dictionary<string, float> SerializeNPCRelationships(NPC npc)
         {
-            // Scale from internal -1..1 to dashboard-expected -100..100
-            return npc.Brain?.Memory?.CharacterImpressions?.ToDictionary(
-                kvp => kvp.Key, kvp => kvp.Value * 100f) ?? new Dictionary<string, float>();
+            // Scale from internal -1..1 to dashboard-expected -100..100.
+            // v0.57.18: cap at serialization to keep the per-NPC relationship dict
+            // bounded. CharacterImpressions can grow to one entry per other NPC ever
+            // met (and never prunes when those NPCs die or leave). Keep the strongest
+            // |impressions| — those carry the most narrative/AI weight; weak/middling
+            // entries can be re-formed through interaction.
+            var impressions = npc.Brain?.Memory?.CharacterImpressions;
+            if (impressions == null || impressions.Count == 0)
+                return new Dictionary<string, float>();
+
+            return impressions
+                .OrderByDescending(kvp => Math.Abs(kvp.Value))
+                .Take(GameConfig.MaxSerializedRelationshipsPerNpc)
+                .ToDictionary(kvp => kvp.Key, kvp => kvp.Value * 100f);
         }
         
         private List<WorldEventData> SerializeActiveEvents()
@@ -1928,36 +1956,54 @@ namespace UsurperRemake.Systems
                         CityTaxPercent = king.CityTaxPercent,
                         CoronationDate = king.CoronationDate.ToString("o"),
                         TaxAlignment = (int)king.TaxAlignment,
-                        MonarchHistory = global::CastleLocation.GetMonarchHistory()?.Select(m => new MonarchRecordSaveData
-                        {
-                            Name = m.Name,
-                            Title = m.Title,
-                            DaysReigned = m.DaysReigned,
-                            CoronationDate = m.CoronationDate.ToString("o"),
-                            EndReason = m.EndReason
-                        }).ToList() ?? new List<MonarchRecordSaveData>(),
+                        // v0.57.18: cap at serialization. Monarch history grows by one
+                        // entry every coup/abdication; over hundreds of in-game days
+                        // and many NG+ cycles this becomes a silent bloat surface. Keep
+                        // the most recent N reigns (older history is just trivia at
+                        // that point).
+                        MonarchHistory = (global::CastleLocation.GetMonarchHistory() ?? new List<MonarchRecord>())
+                            .TakeLast(GameConfig.MaxSerializedMonarchHistory)
+                            .Select(m => new MonarchRecordSaveData
+                            {
+                                Name = m.Name,
+                                Title = m.Title,
+                                DaysReigned = m.DaysReigned,
+                                CoronationDate = m.CoronationDate.ToString("o"),
+                                EndReason = m.EndReason
+                            }).ToList(),
 
-                        // Court members
-                        CourtMembers = king.CourtMembers.Select(m => new CourtMemberSaveData
-                        {
-                            Name = m.Name,
-                            Faction = (int)m.Faction,
-                            Influence = m.Influence,
-                            LoyaltyToKing = m.LoyaltyToKing,
-                            Role = m.Role,
-                            IsPlotting = m.IsPlotting
-                        }).ToList(),
+                        // Court members. v0.57.18 third-round: cap at MaxSerializedCourtMembers
+                        // by Influence desc — the most politically relevant survive the boundary.
+                        // CourtMembers grows as NPCs cycle through positions across reigns
+                        // (WorldSimulator.cs:4578 appends; no obvious decay path).
+                        CourtMembers = king.CourtMembers
+                            .OrderByDescending(m => m.Influence)
+                            .Take(GameConfig.MaxSerializedCourtMembers)
+                            .Select(m => new CourtMemberSaveData
+                            {
+                                Name = m.Name,
+                                Faction = (int)m.Faction,
+                                Influence = m.Influence,
+                                LoyaltyToKing = m.LoyaltyToKing,
+                                Role = m.Role,
+                                IsPlotting = m.IsPlotting
+                            }).ToList(),
 
-                        // Heirs
-                        Heirs = king.Heirs.Select(h => new RoyalHeirSaveData
-                        {
-                            Name = h.Name,
-                            Age = h.Age,
-                            ClaimStrength = h.ClaimStrength,
-                            ParentName = h.ParentName,
-                            Sex = (int)h.Sex,
-                            IsDesignated = h.IsDesignated
-                        }).ToList(),
+                        // Heirs. v0.57.18 third-round: cap at MaxSerializedHeirs. Designated
+                        // heir always survives; remainder ranked by ClaimStrength desc.
+                        Heirs = king.Heirs
+                            .OrderByDescending(h => h.IsDesignated)
+                            .ThenByDescending(h => h.ClaimStrength)
+                            .Take(GameConfig.MaxSerializedHeirs)
+                            .Select(h => new RoyalHeirSaveData
+                            {
+                                Name = h.Name,
+                                Age = h.Age,
+                                ClaimStrength = h.ClaimStrength,
+                                ParentName = h.ParentName,
+                                Sex = (int)h.Sex,
+                                IsDesignated = h.IsDesignated
+                            }).ToList(),
 
                         // Spouse
                         Spouse = king.Spouse != null ? new RoyalSpouseSaveData
@@ -1994,49 +2040,61 @@ namespace UsurperRemake.Systems
                             IsActive = g.IsActive
                         }).ToList() ?? new List<RoyalGuardSaveData>(),
 
-                        MonsterGuards = king.MonsterGuards?.Select(m => new MonsterGuardSaveData
-                        {
-                            Name = m.Name,
-                            Level = m.Level,
-                            HP = m.HP,
-                            MaxHP = m.MaxHP,
-                            Strength = m.Strength,
-                            Defence = m.Defence,
-                            WeapPow = m.WeapPow,
-                            ArmPow = m.ArmPow,
-                            MonsterType = m.MonsterType,
-                            PurchaseCost = m.PurchaseCost,
-                            DailyFeedingCost = m.DailyFeedingCost
-                        }).ToList() ?? new List<MonsterGuardSaveData>(),
+                        // MonsterGuards. v0.57.18 third-round: cap at MaxSerializedMonsterGuards
+                        // (most recent purchases). No runtime cap on additions; long-reigning kings
+                        // could accumulate hundreds. Most-recent ordering keeps active garrison.
+                        MonsterGuards = (king.MonsterGuards ?? new List<MonsterGuard>())
+                            .TakeLast(GameConfig.MaxSerializedMonsterGuards)
+                            .Select(m => new MonsterGuardSaveData
+                            {
+                                Name = m.Name,
+                                Level = m.Level,
+                                HP = m.HP,
+                                MaxHP = m.MaxHP,
+                                Strength = m.Strength,
+                                Defence = m.Defence,
+                                WeapPow = m.WeapPow,
+                                ArmPow = m.ArmPow,
+                                MonsterType = m.MonsterType,
+                                PurchaseCost = m.PurchaseCost,
+                                DailyFeedingCost = m.DailyFeedingCost
+                            }).ToList(),
 
-                        // Phase 2 — previously unserialized fields
-                        Prisoners = king.Prisoners?.Select(kvp => new PrisonRecordSaveData
-                        {
-                            CharacterName = kvp.Value.CharacterName,
-                            Crime = kvp.Value.Crime,
-                            Sentence = kvp.Value.Sentence,
-                            DaysServed = kvp.Value.DaysServed,
-                            ImprisonmentDate = kvp.Value.ImprisonmentDate.ToString("o"),
-                            BailAmount = kvp.Value.BailAmount
-                        }).ToList() ?? new List<PrisonRecordSaveData>(),
+                        // Phase 2 — previously unserialized fields. v0.57.18: caps at
+                        // serialization. Both lists grow with no decay path — released
+                        // prisoners may be removed but historical entries can linger;
+                        // adopted orphans similarly. Keep the most recent N of each.
+                        Prisoners = (king.Prisoners ?? new Dictionary<string, PrisonRecord>())
+                            .Take(GameConfig.MaxSerializedRoyalCourtPrisoners)
+                            .Select(kvp => new PrisonRecordSaveData
+                            {
+                                CharacterName = kvp.Value.CharacterName,
+                                Crime = kvp.Value.Crime,
+                                Sentence = kvp.Value.Sentence,
+                                DaysServed = kvp.Value.DaysServed,
+                                ImprisonmentDate = kvp.Value.ImprisonmentDate.ToString("o"),
+                                BailAmount = kvp.Value.BailAmount
+                            }).ToList(),
 
-                        Orphans = king.Orphans?.Select(o => new RoyalOrphanSaveData
-                        {
-                            Name = o.Name,
-                            Age = o.Age,
-                            Sex = (int)o.Sex,
-                            ArrivalDate = o.ArrivalDate.ToString("o"),
-                            BackgroundStory = o.BackgroundStory,
-                            Happiness = o.Happiness,
-                            MotherName = o.MotherName,
-                            FatherName = o.FatherName,
-                            MotherID = o.MotherID,
-                            FatherID = o.FatherID,
-                            Race = (int)o.Race,
-                            BirthDate = o.BirthDate.ToString("o"),
-                            Soul = o.Soul,
-                            IsRealOrphan = o.IsRealOrphan
-                        }).ToList() ?? new List<RoyalOrphanSaveData>(),
+                        Orphans = (king.Orphans ?? new List<RoyalOrphan>())
+                            .TakeLast(GameConfig.MaxSerializedRoyalCourtOrphans)
+                            .Select(o => new RoyalOrphanSaveData
+                            {
+                                Name = o.Name,
+                                Age = o.Age,
+                                Sex = (int)o.Sex,
+                                ArrivalDate = o.ArrivalDate.ToString("o"),
+                                BackgroundStory = o.BackgroundStory,
+                                Happiness = o.Happiness,
+                                MotherName = o.MotherName,
+                                FatherName = o.FatherName,
+                                MotherID = o.MotherID,
+                                FatherID = o.FatherID,
+                                Race = (int)o.Race,
+                                BirthDate = o.BirthDate.ToString("o"),
+                                Soul = o.Soul,
+                                IsRealOrphan = o.IsRealOrphan
+                            }).ToList(),
 
                         MagicBudget = king.MagicBudget,
                         EstablishmentStatus = king.EstablishmentStatus ?? new Dictionary<string, bool>(),

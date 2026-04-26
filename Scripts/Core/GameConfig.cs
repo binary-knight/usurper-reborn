@@ -9,7 +9,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.57.17";
+    public const string Version = "0.57.18";
     public const string VersionName = "Alignment and Shields";
 
     // v0.57.12: Alignment scale cap. Character.Chivalry and Character.Darkness setters clamp to [0, AlignmentCap]
@@ -670,6 +670,41 @@ public static partial class GameConfig
     // forever. The cap allows the minigame to remain a daily activity without being a
     // dedicated leveling track.
     public const int MaxDrinkingGamesPerDay = 5;
+
+    // Save bloat caps (v0.57.18 — single-player save reliability)
+    // The v0.57.16 NPC-memory fix capped one bloat surface; player reports kept arriving
+    // ("saves run out of memory after I quit", "single player file's gone"), so audit
+    // turned up four MORE per-NPC unbounded fields plus a few RoyalCourt lists. Each cap
+    // is applied at serialization time only, mirroring the v0.57.16 trim pattern, so
+    // existing bloated saves self-heal on next save without losing in-memory state.
+    public const int MaxSerializedDialogueIdsPerNpc = 50;
+    public const int MaxSerializedRelationshipsPerNpc = 100;
+    public const int MaxSerializedKnownCharactersPerNpc = 80;
+    public const int MaxSerializedEnemiesPerNpc = 30;
+    public const int MaxSerializedRoyalCourtPrisoners = 50;
+    public const int MaxSerializedRoyalCourtOrphans = 100;
+    public const int MaxSerializedMonarchHistory = 30;
+    // Second-round v0.57.18 audit found three more unbounded surfaces: RomanceTracker
+    // logs every intimate encounter (long playthroughs accumulate hundreds), Companion
+    // bags can swell during dungeon runs without ever being trimmed, and StrangerEncounter
+    // tracks every dialogue line + game event the player has triggered.
+    public const int MaxSerializedEncounterHistory = 100;          // RomanceTracker.EncounterHistory (most recent)
+    public const int MaxSerializedCompanionInventory = 30;         // per-companion bag cap on save
+    public const int MaxSerializedStrangerDialogueIds = 50;        // StrangerEncounter.UsedDialogueIds (most recent)
+    public const int MaxSerializedStrangerRecentEvents = 20;       // StrangerEncounter.RecentGameEvents (most recent)
+    // Third-round v0.57.18 audit: per-NPC conversation states + RoyalCourt collections
+    // not previously bounded. Conversation states accumulate one entry per NPC the player
+    // has ever spoken to (130 NPCs × ~30 unique topics each = thousands of entries) and
+    // RoyalCourt CourtMembers / Heirs / MonsterGuards have no append-side cap.
+    public const int MaxSerializedConversationStates = 100;        // NPCs ranked by LastConversationDate desc
+    public const int MaxSerializedTopicsDiscussedPerConvo = 30;    // per-conversation topic cap
+    public const int MaxSerializedCourtMembers = 50;
+    public const int MaxSerializedHeirs = 20;
+    public const int MaxSerializedMonsterGuards = 30;
+    public const int MaxSerializedAffairs = 50;                    // active + most recent ended affairs
+    // Save-size warning threshold. Logged only — not a hard failure. Helps surface
+    // future bloat surfaces before they OOM the player on next load.
+    public const long SaveSizeWarningBytes = 5L * 1024 * 1024; // 5 MB
     public const float MurderGuardInterventionChance = 0.30f; // 30% chance guard joins NPC's side
     public const float MurderGrudgeChance = 1.00f;           // 100% grudge encounter after murder (guaranteed)
     public const float MurderGrudgeRageBonusHP = 0.20f;      // +20% HP for murder revenge NPC

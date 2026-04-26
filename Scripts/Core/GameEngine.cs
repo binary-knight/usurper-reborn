@@ -2108,11 +2108,23 @@ public partial class GameEngine
 
                 if (mostRecentSave != null)
                 {
+                    // v0.57.18: surface IsRecovered / IsEmergency status so the player
+                    // knows the slot will route to the recovery menu rather than load
+                    // normally. Saves will be flagged when the listing fell back to
+                    // filename-only metadata (the JSON deserialize threw — likely a
+                    // bloated save) or when the only file on disk is an emergency dump.
+                    string statusTag = mostRecentSave.IsEmergency ? " [EMERGENCY SAVE]"
+                        : mostRecentSave.IsRecovered ? " [RECOVERY]"
+                        : "";
+                    string statusColor = mostRecentSave.IsEmergency ? "bright_red"
+                        : mostRecentSave.IsRecovered ? "yellow"
+                        : "";
+
                     if (GameConfig.ScreenReaderMode)
                     {
                         terminal.SetColor("white");
                         string saveTimeStr = mostRecentSave.SaveTime.Year >= 2020 ? mostRecentSave.SaveTime.ToString("yyyy-MM-dd HH:mm:ss") : "";
-                        terminal.WriteLine(Loc.Get("engine.save_slot_sr_display", i + 1, mostRecentSave.PlayerName, mostRecentSave.ClassName, mostRecentSave.Level, mostRecentSave.SaveType, saveTimeStr));
+                        terminal.WriteLine(Loc.Get("engine.save_slot_sr_display", i + 1, mostRecentSave.PlayerName, mostRecentSave.ClassName, mostRecentSave.Level, mostRecentSave.SaveType, saveTimeStr) + statusTag);
                     }
                     else
                     {
@@ -2124,8 +2136,16 @@ public partial class GameEngine
                         terminal.Write("] ");
                         terminal.SetColor("white");
                         terminal.Write($"{mostRecentSave.PlayerName}");
-                        terminal.SetColor("cyan");
-                        terminal.Write($" ({mostRecentSave.ClassName})");
+                        if (!string.IsNullOrEmpty(statusTag))
+                        {
+                            terminal.SetColor(statusColor);
+                            terminal.Write(statusTag);
+                        }
+                        else
+                        {
+                            terminal.SetColor("cyan");
+                            terminal.Write($" ({mostRecentSave.ClassName})");
+                        }
                         terminal.SetColor("gray");
                         terminal.Write(Loc.Get("engine.save_slot_level", mostRecentSave.Level));
                         terminal.SetColor("darkgray");
@@ -2267,11 +2287,24 @@ public partial class GameEngine
                 terminal.SetColor("darkgray");
                 terminal.Write("] ");
 
-                terminal.SetColor(save.IsAutosave ? "yellow" : "bright_green");
+                // v0.57.18: choose color/label based on slot type so the player sees
+                // which entries are recovery candidates vs normal saves at a glance.
+                string typeColor = save.IsEmergency ? "bright_red"
+                    : save.IsRecovered ? "yellow"
+                    : save.IsAutosave ? "yellow"
+                    : "bright_green";
+                terminal.SetColor(typeColor);
                 terminal.Write($"{save.SaveType.PadRight(12)}");
 
                 terminal.SetColor("gray");
-                terminal.Write(Loc.Get("engine.save_detail", save.CurrentDay, save.Level, save.TurnsRemaining));
+                if (save.IsRecovered)
+                {
+                    terminal.Write("(unparsed — will open recovery menu)");
+                }
+                else
+                {
+                    terminal.Write(Loc.Get("engine.save_detail", save.CurrentDay, save.Level, save.TurnsRemaining));
+                }
 
                 terminal.SetColor("darkgray");
                 terminal.Write(" | ");
@@ -2307,6 +2340,18 @@ public partial class GameEngine
             if (int.TryParse(choice, out int saveNumber) && saveNumber > 0 && saveNumber <= saves.Count)
             {
                 var selectedSave = saves[saveNumber - 1];
+                // v0.57.18: if the listing already detected this slot is unparseable
+                // (IsRecovered = true), route straight to the recovery menu instead
+                // of doing a redundant load attempt that we know will fail. Saves a
+                // step for the player and shows the recovery options immediately.
+                if (selectedSave.IsRecovered)
+                {
+                    string reason = selectedSave.IsEmergency
+                        ? "This is an emergency save (Ctrl+C dump). The regular save for this character was lost or never written."
+                        : "Save file failed to parse during listing — likely bloated or truncated. Recovery options below.";
+                    await ShowLoadFailureWithRecovery(selectedSave.FileName, reason);
+                    return;
+                }
                 await LoadSaveByFileName(selectedSave.FileName);
                 return;
             }
@@ -5284,6 +5329,14 @@ public partial class GameEngine
 
         foreach (var data in npcData)
         {
+            // v0.57.18 (third-round audit): defense-in-depth around per-NPC restore.
+            // Pre-fix, a single bad NPC entry (corrupt enum, malformed dictionary,
+            // unexpected null) would throw and abort the entire restore, leaving
+            // NPCSpawnSystem partially populated and the world half-built. Same shape
+            // of bug as the original FileSaveBackend silent-drop. Now: log + skip
+            // bad entries, keep going. The world loses one NPC instead of all of them.
+            try
+            {
             // Create NPC from save data
             var npc = new NPC
             {
@@ -5787,6 +5840,12 @@ public partial class GameEngine
             if (data.IsKing)
             {
                 kingNpc = npc;
+            }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogWarning("NPC",
+                    $"RestoreNPCs: skipping NPC '{data?.Name ?? "?"}' due to restore error: {ex.Message}");
             }
         }
 

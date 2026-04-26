@@ -1044,6 +1044,16 @@ namespace UsurperRemake.Systems
         public string FileName { get; set; } = "";
         public bool IsAutosave { get; set; }
         public string SaveType { get; set; } = "Manual Save";
+
+        // v0.57.18 — set true when the slot was constructed via filename-fallback
+        // because the JSON deserialize threw (bloated save, malformed JSON, etc.).
+        // Lets the load menu render a "[Recovery]" tag and the player knows they're
+        // about to enter the recovery flow when they click the slot.
+        public bool IsRecovered { get; set; }
+        // True when the only thing on disk for this character is an emergency_*.json
+        // (regular save was lost or never written). UI surfaces this distinctly so
+        // the player knows what they're loading.
+        public bool IsEmergency { get; set; }
     }
 
     /// <summary>

@@ -604,8 +604,15 @@ namespace UsurperRemake.Systems
                 });
             }
 
-            // Convert encounter history
-            foreach (var encounter in EncounterHistory)
+            // Convert encounter history. v0.57.18: cap to the N most recent encounters at
+            // serialization time. Long playthroughs accumulated unbounded entries here —
+            // each ~200 bytes once partner names + watchers are included, so 1000 encounters
+            // is ~200 KB in the player save with no upper limit. In-memory list is unchanged;
+            // only what survives a save/reload boundary is trimmed.
+            var recentEncounters = EncounterHistory.Count > GameConfig.MaxSerializedEncounterHistory
+                ? EncounterHistory.TakeLast(GameConfig.MaxSerializedEncounterHistory)
+                : (IEnumerable<IntimateEncounter>)EncounterHistory;
+            foreach (var encounter in recentEncounters)
             {
                 data.EncounterHistory.Add(new UsurperRemake.Systems.IntimateEncounterData
                 {
