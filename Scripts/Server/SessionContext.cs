@@ -114,6 +114,14 @@ public class SessionContext : IDisposable
     public Queue<string> PendingNotifications { get; } = new();
     public bool IsIntentionalExit { get; set; } = false;
 
+    // v0.60.0 beta-launch Rage event: when set, every save path on this session
+    // becomes a no-op so a late autosave can't re-INSERT the player row that the
+    // rage cinematic just deleted (the INSERT...ON CONFLICT in WriteGameData
+    // doesn't carry password_hash, which would leave a row with an empty hash --
+    // re-login then sees "Incorrect password" instead of the intended "Unknown
+    // username"). Set BEFORE the cinematic begins.
+    public bool IsRageKilled { get; set; } = false;
+
     /// <summary>
     /// Create fresh instances of all per-session systems for a new player session.
     /// </summary>

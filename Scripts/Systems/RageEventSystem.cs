@@ -83,6 +83,18 @@ namespace UsurperRemake.Systems
         /// </summary>
         public static async Task RunRageEventAsync(global::Character player, TerminalEmulator terminal, string username)
         {
+            // Mark this session as rage-killed BEFORE anything else. SqlSaveBackend
+            // checks this flag (and the process-wide erased-username set populated
+            // by DeleteAccountCompletely) on every save and refuses to write,
+            // preventing a fire-and-forget autosave started earlier in the load
+            // path from re-inserting the row after we delete it.
+            try
+            {
+                var ctx = UsurperRemake.Server.SessionContext.Current;
+                if (ctx != null) ctx.IsRageKilled = true;
+            }
+            catch { /* ignore */ }
+
             try
             {
                 terminal.ClearScreen();

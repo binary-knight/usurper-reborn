@@ -54,6 +54,15 @@ namespace UsurperRemake.Systems
         private readonly string connectionString;
         private readonly JsonSerializerOptions jsonOptions;
 
+        // v0.60.0 beta-launch Rage event: usernames erased during this server
+        // uptime. Cross-checked by WriteGameData so a stray save coming from
+        // anywhere (world sim, background timer, fire-and-forget) can't
+        // re-INSERT the row that the rage cinematic just deleted. In-memory
+        // only; the DB row deletion is the durable signal. Reset on restart,
+        // which is fine because by the time the server restarts the row is
+        // already gone and any in-flight saves died with the old process.
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> RageEventErasedUsernames = new();
+
         public SqlSaveBackend(string databasePath)
         {
             this.databasePath = databasePath;
@@ -455,6 +464,24 @@ namespace UsurperRemake.Systems
         {
             try
             {
+                // v0.60.0 beta-launch Rage event guard. If the calling session has
+                // been rage-killed, refuse the save outright. Without this, a
+                // fire-and-forget save started before the cinematic could complete
+                // AFTER the row deletion, re-INSERTing the row with an empty
+                // password_hash. The user then sees "Incorrect password" on
+                // re-login instead of the intended "Unknown username." Cross-check
+                // is also done by deleted username -- if a save fires for a
+                // username that was rage-erased earlier in this server uptime,
+                // refuse (covers world-sim or background saves that don't have a
+                // SessionContext).
+                var ragedSession = UsurperRemake.Server.SessionContext.Current?.IsRageKilled == true;
+                if (ragedSession || RageEventErasedUsernames.ContainsKey(playerName.ToLower()))
+                {
+                    DebugLogger.Instance.LogWarning("RAGE_EVENT",
+                        $"Suppressing save for '{playerName}' (session rage-killed). Row will not be re-created.");
+                    return false;
+                }
+
                 var json = JsonSerializer.Serialize(data, jsonOptions);
                 var displayName = data.Player?.Name2 ?? data.Player?.Name1 ?? playerName;
                 var normalizedUsername = playerName.ToLower();
@@ -700,6 +727,11 @@ namespace UsurperRemake.Systems
         /// </summary>
         public bool DeleteAccountCompletely(string username)
         {
+            // Mark the username in the process-wide blacklist FIRST. WriteGameData
+            // checks this set and refuses to save for any matching username, so
+            // a save in flight from another thread can't beat us to the row.
+            RageEventErasedUsernames[username.ToLower()] = 1;
+
             try
             {
                 using var connection = OpenConnection();

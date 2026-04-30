@@ -3,7 +3,7 @@ using System.Collections.Generic;
 namespace UsurperRemake.Data
 {
     /// <summary>
-    /// The 11 alpha-era founders commemorated by in-world statues at beta launch
+    /// The 12 alpha-era founders commemorated by in-world statues at beta launch
     /// (May 2026). Each founder reached one or more of: Level 100, Immortal
     /// Ascension, or Defeated Manwe and started NG+. Identified from the live
     /// online database before the beta wipe; narratives composed from their
@@ -15,7 +15,8 @@ namespace UsurperRemake.Data
     /// Each founder has a UNIQUE ASCII art piece themed to their character:
     /// harvest god, benevolent giver, speed-runner, dark conqueror, pure
     /// healer, long-walker, contradiction-bearer, cycle-wanderer, first
-    /// shaman, lost immortal, and the renamed-and-erased.
+    /// shaman, lost immortal, the renamed-and-erased, and the veiled
+    /// mutant who ascended on the eve of beta.
     ///
     /// This list is FIXED. Post-beta-launch achievements are recognized
     /// through other systems (Hall of Fame, Steam achievements). The static
@@ -248,6 +249,29 @@ namespace UsurperRemake.Data
             "      ===/=========",
         };
 
+        // aura maximillion, Mutant Assassin who ascended on the eve of beta.
+        // A hooded silhouette under starlight, dagger and halo together --
+        // outcast made divine through a precise blade and quiet purpose.
+        private static readonly string[] ART_AURA = new[]
+        {
+            "            *  .  *",
+            "          .   _   .",
+            "             ( )",
+            "          .   |   .",
+            "         /   /|\\   \\",
+            "        |   / | \\   |",
+            "        |  /  |  \\  |",
+            "         \\(__hood__)/",
+            "          \\   |   /",
+            "           \\  |  /",
+            "            \\ | /",
+            "        ______v______",
+            "       |             |",
+            "       |   ascended  |",
+            "       |_____________|",
+            "       ===============",
+        };
+
         // zengazu, NG+ veteran who renamed in jest and deleted by accident.
         // A scratched-out name plate where his second name used to be.
         private static readonly string[] ART_ZENGAZU_CRACKED = new[]
@@ -355,6 +379,22 @@ namespace UsurperRemake.Data
                 CustomArt = ART_COOSH_CRACKED,
                 ArtColor = "dark_gray",
                 Inscription = "Coosh, ascended of the second cycle, godhood freshly upon him. He sought a finer raiment, pressed the wrong rune, and was undone. The Pantheon does not refund."
+            },
+            new()
+            {
+                Username = "james maximillion",
+                DisplayName = "Aura Maximillion",
+                ClassName = "Assassin",
+                RaceName = "Mutant",
+                FinalLevel = 95,
+                DivineName = "Aura the Veiled",
+                CycleReached = 1,
+                EndingTag = "Pre-NG+",
+                Location = StatueLocationTag.Pantheon,
+                AchievementTag = "Immortal",
+                CustomArt = ART_AURA,
+                ArtColor = "bright_white",
+                Inscription = "An outcast in mortal flesh, she walked these streets with a precise blade and a quiet purpose. She did not wait for the summit. At ninety-five she stepped into Manwe's silence and stepped out crowned. The veil now hangs on her own terms."
             },
 
             // ─── Castle Courtyard (Manwe-Slayers, NG+ at least 2) ─────

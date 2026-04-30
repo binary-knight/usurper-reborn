@@ -2527,6 +2527,19 @@ public partial class GameEngine
     {
         try
         {
+            // v0.60.0 beta-launch Rage event: short-circuit BEFORE any save
+            // restore happens. The cinematic plays for ~25 seconds, and any
+            // restore step that fires a fire-and-forget save would race with
+            // the deletion. By short-circuiting at the top of the method we
+            // guarantee no save path can run during this session.
+            if (UsurperRemake.Systems.RageEventSystem.IsActive && UsurperRemake.BBS.DoorMode.IsOnlineMode)
+            {
+                var rageUsername = UsurperRemake.Server.SessionContext.Current?.Username ?? fileName;
+                await UsurperRemake.Systems.RageEventSystem.RunRageEventAsync(null!, terminal, rageUsername);
+                IsIntentionalExit = true;
+                return;
+            }
+
             terminal.WriteLine(Loc.Get("engine.loading_save"), "yellow");
 
             // v0.57.14: use the error-reporting load path so we can show the player
@@ -3047,20 +3060,8 @@ public partial class GameEngine
                 _ = SaveCurrentGame();
             }
 
-            // v0.60.0 beta-launch event: if the Rage event is firing (May 1 2026 UTC
-            // window, sysop kill switch off), the cinematic plays and the character
-            // is permadeleted before the player ever enters the world. After the
-            // event runs we throw an exit exception so the session disconnects
-            // cleanly instead of falling through to MainStreet with a deleted
-            // character. Online mode only -- single-player saves are out of scope
-            // for the wipe-day event.
-            if (UsurperRemake.Systems.RageEventSystem.IsActive && UsurperRemake.BBS.DoorMode.IsOnlineMode)
-            {
-                var rageUsername = UsurperRemake.Server.SessionContext.Current?.Username ?? fileName;
-                await UsurperRemake.Systems.RageEventSystem.RunRageEventAsync(currentPlayer, terminal, rageUsername);
-                IsIntentionalExit = true;
-                return;
-            }
+            // v0.60.0 Rage hook moved to top-of-method to prevent save races
+            // during the cinematic. See start of method.
 
             await locationManager.EnterLocation(startLocation, currentPlayer);
         }
