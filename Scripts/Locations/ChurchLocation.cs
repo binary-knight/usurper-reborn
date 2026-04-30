@@ -413,24 +413,57 @@ namespace UsurperRemake.Locations
             // Process donation
             currentPlayer.Gold -= amount;
             currentPlayer.ChurchDonations += amount; // Track total donations
-            
-            // Calculate chivalry gain (Pascal formula: amount / 11, minimum 1)
-            long chivalryGain = Math.Max(1, amount / 11);
-            currentPlayer.Chivalry += (int)chivalryGain;
-            
-            // Reduce darkness slightly
+
+            // v0.60.0: snapshot Chivalry before mutation so the displayed gain reflects what
+            // ACTUALLY landed after the AlignmentCap (1000) setter clamp. The Pascal formula
+            // amount/11 made sense in the original economy where donations were tens or hundreds
+            // of gold; at endgame (100,000g donations) it computes 9090 chivalry which the cap
+            // never lets through, but the message used to display the raw 9090 anyway,
+            // confusing players who saw "+9090 chivalry" but no actual change to their stat
+            // (player report from Aura, Lv.91 Mutant Assassin: "you cap chivalry at 1000 yet
+            // it says I gained 9090 chivalry, that's a crazy amount").
+            long chivalryBefore = currentPlayer.Chivalry;
+            long darknessBefore = currentPlayer.Darkness;
+
+            // v0.60.0 alignment-cheese pass: cap per-donation chivalry gain so a
+            // single 100k-gold donation cannot max out chivalry in one transaction.
+            // Pre-fix: amount/11 = 9090 chivalry, clamped to AlignmentCap (1000) by
+            // the Character.Chivalry setter. Post-fix: capped at 25 per donation,
+            // matching the castle treasury donation cap (50) and a sustained-virtue
+            // progression curve. Small donations are unaffected (the cap kicks in
+            // only when the computed gain exceeds it).
+            long requestedChivalryGain = Math.Min(GameConfig.MaxChivalryGainPerChurchAction,
+                Math.Max(1, amount / 11));
+            currentPlayer.Chivalry += (int)requestedChivalryGain; // setter clamps to AlignmentCap
+
+            // Reduce darkness slightly (donation has explicit asymmetric design with a small darkness
+            // reduction so confession/altar paths remain the primary darkness-cleansing routes;
+            // see v0.57.12 alignment audit notes that intentionally left church mechanics as
+            // direct mutations rather than routing through ChangeAlignment's paired movement).
             if (currentPlayer.Darkness > 0)
             {
                 currentPlayer.Darkness = Math.Max(0, currentPlayer.Darkness - 1);
             }
-            
+
+            long actualChivalryGain = currentPlayer.Chivalry - chivalryBefore;
+            long actualDarknessReduction = darknessBefore - currentPlayer.Darkness;
+
             terminal.WriteLine("");
             terminal.SetColor("bright_green");
             terminal.WriteLine(Loc.Get("church.donate_appreciated", amount.ToString("N0"), GameConfig.MoneyType));
             terminal.WriteLine(Loc.Get("church.donate_virtue"));
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("church.donate_blessed_by", bishopName));
-            terminal.WriteLine(Loc.Get("church.donate_chivalry_gain", chivalryGain));
+            if (actualChivalryGain > 0)
+            {
+                terminal.WriteLine(Loc.Get("church.donate_chivalry_gain", actualChivalryGain));
+            }
+            else
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine(Loc.Get("church.donate_chivalry_capped"));
+                terminal.SetColor("bright_green");
+            }
 
             // Church donations are light actions - increase Faith standing
             int faithGain = Math.Max(1, (int)(amount / 100));
@@ -497,18 +530,29 @@ namespace UsurperRemake.Locations
             // Process blessing
             currentPlayer.Gold -= amount;
             currentPlayer.BlessingsReceived += 1; // Track blessings received
-            
-            // Calculate blessing effect (Pascal formula: amount / 15, minimum 1)
-            long chivalryGain = Math.Max(1, amount / 15);
-            currentPlayer.Chivalry += (int)chivalryGain;
-            
-            // Reduce darkness more significantly than donation
-            long darknessReduction = Math.Min(currentPlayer.Darkness, (long)(amount / 100));
-            currentPlayer.Darkness = Math.Max(0, currentPlayer.Darkness - Math.Max(1L, darknessReduction));
-            
+
+            // v0.60.0: same snapshot pattern as donation. Show the actual delta applied after
+            // AlignmentCap clamping rather than the raw computed amount/15.
+            long chivalryBefore = currentPlayer.Chivalry;
+            long darknessBefore = currentPlayer.Darkness;
+
+            // v0.60.0 alignment-cheese pass: cap per-blessing chivalry gain (see
+            // ProcessDonation for full rationale).
+            long requestedChivalryGain = Math.Min(GameConfig.MaxChivalryGainPerChurchAction,
+                Math.Max(1, amount / 15));
+            currentPlayer.Chivalry += (int)requestedChivalryGain; // setter clamps to AlignmentCap
+
+            // Blessing's stronger darkness reduction is intentional: it's the dedicated
+            // "purify" mechanic, distinct from donation's modest -1.
+            long requestedDarknessReduction = Math.Max(1L, Math.Min(currentPlayer.Darkness, amount / 100));
+            currentPlayer.Darkness = Math.Max(0, currentPlayer.Darkness - requestedDarknessReduction);
+
+            long actualChivalryGain = currentPlayer.Chivalry - chivalryBefore;
+            long actualDarknessReduction = darknessBefore - currentPlayer.Darkness;
+
             // Apply divine blessing effect
             currentPlayer.DivineBlessing = Math.Max(currentPlayer.DivineBlessing, 7); // 7 days of blessing
-            
+
             terminal.WriteLine("");
             terminal.SetColor("bright_yellow");
             terminal.WriteLine(Loc.Get("church.blessing_contribution", amount.ToString("N0"), GameConfig.MoneyType));
@@ -516,8 +560,20 @@ namespace UsurperRemake.Locations
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("church.blessing_ritual", bishopName));
             terminal.WriteLine(Loc.Get("church.blessing_divine_light"));
-            terminal.WriteLine(Loc.Get("church.blessing_chivalry", chivalryGain));
-            terminal.WriteLine(Loc.Get("church.blessing_darkness_decrease", Math.Max(1L, darknessReduction)));
+            if (actualChivalryGain > 0)
+            {
+                terminal.WriteLine(Loc.Get("church.blessing_chivalry", actualChivalryGain));
+            }
+            else
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine(Loc.Get("church.donate_chivalry_capped"));
+                terminal.SetColor("bright_yellow");
+            }
+            if (actualDarknessReduction > 0)
+            {
+                terminal.WriteLine(Loc.Get("church.blessing_darkness_decrease", actualDarknessReduction));
+            }
             terminal.WriteLine(Loc.Get("church.blessing_days"));
 
             // Blessings are light actions - increase Faith standing
@@ -1065,6 +1121,14 @@ namespace UsurperRemake.Locations
 
             terminal.WriteLine(Loc.Get("church.confess_darkness", currentPlayer.Darkness), "red");
             terminal.WriteLine(Loc.Get("church.confess_reduce", Math.Min(currentPlayer.Darkness, 10)), "cyan");
+
+            // v0.60.0, issue #89: penance cost. Confession used to be free and
+            // unlimited which made it a frictionless darkness sink. Now the priest
+            // asks for a donation to the poor (penance) that scales with the
+            // player's darkness so the price tracks the benefit.
+            long penanceCost = GameConfig.ConfessionBaseCost +
+                (currentPlayer.Darkness * GameConfig.ConfessionCostPerDarkness);
+            terminal.WriteLine(Loc.Get("church.confess_penance_cost", penanceCost.ToString("N0"), GameConfig.MoneyType), "yellow");
             terminal.WriteLine("");
 
             var confess = await terminal.GetInput(Loc.Get("church.confess_prompt"));
@@ -1074,25 +1138,37 @@ namespace UsurperRemake.Locations
                 await Task.Delay(1500);
                 return;
             }
-            
+
+            if (currentPlayer.Gold < penanceCost)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine(Loc.Get("church.confess_no_gold", penanceCost.ToString("N0"), currentPlayer.Gold.ToString("N0")));
+                await Task.Delay(2000);
+                return;
+            }
+
             // Confession process
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("church.confess_begin"), "white");
             await Task.Delay(2000);
-            
+
+            currentPlayer.Gold -= penanceCost;
+            currentPlayer.Statistics?.RecordGoldSpent(penanceCost);
+
             long darknessReduction = Math.Min(currentPlayer.Darkness, Random.Shared.Next(5, 11));
             currentPlayer.Darkness = Math.Max(0, currentPlayer.Darkness - darknessReduction);
-            
+
             // Small chivalry gain
             int chivalryGain = Random.Shared.Next(2, 6);
             currentPlayer.Chivalry += chivalryGain;
-            
+
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("church.confess_forgiven"), "bright_yellow");
             terminal.WriteLine(Loc.Get("church.confess_sin_no_more"), "bright_yellow");
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("church.confess_darkness_decrease", darknessReduction), "bright_green");
             terminal.WriteLine(Loc.Get("church.confess_chivalry_increase", chivalryGain), "cyan");
+            terminal.WriteLine(Loc.Get("church.confess_penance_paid", penanceCost.ToString("N0")), "yellow");
             terminal.WriteLine(Loc.Get("church.confess_cleansed"), "bright_white");
 
             await Task.Delay(3000);

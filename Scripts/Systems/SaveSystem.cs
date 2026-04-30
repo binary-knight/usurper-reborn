@@ -2454,9 +2454,27 @@ namespace UsurperRemake.Systems
             catch (Exception ex) { DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "LOAD", $"GameEngine not available: {ex.Message}"); }
 
             // Family System - restore children
+            // In online mode, the WorldSim is the single authority for the shared
+            // children list (FamilySystem.Instance is a process-wide singleton holding
+            // every player's children). RestoreStorySystems runs on every login and
+            // its DeserializeChildren clears + replaces the entire singleton with the
+            // logging-in player's stale save view. When a second session loads while
+            // a first session has just had a baby (or renamed one) but before WorldSim
+            // has persisted that change to world_state, the second player's stale
+            // snapshot wipes the in-flight change from the singleton. WorldSim's next
+            // tick then writes the contaminated singleton back to world_state and the
+            // change is lost permanently. Same bug-class as the marriage-restore skip
+            // already in place. LoadSharedChildrenAndMarriages reloads from world_state
+            // immediately after RestoreStorySystems in online mode, so skipping here
+            // is safe: the player still gets the authoritative children list.
             try
             {
-                if (data.Children != null && data.Children.Count > 0)
+                if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                {
+                    DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "LOAD",
+                        "Skipping FamilySystem.DeserializeChildren in online mode (WorldSim is authority)");
+                }
+                else if (data.Children != null && data.Children.Count > 0)
                 {
                     FamilySystem.Instance.DeserializeChildren(data.Children);
                 }

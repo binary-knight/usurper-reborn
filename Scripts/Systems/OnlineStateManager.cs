@@ -205,6 +205,57 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
+        /// Save children directly to world_state from a player session.
+        /// Normally WorldSimService is the only writer, but player sessions need to
+        /// flush births and renames to world_state immediately so the change survives
+        /// a server restart that happens before WorldSim's next tick. This writes the
+        /// same wrapper schema WorldSimService uses (childrenRaw + dashboard summary).
+        /// Fire-and-forget callers can ignore the returned task.
+        /// </summary>
+        public async Task SaveSharedChildrenNow()
+        {
+            try
+            {
+                var familySystem = FamilySystem.Instance;
+                var allChildren = familySystem.AllChildren.Where(c => !c.Deleted).ToList();
+
+                var childrenData = allChildren.Select(c => new Dictionary<string, object>
+                {
+                    ["name"] = c.Name,
+                    ["age"] = c.Age,
+                    ["sex"] = c.Sex == CharacterSex.Male ? "Male" : "Female",
+                    ["mother"] = c.Mother,
+                    ["father"] = c.Father,
+                    ["soul"] = c.Soul,
+                    ["soulDesc"] = c.GetSoulDescription(),
+                    ["health"] = c.Health,
+                    ["royal"] = c.Royal,
+                    ["kidnapped"] = c.Kidnapped,
+                    ["birthDate"] = c.BirthDate.ToString("o"),
+                    ["location"] = c.Location == GameConfig.ChildLocationHome ? "Home" :
+                                   c.Location == GameConfig.ChildLocationOrphanage ? "Orphanage" : "Unknown"
+                }).ToList();
+
+                var childrenRaw = familySystem.SerializeChildren();
+
+                var wrapper = new Dictionary<string, object>
+                {
+                    ["count"] = childrenData.Count,
+                    ["children"] = childrenData,
+                    ["childrenRaw"] = childrenRaw,
+                    ["updatedAt"] = DateTime.UtcNow.ToString("o")
+                };
+
+                var json = JsonSerializer.Serialize(wrapper, jsonOptions);
+                await backend.SaveWorldState("children", json);
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("ONLINE", $"Failed to save children to world_state: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// Load NPC marriage registry from world_state (written by WorldSimService).
         /// Returns marriage and affair data for NPCMarriageRegistry restoration.
         /// Player sessions should call this to get authoritative marriages instead of stale save data.

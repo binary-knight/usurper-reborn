@@ -77,7 +77,7 @@ public static class SpellSystem
             [3] = new SpellInfo(3, "Purify", "Cleanse disease and minor poisons from the body. Cures minor afflictions.", 12, 3, "Purimasarie", false, "Heal"),
             [4] = new SpellInfo(4, "Bless Weapon", "Imbue your weapon with holy power. Attack: +12, scales with level. Duration: whole fight.", 15, 4, "Sanctiweaparie", false, "Buff"),
             [5] = new SpellInfo(5, "Cure Wounds", "A stronger healing prayer. Effect: 25-40 hp, scales with WIS. Duration: 1 turn.", 18, 5, "Aduexusmarie", false, "Heal"),
-            [6] = new SpellInfo(6, "Turn Undead", "Holy light sears the walking dead. Damage: 35-50, scales with WIS. Double damage vs undead and demons.", 22, 6, "Exorcismarie", false, "Attack"),
+            [6] = new SpellInfo(6, "Turn Undead", "Holy light sears the walking dead. Damage: 35-50, scales with WIS. Affects ONLY undead and demons; living enemies are unaffected.", 22, 6, "Exorcismarie", false, "Attack"),
             [7] = new SpellInfo(7, "Sanctuary", "Create a holy ward that makes enemies hesitate. Protection: +18, scales with level and WIS. Duration: 3 rounds.", 25, 7, "Sanctuarie", false, "Buff"),
 
             // --- MID TIER (Levels 26-50) - Advanced Divine Arts ---
@@ -851,10 +851,10 @@ public static class SpellSystem
                 result.Message += $" {Loc.Get("combat.spell_healed", caster.Name2, result.Healing)}";
                 break;
 
-            case 6: // Turn Undead - Damage vs undead
+            case 6: // Turn Undead - Damage ONLY vs undead/demons (issue #85)
                 int baseDamage6 = 35 + random.Next(16);
                 result.Damage = ScaleSpellEffect(baseDamage6, caster, random, profMult);
-                result.SpecialEffect = "holy";
+                result.SpecialEffect = "turn_undead";
                 result.Message += $" {Loc.Get("combat.spell_holy_damage", result.Damage)}";
                 break;
 

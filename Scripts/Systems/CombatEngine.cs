@@ -1356,6 +1356,24 @@ public partial class CombatEngine
             await Task.Delay(GetCombatDelay(1000));
         }
 
+        // v0.60.0, issue #87: hoist the kill-tracking sweep so it runs for EVERY
+        // combat outcome (flee, victory, player death) instead of only the
+        // all-monsters-dead victory branch. Player report: "After combat, sometimes
+        // I'm told I defeated 0 enemies and got 0 XP. Or fighting more than one
+        // enemy, the results give me rewards for one less enemy than I actually
+        // fought." Two fail modes the v0.57.12 sweep didn't cover: (1) the player
+        // flees after killing some enemies and HandlePartialVictory reads
+        // DefeatedMonsters.Count, missing untracked kills; (2) the player dies in
+        // multi-monster combat after killing some, and any partial-credit path
+        // (death penalty mitigation, news-feed text, etc.) reads the same count.
+        // Adding any dead monster not yet tracked is idempotent, cheap, and
+        // strictly more correct than the previous outcome-gated version.
+        foreach (var m in monsters)
+        {
+            if (!m.IsAlive && !result.DefeatedMonsters.Contains(m))
+                result.DefeatedMonsters.Add(m);
+        }
+
         // Determine combat outcome
         if (globalEscape)
         {
@@ -1705,7 +1723,16 @@ public partial class CombatEngine
                 terminal.Write(Loc.Get("combat.choose_action"));
             }
 
+            // v0.60.0 bot-detection Tier 1: timestamp the prompt-rendered moment so
+            // BotDetectionSystem can compute the response interval.
+            var __botDetectStartUtc = DateTime.UtcNow;
             var choice = await terminal.GetInput("");
+            try
+            {
+                var __responseMs = (DateTime.UtcNow - __botDetectStartUtc).TotalMilliseconds;
+                BotDetectionSystem.RecordCombatInput(SessionContext.Current?.Username, __responseMs);
+            }
+            catch { /* never let instrumentation break combat */ }
             var upperChoice = choice.Trim().ToUpper();
 
             // Handle combat speed toggle
@@ -3634,10 +3661,8 @@ public partial class CombatEngine
                 break;
 
             case PoisonType.NightshadeExtract:
-                if (!target.IsStunned && target.StunImmunityRounds <= 0)
+                if (TryStunMonster(target, 2))
                 {
-                    target.IsStunned = true;
-                    target.StunDuration = 2;
                     terminal.SetColor("dark_magenta");
                     terminal.WriteLine(Loc.Get("combat.nightshade_sleep", target.Name));
                 }
@@ -3665,10 +3690,8 @@ public partial class CombatEngine
                 break;
 
             case PoisonType.WidowsKiss:
-                if (!target.IsStunned && target.StunImmunityRounds <= 0)
+                if (TryStunMonster(target, 2))
                 {
-                    target.IsStunned = true;
-                    target.StunDuration = 2;
                     terminal.SetColor("bright_magenta");
                     terminal.WriteLine(Loc.Get("combat.widows_kiss_paralyze", target.Name));
                 }
@@ -3975,7 +3998,7 @@ public partial class CombatEngine
         if (monster.StunRounds > 0)
         {
             monster.StunRounds--;
-            if (monster.StunRounds <= 0) monster.StunImmunityRounds = 1;
+            if (monster.StunRounds <= 0) monster.StunImmunityRounds = GameConfig.StunImmunityRoundsAfterRecovery;
             terminal.WriteLine(Loc.Get("combat.stunned", monster.Name), "cyan");
             await Task.Delay(GetCombatDelay(600));
             return; // Skip action
@@ -3985,7 +4008,7 @@ public partial class CombatEngine
         if (monster.Stunned)
         {
             monster.Stunned = false; // One-round stun
-            monster.StunImmunityRounds = 1;
+            monster.StunImmunityRounds = GameConfig.StunImmunityRoundsAfterRecovery;
             terminal.WriteLine(Loc.Get("combat.stunned", monster.Name), "cyan");
             await Task.Delay(GetCombatDelay(600));
             return;
@@ -4059,7 +4082,8 @@ public partial class CombatEngine
             if (monster.StunDuration <= 0)
             {
                 monster.IsStunned = false;
-                monster.StunImmunityRounds = 1; // Brief immunity prevents stunlock
+                // v0.60.0 stun-lock audit: longer post-recovery immunity (was 1).
+                monster.StunImmunityRounds = GameConfig.StunImmunityRoundsAfterRecovery;
             }
             await Task.Delay(GetCombatDelay(600));
             return;
@@ -4068,6 +4092,17 @@ public partial class CombatEngine
         // Tick down stun immunity (monster is NOT stunned but can't be re-stunned yet)
         if (monster.StunImmunityRounds > 0)
             monster.StunImmunityRounds--;
+
+        // v0.60.0 stun-lock audit: tick the DR window. After StunDRWindowRounds
+        // consecutive non-stunned rounds, decay RecentStunCount by 1. This lets a
+        // stun-resistant boss eventually be stunned again later in a long fight
+        // instead of being permanently DR-immune after one good chain.
+        monster.RoundsSinceLastStun++;
+        if (monster.RoundsSinceLastStun >= GameConfig.StunDRWindowRounds && monster.RecentStunCount > 0)
+        {
+            monster.RecentStunCount--;
+            monster.RoundsSinceLastStun = 0;
+        }
 
         // Check if monster is frozen (from Frost Bomb)
         if (monster.IsFrozen)
@@ -5685,6 +5720,29 @@ public partial class CombatEngine
     {
         if (!teammate.IsAlive || !monster.IsAlive) return;
 
+        // v0.60.0: tick teammate status durations and skip the action if a control effect
+        // (Stun / Paralyze / Sleep / Freeze) is preventing them from acting. Player report:
+        // "Stun only works on enemies. A party member afflicted with stun can act next round
+        // as though nothing happened." Pre-fix the only IsAlive guard above let stunned
+        // teammates act normally, and ActiveStatuses never decremented for teammates either,
+        // so a stun would have lasted the whole fight if anything had been checking it.
+        // Now mirrors the player path at line 1654-1676 (ProcessStatusEffects, then CanAct
+        // guard, then HasStatus(Stunned) message). ProcessStatusEffects also applies poison/bleed ticks
+        // so DoTs land on stunned teammates the same way they do on a stunned player.
+        foreach (var (msg, color) in teammate.ProcessStatusEffects())
+        {
+            terminal.WriteLine(msg, color);
+        }
+        if (!teammate.IsAlive) return; // DoT could have killed the teammate
+        if (!teammate.CanAct())
+        {
+            var preventingStatus = teammate.ActiveStatuses.Keys.FirstOrDefault(s => s.PreventsAction());
+            terminal.SetColor("yellow");
+            terminal.WriteLine(Loc.Get("combat.teammate_status_prevented", teammate.DisplayName, preventingStatus.ToString().ToLower()));
+            await Task.Delay(GetCombatDelay(800));
+            return;
+        }
+
         // Build party list for healing decisions
         var allPartyMembers = new List<Character> { currentPlayer };
         if (currentTeammates != null)
@@ -6917,63 +6975,110 @@ public partial class CombatEngine
         bool isPlayer = attacker == currentPlayer;
         string attackerName = attacker.DisplayName;
 
+        // v0.60.0 lifedrinker cap. Five lifesteal sources can fire on a single
+        // attack: divine blessing, equipment Lifedrinker, divine boon, Abysswarden
+        // Abyssal Siphon passive, and status-effect lifesteal. Each used to apply
+        // its full computed heal independently, so a player stacking equipment
+        // Lifedrinker (sums every slot) plus two or three of the others routinely
+        // produced heal-per-attack greater than the damage dealt. Player report:
+        // 14,571 HP drained from an 11,873-damage hit (~123% of damage).
+        //
+        // Total heal across all five sources is now capped at
+        // damage * MaxTotalLifestealPercent / 100 (default 100% = "you cannot heal
+        // for more than the damage you just dealt"). Each source consumes from a
+        // shared budget; later sources scale down or skip when the budget runs
+        // out. Equipment Lifedrinker is also capped at the source via
+        // GetEquipmentLifeSteal so a single-source heal can't exceed
+        // MaxEquipmentLifeStealPercent (default 60%).
+        long lifestealBudget = damage * GameConfig.MaxTotalLifestealPercent / 100;
+
+        long ApplyLifestealSlice(long requested)
+        {
+            if (lifestealBudget <= 0 || requested <= 0) return 0;
+            long applied = Math.Min(requested, lifestealBudget);
+            lifestealBudget -= applied;
+            return applied;
+        }
+
         // Divine lifesteal
         int lifesteal = DivineBlessingSystem.Instance.CalculateLifesteal(attacker, (int)damage);
         if (lifesteal > 0)
         {
-            attacker.HP = Math.Min(attacker.MaxHP, attacker.HP + lifesteal);
-            if (isPlayer)
-                terminal.WriteLine(Loc.Get("combat.dark_power_drain", lifesteal), "dark_magenta");
-            else
-                terminal.WriteLine(Loc.Get("combat.tm_dark_drain", attackerName, lifesteal), "dark_magenta");
+            long applied = ApplyLifestealSlice(lifesteal);
+            if (applied > 0)
+            {
+                attacker.HP = Math.Min(attacker.MaxHP, attacker.HP + applied);
+                if (isPlayer)
+                    terminal.WriteLine(Loc.Get("combat.dark_power_drain", applied), "dark_magenta");
+                else
+                    terminal.WriteLine(Loc.Get("combat.tm_dark_drain", attackerName, applied), "dark_magenta");
+            }
         }
 
-        // Equipment lifesteal (Lifedrinker enchant) — weapon-based, skip for spells
-        if (!isSpellDamage)
+        // Equipment lifesteal (Lifedrinker enchant), weapon-based, skip for spells.
+        // v0.60.0, issue #91: demons have no mortal life force; Lifedrinker can't
+        // pull anything from them.
+        if (!isSpellDamage && !IsDemonMonster(target))
         {
             int equipLifeSteal = attacker.GetEquipmentLifeSteal();
             if (equipLifeSteal > 0)
             {
-                long stolen = Math.Max(1, damage * equipLifeSteal / 100);
-                attacker.HP = Math.Min(attacker.MaxHP, attacker.HP + stolen);
-                if (isPlayer)
-                    terminal.WriteLine(Loc.Get("combat.lifedrinker", stolen), "dark_green");
-                else
-                    terminal.WriteLine(Loc.Get("combat.tm_lifedrinker", attackerName, stolen), "dark_green");
+                long requested = Math.Max(1, damage * equipLifeSteal / 100);
+                long applied = ApplyLifestealSlice(requested);
+                if (applied > 0)
+                {
+                    attacker.HP = Math.Min(attacker.MaxHP, attacker.HP + applied);
+                    if (isPlayer)
+                        terminal.WriteLine(Loc.Get("combat.lifedrinker", applied), "dark_green");
+                    else
+                        terminal.WriteLine(Loc.Get("combat.tm_lifedrinker", attackerName, applied), "dark_green");
+                }
             }
         }
 
         // Divine Boon lifesteal (from worshipped player-god)
         if (attacker.CachedBoonEffects?.LifestealPercent > 0)
         {
-            long boonSteal = Math.Max(1, (long)(damage * attacker.CachedBoonEffects.LifestealPercent));
-            attacker.HP = Math.Min(attacker.MaxHP, attacker.HP + boonSteal);
-            if (isPlayer)
-                terminal.WriteLine(Loc.Get("combat.boon_drain", boonSteal), "dark_cyan");
-            else
-                terminal.WriteLine(Loc.Get("combat.tm_boon_drain", attackerName, boonSteal), "dark_cyan");
+            long requested = Math.Max(1, (long)(damage * attacker.CachedBoonEffects.LifestealPercent));
+            long applied = ApplyLifestealSlice(requested);
+            if (applied > 0)
+            {
+                attacker.HP = Math.Min(attacker.MaxHP, attacker.HP + applied);
+                if (isPlayer)
+                    terminal.WriteLine(Loc.Get("combat.boon_drain", applied), "dark_cyan");
+                else
+                    terminal.WriteLine(Loc.Get("combat.tm_boon_drain", attackerName, applied), "dark_cyan");
+            }
         }
 
         // Abysswarden Abyssal Siphon passive: 10% lifesteal on all attacks
         if (attacker.Class == CharacterClass.Abysswarden)
         {
-            long siphon = Math.Max(1, (long)(damage * GameConfig.AbysswardenAbyssalSiphonPercent));
-            attacker.HP = Math.Min(attacker.MaxHP, attacker.HP + siphon);
-            if (isPlayer)
-                terminal.WriteLine(Loc.Get("combat.abyssal_siphon", siphon), "dark_red");
-            else
-                terminal.WriteLine(Loc.Get("combat.tm_abyssal_siphon", attackerName, siphon), "dark_red");
+            long requested = Math.Max(1, (long)(damage * GameConfig.AbysswardenAbyssalSiphonPercent));
+            long applied = ApplyLifestealSlice(requested);
+            if (applied > 0)
+            {
+                attacker.HP = Math.Min(attacker.MaxHP, attacker.HP + applied);
+                if (isPlayer)
+                    terminal.WriteLine(Loc.Get("combat.abyssal_siphon", applied), "dark_red");
+                else
+                    terminal.WriteLine(Loc.Get("combat.tm_abyssal_siphon", attackerName, applied), "dark_red");
+            }
         }
 
         // Ability-granted lifesteal (StatusEffect.Lifesteal from Abysswarden/Voidreaver/Assassin abilities)
         if (attacker.HasStatus(StatusEffect.Lifesteal) && attacker.StatusLifestealPercent > 0)
         {
-            long statusSteal = Math.Max(1, damage * attacker.StatusLifestealPercent / 100);
-            attacker.HP = Math.Min(attacker.MaxHP, attacker.HP + statusSteal);
-            if (isPlayer)
-                terminal.WriteLine(Loc.Get("combat.dark_energy_siphon", statusSteal), "dark_red");
-            else
-                terminal.WriteLine(Loc.Get("combat.tm_dark_energy_siphon", attackerName, statusSteal), "dark_red");
+            long requested = Math.Max(1, damage * attacker.StatusLifestealPercent / 100);
+            long applied = ApplyLifestealSlice(requested);
+            if (applied > 0)
+            {
+                attacker.HP = Math.Min(attacker.MaxHP, attacker.HP + applied);
+                if (isPlayer)
+                    terminal.WriteLine(Loc.Get("combat.dark_energy_siphon", applied), "dark_red");
+                else
+                    terminal.WriteLine(Loc.Get("combat.tm_dark_energy_siphon", attackerName, applied), "dark_red");
+            }
         }
 
         // Elemental enchant procs — weapon-based, skip for spells
@@ -7016,6 +7121,98 @@ public partial class CombatEngine
     /// <summary>
     /// Check for elemental enchant procs on equipped weapon (single-monster combat).
     /// </summary>
+    /// <summary>
+    /// v0.60.0, issue #91: name-based detection for type immunities.
+    /// Angels (Celestial family) cannot be hurt by holy damage and you cannot drain
+    /// mana from them (Syphon). Demons cannot be hurt by shadow damage and Lifedrinker
+    /// cannot drain life from them. Name matching follows the same pattern the holy
+    /// proc already uses for the +2x undead bonus, so no MonsterClass plumbing needed.
+    /// </summary>
+    private static bool IsAngelMonster(Monster target)
+    {
+        if (target == null) return false;
+        var n = target.Name;
+        return n.Contains("Angel") || n.Contains("Archangel") || n.Contains("Seraph")
+            || n.Contains("Throne") || n.Contains("Empyrean") || n.Contains("Cherub")
+            || n.Contains("Celestial");
+    }
+
+    private static bool IsDemonMonster(Monster target)
+    {
+        if (target == null) return false;
+        if (target.MonsterClass == MonsterClass.Demon) return true;
+        var n = target.Name;
+        return n.Contains("Demon") || n.Contains("Devil") || n.Contains("Imp")
+            || n.Contains("Archfiend") || n.Contains("Hellspawn") || n.Contains("Fiend");
+    }
+
+    /// <summary>
+    /// v0.60.0 stun-lock audit: centralized stun application with diminishing returns,
+    /// post-recovery immunity, boss resist, and a hard duration cap. Returns true if
+    /// the stun landed, false if it was resisted/blocked. Callers should use the
+    /// return value to choose a "resisted" message vs a "stunned!" message.
+    ///
+    /// Cheese the audit closed: players were chaining Lightning enchant procs (15%
+    /// per attack, multi-attack/dual-wield = ~50%/round), Magician/Sage Stun spells,
+    /// and class abilities to keep bosses perma-stunned through entire fights. Three
+    /// stun fields ticked independently in ProcessMonsterAction so stacking them
+    /// stole multiple monster turns from a single round of player input. The
+    /// 1-round StunImmunityRounds value also ticked down before the player's next
+    /// action so re-stun was effectively unlimited.
+    ///
+    /// Rules now enforced:
+    ///   * If target is already stunned in any field, refuse (no refresh-stack).
+    ///   * If target is in post-recovery immunity (StunImmunityRounds > 0), refuse.
+    ///   * Bosses/mini-bosses: 50% flat resist roll + hard duration cap of 1 round.
+    ///   * Diminishing returns: 1st stun = full duration, 2nd = 50%, 3rd = 25%,
+    ///     4th+ = immune until the DR window resets (StunDRWindowRounds rounds
+    ///     without a stun decays the count back to 0).
+    ///   * Hard duration cap (3 rounds normal, 1 boss) regardless of source.
+    /// </summary>
+    private bool TryStunMonster(Monster target, int requestedDuration)
+    {
+        if (target == null || !target.IsAlive) return false;
+
+        // Already stunned in ANY system: refuse. Refresh-stacking was the primary
+        // perma-stun path -- spell or proc kept extending an existing stun's clock.
+        if (target.IsStunned || target.Stunned || target.StunRounds > 0)
+            return false;
+
+        // Post-recovery immunity window
+        if (target.StunImmunityRounds > 0)
+            return false;
+
+        // Diminishing returns based on recent stun count
+        int dr = target.RecentStunCount;
+        if (dr >= 3) return false; // 4th stun within DR window: outright immune
+        int durationPercent = dr switch
+        {
+            0 => 100,
+            1 => 50,
+            2 => 25,
+            _ => 0
+        };
+        int duration = Math.Max(1, (requestedDuration * durationPercent + 99) / 100);
+
+        // Boss/mini-boss: flat resist roll AND hard duration cap of 1
+        if (target.IsBoss || target.IsMiniBoss)
+        {
+            if (random.Next(100) < (int)(GameConfig.BossStunResistChance * 100))
+                return false;
+            duration = Math.Min(duration, GameConfig.MaxStunDurationBoss);
+        }
+        else
+        {
+            duration = Math.Min(duration, GameConfig.MaxStunDurationNormal);
+        }
+
+        target.IsStunned = true;
+        target.StunDuration = duration;
+        target.RecentStunCount++;
+        target.RoundsSinceLastStun = 0;
+        return true;
+    }
+
     private void CheckElementalEnchantProcs(Character attacker, Monster target, long damage, CombatResult result)
     {
         var weapon = attacker.GetEquipment(EquipmentSlot.MainHand);
@@ -7024,7 +7221,15 @@ public partial class CombatEngine
         bool isPlayer = attacker == currentPlayer;
         string name = attacker.DisplayName;
 
-        if (weapon.HasFireEnchant && random.NextDouble() < GameConfig.FireEnchantProcChance)
+        // v0.60.0, issue #88: skip damage-and-status procs (fire, frost, lightning,
+        // poison, holy, shadow) when the basic attack already killed the target.
+        // Per-strike enchant procs that print "X is set ablaze for 15 damage!" on
+        // a 0-HP corpse are pure spam and read as a bug. Mana steal at the bottom
+        // intentionally still fires on the killing blow because it's an
+        // attacker-side resource gain that's still useful when the target dies.
+        bool targetAlive = target.HP > 0 && target.IsAlive;
+
+        if (targetAlive && weapon.HasFireEnchant && random.NextDouble() < GameConfig.FireEnchantProcChance)
         {
             long fireDamage = Math.Max(1, (long)(damage * GameConfig.FireEnchantDamageMultiplier));
             target.HP = Math.Max(0, target.HP - fireDamage);
@@ -7036,37 +7241,39 @@ public partial class CombatEngine
             attacker.Statistics?.RecordDamageDealt(fireDamage, false);
         }
 
-        if (weapon.HasFrostEnchant && random.NextDouble() < GameConfig.FrostEnchantProcChance)
+        if (targetAlive && weapon.HasFrostEnchant && random.NextDouble() < GameConfig.FrostEnchantProcChance)
         {
             target.Defence = Math.Max(0, target.Defence - GameConfig.FrostEnchantAgiReduction);
             terminal.SetColor("bright_cyan");
             terminal.WriteLine(Loc.Get("combat.enchant_frost", target.Name));
         }
 
-        if (weapon.HasLightningEnchant && random.NextDouble() < GameConfig.LightningEnchantProcChance)
+        if (targetAlive && weapon.HasLightningEnchant && random.NextDouble() < GameConfig.LightningEnchantProcChance)
         {
             long lightningDamage = Math.Max(1, (long)(damage * GameConfig.LightningEnchantDamageMultiplier));
             target.HP = Math.Max(0, target.HP - lightningDamage);
-            if (target.StunImmunityRounds > 0)
+            // v0.60.0 stun-lock audit: route through TryStunMonster. Lightning enchant
+            // was the highest-volume cheese vector (15% per attack, multi-attack/dual-wield
+            // = ~50% per round, refresh-stack onto an already-stunned target).
+            bool stunned = TryStunMonster(target, 1);
+            terminal.SetColor("bright_yellow");
+            if (stunned)
             {
-                terminal.SetColor("bright_yellow");
-                terminal.WriteLine(isPlayer
-                    ? Loc.Get("combat.enchant_lightning_resist", lightningDamage, target.Name)
-                    : $"Lightning arcs from {name}'s strike! {lightningDamage} shock damage! {target.Name} resists the stun! (Thunderstrike)");
-            }
-            else
-            {
-                target.StunRounds = Math.Max(target.StunRounds, 1);
-                terminal.SetColor("bright_yellow");
                 terminal.WriteLine(isPlayer
                     ? Loc.Get("combat.enchant_lightning_stun", lightningDamage, target.Name)
                     : $"Lightning arcs from {name}'s strike! {lightningDamage} shock damage! {target.Name} is stunned! (Thunderstrike)");
+            }
+            else
+            {
+                terminal.WriteLine(isPlayer
+                    ? Loc.Get("combat.enchant_lightning_resist", lightningDamage, target.Name)
+                    : $"Lightning arcs from {name}'s strike! {lightningDamage} shock damage! {target.Name} resists the stun! (Thunderstrike)");
             }
             result.TotalDamageDealt += lightningDamage;
             attacker.Statistics?.RecordDamageDealt(lightningDamage, false);
         }
 
-        if (weapon.HasPoisonEnchant && random.NextDouble() < GameConfig.PoisonEnchantProcChance)
+        if (targetAlive && weapon.HasPoisonEnchant && random.NextDouble() < GameConfig.PoisonEnchantProcChance)
         {
             int poisonValue = weapon.PoisonDamage > 0 ? weapon.PoisonDamage : (int)(damage * 0.10);
             long poisonDamage = Math.Max(1, poisonValue);
@@ -7077,43 +7284,68 @@ public partial class CombatEngine
             attacker.Statistics?.RecordDamageDealt(poisonDamage, false);
         }
 
-        if (weapon.HasHolyEnchant && random.NextDouble() < GameConfig.HolyEnchantProcChance)
+        if (targetAlive && weapon.HasHolyEnchant && random.NextDouble() < GameConfig.HolyEnchantProcChance)
         {
-            bool isUndead = target.Name.Contains("Skeleton") || target.Name.Contains("Zombie") ||
-                            target.Name.Contains("Ghost") || target.Name.Contains("Lich") ||
-                            target.Name.Contains("Wraith") || target.Name.Contains("Vampire") ||
-                            target.Name.Contains("Undead") || target.Name.Contains("Revenant");
-            float holyMult = isUndead ? GameConfig.HolyEnchantDamageMultiplier * 2 : GameConfig.HolyEnchantDamageMultiplier;
-            long holyDamage = Math.Max(1, (long)(damage * holyMult));
-            target.HP = Math.Max(0, target.HP - holyDamage);
-            terminal.SetColor("bright_white");
-            terminal.WriteLine(isUndead
-                ? Loc.Get("combat.enchant_holy_undead", holyDamage)
-                : Loc.Get("combat.enchant_holy", holyDamage));
-            result.TotalDamageDealt += holyDamage;
-            attacker.Statistics?.RecordDamageDealt(holyDamage, false);
+            // v0.60.0, issue #91: angels are immune to holy damage. The proc rolls
+            // and the player is told the attempt was made and absorbed.
+            if (IsAngelMonster(target))
+            {
+                terminal.SetColor("bright_white");
+                terminal.WriteLine(Loc.Get("combat.enchant_holy_immune_angel", target.Name));
+            }
+            else
+            {
+                bool isUndead = target.Name.Contains("Skeleton") || target.Name.Contains("Zombie") ||
+                                target.Name.Contains("Ghost") || target.Name.Contains("Lich") ||
+                                target.Name.Contains("Wraith") || target.Name.Contains("Vampire") ||
+                                target.Name.Contains("Undead") || target.Name.Contains("Revenant");
+                float holyMult = isUndead ? GameConfig.HolyEnchantDamageMultiplier * 2 : GameConfig.HolyEnchantDamageMultiplier;
+                long holyDamage = Math.Max(1, (long)(damage * holyMult));
+                target.HP = Math.Max(0, target.HP - holyDamage);
+                terminal.SetColor("bright_white");
+                terminal.WriteLine(isUndead
+                    ? Loc.Get("combat.enchant_holy_undead", holyDamage)
+                    : Loc.Get("combat.enchant_holy", holyDamage));
+                result.TotalDamageDealt += holyDamage;
+                attacker.Statistics?.RecordDamageDealt(holyDamage, false);
+            }
         }
 
-        if (weapon.HasShadowEnchant && random.NextDouble() < GameConfig.ShadowEnchantProcChance)
+        if (targetAlive && weapon.HasShadowEnchant && random.NextDouble() < GameConfig.ShadowEnchantProcChance)
         {
-            long shadowDamage = Math.Max(1, (long)(damage * GameConfig.ShadowEnchantDamageMultiplier));
-            target.HP = Math.Max(0, target.HP - shadowDamage);
-            terminal.SetColor("dark_magenta");
-            terminal.WriteLine(Loc.Get("combat.enchant_shadow", shadowDamage));
-            result.TotalDamageDealt += shadowDamage;
-            attacker.Statistics?.RecordDamageDealt(shadowDamage, false);
+            // v0.60.0, issue #91: demons are immune to shadow damage. They are creatures
+            // of darkness; shadow magic slides off them.
+            if (IsDemonMonster(target))
+            {
+                terminal.SetColor("dark_magenta");
+                terminal.WriteLine(Loc.Get("combat.enchant_shadow_immune_demon", target.Name));
+            }
+            else
+            {
+                long shadowDamage = Math.Max(1, (long)(damage * GameConfig.ShadowEnchantDamageMultiplier));
+                target.HP = Math.Max(0, target.HP - shadowDamage);
+                terminal.SetColor("dark_magenta");
+                terminal.WriteLine(Loc.Get("combat.enchant_shadow", shadowDamage));
+                result.TotalDamageDealt += shadowDamage;
+                attacker.Statistics?.RecordDamageDealt(shadowDamage, false);
+            }
         }
 
         // Mana steal proc
         int manaStealPct = attacker.GetEquipmentManaSteal();
         if (manaStealPct > 0 && damage > 0)
         {
-            long manaRestored = Math.Max(1, damage * manaStealPct / 100);
-            attacker.Mana = Math.Min(attacker.MaxMana, attacker.Mana + (int)manaRestored);
-            terminal.SetColor("blue");
-            terminal.WriteLine(isPlayer
-                ? Loc.Get("combat.enchant_siphon", manaRestored)
-                : $"{name}'s weapon siphons {manaRestored} mana! (Siphon)");
+            // v0.60.0, issue #91: angels carry no mana to siphon. The proc fizzles
+            // silently rather than spam a message every hit.
+            if (!IsAngelMonster(target))
+            {
+                long manaRestored = Math.Max(1, damage * manaStealPct / 100);
+                attacker.Mana = Math.Min(attacker.MaxMana, attacker.Mana + (int)manaRestored);
+                terminal.SetColor("blue");
+                terminal.WriteLine(isPlayer
+                    ? Loc.Get("combat.enchant_siphon", manaRestored)
+                    : $"{name}'s weapon siphons {manaRestored} mana! (Siphon)");
+            }
         }
     }
 
@@ -7125,7 +7357,11 @@ public partial class CombatEngine
         var weapon = attacker.GetEquipment(EquipmentSlot.MainHand);
         if (weapon == null) return;
 
-        if (weapon.HasFireEnchant && random.NextDouble() < GameConfig.FireEnchantProcChance)
+        // v0.60.0, issue #88: skip damage-and-status procs when the basic attack
+        // already killed the target. See twin in CheckElementalEnchantProcs.
+        bool targetAlive = target.HP > 0 && target.IsAlive;
+
+        if (targetAlive && weapon.HasFireEnchant && random.NextDouble() < GameConfig.FireEnchantProcChance)
         {
             long fireDamage = Math.Max(1, (long)(damage * GameConfig.FireEnchantDamageMultiplier));
             target.HP -= fireDamage;
@@ -7134,32 +7370,27 @@ public partial class CombatEngine
             attacker.Statistics?.RecordDamageDealt(fireDamage, false);
         }
 
-        if (weapon.HasFrostEnchant && random.NextDouble() < GameConfig.FrostEnchantProcChance)
+        if (targetAlive && weapon.HasFrostEnchant && random.NextDouble() < GameConfig.FrostEnchantProcChance)
         {
             target.Defence = Math.Max(0, target.Defence - GameConfig.FrostEnchantAgiReduction);
             terminal.SetColor("bright_cyan");
             terminal.WriteLine(Loc.Get("combat.enchant_frost_multi", target.Name));
         }
 
-        if (weapon.HasLightningEnchant && random.NextDouble() < GameConfig.LightningEnchantProcChance)
+        if (targetAlive && weapon.HasLightningEnchant && random.NextDouble() < GameConfig.LightningEnchantProcChance)
         {
             long lightningDamage = Math.Max(1, (long)(damage * GameConfig.LightningEnchantDamageMultiplier));
             target.HP -= lightningDamage;
-            if (target.StunImmunityRounds > 0)
-            {
-                terminal.SetColor("bright_yellow");
-                terminal.WriteLine(Loc.Get("combat.enchant_lightning_resist_multi", lightningDamage, target.Name));
-            }
-            else
-            {
-                target.StunRounds = Math.Max(target.StunRounds, 1);
-                terminal.SetColor("bright_yellow");
-                terminal.WriteLine(Loc.Get("combat.enchant_lightning_stun_multi", lightningDamage, target.Name));
-            }
+            // v0.60.0 stun-lock audit: route through TryStunMonster (see single-monster twin)
+            bool stunned = TryStunMonster(target, 1);
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine(stunned
+                ? Loc.Get("combat.enchant_lightning_stun_multi", lightningDamage, target.Name)
+                : Loc.Get("combat.enchant_lightning_resist_multi", lightningDamage, target.Name));
             attacker.Statistics?.RecordDamageDealt(lightningDamage, false);
         }
 
-        if (weapon.HasPoisonEnchant && random.NextDouble() < GameConfig.PoisonEnchantProcChance)
+        if (targetAlive && weapon.HasPoisonEnchant && random.NextDouble() < GameConfig.PoisonEnchantProcChance)
         {
             int poisonValue = weapon.PoisonDamage > 0 ? weapon.PoisonDamage : (int)(damage * 0.10);
             long poisonDamage = Math.Max(1, poisonValue);
@@ -7169,39 +7400,61 @@ public partial class CombatEngine
             attacker.Statistics?.RecordDamageDealt(poisonDamage, false);
         }
 
-        if (weapon.HasHolyEnchant && random.NextDouble() < GameConfig.HolyEnchantProcChance)
+        if (targetAlive && weapon.HasHolyEnchant && random.NextDouble() < GameConfig.HolyEnchantProcChance)
         {
-            bool isUndead = target.Name.Contains("Skeleton") || target.Name.Contains("Zombie") ||
-                            target.Name.Contains("Ghost") || target.Name.Contains("Lich") ||
-                            target.Name.Contains("Wraith") || target.Name.Contains("Vampire") ||
-                            target.Name.Contains("Undead") || target.Name.Contains("Revenant");
-            float holyMult = isUndead ? GameConfig.HolyEnchantDamageMultiplier * 2 : GameConfig.HolyEnchantDamageMultiplier;
-            long holyDamage = Math.Max(1, (long)(damage * holyMult));
-            target.HP -= holyDamage;
-            terminal.SetColor("bright_white");
-            terminal.WriteLine(isUndead
-                ? Loc.Get("combat.enchant_holy_undead_multi", holyDamage, target.Name)
-                : Loc.Get("combat.enchant_holy_multi", holyDamage, target.Name));
-            attacker.Statistics?.RecordDamageDealt(holyDamage, false);
+            // v0.60.0, issue #91: angels are immune to holy damage.
+            if (IsAngelMonster(target))
+            {
+                terminal.SetColor("bright_white");
+                terminal.WriteLine(Loc.Get("combat.enchant_holy_immune_angel", target.Name));
+            }
+            else
+            {
+                bool isUndead = target.Name.Contains("Skeleton") || target.Name.Contains("Zombie") ||
+                                target.Name.Contains("Ghost") || target.Name.Contains("Lich") ||
+                                target.Name.Contains("Wraith") || target.Name.Contains("Vampire") ||
+                                target.Name.Contains("Undead") || target.Name.Contains("Revenant");
+                float holyMult = isUndead ? GameConfig.HolyEnchantDamageMultiplier * 2 : GameConfig.HolyEnchantDamageMultiplier;
+                long holyDamage = Math.Max(1, (long)(damage * holyMult));
+                target.HP -= holyDamage;
+                terminal.SetColor("bright_white");
+                terminal.WriteLine(isUndead
+                    ? Loc.Get("combat.enchant_holy_undead_multi", holyDamage, target.Name)
+                    : Loc.Get("combat.enchant_holy_multi", holyDamage, target.Name));
+                attacker.Statistics?.RecordDamageDealt(holyDamage, false);
+            }
         }
 
-        if (weapon.HasShadowEnchant && random.NextDouble() < GameConfig.ShadowEnchantProcChance)
+        if (targetAlive && weapon.HasShadowEnchant && random.NextDouble() < GameConfig.ShadowEnchantProcChance)
         {
-            long shadowDamage = Math.Max(1, (long)(damage * GameConfig.ShadowEnchantDamageMultiplier));
-            target.HP -= shadowDamage;
-            terminal.SetColor("dark_magenta");
-            terminal.WriteLine(Loc.Get("combat.enchant_shadow_multi", shadowDamage, target.Name));
-            attacker.Statistics?.RecordDamageDealt(shadowDamage, false);
+            // v0.60.0, issue #91: demons are immune to shadow damage.
+            if (IsDemonMonster(target))
+            {
+                terminal.SetColor("dark_magenta");
+                terminal.WriteLine(Loc.Get("combat.enchant_shadow_immune_demon", target.Name));
+            }
+            else
+            {
+                long shadowDamage = Math.Max(1, (long)(damage * GameConfig.ShadowEnchantDamageMultiplier));
+                target.HP -= shadowDamage;
+                terminal.SetColor("dark_magenta");
+                terminal.WriteLine(Loc.Get("combat.enchant_shadow_multi", shadowDamage, target.Name));
+                attacker.Statistics?.RecordDamageDealt(shadowDamage, false);
+            }
         }
 
         // Mana steal proc
         int manaStealPct = attacker.GetEquipmentManaSteal();
         if (manaStealPct > 0 && damage > 0)
         {
-            long manaRestored = Math.Max(1, damage * manaStealPct / 100);
-            attacker.Mana = Math.Min(attacker.MaxMana, attacker.Mana + (int)manaRestored);
-            terminal.SetColor("blue");
-            terminal.WriteLine(Loc.Get("combat.enchant_siphon_multi", manaRestored));
+            // v0.60.0, issue #91: angels carry no mana to siphon.
+            if (!IsAngelMonster(target))
+            {
+                long manaRestored = Math.Max(1, damage * manaStealPct / 100);
+                attacker.Mana = Math.Min(attacker.MaxMana, attacker.Mana + (int)manaRestored);
+                terminal.SetColor("blue");
+                terminal.WriteLine(Loc.Get("combat.enchant_siphon_multi", manaRestored));
+            }
         }
     }
 
@@ -8974,16 +9227,34 @@ public partial class CombatEngine
             {
                 var mainEquip = teammate.GetEquipment(EquipmentSlot.MainHand);
                 var offEquip = teammate.GetEquipment(EquipmentSlot.OffHand);
-                // Use weighted scoring (WP*3 + stats) to pick the weaker slot
-                int mainScore = mainEquip != null ? (mainEquip.WeaponPower * 3 + mainEquip.StrengthBonus + mainEquip.DexterityBonus
-                    + mainEquip.IntelligenceBonus + mainEquip.WisdomBonus + mainEquip.ConstitutionBonus
-                    + mainEquip.CharismaBonus + mainEquip.AgilityBonus + mainEquip.DefenceBonus) : 0;
-                int offScore = offEquip != null ? (offEquip.WeaponPower * 3 + offEquip.StrengthBonus + offEquip.DexterityBonus
-                    + offEquip.IntelligenceBonus + offEquip.WisdomBonus + offEquip.ConstitutionBonus
-                    + offEquip.CharismaBonus + offEquip.AgilityBonus + offEquip.DefenceBonus) : 0;
-                // Pick the weaker slot to compare against
-                if (offScore < mainScore)
-                    actualSlot = EquipmentSlot.OffHand;
+
+                // v0.60.0, issue #86: defense-in-depth shield detection. If the OffHand
+                // item smells like a shield (stat signals or name keywords) even though
+                // its WeaponType isn't one of the three Shield types, treat it as
+                // sword-and-board and SKIP the dual-wield slot-swap. Without this guard,
+                // a shield mis-typed as a one-handed weapon (rare but possible from
+                // older saves) lets IsDualWielding return true, the off-score reads as
+                // ~0, and any new weapon compares against the shield's blank stats and
+                // looks like a huge upgrade. Player report: "autocompare says some
+                // weapons are an upgrade because they're better than my shield, but much
+                // worse than my weapon."
+                bool offhandSmellsLikeShield = offEquip != null &&
+                    (offEquip.BlockChance > 0 ||
+                     offEquip.ShieldBonus > 0 ||
+                     ShopItemGenerator.LooksLikeShieldByName(offEquip.Name));
+                if (!offhandSmellsLikeShield)
+                {
+                    // Use weighted scoring (WP*3 + stats) to pick the weaker slot
+                    int mainScore = mainEquip != null ? (mainEquip.WeaponPower * 3 + mainEquip.StrengthBonus + mainEquip.DexterityBonus
+                        + mainEquip.IntelligenceBonus + mainEquip.WisdomBonus + mainEquip.ConstitutionBonus
+                        + mainEquip.CharismaBonus + mainEquip.AgilityBonus + mainEquip.DefenceBonus) : 0;
+                    int offScore = offEquip != null ? (offEquip.WeaponPower * 3 + offEquip.StrengthBonus + offEquip.DexterityBonus
+                        + offEquip.IntelligenceBonus + offEquip.WisdomBonus + offEquip.ConstitutionBonus
+                        + offEquip.CharismaBonus + offEquip.AgilityBonus + offEquip.DefenceBonus) : 0;
+                    // Pick the weaker slot to compare against
+                    if (offScore < mainScore)
+                        actualSlot = EquipmentSlot.OffHand;
+                }
             }
             // For rings, pick the per-teammate best slot (empty first, then weaker
             // ring) so a strong ring on RFinger doesn't make a strictly-better drop
@@ -11063,7 +11334,15 @@ public partial class CombatEngine
                 terminal.Write(Loc.Get("combat.choose_action"));
             }
 
+            // v0.60.0 bot-detection Tier 1: see GetPlayerAction for full rationale.
+            var __botDetectStartUtc = DateTime.UtcNow;
             var input = await terminal.GetInput("");
+            try
+            {
+                var __responseMs = (DateTime.UtcNow - __botDetectStartUtc).TotalMilliseconds;
+                BotDetectionSystem.RecordCombatInput(SessionContext.Current?.Username, __responseMs);
+            }
+            catch { /* never let instrumentation break combat */ }
             var action = new CombatAction();
 
             switch (input.Trim().ToUpper())
@@ -12304,6 +12583,29 @@ public partial class CombatEngine
                 terminal.SetColor("dark_red");
                 terminal.WriteLine(Loc.Get("combat.shadow_harvest_feast", target.Name));
             }
+            else if (abilityResult.SpecialEffect == "double_vs_debuffed" && target != null)
+            {
+                // Wavecaller Wave Echo: damage doubles vs any debuffed target (weaken/poison/stun/etc).
+                // Previously a separate post-damage handler at the SpecialEffect switch added more damage
+                // and gated on `target.IsAlive`; once a Lv.55+ Wavecaller could one-shot floor-54 monsters
+                // with the base damage, the IsAlive check failed and the resonance message Lumina expected
+                // never printed. Inlined here like Backstab / Shadow Harvest so the doubling and the
+                // flavor message are applied to the same damage event the standard combat line reports.
+                bool waveEchoDebuffed = target.Poisoned || target.Stunned || target.Charmed || target.Distracted
+                    || target.WeakenRounds > 0 || target.IsSlowed || target.IsMarked
+                    || target.IsCorroded || target.IsFeared || target.IsConfused || target.IsSleeping || target.IsFrozen;
+                if (waveEchoDebuffed)
+                {
+                    actualDamage *= 2;
+                    terminal.SetColor("bright_cyan");
+                    terminal.WriteLine(Loc.Get("combat.wave_echo_resonates", target.Name));
+                }
+                else
+                {
+                    terminal.SetColor("bright_cyan");
+                    terminal.WriteLine(Loc.Get("combat.wave_echo_strikes", target.Name));
+                }
+            }
             else if (abilityResult.SpecialEffect == "aoe" || abilityResult.SpecialEffect == "aoe_confusion")
             {
                 // AoE abilities hit all monsters
@@ -12566,16 +12868,15 @@ public partial class CombatEngine
             case "stun":
                 if (target != null && target.IsAlive && random.Next(100) < 60)
                 {
-                    if (target.StunImmunityRounds > 0)
+                    if (TryStunMonster(target, 1))
                     {
                         terminal.SetColor("yellow");
-                        terminal.WriteLine(Loc.Get("combat.ability_stun_resist", target.Name));
+                        terminal.WriteLine(Loc.Get("combat.ability_stunned", target.Name));
                     }
                     else
                     {
-                        target.Stunned = true;
                         terminal.SetColor("yellow");
-                        terminal.WriteLine(Loc.Get("combat.ability_stunned", target.Name));
+                        terminal.WriteLine(Loc.Get("combat.ability_stun_resist", target.Name));
                     }
                 }
                 break;
@@ -13294,17 +13595,15 @@ public partial class CombatEngine
             case "legendary":
                 if (target != null && target.IsAlive)
                 {
-                    if (target.StunImmunityRounds > 0)
+                    if (TryStunMonster(target, 1))
                     {
                         terminal.SetColor("bright_yellow");
-                        terminal.WriteLine(Loc.Get("combat.ability_legendary_resist", target.Name));
+                        terminal.WriteLine(Loc.Get("combat.ability_legendary_stagger", target.Name));
                     }
                     else
                     {
-                        target.IsStunned = true;
-                        target.StunDuration = 1;
                         terminal.SetColor("bright_yellow");
-                        terminal.WriteLine(Loc.Get("combat.ability_legendary_stagger", target.Name));
+                        terminal.WriteLine(Loc.Get("combat.ability_legendary_resist", target.Name));
                     }
                 }
                 break;
@@ -13563,24 +13862,9 @@ public partial class CombatEngine
                 break;
 
             case "double_vs_debuffed":
-                // Double damage if target is debuffed
-                if (target != null && target.IsAlive)
-                {
-                    bool isDebuffed = target.Poisoned || target.Stunned || target.Charmed || target.Distracted ||
-                        target.WeakenRounds > 0 || target.IsSlowed || target.IsMarked ||
-                        target.IsCorroded || target.IsFeared || target.IsConfused || target.IsSleeping || target.IsFrozen;
-                    int dmg = abilityResult.Damage;
-                    if (isDebuffed) dmg *= 2;
-                    target.HP -= dmg;
-                    terminal.SetColor("bright_cyan");
-                    terminal.WriteLine(Loc.Get(isDebuffed ? "combat.ability_double_vs_debuffed_resonance" : "combat.ability_double_vs_debuffed", target.Name, dmg));
-                    if (target.HP <= 0)
-                    {
-                        target.HP = 0;
-                        if (!result.DefeatedMonsters.Contains(target))
-                            result.DefeatedMonsters.Add(target);
-                    }
-                }
+                // No-op. Wave Echo's doubling and resonance message are applied inline in the
+                // base-damage block above (see "double_vs_debuffed" branch around line 12300).
+                // Keeping the case so unrouted ability code paths don't spam a "no handler" warning.
                 break;
 
             case "empathic_link":
@@ -13960,22 +14244,19 @@ public partial class CombatEngine
             }
 
             case "temporal_prison":
-                // Target cannot act for 2 rounds (boss: 1)
+                // Target cannot act for 2 rounds (boss: 1, further capped by TryStunMonster's boss cap)
                 if (target != null && target.IsAlive)
                 {
-                    if (target.StunImmunityRounds > 0)
+                    int requestedDur = target.IsBoss ? 1 : (abilityResult.Duration > 0 ? abilityResult.Duration : 2);
+                    if (TryStunMonster(target, requestedDur))
                     {
                         terminal.SetColor("bright_magenta");
-                        terminal.WriteLine(Loc.Get("combat.ability_temporal_prison_resist", target.Name));
+                        terminal.WriteLine(Loc.Get("combat.ability_temporal_prison", target.Name, target.StunDuration));
                     }
                     else
                     {
-                        int dur = target.IsBoss ? 1 : (abilityResult.Duration > 0 ? abilityResult.Duration : 2);
-                        target.Stunned = true;
-                        target.IsStunned = true;
-                        target.StunDuration = Math.Max(target.StunDuration, dur);
                         terminal.SetColor("bright_magenta");
-                        terminal.WriteLine(Loc.Get("combat.ability_temporal_prison", target.Name, dur));
+                        terminal.WriteLine(Loc.Get("combat.ability_temporal_prison_resist", target.Name));
                     }
                 }
                 break;
@@ -14810,6 +15091,20 @@ public partial class CombatEngine
                             tm.TempAttackBonusDuration = Math.Max(tm.TempAttackBonusDuration, dur);
                             terminal.WriteLine(Loc.Get("combat.power_surges", tm.DisplayName, spellResult.AttackBonus), "red");
                         }
+                        // Symphony of the Depths and any other multi-target buff that
+                        // sets the caster's Hidden status as an "auto-crit on next attack"
+                        // marker should propagate that crit to teammates too. The spell
+                        // description for Symphony is explicit: "All allies: ... guaranteed
+                        // crit on next hit", but until v0.60.0 only the caster received
+                        // the Hidden flag in SpellSystem, so teammates' next attacks were
+                        // normal. Use Hidden=2 to match the caster (also matches the
+                        // shadow-ability convention that already used 2). Teammates have
+                        // no per-round ProcessStatusEffects tick so the value matters less
+                        // for them, but keeping it consistent simplifies reasoning.
+                        if (player.HasStatus(StatusEffect.Hidden) && !tm.HasStatus(StatusEffect.Hidden))
+                        {
+                            tm.ApplyStatus(StatusEffect.Hidden, 2);
+                        }
                     }
                 }
 
@@ -14988,6 +15283,18 @@ public partial class CombatEngine
                     damage = spellInfo.Level * 50 + (player.Intelligence / 2);
                 }
 
+                // v0.60.0, issue #85: Turn Undead does no damage to non-undead/non-demon
+                // targets. Mirror of the gate in ApplySpellEffects (single-monster combat path).
+                bool turnUndeadOnLiving = spellResult.SpecialEffect == "turn_undead" &&
+                    target.MonsterClass != MonsterClass.Undead &&
+                    target.MonsterClass != MonsterClass.Demon &&
+                    target.Undead == 0;
+                if (turnUndeadOnLiving)
+                {
+                    terminal.WriteLine(Loc.Get("combat.spell_turn_undead_unaffected", target.Name), "gray");
+                    damage = 0;
+                }
+
                 if (damage > 0)
                 {
                     damage = DifficultySystem.ApplyPlayerDamageMultiplier(damage);
@@ -15047,16 +15354,10 @@ public partial class CombatEngine
 
             case "stun":
             case "lightning":
-                if (target.StunImmunityRounds > 0)
-                {
-                    terminal.WriteLine(Loc.Get("combat.spell_resist_stun", target.Name), "yellow");
-                }
-                else
-                {
-                    target.IsStunned = true;
-                    target.StunDuration = duration > 0 ? duration : 1;
+                if (TryStunMonster(target, duration > 0 ? duration : 1))
                     terminal.WriteLine(Loc.Get("combat.spell_stunned", target.Name), "bright_yellow");
-                }
+                else
+                    terminal.WriteLine(Loc.Get("combat.spell_resist_stun", target.Name), "yellow");
                 break;
 
             case "slow":
@@ -15084,16 +15385,10 @@ public partial class CombatEngine
                 break;
 
             case "web":
-                if (target.StunImmunityRounds > 0)
-                {
-                    terminal.WriteLine(Loc.Get("combat.spell_web_resist", target.Name), "white");
-                }
-                else
-                {
-                    target.IsStunned = true;
-                    target.StunDuration = duration > 0 ? duration : 2;
+                if (TryStunMonster(target, duration > 0 ? duration : 2))
                     terminal.WriteLine(Loc.Get("combat.spell_web", target.Name), "white");
-                }
+                else
+                    terminal.WriteLine(Loc.Get("combat.spell_web_resist", target.Name), "white");
                 break;
 
             case "confusion":
@@ -15325,16 +15620,10 @@ public partial class CombatEngine
 
             case "temporal":
                 // Temporal Paradox: trap in time loop — stun for 2 rounds
-                if (target.StunImmunityRounds > 0)
-                {
-                    terminal.WriteLine(Loc.Get("combat.resists_time_loop", target.Name), "yellow");
-                }
-                else
-                {
-                    target.IsStunned = true;
-                    target.StunDuration = duration > 0 ? duration : 2;
+                if (TryStunMonster(target, duration > 0 ? duration : 2))
                     terminal.WriteLine(Loc.Get("combat.trapped_time_loop", target.Name), "bright_cyan");
-                }
+                else
+                    terminal.WriteLine(Loc.Get("combat.resists_time_loop", target.Name), "yellow");
                 break;
 
             case "paradox_collapse":
@@ -15424,16 +15713,14 @@ public partial class CombatEngine
                     }
                     else if (effectRoll < 70)
                     {
-                        if (target.StunImmunityRounds > 0)
+                        if (TryStunMonster(target, 3 + random.Next(1, 4)))
                         {
-                            terminal.WriteLine(Loc.Get("combat.spell_convert_pacify_resist", target.Name), "bright_green");
+                            terminal.WriteLine(Loc.Get("combat.spell_convert_pacify", target.Name), "bright_green");
+                            target.IsFriendly = true;
                         }
                         else
                         {
-                            terminal.WriteLine(Loc.Get("combat.spell_convert_pacify", target.Name), "bright_green");
-                            target.IsStunned = true;
-                            target.StunDuration = 3 + random.Next(1, 4);
-                            target.IsFriendly = true;
+                            terminal.WriteLine(Loc.Get("combat.spell_convert_pacify_resist", target.Name), "bright_green");
                         }
                     }
                     else
@@ -16033,6 +16320,24 @@ public partial class CombatEngine
     /// </summary>
     private async Task ProcessTeammateActionMultiMonster(Character teammate, List<Monster> monsters, CombatResult result)
     {
+        if (!teammate.IsAlive) return;
+
+        // v0.60.0: tick statuses + skip turn for control effects (see ProcessTeammateAction
+        // for the full rationale (the "Stun only works on enemies" player report).
+        foreach (var (msg, color) in teammate.ProcessStatusEffects())
+        {
+            terminal.WriteLine(msg, color);
+        }
+        if (!teammate.IsAlive) return; // DoT could have killed the teammate
+        if (!teammate.CanAct())
+        {
+            var preventingStatus = teammate.ActiveStatuses.Keys.FirstOrDefault(s => s.PreventsAction());
+            terminal.SetColor("yellow");
+            terminal.WriteLine(Loc.Get("combat.teammate_status_prevented", teammate.DisplayName, preventingStatus.ToString().ToLower()));
+            await Task.Delay(GetCombatDelay(800));
+            return;
+        }
+
         // Build list of all party members (player + teammates) for healing decisions
         var allPartyMembers = new List<Character> { currentPlayer };
         if (currentTeammates != null)
@@ -16449,20 +16754,32 @@ public partial class CombatEngine
     /// Get the best offensive spell the character can cast based on their current mana
     /// Prefers AoE spells when multiple enemies exist, otherwise single-target
     /// </summary>
-    private SpellSystem.SpellInfo? GetBestOffensiveSpell(Character caster, bool preferAoE)
+    private SpellSystem.SpellInfo? GetBestOffensiveSpell(Character caster, bool preferAoE, List<Monster>? availableTargets = null)
     {
         var spells = SpellSystem.GetAllSpellsForClass(caster.Class);
         if (spells == null || spells.Count == 0) return null;
 
-        // v0.57.11: parallel to `GetBestHealSpell` — drop spells the player has
+        // v0.57.11: parallel to `GetBestHealSpell`. Drop spells the player has
         // disabled on this companion at the Inn Combat Skills screen.
         var disabledSpells = GetDisabledSpellsFor(caster);
+
+        // v0.60.0, issue #85: target-aware filter for spells that whiff on the
+        // current encounter. Turn Undead does zero damage to non-undead/non-demon
+        // enemies, so a Cleric companion in a fight against orcs would burn a turn
+        // on a guaranteed no-op. Drop it from the candidate list when no valid
+        // target exists.
+        bool hasUndeadOrDemonTarget = availableTargets != null &&
+            availableTargets.Any(m => m.IsAlive &&
+                (m.MonsterClass == MonsterClass.Undead ||
+                 m.MonsterClass == MonsterClass.Demon ||
+                 m.Undead > 0));
 
         var availableAttacks = spells
             .Where(s => s.SpellType == "Attack" &&
                         caster.Level >= SpellSystem.GetLevelRequired(caster.Class, s.Level) &&
                         caster.Mana >= SpellSystem.CalculateManaCost(s, caster) &&
-                        !disabledSpells.Contains(s.Name))
+                        !disabledSpells.Contains(s.Name) &&
+                        !(s.Name == "Turn Undead" && availableTargets != null && !hasUndeadOrDemonTarget))
             .ToList();
 
         if (availableAttacks.Count == 0) return null;
@@ -16503,7 +16820,7 @@ public partial class CombatEngine
         if (livingMonsters.Count == 0) return false;
 
         bool preferAoE = livingMonsters.Count >= 3;
-        var spell = GetBestOffensiveSpell(teammate, preferAoE);
+        var spell = GetBestOffensiveSpell(teammate, preferAoE, livingMonsters);
 
         if (spell == null) return false;
 
@@ -19672,6 +19989,24 @@ public partial class CombatEngine
                 terminal.SetColor("dark_red");
                 terminal.WriteLine(Loc.Get("combat.shadow_harvest_feast", monster.Name));
             }
+            else if (abilityResult.SpecialEffect == "double_vs_debuffed" && monster != null)
+            {
+                // Wavecaller Wave Echo: doubling moved inline (see multi-monster comment for details).
+                bool waveEchoDebuffed = monster.Poisoned || monster.Stunned || monster.Charmed || monster.Distracted
+                    || monster.WeakenRounds > 0 || monster.IsSlowed || monster.IsMarked
+                    || monster.IsCorroded || monster.IsFeared || monster.IsConfused || monster.IsSleeping || monster.IsFrozen;
+                if (waveEchoDebuffed)
+                {
+                    actualDamage *= 2;
+                    terminal.SetColor("bright_cyan");
+                    terminal.WriteLine(Loc.Get("combat.wave_echo_resonates", monster.Name));
+                }
+                else
+                {
+                    terminal.SetColor("bright_cyan");
+                    terminal.WriteLine(Loc.Get("combat.wave_echo_strikes", monster.Name));
+                }
+            }
 
             // v0.57.2 — Hidden status guaranteed crit on ability (Umbral Step, stealth attacks).
             // Previously only basic attacks honored Hidden; abilities skipped it.
@@ -19848,15 +20183,10 @@ public partial class CombatEngine
             case "stun":
                 if (monster != null && random.Next(100) < 60)
                 {
-                    if (monster.StunImmunityRounds > 0)
-                    {
-                        terminal.WriteLine(Loc.Get("combat.resists_stun", monster.Name), "yellow");
-                    }
-                    else
-                    {
-                        monster.Stunned = true;
+                    if (TryStunMonster(monster, 1))
                         terminal.WriteLine(Loc.Get("combat.is_stunned", monster.Name), "yellow");
-                    }
+                    else
+                        terminal.WriteLine(Loc.Get("combat.resists_stun", monster.Name), "yellow");
                 }
                 break;
 
@@ -20467,18 +20797,11 @@ public partial class CombatEngine
             case "legendary":
                 if (monster != null && monster.IsAlive)
                 {
-                    if (monster.StunImmunityRounds > 0)
-                    {
-                        terminal.SetColor("bright_yellow");
-                        terminal.WriteLine(Loc.Get("combat.legendary_shot_withstands", monster.Name));
-                    }
-                    else
-                    {
-                        monster.IsStunned = true;
-                        monster.StunDuration = 1;
-                        terminal.SetColor("bright_yellow");
+                    terminal.SetColor("bright_yellow");
+                    if (TryStunMonster(monster, 1))
                         terminal.WriteLine(Loc.Get("combat.legendary_shot_staggers", monster.Name));
-                    }
+                    else
+                        terminal.WriteLine(Loc.Get("combat.legendary_shot_withstands", monster.Name));
                 }
                 break;
 
@@ -20748,24 +21071,8 @@ public partial class CombatEngine
                 break;
 
             case "double_vs_debuffed":
-                // Double damage if target is debuffed
-                if (monster != null && monster.IsAlive)
-                {
-                    bool isDebuffed = monster.Poisoned || monster.Stunned || monster.Charmed || monster.Distracted ||
-                        monster.WeakenRounds > 0 || monster.IsSlowed || monster.IsMarked ||
-                        monster.IsCorroded || monster.IsFeared || monster.IsConfused || monster.IsSleeping || monster.IsFrozen;
-                    int dvdDmg = abilityResult.Damage;
-                    if (isDebuffed) dvdDmg *= 2;
-                    monster.HP -= dvdDmg;
-                    terminal.SetColor("bright_cyan");
-                    terminal.WriteLine(Loc.Get(isDebuffed ? "combat.ability_double_vs_debuffed_resonance" : "combat.ability_double_vs_debuffed", monster.Name, dvdDmg));
-                    if (monster.HP <= 0)
-                    {
-                        monster.HP = 0;
-                        if (!result.DefeatedMonsters.Contains(monster))
-                            result.DefeatedMonsters.Add(monster);
-                    }
-                }
+                // No-op. Wave Echo's doubling and resonance message are applied inline in the
+                // base-damage block above (see "double_vs_debuffed" branch in ApplyAbilityEffects).
                 break;
 
             case "empathic_link":
@@ -20846,9 +21153,9 @@ public partial class CombatEngine
                     monster.WeakenRounds = Math.Max(monster.WeakenRounds, abilityResult.Duration);
                     monster.IsMarked = true;
                     monster.MarkedDuration = Math.Max(monster.MarkedDuration, abilityResult.Duration);
-                    if (random.Next(100) < 25 && monster.StunImmunityRounds <= 0) monster.Stunned = true;
+                    bool dissonantStun = random.Next(100) < 25 && TryStunMonster(monster, 1);
                     terminal.SetColor("magenta");
-                    terminal.WriteLine(Loc.Get(monster.Stunned ? "combat.ability_dissonant_wave_stun" : "combat.ability_dissonant_wave", monster.Name));
+                    terminal.WriteLine(Loc.Get(dissonantStun ? "combat.ability_dissonant_wave_stun" : "combat.ability_dissonant_wave", monster.Name));
                 }
                 break;
 
@@ -21117,23 +21424,15 @@ public partial class CombatEngine
             }
 
             case "temporal_prison":
-                // Target cannot act for 2 rounds (boss: 1)
+                // Target cannot act for 2 rounds (boss: 1, further capped by TryStunMonster's boss cap)
                 if (monster != null && monster.IsAlive)
                 {
-                    if (monster.StunImmunityRounds > 0)
-                    {
-                        terminal.SetColor("bright_magenta");
-                        terminal.WriteLine(Loc.Get("combat.ability_temporal_prison_resist", monster.Name));
-                    }
+                    int tpReqDur = monster.IsBoss ? 1 : (abilityResult.Duration > 0 ? abilityResult.Duration : 2);
+                    terminal.SetColor("bright_magenta");
+                    if (TryStunMonster(monster, tpReqDur))
+                        terminal.WriteLine(Loc.Get("combat.ability_temporal_prison", monster.Name, monster.StunDuration));
                     else
-                    {
-                        int tpDur = monster.IsBoss ? 1 : (abilityResult.Duration > 0 ? abilityResult.Duration : 2);
-                        monster.Stunned = true;
-                        monster.IsStunned = true;
-                        monster.StunDuration = Math.Max(monster.StunDuration, tpDur);
-                        terminal.SetColor("bright_magenta");
-                        terminal.WriteLine(Loc.Get("combat.ability_temporal_prison", monster.Name, tpDur));
-                    }
+                        terminal.WriteLine(Loc.Get("combat.ability_temporal_prison_resist", monster.Name));
                 }
                 break;
 
@@ -22972,23 +23271,39 @@ public partial class CombatEngine
         // Apply damage to target
         if (spellResult.Damage > 0 && target != null)
         {
-            // Apply boss-layer protections (magical immunity, divine armor) that were
-            // previously bypassed here — direct HP subtraction let spells hit Old God
-            // bosses at full damage regardless of their immunity phase.
-            long spellDamage = ApplyBossSpellProtections(target, spellResult.Damage, announce: true);
-            target.HP = Math.Max(0, target.HP - spellDamage);
-            terminal.WriteLine(Loc.Get("combat.target_takes_damage_flat", target.Name, spellDamage), "red");
-
-            // Track spell damage dealt for boss kill summary / telemetry
-            if (result != null)
+            // v0.60.0, issue #85: Turn Undead is gated to undead and demon targets only.
+            // Living enemies receive no damage and the spell effectively whiffs. Player
+            // expectation matches the D&D-style "Turn Undead" namesake; previously the
+            // spell did full base damage to anything because its SpecialEffect was
+            // generic "holy" (which only adds a +50% bonus on top of regular damage).
+            bool turnUndeadOnLiving = spellResult.SpecialEffect == "turn_undead" &&
+                target.MonsterClass != MonsterClass.Undead &&
+                target.MonsterClass != MonsterClass.Demon &&
+                target.Undead == 0;
+            if (turnUndeadOnLiving)
             {
-                result.TotalDamageDealt += spellDamage;
-                result.Player?.Statistics.RecordDamageDealt(spellDamage, false);
+                terminal.WriteLine(Loc.Get("combat.spell_turn_undead_unaffected", target.Name), "gray");
             }
-
-            if (target.HP <= 0)
+            else
             {
-                terminal.WriteLine(Loc.Get("combat.slain_by_magic", target.Name), "dark_red");
+                // Apply boss-layer protections (magical immunity, divine armor) that were
+                // previously bypassed here, since direct HP subtraction let spells hit Old God
+                // bosses at full damage regardless of their immunity phase.
+                long spellDamage = ApplyBossSpellProtections(target, spellResult.Damage, announce: true);
+                target.HP = Math.Max(0, target.HP - spellDamage);
+                terminal.WriteLine(Loc.Get("combat.target_takes_damage_flat", target.Name, spellDamage), "red");
+
+                // Track spell damage dealt for boss kill summary / telemetry
+                if (result != null)
+                {
+                    result.TotalDamageDealt += spellDamage;
+                    result.Player?.Statistics.RecordDamageDealt(spellDamage, false);
+                }
+
+                if (target.HP <= 0)
+                {
+                    terminal.WriteLine(Loc.Get("combat.slain_by_magic", target.Name), "dark_red");
+                }
             }
         }
         
@@ -23064,19 +23379,13 @@ public partial class CombatEngine
             case "web":
                 if (target != null)
                 {
-                    if (target.StunImmunityRounds > 0)
-                    {
-                        terminal.WriteLine(Loc.Get("combat.spell_web_resist", target.Name), "white");
-                    }
-                    else
-                    {
-                        target.IsStunned = true;
-                        target.StunDuration = duration > 0 ? duration : 2;
+                    if (TryStunMonster(target, duration > 0 ? duration : 2))
                         terminal.WriteLine(Loc.Get("combat.spell_web", target.Name), "white");
-                    }
+                    else
+                        terminal.WriteLine(Loc.Get("combat.spell_web_resist", target.Name), "white");
                 }
                 break;
-                
+
             case "escape":
                 terminal.WriteLine(Loc.Get("combat.vanish_arcane", caster.DisplayName), "magenta");
                 globalEscape = true;
@@ -23145,19 +23454,17 @@ public partial class CombatEngine
                         else if (effectRoll < 70)
                         {
                             // Monster becomes pacified (won't attack for several rounds)
-                            if (target.StunImmunityRounds > 0)
-                            {
-                                terminal.SetColor("bright_green");
-                                terminal.WriteLine(Loc.Get("combat.resists_holy_light", target.Name));
-                            }
-                            else
+                            if (TryStunMonster(target, 3 + random.Next(1, 4)))
                             {
                                 terminal.SetColor("bright_green");
                                 terminal.WriteLine(Loc.Get("combat.pacified_holy_light", target.Name));
                                 terminal.WriteLine(Loc.Get("combat.tame_respect"));
-                                target.IsStunned = true;
-                                target.StunDuration = 3 + random.Next(1, 4); // Stunned (won't attack) for 3-6 rounds
                                 target.IsFriendly = true; // Mark as temporarily friendly
+                            }
+                            else
+                            {
+                                terminal.SetColor("bright_green");
+                                terminal.WriteLine(Loc.Get("combat.resists_holy_light", target.Name));
                             }
                         }
                         else

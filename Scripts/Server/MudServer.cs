@@ -487,6 +487,10 @@ public class MudServer
             {
                 var usernameKey = username.ToLowerInvariant();
                 ActiveSessions.TryRemove(usernameKey, out _);
+                // v0.60.0 bot-detection Tier 1: drop the player's input-timing ring
+                // buffer so reconnects start fresh (otherwise a fast player who
+                // reconnects inherits a stale fast-streak count).
+                BotDetectionSystem.ClearSession(usernameKey);
                 Console.Error.WriteLine($"[MUD] Session ended for '{username}'. Active sessions: {ActiveSessions.Count}");
             }
 
@@ -1017,10 +1021,33 @@ public class MudServer
                         var minutesLeft = (int)Math.Ceiling((IdleTimeout - idleTime).TotalMinutes);
                         try
                         {
+                            // v0.60.0, issue #90 (fastfinge): emit ASCII BEL before the
+                            // warning text so the user gets an audible alert when the
+                            // terminal window is minimized. Universal across every MUD
+                            // client we ship to: xterm/WezTerm play the system beep,
+                            // Mudlet/TinTin++ pass it through, VIP Mud and NVDA-paired
+                            // screen-reader clients speak/chirp on BEL, web terminal
+                            // (xterm.js) plays the bell sound when audible-bell is on,
+                            // BBS terminals (SyncTERM/NetRunner) honor BEL natively.
+                            // Two BELs because some terminals coalesce a single bell
+                            // into one short tick that's easy to miss; two is reliably
+                            // noticeable without being obnoxious.
+                            session.Context?.Terminal?.WriteRawAnsi("\x07\x07");
                             session.Context?.Terminal?.WriteLine("");
                             session.Context?.Terminal?.SetColor("bright_yellow");
                             session.Context?.Terminal?.WriteLine($"  *** WARNING: You will be disconnected in ~{minutesLeft} minute{(minutesLeft != 1 ? "s" : "")} due to inactivity! Press any key. ***");
                             session.Context?.Terminal?.SetColor("white");
+
+                            // Electron client: emit a structured sound event so the
+                            // graphical client can play a dedicated chirp through its
+                            // audio mixer regardless of terminal-bell handling. The
+                            // sound asset isn't shipped yet (Phase 9.5 audio
+                            // scaffolding) but emitting now is harmless: the JS side
+                            // gracefully ignores unknown soundIds.
+                            if (global::GameConfig.ElectronMode)
+                            {
+                                global::ElectronBridge.EmitSound("sfx.idle_warning", channel: "ui");
+                            }
                         }
                         catch { }
                         Console.Error.WriteLine($"[MUD] [{session.Username}] Idle warning sent ({idleTime.TotalMinutes:F0} min idle)");
@@ -1148,8 +1175,18 @@ public class MudServer
                     // Match the format used by HandleGossip so Discord-originated lines look
                     // identical to in-game /gos in everyone's scroll (author already has the
                     // "(Discord)" suffix applied by the Node bot).
+                    // v0.60.0: pass channelKey: "gossip" so per-channel mutes apply
+                    // to Discord-originated gossips too. Pre-fix the Discord inbound
+                    // path bypassed the mute filter entirely, players who had typed
+                    // `/gos` to mute the gossip channel still saw Discord posts.
+                    // Also fan out via GMCP so chat-capture clients (Mudlet/MUSHclient
+                    // split panes) see Discord posts on the same Comm.Channel.Text
+                    // stream as in-game gossip, with the same mute-respecting logic.
                     RoomRegistry.Instance?.BroadcastGlobal(
-                        $"[92m  [Gossip] {msg.Author}: {msg.Message}[0m");
+                        $"[92m  [Gossip] {msg.Author}: {msg.Message}[0m",
+                        excludeUsername: null,
+                        channelKey: "gossip");
+                    UsurperRemake.Server.MudChatSystem.FanoutChannelText("gossip", msg.Author, msg.Message);
                 }
             }
             catch (Exception ex)

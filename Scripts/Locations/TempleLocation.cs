@@ -189,6 +189,14 @@ public partial class TempleLocation : BaseLocation
                         refreshMenu = true;
                         break;
 
+                    case "V": // View statues of the Ascended (alpha-era founders)
+                        // Mortals can't enter the Pantheon, so the immortal-founder
+                        // statues are mirrored here at the Temple where the public
+                        // venerates the gods. Same data as Pantheon's [H] menu.
+                        await UsurperRemake.Systems.FounderStatueSystem.ShowStatuesAt(
+                            UsurperRemake.Data.FounderStatueData.StatueLocationTag.Pantheon, terminal);
+                        break;
+
                     case GameConfig.TempleMenuReturn: // "R"
                         exitLocation = true;
                         break;
@@ -662,6 +670,17 @@ public partial class TempleLocation : BaseLocation
                     terminal.WriteLine(Loc.Get("temple.menu_leave_faith"));
                 }
             }
+
+            // Hall of the Ascended: alpha-era founder statues, mortals'
+            // viewpoint onto the Pantheon's deified founders.
+            terminal.SetColor("darkgray");
+            terminal.Write(" [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("V");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("white");
+            terminal.WriteLine(" Hall of the Ascended");
 
             terminal.SetColor("darkgray");
             terminal.Write(" [");
@@ -1445,7 +1464,16 @@ public partial class TempleLocation : BaseLocation
 
         // Check if god is evil (Darkness > Goodness) to determine faction effect
         bool isEvilGod = god.Darkness > god.Goodness;
-        int standingGain = Math.Max(1, (int)(goldAmount / 100));
+        // v0.60.0 alignment-cheese pass: cap per-sacrifice alignment gain. Pre-fix:
+        // a 100,000g donation produced standingGain = 1000, exactly the AlignmentCap,
+        // so one transaction maxed out darkness or chivalry. Player report from
+        // in-game gossip: "Donate 100k to an evil god, probably less, and I have
+        // max darkness." With the cap, the same donation grants 50, so reaching
+        // the cap requires sustained behavior across many sessions. The faction
+        // reputation gain below shares the same capped value, which is also
+        // intentional: big donors should not buy a top faction rank in one shot.
+        int standingGain = Math.Min(GameConfig.MaxAlignmentGainPerTempleSacrifice,
+            Math.Max(1, (int)(goldAmount / 100)));
 
         if (isEvilGod)
         {

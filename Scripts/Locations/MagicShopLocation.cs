@@ -1769,6 +1769,32 @@ public partial class MagicShopLocation : BaseLocation
             });
             terminal.WriteLine($"  Materials: {string.Join(" + ", matList)}");
         }
+        // v0.60.0: pre-attempt warning when the weapon already has 3+ enchants.
+        // Player report (Lumina, Lv.39 Wavecaller): "Adding enchantment to a
+        // looted weapon removes existing enchantments... There was no warning
+        // the weapon had too many enchantments." The failure mechanic at
+        // 4th/5th enchant has always destroyed an existing enchant, but that
+        // was only narrated AFTER the gold was spent. This block warns BEFORE
+        // commit and forces an extra typed-Y confirmation when the risk is real.
+        int existingEnchants = selectedEquip.GetEnchantmentCount();
+        if (existingEnchants >= 3)
+        {
+            float failPct = existingEnchants == 3
+                ? GameConfig.FourthEnchantFailChance * 100f
+                : GameConfig.FifthEnchantFailChance * 100f;
+            terminal.WriteLine("");
+            terminal.SetColor("bright_red");
+            terminal.WriteLine($"  WARNING: this item already carries {existingEnchants} enchantments.");
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"  Adding another has a {failPct:F0}% chance to FAIL.");
+            terminal.WriteLine($"  On failure: gold and materials are consumed, AND one of the");
+            terminal.WriteLine($"  existing enchantments is destroyed at random.");
+            terminal.WriteLine("");
+            terminal.SetColor("cyan");
+            terminal.WriteLine($"  '{_ownerName} narrows her eyes. \"You are testing the weave.\"'");
+            terminal.WriteLine("");
+        }
+
         terminal.WriteLine("");
         var confirm = await terminal.GetInput($"  {Loc.Get("magic_shop.proceed_yn")}");
         if (confirm.ToUpper() != "Y")
@@ -3367,11 +3393,13 @@ public partial class MagicShopLocation : BaseLocation
             // Blood price for dark magic kill
             WorldSimulator.ApplyBloodPrice(player, targetNPC, GameConfig.MurderWeightPerDarkMagicKill, isDeliberate: true);
 
-            // Alignment shift
-            player.Darkness += darkShiftAmount;
-            player.Chivalry = Math.Max(0, player.Chivalry - darkShiftAmount / 2);
+            // Alignment shift -- v0.60.0 alignment audit: route through ChangeAlignment
+            // for paired movement and DR (was raw Darkness += / Chivalry -=).
+            long darkBefore = player.Darkness;
+            UsurperRemake.Systems.AlignmentSystem.Instance.ChangeAlignment(player, darkShiftAmount, isGood: false, "magic_shop.death_spell");
+            long darkActual = player.Darkness - darkBefore;
             terminal.SetColor("red");
-            terminal.WriteLine($"  Your alignment shifts toward darkness. (+{darkShiftAmount} Darkness)");
+            terminal.WriteLine($"  Your alignment shifts toward darkness. (+{darkActual} Darkness)");
 
             // Worsen relationships with ALL living NPCs (not just first 10)
             int affectedCount = 0;
@@ -3410,10 +3438,12 @@ public partial class MagicShopLocation : BaseLocation
             terminal.SetColor("red");
             terminal.WriteLine($"  {targetNPC.Name1} senses what you attempted. They are furious.");
 
-            // Still shift alignment (you tried)
-            player.Darkness += darkShiftAmount / 2;
+            // Still shift alignment (you tried) -- v0.60.0 alignment audit: route through ChangeAlignment
+            long darkBefore2 = player.Darkness;
+            UsurperRemake.Systems.AlignmentSystem.Instance.ChangeAlignment(player, darkShiftAmount / 2, isGood: false, "magic_shop.death_spell_failed");
+            long darkActual2 = player.Darkness - darkBefore2;
             terminal.SetColor("red");
-            terminal.WriteLine($"  Your alignment shifts toward darkness. (+{darkShiftAmount / 2} Darkness)");
+            terminal.WriteLine($"  Your alignment shifts toward darkness. (+{darkActual2} Darkness)");
 
             terminal.SetColor("darkgray");
             terminal.WriteLine("  (Gold and mana still consumed)");

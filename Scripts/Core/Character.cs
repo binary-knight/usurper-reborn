@@ -1260,7 +1260,12 @@ public class Character
 
     public int GetEquipmentCritChanceBonus() => SumEquipmentProperty(e => e.CriticalChanceBonus);
     public int GetEquipmentCritDamageBonus() => SumEquipmentProperty(e => e.CriticalDamageBonus);
-    public int GetEquipmentLifeSteal() => SumEquipmentProperty(e => e.LifeSteal);
+    // v0.60.0: cap stacked Lifedrinker. Pre-fix, summing LifeSteal from every slot
+    // with no ceiling let stacked enchants exceed 100% lifesteal (player report:
+    // 14,571 HP drained from 11,873 damage). Cap at 60% so even fully-stacked
+    // builds heal at most ~60% of damage from equipment alone; the total
+    // per-attack cap in ApplyPostHitEnchantments enforces the across-sources limit.
+    public int GetEquipmentLifeSteal() => Math.Min(GameConfig.MaxEquipmentLifeStealPercent, SumEquipmentProperty(e => e.LifeSteal));
     public int GetEquipmentMagicResistance() => SumEquipmentProperty(e => e.MagicResistance);
     public int GetEquipmentManaSteal() => SumEquipmentProperty(e => e.ManaSteal);
     public int GetEquipmentArmorPiercing() => SumEquipmentProperty(e => e.ArmorPiercing);

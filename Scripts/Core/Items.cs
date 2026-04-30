@@ -1173,6 +1173,28 @@ public class Equipment
             IsCursed = this.IsCursed,
             IsIdentified = this.IsIdentified,
             IsUnique = false, // Enchanted copies are never unique
+            // Elemental enchant flags (v0.30.9+). Bug fix v0.60.0: previously
+            // missing from Clone(). When the Magic Shop enchanted a looted
+            // weapon (which uses Clone() internally), the elemental flags
+            // silently dropped. Player report (Lumina, Lv.39 Wavecaller):
+            // Piercing Bardiche with Fire + Frost + ArmorPen 48% lost all
+            // three after adding Lifedrinker. Cloning now preserves them.
+            HasFireEnchant = this.HasFireEnchant,
+            HasFrostEnchant = this.HasFrostEnchant,
+            HasLightningEnchant = this.HasLightningEnchant,
+            HasPoisonEnchant = this.HasPoisonEnchant,
+            HasHolyEnchant = this.HasHolyEnchant,
+            HasShadowEnchant = this.HasShadowEnchant,
+            // Proc-based enchantments (v0.40.5), also missing from Clone()
+            // before v0.60.0. Same bug class as the elemental flags.
+            ManaSteal = this.ManaSteal,
+            ArmorPiercing = this.ArmorPiercing,
+            Thorns = this.Thorns,
+            HPRegen = this.HPRegen,
+            ManaRegen = this.ManaRegen,
+            // World boss exclusive loot effects (v0.54.0)
+            HasBossSlayer = this.HasBossSlayer,
+            HasTitanResolve = this.HasTitanResolve,
         };
     }
 

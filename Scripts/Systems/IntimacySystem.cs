@@ -403,6 +403,18 @@ namespace UsurperRemake.Systems
                 child.Name = nameInput + surname;
             }
 
+            // Persist the new child to world_state immediately. Without this the
+            // baby lives only in the in-memory FamilySystem singleton until WorldSim's
+            // next tick. If a second session logs in during that window its
+            // RestoreStorySystems used to clobber the singleton with stale data and
+            // the newborn vanished. RestoreStorySystems now skips children in online
+            // mode (v0.60.1) but writing here also makes the birth durable across an
+            // unexpected MUD server restart.
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode && OnlineStateManager.Instance != null)
+            {
+                _ = OnlineStateManager.Instance.SaveSharedChildrenNow();
+            }
+
             terminal.SetColor("bright_yellow");
             terminal.WriteLine($"  {Get("intimacy.baby_named", babyPronoun, child.Name)}");
             if (!GameConfig.ScreenReaderMode)

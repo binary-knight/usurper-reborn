@@ -97,6 +97,10 @@ public class PantheonLocation : BaseLocation
                 case "V":
                     await VisitManwe();
                     break;
+                case "H":
+                    await UsurperRemake.Systems.FounderStatueSystem.ShowStatuesAt(
+                        UsurperRemake.Data.FounderStatueData.StatueLocationTag.Pantheon, terminal);
+                    break;
                 case "R":
                     bool renounced = await RenounceImmortality();
                     if (renounced) return;
@@ -141,6 +145,7 @@ public class PantheonLocation : BaseLocation
         WriteMenuOption("N", Loc.Get("pantheon.menu_news"), Loc.Get("pantheon.menu_news_desc"));
         WriteMenuOption("C", Loc.Get("pantheon.menu_comment"), Loc.Get("pantheon.menu_comment_desc"));
         WriteMenuOption("V", Loc.Get("pantheon.menu_visit_manwe"), Loc.Get("pantheon.menu_visit_manwe_desc"));
+        WriteMenuOption("H", "Hall of the Ascended", "Walk among the alpha-era founder statues");
         terminal.WriteLine("");
         WriteMenuOption("R", Loc.Get("pantheon.menu_renounce"), Loc.Get("pantheon.menu_renounce_desc"));
         WriteMenuOption("Q", Loc.Get("pantheon.menu_quit"), Loc.Get("pantheon.menu_quit_desc"));
@@ -1681,6 +1686,7 @@ public class PantheonLocation : BaseLocation
             new() { Key = "N", Label = "World News", Category = "info", Icon = "news" },
             new() { Key = "C", Label = "Send Proclamation", Category = "divine", Icon = "proclaim" },
             new() { Key = "V", Label = "Visit Manwe", Category = "social", Icon = "manwe" },
+            new() { Key = "H", Label = "Hall of the Ascended", Category = "info", Icon = "statue" },
             new() { Key = "R", Label = "Renounce Immortality", Category = "danger", Icon = "renounce" },
             new() { Key = "Q", Label = "Quit Realm", Category = "navigate", Icon = "back" },
         };

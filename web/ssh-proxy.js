@@ -2157,6 +2157,115 @@ async function handleAdminRequest(req, res) {
     return true;
   }
 
+  // POST /api/admin/nuke: beta-launch wipe of the entire game state.
+  //
+  // Invokes /opt/usurper/scripts/nuke-server.sh as root via NOPASSWD sudo
+  // (sudoers config: scripts-server/sudoers-usurper-nuke). The script stops
+  // services, backs up the DB, wipes all gameplay tables, vacuums, and
+  // restarts services. Admin auth + dashboard sessions are preserved.
+  //
+  // Safety:
+  //   1. Admin token already verified above.
+  //   2. Body must contain confirmPhrase: "WIPE THE WORLD" (exact match).
+  //   3. Per-IP rate limit of one nuke attempt per 5 minutes.
+  //   4. Audit logged to /var/log/usurper-nuke/ (survives the in-DB wipe).
+  //   5. Pre-wipe DB backup retained at /var/usurper/nuke-backups/.
+  if (method === 'POST' && url === '/api/admin/nuke') {
+    const ip = req.headers['x-real-ip'] || req.socket.remoteAddress || 'unknown';
+
+    // Rate limit: one nuke attempt per 5 minutes per IP.
+    const now = Date.now();
+    if (!global._lastNukeAttempt) global._lastNukeAttempt = {};
+    const lastAttempt = global._lastNukeAttempt[ip] || 0;
+    if (now - lastAttempt < 5 * 60 * 1000) {
+      console.warn(`[nuke] Rate limited from ${ip}`);
+      sendJson(res, 429, {
+        error: 'Rate limit: only one nuke attempt allowed per 5 minutes.'
+      });
+      return true;
+    }
+    global._lastNukeAttempt[ip] = now;
+
+    let body;
+    try {
+      body = await readBody(req);
+    } catch (e) {
+      sendJson(res, 400, { error: 'Invalid request body' });
+      return true;
+    }
+
+    if (body.confirmPhrase !== 'WIPE THE WORLD') {
+      console.warn(`[nuke] Wrong confirmation phrase from ${ip}: "${String(body.confirmPhrase || '').slice(0, 40)}"`);
+      sendJson(res, 400, {
+        error: 'Confirmation phrase missing or incorrect. Must type exactly: WIPE THE WORLD'
+      });
+      return true;
+    }
+
+    console.warn(`[nuke] === NUKE INITIATED from ${ip} ===`);
+
+    // Run the script and stream/collect output. spawn rather than execFile so
+    // we can grab stderr separately and not be limited by the default 1MB
+    // exec buffer if the script gets chatty in future revisions.
+    const { spawn } = require('child_process');
+    const scriptPath = process.env.USURPER_NUKE_SCRIPT
+      || '/opt/usurper/scripts/nuke-server.sh';
+
+    let stdoutBuf = '';
+    let stderrBuf = '';
+    let proc;
+    try {
+      proc = spawn('sudo', ['-n', scriptPath], {
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+    } catch (e) {
+      console.error(`[nuke] Failed to spawn nuke script: ${e.message}`);
+      sendJson(res, 500, {
+        error: 'Failed to invoke nuke script',
+        detail: e.message
+      });
+      return true;
+    }
+
+    proc.stdout.on('data', d => { stdoutBuf += d.toString(); });
+    proc.stderr.on('data', d => { stderrBuf += d.toString(); });
+
+    const exitCode = await new Promise(resolve => {
+      proc.on('close', code => resolve(code));
+      // Timeout after 90 seconds (the script normally runs in ~10s)
+      setTimeout(() => {
+        try { proc.kill('SIGTERM'); } catch {}
+        resolve(-1);
+      }, 90 * 1000);
+    });
+
+    if (exitCode !== 0) {
+      console.error(`[nuke] Script exited with code ${exitCode}`);
+      console.error(`[nuke] stderr: ${stderrBuf.slice(-2000)}`);
+      sendJson(res, 500, {
+        error: `Nuke script failed (exit ${exitCode})`,
+        stdout: stdoutBuf,
+        stderr: stderrBuf,
+      });
+      return true;
+    }
+
+    // After a successful wipe the in-process Node state for peak-online etc.
+    // is now stale. Reset it to match the freshly-wiped DB.
+    peakOnlinePlayers = 0;
+    peakOnlinePlayersTime = null;
+    sessionPeakOnline = 0;
+    sessionPeakTime = null;
+
+    console.warn(`[nuke] === NUKE COMPLETE ===`);
+    sendJson(res, 200, {
+      success: true,
+      log: stdoutBuf,
+      message: 'Server wiped to fresh state. Game services restarted.'
+    });
+    return true;
+  }
+
   // GET /api/admin/geolocate — resolve IPs of online players to lat/lng/country/city
   if (method === 'GET' && url === '/api/admin/geolocate') {
     try {

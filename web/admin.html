@@ -481,6 +481,95 @@
     <div class="section-title">Admin Audit Log</div>
     <div class="section-body" id="wizard-log-body">Loading...</div>
   </div>
+
+  <!-- Danger Zone: Server Wipe -->
+  <div class="section danger-zone">
+    <div class="section-title" style="color:#ff6060">&#9888; Danger Zone</div>
+    <div class="section-body">
+      <p style="color:#ff8080;margin:0 0 8px 0;font-weight:bold">Wipe Server to Fresh State</p>
+      <p style="color:var(--dim);margin:0 0 12px 0;font-size:13px;line-height:1.5;max-width:780px">
+        Returns the live online server to a brand-new state. Stops services, backs up
+        the current database (kept indefinitely under <code>/var/usurper/nuke-backups/</code>),
+        deletes all gameplay data (players, NPCs, news, mail, guilds, teams, auctions, world
+        bosses, sieges, deleted-character archive, audit log), and restarts services. Admin
+        accounts and your current dashboard session are preserved.
+        <br><br>
+        Intended for the May 1st beta launch. There is no undo from the UI; recovery requires
+        SSH access to copy a backup file back into place.
+      </p>
+      <button id="btn-nuke" onclick="openNukeModal()" style="background:#3a0a0a;color:#ff8080;border:1px solid #ff4040;padding:10px 18px;font-weight:bold;border-radius:4px;cursor:pointer">
+        Wipe Server&hellip;
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Nuke confirmation modal -->
+<div id="nuke-modal" class="modal-overlay">
+  <div class="modal" style="width:600px;max-width:90vw;border-color:#ff4040">
+    <h3 style="color:#ff6060">&#9888; Wipe the Server</h3>
+    <div id="nuke-step-1">
+      <p style="color:#ff8080">This is irreversible from the UI. The following data will be erased:</p>
+      <ul style="color:var(--text);font-size:13px;line-height:1.6">
+        <li>All player characters, including immortal ascensions and prestige progress</li>
+        <li>All NPCs and world simulation state</li>
+        <li>All news, mail, gossip relay queue, snoop buffers</li>
+        <li>All guilds, guild banks, teams, team vaults, team upgrades</li>
+        <li>All trade offers, auction listings, bounties</li>
+        <li>All world bosses, castle sieges, PvP logs, combat events</li>
+        <li>All wizard logs, deleted-character archives, sleeping-player records</li>
+        <li>Peak online player stats</li>
+      </ul>
+      <p style="color:var(--gold);font-size:13px">Preserved:</p>
+      <ul style="color:var(--text);font-size:13px;line-height:1.6">
+        <li>Schema (table definitions stay; tables are emptied, not dropped)</li>
+        <li>Admin password hash and dashboard user accounts</li>
+        <li>Your current admin login session</li>
+        <li>Pre-wipe DB backup at <code>/var/usurper/nuke-backups/pre-nuke-{timestamp}.db</code></li>
+      </ul>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
+        <button class="btn-cancel" onclick="closeNukeModal()">Cancel</button>
+        <button class="btn-primary" style="background:#5a1010;color:#ff8080" onclick="nukeStep2()">Continue&hellip;</button>
+      </div>
+    </div>
+    <div id="nuke-step-2" style="display:none">
+      <p style="color:#ff8080">Type the confirmation phrase exactly to enable the wipe:</p>
+      <p style="color:var(--text);font-family:monospace;font-size:16px;background:#1a0a0a;padding:8px;border-radius:4px;text-align:center">
+        WIPE THE WORLD
+      </p>
+      <input type="text" id="nuke-confirm-input" placeholder="Type the phrase here"
+             oninput="updateNukeButton()" autocomplete="off"
+             style="width:100%;padding:8px;background:var(--bg-soft);color:var(--text);border:1px solid var(--dim);border-radius:4px;font-family:monospace;font-size:16px;box-sizing:border-box">
+      <p id="nuke-countdown-text" style="color:var(--dim);font-size:12px;margin-top:8px;display:none">
+        Wipe will proceed in <span id="nuke-countdown-num">5</span> seconds.
+        <a href="#" onclick="cancelNukeCountdown();return false" style="color:var(--gold)">Cancel</a>
+      </p>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
+        <button class="btn-cancel" onclick="closeNukeModal()">Cancel</button>
+        <button id="btn-nuke-confirm" class="btn-primary" disabled
+                style="background:#3a0a0a;color:#ff8080;opacity:0.4;cursor:not-allowed"
+                onclick="startNukeCountdown()">Wipe Server</button>
+      </div>
+    </div>
+    <div id="nuke-step-3" style="display:none">
+      <p style="color:var(--gold)">Wiping the server&hellip;</p>
+      <pre id="nuke-progress" style="background:#1a0a0a;color:var(--text);padding:10px;border-radius:4px;max-height:300px;overflow:auto;font-size:11px;line-height:1.4">Initiating...</pre>
+    </div>
+    <div id="nuke-step-4" style="display:none">
+      <p style="color:#80ff80">Server wiped successfully.</p>
+      <pre id="nuke-result-log" style="background:#0a1a0a;color:var(--text);padding:10px;border-radius:4px;max-height:300px;overflow:auto;font-size:11px;line-height:1.4"></pre>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
+        <button class="btn-primary" onclick="closeNukeModal();refreshAll()">Done</button>
+      </div>
+    </div>
+    <div id="nuke-step-error" style="display:none">
+      <p style="color:#ff6060">Wipe failed:</p>
+      <pre id="nuke-error-log" style="background:#1a0a0a;color:#ff8080;padding:10px;border-radius:4px;max-height:300px;overflow:auto;font-size:11px;line-height:1.4"></pre>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
+        <button class="btn-cancel" onclick="closeNukeModal()">Close</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- Player Detail Panel -->
@@ -586,6 +675,114 @@ function doLogout() {
   if (refreshTimer) clearInterval(refreshTimer);
   document.getElementById('dashboard').style.display = 'none';
   document.getElementById('login-screen').style.display = 'flex';
+}
+
+// --- Server Nuke (beta-launch wipe) ---
+let nukeCountdownTimer = null;
+
+function openNukeModal() {
+  document.getElementById('nuke-step-1').style.display = 'block';
+  document.getElementById('nuke-step-2').style.display = 'none';
+  document.getElementById('nuke-step-3').style.display = 'none';
+  document.getElementById('nuke-step-4').style.display = 'none';
+  document.getElementById('nuke-step-error').style.display = 'none';
+  document.getElementById('nuke-confirm-input').value = '';
+  document.getElementById('nuke-countdown-text').style.display = 'none';
+  const btn = document.getElementById('btn-nuke-confirm');
+  btn.disabled = true;
+  btn.style.opacity = '0.4';
+  btn.style.cursor = 'not-allowed';
+  document.getElementById('nuke-modal').classList.add('active');
+}
+
+function closeNukeModal() {
+  cancelNukeCountdown();
+  document.getElementById('nuke-modal').classList.remove('active');
+}
+
+function nukeStep2() {
+  document.getElementById('nuke-step-1').style.display = 'none';
+  document.getElementById('nuke-step-2').style.display = 'block';
+  setTimeout(() => document.getElementById('nuke-confirm-input').focus(), 50);
+}
+
+function updateNukeButton() {
+  const phrase = document.getElementById('nuke-confirm-input').value;
+  const btn = document.getElementById('btn-nuke-confirm');
+  if (phrase === 'WIPE THE WORLD') {
+    btn.disabled = false;
+    btn.style.opacity = '1';
+    btn.style.cursor = 'pointer';
+  } else {
+    btn.disabled = true;
+    btn.style.opacity = '0.4';
+    btn.style.cursor = 'not-allowed';
+    cancelNukeCountdown();
+  }
+}
+
+function startNukeCountdown() {
+  // 5-second countdown with cancel option, in case the operator misclicks.
+  let secondsLeft = 5;
+  document.getElementById('nuke-countdown-num').textContent = secondsLeft;
+  document.getElementById('nuke-countdown-text').style.display = 'block';
+  document.getElementById('btn-nuke-confirm').disabled = true;
+  document.getElementById('btn-nuke-confirm').style.opacity = '0.4';
+
+  nukeCountdownTimer = setInterval(() => {
+    secondsLeft--;
+    document.getElementById('nuke-countdown-num').textContent = secondsLeft;
+    if (secondsLeft <= 0) {
+      clearInterval(nukeCountdownTimer);
+      nukeCountdownTimer = null;
+      executeNuke();
+    }
+  }, 1000);
+}
+
+function cancelNukeCountdown() {
+  if (nukeCountdownTimer) {
+    clearInterval(nukeCountdownTimer);
+    nukeCountdownTimer = null;
+    document.getElementById('nuke-countdown-text').style.display = 'none';
+    updateNukeButton();
+  }
+}
+
+async function executeNuke() {
+  document.getElementById('nuke-step-2').style.display = 'none';
+  document.getElementById('nuke-step-3').style.display = 'block';
+  const progress = document.getElementById('nuke-progress');
+  progress.textContent = 'Calling /api/admin/nuke ...';
+
+  try {
+    const r = await fetch('/api/admin/nuke', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+      },
+      body: JSON.stringify({ confirmPhrase: 'WIPE THE WORLD' })
+    });
+    const data = await r.json();
+    if (r.ok && data.success) {
+      document.getElementById('nuke-step-3').style.display = 'none';
+      document.getElementById('nuke-step-4').style.display = 'block';
+      document.getElementById('nuke-result-log').textContent = data.log || data.message || 'Wipe complete.';
+    } else {
+      document.getElementById('nuke-step-3').style.display = 'none';
+      document.getElementById('nuke-step-error').style.display = 'block';
+      let logText = data.error || 'Unknown error';
+      if (data.stdout) logText += '\n\n--- stdout ---\n' + data.stdout;
+      if (data.stderr) logText += '\n\n--- stderr ---\n' + data.stderr;
+      document.getElementById('nuke-error-log').textContent = logText;
+    }
+  } catch (e) {
+    document.getElementById('nuke-step-3').style.display = 'none';
+    document.getElementById('nuke-step-error').style.display = 'block';
+    document.getElementById('nuke-error-log').textContent =
+      'Network error: ' + (e && e.message ? e.message : String(e));
+  }
 }
 
 // --- Password Change ---

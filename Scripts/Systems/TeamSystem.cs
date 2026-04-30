@@ -973,6 +973,13 @@ public partial class TeamSystem
         if (!string.IsNullOrEmpty(npc.Team)) return false;
         if (npc.IsSpecialNPC) return false;        // v0.57.11: Seth Able etc. — not recruitable
         if (npc.DaysInPrison > 0) return false;    // v0.57.11: prisoners aren't available
+        // v0.60.0: gods/immortals are not recruitable. Player report (Spudder,
+        // Lv.22 Voidreaver): "God characters showing up in team after rolling
+        // new character, can be used in dungeons." Immortal players (those who
+        // ascended) live in the world as IsImmortal=true characters; they are
+        // meant to be venerated, not hired. The recruitment menu was missing
+        // this filter, so gods passed through to the team picker like any NPC.
+        if (npc.IsImmortal) return false;
 
         (band, _) = GetRecruitmentBand(player, npc);
         return band != RecruitmentBand.Hidden;     // refused bands still render, with a tag

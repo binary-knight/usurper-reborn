@@ -1546,7 +1546,11 @@ public class BankLocation : BaseLocation
             }
 
             // Increase darkness and wanted level
-            player.Darkness += 5;
+            // v0.60.0 alignment audit: route through ChangeAlignment for paired
+            // movement and DR. Pre-fix this raw mutation skipped both. Loan
+            // delinquency is a punishment but should still be subject to the
+            // same DR curve every other source uses.
+            UsurperRemake.Systems.AlignmentSystem.Instance.ChangeAlignment(player, 5, isGood: false, "bank.loan_delinquent_minor");
             player.WantedLvl += 1;
         }
 
@@ -1571,7 +1575,10 @@ public class BankLocation : BaseLocation
             }
 
             // Severe reputation hit
-            player.Darkness += 20;
+            // v0.60.0 alignment audit: route darkness gain through ChangeAlignment
+            // (gets DR + paired movement). Chivalry -50 stays direct -- it's a flat
+            // punishment, not a "gain" that should be subject to DR curves.
+            UsurperRemake.Systems.AlignmentSystem.Instance.ChangeAlignment(player, 20, isGood: false, "bank.loan_delinquent_severe");
             player.WantedLvl += 3;
             player.Chivalry = Math.Max(0, player.Chivalry - 50);
         }

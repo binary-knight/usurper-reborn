@@ -346,6 +346,15 @@ public class CastleLocation : BaseLocation
             terminal.SetColor("white");
             terminal.WriteLine(Loc.Get("castle.menu_bodyguards"));
 
+            terminal.SetColor("darkgray");
+            terminal.Write(" [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("V");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("white");
+            terminal.WriteLine(" Courtyard Statues");
+
             terminal.WriteLine("");
 
             // Navigation
@@ -588,6 +597,16 @@ public class CastleLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("castle.menu_royal_armory"));
             }
 
+            // Courtyard statues. Alpha-era founder commemoration.
+            terminal.SetColor("darkgray");
+            terminal.Write(" [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("V");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("white");
+            terminal.WriteLine(" Courtyard Statues");
+
             // Navigation
             terminal.SetColor("darkgray");
             terminal.Write(" [");
@@ -778,6 +797,11 @@ public class CastleLocation : BaseLocation
                 await ManageRoyalBodyguards();
                 return false;
 
+            case "V":
+                await UsurperRemake.Systems.FounderStatueSystem.ShowStatuesAt(
+                    UsurperRemake.Data.FounderStatueData.StatueLocationTag.Castle, terminal);
+                return false;
+
             case "R":
                 await NavigateToLocation(GameLocation.MainStreet);
                 return true;
@@ -875,6 +899,11 @@ public class CastleLocation : BaseLocation
                     terminal.WriteLine(Loc.Get("castle.siege_online_only"));
                     await Task.Delay(1500);
                 }
+                return false;
+
+            case "V":
+                await UsurperRemake.Systems.FounderStatueSystem.ShowStatuesAt(
+                    UsurperRemake.Data.FounderStatueData.StatueLocationTag.Castle, terminal);
                 return false;
 
             case "R":
@@ -1947,8 +1976,12 @@ public class CastleLocation : BaseLocation
             currentPlayer.Gold = 0;
             currentPlayer.BankGold = 0; // Bank accounts seized
             currentPlayer.Fame = 0;
+            // Chivalry direct strip (punishment, far past the cap to ensure it sticks).
             currentPlayer.Chivalry = Math.Max(0, currentPlayer.Chivalry - 5000);
-            currentPlayer.Darkness += 500;
+            // v0.60.0 alignment audit: darkness gain routed through ChangeAlignment for DR + paired movement.
+            // A typical executing king is high-chivalry, so DR's effect on darkness is minimal here;
+            // the chivalry strip above already sets chivalry to 0 (no further reduction needed).
+            UsurperRemake.Systems.AlignmentSystem.Instance.ChangeAlignment(currentPlayer, 500, isGood: false, "castle.banished_for_executions");
             currentPlayer.TotalExecutions = 0; // Reset counter
             currentPlayer.RecalculateStats();
 
@@ -8632,6 +8665,7 @@ public class CastleLocation : BaseLocation
                 new() { Key = "X", Label = "Tax Rate", Category = "royal", Icon = "tax" },
                 new() { Key = "Q", Label = "Establishments", Category = "royal", Icon = "establishment" },
                 new() { Key = "S", Label = "Status", Category = "info", Icon = "info" },
+                new() { Key = "V", Label = "Courtyard Statues", Category = "info", Icon = "statue" },
                 new() { Key = "R", Label = Loc.Get("ui.return"), Category = "navigate", Icon = "back" },
             }
             : new List<ElectronBridge.MenuItemData>
@@ -8644,6 +8678,7 @@ public class CastleLocation : BaseLocation
                 new() { Key = "C", Label = "Claim Empty Throne", Category = "royal", Icon = "throne" },
                 new() { Key = "L", Label = "Royal Armory", Category = "shop", Icon = "armory" },
                 new() { Key = "B", Label = "Castle Siege", Category = "combat", Icon = "siege" },
+                new() { Key = "V", Label = "Courtyard Statues", Category = "info", Icon = "statue" },
                 new() { Key = "R", Label = Loc.Get("ui.return"), Category = "navigate", Icon = "back" },
             };
         ElectronBridge.EmitMenu(menu);

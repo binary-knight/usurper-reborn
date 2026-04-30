@@ -9,8 +9,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.57.21";
-    public const string VersionName = "Alignment and Shields";
+    public const string Version = "0.60.0";
+    public const string VersionName = "Beta";
 
     // v0.57.12: Alignment scale cap. Character.Chivalry and Character.Darkness setters clamp to [0, AlignmentCap]
     // as defense in depth against direct-mutation bypass sites that don't route through AlignmentSystem.ChangeAlignment.
@@ -825,6 +825,24 @@ public static partial class GameConfig
     public const int CompanionLossPerMurder = 15;               // Companion loyalty loss per deliberate murder
     public const long BloodConfessionBaseCost = 500;            // Base gold cost for blood absolution
     public const long BloodConfessionCostPerWeight = 200;       // Extra gold per weight point
+    // v0.60.0, issue #89: regular church confession used to be free and unlimited.
+    // Penance gold cost scales with the player's darkness so the price tracks the
+    // benefit. 50 darkness => 350g, 200 darkness => 1100g, 1000 darkness (cap) => 5100g.
+    public const long ConfessionBaseCost = 100;                 // Base gold cost (penance) for church confession
+    public const long ConfessionCostPerDarkness = 5;            // Extra gold per darkness point cleansed
+
+    // v0.60.0 alignment-cheese pass: per-action caps so a single huge donation
+    // cannot max out alignment. Aura report: "Donate 100k gold to an evil god,
+    // probably less, and I have max darkness. Pay the king 200k, then church 50k,
+    // and I have max chivalry." Castle treasury donation was already capped at 50
+    // per action (CastleLocation.cs:7090); the temple gold sacrifice and church
+    // donation/blessing paths missed the same cap and let goldAmount/N translate
+    // 1:1 into alignment up to the 1000-point AlignmentCap. New caps make
+    // alignment progression a sustained-behavior lever instead of a one-shot
+    // payment, while preserving the existing ratios for small donations (cap
+    // only kicks in when the raw computed value would exceed it).
+    public const int MaxChivalryGainPerChurchAction = 25;       // Cap on chivalry per church donation/blessing
+    public const int MaxAlignmentGainPerTempleSacrifice = 50;   // Cap on chivalry/darkness per temple gold sacrifice
 
     // Group Dungeon System (v0.45.0)
     public const int GroupMaxSize = 5;                          // Max players in a group (leader + 4)
@@ -1324,6 +1342,34 @@ public static partial class GameConfig
     public const int FrostEnchantDuration = 2;                // Frost slow lasts 2 turns
     public const float LightningEnchantProcChance = 0.15f;    // 15% chance to stun per attack
     public const float LightningEnchantDamageMultiplier = 0.12f; // Lightning damage = weapon damage * 12%
+
+    // v0.60.0 lifedrinker cap. Player report showed Lifedrinker draining 14,571 HP
+    // from an 11,873-damage hit (~123% lifesteal), enabled by stacking Lifedrinker
+    // enchants across weapon + necklace + rings + body slots since
+    // GetEquipmentLifeSteal sums every slot with no cap. Two layers:
+    //   * Per-source equipment cap: total equipment LifeSteal capped at 60%.
+    //   * Total per-attack cap: combined heal from ALL lifesteal sources (equipment,
+    //     divine blessing, divine boon, Abysswarden passive, status effect) cannot
+    //     exceed damage dealt * MaxTotalLifestealPercent / 100. 100% = "cannot heal
+    //     for more than the damage you just dealt", which is the obvious physical
+    //     constraint and stops the bonkers stacked-source heals.
+    public const int MaxEquipmentLifeStealPercent = 60;
+    public const int MaxTotalLifestealPercent = 100;
+
+    // v0.60.0 stun-lock audit: diminishing-returns and post-recovery immunity.
+    // Players were chaining lightning-enchant procs with Magician/Sage stun spells
+    // to keep bosses perma-stunned. New rules:
+    //   * Stun cannot be re-applied while target is already stunned.
+    //   * After a stun expires, target gains StunImmunityRoundsAfterRecovery rounds
+    //     of immunity to new stuns.
+    //   * Each successive stun within StunDRWindowRounds gets shorter via DR
+    //     (1st = 100%, 2nd = 50%, 3rd = 25%, 4th+ = immune until the window resets).
+    //   * Bosses and mini-bosses get a flat resist roll AND a hard duration cap.
+    public const int StunImmunityRoundsAfterRecovery = 3;     // Rounds of immunity after a stun expires
+    public const int StunDRWindowRounds = 5;                  // Rounds of "no stun" before DR resets to 0
+    public const int MaxStunDurationNormal = 3;               // Hard cap on stun duration vs normal monsters
+    public const int MaxStunDurationBoss = 1;                 // Hard cap on stun duration vs bosses
+    public const float BossStunResistChance = 0.50f;          // Bosses resist stun outright at this rate
     public const float PoisonEnchantProcChance = 0.20f;       // 20% chance to poison per attack
     public const float HolyEnchantProcChance = 0.25f;         // 25% chance for holy damage (bonus vs undead)
     public const float HolyEnchantDamageMultiplier = 0.20f;   // Holy damage = weapon damage * 20%

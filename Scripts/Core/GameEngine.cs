@@ -3047,6 +3047,21 @@ public partial class GameEngine
                 _ = SaveCurrentGame();
             }
 
+            // v0.60.0 beta-launch event: if the Rage event is firing (May 1 2026 UTC
+            // window, sysop kill switch off), the cinematic plays and the character
+            // is permadeleted before the player ever enters the world. After the
+            // event runs we throw an exit exception so the session disconnects
+            // cleanly instead of falling through to MainStreet with a deleted
+            // character. Online mode only -- single-player saves are out of scope
+            // for the wipe-day event.
+            if (UsurperRemake.Systems.RageEventSystem.IsActive && UsurperRemake.BBS.DoorMode.IsOnlineMode)
+            {
+                var rageUsername = UsurperRemake.Server.SessionContext.Current?.Username ?? fileName;
+                await UsurperRemake.Systems.RageEventSystem.RunRageEventAsync(currentPlayer, terminal, rageUsername);
+                IsIntentionalExit = true;
+                return;
+            }
+
             await locationManager.EnterLocation(startLocation, currentPlayer);
         }
         catch (Exception ex)
@@ -4306,6 +4321,20 @@ public partial class GameEngine
     /// </summary>
     private async Task CreateNewGame(string playerName)
     {
+        // v0.60.0 beta-launch event: refuse to create a character during the Rage
+        // window. The god of intolerance does not care that the mortal is brand
+        // new -- he sees the intent to play, scoffs, and erases the attempt.
+        // Online mode only.
+        if (UsurperRemake.Systems.RageEventSystem.IsActive && UsurperRemake.BBS.DoorMode.IsOnlineMode)
+        {
+            var rageUsername = UsurperRemake.Server.SessionContext.Current?.Username ?? playerName;
+            // Pass null player -- there's nothing to delete yet, but the cinematic
+            // still plays and the kicker disconnects the session afterward.
+            await UsurperRemake.Systems.RageEventSystem.RunRageEventAsync(null!, terminal, rageUsername);
+            IsIntentionalExit = true;
+            return;
+        }
+
         // Reset per-player session systems for new game
         var storyDbg = StoryProgressionSystem.Instance;
         bool isNgPlus = storyDbg.CurrentCycle > 1;
@@ -5005,10 +5034,17 @@ public partial class GameEngine
                 // v0.57.13: skip shields — they live in OffHand with ShieldBonus/BlockChance set,
                 // and InferWeaponType has no shield keywords so it would rewrite them to Sword +
                 // OneHanded, letting IsDualWielding fire an off-hand strike with the shield.
+                // v0.60.0: name-based detection added as a third signal alongside
+                // ShieldBonus / BlockChance / WeaponType. Catches shields that
+                // were mangled by a pre-v0.53.13 load and saved with all stat-
+                // side signals stripped: the new name match rescues them on
+                // load instead of leaving them perpetually mis-typed as Sword.
                 bool isShield = equipment.ShieldBonus > 0 || equipment.BlockChance > 0
                     || equipment.WeaponType == WeaponType.Shield
                     || equipment.WeaponType == WeaponType.Buckler
-                    || equipment.WeaponType == WeaponType.TowerShield;
+                    || equipment.WeaponType == WeaponType.TowerShield
+                    || (equipment.Slot == EquipmentSlot.OffHand
+                        && ShopItemGenerator.LooksLikeShieldByName(equipment.Name));
                 if ((equipment.Slot == EquipmentSlot.MainHand || equipment.Slot == EquipmentSlot.OffHand) && !isShield)
                 {
                     var inferred = ShopItemGenerator.InferWeaponType(equipment.Name);
@@ -6205,10 +6241,16 @@ public partial class GameEngine
                     // path that defaulted to Sword instead of inferring). v0.57.13: skip shields —
                     // InferWeaponType has no shield keywords and would rewrite them to Sword +
                     // OneHanded, letting IsDualWielding fire an off-hand strike with the shield.
+                    // v0.60.0: name-based shield detection added as a third
+                    // signal so pre-v0.53.13 mangled shields self-heal on load
+                    // even when stat signals (ShieldBonus / BlockChance) were
+                    // stripped by an earlier bad migration.
                     bool isShieldNpc = equipment.ShieldBonus > 0 || equipment.BlockChance > 0
                         || equipment.WeaponType == WeaponType.Shield
                         || equipment.WeaponType == WeaponType.Buckler
-                        || equipment.WeaponType == WeaponType.TowerShield;
+                        || equipment.WeaponType == WeaponType.TowerShield
+                        || (equipment.Slot == EquipmentSlot.OffHand
+                            && ShopItemGenerator.LooksLikeShieldByName(equipment.Name));
                     if ((equipment.Slot == EquipmentSlot.MainHand || equipment.Slot == EquipmentSlot.OffHand) && !isShieldNpc)
                     {
                         var inferred = ShopItemGenerator.InferWeaponType(equipment.Name);

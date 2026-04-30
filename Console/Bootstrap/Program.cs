@@ -58,6 +58,27 @@ namespace UsurperConsole
             // WezTerm handles this natively, but users running the exe directly need it.
             EnableWindowsAnsiSupport();
 
+            // Defense-in-depth UTF-8 setup. The MUD server writes player-facing
+            // bytes via explicit `Encoding.UTF8.GetBytes()` calls on the network
+            // stream, but anything that touches Console.Out / stdout (relay
+            // forwarding, debug logging, error fallback paths) inherits whatever
+            // the OS default is. On Linux systemd units without a UTF-8 locale
+            // set (LANG=C.UTF-8 / en_US.UTF-8), Console.OutputEncoding falls
+            // back to ASCII, which silently truncates accented characters in
+            // French/Spanish/Italian translated strings. Force UTF-8 explicitly
+            // here unless we're in BBS-door-stdio mode (where DoorMode.cs may
+            // need to set CP437 instead). This is idempotent and safe to call
+            // before mode-specific overrides further down the stack.
+            try
+            {
+                if (!args.Contains("--door") && !args.Contains("--door32") && !args.Contains("--doorsys"))
+                {
+                    Console.OutputEncoding = System.Text.Encoding.UTF8;
+                    Console.InputEncoding = System.Text.Encoding.UTF8;
+                }
+            }
+            catch { /* Best effort. Never block startup on encoding setup */ }
+
             // Enable System.Text.Json reflection-based serialization.
             // The trimmer sets IsReflectionEnabledByDefault=false in runtimeconfig,
             // but we use reflection-based JsonSerializer.Deserialize<T>() everywhere.
@@ -107,20 +128,55 @@ namespace UsurperConsole
             SteamIntegration.Initialize();
 
             // Check for BBS door mode arguments
+            bool useDoorMode = false;
             if (args.Length > 0)
             {
                 if (DoorMode.ParseCommandLineArgs(args))
                 {
-                    // BBS Door Mode - initialize door terminal
-                    await RunDoorModeAsync();
-                    return;
+                    useDoorMode = true;
                 }
-
-                // Check if --help was shown - exit without launching game
-                if (DoorMode.HelpWasShown)
+                else if (DoorMode.HelpWasShown)
                 {
                     return;
                 }
+            }
+
+            // v0.60.0, issue #92 (fastfinge): auto-enable screen-reader mode if a
+            // screen reader is running on the host. Windows queries SPI_GETSCREENREADER,
+            // which NVDA / JAWS / Narrator / most others set while active.
+            //
+            // Order matters: this runs AFTER ParseCommandLineArgs (so an explicit
+            // `--screen-reader` flag sets ScreenReaderMode first and our `if`
+            // short-circuits, no announcement) but BEFORE branching into door-mode
+            // or standard-console flows so both paths benefit equally. The WezTerm
+            // Steam launcher passes `--local` which routes through RunDoorModeAsync,
+            // so injecting only into the standard branch would have missed the
+            // most common Steam install.
+            //
+            // Skip the announcement for non-local door-mode connections (real
+            // BBS doors, MUD server/relay, headless world sim). Those run on a
+            // sysop machine that may have no display and are serving remote
+            // users whose own clients negotiate accessibility via TTYPE.
+            // Saved characters' explicit ScreenReaderMode still wins on character
+            // load via GameConfig.ScreenReaderMode = player.ScreenReaderMode in
+            // GameEngine.LoadSaveByFileName, so this only sets the pre-character
+            // default and the inheritance for fresh characters.
+            bool isRemoteOrHeadlessMode = useDoorMode &&
+                (DoorMode.IsMudServerMode || DoorMode.IsMudRelayMode || DoorMode.IsWorldSimMode ||
+                 (DoorMode.IsInDoorMode && DoorMode.SessionInfo?.CommType != ConnectionType.Local));
+            if (!isRemoteOrHeadlessMode && !GameConfig.ScreenReaderMode &&
+                UsurperRemake.UI.AccessibilityDetection.IsScreenReaderActive())
+            {
+                GameConfig.ScreenReaderMode = true;
+                Console.WriteLine("Screen reader detected. Accessible mode enabled automatically.");
+                Console.WriteLine("(Disable in-game via the Preferences menu if you don't want this.)");
+                Console.WriteLine();
+            }
+
+            if (useDoorMode)
+            {
+                await RunDoorModeAsync();
+                return;
             }
 
             // Standard console mode

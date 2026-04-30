@@ -236,21 +236,66 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// v0.57.0 paired alignment movement — a good deed raises Chivalry AND lowers Darkness,
+        /// v0.57.0 paired alignment movement: a good deed raises Chivalry AND lowers Darkness,
         /// an evil deed raises Darkness AND lowers Chivalry. The opposite side moves 50% of the
         /// primary amount (minimum 1 when amount > 0). Feedback from playtesters: without this,
         /// staying neutral was almost impossible because nothing reduced one scale when the other
-        /// moved — paired movement lets evil deeds naturally cleanse accumulated chivalry and
+        /// moved. Paired movement lets evil deeds naturally cleanse accumulated chivalry and
         /// vice versa, making "Balanced" a meaningful alignment target.
+        ///
+        /// v0.60.0 alignment audit: diminishing returns on the GAINING side. Player feedback:
+        /// "Getting 1000 should be hard." Pre-fix: every grant landed at full value, so a player
+        /// could chain Old God saves (+150 each), knighthood (+50), castle/temple/church donations
+        /// (now capped at 25-50 each from the cheese pass), and a handful of quests to max out
+        /// in a couple of sessions. The DR curve scales the gain by the current scale value:
+        ///
+        ///   below 500 = 100% (full grant; early-mid alignment progresses normally)
+        ///   500..699  = 75%
+        ///   700..849  = 50%
+        ///   850..949  = 25%
+        ///   950+      = 10%
+        ///
+        /// Only the GAIN side is scaled; the paired opposite-side reduction uses the original
+        /// (un-scaled) amount/2 so an evil deed at high chivalry still cleanses meaningfully.
+        /// All 98+ ChangeAlignment call sites benefit automatically.
         /// </summary>
         public void ChangeAlignment(Character character, int amount, bool isGood, string reason)
         {
             if (amount <= 0) return;
+
+            long currentScale = isGood ? character.Chivalry : character.Darkness;
+            int scaledAmount = ScaleAlignmentByDR(amount, currentScale);
+
+            // Paired movement uses the un-scaled amount so the opposite scale is cleansed
+            // at full strength. Otherwise a maxed-chivalry player committing a small evil
+            // deed would barely lose any chivalry, defeating the cleansing purpose.
             int opposite = Math.Max(1, amount / 2);
+
             if (isGood)
-                ModifyAlignment(character, amount, -opposite, reason);
+                ModifyAlignment(character, scaledAmount, -opposite, reason);
             else
-                ModifyAlignment(character, -opposite, amount, reason);
+                ModifyAlignment(character, -opposite, scaledAmount, reason);
+        }
+
+        /// <summary>
+        /// v0.60.0 alignment-audit DR helper. Scales an alignment GAIN by the current value
+        /// of the relevant scale so the last 200 points cost roughly 10x what the first 500 do.
+        /// Public for test access.
+        /// </summary>
+        public static int ScaleAlignmentByDR(int amount, long currentValue)
+        {
+            if (amount <= 0) return amount;
+            int scaled = currentValue switch
+            {
+                < 500  => amount,
+                < 700  => (amount * 75) / 100,
+                < 850  => (amount * 50) / 100,
+                < 950  => (amount * 25) / 100,
+                _      => (amount * 10) / 100
+            };
+            // Don't let a small grant disappear entirely from rounding; minimum 1 so progress
+            // is always possible even at 999 (10 attempts * 1 point each = inch toward cap).
+            return Math.Max(1, scaled);
         }
 
         /// <summary>

@@ -108,6 +108,14 @@ public class Monster
     public bool IsStunned { get; set; } = false;
     public int StunDuration { get; set; } = 0;
     public int StunImmunityRounds { get; set; } = 0;  // Prevents re-stun immediately after recovery
+    // v0.60.0 stun-lock audit: diminishing-returns tracking. Each successful stun
+    // application increments RecentStunCount and resets RoundsSinceLastStun. The
+    // DR window in GameConfig.StunDRWindowRounds gradually decays the count back to
+    // zero so stuns are usable again after the monster has had a few free turns.
+    // CombatEngine.TryStunMonster reads these fields to scale duration (1st = 100%,
+    // 2nd = 50%, 3rd = 25%, 4th+ = full immunity until the window resets).
+    public int RecentStunCount { get; set; } = 0;
+    public int RoundsSinceLastStun { get; set; } = 0;
     public bool IsSlowed { get; set; } = false;
     public int SlowDuration { get; set; } = 0;
 

@@ -134,9 +134,57 @@ public static class WizardCommandSystem
             case "wizlog":
                 if (wizLevel < WizardLevel.God) return NotEnoughPower(terminal);
                 return await HandleWizLog(terminal);
+            case "rage":
+                if (wizLevel < WizardLevel.God) return NotEnoughPower(terminal);
+                return HandleRageEvent(args, terminal);
 
             default:
                 return false; // Not a wizard command
+        }
+    }
+
+    /// <summary>
+    /// v0.60.0 beta-launch event sysop kill switch. Status / on / off.
+    /// Date window is hardcoded to 2026-05-01 UTC; this command toggles the
+    /// in-process kill switch within the window. Outside the window the event
+    /// is dormant regardless.
+    /// </summary>
+    private static bool HandleRageEvent(string args, TerminalEmulator terminal)
+    {
+        var sub = args.Trim().ToLowerInvariant();
+        terminal.WriteLine("");
+        switch (sub)
+        {
+            case "off":
+            case "disable":
+                UsurperRemake.Systems.RageEventSystem.DisableViaSysop();
+                terminal.SetColor("yellow");
+                terminal.WriteLine("  Rage event DISABLED via kill switch.");
+                terminal.WriteLine("");
+                terminal.WriteLine(UsurperRemake.Systems.RageEventSystem.GetStatus());
+                return true;
+            case "on":
+            case "enable":
+                UsurperRemake.Systems.RageEventSystem.EnableViaSysop();
+                terminal.SetColor("yellow");
+                terminal.WriteLine("  Rage event RE-ENABLED. Will fire if inside the date window.");
+                terminal.WriteLine("");
+                terminal.WriteLine(UsurperRemake.Systems.RageEventSystem.GetStatus());
+                return true;
+            case "":
+            case "status":
+                terminal.SetColor("cyan");
+                terminal.WriteLine(UsurperRemake.Systems.RageEventSystem.GetStatus());
+                terminal.WriteLine("");
+                terminal.SetColor("gray");
+                terminal.WriteLine("  /rage off    -- disable kill switch (dormant even in window)");
+                terminal.WriteLine("  /rage on     -- re-enable kill switch");
+                terminal.WriteLine("  /rage status -- show this");
+                return true;
+            default:
+                terminal.SetColor("red");
+                terminal.WriteLine($"  Unknown rage subcommand: '{sub}'. Try /rage status.");
+                return true;
         }
     }
 

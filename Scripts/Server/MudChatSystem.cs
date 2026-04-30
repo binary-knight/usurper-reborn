@@ -116,6 +116,11 @@ public static class MudChatSystem
             case "nospectate":
                 return HandleKickAllSpectators(username, terminal);
 
+            // v0.57.22 Tier 1: restore an accidentally-deleted character from
+            // the same SSH account, if within the 7-day grace window.
+            case "restore":
+                return HandleRestore(username, terminal);
+
             case "group":
                 return await HandleGroup(username, args, terminal);
 
@@ -173,6 +178,43 @@ public static class MudChatSystem
         // Fall back to login username
         return server.ActiveSessions.Values.FirstOrDefault(s =>
             s.Username.Equals(name, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// Greedy parser for "/tell &lt;name&gt; &lt;message&gt;" style commands where
+    /// the name may contain spaces (e.g. "Lumina Starbloom"). Tries the
+    /// longest possible word prefix first as the target name, falls back word
+    /// by word until a session matches or we run out of words. The remaining
+    /// suffix becomes the message.
+    ///
+    /// Returns (targetName, message, session). If no prefix resolves to an
+    /// active session, returns the first word as targetName so the caller can
+    /// surface a "X is not online" message with a sensible name in it.
+    /// </summary>
+    private static (string targetName, string message, PlayerSession? session) ResolveTargetAndMessage(string args)
+    {
+        if (string.IsNullOrWhiteSpace(args)) return ("", "", null);
+        var trimmed = args.Trim();
+        var words = trimmed.Split(' ', System.StringSplitOptions.RemoveEmptyEntries);
+        if (words.Length < 2) return (trimmed, "", null);
+
+        // Try the longest prefix first (entire args minus last word), then
+        // shorter prefixes. Stop at the first prefix that matches an active
+        // session, since that's the most specific match.
+        for (int prefixWordCount = words.Length - 1; prefixWordCount >= 1; prefixWordCount--)
+        {
+            string candidateName = string.Join(' ', words, 0, prefixWordCount);
+            var session = FindSessionByNameOrUsername(candidateName);
+            if (session != null)
+            {
+                string message = string.Join(' ', words, prefixWordCount, words.Length - prefixWordCount);
+                return (candidateName, message, session);
+            }
+        }
+
+        // No prefix matched. Default to the first-word interpretation so the
+        // caller can show "Foo is not online" rather than something baffling.
+        return (words[0], string.Join(' ', words, 1, words.Length - 1), null);
     }
 
     /// <summary>
@@ -313,28 +355,21 @@ public static class MudChatSystem
             return ToggleChannelMute(username, "tell", "Incoming tells", "Usage: /tell <player> <message>", terminal);
         }
 
-        // Parse: /tell <playername> <message>
-        var spaceIndex = args.IndexOf(' ');
-        if (spaceIndex <= 0)
+        // Parse: /tell <playername> <message>. Display names can contain spaces
+        // (e.g. a multi-word display name), so we resolve greedily: try the longest
+        // possible prefix first and fall back word by word until a session
+        // matches or we run out of words. The remaining suffix is the message.
+        var (targetName, message, targetSession) = ResolveTargetAndMessage(args);
+
+        if (string.IsNullOrWhiteSpace(targetName) || string.IsNullOrWhiteSpace(message))
         {
             terminal.SetColor("gray");
             terminal.WriteLine("  Usage: /tell <player> <message>");
             return true;
         }
 
-        var targetName = args.Substring(0, spaceIndex).Trim();
-        var message = args.Substring(spaceIndex + 1).Trim();
-
-        if (string.IsNullOrWhiteSpace(message))
-        {
-            terminal.SetColor("gray");
-            terminal.WriteLine("  Usage: /tell <player> <message>");
-            return true;
-        }
-
-        // Try to send in-memory first — resolve by display name or username
+        // Try to send in-memory first
         var displayName = GetChatDisplayName(username);
-        var targetSession = FindSessionByNameOrUsername(targetName);
         if (targetSession != null)
         {
             // v0.57.14: respect target's incoming-tell mute.
@@ -442,7 +477,7 @@ public static class MudChatSystem
     /// Payload format matches the Achaea/Iron Realms GMCP convention so off-the-shelf
     /// Mudlet/MUSHclient chat capture scripts work without remapping.
     /// </summary>
-    private static void FanoutChannelText(string channel, string sender, string text, string? excludeUsername = null)
+    internal static void FanoutChannelText(string channel, string sender, string text, string? excludeUsername = null)
     {
         var server = MudServer.Instance;
         if (server == null)
@@ -859,6 +894,91 @@ public static class MudChatSystem
 
         terminal.SetColor("bright_green");
         terminal.WriteLine("  All spectators have been removed.");
+        return true;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // /RESTORE: recover an accidentally-deleted character (v0.57.22 Tier 1)
+    // ═══════════════════════════════════════════════════════════════════
+    //
+    // Looks up the most recent entry in deleted_characters for this SSH
+    // account, restores it to the players table if within 7 days, and tells
+    // the player to log out + back in to load the restored character.
+    // Refuses to overwrite an active character (player must delete the new
+    // one first if they really want the old back).
+
+    private static bool HandleRestore(string username, TerminalEmulator terminal)
+    {
+        // Only meaningful in online (SQL-backed) mode. Single-player saves
+        // are file-based and the player can manage their own backups.
+        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("  /restore is only available on the online server.");
+            return true;
+        }
+
+        var backend = UsurperRemake.Systems.SaveSystem.Instance.Backend
+            as UsurperRemake.Systems.SqlSaveBackend;
+        if (backend == null)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("  /restore is not available in this session.");
+            return true;
+        }
+
+        // Probe first to see if there's anything to restore.
+        var info = backend.GetMostRecentDeletedCharacter(username);
+        if (info == null)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("  No deleted character is on file for your account, or the");
+            terminal.WriteLine("  7-day grace window has passed. Nothing to restore.");
+            return true;
+        }
+
+        // Show what we found and ask for explicit confirmation.
+        terminal.WriteLine("");
+        terminal.WriteLine("  Found a deleted character on file:", "bright_yellow");
+        terminal.WriteLine($"    Character:   {info.DisplayName}", "white");
+        terminal.WriteLine($"    Deleted at:  {info.DeletedAt} UTC", "gray");
+        terminal.WriteLine($"    Expires at:  {info.ExpiresAt} UTC", "gray");
+        terminal.WriteLine("");
+        terminal.WriteLine("  Restoring will replace your CURRENT character with this one.", "yellow");
+        terminal.WriteLine("  If you have an active character in this account, type /restore");
+        terminal.WriteLine("  CONFIRM to proceed (a delete-then-restore will be needed).", "gray");
+        terminal.WriteLine("");
+
+        if (backend.RestoreFromDeleted(username, out string failureReason))
+        {
+            terminal.SetColor("bright_green");
+            terminal.WriteLine($"  '{info.DisplayName}' has been restored.");
+            terminal.SetColor("white");
+            terminal.WriteLine("  Log out and log back in to play as the restored character.");
+            return true;
+        }
+
+        terminal.SetColor("red");
+        switch (failureReason)
+        {
+            case "active_character_exists":
+                terminal.WriteLine("  You already have an active character on this account.");
+                terminal.WriteLine("  Delete the current character first, then run /restore again.");
+                terminal.SetColor("gray");
+                terminal.WriteLine("  Both characters cannot exist simultaneously on one SSH account.");
+                break;
+            case "no_archived_character":
+                terminal.WriteLine("  The archive entry vanished between probe and restore (race condition?).");
+                terminal.WriteLine("  Try /restore again. If it persists, contact a sysop.");
+                break;
+            case "no_player_row":
+                terminal.WriteLine("  Your account row was not found. Cannot restore.");
+                break;
+            default:
+                terminal.WriteLine($"  Restore failed: {failureReason}");
+                terminal.WriteLine("  Contact a sysop with this exact message.");
+                break;
+        }
         return true;
     }
 

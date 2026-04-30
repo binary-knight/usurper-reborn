@@ -1204,13 +1204,20 @@ public abstract class BaseLocation
                 }
                 if (selected.Chivalry > 0)
                 {
-                    currentPlayer.Chivalry += selected.Chivalry;
-                    terminal.WriteLine(Loc.Get("base.plus_chivalry", selected.Chivalry), "bright_green");
+                    // v0.60.0 alignment audit: route through ChangeAlignment for DR + paired movement.
+                    long chivBefore = currentPlayer.Chivalry;
+                    AlignmentSystem.Instance.ChangeAlignment(currentPlayer, selected.Chivalry, isGood: true, "base.stage_choice");
+                    long chivActual = currentPlayer.Chivalry - chivBefore;
+                    if (chivActual > 0)
+                        terminal.WriteLine(Loc.Get("base.plus_chivalry", chivActual), "bright_green");
                 }
                 if (selected.Darkness > 0)
                 {
-                    currentPlayer.Darkness += selected.Darkness;
-                    terminal.WriteLine(Loc.Get("base.plus_darkness", selected.Darkness), "dark_red");
+                    long darkBefore = currentPlayer.Darkness;
+                    AlignmentSystem.Instance.ChangeAlignment(currentPlayer, selected.Darkness, isGood: false, "base.stage_choice");
+                    long darkActual = currentPlayer.Darkness - darkBefore;
+                    if (darkActual > 0)
+                        terminal.WriteLine(Loc.Get("base.plus_darkness", darkActual), "dark_red");
                 }
             }
         }
@@ -2735,6 +2742,14 @@ public abstract class BaseLocation
                 await HandleSettingsCommand(string.Empty);
                 return (true, false);
 
+            case "founders":
+            case "statues":
+            case "hall":
+                // Show all alpha-era founder statues across all three placements,
+                // not just one location. Keys to a hub-style picker first.
+                await ShowFounderHubMenu();
+                return (true, false);
+
             default:
                 terminal.WriteLine("");
                 terminal.SetColor("red");
@@ -3142,6 +3157,56 @@ public abstract class BaseLocation
     /// player's bank account.
     /// </summary>
     /// <summary>
+    /// Hub picker for the alpha-era founder statues. Reachable via /founders
+    /// /statues / /hall from any location. Lets the player pick which placement
+    /// (Pantheon / Castle / Main Street plinths) they want to walk among,
+    /// without needing all three menus to host explicit options.
+    /// </summary>
+    protected async Task ShowFounderHubMenu()
+    {
+        if (terminal == null) return;
+
+        terminal.WriteLine("");
+        if (!GameConfig.ScreenReaderMode)
+        {
+            terminal.WriteLine("═══════════════════════════════════════════════════════════════", "bright_yellow");
+            terminal.WriteLine("  Alpha-Era Founders: Hall of Statues", "bright_yellow");
+            terminal.WriteLine("═══════════════════════════════════════════════════════════════", "bright_yellow");
+        }
+        else
+        {
+            terminal.WriteLine("Alpha-Era Founders: Hall of Statues", "bright_yellow");
+        }
+        terminal.WriteLine("");
+        terminal.WriteLine("  Eleven souls are commemorated across the world. Choose where to walk:", "gray");
+        terminal.WriteLine("");
+        terminal.WriteLine("  [1] Hall of the Ascended (immortal founders, Temple / Pantheon)", "white");
+        terminal.WriteLine("  [2] Castle Courtyard: The Slayers of Manwe (NG+ veterans)", "white");
+        terminal.WriteLine("  [3] Main Square: Founders' Plinths (Lv.100 founders)", "white");
+        terminal.WriteLine("  [R] Return", "gray");
+        terminal.WriteLine("");
+
+        var input = (await terminal.GetInput("  Choose: ")).Trim().ToUpperInvariant();
+        switch (input)
+        {
+            case "1":
+                await UsurperRemake.Systems.FounderStatueSystem.ShowStatuesAt(
+                    UsurperRemake.Data.FounderStatueData.StatueLocationTag.Pantheon, terminal);
+                break;
+            case "2":
+                await UsurperRemake.Systems.FounderStatueSystem.ShowStatuesAt(
+                    UsurperRemake.Data.FounderStatueData.StatueLocationTag.Castle, terminal);
+                break;
+            case "3":
+                await UsurperRemake.Systems.FounderStatueSystem.ShowStatuesAt(
+                    UsurperRemake.Data.FounderStatueData.StatueLocationTag.MainStreetMini, terminal);
+                break;
+            default:
+                return;
+        }
+    }
+
+    /// <summary>
     /// Phase 9: handle /settings slash command. With no args, opens the Electron
     /// settings overlay (in Electron mode) or the existing text preferences menu.
     /// With args (e.g. "lang es", "sr on", "compact off", "art on"), applies the
@@ -3175,12 +3240,26 @@ public abstract class BaseLocation
             case "language":
                 if (!string.IsNullOrEmpty(value))
                 {
-                    GameConfig.Language = value;
-                    currentPlayer.Language = value;
-                    Loc.Initialize();
-                    if (GameConfig.ElectronMode)
-                        ElectronBridge.EmitSettingsApplied("language", value);
-                    await GameEngine.Instance.SaveCurrentGame();
+                    // v0.60.0 beta-audit Low finding: validate against the loaded
+                    // language list before persisting. Without this guard, a typo or
+                    // hostile slash-command argument would write garbage into the
+                    // save's Language field. Loc.Get already falls back to English
+                    // on unknown codes, but the bad string would persist forever and
+                    // confuse player-support tickets.
+                    if (Loc.LoadedLanguages.Contains(value))
+                    {
+                        GameConfig.Language = value;
+                        currentPlayer.Language = value;
+                        Loc.Initialize();
+                        if (GameConfig.ElectronMode)
+                            ElectronBridge.EmitSettingsApplied("language", value);
+                        await GameEngine.Instance.SaveCurrentGame();
+                    }
+                    else
+                    {
+                        terminal.SetColor("yellow");
+                        terminal.WriteLine($"Unknown language code '{value}'. Available: {string.Join(", ", Loc.LoadedLanguages)}");
+                    }
                 }
                 break;
 

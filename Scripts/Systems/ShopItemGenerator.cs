@@ -765,6 +765,34 @@ public static class ShopItemGenerator
         return WeaponType.Shield;
     }
 
+    /// <summary>
+    /// Name-based shield detection used by the on-load migration as a third
+    /// signal alongside ShieldBonus / BlockChance / WeaponType. Catches the
+    /// case where a shield got mis-typed by an older buggy load (re-inferred
+    /// as Sword + OneHanded) and saved with all stat-side shield signals
+    /// stripped: without name-matching, no subsequent load can rescue it.
+    /// Returns true if the name contains any shield-style keyword.
+    /// Player report (v0.57.21): shield abilities not active and IsDualWielding
+    /// firing despite a shield equipped. Root cause was a pre-v0.53.13 mangled
+    /// save that had no remaining stat signal.
+    /// </summary>
+    public static bool LooksLikeShieldByName(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return false;
+        return name.Contains("Shield")
+            || name.Contains("Buckler")
+            || name.Contains("Aegis")
+            || name.Contains("Bulwark")
+            || name.Contains("Pavise")
+            || name.Contains("Targe")
+            || name.Contains("Heater")
+            || name.Contains("Kite")
+            || name.Contains("Round Wood")
+            || name.Contains("Ward of ")
+            || name.Contains("Fortress")
+            || (name.Contains("Tower") && !name.Contains("Towering"));
+    }
+
     private static ArmorType InferArmorType(string name)
     {
         // Plate: heavy metal armor

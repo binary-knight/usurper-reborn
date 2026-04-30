@@ -1430,6 +1430,42 @@ namespace UsurperRemake.Systems
                 await Task.Delay(1500);
             }
 
+            // v0.60.0: Auto-quit any current team. A god on a mortal's roster
+            // is a category error: gods are venerated, not hired. Player report:
+            // "God characters showing up in team after rolling new character, can
+            // be used in dungeons." Some ascensions left the player on their
+            // previous team, and team members remained recruitable to others
+            // through the recruitment menu (separately fixed in
+            // TeamSystem.IsRecruitable).
+            if (!string.IsNullOrEmpty(player.Team))
+            {
+                new TeamSystem().QuitTeam(player);
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine($"  Your mortal team bonds dissolve in the divine ascension.");
+                terminal.WriteLine("");
+                await Task.Delay(1000);
+            }
+
+            // v0.60.0: Auto-leave any current guild for the same reason. Gods don't
+            // hold guild membership; without this, an ascended player would still
+            // appear on the guild roster (and the GuildSystem.AddMember/CreateGuild
+            // filters added in this release would reject re-joining, leaving them
+            // permanently grandfathered into a mortal guild). RemoveMember handles
+            // leader-promotion automatically if the ascending player led the guild.
+            var ctxAscend = UsurperRemake.Server.SessionContext.Current;
+            if (ctxAscend != null && !string.IsNullOrEmpty(ctxAscend.Username))
+            {
+                var guildSys = Systems.GuildSystem.Instance;
+                if (guildSys != null && guildSys.GetPlayerGuild(ctxAscend.Username) != null)
+                {
+                    guildSys.RemoveMember(ctxAscend.Username);
+                    terminal.SetColor("bright_yellow");
+                    terminal.WriteLine($"  Your guild crest tarnishes and falls away. The faithful have no guild.");
+                    terminal.WriteLine("");
+                    await Task.Delay(1000);
+                }
+            }
+
             // Block alt characters from ascending
             if (SqlSaveBackend.IsAltCharacter(UsurperRemake.BBS.DoorMode.GetPlayerName() ?? ""))
             {

@@ -2079,17 +2079,36 @@ public class CharacterCreationSystem
     private static List<CharacterClass> GetUnlockedPrestigeClasses()
     {
         var story = StoryProgressionSystem.Instance;
+        var meta = UsurperRemake.Systems.MetaProgressionSystem.Instance;
         var unlocked = new List<CharacterClass>();
 
-        var endingsList = story?.CompletedEndings != null ? string.Join(",", story.CompletedEndings) : "null";
-        Console.Error.WriteLine($"[Prestige] cycle={story?.CurrentCycle}, endings=[{endingsList}], count={story?.CompletedEndings?.Count}");
-        if (story == null || story.CurrentCycle < 2 || story.CompletedEndings.Count == 0)
+        // Union character-scope endings (current StoryProgressionSystem) with
+        // account-scope endings (MetaProgressionSystem, persisted across
+        // character deletions). The latter ensures a player who deletes their
+        // immortal character and rerolls still has prestige class access on
+        // the same SSH account. Also covers cycle-1 fresh characters whose
+        // SSH account previously won an ending on a since-deleted character.
+        var endingsSet = new HashSet<EndingType>();
+        if (story?.CompletedEndings != null)
+            foreach (var e in story.CompletedEndings) endingsSet.Add(e);
+        var accountEndings = meta?.UnlockedEndings;
+        if (accountEndings != null)
+            foreach (var e in accountEndings) endingsSet.Add(e);
+
+        // Cycle gate is satisfied if EITHER the current character is past
+        // cycle 1 OR the account has a recorded ending. The latter handles
+        // the post-delete reroll case where CurrentCycle is back to 1.
+        bool cycleSatisfied = (story != null && story.CurrentCycle >= 2)
+            || (accountEndings != null && accountEndings.Count > 0);
+
+        Console.Error.WriteLine($"[Prestige] cycle={story?.CurrentCycle}, charEndings={story?.CompletedEndings?.Count ?? 0}, accountEndings={accountEndings?.Count ?? 0}, total={endingsSet.Count}");
+        if (!cycleSatisfied || endingsSet.Count == 0)
         {
-            Console.Error.WriteLine($"[Prestige] BLOCKED: story null={story == null}, cycle<2={story?.CurrentCycle < 2}, endings empty={story?.CompletedEndings?.Count == 0}");
+            Console.Error.WriteLine($"[Prestige] BLOCKED: cycleSatisfied={cycleSatisfied}, endingsSet empty={endingsSet.Count == 0}");
             return unlocked;
         }
 
-        var endings = story.CompletedEndings;
+        var endings = endingsSet;
 
         // True ending or Secret ending unlocks all prestige classes
         if (endings.Contains(EndingType.TrueEnding) || endings.Contains(EndingType.Secret))

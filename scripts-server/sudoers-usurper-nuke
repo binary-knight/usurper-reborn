@@ -1,0 +1,20 @@
+# /etc/sudoers.d/usurper-nuke
+#
+# Allows the usurper user (under which the usurper-web Node service runs)
+# to invoke the beta-launch nuke script as root, NOPASSWD. The sudo rule is
+# scoped to ONLY this exact path so no other commands can be elevated.
+#
+# Install:
+#   sudo cp /opt/usurper/scripts-server/sudoers-usurper-nuke /etc/sudoers.d/usurper-nuke
+#   sudo chown root:root /etc/sudoers.d/usurper-nuke
+#   sudo chmod 0440 /etc/sudoers.d/usurper-nuke
+#   sudo visudo -c -f /etc/sudoers.d/usurper-nuke    # validate before applying
+#
+# To revoke:
+#   sudo rm /etc/sudoers.d/usurper-nuke
+#
+# Audit: every invocation also writes to /var/log/usurper-nuke/ and the
+# admin endpoint logs to console; both survive the wipe (the in-DB
+# admin_commands table gets cleared by the script itself).
+
+usurper ALL=(root) NOPASSWD: /opt/usurper/scripts/nuke-server.sh

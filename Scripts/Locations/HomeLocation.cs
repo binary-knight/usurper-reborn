@@ -1965,6 +1965,14 @@ public class HomeLocation : BaseLocation
                 selectedChild.Name = newFirst + surname;
                 terminal.SetColor("bright_green");
                 terminal.WriteLine($"  {oldName} is now known as {selectedChild.Name}.");
+
+                // Persist the rename to world_state immediately so it survives a server
+                // restart before WorldSim's next tick. In single-player mode the next
+                // autosave handles persistence; this is online-only.
+                if (UsurperRemake.BBS.DoorMode.IsOnlineMode && OnlineStateManager.Instance != null)
+                {
+                    _ = OnlineStateManager.Instance.SaveSharedChildrenNow();
+                }
             }
             else
             {

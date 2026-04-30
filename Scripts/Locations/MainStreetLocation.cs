@@ -2885,16 +2885,45 @@ public class MainStreetLocation : BaseLocation
         if (int.TryParse(choice, out var index) && index >= 1 && index <= saves.Count)
         {
             var selectedSave = saves[index - 1];
-            
+
+            // v0.57.22 Tier 1 enhanced warning: enumerate what the player will
+            // lose (immortal status, ending unlocks, prestige access), and
+            // mention the 7-day grace window so they know it isn't truly
+            // instant-final.
             terminal.WriteLine("");
+            terminal.WriteLine("");
+            terminal.WriteLine("  YOU ARE ABOUT TO DELETE THIS CHARACTER.", "bright_red");
+            terminal.WriteLine("");
+            terminal.WriteLine($"  Character: {selectedSave.PlayerName} (Lv.{selectedSave.Level})", "white");
+            terminal.WriteLine("");
+            terminal.WriteLine("  This will erase:", "yellow");
+            terminal.WriteLine("    - All inventory, equipment, and gold", "gray");
+            terminal.WriteLine("    - Character stats, level, and class progress", "gray");
+            terminal.WriteLine("    - Active quests, relationships, and family", "gray");
+            terminal.WriteLine("    - Story progress on this CHARACTER (cycle, endings)", "gray");
+            terminal.WriteLine("    - Immortal status / divine name (if any)", "gray");
+            terminal.WriteLine("");
+            terminal.WriteLine("  Your SSH account will keep:", "green");
+            terminal.WriteLine("    - Account-level prestige class unlocks", "gray");
+            terminal.WriteLine("    - Account-level ending records", "gray");
+            terminal.WriteLine("    - Steam achievements", "gray");
+            terminal.WriteLine("");
+            terminal.WriteLine("  GRACE WINDOW: This character can be restored by typing", "bright_cyan");
+            terminal.WriteLine("  /restore from this same SSH account within 7 days.", "bright_cyan");
+            terminal.WriteLine("  After 7 days the deletion is permanent.", "gray");
+            terminal.WriteLine("");
+
             var confirm = await terminal.GetInput(Loc.Get("ui.confirm_delete", selectedSave.PlayerName));
-            
+
             if (confirm == "DELETE")
             {
                 var success = SaveSystem.Instance.DeleteSave(selectedSave.PlayerName);
                 if (success)
                 {
                     terminal.WriteLine(Loc.Get("main_street.delete_success"), "green");
+                    terminal.WriteLine("");
+                    terminal.WriteLine("  Reminder: type /restore from this same SSH account within 7 days", "bright_cyan");
+                    terminal.WriteLine("  to bring this character back. After 7 days it is permanent.", "bright_cyan");
                 }
                 else
                 {

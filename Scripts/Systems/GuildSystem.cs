@@ -194,6 +194,12 @@ public class GuildSystem
         if (GetPlayerGuild(leaderUsername) != null)
             return "You are already in a guild. Leave first with /gleave.";
 
+        // v0.60.0: gods don't create or join guilds (parity with TeamSystem and the
+        // AddMember filter below). An ascended player is venerated, not enrolled.
+        var ctxCreate = UsurperRemake.Server.SessionContext.Current;
+        if (ctxCreate?.Player != null && string.Equals(ctxCreate.Username, leaderUsername, StringComparison.OrdinalIgnoreCase) && ctxCreate.Player.IsImmortal)
+            return "Gods do not lead guilds.";
+
         try
         {
             using var conn = new SqliteConnection(connectionString);
@@ -249,6 +255,17 @@ public class GuildSystem
     {
         if (GetPlayerGuild(username) != null)
             return "That player is already in a guild.";
+
+        // v0.60.0: gods-not-recruitable parity with TeamSystem.IsRecruitable. An ascended
+        // player is venerated, not joined. Without this filter, an immortal could accept
+        // a guild invite (or be added by the leader) and would appear on the guild
+        // roster -- mortal players could then "have a god in our guild" which breaks
+        // the ascension narrative the same way "have a god on our team" did. We check
+        // via the live SessionContext player object since GuildSystem is keyed on
+        // username (account-level), not on a Character reference.
+        var ctx = UsurperRemake.Server.SessionContext.Current;
+        if (ctx?.Player != null && string.Equals(ctx.Username, username, StringComparison.OrdinalIgnoreCase) && ctx.Player.IsImmortal)
+            return "Gods do not join guilds.";
 
         int count = GetMemberCount(guildName);
         if (count >= MaxGuildMembers)

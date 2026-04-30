@@ -293,6 +293,24 @@ namespace UsurperRemake.Systems
                         attack_log TEXT DEFAULT '[]'
                     );
 
+                    -- Tier 1 grace window for accidental deletes (v0.57.22).
+                    -- When a player deletes their character, the JSON blob is
+                    -- archived here for 7 days. The same SSH account can call
+                    -- /restore within that window to bring the character back.
+                    -- After expires_at, a periodic cleanup drops the row.
+                    CREATE TABLE IF NOT EXISTS deleted_characters (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        username TEXT NOT NULL,
+                        display_name TEXT NOT NULL,
+                        player_data TEXT NOT NULL,
+                        deleted_at TEXT DEFAULT (datetime('now')),
+                        expires_at TEXT NOT NULL
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_deleted_characters_username
+                        ON deleted_characters(LOWER(username));
+                    CREATE INDEX IF NOT EXISTS idx_deleted_characters_expires
+                        ON deleted_characters(expires_at);
+
                     CREATE TABLE IF NOT EXISTS combat_events (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         player_name TEXT NOT NULL,
@@ -590,11 +608,67 @@ namespace UsurperRemake.Systems
             }
         }
 
-        public bool DeleteGameData(string playerName)
+        public bool DeleteGameData(string playerName) => DeleteGameData(playerName, bypassArchive: false);
+
+        /// <summary>
+        /// Delete a player's character. Default behavior archives to deleted_characters
+        /// for 7-day /restore window (v0.57.22 Tier 1). Pass bypassArchive=true to
+        /// skip the archive entirely for irreversible deletes (v0.60.0 beta-launch
+        /// Rage event uses this to make the divine erasure final).
+        /// </summary>
+        public bool DeleteGameData(string playerName, bool bypassArchive)
         {
             try
             {
                 using var connection = OpenConnection();
+
+                // v0.57.22 Tier 1: archive the player_data into deleted_characters
+                // BEFORE clearing it, so the same SSH account can /restore within
+                // 7 days. Skip the archive if player_data is already empty (no
+                // point archiving '{}'). Best-effort: if archive fails, the
+                // delete still proceeds. Player loses no MORE than they would
+                // have lost in the pre-archive era. v0.60.0: the bypassArchive
+                // path skips this block entirely for genuinely irreversible deletes.
+                if (!bypassArchive)
+                {
+                    try
+                    {
+                        using var archiveCmd = connection.CreateCommand();
+                        archiveCmd.CommandText = @"
+                            INSERT INTO deleted_characters (username, display_name, player_data, expires_at)
+                            SELECT username, display_name, player_data,
+                                   datetime('now', '+7 days')
+                              FROM players
+                             WHERE LOWER(username) = LOWER(@username)
+                               AND player_data IS NOT NULL
+                               AND player_data != '{}'
+                               AND length(player_data) > 4;";
+                        archiveCmd.Parameters.AddWithValue("@username", playerName);
+                        int archived = archiveCmd.ExecuteNonQuery();
+                        if (archived > 0)
+                        {
+                            DebugLogger.Instance.LogInfo("SAVE",
+                                $"Archived '{playerName}' to deleted_characters (7-day grace).");
+                        }
+                    }
+                    catch (Exception archiveEx)
+                    {
+                        DebugLogger.Instance.LogWarning("SAVE",
+                            $"deleted_characters archive failed for '{playerName}': {archiveEx.Message}. Proceeding with delete anyway.");
+                    }
+                }
+
+                // Opportunistic cleanup of expired entries (one query per
+                // delete keeps the table from growing unbounded; cheap because
+                // of the expires_at index).
+                try
+                {
+                    using var purgeCmd = connection.CreateCommand();
+                    purgeCmd.CommandText = "DELETE FROM deleted_characters WHERE expires_at < datetime('now');";
+                    purgeCmd.ExecuteNonQuery();
+                }
+                catch { /* best effort */ }
+
                 using var cmd = connection.CreateCommand();
                 // Clear player_data instead of deleting the row — preserves password_hash,
                 // ban status, and other account-level fields. A row with '{}' player_data
@@ -609,6 +683,126 @@ namespace UsurperRemake.Systems
                 DebugLogger.Instance.LogError("SQL", $"Failed to delete game data: {ex.Message}");
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Look up the most recent archived character for an SSH account, if
+        /// one exists within the 7-day grace window. Returns null if nothing
+        /// to restore. Used by the /restore slash command.
+        /// </summary>
+        public DeletedCharacterInfo? GetMostRecentDeletedCharacter(string username)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT id, display_name, player_data, deleted_at, expires_at
+                      FROM deleted_characters
+                     WHERE LOWER(username) = LOWER(@username)
+                       AND expires_at >= datetime('now')
+                     ORDER BY deleted_at DESC
+                     LIMIT 1;";
+                cmd.Parameters.AddWithValue("@username", username);
+                using var reader = cmd.ExecuteReader();
+                if (reader.Read())
+                {
+                    return new DeletedCharacterInfo
+                    {
+                        Id = reader.GetInt64(0),
+                        DisplayName = reader.GetString(1),
+                        PlayerData = reader.GetString(2),
+                        DeletedAt = reader.GetString(3),
+                        ExpiresAt = reader.GetString(4)
+                    };
+                }
+                return null;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"GetMostRecentDeletedCharacter failed: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Restore the most-recent archived character back into the players table,
+        /// then remove it from deleted_characters. Returns true on success.
+        /// Will refuse to overwrite if the SSH account already has a non-empty
+        /// player_data (player created a new character after deleting; we don't
+        /// want to silently replace it).
+        /// </summary>
+        public bool RestoreFromDeleted(string username, out string failureReason)
+        {
+            failureReason = "";
+            try
+            {
+                using var connection = OpenConnection();
+
+                // Refuse if there's an active character on this account already.
+                using (var checkCmd = connection.CreateCommand())
+                {
+                    checkCmd.CommandText = @"
+                        SELECT player_data FROM players
+                         WHERE LOWER(username) = LOWER(@username);";
+                    checkCmd.Parameters.AddWithValue("@username", username);
+                    var existing = checkCmd.ExecuteScalar() as string;
+                    if (!string.IsNullOrEmpty(existing) && existing != "{}" && existing.Length > 4)
+                    {
+                        failureReason = "active_character_exists";
+                        return false;
+                    }
+                }
+
+                var info = GetMostRecentDeletedCharacter(username);
+                if (info == null)
+                {
+                    failureReason = "no_archived_character";
+                    return false;
+                }
+
+                using (var updateCmd = connection.CreateCommand())
+                {
+                    updateCmd.CommandText = @"
+                        UPDATE players SET player_data = @data
+                         WHERE LOWER(username) = LOWER(@username);";
+                    updateCmd.Parameters.AddWithValue("@username", username);
+                    updateCmd.Parameters.AddWithValue("@data", info.PlayerData);
+                    int affected = updateCmd.ExecuteNonQuery();
+                    if (affected == 0)
+                    {
+                        failureReason = "no_player_row";
+                        return false;
+                    }
+                }
+
+                // Remove the archive entry now that it's been claimed.
+                using (var deleteCmd = connection.CreateCommand())
+                {
+                    deleteCmd.CommandText = "DELETE FROM deleted_characters WHERE id = @id;";
+                    deleteCmd.Parameters.AddWithValue("@id", info.Id);
+                    deleteCmd.ExecuteNonQuery();
+                }
+
+                DebugLogger.Instance.LogInfo("SAVE",
+                    $"Restored '{username}' (display: '{info.DisplayName}') from deleted_characters archive.");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                failureReason = $"sql_error: {ex.Message}";
+                DebugLogger.Instance.LogError("SQL", $"RestoreFromDeleted failed: {ex.Message}");
+                return false;
+            }
+        }
+
+        public class DeletedCharacterInfo
+        {
+            public long Id { get; set; }
+            public string DisplayName { get; set; } = "";
+            public string PlayerData { get; set; } = "";
+            public string DeletedAt { get; set; } = "";
+            public string ExpiresAt { get; set; } = "";
         }
 
         public List<SaveInfo> GetAllSaves()
