@@ -388,7 +388,19 @@ public partial class PrisonLocation : BaseLocation
                 await HandlePetitionKing(player);
                 return false;
             case 'V':
-                return await HandleVexEncounter(player);
+                try
+                {
+                    return await HandleVexEncounter(player);
+                }
+                catch (LocationExitException) { throw; }
+                catch (Exception ex)
+                {
+                    DebugLogger.Instance.LogError("PRISON", $"Vex encounter failed: {ex.Message}");
+                    await terminal.WriteLineAsync();
+                    await terminal.WriteColorLineAsync(Loc.Get("prison.no_one_unusual"), TerminalEmulator.ColorDarkGray);
+                    await Task.Delay(1000);
+                    return false;
+                }
             default:
                 // Invalid choice, do nothing
                 return false;
@@ -1113,7 +1125,7 @@ public partial class PrisonLocation : BaseLocation
                 await terminal.WriteColorLineAsync(Loc.Get("prison.vex_shake_head"), TerminalEmulator.ColorDarkGray);
                 await terminal.WriteLineAsync();
                 await terminal.WriteColorLineAsync(Loc.Get("prison.vex_your_loss"), TerminalEmulator.ColorYellow);
-                await terminal.WriteColorAsync($"\"{vex.DialogueHints[2]}\"", TerminalEmulator.ColorCyan);
+                await terminal.WriteColorAsync($"\"{hint2}\"", TerminalEmulator.ColorCyan);
                 await terminal.WriteLineAsync();
                 await Task.Delay(2000);
                 break;
@@ -1131,6 +1143,7 @@ public partial class PrisonLocation : BaseLocation
     private async Task<bool> VexHelpsEscape(Character player, UsurperRemake.Systems.Companion vex)
     {
         var companionSystem = CompanionSystem.Instance;
+        string vexName = vex?.Name ?? "Vex";
 
         await terminal.WriteLineAsync();
         await terminal.WriteColorLineAsync(Loc.Get("prison.vex_excellent"), TerminalEmulator.ColorYellow);
@@ -1186,14 +1199,14 @@ public partial class PrisonLocation : BaseLocation
 
         if (success)
         {
-            await terminal.WriteColorLineAsync(Loc.Get("prison.vex_joined", vex.Name), TerminalEmulator.ColorGreen);
+            await terminal.WriteColorLineAsync(Loc.Get("prison.vex_joined", vexName), TerminalEmulator.ColorGreen);
             await terminal.WriteLineAsync();
             await terminal.WriteColorLineAsync(Loc.Get("prison.vex_warning_dying"), TerminalEmulator.ColorRed);
             await terminal.WriteColorLineAsync(Loc.Get("prison.vex_make_most"), TerminalEmulator.ColorYellow);
             await terminal.WriteLineAsync();
 
             // Generate news
-            NewsSystem.Instance.Newsy(true, $"{player.DisplayName} escaped from the Royal Prison with {vex.Name}'s help!");
+            NewsSystem.Instance.Newsy(true, $"{player.DisplayName} escaped from the Royal Prison with {vexName}'s help!");
         }
 
         // Free the player
@@ -1225,7 +1238,7 @@ public partial class PrisonLocation : BaseLocation
         await terminal.WriteLineAsync();
         await Task.Delay(1000);
 
-        await terminal.WriteColorLineAsync(vex.Description, TerminalEmulator.ColorWhite);
+        await terminal.WriteColorLineAsync(vex.Description ?? "", TerminalEmulator.ColorWhite);
         await terminal.WriteLineAsync();
         await Task.Delay(1500);
 
@@ -1244,7 +1257,7 @@ public partial class PrisonLocation : BaseLocation
 
         if (!string.IsNullOrEmpty(vex.PersonalQuestDescription))
         {
-            await terminal.WriteColorLineAsync(Loc.Get("prison.vex_personal_quest", vex.PersonalQuestName), TerminalEmulator.ColorMagenta);
+            await terminal.WriteColorLineAsync(Loc.Get("prison.vex_personal_quest", vex.PersonalQuestName ?? ""), TerminalEmulator.ColorMagenta);
             await terminal.WriteColorLineAsync($"\"{vex.PersonalQuestDescription}\"", TerminalEmulator.ColorMagenta);
             await terminal.WriteLineAsync();
         }
