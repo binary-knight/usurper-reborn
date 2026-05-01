@@ -102,12 +102,6 @@ Files: `Scripts/Core/Character.cs` (`EquipItem` non-weapon branch).
 
 ---
 
-## GMCP comprehensive update
-
-Player feedback (TT++ user): "everything works great, even GMCP. Honestly looking forward to when it sends events in the dungeon (vitals are not sent at all in a dungeon)." That kicked off a full pass on the GMCP package set plus a robustness audit on the bridge itself. v0.57.21 shipped four packages (`Char.Vitals`, `Char.Status`, placeholder `Room.Info`, `Comm.Channel.Text`) and left the rest of the IRE-convention package set on a "future point release" list. This release lands most of it.
-
-### Robustness pass on `GmcpBridge`
-
 Every emit now goes through a centralized `TryWriteFrame` helper that:
 
 - Validates the package name against `^[A-Za-z][A-Za-z0-9._-]*$`. Bad input is a programmer error; refuse to put garbage on the wire instead of relying on the client to ignore it.
