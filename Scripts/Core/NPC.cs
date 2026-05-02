@@ -290,7 +290,7 @@ public partial class NPC : Character
         Gold = GetBaseGold(archetype) * level;
 
         // Set experience
-        Experience = GetExperienceForLevel(level);
+        Experience = GameConfig.GetExperienceForLevel(level);
 
         // Save base stats so RecalculateStats() works correctly
         BaseStrength = Strength;
@@ -392,23 +392,6 @@ public partial class NPC : Character
         Age = 18 + Level + Random.Shared.Next(-5, 11);
         if (Age < 18) Age = 18;
         if (Age > 80) Age = 80;
-    }
-    
-    /// <summary>
-    /// Get experience needed for a specific level (Pascal compatible)
-    /// </summary>
-    private long GetExperienceForLevel(int level)
-    {
-        if (level <= 1) return 0;
-        
-        // Experience formula compatible with Pascal
-        long exp = 0;
-        for (int i = 2; i <= level; i++)
-        {
-            // Softened curve: level^2.0 * 50 (rebalanced v0.41.4)
-            exp += (long)(Math.Pow(i, 2.0) * 50);
-        }
-        return exp;
     }
     
     /// <summary>

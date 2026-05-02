@@ -6158,7 +6158,7 @@ public partial class GameEngine
 
             // Fix Experience if it's too low for the NPC's level — legacy saves may not have
             // tracked NPC XP, or GenerateNPCStats may have used template.StartLevel instead of actual Level
-            long expectedMinXP = GetExperienceForNPCLevel(npc.Level);
+            long expectedMinXP = GameConfig.GetExperienceForLevel(npc.Level);
             if (npc.Experience < expectedMinXP && npc.Level > 1)
             {
                 npc.Experience = expectedMinXP;
@@ -6515,21 +6515,6 @@ public partial class GameEngine
                 $"Fixed corrupted base stats for {npc.Name} (Level {level} {npc.ClassName}): " +
                 $"STR={npc.BaseStrength}, DEF={npc.BaseDefence}, AGI={npc.BaseAgility}");
         }
-    }
-
-    /// <summary>
-    /// XP formula matching the player's curve (level^2.0 * 50)
-    /// Used to initialize NPC XP when loading legacy saves
-    /// </summary>
-    private static long GetExperienceForNPCLevel(int level)
-    {
-        if (level <= 1) return 0;
-        long exp = 0;
-        for (int i = 2; i <= level; i++)
-        {
-            exp += (long)(Math.Pow(i, 2.0) * 50);
-        }
-        return exp;
     }
 
     /// <summary>

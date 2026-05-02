@@ -1619,7 +1619,7 @@ namespace UsurperRemake.Systems
 
                 // Fix XP for legacy data — also catches NPCs whose Experience was set from
                 // template.StartLevel instead of their actual Level (bug in GenerateNPCStats)
-                long expectedMinXP = GetExperienceForLevel(npc.Level);
+                long expectedMinXP = GameConfig.GetExperienceForLevel(npc.Level);
                 if (npc.Experience < expectedMinXP && npc.Level > 1)
                 {
                     npc.Experience = expectedMinXP;
@@ -1907,21 +1907,6 @@ namespace UsurperRemake.Systems
             {
                 DebugLogger.Instance.LogError("WORLDSIM", $"ProcessWorldDailyReset error: {ex.Message}");
             }
-        }
-
-        /// <summary>
-        /// Calculate experience needed for a given level.
-        /// Same formula as WorldSimulator.GetExperienceForLevel.
-        /// </summary>
-        private static long GetExperienceForLevel(int level)
-        {
-            if (level <= 1) return 0;
-            long exp = 0;
-            for (int i = 2; i <= level; i++)
-            {
-                exp += (long)(Math.Pow(i, 2.0) * 50);
-            }
-            return exp;
         }
     }
 }

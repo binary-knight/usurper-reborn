@@ -486,7 +486,7 @@ public class WorldInitializerSystem
 
     private void CheckNPCLevelUp(NPC npc, int day)
     {
-        long expForNextLevel = GetExperienceForLevel(npc.Level + 1);
+        long expForNextLevel = GameConfig.GetExperienceForLevel(npc.Level + 1);
         if (npc.Experience >= expForNextLevel && npc.Level < 100)
         {
             npc.Level++;
@@ -646,20 +646,6 @@ public class WorldInitializerSystem
         } while (ActiveTeams.Any(t => t.Name == name) && attempts < 20);
 
         return name;
-    }
-
-    /// <summary>
-    /// Calculate XP needed for a level (matches other formulas)
-    /// </summary>
-    private static long GetExperienceForLevel(int level)
-    {
-        if (level <= 1) return 0;
-        long exp = 0;
-        for (int i = 2; i <= level; i++)
-        {
-            exp += (long)(Math.Pow(i, 2.0) * 50);
-        }
-        return exp;
     }
 
     /// <summary>

@@ -403,7 +403,7 @@ namespace UsurperRemake.Systems
             npc.MaxHP = npc.HP;
             npc.MaxMana = npc.Mana;
             // Use same XP curve as players: level^2.0 * 50 per level
-            npc.Experience = GetExperienceForLevel(level);
+            npc.Experience = GameConfig.GetExperienceForLevel(level);
             npc.Gold = random.Next(level * 100, level * 500);
 
             // Add Constitution stat (was missing)
@@ -1111,21 +1111,6 @@ namespace UsurperRemake.Systems
                 _listVersion++;
         }
 
-        /// <summary>
-        /// Calculate experience points needed for a given level using same curve as players
-        /// Formula: Sum of level^2.0 * 50 for each level from 2 to target
-        /// </summary>
-        private static long GetExperienceForLevel(int level)
-        {
-            if (level <= 1) return 0;
-            long exp = 0;
-            for (int i = 2; i <= level; i++)
-            {
-                exp += (long)(Math.Pow(i, 2.0) * 50);
-            }
-            return exp;
-        }
-
         // Fantasy name pools for immigrant NPCs (shared with FamilySystem)
         private static readonly string[] ImmigrantMaleNames = new[]
         {
@@ -1221,7 +1206,7 @@ namespace UsurperRemake.Systems
                     Race = race,
                     Class = npcClass,
                     Level = level,
-                    Experience = GetExperienceForLevel(level),
+                    Experience = GameConfig.GetExperienceForLevel(level),
                     Strength = baseStat + random.Next(5),
                     Defence = baseStat + random.Next(5),
                     Stamina = baseStat + random.Next(5),

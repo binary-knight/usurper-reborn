@@ -2021,8 +2021,8 @@ public abstract class BaseLocation
             if (currentPlayer.Level < GameConfig.MaxLevel)
             {
                 long currentXP = currentPlayer.Experience;
-                long nextLevelXP = GetExperienceForLevel(currentPlayer.Level + 1);
-                long prevLevelXP = GetExperienceForLevel(currentPlayer.Level);
+                long nextLevelXP = GameConfig.GetExperienceForLevel(currentPlayer.Level + 1);
+                long prevLevelXP = GameConfig.GetExperienceForLevel(currentPlayer.Level);
                 long xpIntoLevel = currentXP - prevLevelXP;
                 long xpNeeded = nextLevelXP - prevLevelXP;
                 int xpPercent = xpNeeded > 0 ? (int)((xpIntoLevel * 100) / xpNeeded) : 0;
@@ -2084,8 +2084,8 @@ public abstract class BaseLocation
             if (currentPlayer.Level < GameConfig.MaxLevel)
             {
                 long currentXP = currentPlayer.Experience;
-                long nextLevelXP = GetExperienceForLevel(currentPlayer.Level + 1);
-                long prevLevelXP = GetExperienceForLevel(currentPlayer.Level);
+                long nextLevelXP = GameConfig.GetExperienceForLevel(currentPlayer.Level + 1);
+                long prevLevelXP = GameConfig.GetExperienceForLevel(currentPlayer.Level);
                 long xpIntoLevel = currentXP - prevLevelXP;
                 long xpNeeded = nextLevelXP - prevLevelXP;
                 int xpPercent = xpNeeded > 0 ? (int)((xpIntoLevel * 100) / xpNeeded) : 0;
@@ -2105,20 +2105,6 @@ public abstract class BaseLocation
 
         // Quick command bar
         ShowQuickCommandBar();
-    }
-
-    /// <summary>
-    /// Experience required to have the specified level (cumulative)
-    /// </summary>
-    private static long GetExperienceForLevel(int level)
-    {
-        if (level <= 1) return 0;
-        long exp = 0;
-        for (int i = 2; i <= level; i++)
-        {
-            exp += (long)(Math.Pow(i, 2.0) * 50);
-        }
-        return exp;
     }
 
     /// <summary>
@@ -2321,8 +2307,8 @@ public abstract class BaseLocation
         if (currentPlayer.Level < GameConfig.MaxLevel)
         {
             long curXP = currentPlayer.Experience;
-            long nextXP = GetExperienceForLevel(currentPlayer.Level + 1);
-            long prevXP = GetExperienceForLevel(currentPlayer.Level);
+            long nextXP = GameConfig.GetExperienceForLevel(currentPlayer.Level + 1);
+            long prevXP = GameConfig.GetExperienceForLevel(currentPlayer.Level);
             long xpInto = curXP - prevXP;
             long xpNeed = nextXP - prevXP;
             int pct = xpNeed > 0 ? (int)((xpInto * 100) / xpNeed) : 0;
@@ -5647,7 +5633,7 @@ public abstract class BaseLocation
         terminal.WriteLine($"{currentPlayer.Experience:N0}");
 
         // Calculate XP needed for next level
-        long nextLevelXP = GetExperienceForLevel(currentPlayer.Level + 1);
+        long nextLevelXP = GameConfig.GetExperienceForLevel(currentPlayer.Level + 1);
         long xpNeeded = nextLevelXP - currentPlayer.Experience;
 
         terminal.SetColor("white");

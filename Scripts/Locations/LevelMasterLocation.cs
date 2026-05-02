@@ -1275,23 +1275,7 @@ public class LevelMasterLocation : BaseLocation
     /// </summary>
     public static long GetExperienceForLevel(int level)
     {
-        if (level <= 1) return 0;
-        long exp = 0;
-        for (int i = 2; i <= level; i++)
-        {
-            // Softened curve: level^2.0 * 50 (rebalanced v0.41.4)
-            // Late-game tuning: above level 50 the exponent steepens to 2.25,
-            // so each level beyond 50 costs progressively more XP relative to
-            // monster XP rewards (which scale ^1.5). Closes the gap that let
-            // dedicated players reach Lv.100 in ~12-15 hours of focused play.
-            // Existing characters retain their Level field; CheckAutoLevelUp
-            // only levels UP, never DOWN, so nobody de-levels on deploy --
-            // they just take longer to reach the next level. Below 50, curve
-            // is unchanged so new players don't see any difference.
-            double exponent = i <= 50 ? 2.0 : 2.25;
-            exp += (long)(Math.Pow(i, exponent) * 50);
-        }
-        return exp;
+        return GameConfig.GetExperienceForLevel(level);
     }
 
     /// <summary>

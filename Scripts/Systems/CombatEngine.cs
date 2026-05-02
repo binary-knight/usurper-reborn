@@ -24954,7 +24954,7 @@ public partial class CombatEngine
             // Award XP
             long previousXP = teammate.Experience;
             teammate.Experience += teammateXP;
-            long xpNeeded = GetExperienceForLevel(teammate.Level + 1);
+            long xpNeeded = GameConfig.GetExperienceForLevel(teammate.Level + 1);
 
             // Show XP gain for all teammates (with catch-up indicator)
             terminal.SetColor("cyan");
@@ -24963,7 +24963,7 @@ public partial class CombatEngine
             terminal.SetColor("white");
 
             // Check for level up (using same formula as player/NPCs)
-            long xpForNextLevel = GetExperienceForLevel(teammate.Level + 1);
+            long xpForNextLevel = GameConfig.GetExperienceForLevel(teammate.Level + 1);
             while (teammate.Experience >= xpForNextLevel && teammate.Level < 100)
             {
                 // Snapshot stats before this level's gains
@@ -25002,7 +25002,7 @@ public partial class CombatEngine
                 NewsSystem.Instance?.Newsy(true, $"{teammate.DisplayName} has achieved Level {teammate.Level}!");
 
                 // Calculate next threshold
-                xpForNextLevel = GetExperienceForLevel(teammate.Level + 1);
+                xpForNextLevel = GameConfig.GetExperienceForLevel(teammate.Level + 1);
             }
 
             // Sync changes to canonical ActiveNPCs entry (handles orphaned references)
@@ -25066,12 +25066,12 @@ public partial class CombatEngine
             {
                 // NPC teammate — award directly and check level-up
                 teammate.Experience += slotXP;
-                long xpNeeded = GetExperienceForLevel(teammate.Level + 1);
+                long xpNeeded = GameConfig.GetExperienceForLevel(teammate.Level + 1);
                 terminal.SetColor("cyan");
                 terminal.WriteLine($"  {teammate.DisplayName} ({percent}%): +{slotXP} XP ({teammate.Experience:N0}/{xpNeeded:N0}){catchUpLabel}");
 
                 // Check for level up
-                long xpForNextLevel = GetExperienceForLevel(teammate.Level + 1);
+                long xpForNextLevel = GameConfig.GetExperienceForLevel(teammate.Level + 1);
                 while (teammate.Experience >= xpForNextLevel && teammate.Level < 100)
                 {
                     long bHP = teammate.BaseMaxHP; long bStr = teammate.BaseStrength; long bDef = teammate.BaseDefence;
@@ -25100,7 +25100,7 @@ public partial class CombatEngine
                     if (sc.Count > 0) terminal.WriteLine($"    {string.Join("  ", sc)}");
 
                     NewsSystem.Instance?.Newsy(true, $"{teammate.DisplayName} has achieved Level {teammate.Level}!");
-                    xpForNextLevel = GetExperienceForLevel(teammate.Level + 1);
+                    xpForNextLevel = GameConfig.GetExperienceForLevel(teammate.Level + 1);
                 }
 
                 // Sync changes to canonical ActiveNPCs entry — if the world sim rebuilt
@@ -25180,20 +25180,6 @@ public partial class CombatEngine
         canonical.RecalculateStats();
 
         DebugLogger.Instance.LogInfo("COMBAT", $"Synced orphaned NPC teammate {npcTeammate.DisplayName} (Lv {canonical.Level}) back to ActiveNPCs");
-    }
-
-    /// <summary>
-    /// XP formula matching the player's curve (level^2.0 * 50)
-    /// </summary>
-    private static long GetExperienceForLevel(int level)
-    {
-        if (level <= 1) return 0;
-        long exp = 0;
-        for (int i = 2; i <= level; i++)
-        {
-            exp += (long)(Math.Pow(i, 2.0) * 50);
-        }
-        return exp;
     }
 
     // v0.57.13: returns (totalSwings, windfuryProcced). Callers that route main-hand/off-hand

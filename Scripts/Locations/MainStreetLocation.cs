@@ -547,8 +547,8 @@ public class MainStreetLocation : BaseLocation
         if (currentPlayer.Level < GameConfig.MaxLevel)
         {
             long curXP = currentPlayer.Experience;
-            long nextXP = GetExperienceForLevel(currentPlayer.Level + 1);
-            long prevXP = GetExperienceForLevel(currentPlayer.Level);
+            long nextXP = GameConfig.GetExperienceForLevel(currentPlayer.Level + 1);
+            long prevXP = GameConfig.GetExperienceForLevel(currentPlayer.Level);
             long xpInto = curXP - prevXP;
             long xpNeed = nextXP - prevXP;
             int pct = xpNeed > 0 ? (int)((xpInto * 100) / xpNeed) : 0;
@@ -670,7 +670,7 @@ public class MainStreetLocation : BaseLocation
         if (currentPlayer.Level >= GameConfig.MaxLevel)
             return;
 
-        long experienceNeeded = GetExperienceForLevel(currentPlayer.Level + 1);
+        long experienceNeeded = GameConfig.GetExperienceForLevel(currentPlayer.Level + 1);
 
         if (currentPlayer.Experience >= experienceNeeded)
         {
@@ -691,21 +691,6 @@ public class MainStreetLocation : BaseLocation
             }
             terminal.WriteLine("");
         }
-    }
-
-    /// <summary>
-    /// Experience required to have the specified level (cumulative)
-    /// </summary>
-    private static long GetExperienceForLevel(int level)
-    {
-        if (level <= 1) return 0;
-        long exp = 0;
-        for (int i = 2; i <= level; i++)
-        {
-            // Softened curve: level^2.0 * 50 (rebalanced v0.41.4)
-            exp += (long)(Math.Pow(i, 2.0) * 50);
-        }
-        return exp;
     }
 
     /// <summary>

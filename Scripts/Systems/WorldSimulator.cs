@@ -1782,7 +1782,7 @@ public class WorldSimulator
         }
 
         // Visit level master if eligible
-        long expForNextLevel = GetExperienceForLevel(npc.Level + 1);
+        long expForNextLevel = GameConfig.GetExperienceForLevel(npc.Level + 1);
         if (npc.Experience >= expForNextLevel && npc.Level < 100)
         {
             activities.Add(("levelup", 0.30));
@@ -3205,7 +3205,7 @@ public class WorldSimulator
     private void NPCVisitMaster(NPC npc)
     {
         npc.UpdateLocation("Level Master");
-        long expNeeded = GetExperienceForLevel(npc.Level + 1);
+        long expNeeded = GameConfig.GetExperienceForLevel(npc.Level + 1);
         if (npc.Experience >= expNeeded && npc.Level < 100)
         {
             npc.Level++;
@@ -3260,20 +3260,6 @@ public class WorldSimulator
         }
     }
 
-    /// <summary>
-    /// Calculate XP needed for a level (matches player formula)
-    /// </summary>
-    private static long GetExperienceForLevel(int level)
-    {
-        if (level <= 1) return 0;
-        long exp = 0;
-        for (int i = 2; i <= level; i++)
-        {
-            exp += (long)(Math.Pow(i, 2.0) * 50);
-        }
-        return exp;
-    }
-    
     private void ExecuteNPCAction(NPC npc, NPCAction action, WorldState world)
     {
         switch (action.Type)

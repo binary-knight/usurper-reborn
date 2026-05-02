@@ -1601,7 +1601,7 @@ namespace UsurperRemake.Systems
                 companion.DisabledAbilities.Clear();
                 companion.DisabledSpells.Clear();
                 companion.Level = Math.Max(1, companion.RecruitLevel + 5);
-                companion.Experience = GetExperienceForLevel(companion.Level);
+                companion.Experience = GameConfig.GetExperienceForLevel(companion.Level);
             }
 
             activeCompanions.Clear();
@@ -1668,7 +1668,7 @@ namespace UsurperRemake.Systems
                     }
                     else
                     {
-                        companion.Experience = GetExperienceForLevel(companion.Level);
+                        companion.Experience = GameConfig.GetExperienceForLevel(companion.Level);
                         // DebugLogger: Initialized {companion.Name}'s XP to {companion.Experience} for level {companion.Level}
                     }
 
@@ -1797,20 +1797,6 @@ namespace UsurperRemake.Systems
         #region Experience and Leveling
 
         /// <summary>
-        /// XP formula matching the player's curve (level^2.0 * 50)
-        /// </summary>
-        public static long GetExperienceForLevel(int level)
-        {
-            if (level <= 1) return 0;
-            long exp = 0;
-            for (int i = 2; i <= level; i++)
-            {
-                exp += (long)(Math.Pow(i, 2.0) * 50);
-            }
-            return exp;
-        }
-
-        /// <summary>
         /// Award experience to all active companions (typically 50% of what player earns)
         /// Companions auto-level when they hit the threshold
         /// </summary>
@@ -1840,7 +1826,7 @@ namespace UsurperRemake.Systems
                 // Show XP gain
                 if (terminal != null)
                 {
-                    long xpNeeded = GetExperienceForLevel(companion.Level + 1);
+                    long xpNeeded = GameConfig.GetExperienceForLevel(companion.Level + 1);
                     terminal.SetColor("bright_magenta");
                     terminal.WriteLine($"  {companion.Name}: {companion.Experience:N0}/{xpNeeded:N0}");
                 }
@@ -1869,7 +1855,7 @@ namespace UsurperRemake.Systems
         {
             if (companion.Level >= 100) return;
 
-            long xpForNextLevel = GetExperienceForLevel(companion.Level + 1);
+            long xpForNextLevel = GameConfig.GetExperienceForLevel(companion.Level + 1);
 
             while (companion.Experience >= xpForNextLevel && companion.Level < 100)
             {
@@ -1931,7 +1917,7 @@ namespace UsurperRemake.Systems
                 ModifyLoyalty(companion.Id, 1, "Leveled up through shared combat");
 
                 // Calculate next threshold
-                xpForNextLevel = GetExperienceForLevel(companion.Level + 1);
+                xpForNextLevel = GameConfig.GetExperienceForLevel(companion.Level + 1);
             }
         }
 
@@ -2090,7 +2076,7 @@ namespace UsurperRemake.Systems
         {
             // Start at RecruitLevel + 5 (as before, but now tracked)
             companion.Level = Math.Max(1, companion.RecruitLevel + 5);
-            companion.Experience = GetExperienceForLevel(companion.Level);
+            companion.Experience = GameConfig.GetExperienceForLevel(companion.Level);
 
             // Scale base stats to match level
             ScaleCompanionStatsToLevel(companion);

@@ -1201,13 +1201,31 @@ public static partial class GameConfig
     public const int SessionXPDiminishMessageInterval = 10;     // Show fatigue message every N combats
 
     /// <summary>
+    /// Canonical XP formula. Cumulative experience required to reach <paramref name="level"/>.
+    /// Late-game exponent steepens to 2.25 above level 50.
+    /// </summary>
+    public static long GetExperienceForLevel(int level)
+    {
+        if (level <= 1) return 0;
+        long exp = 0;
+        for (int i = 2; i <= level; i++)
+        {
+            double exponent = i <= 50 ? 2.0 : 2.25;
+            exp += (long)(Math.Pow(i, exponent) * 50);
+        }
+        return exp;
+    }
+
+    /// <summary>
     /// Get the session XP threshold for a given player level.
     /// Scales with level so higher-level players can earn proportionally more XP per session.
     /// At level 10: 100,000. At level 50: 1,040,400. At level 89: 3,240,000. At level 100: 4,080,400.
     /// </summary>
     public static long GetSessionXPThreshold(int level)
     {
-        long nextLevelXP = (long)(Math.Pow(level + 1, 2.0) * 50);
+        int l = level + 1;
+        double exponent = l <= 50 ? 2.0 : 2.25;
+        long nextLevelXP = (long)(Math.Pow(l, exponent) * 50);
         return Math.Max(SessionXPDiminishBaseThreshold, nextLevelXP * 8);
     }
     // Study / Library

@@ -2526,7 +2526,7 @@ public class DungeonLocation : BaseLocation
         // Line 6: Level eligibility
         if (player != null && player.Level < GameConfig.MaxLevel)
         {
-            long experienceNeeded = GetExperienceForLevel(player.Level + 1);
+            long experienceNeeded = GameConfig.GetExperienceForLevel(player.Level + 1);
             if (player.Experience >= experienceNeeded)
             {
                 terminal.SetColor("bright_green");
@@ -3547,7 +3547,7 @@ public class DungeonLocation : BaseLocation
         if (currentPlayer == null || currentPlayer.Level >= GameConfig.MaxLevel)
             return;
 
-        long experienceNeeded = GetExperienceForLevel(currentPlayer.Level + 1);
+        long experienceNeeded = GameConfig.GetExperienceForLevel(currentPlayer.Level + 1);
 
         if (currentPlayer.Experience >= experienceNeeded)
         {
@@ -3555,20 +3555,6 @@ public class DungeonLocation : BaseLocation
             WriteBoxHeader(Loc.Get("dungeon.level_raise"), "bright_yellow");
             terminal.WriteLine("");
         }
-    }
-
-    /// <summary>
-    /// Experience required to have the specified level (cumulative)
-    /// </summary>
-    private static long GetExperienceForLevel(int level)
-    {
-        if (level <= 1) return 0;
-        long exp = 0;
-        for (int i = 2; i <= level; i++)
-        {
-            exp += (long)(Math.Pow(i, 2.0) * 50);
-        }
-        return exp;
     }
 
     protected override string GetBreadcrumbPath()
