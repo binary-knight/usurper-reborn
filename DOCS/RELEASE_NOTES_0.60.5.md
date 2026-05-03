@@ -6,8 +6,6 @@ Substantial release on top of v0.60.4. One contributor PR fixing an XP regressio
 
 ## XP threshold desync at Lv.51+ (PR #98)
 
-Player report (Coosh): *"I didn't get my lvl up automatically, went over the XP required for the level (now xp to level shows negative value). The trainer says not available too."*
-
 Root cause: when the late-game XP curve was tuned in v0.60.4 (levels 51+ now use exponent `2.25` instead of `2.0`), only `LevelMasterLocation.GetExperienceForLevel` was updated. The same function had been duplicated **12 times** across the codebase and 11 of those copies stayed at the flat `^2.0` exponent.
 
 Visible desync for any player past level 50:
@@ -32,8 +30,6 @@ Existing characters retain their current `Level` field. `CheckAutoLevelUp` only 
 
 ## Snoop SSE keepalive + nginx pass-through hardening
 
-Admin report: *"the website admin snoop doesn't seem to be working, it's just a blank screen now."*
-
 The snoop SSE handler in `web/ssh-proxy.js` had no keepalive ping. If the snooped player was idle for 60+ seconds, nginx's default `proxy_read_timeout = 60s` killed the connection silently. The admin saw an overlay with no data and no error. There was also no server-side logging to diagnose any of this from the outside.
 
 Three fixes:
@@ -48,7 +44,6 @@ Files: `web/ssh-proxy.js`, `/etc/nginx/sites-available/usurper` (server config p
 
 ## Full ban system rewrite
 
-Player request: *"I want a full ban, from the entire server, I don't want them to be able to even create a new ssh account. I want it to disconnect them if they are currently online, and then completely lock them out of the multiplayer online server unless I revoke the ban."*
 
 The pre-v0.60.5 ban system was account-name-only: `players.is_banned` was a boolean checked once at the auth password step. A banned player could (a) keep playing their current session until they disconnected on their own (no kick), (b) trivially register a new account with a different name, (c) connect from any IP without restriction. It existed, it discouraged, but it didn't actually ban anyone.
 
@@ -130,8 +125,6 @@ Every ban / unban / IP-ban / IP-unban writes to `wizard_log` with the action and
 ---
 
 ## Permadeath leaks shared world-state references
-
-Player report (Rage): *"Interesting thing -- I lost all 4 of my lives, was booted off and created a new char. Came back in my guild still, and actually still worshiping the same god."*
 
 Same flow surfaced the other half of the bug above: when permadeath fires, `DeleteGameData` was clearing the player's `player_data` JSON blob and archiving it for the 7-day `/restore` window, but it wasn't touching any of the per-username rows in shared world-state tables. So a new character with the same username inherited:
 
@@ -256,26 +249,6 @@ Files: `Console/Bootstrap/Program.cs`.
 - `/etc/nginx/sites-available/usurper` -- `/api/` block tightened with `proxy_buffering off`, `proxy_cache off`, `proxy_http_version 1.1`, `proxy_read_timeout 600s`, `proxy_send_timeout 600s`. Patched in place via awk; backup at `/etc/nginx/sites-available/usurper.bak.<timestamp>`.
 
 ---
-
-## Deploy notes
-
-- Standard recipe: publish linux-x64, tar, scp, restart `usurper-mud` and `sshd-usurper`.
-- **Web changes also require restarting `usurper-web`** (Banned IPs admin endpoints + admin.html + snoop fixes).
-- The new `banned_ips` table and `players.last_login_ip` / `players.created_ip` columns are auto-migrated via `CREATE TABLE IF NOT EXISTS` and `ALTER TABLE ADD COLUMN` on first MUD server startup. No manual SQL needed.
-- Existing characters' `Level` field unchanged. Players past Lv.50 who appeared "stuck" in v0.60.4 see their XP bar render correctly in v0.60.5 and start leveling up again as they cross the real (steeper) threshold.
-- Pre-existing players have `last_login_ip = NULL` and `created_ip = NULL` until their next login / a fresh registration. Banning a never-logged-in player therefore can't IP-ban them automatically -- the admin can still add an IP-only ban manually if they have the IP from another source.
-
-For testing post-deploy:
-
-- Log in any Lv.51+ character. Confirm the Status window's "XP to next level" matches what the Trainer at Level Master shows.
-- Click Ban on an online player from the admin dashboard with the "Also ban IP" checkbox checked. Confirm: their session disconnects immediately; their IP appears in the new Banned IPs section; reconnecting from the same IP gets refused with "this address is banned"; clicking Lift restores everything.
-- Try registering 4 accounts from the same IP within 24 hours. The 4th gets `"Too many accounts registered from this address recently."`
-- Add a CIDR ban via "+ Ban IP" with `1.2.3.0/24`. Connect from any IP in `1.2.3.0` through `1.2.3.255` -- all should be refused.
-- Permadeath a test character via `/setlevel 1` + repeat-deaths. After permadeath fires, register a new character on the same SSH account. Confirm they are NOT in the old guild, NOT worshipping the old god, have no pending bounties, and start fresh.
-- Trigger an admin snoop on a player who's idle for 90+ seconds. Confirm the SSE stream stays alive and resumes streaming output once the player takes an action.
-
----
-
 ## Credits
 
 - **PR #98** authored by Coosh. Diagnosed the XP-formula desync from his own soft-locked Lv.73 character, traced the root cause to 12 duplicated copies of the same function, and submitted a clean centralized fix in a single PR. Merged and deployed within minutes.
