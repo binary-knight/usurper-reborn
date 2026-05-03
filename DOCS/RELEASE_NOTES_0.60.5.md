@@ -207,6 +207,20 @@ Files: `Scripts/Core/GameEngine.cs` (engine credits screen call), `Localization/
 
 ---
 
+## Screen reader auto-detect false positive on Steam (WezTerm)
+
+Player report (sighted Steam player on a clean v0.60.4 launch via the default Play.bat): *"Screen reader detected. Accessible mode enabled automatically."* showing on the title screen with no SR actually running.
+
+Root cause: `AccessibilityDetection.IsScreenReaderActive` calls `SystemParametersInfo(SPI_GETSCREENREADER, ...)` -- the documented Microsoft API that NVDA/JAWS/Narrator set while running. The flag is stickier than the docs imply: browsers, accessibility tools, and apps that crashed without clearing it can leave `SPI_SCREENREADER = TRUE` set on the desktop session. `Console/Bootstrap/Program.cs` was firing the auto-detect for every non-headless launch, so any Steam player on a system where the flag had ever been set saw the message and got flipped into accessible mode against their will.
+
+Fix: skip the auto-detect when running inside WezTerm (`TERM_PROGRAM == "WezTerm"`, set by WezTerm for all child processes). The default Steam launcher (`Play.bat`) wraps WezTerm; screen reader users on Steam are expected to use `Play-Accessible.bat` which passes `--screen-reader` explicitly (and short-circuits this whole code path via the existing `!GameConfig.ScreenReaderMode` guard). The auto-detect still runs for the standard console branch (non-WezTerm desktop console / direct `.exe` double-click) where it's the only path a screen reader user has to discover the mode without command-line flags.
+
+Macros'n'Linux unaffected -- the underlying Win32 API returns false on those platforms anyway, so the auto-detect was already a no-op there.
+
+Files: `Console/Bootstrap/Program.cs`.
+
+---
+
 ## Files Changed (cumulative)
 
 ### New SQLite schema additions
@@ -215,6 +229,7 @@ Files: `Scripts/Core/GameEngine.cs` (engine credits screen call), `Localization/
 - `players.created_ip` column (ALTER TABLE migration, idempotent)
 
 ### Modified files (game)
+- `Console/Bootstrap/Program.cs` -- skip screen reader auto-detect when `TERM_PROGRAM == "WezTerm"`.
 - `Scripts/Core/GameConfig.cs` -- version bump to 0.60.5; canonical `GetExperienceForLevel` (PR #98); fixed `GetSessionXPThreshold` exponent (PR #98); `MaxRegistrationsPerIpPer24h = 3` constant.
 - `Scripts/Core/GameEngine.cs` -- 1 stale XP duplicate removed (PR #98); engine credits screen adds Coosh.
 - `Scripts/Core/NPC.cs` -- 1 stale XP duplicate removed (PR #98).

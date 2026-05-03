@@ -164,7 +164,21 @@ namespace UsurperConsole
             bool isRemoteOrHeadlessMode = useDoorMode &&
                 (DoorMode.IsMudServerMode || DoorMode.IsMudRelayMode || DoorMode.IsWorldSimMode ||
                  (DoorMode.IsInDoorMode && DoorMode.SessionInfo?.CommType != ConnectionType.Local));
-            if (!isRemoteOrHeadlessMode && !GameConfig.ScreenReaderMode &&
+            // v0.60.5: skip auto-detect when running inside WezTerm. WezTerm is what
+            // Play.bat / play.sh (the default Steam launcher) wraps; screen reader
+            // users on Steam are expected to use Play-Accessible.bat which passes
+            // --screen-reader explicitly. SPI_GETSCREENREADER is unreliable on
+            // Windows -- the flag can be left set by browsers, accessibility tools,
+            // or apps that crashed without clearing it -- so a Steam user launching
+            // the normal way was getting flipped into accessible mode despite no
+            // screen reader actually running. Player report: "Screen reader detected"
+            // showing on a clean Steam + WezTerm launch with no SR active.
+            // TERM_PROGRAM=WezTerm is set by WezTerm for all child processes.
+            bool isWezTerm = string.Equals(
+                Environment.GetEnvironmentVariable("TERM_PROGRAM"),
+                "WezTerm",
+                StringComparison.OrdinalIgnoreCase);
+            if (!isRemoteOrHeadlessMode && !isWezTerm && !GameConfig.ScreenReaderMode &&
                 UsurperRemake.UI.AccessibilityDetection.IsScreenReaderActive())
             {
                 GameConfig.ScreenReaderMode = true;
