@@ -153,17 +153,25 @@ namespace UsurperConsole
             // so injecting only into the standard branch would have missed the
             // most common Steam install.
             //
-            // Skip the announcement for non-local door-mode connections (real
-            // BBS doors, MUD server/relay, headless world sim). Those run on a
-            // sysop machine that may have no display and are serving remote
-            // users whose own clients negotiate accessibility via TTYPE.
+            // Skip the announcement in ANY door mode. Door modes always run on
+            // a separate machine from the player (BBS host, MUD server, relay)
+            // and the SPI_GETSCREENREADER flag we'd be reading is from THAT
+            // machine's Windows session, not the remote player's. Inheriting
+            // the host's flag bumped real BBS players into accessible mode
+            // because the BBS sysop's machine had the SR flag stuck on (the
+            // flag can be left set by browsers, accessibility tools, or apps
+            // that crashed without clearing it). Door players who actually
+            // need accessible mode either: (a) have it negotiated via TTYPE
+            // in their MUD client, (b) toggle it in the in-game preferences
+            // menu, or (c) launch via Play-Accessible.bat which passes
+            // --screen-reader explicitly. The auto-detect is only useful for
+            // the standard console launch where the player is genuinely on
+            // the local Windows session that the API queries.
             // Saved characters' explicit ScreenReaderMode still wins on character
             // load via GameConfig.ScreenReaderMode = player.ScreenReaderMode in
             // GameEngine.LoadSaveByFileName, so this only sets the pre-character
             // default and the inheritance for fresh characters.
-            bool isRemoteOrHeadlessMode = useDoorMode &&
-                (DoorMode.IsMudServerMode || DoorMode.IsMudRelayMode || DoorMode.IsWorldSimMode ||
-                 (DoorMode.IsInDoorMode && DoorMode.SessionInfo?.CommType != ConnectionType.Local));
+            bool isRemoteOrHeadlessMode = useDoorMode;
             // v0.60.5: skip auto-detect when running inside WezTerm. WezTerm is what
             // Play.bat / play.sh (the default Steam launcher) wraps; screen reader
             // users on Steam are expected to use Play-Accessible.bat which passes

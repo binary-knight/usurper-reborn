@@ -200,15 +200,103 @@ Files: `Scripts/Core/GameEngine.cs` (engine credits screen call), `Localization/
 
 ---
 
-## Screen reader auto-detect false positive on Steam (WezTerm)
+## SECURITY: trusted-auth account impersonation via direct TCP
 
-Player report (sighted Steam player on a clean v0.60.4 launch via the default Play.bat): *"Screen reader detected. Accessible mode enabled automatically."* showing on the title screen with no SR actually running.
+Reporter found a critical authentication bypass against the MUD server's protocol-mode AUTH handler. Reproduction: telnet to the public game port and immediately send `AUTH:targetUsername:Web` (or any connection-type string). The 3-part AUTH form `AUTH:user:type` was the trusted-auth path -- intended for the local SSH relay (`sshd-usurper` -> `--mud-relay` -> `127.0.0.1:4001`) and the local BBS gateway -- and skipped password verification entirely. Anyone could log in as any account on the public server, with no auth attempt logged as a failure (the server treated it as a successful trusted login).
 
-Root cause: `AccessibilityDetection.IsScreenReaderActive` calls `SystemParametersInfo(SPI_GETSCREENREADER, ...)` -- the documented Microsoft API that NVDA/JAWS/Narrator set while running. The flag is stickier than the docs imply: browsers, accessibility tools, and apps that crashed without clearing it can leave `SPI_SCREENREADER = TRUE` set on the desktop session. `Console/Bootstrap/Program.cs` was firing the auto-detect for every non-headless launch, so any Steam player on a system where the flag had ever been set saw the message and got flipped into accessible mode against their will.
+The 4-part form `AUTH:user:password:type` and the interactive login menu were unaffected -- those always run real password verification.
 
-Fix: skip the auto-detect when running inside WezTerm (`TERM_PROGRAM == "WezTerm"`, set by WezTerm for all child processes). The default Steam launcher (`Play.bat`) wraps WezTerm; screen reader users on Steam are expected to use `Play-Accessible.bat` which passes `--screen-reader` explicitly (and short-circuits this whole code path via the existing `!GameConfig.ScreenReaderMode` guard). The auto-detect still runs for the standard console branch (non-WezTerm desktop console / direct `.exe` double-click) where it's the only path a screen reader user has to discover the mode without command-line flags.
+Root cause: the trusted-auth design assumed the only connections without a password would come from local relays. There was no enforcement of that assumption -- the gate was implicit ("anyone hitting this port without a password must be trusted") rather than explicit.
 
-Macros'n'Linux unaffected -- the underlying Win32 API returns false on those platforms anyway, so the auto-detect was already a no-op there.
+### Fix
+
+`MudServer.HandleConnectionAsync` now captures the raw TCP socket peer separately from the public-facing `effectiveIp` (which honors the `X-IP` forwarded header for ban-tracking). The TCP peer cannot be spoofed by external clients -- only the actual socket source determines whether `IPAddress.IsLoopback` returns true. New gate after AUTH parsing, before password verification:
+
+```
+if (password == null && !isLoopbackPeer) {
+    log SECURITY rejection with peer IP and claimed username
+    return ERR:Authentication required. Trusted auth is only available from local relays.
+}
+```
+
+Legitimate flows that still work:
+- SSH relay path (sshd-usurper from localhost) -- loopback peer, gate passes.
+- Web proxy (`ssh-proxy.js` on the same host) -- loopback peer, gate passes.
+- Local BBS Online Play connecting to localhost:4001 -- loopback peer, gate passes.
+- Desktop / Steam client with password (the 4-part AUTH form) -- password != null, gate is skipped, real password verification runs.
+- Interactive login menu (raw telnet without an AUTH header) -- always password-verified, unaffected.
+
+Every rejected attempt is logged with the peer IP and the impersonated username so post-incident audit can identify probes:
+
+```
+[MUD] SECURITY: rejected trusted-auth from non-loopback peer 203.0.113.42 (claimed user='rage', type='Web')
+```
+
+Files: `Scripts/Server/MudServer.cs`.
+
+### BBS Online Play migrated to password auth
+
+The `[O] Online Play` menu in BBS door mode used to send the no-password trusted form (the same vector exploited above). It now goes through the same login/register flow as desktop and Steam clients: the user picks Login or Register, types a username and password, and the server runs real password verification.
+
+The transport stays direct TCP for BBS (a door environment can't host an SSH client), but the AUTH wire format is the standard 4-part `AUTH:user:password:type`. Convenience touches:
+
+- The username prompt is pre-filled with the BBS handle from the drop file -- the user can press Enter to accept it as their game-server username, or type a different one.
+- Registration runs against the public server's normal flow, including the per-IP rate limit (3 new accounts per IP per 24h) added in this same release.
+- Saved-credential auto-login is intentionally disabled in BBS door mode -- on a multi-user BBS box, the credentials file is per-install, not per-user, so caching a login would let the next door user inherit the previous one's account. Each BBS user logs in fresh.
+
+What this does NOT change (the common BBS deployment):
+- BBSes running with the `--online` flag, which gives the BBS its own local SQLite-backed shared world for the players ON that BBS. Those players are already inside the local online world; no remote AUTH involved.
+- BBSes running in single-player file-save mode (no `--online`).
+- Any sysop running both their BBS door AND a private MUD server on the same box, since the BBS-to-MUD connection is over loopback.
+- The public game server's normal player paths: SSH gateway, web terminal, desktop/Steam (password auth), Mudlet/MUSHclient (password auth or interactive login), and the in-game admin tools.
+
+Sysop note: BBS sysops on an earlier 0.60.5 binary (pre-security-fix) whose users hit `[O] Online Play` will see the new server-side rejection until they update their BBS door binary to the latest 0.60.5 build (win-x86). The new binary's `[O] Online Play` menu prompts for username + password instead of the old trusted passthrough.
+
+Files: `Scripts/Systems/OnlinePlaySystem.cs`.
+
+---
+
+## Online Play server picker
+
+The `[O] Online Play` menu used to drop the player straight onto the official server. Now it shows a server picker first:
+
+```
+  Choose a server:
+
+  [1] Official server  (play.usurper-reborn.net:4000)
+  [2] Connect to a different server (enter host and port)
+  [B] Back to Main Menu
+```
+
+`[1]` is one keystroke for the common case. `[2]` prompts for hostname then port (defaults to 4000 if blank; validates 1-65535). After picking, the existing auth + connection flow runs unchanged.
+
+This is groundwork for community-run servers. The minimum viable shape: players can already paste their friend's hostname and play together, no central registry needed. A full P2P / phone-home server discovery system was scoped and deferred -- the picker is the immediate win that doesn't require any backend infrastructure or moderation work.
+
+Six new localization keys per language (`online.choose_server`, `online.server_official`, `online.server_custom`, `online.custom_host_prompt`, `online.custom_port_prompt`, `online.invalid_port`) translated for en/es/fr/hu/it.
+
+Files: `Scripts/Systems/OnlinePlaySystem.cs`, `Localization/{en,es,fr,hu,it}.json`.
+
+---
+
+## Screen reader auto-detect false positives (Steam + BBS)
+
+Two reports of *"Screen reader detected. Accessible mode enabled automatically."* showing on launch with no SR actually running:
+
+- Sighted Steam player on a clean v0.60.4 launch via the default `Play.bat` (WezTerm wrapper).
+- BBS player connecting through Synchronet to a sysop's BBS hosting Usurper Reborn as a door, getting bumped into accessible mode before the title screen even rendered.
+
+Root cause (same for both): `AccessibilityDetection.IsScreenReaderActive` calls `SystemParametersInfo(SPI_GETSCREENREADER, ...)` -- the documented Microsoft API that NVDA/JAWS/Narrator set while running. The flag is stickier than the docs imply: browsers, accessibility tools, and apps that crashed without clearing it can leave `SPI_SCREENREADER = TRUE` set on the desktop session. `Console/Bootstrap/Program.cs` was firing the auto-detect on every non-headless launch -- on the BBS path, that meant the *sysop's* Windows session flag was being read and applied to every player who connected through the door.
+
+The BBS case in particular has nothing to do with the actual player. They're on a remote terminal at the other end of a telnet/SSH session; whatever flags are stuck on the BBS host's Windows desktop are completely unrelated to whether they have a screen reader running. The previous gate `(IsInDoorMode && CommType != Local)` failed to skip Synchronet stdio mode because that mode reports `CommType = Local` (it's local from the door's perspective even though the user is remote).
+
+### Fix
+
+Two-layer:
+
+1. **Skip the auto-detect for any door mode** (`useDoorMode = true`). Door modes always run on a host machine separate from the player, so reading the host's Windows flag is meaningless. Door players who need accessible mode have three working paths: (a) MUD-client TTYPE negotiation, (b) the in-game preferences toggle (saved per-character), or (c) launching via `Play-Accessible.bat` which passes `--screen-reader` explicitly.
+2. **Skip the auto-detect when running inside WezTerm** (`TERM_PROGRAM == "WezTerm"`, set by WezTerm for all child processes). The default Steam launcher (`Play.bat`) wraps WezTerm; SR users on Steam use `Play-Accessible.bat`. The auto-detect still runs for the standard console branch (non-WezTerm desktop console / direct `.exe` double-click) where it's the only path a SR user has to discover the mode without command-line flags.
+
+macOS and Linux unaffected -- the underlying Win32 API returns false on those platforms anyway, so the auto-detect was already a no-op there.
 
 Files: `Console/Bootstrap/Program.cs`.
 
@@ -230,7 +318,8 @@ Files: `Console/Bootstrap/Program.cs`.
 - `Scripts/Systems/{CombatEngine,CompanionSystem,NPCSpawnSystem,WorldSimulator,WorldInitializerSystem,WorldSimService}.cs` -- 6 stale XP duplicates removed (PR #98).
 - `Scripts/Systems/SqlSaveBackend.cs` -- `banned_ips` schema, IP-ban methods (`BanIp` / `UnbanIp` / `IsIpBanned` / `GetIpBanReason` / `GetLastLoginIpForPlayer` / `GetCurrentOnlineIpForPlayer` / `GetBannedIps` / `CidrContains`); enhanced `BanPlayer` (capture IP + kick + ban-IP cascade), enhanced `UnbanPlayer` (lift associated IP bans); `RegisterPlayer` rate limit + `created_ip` storage; `AuthenticatePlayer` defense-in-depth IP check; `UpdatePlayerSession` accepts and persists `ipAddress`; `KickActiveSessionHook` + `PermadeathPurgeHook` static delegates; `PurgePlayerWorldState` + `ExecPurge` helper.
 - `Scripts/Systems/PermadeathHelper.cs` -- calls `PurgePlayerWorldState` before `DeleteGameData` in `ExecutePermadeath`.
-- `Scripts/Server/MudServer.cs` -- accept-time IP check; `KickActiveSessionHook` and `PermadeathPurgeHook` wired at startup; `InteractiveAuthAsync` plumbs `effectiveIp` into auth/register calls.
+- `Scripts/Server/MudServer.cs` -- accept-time IP check; `KickActiveSessionHook` and `PermadeathPurgeHook` wired at startup; `InteractiveAuthAsync` plumbs `effectiveIp` into auth/register calls; raw TCP peer captured separately from `effectiveIp`; loopback gate on trusted-AUTH; SECURITY rejection logged with peer IP + claimed username.
+- `Scripts/Systems/OnlinePlaySystem.cs` -- BBS path uses unified login/register flow over TCP; BBS username pre-fill; saved-credential auto-load skipped in BBS mode. `StartOnlinePlay` rewritten as a server picker (Official / Custom / Back) with hostname + port prompts and 1-65535 validation.
 - `Scripts/Systems/OnlineAuthScreen.cs` -- threads session IP into `AuthenticatePlayer` / `RegisterPlayer`.
 - `Scripts/Systems/OnlineStateManager.cs` -- passes IP through `UpdatePlayerSession` so `last_login_ip` is persisted on every login.
 - `Scripts/Systems/IOnlineSaveBackend.cs` -- `UpdatePlayerSession` signature gains optional `ipAddress`.
@@ -243,7 +332,7 @@ Files: `Console/Bootstrap/Program.cs`.
 - `web/steam.html` -- new credits card for Coosh.
 
 ### Modified files (localization)
-- `Localization/{en,es,fr,hu,it}.json` -- 7 beta-banner keys updated per language; `engine.credits_coosh` key added per language.
+- `Localization/{en,es,fr,hu,it}.json` -- 7 beta-banner keys updated per language; `engine.credits_coosh` key added per language; 6 server-picker keys added per language (`online.choose_server`, `online.server_official`, `online.server_custom`, `online.custom_host_prompt`, `online.custom_port_prompt`, `online.invalid_port`).
 
 ### Server config
 - `/etc/nginx/sites-available/usurper` -- `/api/` block tightened with `proxy_buffering off`, `proxy_cache off`, `proxy_http_version 1.1`, `proxy_read_timeout 600s`, `proxy_send_timeout 600s`. Patched in place via awk; backup at `/etc/nginx/sites-available/usurper.bak.<timestamp>`.

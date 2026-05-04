@@ -341,16 +341,32 @@ public class MudServer
                 firstBytes = System.Text.Encoding.UTF8.GetBytes(authLine);
             }
 
+            // Capture the RAW TCP peer IP separately from effectiveIp. effectiveIp
+            // is the public-facing address (X-IP from a relay if set), used for ban
+            // checks and rate-limit attribution. rawPeerIp is the actual socket peer,
+            // used for trust-gating: only loopback connections may use trusted auth
+            // (no password). Anyone can spoof X-IP, only loopback can spoof rawPeerIp.
+            string? rawPeerIp = null;
+            try { rawPeerIp = (client.Client.RemoteEndPoint as System.Net.IPEndPoint)?.Address.ToString(); }
+            catch { /* socket may have closed */ }
+            bool isLoopbackPeer = false;
+            if (!string.IsNullOrEmpty(rawPeerIp))
+            {
+                try
+                {
+                    var addr = System.Net.IPAddress.Parse(rawPeerIp);
+                    isLoopbackPeer = System.Net.IPAddress.IsLoopback(addr);
+                }
+                catch { /* malformed; not loopback */ }
+            }
+
             // v0.60.5: IP-ban check at the earliest practical point. Effective IP
             // is the X-IP forwarded header value if a relay set one (web/SSH gateway),
             // otherwise the raw TCP peer address. Banned IPs get a polite message and
             // a closed socket — no auth attempt, no register attempt, no session.
             string? effectiveIp = forwardedIP;
             if (string.IsNullOrEmpty(effectiveIp))
-            {
-                try { effectiveIp = (client.Client.RemoteEndPoint as System.Net.IPEndPoint)?.Address.ToString(); }
-                catch { /* socket may have closed; effectiveIp stays null */ }
-            }
+                effectiveIp = rawPeerIp;
             if (!string.IsNullOrEmpty(effectiveIp) && sqlBackend.IsIpBanned(effectiveIp))
             {
                 var ipReason = sqlBackend.GetIpBanReason(effectiveIp);
@@ -444,6 +460,24 @@ public class MudServer
 
                 var usernameKey = username.ToLowerInvariant();
                 Console.Error.WriteLine($"[MUD] Connection from {client.Client.RemoteEndPoint}: user={username}, type={connectionType}, auth={( password != null ? (isRegistration ? "register" : "password") : "trusted" )}");
+
+                // SECURITY: trusted auth (no password) is only allowed from loopback.
+                // The 3-part AUTH:user:type form was originally intended for the local
+                // SSH relay (sshd-usurper -> --mud-relay -> 127.0.0.1:4001) and the BBS
+                // gateway. Without this gate, any external client could telnet to the
+                // game port and send "AUTH:targetUser:Web" to log in as that account
+                // with no password verification. Reproduces against any public server.
+                // Loopback-only because the raw TCP peer is the only thing the server
+                // can trust (X-IP forwarded headers can be spoofed by external clients).
+                // Remote BBS deployments that previously used trusted Online Play must
+                // either co-locate with the game server or migrate to password auth.
+                if (password == null && !isLoopbackPeer)
+                {
+                    Console.Error.WriteLine($"[MUD] SECURITY: rejected trusted-auth from non-loopback peer {rawPeerIp ?? "unknown"} (claimed user='{username}', type='{connectionType}')");
+                    await WriteLineAsync(stream, "ERR:Authentication required. Trusted auth is only available from local relays.");
+                    client.Close();
+                    return;
+                }
 
                 // Handle registration
                 if (isRegistration && password != null)

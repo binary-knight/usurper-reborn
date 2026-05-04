@@ -49,52 +49,115 @@ namespace UsurperRemake.Systems
         /// </summary>
         public async Task StartOnlinePlay()
         {
-            terminal.ClearScreen();
+            // Server picker loop -- user can select the official server, type a
+            // custom hostname/port to connect to a friend's server, or back out.
+            // The official server is pre-populated at [1] for one-keystroke entry;
+            // custom servers go through the same auth + connection flow.
+            while (true)
+            {
+                terminal.ClearScreen();
 
-            UIHelper.WriteBoxHeader(terminal, Loc.Get("online.header"), "bright_cyan");
-            terminal.WriteLine("");
+                UIHelper.WriteBoxHeader(terminal, Loc.Get("online.header"), "bright_cyan");
+                terminal.WriteLine("");
 
-            terminal.SetColor("gray");
-            terminal.WriteLine(Loc.Get("online.connect_desc"));
-            terminal.WriteLine(Loc.Get("online.separate_saves"));
-            if (UsurperRemake.BBS.DoorMode.IsInDoorMode)
-                terminal.WriteLine(Loc.Get("online.bbs_auto_login"));
-            else
-                terminal.WriteLine(Loc.Get("online.login_or_create"));
-            terminal.WriteLine("");
+                terminal.SetColor("gray");
+                terminal.WriteLine(Loc.Get("online.connect_desc"));
+                terminal.WriteLine(Loc.Get("online.separate_saves"));
+                if (UsurperRemake.BBS.DoorMode.IsInDoorMode)
+                    terminal.WriteLine(Loc.Get("online.bbs_auto_login"));
+                else
+                    terminal.WriteLine(Loc.Get("online.login_or_create"));
+                terminal.WriteLine("");
 
-            terminal.SetColor("bright_white");
-            terminal.Write($"  {Loc.Get("online.server_label")}");
-            terminal.SetColor("bright_green");
-            terminal.WriteLine($"{GameConfig.OnlineServerAddress}:{GameConfig.OnlineServerPort}");
-            terminal.WriteLine("");
+                terminal.SetColor("bright_white");
+                terminal.WriteLine($"  {Loc.Get("online.choose_server")}");
+                terminal.WriteLine("");
 
-            terminal.SetColor("darkgray");
-            terminal.Write("  [");
-            terminal.SetColor("bright_green");
-            terminal.Write("C");
-            terminal.SetColor("darkgray");
-            terminal.Write("] ");
-            terminal.SetColor("white");
-            terminal.WriteLine(Loc.Get("online.menu_connect"));
+                // [1] Official server (pre-populated from GameConfig)
+                terminal.SetColor("darkgray");
+                terminal.Write("  [");
+                terminal.SetColor("bright_green");
+                terminal.Write("1");
+                terminal.SetColor("darkgray");
+                terminal.Write("] ");
+                terminal.SetColor("white");
+                terminal.Write(Loc.Get("online.server_official"));
+                terminal.SetColor("bright_green");
+                terminal.WriteLine($"  ({GameConfig.OnlineServerAddress}:{GameConfig.OnlineServerPort})");
 
-            terminal.SetColor("darkgray");
-            terminal.Write("  [");
-            terminal.SetColor("bright_red");
-            terminal.Write("B");
-            terminal.SetColor("darkgray");
-            terminal.Write("] ");
-            terminal.SetColor("gray");
-            terminal.WriteLine(Loc.Get("online.menu_back"));
+                // [2] Custom server (prompt for host/port)
+                terminal.SetColor("darkgray");
+                terminal.Write("  [");
+                terminal.SetColor("bright_cyan");
+                terminal.Write("2");
+                terminal.SetColor("darkgray");
+                terminal.Write("] ");
+                terminal.SetColor("white");
+                terminal.WriteLine(Loc.Get("online.server_custom"));
 
-            terminal.WriteLine("");
-            terminal.SetColor("bright_white");
-            var menuChoice = await terminal.GetInput($"  {Loc.Get("ui.your_choice")}");
+                // [B] Back
+                terminal.SetColor("darkgray");
+                terminal.Write("  [");
+                terminal.SetColor("bright_red");
+                terminal.Write("B");
+                terminal.SetColor("darkgray");
+                terminal.Write("] ");
+                terminal.SetColor("gray");
+                terminal.WriteLine(Loc.Get("online.menu_back"));
 
-            if (menuChoice.Trim().ToUpper() != "C")
+                terminal.WriteLine("");
+                terminal.SetColor("bright_white");
+                var menuChoice = (await terminal.GetInput($"  {Loc.Get("ui.your_choice")}")).Trim().ToUpper();
+
+                if (menuChoice == "B" || string.IsNullOrEmpty(menuChoice))
+                    return;
+
+                string targetHost;
+                int targetPort;
+
+                if (menuChoice == "1")
+                {
+                    targetHost = GameConfig.OnlineServerAddress;
+                    targetPort = GameConfig.OnlineServerPort;
+                }
+                else if (menuChoice == "2")
+                {
+                    // Prompt for hostname
+                    terminal.WriteLine("");
+                    terminal.SetColor("bright_white");
+                    var hostInput = (await terminal.GetInput($"  {Loc.Get("online.custom_host_prompt")}")).Trim();
+                    if (string.IsNullOrEmpty(hostInput))
+                        continue;
+                    targetHost = hostInput;
+
+                    // Prompt for port (default 4000 if blank)
+                    terminal.SetColor("bright_white");
+                    var portInput = (await terminal.GetInput($"  {Loc.Get("online.custom_port_prompt")}")).Trim();
+                    if (string.IsNullOrEmpty(portInput))
+                    {
+                        targetPort = 4000;
+                    }
+                    else if (!int.TryParse(portInput, out targetPort) || targetPort < 1 || targetPort > 65535)
+                    {
+                        terminal.SetColor("bright_red");
+                        terminal.WriteLine("");
+                        terminal.WriteLine($"  {Loc.Get("online.invalid_port")}");
+                        await terminal.PressAnyKey();
+                        continue;
+                    }
+                }
+                else
+                {
+                    // Invalid choice -- redraw menu
+                    continue;
+                }
+
+                await ConnectAndPlay(targetHost, targetPort);
+                // After ConnectAndPlay returns (disconnect or auth failure), drop back
+                // to the server picker so the user can try a different server without
+                // re-entering the Online Play menu from the main screen.
                 return;
-
-            await ConnectAndPlay(GameConfig.OnlineServerAddress, GameConfig.OnlineServerPort);
+            }
         }
 
         /// <summary>
@@ -296,15 +359,20 @@ namespace UsurperRemake.Systems
 
         /// <summary>
         /// Connect to the MUD server, authenticate, and pipe I/O.
-        /// BBS door mode uses direct TCP with trusted AUTH passthrough.
-        /// Local/Steam uses SSH tunnel with interactive login.
+        /// BBS door mode uses direct TCP transport (no SSH client available in
+        /// the door environment). Local/Steam uses SSH tunnel. Both transports
+        /// run the same interactive login/register flow with username + password,
+        /// so BBS users authenticate the same way as everyone else.
         /// </summary>
         private async Task ConnectAndPlay(string server, int port)
         {
-            // BBS door mode: seamless passthrough using trusted AUTH (no password).
-            // The BBS has already authenticated the user, so we send AUTH:username:BBS
-            // and let --auto-provision on the server create the account if needed.
-            if (UsurperRemake.BBS.DoorMode.IsInDoorMode)
+            // v0.60.5 security fix: BBS mode no longer uses the no-password
+            // trusted-AUTH path. BBS users now register and log in with a username
+            // and password, identical to the desktop/Steam flow. The transport
+            // stays TCP for BBS (door environment can't host an SSH client) but
+            // the AUTH wire format is the standard 4-part `AUTH:user:pass:type`.
+            bool isBbs = UsurperRemake.BBS.DoorMode.IsInDoorMode;
+            if (isBbs)
             {
                 useTcpMode = true;
                 bool connected = await EstablishTcpConnection(server, port);
@@ -313,88 +381,37 @@ namespace UsurperRemake.Systems
                     await terminal.PressAnyKey();
                     return;
                 }
-
-                // Send trusted AUTH header with BBS username from drop file
-                string bbsUsername = UsurperRemake.BBS.DoorMode.GetPlayerName() ?? "unknown";
-                string authHeader = $"AUTH:{bbsUsername}:BBS\n";
-                terminal.SetColor("gray");
-                terminal.WriteLine(Loc.Get("online.authenticating_as", bbsUsername));
-
-                try
-                {
-                    WriteToServer(authHeader);
-                }
-                catch
-                {
-                    terminal.SetColor("bright_red");
-                    terminal.WriteLine(Loc.Get("online.lost_connection"));
-                    await terminal.PressAnyKey();
-                    Disconnect();
-                    return;
-                }
-
-                var authResponse = await ReadAuthResponse();
-                if (authResponse == null || !authResponse.Contains("OK"))
-                {
-                    terminal.SetColor("bright_red");
-                    if (authResponse != null && authResponse.Contains("ERR:"))
-                    {
-                        var errStart = authResponse.IndexOf("ERR:") + 4;
-                        var errEnd = authResponse.IndexOf('\n', errStart);
-                        var errText = errEnd > errStart
-                            ? authResponse.Substring(errStart, errEnd - errStart).Trim()
-                            : authResponse.Substring(errStart).Trim();
-                        terminal.WriteLine(Loc.Get("online.auth_failed", errText));
-                    }
-                    else
-                    {
-                        terminal.WriteLine(Loc.Get("online.auth_failed_no_response"));
-                    }
-                    terminal.SetColor("gray");
-                    terminal.WriteLine(Loc.Get("online.auto_provision_hint"));
-                    await terminal.PressAnyKey();
-                    Disconnect();
-                    return;
-                }
-
-                terminal.SetColor("bright_green");
-                terminal.WriteLine(Loc.Get("online.authenticated"));
-                terminal.WriteLine(Loc.Get("online.starting_session"));
-                terminal.WriteLine("");
-
-                cancellationSource = new CancellationTokenSource();
-                try
-                {
-                    await PipeIO(cancellationSource.Token);
-                }
-                finally
-                {
-                    Disconnect();
-                }
-                return;
             }
-
-            // Non-BBS mode (Local/Steam): SSH tunnel with interactive login
-            useTcpMode = false;
-
-            bool sshConnected = EstablishSSHConnection(server, port);
-
-            if (!sshConnected)
+            else
             {
-                await terminal.PressAnyKey();
-                return;
-            }
+                useTcpMode = false;
+                bool sshConnected = EstablishSSHConnection(server, port);
+                if (!sshConnected)
+                {
+                    await terminal.PressAnyKey();
+                    return;
+                }
 
-            // SSH mode: drain relay banner before sending AUTH
-            await Task.Delay(500);
-            DrainShellStream();
+                // SSH mode: drain relay banner before sending AUTH
+                await Task.Delay(500);
+                DrainShellStream();
+            }
 
             // Auth loop — prompt for Login/Register until success or user quits
             bool authenticated = false;
             int attempts = 0;
             const int MAX_ATTEMPTS = 5;
 
-            var savedCreds = LoadSavedCredentials();
+            // Skip auto-load of saved credentials in BBS mode. The credentials
+            // file is keyed to the install directory (not the user), so on a
+            // multi-user BBS box every door user would inherit the previous
+            // user's saved login. Save is already gated for BBS at the prompt
+            // site; this also gates load. Belt and suspenders.
+            var savedCreds = isBbs ? null : LoadSavedCredentials();
+
+            // Pre-fill username default from the BBS drop file so the user
+            // can just press Enter on the username prompt to use their BBS handle.
+            string? bbsDefaultUser = isBbs ? UsurperRemake.BBS.DoorMode.GetPlayerName() : null;
 
             while (!authenticated && attempts < MAX_ATTEMPTS)
             {
@@ -518,8 +535,15 @@ namespace UsurperRemake.Systems
                     // Login
                     terminal.WriteLine("");
                     terminal.SetColor("bright_white");
-                    username = (await terminal.GetInput($"  {Loc.Get("online.username_prompt")}")).Trim();
-                    if (string.IsNullOrEmpty(username)) continue;
+                    string usernamePrompt = string.IsNullOrEmpty(bbsDefaultUser)
+                        ? $"  {Loc.Get("online.username_prompt")}"
+                        : $"  {Loc.Get("online.username_prompt")}[{bbsDefaultUser}] ";
+                    username = (await terminal.GetInput(usernamePrompt)).Trim();
+                    if (string.IsNullOrEmpty(username))
+                    {
+                        if (!string.IsNullOrEmpty(bbsDefaultUser)) username = bbsDefaultUser;
+                        else continue;
+                    }
 
                     terminal.Write($"  {Loc.Get("online.password_prompt")}", "bright_white");
                     password = (await terminal.GetMaskedInput()).Trim();
@@ -530,8 +554,15 @@ namespace UsurperRemake.Systems
                     // Register
                     terminal.WriteLine("");
                     terminal.SetColor("bright_green");
-                    username = (await terminal.GetInput($"  {Loc.Get("online.choose_username")}")).Trim();
-                    if (string.IsNullOrEmpty(username)) continue;
+                    string regUsernamePrompt = string.IsNullOrEmpty(bbsDefaultUser)
+                        ? $"  {Loc.Get("online.choose_username")}"
+                        : $"  {Loc.Get("online.choose_username")}[{bbsDefaultUser}] ";
+                    username = (await terminal.GetInput(regUsernamePrompt)).Trim();
+                    if (string.IsNullOrEmpty(username))
+                    {
+                        if (!string.IsNullOrEmpty(bbsDefaultUser)) username = bbsDefaultUser;
+                        else continue;
+                    }
 
                     if (username.Length < 2 || username.Length > 20)
                     {
