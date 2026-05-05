@@ -372,6 +372,15 @@ public class LocationManager
                 xp = player.Experience,
                 location = currentLocation?.LocationName ?? locationId.ToString()
             });
+            // Sync delta-tracking so the first loop iteration doesn't immediately
+            // re-emit the same values we just sent unconditionally on location entry.
+            if (gmcpCtx != null)
+            {
+                gmcpCtx.LastGmcpGold     = player.Gold;
+                gmcpCtx.LastGmcpBankGold = player.BankGold;
+                gmcpCtx.LastGmcpXp       = player.Experience;
+                gmcpCtx.LastGmcpLevel    = player.Level;
+            }
         }
 
         // Advance game time for travel between locations (single-player only)
