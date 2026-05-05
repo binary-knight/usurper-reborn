@@ -553,11 +553,18 @@ public static class ClassAbilitySystem
             BaseHealing = 40,  // Stronger than Paladin's Lay on Hands
             AvailableToClasses = new[] { CharacterClass.Cleric }
         },
+        // v0.60.8: Spud reported the Cleric had two abilities both called Holy Smite,
+        // one mana and one stamina. The Cleric class has a Holy Smite *spell* (slot 9,
+        // 35 MP) and a Holy Smite *ability* (30 STA) -- they shared a name and read
+        // as duplicates in the quickbar. Same bug-class hit three more pairs:
+        // Sanctuary, Resurrection Prayer, and Divine Intervention. All four ability
+        // names renamed below (the spells keep their iconic names) to a Monty Python
+        // theme per the bug-fix conversation.
         ["holy_smite"] = new ClassAbility
         {
             Id = "holy_smite",
-            Name = "Holy Smite",
-            Description = "Channel divine wrath to strike your enemy with holy fire.",
+            Name = "Holy Shite",
+            Description = "Channel divine wrath through your weapon to strike your enemy with holy fire.",
             LevelRequired = 8,
             StaminaCost = 30,
             Cooldown = 2,
@@ -569,8 +576,8 @@ public static class ClassAbilitySystem
         ["sanctuary"] = new ClassAbility
         {
             Id = "sanctuary",
-            Name = "Sanctuary",
-            Description = "Create a sacred barrier that greatly reduces incoming damage.",
+            Name = "Just a Flesh Wound",
+            Description = "Shrug off incoming damage with the sheer denial of the Black Knight. The wounds are minor inconveniences.",
             LevelRequired = 16,
             StaminaCost = 35,
             Cooldown = 5,
@@ -662,8 +669,8 @@ public static class ClassAbilitySystem
         ["resurrection_prayer"] = new ClassAbility
         {
             Id = "resurrection_prayer",
-            Name = "Resurrection Prayer",
-            Description = "A desperate prayer that massively heals and fortifies your body.",
+            Name = "I'm Not Dead Yet",
+            Description = "Insist loudly that you are very much alive. Your body, suitably persuaded, knits itself back together and stiffens for the next blow.",
             LevelRequired = 68,
             StaminaCost = 75,
             Cooldown = 7,
@@ -689,8 +696,8 @@ public static class ClassAbilitySystem
         ["divine_intervention"] = new ClassAbility
         {
             Id = "divine_intervention",
-            Name = "Divine Intervention",
-            Description = "The gods themselves intervene, shielding you from all harm.",
+            Name = "The Spanish Inquisition",
+            Description = "Nobody expects divine wrath this absolute. Incoming attacks are dispelled by sheer disbelief.",
             LevelRequired = 80,
             StaminaCost = 85,
             Cooldown = 8,

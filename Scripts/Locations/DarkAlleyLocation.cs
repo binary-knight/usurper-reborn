@@ -2044,11 +2044,15 @@ namespace UsurperRemake.Locations
             terminal.WriteLine("");
             await Task.Delay(1500);
 
-            // Save armor, zero it for bare-knuckle fight
+            // Save armor, zero it for bare-knuckle fight. v0.60.8: mark the
+            // fight as exhibition so a loss doesn't burn a resurrection on
+            // top of the entry-fee + daily-pit-slot cost. HandlePlayerDeath
+            // restores HP=1 and skips the death cinematic.
             long savedArmPow = currentPlayer.ArmPow;
             try
             {
                 currentPlayer.ArmPow = 0;
+                currentPlayer.IsExhibitionCombat = true;
 
                 var combatEngine = new CombatEngine(terminal);
                 var result = await combatEngine.PlayerVsMonster(currentPlayer, monster, null, false);
@@ -2084,6 +2088,8 @@ namespace UsurperRemake.Locations
                 {
                     terminal.SetColor("red");
                     terminal.WriteLine(Loc.Get("dark_alley.pit_defeat"));
+                    terminal.SetColor("dark_gray");
+                    terminal.WriteLine(Loc.Get("dark_alley.pit_recovered"));
 
                     if (spectatorBet > 0)
                     {
@@ -2098,6 +2104,7 @@ namespace UsurperRemake.Locations
             finally
             {
                 currentPlayer.ArmPow = savedArmPow;
+                currentPlayer.IsExhibitionCombat = false;
             }
 
             await Task.Delay(2000);
@@ -2195,12 +2202,20 @@ namespace UsurperRemake.Locations
                 }
                 else
                 {
+                    // v0.60.8: PvP path doesn't go through HandlePlayerDeath,
+                    // so the exhibition flag wouldn't fire here. Restore HP=1
+                    // inline so the player walks out of the alley alive instead
+                    // of dying on their next encounter from leftover HP=0.
+                    if (currentPlayer.HP <= 0) currentPlayer.HP = 1;
+
                     long goldLost = (long)(currentPlayer.Gold * 0.20);
                     currentPlayer.Gold -= goldLost;
                     opponent.Gold += goldLost;
 
                     terminal.SetColor("red");
                     terminal.WriteLine(Loc.Get("dark_alley.pit_stumble_out", goldLost));
+                    terminal.SetColor("dark_gray");
+                    terminal.WriteLine(Loc.Get("dark_alley.pit_recovered"));
 
                     if (spectatorBet > 0)
                     {

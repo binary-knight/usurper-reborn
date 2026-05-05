@@ -820,6 +820,8 @@ public class AnchorRoadLocation : BaseLocation
         terminal.WriteLine(Loc.Get("anchor_road.gauntlet_desc_1"));
         terminal.WriteLine(Loc.Get("anchor_road.gauntlet_desc_2"));
         terminal.WriteLine(Loc.Get("anchor_road.gauntlet_desc_3"));
+        terminal.SetColor("dark_gray");
+        terminal.WriteLine(Loc.Get("anchor_road.gauntlet_desc_safety"));
         terminal.WriteLine("");
 
         if (currentPlayer.Level < GameConfig.GauntletMinLevel)
@@ -965,9 +967,22 @@ public class AnchorRoadLocation : BaseLocation
             terminal.WriteLine("");
             await Task.Delay(1000);
 
-            // Real combat
+            // Real combat. v0.60.8: mark as exhibition so a wave loss doesn't
+            // burn a resurrection -- the entry fee + daily PFight slot are
+            // already the cost of admission. HP=1 restore happens inside
+            // HandlePlayerDeath; the wave loop ends in the defeat branch
+            // below.
             var combatEngine = new CombatEngine(terminal);
-            var result = await combatEngine.PlayerVsMonster(currentPlayer, monster, null, false);
+            CombatResult result;
+            currentPlayer.IsExhibitionCombat = true;
+            try
+            {
+                result = await combatEngine.PlayerVsMonster(currentPlayer, monster, null, false);
+            }
+            finally
+            {
+                currentPlayer.IsExhibitionCombat = false;
+            }
 
             if (result.Outcome == CombatOutcome.Victory)
             {
@@ -1021,13 +1036,20 @@ public class AnchorRoadLocation : BaseLocation
             }
             else
             {
-                // Player died or fled — gauntlet over
+                // Player went down or fled -- gauntlet over. v0.60.8:
+                // exhibition flag in HandlePlayerDeath already restored HP=1;
+                // surface a recovery line so the player understands no
+                // resurrection was consumed.
                 terminal.SetColor("red");
                 terminal.WriteLine("");
                 if (result.Outcome == CombatOutcome.PlayerEscaped)
                     terminal.WriteLine(Loc.Get("anchor_road.flee_disgrace"));
                 else
+                {
                     terminal.WriteLine(Loc.Get("anchor_road.collapse_arena"));
+                    terminal.SetColor("dark_gray");
+                    terminal.WriteLine(Loc.Get("anchor_road.gauntlet_recovered"));
+                }
                 break;
             }
         }

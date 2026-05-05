@@ -1434,6 +1434,17 @@ public class Character
     // hauls them to prison. Cleared after the fight. Not serialized.
     [System.Text.Json.Serialization.JsonIgnore]
     public bool IsArrestCombat { get; set; }
+
+    // v0.60.8: transient flag set by paid-arena surfaces (The Gauntlet at
+    // AnchorRoad, the Dark Alley pit fight) before the combat call. When
+    // true, CombatEngine.HandlePlayerDeath short-circuits the same way
+    // arrest combat does -- HP set to 1, no resurrection consumed, no
+    // permadeath, no death cinematic. The player still loses the entry
+    // fee, the daily fight slot, and any unearned wave/pit rewards, so
+    // the loss still has bite, but it doesn't burn a resurrection on top
+    // of the existing penalties. Cleared in the caller's finally block.
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsExhibitionCombat { get; set; }
     
     // New for version 0.20+
     public int PickPocketAttempts { get; set; }     // pick pocket attempts

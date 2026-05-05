@@ -19265,6 +19265,21 @@ public partial class CombatEngine
             return;
         }
 
+        // v0.60.8: Spud's Floor-25-Gauntlet report -- paid arena surfaces
+        // (The Gauntlet, Dark Alley pit fight vs monster) call PlayerVsMonster
+        // and were burning a resurrection on every loss. Match the arrest
+        // pattern: HP=1, no resurrection consumed, no permadeath, no death
+        // cinematic. The caller already deducted the entry fee + daily fight
+        // slot before the combat, so the loss still costs something.
+        if (result.Player.IsExhibitionCombat)
+        {
+            result.Player.HP = 1;
+            result.Outcome = CombatOutcome.PlayerDied;
+            DebugLogger.Instance.LogInfo("EXHIBITION",
+                $"{result.Player.Name} dropped in exhibition combat (no resurrection consumed).");
+            return;
+        }
+
         // v0.60.0 beta: track total deaths for stats/analytics. The cap that
         // actually triggers permadeath is the Resurrections counter check
         // below (online mode only).

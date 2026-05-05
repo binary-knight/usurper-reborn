@@ -58,6 +58,58 @@ Files: `Scripts/Locations/ArenaLocation.cs`.
 
 ---
 
+## Bug fix: paid arenas (Gauntlet, Pit Fight) consumed a resurrection on loss
+
+Player report (Spud, Lv.28 Cleric): *"Losing in the gauntlet counted as a real death. perhaps a warning before entering if that's how it's supposed to be."*
+
+The Gauntlet at AnchorRoad and the Dark Alley pit fight (vs monster path) both call `CombatEngine.PlayerVsMonster` directly. A wave loss in the Gauntlet -- or a single round loss in the pit fight -- went through the normal PvE death pipeline: a resurrection burned online, full Temple/Deal/Accept menu single-player. On top of the entry fee + daily fight slot already paid, that's a triple penalty for a paid arena entertainment surface.
+
+Architectural cause: only `IsArrestCombat` (used by the Royal Guard murder-arrest combat) had a short-circuit in `HandlePlayerDeath` to set HP=1, skip resurrection consumption, and skip the death cinematic. No equivalent flag existed for paid-arena surfaces, so they all went through the lethal path.
+
+### Fix
+
+New transient `Character.IsExhibitionCombat` flag (parallel to `IsArrestCombat`, not serialized). `HandlePlayerDeath` checks it right after the arrest short-circuit -- if true: HP set to 1, no resurrection consumed, no permadeath, no death cinematic, `EXHIBITION` log line. Caller clears in `finally`.
+
+Wired into both PvE arena surfaces: `AnchorRoadLocation.StartGauntlet` sets the flag around each wave's `PlayerVsMonster`, `DarkAlleyLocation.PitFightMonster` sets it for the bare-knuckle fight. Loss flavor text gets a follow-up "Medics drag you out and patch you up. Your soul is intact -- only your pride and the entry fee are gone." line so players see the recovery is automatic. Gauntlet entry screen gains a small "(Medics stand by: a loss costs the entry fee, not a resurrection.)" note so the stakes are clear before paying in.
+
+Pit fight vs NPC (PvP path through `PlayerVsPlayer`) doesn't route through `HandlePlayerDeath` so resurrection wasn't consumed there to begin with -- but the loss left the player at HP=0, which was its own latent bug (would die on the very next encounter from leftover damage). The PvP loss branch now restores `HP = 1` inline if it dropped to zero, with the same recovery flavor line for consistency.
+
+What still costs you: entry fee (Gauntlet) / spectator-bet stake (Pit Fight), the daily fight slot, any wave/pit rewards from rounds you didn't win, and any HP/mana/status damage you took. Just not a resurrection on top.
+
+Files: `Scripts/Core/Character.cs` (new `IsExhibitionCombat` flag, JsonIgnore), `Scripts/Systems/CombatEngine.cs` (short-circuit in `HandlePlayerDeath`), `Scripts/Locations/AnchorRoadLocation.cs` (flag set/unset around wave combat, recovery line, entry-screen safety note), `Scripts/Locations/DarkAlleyLocation.cs` (flag set/unset around monster pit fight, HP=1 restore on PvP pit fight loss, recovery line on both paths), `Localization/{en,es,fr,hu,it}.json` (3 new keys per language: `anchor_road.gauntlet_recovered`, `anchor_road.gauntlet_desc_safety`, `dark_alley.pit_recovered`).
+
+---
+
+## Bug fix: Cleric quickbar showed duplicate ability/spell names
+
+Player report (Spud, Lv.37 Human Cleric): *"The cleric has two abilities called Holy Smite. One uses mana, the other stamina. Should have a different name."*
+
+The Cleric class kit had four name collisions where a class ability (stamina-cost) and a spell (mana-cost) shared the exact same display name. The quickbar/menu rendered both with identical labels and players had no way to tell at a glance which entry was which:
+
+- **Holy Smite** -- ability (lv8, 30 STA, +holy bonus vs undead) vs spell slot 9 (35 MP, 45-65 dmg, 2x vs undead/demons)
+- **Sanctuary** -- ability (lv16, +45 DEF, 35 STA) vs spell slot 7 (25 MP, +18 protection, 3 rounds)
+- **Resurrection Prayer** -- ability (lv68, 160 heal + 30 DEF, 75 STA) vs spell slot 22 (160 MP, 320-450 hp)
+- **Divine Intervention** -- ability (lv80, invulnerable 2 rounds, 85 STA) vs spell slot 20 (120 MP, +85 protection, 5 rounds)
+
+A programmatic audit of every class abilities-vs-spells pair confirmed the collisions are Cleric-only (the other six spell-using classes -- Magician, Sage, Tidesworn, Wavecaller, Cyclebreaker, Abysswarden -- have no overlap). Per the bug-fix conversation, the abilities (stamina, the newer additions) were renamed; the spells keep their iconic names.
+
+### Renames (Cleric class abilities only)
+
+| Ability id | Old name | New name |
+|---|---|---|
+| `holy_smite` | Holy Smite | **Holy Shite** |
+| `sanctuary` | Sanctuary | **Just a Flesh Wound** |
+| `resurrection_prayer` | Resurrection Prayer | **I'm Not Dead Yet** |
+| `divine_intervention` | Divine Intervention | **The Spanish Inquisition** |
+
+Mechanics, level requirements, costs, cooldowns, special effects, and ability ids are all unchanged. Only the player-facing `Name` and `Description` fields were edited, so existing learned-ability lists / quickbar slots / save data round-trip cleanly with no migration needed.
+
+The `combat.ability_holy_smite` flavor key (which fires from the `SpecialEffect = "holy"` handler when a holy-tagged ability hits an undead/demon target) used to shout "HOLY SMITE!" -- mismatched against the new ability name. Reworded to be name-agnostic ("Holy fire burns the undead! +{0} damage!") in all 5 languages so the bonus flavor reads cleanly regardless of which holy ability triggered it.
+
+Files: `Scripts/Systems/ClassAbilitySystem.cs` (4 ability `Name` + `Description` field updates, with audit comment), `Localization/{en,es,fr,hu,it}.json` (`combat.ability_holy_smite` reworded to be ability-name-agnostic).
+
+---
+
 ## FILE_ID.DIZ included in download zips
 
 Sysop request: a BBS file database expects `FILE_ID.DIZ` inside the downloaded archive to populate the door's description. Previously the zip only contained `LICENSE`, `GPL_NOTICE.txt`, and `README.txt`.
@@ -94,17 +146,21 @@ Code-only release. Existing `server_config` / `server_config_schema` / `server_c
 
 ### Modified files (game)
 - `Scripts/Core/GameConfig.cs` -- version bump to 0.60.8.
+- `Scripts/Core/Character.cs` -- new `IsExhibitionCombat` JsonIgnore flag for paid-arena non-lethal combat.
 - `Scripts/Core/Monster.cs` -- new `BurnRounds` field; reset to 0 alongside `IsBurning` on combat-state-clear.
+- `Scripts/Locations/AnchorRoadLocation.cs` -- Gauntlet wave combat wrapped in exhibition flag (try/finally); recovery flavor line on collapse; entry-screen safety note.
 - `Scripts/Locations/ArenaLocation.cs` -- `ChooseOpponent` skips home-sleepers from the PvP opponent list.
+- `Scripts/Locations/DarkAlleyLocation.cs` -- pit fight vs monster wrapped in exhibition flag; HP=1 restore on PvP pit fight loss; recovery flavor line on both defeat paths.
 - `Scripts/Locations/DungeonLocation.cs` -- `OldGodFloors` promoted from `private` to `public static readonly` so other systems can reference the canonical list rather than duplicating literals.
 - `Scripts/Locations/MagicShopLocation.cs` -- Dungeon Reset Scroll restored (PR #101); body strings localized; `WriteSectionHeader` replaces hardcoded Unicode separator; uses central `OldGodFloors`.
 - `Scripts/Locations/SettlementLocation.cs` -- watchtower scout report uses central `OldGodFloors`.
 - `Scripts/Systems/AlignmentSystem.cs` -- floor-hint logic uses central `OldGodFloors`.
-- `Scripts/Systems/CombatEngine.cs` -- burn DoT separated from poison DoT (independent counters, both can tick per round); 4 burn-apply sites + Searing Totem migrated; status display shows BURN and PSN independently.
+- `Scripts/Systems/ClassAbilitySystem.cs` -- 4 Cleric ability `Name` + `Description` fields renamed to break the spell-name collision (Holy Shite / Just a Flesh Wound / I'm Not Dead Yet / The Spanish Inquisition). Mechanics and ids unchanged.
+- `Scripts/Systems/CombatEngine.cs` -- burn DoT separated from poison DoT (independent counters, both can tick per round); 4 burn-apply sites + Searing Totem migrated; status display shows BURN and PSN independently. Plus new `IsExhibitionCombat` short-circuit in `HandlePlayerDeath` (HP=1, no resurrection consumed, no death cinematic).
 - `Scripts/Systems/FileSaveBackend.cs` -- new `IsAuxiliaryFile` predicate filters `sysop_config.json` from all three save-listing paths.
 
 ### Modified files (localization)
-- `Localization/{en,es,fr,hu,it}.json` -- 23 new keys per language for Dungeon Reset Scroll body strings.
+- `Localization/{en,es,fr,hu,it}.json` -- 23 new keys per language for Dungeon Reset Scroll body strings; 3 new keys per language for paid-arena non-lethal flavor (`anchor_road.gauntlet_recovered`, `anchor_road.gauntlet_desc_safety`, `dark_alley.pit_recovered`); reworded `combat.ability_holy_smite` to be ability-name-agnostic.
 
 ### Modified files (CI)
 - `.github/workflows/ci-cd.yml` -- copy `dist/FILE_ID.DIZ` into the build output so it ships in every platform zip.
