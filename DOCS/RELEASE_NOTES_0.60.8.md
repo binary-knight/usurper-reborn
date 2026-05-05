@@ -110,6 +110,29 @@ Files: `Scripts/Systems/ClassAbilitySystem.cs` (4 ability `Name` + `Description`
 
 ---
 
+## Bug fix: NPC AI casting Focus then Battle Cry (issue #99)
+
+Reporter (fastfinge, GitHub issue #99): *"Teach NPC AI not to use focus then battlecry. Or for that matter, any skill that increases attack for 1 round, followed by any non-attack skill. I notice NPCs using focus then battlecry, and it's a bit silly."*
+
+Confirmed and exactly as described. `Focus` (universal ability, AttackBonus 20, Duration 1) and `Battle Cry` (Warrior/Barbarian, AttackBonus 40, Duration 4) both set `TempAttackBonus` + `TempAttackBonusDuration` on the casting teammate. Round-end bookkeeping decrements the duration, and Focus's Duration=1 means the buff is gone before the NPC's next action -- so casting Focus and then Battle Cry on the next round both wastes Focus's stamina (bonus expired without ever firing on an attack) AND lets Battle Cry overwrite Focus's bonus (40 > 20) before any attack consumed it. Worse, the NPC could keep stacking buffs round after round and never actually swing while buffed.
+
+Architectural cause: `TryTeammateClassAbility` in `CombatEngine.cs` had filters for defensive-buff stacking (line 17180, the v0.56.1 tank defensive-spread fix) and status-immunity stacking (line 17195, the v0.57.7 Iron-Will-overwriting-Arcane-Immunity fix) but no equivalent filter for attack-buff stacking. Once an NPC was attack-buffed, the pool selection was free to pick another non-attack ability the next round.
+
+### Fix
+
+New filter in `TryTeammateClassAbility` immediately after the tank-priority taunt block. When the teammate has an active attack buff (`TempAttackBonusDuration > 0 && TempAttackBonus > 0`) AND no one in the party needs healing, the affordable-abilities pool is narrowed to `Attack` / `Debuff` types. If at least one damage ability remains, the AI picks from that subset (consuming the buff). If no damage abilities are available, the function returns false and the teammate falls through to a basic attack on the weakest monster -- which still consumes the buff.
+
+Two intentional exemptions, both higher-priority than buff use:
+
+- **Tank-priority taunt** (line 17218-17229) runs first; a tank without an active taunt on any monster gets to taunt regardless of attack-buff state. Tanks that self-buff and then need to taunt aren't blocked.
+- **Healing need** (`anyoneNeedsHealing == true`, set at line 17162 when any party member is below 70% HP) bypasses the filter so heals can still be chosen. Keeping a teammate alive is more important than spending an attack buff this round.
+
+The fix complements the existing buff-stacking-prevention filters and follows the same pattern. No changes to ability data, mechanics, or the buff-overwrite resolution in `ApplyAbilityEffects` (which already keeps the stronger of new/existing AttackBonus, so player-cast Bardic Inspiration on top of the NPC's Battle Cry still does the right thing).
+
+Files: `Scripts/Systems/CombatEngine.cs` (one new filter block in `TryTeammateClassAbility`).
+
+---
+
 ## FILE_ID.DIZ included in download zips
 
 Sysop request: a BBS file database expects `FILE_ID.DIZ` inside the downloaded archive to populate the door's description. Previously the zip only contained `LICENSE`, `GPL_NOTICE.txt`, and `README.txt`.
@@ -156,7 +179,7 @@ Code-only release. Existing `server_config` / `server_config_schema` / `server_c
 - `Scripts/Locations/SettlementLocation.cs` -- watchtower scout report uses central `OldGodFloors`.
 - `Scripts/Systems/AlignmentSystem.cs` -- floor-hint logic uses central `OldGodFloors`.
 - `Scripts/Systems/ClassAbilitySystem.cs` -- 4 Cleric ability `Name` + `Description` fields renamed to break the spell-name collision (Holy Shite / Just a Flesh Wound / I'm Not Dead Yet / The Spanish Inquisition). Mechanics and ids unchanged.
-- `Scripts/Systems/CombatEngine.cs` -- burn DoT separated from poison DoT (independent counters, both can tick per round); 4 burn-apply sites + Searing Totem migrated; status display shows BURN and PSN independently. Plus new `IsExhibitionCombat` short-circuit in `HandlePlayerDeath` (HP=1, no resurrection consumed, no death cinematic).
+- `Scripts/Systems/CombatEngine.cs` -- burn DoT separated from poison DoT (independent counters, both can tick per round); 4 burn-apply sites + Searing Totem migrated; status display shows BURN and PSN independently. Plus new `IsExhibitionCombat` short-circuit in `HandlePlayerDeath` (HP=1, no resurrection consumed, no death cinematic). Plus new attack-buff-stacking filter in `TryTeammateClassAbility` (issue #99) so NPCs don't waste Focus / Battle Cry by chaining a non-attack skill after them.
 - `Scripts/Systems/FileSaveBackend.cs` -- new `IsAuxiliaryFile` predicate filters `sysop_config.json` from all three save-listing paths.
 
 ### Modified files (localization)

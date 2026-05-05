@@ -17228,6 +17228,38 @@ public partial class CombatEngine
             }
         }
 
+        // v0.60.8 (fastfinge issue #99): "teach NPC AI not to use focus then
+        // battlecry. Or for that matter, any skill that increases attack for
+        // 1 round, followed by any non-attack skill."
+        //
+        // When a teammate already has an active attack buff (Focus / Battle Cry
+        // / Bard inspiration / etc. set TempAttackBonus + TempAttackBonusDuration),
+        // don't waste another action on a non-attack skill. The whole point of
+        // the buff is to USE it on a subsequent attack. Filter the pool to
+        // Attack/Debuff abilities so the AI either picks a damage ability that
+        // consumes the buff, or returns false here and falls through to a basic
+        // attack.
+        //
+        // Skipped when:
+        //   - The tank-priority block above already chose a taunt (taunting is
+        //     a higher-priority class function than spending the buff).
+        //   - Someone in the party needs healing (the heal-filter logic above
+        //     kept heals in the pool intentionally; healing trumps buff use).
+        if (chosenAbility == null
+            && teammate.TempAttackBonusDuration > 0
+            && teammate.TempAttackBonus > 0
+            && anyoneNeedsHealing == false)
+        {
+            var attackOnly = affordableAbilities
+                .Where(a => a.Type == ClassAbilitySystem.AbilityType.Attack
+                         || a.Type == ClassAbilitySystem.AbilityType.Debuff)
+                .ToList();
+            if (attackOnly.Count > 0)
+                affordableAbilities = attackOnly;
+            else
+                return false; // No damage abilities available -- fall through to basic attack
+        }
+
         // Ability use chance: default 50%, overridden by spec
         int abilityUsePercent = 50;
         if (activeSpec != null)
