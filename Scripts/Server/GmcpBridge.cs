@@ -104,6 +104,46 @@ public static class GmcpBridge
     }
 
     /// <summary>
+    /// Emit Char.Status if gold, bank balance, XP, or level changed since the last
+    /// emit on this session. Called on every location-loop iteration and at combat
+    /// end so MUD clients always see up-to-date wealth and progression without
+    /// waiting for the next location transition. Cheap no-op when GMCP isn't
+    /// negotiated.
+    /// </summary>
+    public static void EmitStatusIfChanged(global::Character? player)
+    {
+        if (player == null || !IsActive) return;
+        var ctx = SessionContext.Current;
+        if (ctx == null) return;
+
+        long gold = player.Gold;
+        long bank = player.BankGold;
+        long xp   = player.Experience;
+        int  level = player.Level;
+
+        if (gold == ctx.LastGmcpGold && bank == ctx.LastGmcpBankGold
+            && xp == ctx.LastGmcpXp && level == ctx.LastGmcpLevel)
+            return;
+
+        ctx.LastGmcpGold    = gold;
+        ctx.LastGmcpBankGold = bank;
+        ctx.LastGmcpXp      = xp;
+        ctx.LastGmcpLevel   = level;
+
+        Emit("Char.Status", new
+        {
+            name     = player.Name2 ?? player.Name1,
+            @class   = player.Class.ToString(),
+            level,
+            race     = player.Race.ToString(),
+            gold,
+            bank,
+            xp,
+            location = player.CurrentLocation
+        });
+    }
+
+    /// <summary>
     /// v0.60.3: emit Char.Items.List with the full backpack contents and equipped
     /// items. Called at character login and on combat end (post-loot pickup).
     /// MUD client scripts can wire this to inventory panes / equipment displays

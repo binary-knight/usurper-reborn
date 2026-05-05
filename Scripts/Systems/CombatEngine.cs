@@ -1607,6 +1607,10 @@ public partial class CombatEngine
             UsurperRemake.Server.GmcpBridge.EmitItemsList(player);
             UsurperRemake.Server.GmcpBridge.EmitSkillsList(player);
             UsurperRemake.Server.GmcpBridge.EmitVitalsIfChanged(player);
+            // Gold and XP always change after combat — push Char.Status so the
+            // client's wealth and progression display updates without waiting for
+            // the next location transition.
+            UsurperRemake.Server.GmcpBridge.EmitStatusIfChanged(player);
         }
 
         return result;

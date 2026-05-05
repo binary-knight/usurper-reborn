@@ -60,6 +60,14 @@ public class SessionContext : IDisposable
     public long LastGmcpMaxMana { get; set; } = -1;
     public long LastGmcpStamina { get; set; } = -1;
 
+    // Per-session delta tracking for GMCP Char.Status (gold / bank / xp / level).
+    // Initialised to sentinel values so the first emit always fires regardless of
+    // whether the player started with 0 gold or level 1.
+    public long LastGmcpGold { get; set; } = long.MinValue;
+    public long LastGmcpBankGold { get; set; } = long.MinValue;
+    public long LastGmcpXp { get; set; } = long.MinValue;
+    public int LastGmcpLevel { get; set; } = -1;
+
     /// <summary>
     /// v0.60.3: consecutive emit failure counter. Reset to 0 on every successful
     /// emit; after GmcpBridge.MaxConsecutiveErrors failures in a row the bridge

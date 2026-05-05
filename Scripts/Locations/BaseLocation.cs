@@ -74,6 +74,15 @@ public abstract class BaseLocation
         => UsurperRemake.Server.GmcpBridge.EmitVitalsIfChanged(player);
 
     /// <summary>
+    /// Emit GMCP Char.Status if gold, bank, XP or level changed since last emit.
+    /// Mirrors the EmitGmcpVitals pattern — called on every loop iteration so any
+    /// in-location transaction (shop purchase, bank deposit, quest reward, etc.)
+    /// is reflected in the MUD client's status display within one loop tick.
+    /// </summary>
+    private void EmitGmcpStatus(Character player)
+        => UsurperRemake.Server.GmcpBridge.EmitStatusIfChanged(player);
+
+    /// <summary>
     /// True when this session should use compact BBS menus (80x24 terminal).
     /// Covers both single-player BBS door mode and MUD server BBS connections.
     /// </summary>
@@ -566,6 +575,10 @@ public abstract class BaseLocation
             // boolean check + early return for non-GMCP clients (web, SSH, BBS).
             // Mudlet/MUSHclient/TT++ users get live HP/MP/SP gauges via this stream.
             EmitGmcpVitals(currentPlayer);
+            // Re-emit Char.Status whenever gold/bank/XP/level changed since the last
+            // send. Covers every in-location transaction without touching the ~180
+            // individual mutation sites scattered across location files.
+            EmitGmcpStatus(currentPlayer);
 
             // Nightmare permadeath — save deleted, exit immediately
             if (GameEngine.Instance.IsPermadeath)
