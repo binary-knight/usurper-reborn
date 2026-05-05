@@ -1355,7 +1355,8 @@ public partial class MagicShopLocation : BaseLocation
         {
             var floor = clearedFloors[i];
             var timeUntilRespawn = floor.Value.TimeUntilRespawn();
-            DisplayMessage($"{i + 1}. Floor {floor.Key} (respawns naturally in {timeUntilRespawn.TotalHours:F1} hours)", "white");
+            int minsLeft = (int)Math.Ceiling(timeUntilRespawn.TotalMinutes);
+            DisplayMessage($"{i + 1}. Floor {floor.Key} (respawns naturally in {minsLeft} min)", "white");
         }
 
         DisplayMessage("");
@@ -1406,14 +1407,16 @@ public partial class MagicShopLocation : BaseLocation
 
     /// <summary>
     /// Calculate the price of a dungeon reset scroll based on player level.
-    /// Higher level players pay more since they likely have more gold.
-    /// Level  1 →   1,200 gold
-    /// Level 10 →   3,000 gold
-    /// Level 50 →  11,000 gold
-    /// Level 100 → 21,000 gold
+    /// Uses a quadratic curve (1000 + level² × 5) so low-level players
+    /// pay a manageable amount while high-level players pay proportionally more.
+    /// Level  10 →   1,500 gold
+    /// Level  20 →   3,000 gold
+    /// Level  50 →  13,500 gold
+    /// Level  83 →  35,445 gold
+    /// Level 100 →  51,000 gold
     /// </summary>
     private static long CalculateResetScrollPrice(int playerLevel)
-        => 1000 + (playerLevel * 200L);
+        => 1000 + (playerLevel * playerLevel * 5L);
 
     /// <summary>
     /// Get current magic shop owner name
