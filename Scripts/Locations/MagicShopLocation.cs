@@ -158,6 +158,7 @@ public partial class MagicShopLocation : BaseLocation
         terminal.WriteLine(Loc.Get("magic_shop.potions"));
         WriteSRMenuOption("H", Loc.Get("magic_shop.healing_potions"));
         WriteSRMenuOption("M", Loc.Get("magic_shop.mana_potions"));
+        WriteSRMenuOption("D", Loc.Get("magic_shop.reset_scroll"));
         terminal.WriteLine("");
 
         // Arcane Arts
@@ -205,7 +206,7 @@ public partial class MagicShopLocation : BaseLocation
         // Potions & Scrolls
         terminal.SetColor("cyan");
         terminal.WriteLine($" {Loc.Get("magic_shop.bbs_potions_scrolls")}");
-        ShowBBSMenuRow(("H", "bright_yellow", Loc.Get("magic_shop.bbs_healing_pots")), ("M", "bright_yellow", Loc.Get("magic_shop.bbs_mana_pots")));
+        ShowBBSMenuRow(("H", "bright_yellow", Loc.Get("magic_shop.bbs_healing_pots")), ("M", "bright_yellow", Loc.Get("magic_shop.bbs_mana_pots")), ("D", "bright_yellow", Loc.Get("magic_shop.bbs_dungeon_reset")));
 
         // Enchanting & Arcane
         terminal.SetColor("cyan");
@@ -341,6 +342,7 @@ public partial class MagicShopLocation : BaseLocation
                 await BuyManaPotions(player);
                 return false;
             case "D":
+                await BuyDungeonResetScroll(player);
                 return false;
             case "V":
                 await CastLoveSpell(player);
@@ -438,7 +440,9 @@ public partial class MagicShopLocation : BaseLocation
         terminal.WriteLine("");
         WriteMenuRow("H", "bright_yellow", "ealing Potions", "V", "bright_yellow", " Love Spells");
         WriteMenuRow("M", "bright_yellow", "ana Potions", "K", "bright_yellow", " Dark Arts");
-        WriteMenuRow("Y", "bright_yellow", " Study Spells", "G", "bright_yellow", " Scrying (NPC Info)");
+        WriteMenuRow("D", "bright_yellow", "ungeon Reset Scroll", "Y", "bright_yellow", " Study Spells");
+        terminal.Write(new string(' ', 42));
+        WriteMenuKey("G", "bright_yellow", " Scrying (NPC Info)");
         terminal.WriteLine("");
         terminal.WriteLine("");
         WriteMenuRow("T", "bright_yellow", $"alk to {_ownerName}", "R", "bright_yellow", "eturn to street");
@@ -1293,6 +1297,123 @@ public partial class MagicShopLocation : BaseLocation
         }
     }
 
+
+    /// <summary>
+    /// Buy a Dungeon Reset Scroll to reset a dungeon floor's monsters.
+    /// Permanently cleared floors (seal / secret boss) and Old God boss floors
+    /// are excluded — those cannot be rolled back by a scroll.
+    /// </summary>
+    private async Task BuyDungeonResetScroll(Character player)
+    {
+        // Floors that must never be scroll-resettable:
+        //   • IsPermanentlyClear  → seal floors (15,30,45,60,80,99) and secret-boss floors (25,50,75,99)
+        //   • Old God boss floors → hard progression gates that guard story content
+        int[] oldGodFloors = { 25, 40, 55, 70, 85, 95, 100 };
+
+        DisplayMessage("");
+        DisplayMessage("═══ Dungeon Reset Scroll ═══", "magenta");
+        DisplayMessage("");
+        DisplayMessage($"{_ownerName} pulls out an ancient scroll covered in glowing runes.", "gray");
+        DisplayMessage("'This scroll contains the power to disturb the dungeon's slumber.'", "cyan");
+        DisplayMessage("'Monsters that have been slain will rise again, treasures replenished.'", "cyan");
+        DisplayMessage("'Use it wisely - the dungeon remembers those who abuse its cycles.'", "cyan");
+        DisplayMessage("");
+
+        // Floors eligible for reset: cleared at least once, not permanently clear,
+        // not already respawning naturally, and not an Old God or special floor.
+        var clearedFloors = player.DungeonFloorStates
+            .Where(kvp => kvp.Value.EverCleared
+                && !kvp.Value.IsPermanentlyClear
+                && !kvp.Value.ShouldRespawn()
+                && !oldGodFloors.Contains(kvp.Key))
+            .OrderBy(kvp => kvp.Key)
+            .ToList();
+
+        if (clearedFloors.Count == 0)
+        {
+            DisplayMessage("You have no dungeon floors eligible for reset.", "gray");
+            DisplayMessage("'Permanently cleared floors, Old God floors, and floors already respawning cannot be reset.'", "cyan");
+            DisplayMessage("'Come back when you've conquered some dungeon levels.'", "cyan");
+            return;
+        }
+
+        long scrollPrice = CalculateResetScrollPrice(player.Level);
+        var (scrollKingTax, scrollCityTax, scrollTotalWithTax) = CityControlSystem.CalculateTaxedPrice(scrollPrice);
+
+        DisplayMessage($"Reset Scroll Price: {scrollPrice:N0} gold", "yellow");
+        DisplayMessage($"You have: {player.Gold:N0} gold", "gray");
+        DisplayMessage("");
+
+        if (player.Gold < scrollTotalWithTax)
+        {
+            DisplayMessage("'You lack the gold for such powerful magic,' the gnome says.", "red");
+            return;
+        }
+
+        DisplayMessage("Floors available for reset:", "cyan");
+        for (int i = 0; i < clearedFloors.Count; i++)
+        {
+            var floor = clearedFloors[i];
+            var timeUntilRespawn = floor.Value.TimeUntilRespawn();
+            DisplayMessage($"{i + 1}. Floor {floor.Key} (respawns naturally in {timeUntilRespawn.TotalHours:F1} hours)", "white");
+        }
+
+        DisplayMessage("");
+        DisplayMessage("Enter floor # to reset (0 to cancel): ", "yellow", false);
+        string input = await terminal.GetInput("");
+
+        if (!int.TryParse(input, out int floorChoice) || floorChoice <= 0 || floorChoice > clearedFloors.Count)
+        {
+            DisplayMessage("Cancelled.", "gray");
+            return;
+        }
+
+        var selectedFloor = clearedFloors[floorChoice - 1];
+
+        DisplayMessage("");
+        CityControlSystem.Instance.DisplayTaxBreakdown(terminal, "Dungeon Reset Scroll", scrollPrice);
+        DisplayMessage($"Reset Floor {selectedFloor.Key} for {scrollTotalWithTax:N0} gold? (Y/N): ", "yellow", false);
+        var confirm = (await terminal.GetInput("")).ToUpper();
+
+        if (confirm == "Y")
+        {
+            player.Gold -= scrollTotalWithTax;
+            CityControlSystem.Instance.ProcessSaleTax(scrollPrice);
+
+            // Mark the floor as needing respawn by back-dating LastVisitedAt past
+            // the RESPAWN_HOURS window — ShouldRespawn() checks that field.
+            selectedFloor.Value.LastVisitedAt =
+                DateTime.Now.AddHours(-(DungeonFloorState.RESPAWN_HOURS + 1));
+
+            // Also directly clear room states so monsters are present immediately
+            // on the next visit regardless of the ShouldRespawn path.
+            foreach (var room in selectedFloor.Value.RoomStates.Values)
+                room.IsCleared = false;
+
+            DisplayMessage("");
+            DisplayMessage($"{_ownerName} unrolls the scroll and speaks words of power...", "gray");
+            DisplayMessage("The parchment ignites with ethereal flame!", "magenta");
+            DisplayMessage("");
+            DisplayMessage($"Floor {selectedFloor.Key} has been reset!", "bright_green");
+            DisplayMessage("Monsters will await you when you next descend.", "cyan");
+            DisplayMessage("'The dungeon stirs once more,' the gnome says with a knowing smile.", "gray");
+        }
+        else
+        {
+            DisplayMessage("Transaction cancelled.", "gray");
+        }
+    }
+
+    /// <summary>
+    /// Calculate the price of a dungeon reset scroll based on player level.
+    /// Higher level players pay more since they likely have more gold.
+    /// Level  1 →   1,200 gold
+    /// Level 10 →   3,000 gold
+    /// Level 50 →  11,000 gold
+    /// Level 100 → 21,000 gold
+    /// </summary>
+    private static long CalculateResetScrollPrice(int playerLevel)
+        => 1000 + (playerLevel * 200L);
 
     /// <summary>
     /// Get current magic shop owner name
