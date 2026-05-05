@@ -321,6 +321,26 @@ namespace UsurperRemake.Systems
             }
         }
 
+        /// <summary>
+        /// v0.60.7: predicate for auxiliary / non-character JSON files that live
+        /// alongside saves. Returns true for files that should be excluded from
+        /// every listing path (`GetAllSaves`, `GetPlayerSaves`, `GetAllPlayerNames`).
+        ///
+        /// `sysop_config.json` is the case that motivated this -- player report
+        /// (single-player Linux): the game creates the SysOpConfig file in the
+        /// save directory on startup, and the listing methods would parse it as
+        /// a save (fail), then fall back to the filename-based recovery path
+        /// and surface "sysop_config" as a phantom character in the load menu.
+        ///
+        /// The SysOpConfig file is intentionally BBS-namespaced (per-BBS-instance
+        /// configuration), so it has to live in the save directory for the
+        /// namespacing to work. Filtering at listing time is the cleanest fix.
+        /// </summary>
+        private static bool IsAuxiliaryFile(string fileName)
+        {
+            return string.Equals(fileName, "sysop_config.json", StringComparison.OrdinalIgnoreCase);
+        }
+
         public List<SaveInfo> GetAllSaves()
         {
             var saves = new List<SaveInfo>();
@@ -339,7 +359,8 @@ namespace UsurperRemake.Systems
                     // slot below if no real save exists for that character.
                     if (fileName.Contains("_autosave") ||
                         fileName.Contains("_backup") ||
-                        fileName.StartsWith("emergency_"))
+                        fileName.StartsWith("emergency_") ||
+                        IsAuxiliaryFile(fileName))
                     {
                         continue;
                     }
@@ -454,6 +475,7 @@ namespace UsurperRemake.Systems
                 foreach (var file in files)
                 {
                     string fileName = Path.GetFileName(file);
+                    if (IsAuxiliaryFile(fileName)) continue;
                     bool isAutosave = fileName.Contains("_autosave_");
                     bool isBackup = fileName.Contains("_backup");
                     bool isEmergency = fileName.StartsWith("emergency_");
@@ -544,7 +566,7 @@ namespace UsurperRemake.Systems
                     // exists" claim by themselves. Emergency files are handled below
                     // because they may be the ONLY surviving evidence of a character
                     // when the primary save was lost.
-                    if (fileName.Contains("_autosave_") || fileName.Contains("_backup"))
+                    if (fileName.Contains("_autosave_") || fileName.Contains("_backup") || IsAuxiliaryFile(fileName))
                         continue;
 
                     bool isEmergency = fileName.StartsWith("emergency_");

@@ -9,7 +9,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.60.7";
+    public const string Version = "0.60.8";
     public const string VersionName = "Beta";
 
     // v0.57.12: Alignment scale cap. Character.Chivalry and Character.Darkness setters clamp to [0, AlignmentCap]

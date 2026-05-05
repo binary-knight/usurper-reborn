@@ -24,6 +24,7 @@ public class Monster
     public long Punch { get; set; }                     // punch, temporary battle var
     public bool Poisoned { get; set; }                  // poisoned?, temporary battle var
     public bool IsBurning { get; set; }                  // burning (fire DoT), temporary battle var
+    public int BurnRounds { get; set; } = 0;             // remaining rounds of fire DoT (independent of PoisonRounds)
     public bool Stunned { get; set; }                   // stunned?, temporary battle var
     public bool Distracted { get; set; }                // distracted?, reduced accuracy
     public int DistractedPenalty { get; set; }           // scaled penalty (5 + level/5 + CHA/10)
@@ -656,6 +657,7 @@ public class Monster
         CombatRound = 0;
         Poisoned = false;
         IsBurning = false;
+        BurnRounds = 0;
         CorruptingDotRounds = 0;
         CorruptingDotTickDamage = 0;
         Disease = false;

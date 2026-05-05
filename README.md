@@ -2,7 +2,7 @@
 
 ## A Persistent Online Text RPG with a Living World
 
-**BETA v0.60.7** | **FREE AND OPEN SOURCE** | **GPL v2**
+**BETA v0.60.8** | **FREE AND OPEN SOURCE** | **GPL v2**
 
 130+ autonomous NPCs wake up, go to work, visit taverns, fall in love, get married, have children, age, and eventually die of old age, all while you're offline. Log back in, read the news feed, and discover that the blacksmith married the barmaid, the king was assassinated, or a new generation just came of age. The world doesn't wait for you.
 
@@ -272,7 +272,7 @@ UsurperReborn --verbose            # Detailed debug output for troubleshooting
 
 For detailed BBS setup, see [DOCS/BBS_DOOR_SETUP.md](DOCS/BBS_DOOR_SETUP.md).
 
-**BBS Online Play:** A BBS player can pick `[O] Online Play` from the main menu to connect to the public game server (or any other Usurper Reborn server with a hostname they know). As of v0.60.7 the connection requires a normal username + password (the previous trusted-passthrough was removed for security; the BBS handle is pre-filled as the username default).
+**BBS Online Play:** A BBS player can pick `[O] Online Play` from the main menu to connect to the public game server (or any other Usurper Reborn server with a hostname they know). As of v0.60.8 the connection requires a normal username + password (the previous trusted-passthrough was removed for security; the BBS handle is pre-filled as the username default).
 
 ## Recent Highlights
 
@@ -326,7 +326,7 @@ Join Discord for discussions, feedback, and updates: **https://discord.gg/EZhwgD
 
 *"You are not a wave fighting the ocean. You ARE the ocean, dreaming of being a wave."*
 
-## Known Issues (Beta v0.60.7)
+## Known Issues (Beta v0.60.8)
 
 - Save files from earlier alpha versions may not be fully compatible.
 - BBS FOSSIL mode not natively supported (use `--stdio` flag for FOSSIL-based BBSes via host pipe).
@@ -338,4 +338,4 @@ Join Discord for discussions, feedback, and updates: **https://discord.gg/EZhwgD
 
 ---
 
-**Status:** BETA v0.60.7. The world is running. [Watch it live.](https://usurper-reborn.net)
+**Status:** BETA v0.60.8. The world is running. [Watch it live.](https://usurper-reborn.net)

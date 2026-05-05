@@ -204,6 +204,22 @@ public class ArenaLocation : BaseLocation
 
         // Get eligible opponents
         var allPlayers = await backend.GetAllPlayerSummaries();
+
+        // v0.60.7: home-sleepers are PvP-immune. The Reinforced Door home
+        // upgrade is sold explicitly as the safe-sleep option; players who
+        // chose it expect zero PvP exposure while offline. The Inn and
+        // Dormitory sleeper-attack flows already filter by SleepLocation
+        // ("inn" / "dormitory"), so home-sleepers were never vulnerable
+        // there -- the arena was the missing gate. Player report (Lumina):
+        // "Players who go to sleep in their houses with doors upgrade are
+        // still available for attacking in the PvP arena. Sleeping in the
+        // house is supposed to prevent all PvP while offline."
+        var sleepers = await backend.GetSleepingPlayers();
+        var sleepingAtHome = new HashSet<string>(
+            sleepers.Where(s => s.SleepLocation == "home" && !s.IsDead)
+                    .Select(s => s.Username),
+            StringComparer.OrdinalIgnoreCase);
+
         // Determine this account's base username (strip __alt suffix if present)
         string myAccount = SqlSaveBackend.GetAccountUsername(myUsername);
         var eligible = allPlayers
@@ -216,6 +232,8 @@ public class ArenaLocation : BaseLocation
             // v0.60.0 alpha balance review: defender shield. Skip players who
             // already lost a PvP today and haven't logged in to clear it.
             .Where(p => !backend.IsDefenderShielded(p.Username))
+            // v0.60.7: skip home-sleepers (Reinforced Door safe-sleep).
+            .Where(p => !sleepingAtHome.Contains(p.Username))
             .OrderByDescending(p => p.Level)
             .ToList();
 

@@ -160,6 +160,11 @@ jobs:
           cp LICENSE build/
           cp dist/GPL_NOTICE.txt build/
           cp dist/README.txt build/
+          # FILE_ID.DIZ for BBS sysops who want to add the door to their
+          # file database (sysop request). Standard 10-line, ~45-char,
+          # CRLF-terminated description. Lives in dist/ alongside the other
+          # compliance files and gets bundled into every platform zip.
+          cp dist/FILE_ID.DIZ build/
 
       - uses: actions/upload-artifact@v4
         with:
