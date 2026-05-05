@@ -439,7 +439,7 @@ namespace UsurperRemake.Systems
                         // Dynamic hints based on player level
                         int playerLevel = player.Level;
                         int[] sealFloors = { 15, 30, 45, 60, 80, 99 };
-                        int[] godFloors = { 25, 40, 55, 70, 85, 95, 100 };
+                        int[] godFloors = DungeonLocation.OldGodFloors;
                         string[] godNames = { "Maelketh", "Veloura", "Thorgrim", "Noctura", "Aurelion", "Terravok", "Manwe" };
 
                         var hints = new List<string>();

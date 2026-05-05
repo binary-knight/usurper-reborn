@@ -619,7 +619,7 @@ public class SettlementLocation : BaseLocation
         terminal.SetColor("white");
 
         // Special floor warnings
-        int[] oldGodFloors = { 25, 40, 55, 70, 85, 95, 100 };
+        int[] oldGodFloors = DungeonLocation.OldGodFloors;
         int[] sealFloors   = { 15, 30, 45, 60, 80, 99 };
         if (oldGodFloors.Contains(floor))
         {

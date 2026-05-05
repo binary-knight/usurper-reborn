@@ -1306,17 +1306,18 @@ public partial class MagicShopLocation : BaseLocation
     private async Task BuyDungeonResetScroll(Character player)
     {
         // Floors that must never be scroll-resettable:
-        //   • IsPermanentlyClear  → seal floors (15,30,45,60,80,99) and secret-boss floors (25,50,75,99)
+        //   • IsPermanentlyClear  → seal floors (15,30,45,60,80,99) and secret-boss floors
         //   • Old God boss floors → hard progression gates that guard story content
-        int[] oldGodFloors = { 25, 40, 55, 70, 85, 95, 100 };
+        // v0.60.8: use the central DungeonLocation.OldGodFloors constant rather
+        // than duplicating the literal here.
 
         DisplayMessage("");
-        DisplayMessage("═══ Dungeon Reset Scroll ═══", "magenta");
+        WriteSectionHeader(Loc.Get("magic_shop.reset_scroll_header"), "magenta");
         DisplayMessage("");
-        DisplayMessage($"{_ownerName} pulls out an ancient scroll covered in glowing runes.", "gray");
-        DisplayMessage("'This scroll contains the power to disturb the dungeon's slumber.'", "cyan");
-        DisplayMessage("'Monsters that have been slain will rise again, treasures replenished.'", "cyan");
-        DisplayMessage("'Use it wisely - the dungeon remembers those who abuse its cycles.'", "cyan");
+        DisplayMessage(Loc.Get("magic_shop.reset_scroll_intro1", _ownerName), "gray");
+        DisplayMessage(Loc.Get("magic_shop.reset_scroll_intro2"), "cyan");
+        DisplayMessage(Loc.Get("magic_shop.reset_scroll_intro3"), "cyan");
+        DisplayMessage(Loc.Get("magic_shop.reset_scroll_intro4"), "cyan");
         DisplayMessage("");
 
         // Floors eligible for reset: cleared at least once, not permanently clear,
@@ -1325,55 +1326,55 @@ public partial class MagicShopLocation : BaseLocation
             .Where(kvp => kvp.Value.EverCleared
                 && !kvp.Value.IsPermanentlyClear
                 && !kvp.Value.ShouldRespawn()
-                && !oldGodFloors.Contains(kvp.Key))
+                && !DungeonLocation.OldGodFloors.Contains(kvp.Key))
             .OrderBy(kvp => kvp.Key)
             .ToList();
 
         if (clearedFloors.Count == 0)
         {
-            DisplayMessage("You have no dungeon floors eligible for reset.", "gray");
-            DisplayMessage("'Permanently cleared floors, Old God floors, and floors already respawning cannot be reset.'", "cyan");
-            DisplayMessage("'Come back when you've conquered some dungeon levels.'", "cyan");
+            DisplayMessage(Loc.Get("magic_shop.reset_scroll_no_eligible"), "gray");
+            DisplayMessage(Loc.Get("magic_shop.reset_scroll_no_eligible_hint"), "cyan");
+            DisplayMessage(Loc.Get("magic_shop.reset_scroll_no_eligible_come_back"), "cyan");
             return;
         }
 
         long scrollPrice = CalculateResetScrollPrice(player.Level);
         var (scrollKingTax, scrollCityTax, scrollTotalWithTax) = CityControlSystem.CalculateTaxedPrice(scrollPrice);
 
-        DisplayMessage($"Reset Scroll Price: {scrollPrice:N0} gold", "yellow");
-        DisplayMessage($"You have: {player.Gold:N0} gold", "gray");
+        DisplayMessage(Loc.Get("magic_shop.reset_scroll_price", scrollPrice.ToString("N0")), "yellow");
+        DisplayMessage(Loc.Get("magic_shop.reset_scroll_you_have", player.Gold.ToString("N0")), "gray");
         DisplayMessage("");
 
         if (player.Gold < scrollTotalWithTax)
         {
-            DisplayMessage("'You lack the gold for such powerful magic,' the gnome says.", "red");
+            DisplayMessage(Loc.Get("magic_shop.reset_scroll_too_expensive"), "red");
             return;
         }
 
-        DisplayMessage("Floors available for reset:", "cyan");
+        DisplayMessage(Loc.Get("magic_shop.reset_scroll_floors_avail"), "cyan");
         for (int i = 0; i < clearedFloors.Count; i++)
         {
             var floor = clearedFloors[i];
             var timeUntilRespawn = floor.Value.TimeUntilRespawn();
             int minsLeft = (int)Math.Ceiling(timeUntilRespawn.TotalMinutes);
-            DisplayMessage($"{i + 1}. Floor {floor.Key} (respawns naturally in {minsLeft} min)", "white");
+            DisplayMessage(Loc.Get("magic_shop.reset_scroll_floor_entry", (i + 1).ToString(), floor.Key.ToString(), minsLeft.ToString()), "white");
         }
 
         DisplayMessage("");
-        DisplayMessage("Enter floor # to reset (0 to cancel): ", "yellow", false);
+        DisplayMessage(Loc.Get("magic_shop.reset_scroll_prompt"), "yellow", false);
         string input = await terminal.GetInput("");
 
         if (!int.TryParse(input, out int floorChoice) || floorChoice <= 0 || floorChoice > clearedFloors.Count)
         {
-            DisplayMessage("Cancelled.", "gray");
+            DisplayMessage(Loc.Get("magic_shop.reset_scroll_cancelled"), "gray");
             return;
         }
 
         var selectedFloor = clearedFloors[floorChoice - 1];
 
         DisplayMessage("");
-        CityControlSystem.Instance.DisplayTaxBreakdown(terminal, "Dungeon Reset Scroll", scrollPrice);
-        DisplayMessage($"Reset Floor {selectedFloor.Key} for {scrollTotalWithTax:N0} gold? (Y/N): ", "yellow", false);
+        CityControlSystem.Instance.DisplayTaxBreakdown(terminal, Loc.Get("magic_shop.reset_scroll_tax_label"), scrollPrice);
+        DisplayMessage(Loc.Get("magic_shop.reset_scroll_confirm", selectedFloor.Key.ToString(), scrollTotalWithTax.ToString("N0")), "yellow", false);
         var confirm = (await terminal.GetInput("")).ToUpper();
 
         if (confirm == "Y")
@@ -1392,16 +1393,16 @@ public partial class MagicShopLocation : BaseLocation
                 room.IsCleared = false;
 
             DisplayMessage("");
-            DisplayMessage($"{_ownerName} unrolls the scroll and speaks words of power...", "gray");
-            DisplayMessage("The parchment ignites with ethereal flame!", "magenta");
+            DisplayMessage(Loc.Get("magic_shop.reset_scroll_unfurl1", _ownerName), "gray");
+            DisplayMessage(Loc.Get("magic_shop.reset_scroll_unfurl2"), "magenta");
             DisplayMessage("");
-            DisplayMessage($"Floor {selectedFloor.Key} has been reset!", "bright_green");
-            DisplayMessage("Monsters will await you when you next descend.", "cyan");
-            DisplayMessage("'The dungeon stirs once more,' the gnome says with a knowing smile.", "gray");
+            DisplayMessage(Loc.Get("magic_shop.reset_scroll_success", selectedFloor.Key.ToString()), "bright_green");
+            DisplayMessage(Loc.Get("magic_shop.reset_scroll_success_desc"), "cyan");
+            DisplayMessage(Loc.Get("magic_shop.reset_scroll_success_flavor"), "gray");
         }
         else
         {
-            DisplayMessage("Transaction cancelled.", "gray");
+            DisplayMessage(Loc.Get("magic_shop.reset_scroll_decline"), "gray");
         }
     }
 

@@ -4,6 +4,26 @@ Two bug fixes on top of v0.60.7. One PvP-protection gap reported by a player who
 
 ---
 
+## Dungeon Reset Scroll restored (PR #101 by Coosh)
+
+Community PR by Coosh restores the Dungeon Reset Scroll to the Magic Shop. The scroll was removed in v0.42.4 when the dungeon respawn timer dropped from 6 hours to 1 hour, on the reasoning that a 1-hour wait made it redundant. With the tighter XP curve and loot improvements since then, players grinding the same floor have a meaningful reason to spend gold to skip the wait rather than sitting idle.
+
+**`[D]` Dungeon Reset Scroll** is now visible in the Magic Shop in all three display modes (standard / SR / BBS). Selecting a floor immediately resets its monster rooms and back-dates `LastVisitedAt` past the respawn window so both reset paths fire on the next visit. Quadratic pricing (`1000 + level² × 5`) keeps low-level use manageable while scaling meaningfully into the late game (Lv.10 = 1.5K, Lv.50 = 13.5K, Lv.100 = 51K, before tax). Tax integration via `CityControlSystem.CalculateTaxedPrice` and `ProcessSaleTax` matches every other taxable shop.
+
+**What can't be reset**: floors flagged `IsPermanentlyClear` (seal floors 15/30/45/60/80/99 and secret-boss floors), Old God boss floors (25/40/55/70/85/95/100), and floors already in their natural respawn window (no point paying when it's free in <1h).
+
+### Post-merge polish
+
+After merge the Phase 1 review surfaced three items, fixed in this release:
+
+- **Hardcoded English body strings** -- the menu items used `Loc.Get` keys in all 5 languages (added in the PR), but the dialog body, gnome speech, prompts, and confirm/success/decline messages were all hardcoded English. A Spanish player would see a Spanish menu entry that opened an English shop dialog. Added 23 new keys per language (`magic_shop.reset_scroll_header` / `_intro1..4` / `_no_eligible*` / `_price` / `_you_have` / `_too_expensive` / `_floors_avail` / `_floor_entry` / `_prompt` / `_cancelled` / `_tax_label` / `_confirm` / `_unfurl1..2` / `_success*` / `_decline`) translated for en / es / fr / hu / it. All call sites in `BuyDungeonResetScroll` now route through `Loc.Get`.
+- **Unicode separator** -- the `═══ Dungeon Reset Scroll ═══` header was hardcoded box-drawing characters that mangle in screen-reader and CP437 BBS modes. Replaced with `WriteSectionHeader(Loc.Get("magic_shop.reset_scroll_header"), "magenta")`, the same SR-aware helper the rest of the Magic Shop uses (`curse_removal`, `enchant_bless`, etc.).
+- **Duplicated `OldGodFloors` array** -- the PR introduced a fourth literal copy of `{ 25, 40, 55, 70, 85, 95, 100 }`. Promoted `DungeonLocation.OldGodFloors` from `private` to `public static readonly` and replaced the duplicate copies in `MagicShopLocation`, `SettlementLocation`, and `AlignmentSystem`. Future floor changes touch one place.
+
+Files: `Scripts/Locations/MagicShopLocation.cs` (PR + post-merge polish), `Scripts/Locations/DungeonLocation.cs` (`OldGodFloors` made public), `Scripts/Locations/SettlementLocation.cs` and `Scripts/Systems/AlignmentSystem.cs` (use central constant), `Localization/{en,es,fr,hu,it}.json` (23 new keys per language).
+
+---
+
 ## Bug fix: poison and burn DoTs cancelling each other out
 
 Player report (Lumina, Lv.23 Sage): *"Poison status does not work when burning status is active. Existing poison status is erased when Roast is cast. Does not work at all if I cast Poison after Roast."*
@@ -76,8 +96,15 @@ Code-only release. Existing `server_config` / `server_config_schema` / `server_c
 - `Scripts/Core/GameConfig.cs` -- version bump to 0.60.8.
 - `Scripts/Core/Monster.cs` -- new `BurnRounds` field; reset to 0 alongside `IsBurning` on combat-state-clear.
 - `Scripts/Locations/ArenaLocation.cs` -- `ChooseOpponent` skips home-sleepers from the PvP opponent list.
+- `Scripts/Locations/DungeonLocation.cs` -- `OldGodFloors` promoted from `private` to `public static readonly` so other systems can reference the canonical list rather than duplicating literals.
+- `Scripts/Locations/MagicShopLocation.cs` -- Dungeon Reset Scroll restored (PR #101); body strings localized; `WriteSectionHeader` replaces hardcoded Unicode separator; uses central `OldGodFloors`.
+- `Scripts/Locations/SettlementLocation.cs` -- watchtower scout report uses central `OldGodFloors`.
+- `Scripts/Systems/AlignmentSystem.cs` -- floor-hint logic uses central `OldGodFloors`.
 - `Scripts/Systems/CombatEngine.cs` -- burn DoT separated from poison DoT (independent counters, both can tick per round); 4 burn-apply sites + Searing Totem migrated; status display shows BURN and PSN independently.
 - `Scripts/Systems/FileSaveBackend.cs` -- new `IsAuxiliaryFile` predicate filters `sysop_config.json` from all three save-listing paths.
+
+### Modified files (localization)
+- `Localization/{en,es,fr,hu,it}.json` -- 23 new keys per language for Dungeon Reset Scroll body strings.
 
 ### Modified files (CI)
 - `.github/workflows/ci-cd.yml` -- copy `dist/FILE_ID.DIZ` into the build output so it ships in every platform zip.

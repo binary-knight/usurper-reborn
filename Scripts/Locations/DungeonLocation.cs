@@ -5563,8 +5563,10 @@ public class DungeonLocation : BaseLocation
     private static readonly int[] SealFloors = { 15, 30, 45, 60, 80, 99 };
     private static readonly int[] SecretBossFloors = { 25, 50, 75, 99 };
 
-    // Old God boss floors
-    private static readonly int[] OldGodFloors = { 25, 40, 55, 70, 85, 95, 100 };
+    // Old God boss floors. Public so other systems (MagicShop reset scroll,
+    // SettlementSystem, AlignmentSystem) can reference the single canonical
+    // list rather than duplicating literals -- v0.60.8 cleanup.
+    public static readonly int[] OldGodFloors = { 25, 40, 55, 70, 85, 95, 100 };
 
     // Combined list of all special floors for easy lookup (includes Old God floors)
     private static readonly int[] AllSpecialFloors = { 15, 25, 30, 40, 45, 50, 55, 60, 70, 75, 80, 85, 95, 99, 100 };
