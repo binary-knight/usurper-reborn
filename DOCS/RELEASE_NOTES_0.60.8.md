@@ -133,6 +133,16 @@ Files: `Scripts/Systems/CombatEngine.cs` (one new filter block in `TryTeammateCl
 
 ---
 
+## Bug fix: World Boss `[B]ack` hotkey didn't work
+
+Player report (screenshot): the World Boss menu label rendered as `[A] Attack Boss   [Q] [B]ack` -- two apparent hotkeys for the back option. Pressing `B` did nothing; only `Q` (or empty Enter) actually broke out of the loop.
+
+Root: `WorldBossSystem.ShowWorldBossUI` at line 185 builds the back option as `$"[Q] {Loc.Get("ui.back")}"`, and `ui.back` is `"[B]ack"` (the BBS convention where `[B]` implies B is a hotkey). The handler at line 190 only matched `Q` or empty input. The displayed label promised B; the input handler didn't deliver. Tiny fix: handler now also matches `B`. No display change needed -- both hotkeys in the existing label now work as advertised.
+
+Files: `Scripts/Systems/WorldBossSystem.cs` (one-line input check expansion).
+
+---
+
 ## FILE_ID.DIZ included in download zips
 
 Sysop request: a BBS file database expects `FILE_ID.DIZ` inside the downloaded archive to populate the door's description. Previously the zip only contained `LICENSE`, `GPL_NOTICE.txt`, and `README.txt`.
@@ -181,6 +191,7 @@ Code-only release. Existing `server_config` / `server_config_schema` / `server_c
 - `Scripts/Systems/ClassAbilitySystem.cs` -- 4 Cleric ability `Name` + `Description` fields renamed to break the spell-name collision (Holy Shite / Just a Flesh Wound / I'm Not Dead Yet / The Spanish Inquisition). Mechanics and ids unchanged.
 - `Scripts/Systems/CombatEngine.cs` -- burn DoT separated from poison DoT (independent counters, both can tick per round); 4 burn-apply sites + Searing Totem migrated; status display shows BURN and PSN independently. Plus new `IsExhibitionCombat` short-circuit in `HandlePlayerDeath` (HP=1, no resurrection consumed, no death cinematic). Plus new attack-buff-stacking filter in `TryTeammateClassAbility` (issue #99) so NPCs don't waste Focus / Battle Cry by chaining a non-attack skill after them.
 - `Scripts/Systems/FileSaveBackend.cs` -- new `IsAuxiliaryFile` predicate filters `sysop_config.json` from all three save-listing paths.
+- `Scripts/Systems/WorldBossSystem.cs` -- accept `B` as well as `Q` for the back option so the visible `[B]ack` hotkey label actually works.
 
 ### Modified files (localization)
 - `Localization/{en,es,fr,hu,it}.json` -- 23 new keys per language for Dungeon Reset Scroll body strings; 3 new keys per language for paid-arena non-lethal flavor (`anchor_road.gauntlet_recovered`, `anchor_road.gauntlet_desc_safety`, `dark_alley.pit_recovered`); reworded `combat.ability_holy_smite` to be ability-name-agnostic.

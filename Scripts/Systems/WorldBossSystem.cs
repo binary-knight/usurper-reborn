@@ -187,7 +187,11 @@ namespace UsurperRemake.Systems
                 terminal.Write($"\n  {Loc.Get("ui.your_choice")}");
                 string input = (await terminal.ReadLineAsync())?.Trim().ToUpper() ?? "";
 
-                if (input == "Q" || input == "") break;
+                // v0.60.8: the menu label renders as `[Q] [B]ack` (Loc.Get("ui.back")
+                // is the BBS-convention string `[B]ack`), so pressing B looked valid
+                // but did nothing. Accept B as an alias to Q so both hotkeys in the
+                // displayed label work as advertised.
+                if (input == "Q" || input == "B" || input == "") break;
 
                 if (input == "A")
                 {

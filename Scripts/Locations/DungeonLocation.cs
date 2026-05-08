@@ -6170,6 +6170,11 @@ public class DungeonLocation : BaseLocation
         if (player != null)
         {
             QuestSystem.OnDungeonFloorReached(player, currentDungeonLevel);
+            // DeepestDungeonLevel was previously only updated at the initial dungeon
+            // entry, so a player who entered at floor N and descended via stairs would
+            // keep DeepestDungeonLevel = N. Bug-report metadata reads this stat as
+            // "current floor" (Zengazu Regret-seal report), so descent must update it.
+            player.Statistics?.RecordDungeonLevel(currentDungeonLevel);
         }
 
         // Start in entrance room (or restored position)
@@ -6489,6 +6494,9 @@ public class DungeonLocation : BaseLocation
             if (player != null)
             {
                 QuestSystem.OnDungeonFloorReached(player, currentDungeonLevel);
+                // Mirror DescendStairs: keep DeepestDungeonLevel current so bug-report
+                // metadata and DeepestDungeonLevel-gated systems see the real floor.
+                player.Statistics?.RecordDungeonLevel(currentDungeonLevel);
             }
 
             terminal.WriteLine(Loc.Get("dungeon.level_set_to", currentDungeonLevel), "green");
@@ -12725,6 +12733,18 @@ public class DungeonLocation : BaseLocation
                         room.IsCleared = true;
                 }
                 terminal.WriteLine(Loc.Get("dungeon.gain_knowledge"), "green");
+                // Same gap as the Vision event: a half-floor reveal can push exploration
+                // past 50% (or even 75%) without the player walking anywhere afterward,
+                // and TryDiscoverSeal only runs from MoveToRoom. Re-attempt discovery in
+                // the current room so the seal can land off the map-reveal directly.
+                if (player != null)
+                {
+                    var mapRoom = currentFloor.GetCurrentRoom();
+                    if (mapRoom != null)
+                    {
+                        await TryDiscoverSeal(player, mapRoom);
+                    }
+                }
                 BroadcastDungeonEvent($"\u001b[32m  {player.Name2} receives a map from a wounded adventurer — dungeon layout revealed!\u001b[0m");
                 break;
 
@@ -13861,6 +13881,21 @@ public class DungeonLocation : BaseLocation
                         room.IsCleared = true;
                 }
                 terminal.WriteLine(Loc.Get("dungeon.rooms_revealed"), "green");
+                // Seal discovery is gated on entering a new room via MoveToRoom, so a
+                // map-reveal that pushes exploration to 100% wouldn't actually find the
+                // seal until the player happened to walk somewhere afterward (Zengazu
+                // floor-80 Regret-seal report -- vision fires, exploration is now 100%,
+                // guaranteedDiscovery would be true in TryDiscoverSeal, but the player
+                // is still standing in the same room and never moves through the trigger
+                // path). Re-run discovery on the current room now that everything is lit.
+                if (player != null)
+                {
+                    var visionRoom = currentFloor.GetCurrentRoom();
+                    if (visionRoom != null)
+                    {
+                        await TryDiscoverSeal(player, visionRoom);
+                    }
+                }
                 BroadcastDungeonEvent($"\u001b[36m  A vision reveals the entire floor layout!\u001b[0m");
                 break;
 
