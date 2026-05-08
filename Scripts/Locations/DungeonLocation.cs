@@ -56,7 +56,34 @@ public class DungeonLocation : BaseLocation
     /// </summary>
     public void InvalidateFloorCache()
     {
-        currentFloor = null!;
+        // Player report (Lv.73 Mystic Shaman, online): "If I change language in
+        // /prefs from Hungarian to English while in the dungeon, I get an Object
+        // reference not set to an instance of an object error." The /prefs flow
+        // calls this method from BaseLocation.HandlePreferences, which can fire
+        // from anywhere -- including while the player is standing in a dungeon
+        // room. The dungeon location loop accesses currentFloor every redisplay
+        // (room name, exits, status bar, action menu), and the loop never
+        // re-enters EnterLocation after /prefs exits -- it just redraws.
+        // Nulling currentFloor here therefore NREs on the next redisplay.
+        //
+        // Fix: if we currently have a floor (player is mid-dungeon), save its
+        // state and immediately regenerate from saved state with the new-language
+        // strings baked in. GenerateOrRestoreFloor is deterministic per floor
+        // level and restores IsExplored / IsCleared / treasure / event flags
+        // from DungeonFloorState, so room progress is preserved. If no floor
+        // is cached (player never entered the dungeon this session), null is
+        // fine -- next entry generates fresh.
+        if (currentFloor != null && currentPlayer != null)
+        {
+            SaveFloorState(currentPlayer);
+            var floorResult = GenerateOrRestoreFloor(currentPlayer, currentDungeonLevel);
+            currentFloor = floorResult.Floor;
+            roomsExploredThisFloor = currentFloor.Rooms.Count(r => r.IsExplored);
+        }
+        else
+        {
+            currentFloor = null!;
+        }
     }
 
     // One-time tutorial flag stored in player.HintsShown

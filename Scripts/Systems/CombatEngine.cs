@@ -1094,6 +1094,23 @@ public partial class CombatEngine
                 player.HP = Math.Max(0, player.HP - poisonDmg);
                 terminal.SetColor("dark_green");
                 terminal.WriteLine(Loc.Get("combat.poison_courses", poisonDmg));
+
+                // Player report: poison didn't tick down across combat rounds. Was poisoned
+                // from a trap with 3 turns remaining, beat the boss in 5 rounds, came out
+                // with 2 turns remaining (only the room-move tick fired). Combat poured
+                // damage every round via the block above but never decremented PoisonTurns,
+                // so duration was effectively frozen for the duration of every fight. Match
+                // the BaseLocation.ApplyPoisonDamage tick+clear logic so the duration moves
+                // forward in combat the same way it does on room movement.
+                if (player.PoisonTurns <= 0)
+                    player.PoisonTurns = Math.Max(5, player.Poison * 2); // legacy-save migration
+                player.PoisonTurns--;
+                if (player.PoisonTurns <= 0)
+                {
+                    player.Poison = 0;
+                    terminal.SetColor("green");
+                    terminal.WriteLine(Loc.Get("base.poison_cleared"));
+                }
             }
 
             // Broadcast status effects / regen / drug drain to followers
@@ -12833,6 +12850,19 @@ public partial class CombatEngine
                     actualDamage = Math.Max(1, actualDamage - defense);
                 }
 
+                // Marked target takes 30% bonus damage. Player report: Shield Bash (and
+                // every other single-target class ability) skipped the Marked bonus
+                // because this path applies damage directly to target.HP instead of
+                // routing through ApplySingleMonsterDamage. Mirrors the basic-attack
+                // path at line ~11234 and the AoE path at line ~11114.
+                if (target.IsMarked)
+                {
+                    long markedBonus = (long)(actualDamage * 0.3);
+                    actualDamage += markedBonus;
+                    terminal.SetColor("bright_red");
+                    terminal.WriteLine(Loc.Get("combat.marked_bonus", markedBonus));
+                }
+
                 target.HP -= actualDamage;
                 result.TotalDamageDealt += actualDamage;
 
@@ -20569,6 +20599,20 @@ public partial class CombatEngine
                 long defense = monster.Defence / 2; // Abilities partially bypass defense
                 if (monster.IsCorroded) defense = Math.Max(0, (long)(defense * 0.6));
                 actualDamage = Math.Max(1, actualDamage - defense);
+            }
+
+            // Marked target takes 30% bonus damage. Player report: Shield Bash (and
+            // every other single-target class ability) skipped the Marked bonus
+            // because this path applies damage directly to monster.HP instead of
+            // routing through ApplySingleMonsterDamage. Basic attacks honor Marked
+            // (line ~11234) and AoE abilities honor it (line ~11114); the
+            // single-target ability path was the only damage path that didn't.
+            if (monster.IsMarked)
+            {
+                long markedBonus = (long)(actualDamage * 0.3);
+                actualDamage += markedBonus;
+                terminal.SetColor("bright_red");
+                terminal.WriteLine(Loc.Get("combat.marked_bonus", markedBonus));
             }
 
             monster.HP -= actualDamage;

@@ -62,11 +62,109 @@ Files: `Scripts/Server/GmcpBridge.cs` (new helper + internal emit), `Scripts/Ser
 
 ---
 
+## Bug fix: Marked +30% bonus damage skipped by single-target class abilities
+
+Player report (Lv.25 Cleric, online): *"Shield bash doesn't get the bonus damage from marked. I'm not sure if this is intentional."*
+
+Not Shield-Bash-specific. The Marked +30% bonus is a debuff that ranger / assassin / hunter abilities apply to a target, and any subsequent damage against that target is supposed to deal +30%. Three damage paths apply damage to monsters:
+
+1. Basic attacks -> `ApplySingleMonsterDamage` -> Marked bonus check at line ~11234 ✓
+2. AoE abilities -> `ApplyAoEDamage` -> Marked bonus check at line ~11114 ✓
+3. Single-target class abilities -> `ApplyAbilityEffects` (single-monster) and `ApplyAbilityEffectsMultiMonster` (multi) -> direct `target.HP -= actualDamage` with no Marked check ✗
+
+So Shield Bash, Backstab, Holy Smite, Power Strike, Riptide Strike, Wave Echo, every single-target class ability silently dropped the Marked bonus. Reporter happened to notice it on Shield Bash (likely a Warrior NPC teammate, since Shield Bash is Warrior-only and they were a Cleric) but every class with an offensive ability was missing the bonus on Marked targets.
+
+### Fix
+
+Both ability damage paths (`ApplyAbilityEffects` line ~20574 and `ApplyAbilityEffectsMultiMonster` line ~12836) now apply the same Marked +30% check the basic-attack path uses, in the same position (after defense reduction, before HP subtraction). Existing flavor line `combat.marked_bonus` reused so the player sees the bonus call out the same way it does on basic attacks.
+
+Files: `Scripts/Systems/CombatEngine.cs` (two ability damage paths).
+
+---
+
+## Bug fix: skill-reset narration assumed male Level Master
+
+Player report (Lv.25 Cleric, online): *"If you want to reset your skills, the message doesn't respect level master gender. I had Seraphina the Radiant and 'he leaned forward', but I suspect it is a she."*
+
+The Level Master cycles between three NPCs by player alignment:
+
+- **Seraphina the Radiant** (Good) -- female
+- **Zharkon the Grey** (Neutral) -- male
+- **Malachar the Dark** (Evil) -- male
+
+Four narration lines in the skill-reset flow had hardcoded masculine pronouns:
+
+- `training.reset_lore_4` -- "**He** gestures to a shelf..."
+- `training.single_reset_lore_2` -- "...behind **him**."
+- `training.single_reset_lore_5` -- "**his** thumb to your forehead..."
+- `training.all_reset_lore_5` -- "**He** pours an entire flask..."
+
+Good-aligned players (Seraphina) saw misgendered text. Neutral / evil players never noticed because their masters happen to be male.
+
+### Fix
+
+Rewrote the four lines to gender-neutral phrasing across English / Spanish / French / Italian. Hungarian was already pronoun-neutral, no change needed. The recasts mirror the disembodied imagery already used at `training.all_reset_lore_6` ("Both hands press against your temples") so the style stays consistent:
+
+- "He gestures..." → "A hand gestures..."
+- "...on the shelf behind him." → "...from a shelf along the wall."
+- "his thumb..." → "a thumb..."
+- "He pours an entire flask..." → "An entire flask... empties over your head."
+
+Cleaner than threading a `MasterInfo.IsFemale` field through `TrainingSystem`'s static call chain, and avoids the multilingual headache of language-specific pronoun grammar (French / Italian / Spanish all gender adjectives and verbs differently from English).
+
+Files: `Localization/en.json`, `Localization/es.json` (1 line), `Localization/fr.json` (3 lines), `Localization/it.json` (1 line). Hungarian unchanged.
+
+---
+
+## Bug fix: NullReferenceException when changing language in /prefs while in the dungeon
+
+Player report (Lv.73 Mystic Shaman, online): *"If I change language in /prefs from Hungarian to English while in the dungeon, I get an Object reference not set to an instance of an object error."*
+
+`DungeonLocation.InvalidateFloorCache()` (called from `BaseLocation.HandlePreferences` after the player picks a new language) was a one-liner that just set `currentFloor = null!`. The original comment claimed "regenerates with current language on next entry" -- but `EnterLocation` is the only path that null-checks and regenerates, and `/prefs` returns to the dungeon's location loop, NOT to `EnterLocation`. The loop's next redisplay accessed `currentFloor.Rooms` / `GetCurrentRoom()` and NREd.
+
+### Fix
+
+Inlined the regeneration. If `currentFloor != null && currentPlayer != null` (player is mid-dungeon), `InvalidateFloorCache` now calls `SaveFloorState(currentPlayer)` -> `GenerateOrRestoreFloor(currentPlayer, currentDungeonLevel)` -> rebuilds `currentFloor` with the new-language strings baked in. `GenerateOrRestoreFloor` is deterministic per floor level and restores `IsExplored` / `IsCleared` / `TreasureLooted` / `EventCompleted` / `CurrentRoomId` from `DungeonFloorState`, so room progress is preserved across the language switch. `roomsExploredThisFloor` is also recomputed from the restored room states.
+
+If `currentFloor == null` (player never entered the dungeon this session), nulling stays the right behavior -- the next entry generates fresh.
+
+The fix only triggers on language change while in the dungeon. Town location loops were unaffected by the original bug because they don't read dungeon state.
+
+Files: `Scripts/Locations/DungeonLocation.cs`.
+
+---
+
+## Bug fix: poison duration didn't tick down during combat
+
+Player report (Lv.25 Cleric, online): *"Shouldn't poison tick down in combat? I was poisoned from a trap, I moved to the boss room and defeated the boss in 5 rounds. When I arrived to the room I had 3 turns left, when I moved away I had 2."*
+
+The reporter expected 6 ticks consumed (1 from room movement entering the boss + 5 from combat rounds), which would have cleared the poison entirely. Actual: 1 tick consumed total. Long boss fights with poison effectively pinned the duration since combat rounds took zero off the counter.
+
+`CombatEngine`'s round-start poison block (`CombatEngine.cs:1086-1097`) applied poison damage every round but never decremented `PoisonTurns`. The matching path in `BaseLocation.ApplyPoisonDamage` (which fires on room movement) does both the damage AND the tick AND the clear-on-expiry. So poison damage flowed through combat correctly, the duration just never moved.
+
+### Fix
+
+Added the tick + clear logic to `CombatEngine`'s combat-round poison block, mirroring `BaseLocation.ApplyPoisonDamage`:
+
+- Decrement `PoisonTurns` after damage applies
+- Legacy-save migration (set `PoisonTurns = max(5, Poison * 2)` if the field was 0 but `Poison > 0`)
+- When `PoisonTurns` hits 0, clear `Poison = 0` and print `base.poison_cleared` so the player sees the duration end
+
+5-round boss fights now consume 5 turns of poison. Long fights can clear poison naturally without needing an antidote / temple visit / dungeon shrine. Doesn't change damage values, just makes the duration counter actually count.
+
+PvP combat (`PlayerVsPlayer`) is unaffected -- it doesn't have a per-round `player.Poison` tick block (PvP's poison-related code is the weapon-coating mechanic, a different system). Out of scope for this fix; PvP fights are typically short enough that poison duration mid-fight is a rare scenario.
+
+Files: `Scripts/Systems/CombatEngine.cs`.
+
+---
+
 ## Files Changed
 
 - `Scripts/Core/GameConfig.cs` -- Version 0.60.9
 - `Scripts/Locations/DungeonLocation.cs` -- Map-reveal events (`MysteryEventEncounter` Vision case, `NPCEncounter` Wounded Adventurer case) now call `TryDiscoverSeal` directly so seal discovery lands the same instant exploration crosses the threshold; `DescendStairs` and `ChangeDungeonLevel` now call `RecordDungeonLevel` after the floor change so `DeepestDungeonLevel` (and bug-report metadata, achievements, bounty-board) reflect post-descent depth.
 - `Scripts/Server/GmcpBridge.cs` -- Renamed `Combat.Party` package to `Char.Combat.Party` for naming consistency with sibling combat events; switched `Class.ToString()` to `ClassName` to restore the v0.53.0 display-name fix; status keys now part of the change-detection snapshot so debuff applications re-emit. New `EmitCombatEnemiesIfChanged` / `EmitCombatEnemiesInternal` helpers wrap the `Char.Combat.Enemies` emit with the same change-detection pattern as the other per-round emits.
 - `Scripts/Server/SessionContext.cs` -- New `LastGmcpEnemiesSnapshot` field for `Char.Combat.Enemies` per-session delta tracking.
-- `Scripts/Systems/CombatEngine.cs` -- Inline comments at the four `EmitCombatPartyIfChanged` call sites updated to reference `Char.Combat.Party`. Inline `Char.Combat.Enemies` emit at the round-end replaced with a single call to `EmitCombatEnemiesIfChanged`.
+- `Scripts/Locations/DungeonLocation.cs` (above, plus): `InvalidateFloorCache` now regenerates the floor inline when called mid-dungeon (e.g. from `/prefs` language change) instead of just nulling `currentFloor` -- the dungeon loop's next redisplay used to NRE on the null reference.
+- `Scripts/Systems/CombatEngine.cs` -- Inline comments at the four `EmitCombatPartyIfChanged` call sites updated to reference `Char.Combat.Party`. Inline `Char.Combat.Enemies` emit at the round-end replaced with a single call to `EmitCombatEnemiesIfChanged`. Marked +30% bonus damage check added to both `ApplyAbilityEffects` (single-monster) and `ApplyAbilityEffectsMultiMonster` (multi-monster) ability damage paths, mirroring the existing basic-attack and AoE pathways. Round-start poison block (`player.Poison` damage tick) now also decrements `PoisonTurns` and clears `Poison = 0` when duration expires, matching `BaseLocation.ApplyPoisonDamage`'s tick+clear logic so poison duration moves forward during combat.
+- `Localization/en.json`, `Localization/es.json`, `Localization/fr.json`, `Localization/it.json` -- Four skill-reset narration lines rewritten to gender-neutral phrasing so Seraphina the Radiant (female Good-alignment Level Master) is no longer described with masculine pronouns. Hungarian unchanged (already pronoun-neutral).
 - `DOCS/RELEASE_NOTES_0.60.9.md` -- This file.
