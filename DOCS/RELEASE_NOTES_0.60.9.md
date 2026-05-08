@@ -36,8 +36,24 @@ Files: `Scripts/Locations/DungeonLocation.cs` (descent paths).
 
 ---
 
+## GMCP Char.Combat.Party (post-merge cleanup of PR #105)
+
+PR #105 by Coosh added a new GMCP frame so MUD clients can render party HP bars and detect teammate deaths without text-pattern matching the combat output. Three follow-up issues caught in post-merge review and fixed in this release:
+
+- **Package name aligned with the rest of the combat family.** Original PR used `Combat.Party` as a top-level package; the existing combat events live under `Char.Combat.*` (`Char.Combat.Start`, `Char.Combat.End`, `Char.Combat.Killed`). Mudlet scripts that subscribe by `Char.Combat.*` prefix would have missed `Combat.Party`. Renamed to `Char.Combat.Party`.
+- **Class display string regression.** Payload built `@class = m.Class.ToString()`, which emits raw enum names (`MysticShaman`, `HalfElf`). The v0.53.0 audit (15+ files) deliberately moved every display path off `.ToString()` onto `Character.ClassName`, which routes through `GameConfig.ClassNames[]` for the player-facing display string (`Mystic Shaman`). Switched to `m.ClassName`.
+- **Status changes did not trigger re-emits.** Snapshot string for change detection was `name|hp|maxHp|mana|maxMana|alive;` per member, but the payload includes `statuses`. A teammate getting poisoned, stunned, or hit with a debuff mid-round without HP movement would not re-push the new `statuses` list to the client until something else changed -- defeating the whole point of the frame for clients trying to render status icons. Snapshot now includes a sorted, comma-joined status-key list per member.
+
+Comments at the four `EmitCombatPartyIfChanged` call sites in `CombatEngine.cs` updated to reference the new package name.
+
+Files: `Scripts/Server/GmcpBridge.cs`, `Scripts/Systems/CombatEngine.cs` (comment updates).
+
+---
+
 ## Files Changed
 
 - `Scripts/Core/GameConfig.cs` -- Version 0.60.9
 - `Scripts/Locations/DungeonLocation.cs` -- Map-reveal events (`MysteryEventEncounter` Vision case, `NPCEncounter` Wounded Adventurer case) now call `TryDiscoverSeal` directly so seal discovery lands the same instant exploration crosses the threshold; `DescendStairs` and `ChangeDungeonLevel` now call `RecordDungeonLevel` after the floor change so `DeepestDungeonLevel` (and bug-report metadata, achievements, bounty-board) reflect post-descent depth.
+- `Scripts/Server/GmcpBridge.cs` -- Renamed `Combat.Party` package to `Char.Combat.Party` for naming consistency with sibling combat events; switched `Class.ToString()` to `ClassName` to restore the v0.53.0 display-name fix; status keys now part of the change-detection snapshot so debuff applications re-emit.
+- `Scripts/Systems/CombatEngine.cs` -- Inline comments at the four `EmitCombatPartyIfChanged` call sites updated to reference `Char.Combat.Party`.
 - `DOCS/RELEASE_NOTES_0.60.9.md` -- This file.

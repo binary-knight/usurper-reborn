@@ -245,7 +245,7 @@ public static class GmcpBridge
     }
 
     /// <summary>
-    /// Build and emit a Combat.Party frame for the given party list. Does not check
+    /// Build and emit a Char.Combat.Party frame for the given party list. Does not check
     /// for changes; callers should use EmitCombatPartyIfChanged for per-round calls.
     /// </summary>
     private static void EmitCombatPartyInternal(System.Collections.Generic.List<global::Character> party)
@@ -253,7 +253,11 @@ public static class GmcpBridge
         var members = party.Select(m => new
         {
             name     = m.DisplayName,
-            @class   = m.Class.ToString(),
+            // ClassName routes through GameConfig.ClassNames[] so MUD clients get
+            // the player-facing display string ("Mystic Shaman") instead of the raw
+            // enum name ("MysticShaman"). v0.53.0 audit moved 15+ sites off
+            // .ToString() onto .ClassName for exactly this reason.
+            @class   = m.ClassName,
             level    = m.Level,
             hp       = m.HP,
             maxHp    = m.MaxHP,
@@ -267,11 +271,14 @@ public static class GmcpBridge
                          .ToList()
         }).ToList();
 
-        Emit("Combat.Party", new { members, count = members.Count });
+        // Package name aligned with the rest of the combat event family
+        // (Char.Combat.Start / Char.Combat.End / Char.Combat.Killed). Mudlet
+        // scripts that subscribe to "Char.Combat.*" pick this up automatically.
+        Emit("Char.Combat.Party", new { members, count = members.Count });
     }
 
     /// <summary>
-    /// Emit Combat.Party if any tracked party member stat changed since the last
+    /// Emit Char.Combat.Party if any tracked party member stat changed since the last
     /// emit on this session. Called at the end of each combat round (alongside
     /// EmitVitalsIfChanged) so MUD clients see live party HP/MP/status throughout
     /// the fight. Also used at Combat.Start to seed the initial party state.
@@ -284,10 +291,19 @@ public static class GmcpBridge
         if (ctx == null) return;
 
         // Build a compact snapshot string for change detection.
-        // Format: "name|hp|maxHp|mana|maxMana|alive;" per member.
+        // Format: "name|hp|maxHp|mana|maxMana|alive|status1,status2,...;" per member.
+        // Status keys are sorted for stable comparison so a HashSet reorder doesn't
+        // spuriously fire an emit. Status changes (poison/stun/freeze applied
+        // mid-round without HP movement) MUST trigger a re-emit -- clients render
+        // status icons off this frame.
         var sb = new System.Text.StringBuilder();
         foreach (var m in party)
-            sb.Append($"{m.DisplayName}|{m.HP}|{m.MaxHP}|{m.Mana}|{m.MaxMana}|{m.IsAlive};");
+        {
+            sb.Append($"{m.DisplayName}|{m.HP}|{m.MaxHP}|{m.Mana}|{m.MaxMana}|{m.IsAlive}|");
+            foreach (var s in m.ActiveStatuses.Keys.Select(k => k.ToString()).OrderBy(k => k, System.StringComparer.Ordinal))
+                sb.Append(s).Append(',');
+            sb.Append(';');
+        }
         var snapshot = sb.ToString();
 
         if (snapshot == ctx.LastGmcpPartySnapshot) return;

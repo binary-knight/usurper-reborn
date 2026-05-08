@@ -1379,7 +1379,7 @@ public partial class CombatEngine
             // HP/MP/SP throughout the fight instead of frozen pre-combat values until
             // the menu redraws. Cheap no-op when GMCP isn't negotiated.
             UsurperRemake.Server.GmcpBridge.EmitVitalsIfChanged(player);
-            // Emit Combat.Party update if any party member HP/status changed this round.
+            // Emit Char.Combat.Party update if any party member HP/status changed this round.
             UsurperRemake.Server.GmcpBridge.EmitCombatPartyIfChanged(result.Teammates);
 
             // Short pause between rounds
@@ -1736,7 +1736,7 @@ public partial class CombatEngine
             // Covers single-monster combat (which doesn't go through the multi-monster
             // end-of-round path above). Cheap no-op when GMCP isn't negotiated.
             UsurperRemake.Server.GmcpBridge.EmitVitalsIfChanged(player);
-            // Emit Combat.Party if party member HP/status changed since last prompt.
+            // Emit Char.Combat.Party if party member HP/status changed since last prompt.
             UsurperRemake.Server.GmcpBridge.EmitCombatPartyIfChanged(result.Teammates);
 
             // Check if player can act due to status effects
