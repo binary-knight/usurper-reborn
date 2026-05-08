@@ -466,6 +466,9 @@ public partial class CombatEngine
                 enemies = enemyData,
                 ambush = isAmbush
             });
+            // Seed initial party state so MUD clients can render party panes
+            // without waiting for the first round-end update.
+            UsurperRemake.Server.GmcpBridge.EmitCombatPartyIfChanged(teammates);
         }
 
         // Store teammates for healing/support actions
@@ -1376,6 +1379,8 @@ public partial class CombatEngine
             // HP/MP/SP throughout the fight instead of frozen pre-combat values until
             // the menu redraws. Cheap no-op when GMCP isn't negotiated.
             UsurperRemake.Server.GmcpBridge.EmitVitalsIfChanged(player);
+            // Emit Combat.Party update if any party member HP/status changed this round.
+            UsurperRemake.Server.GmcpBridge.EmitCombatPartyIfChanged(result.Teammates);
 
             // Short pause between rounds
             await Task.Delay(GetCombatDelay(1000));
@@ -1607,6 +1612,8 @@ public partial class CombatEngine
             UsurperRemake.Server.GmcpBridge.EmitItemsList(player);
             UsurperRemake.Server.GmcpBridge.EmitSkillsList(player);
             UsurperRemake.Server.GmcpBridge.EmitVitalsIfChanged(player);
+            // Final party state at combat end (captures deaths, full heals on victory, etc.)
+            UsurperRemake.Server.GmcpBridge.EmitCombatPartyIfChanged(result.Teammates);
             // Gold and XP always change after combat — push Char.Status so the
             // client's wealth and progression display updates without waiting for
             // the next location transition.
@@ -1729,6 +1736,8 @@ public partial class CombatEngine
             // Covers single-monster combat (which doesn't go through the multi-monster
             // end-of-round path above). Cheap no-op when GMCP isn't negotiated.
             UsurperRemake.Server.GmcpBridge.EmitVitalsIfChanged(player);
+            // Emit Combat.Party if party member HP/status changed since last prompt.
+            UsurperRemake.Server.GmcpBridge.EmitCombatPartyIfChanged(result.Teammates);
 
             // Check if player can act due to status effects
             if (!player.CanAct())
