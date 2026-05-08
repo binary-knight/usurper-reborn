@@ -68,6 +68,10 @@ public class SessionContext : IDisposable
     public long LastGmcpXp { get; set; } = long.MinValue;
     public int LastGmcpLevel { get; set; } = -1;
 
+    // Per-session delta tracking for GMCP Combat.Party
+    // Snapshot string lets us skip redundant emits when party HP hasn't changed.
+    public string LastGmcpPartySnapshot { get; set; } = "";
+
     /// <summary>
     /// v0.60.3: consecutive emit failure counter. Reset to 0 on every successful
     /// emit; after GmcpBridge.MaxConsecutiveErrors failures in a row the bridge

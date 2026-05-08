@@ -245,6 +245,58 @@ public static class GmcpBridge
     }
 
     /// <summary>
+    /// Build and emit a Combat.Party frame for the given party list. Does not check
+    /// for changes; callers should use EmitCombatPartyIfChanged for per-round calls.
+    /// </summary>
+    private static void EmitCombatPartyInternal(System.Collections.Generic.List<global::Character> party)
+    {
+        var members = party.Select(m => new
+        {
+            name     = m.DisplayName,
+            @class   = m.Class.ToString(),
+            level    = m.Level,
+            hp       = m.HP,
+            maxHp    = m.MaxHP,
+            mp       = m.Mana,
+            maxMp    = m.MaxMana,
+            isAlive  = m.IsAlive,
+            isPlayer = m.IsGroupedPlayer,
+            isCompanion = m.IsCompanion,
+            statuses = m.ActiveStatuses.Keys
+                         .Select(s => s.ToString().ToLower())
+                         .ToList()
+        }).ToList();
+
+        Emit("Combat.Party", new { members, count = members.Count });
+    }
+
+    /// <summary>
+    /// Emit Combat.Party if any tracked party member stat changed since the last
+    /// emit on this session. Called at the end of each combat round (alongside
+    /// EmitVitalsIfChanged) so MUD clients see live party HP/MP/status throughout
+    /// the fight. Also used at Combat.Start to seed the initial party state.
+    /// Cheap no-op when GMCP isn't negotiated or the party list is empty.
+    /// </summary>
+    public static void EmitCombatPartyIfChanged(System.Collections.Generic.List<global::Character>? party)
+    {
+        if (party == null || party.Count == 0 || !IsActive) return;
+        var ctx = SessionContext.Current;
+        if (ctx == null) return;
+
+        // Build a compact snapshot string for change detection.
+        // Format: "name|hp|maxHp|mana|maxMana|alive;" per member.
+        var sb = new System.Text.StringBuilder();
+        foreach (var m in party)
+            sb.Append($"{m.DisplayName}|{m.HP}|{m.MaxHP}|{m.Mana}|{m.MaxMana}|{m.IsAlive};");
+        var snapshot = sb.ToString();
+
+        if (snapshot == ctx.LastGmcpPartySnapshot) return;
+        ctx.LastGmcpPartySnapshot = snapshot;
+
+        EmitCombatPartyInternal(party);
+    }
+
+    /// <summary>
     /// Emit a GMCP frame to the current session's output stream.
     /// Package format follows the GMCP convention: "Module.Submodule" (e.g. "Char.Vitals",
     /// "Room.Info", "Comm.Channel.Text"). Payload is JSON-serialized with camelCase property
