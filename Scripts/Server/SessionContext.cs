@@ -72,6 +72,11 @@ public class SessionContext : IDisposable
     // Snapshot string lets us skip redundant emits when party HP hasn't changed.
     public string LastGmcpPartySnapshot { get; set; } = "";
 
+    // Per-session delta tracking for GMCP Char.Combat.Enemies. Same snapshot pattern
+    // as the party tracker. Round number is intentionally NOT part of the snapshot --
+    // including it would force an emit every round and defeat the change-detection.
+    public string LastGmcpEnemiesSnapshot { get; set; } = "";
+
     /// <summary>
     /// v0.60.3: consecutive emit failure counter. Reset to 0 on every successful
     /// emit; after GmcpBridge.MaxConsecutiveErrors failures in a row the bridge

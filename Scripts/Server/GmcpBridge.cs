@@ -313,6 +313,55 @@ public static class GmcpBridge
     }
 
     /// <summary>
+    /// Build and emit a Char.Combat.Enemies frame for the given monster list.
+    /// Does not check for changes; callers should use EmitCombatEnemiesIfChanged
+    /// for the per-round path.
+    /// </summary>
+    private static void EmitCombatEnemiesInternal(System.Collections.Generic.List<global::Monster> monsters, int currentRound)
+    {
+        var enemies = monsters.Select(m => new
+        {
+            name   = m.Name,
+            level  = m.Level,
+            hp     = m.HP,
+            maxHp  = m.MaxHP,
+            isBoss = m.IsBoss || m.IsMiniBoss,
+            alive  = m.IsAlive
+        }).ToList();
+
+        Emit("Char.Combat.Enemies", new { enemies, round = currentRound });
+    }
+
+    /// <summary>
+    /// Emit Char.Combat.Enemies if any tracked enemy stat (hp / maxHp / alive)
+    /// changed since the last emit on this session. Called at the end of each
+    /// combat round so MUD clients see live enemy HP gauges throughout the
+    /// fight. Cheap no-op when GMCP isn't negotiated or the monster list is
+    /// empty.
+    ///
+    /// Round number is passed through to the payload but is not part of the
+    /// change-detection snapshot -- including it would force an emit every
+    /// round and defeat the whole point. Name / level / isBoss are also
+    /// stable across a fight so they don't need to be in the snapshot.
+    /// </summary>
+    public static void EmitCombatEnemiesIfChanged(System.Collections.Generic.List<global::Monster>? monsters, int currentRound)
+    {
+        if (monsters == null || monsters.Count == 0 || !IsActive) return;
+        var ctx = SessionContext.Current;
+        if (ctx == null) return;
+
+        var sb = new System.Text.StringBuilder();
+        foreach (var m in monsters)
+            sb.Append($"{m.Name}|{m.HP}|{m.MaxHP}|{m.IsAlive};");
+        var snapshot = sb.ToString();
+
+        if (snapshot == ctx.LastGmcpEnemiesSnapshot) return;
+        ctx.LastGmcpEnemiesSnapshot = snapshot;
+
+        EmitCombatEnemiesInternal(monsters, currentRound);
+    }
+
+    /// <summary>
     /// Emit a GMCP frame to the current session's output stream.
     /// Package format follows the GMCP convention: "Module.Submodule" (e.g. "Char.Vitals",
     /// "Room.Info", "Comm.Channel.Text"). Payload is JSON-serialized with camelCase property

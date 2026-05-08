@@ -50,10 +50,23 @@ Files: `Scripts/Server/GmcpBridge.cs`, `Scripts/Systems/CombatEngine.cs` (commen
 
 ---
 
+## GMCP Char.Combat.Enemies (post-merge cleanup of PR #104)
+
+PR #104 by Coosh added a per-round `Char.Combat.Enemies` emit so MUD clients see live enemy HP gauges throughout a fight (without it, the gauges seeded by `Char.Combat.Start` would freeze at starting HP until `Char.Combat.End`). The package name was right out of the gate, payload shape is a strict superset of `Char.Combat.Start` (adds `alive` and a top-level `round`), and routing `PlayerVsMonster` through `PlayerVsMonsters` covers both single and multi-monster PvE in one site. One follow-up:
+
+- **No change-detection.** The PR fired the emit unconditionally at end of every round, breaking the change-detected pattern shared by every other per-round GMCP emit in this file (`EmitVitalsIfChanged`, `EmitCombatPartyIfChanged`). Wrapped in a new `EmitCombatEnemiesIfChanged(monsters, currentRound)` helper in `GmcpBridge.cs` that keys the snapshot on `name|hp|maxHp|alive;` per monster (the only fields that change between rounds; level / isBoss are stable across a fight). Round number is intentionally NOT in the snapshot -- including it would force an emit every round and defeat the point. Skips redundant frames on stunned / fully-resisted / heal-only rounds. New `LastGmcpEnemiesSnapshot` field on `SessionContext` holds the per-session delta.
+
+PvP combat (`CombatEngine.cs:339`) is intentionally not covered -- it doesn't go through `PlayerVsMonsters`, and emitting "enemies" for a single PvP opponent would need its own scaffolding. Out of scope for this fix.
+
+Files: `Scripts/Server/GmcpBridge.cs` (new helper + internal emit), `Scripts/Server/SessionContext.cs` (new snapshot field), `Scripts/Systems/CombatEngine.cs` (round-end call site swapped from inline emit to helper).
+
+---
+
 ## Files Changed
 
 - `Scripts/Core/GameConfig.cs` -- Version 0.60.9
 - `Scripts/Locations/DungeonLocation.cs` -- Map-reveal events (`MysteryEventEncounter` Vision case, `NPCEncounter` Wounded Adventurer case) now call `TryDiscoverSeal` directly so seal discovery lands the same instant exploration crosses the threshold; `DescendStairs` and `ChangeDungeonLevel` now call `RecordDungeonLevel` after the floor change so `DeepestDungeonLevel` (and bug-report metadata, achievements, bounty-board) reflect post-descent depth.
-- `Scripts/Server/GmcpBridge.cs` -- Renamed `Combat.Party` package to `Char.Combat.Party` for naming consistency with sibling combat events; switched `Class.ToString()` to `ClassName` to restore the v0.53.0 display-name fix; status keys now part of the change-detection snapshot so debuff applications re-emit.
-- `Scripts/Systems/CombatEngine.cs` -- Inline comments at the four `EmitCombatPartyIfChanged` call sites updated to reference `Char.Combat.Party`.
+- `Scripts/Server/GmcpBridge.cs` -- Renamed `Combat.Party` package to `Char.Combat.Party` for naming consistency with sibling combat events; switched `Class.ToString()` to `ClassName` to restore the v0.53.0 display-name fix; status keys now part of the change-detection snapshot so debuff applications re-emit. New `EmitCombatEnemiesIfChanged` / `EmitCombatEnemiesInternal` helpers wrap the `Char.Combat.Enemies` emit with the same change-detection pattern as the other per-round emits.
+- `Scripts/Server/SessionContext.cs` -- New `LastGmcpEnemiesSnapshot` field for `Char.Combat.Enemies` per-session delta tracking.
+- `Scripts/Systems/CombatEngine.cs` -- Inline comments at the four `EmitCombatPartyIfChanged` call sites updated to reference `Char.Combat.Party`. Inline `Char.Combat.Enemies` emit at the round-end replaced with a single call to `EmitCombatEnemiesIfChanged`.
 - `DOCS/RELEASE_NOTES_0.60.9.md` -- This file.
