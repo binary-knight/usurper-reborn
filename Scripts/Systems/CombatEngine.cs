@@ -1382,6 +1382,28 @@ public partial class CombatEngine
             // Emit Char.Combat.Party update if any party member HP/status changed this round.
             UsurperRemake.Server.GmcpBridge.EmitCombatPartyIfChanged(result.Teammates);
 
+            // Emit Char.Combat.Enemies each round so MUD clients see live enemy HP
+            // values as they change. Char.Combat.Start emits the initial snapshot;
+            // without this, enemy gauges stay frozen at their starting HP until the
+            // fight ends. Cheap no-op when GMCP isn't negotiated.
+            if (UsurperRemake.Server.GmcpBridge.IsActive)
+            {
+                var enemyUpdate = monsters.Select(m => new
+                {
+                    name   = m.Name,
+                    level  = m.Level,
+                    hp     = m.HP,
+                    maxHp  = m.MaxHP,
+                    isBoss = m.IsBoss || m.IsMiniBoss,
+                    alive  = m.IsAlive
+                }).ToList();
+                UsurperRemake.Server.GmcpBridge.Emit("Char.Combat.Enemies", new
+                {
+                    enemies = enemyUpdate,
+                    round   = result.CurrentRound
+                });
+            }
+
             // Short pause between rounds
             await Task.Delay(GetCombatDelay(1000));
         }
