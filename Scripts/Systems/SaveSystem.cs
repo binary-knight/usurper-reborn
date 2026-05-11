@@ -925,6 +925,7 @@ namespace UsurperRemake.Systems
                 MurdersToday = player.MurdersToday,
                 TeamWarsToday = player.TeamWarsToday,
                 DrinkingGamesToday = player.DrinkingGamesToday,
+                LoveStreetVisitsToday = player.LoveStreetVisitsToday,
                 LastPartnerBondingUtc = player.LastPartnerBondingUtc,
                 LoanAmount = player.LoanAmount,
                 LoanDaysRemaining = player.LoanDaysRemaining,
@@ -1816,6 +1817,31 @@ namespace UsurperRemake.Systems
                 var story = StoryProgressionSystem.Instance;
                 data.CurrentCycle = story.CurrentCycle;
                 data.CollectedSeals = story.CollectedSeals.Select(s => (int)s).ToList();
+
+                // v0.60.10 SAVE_SEAL_AUDIT — Spud's v0.60.9 seal-loss bug. CollectedSeals
+                // dropped from [0,1,2,3,4] to [0] across the deploy and we can't pin the
+                // contamination point without runtime data. Log every online save's seal
+                // state plus whether SessionContext.Current was present at the read of
+                // StoryProgressionSystem.Instance. If a save fires without a session
+                // context, Instance falls back to the process-wide _fallbackInstance
+                // (empty CollectedSeals) and the save persists [] — that's the suspect
+                // path. Loud warning when ctx is null AND seals <= 1 so we can grep.
+                if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                {
+                    var auditCtx = UsurperRemake.Server.SessionContext.Current;
+                    var auditWho = auditCtx?.Username ?? "<no-ctx>";
+                    var auditSeals = string.Join(",", data.CollectedSeals);
+                    DebugLogger.Instance.LogInfo("SAVE_SEAL_AUDIT",
+                        $"player={auditWho} ctxPresent={auditCtx != null} cycle={data.CurrentCycle} " +
+                        $"sealsCount={data.CollectedSeals.Count} seals=[{auditSeals}]");
+                    if (auditCtx == null)
+                    {
+                        DebugLogger.Instance.LogWarning("SAVE_SEAL_AUDIT",
+                            $"SUSPICIOUS_FALLBACK_SAVE: persisting seals=[{auditSeals}] cycle={data.CurrentCycle} " +
+                            $"with NO SessionContext (StoryProgressionSystem.Instance fallback path).");
+                    }
+                }
+
                 data.CollectedArtifacts = story.CollectedArtifacts.Select(a => (int)a).ToList();
                 data.StoryFlags = story.ExportStringFlags();
                 data.CompletedEndings = story.CompletedEndings.Select(e => (int)e).ToList();

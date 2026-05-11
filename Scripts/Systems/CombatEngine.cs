@@ -499,6 +499,15 @@ public partial class CombatEngine
         player.RemoveStatus(StatusEffect.Blessed);
         player.RemoveStatus(StatusEffect.Haste);
         player.RemoveStatus(StatusEffect.Reflecting);
+        // v0.60.10 (druidah report): defense in depth -- end-of-combat cleanup is now the
+        // primary scrub for control effects, but mirror here at combat start so any
+        // status that somehow leaked past (mid-combat disconnect, save/load edge case) is
+        // wiped before the next fight begins.
+        player.RemoveStatus(StatusEffect.Stunned);
+        player.RemoveStatus(StatusEffect.Paralyzed);
+        player.RemoveStatus(StatusEffect.Sleeping);
+        player.RemoveStatus(StatusEffect.Frozen);
+        player.RemoveStatus(StatusEffect.Slow);
         player.ActiveTotemType = 0;
         player.ActiveTotemRounds = 0;
         player.ActiveTotemPower = 0;
@@ -719,6 +728,19 @@ public partial class CombatEngine
                     teammate.TempThornReflectDuration = 0;
                     teammate.TempPercentRegenPerRound = 0;
                     teammate.TempPercentRegenDuration = 0;
+                    // v0.60.10 (druidah report): scrub action-preventing statuses on
+                    // combat start too -- defense in depth alongside the end-of-combat
+                    // cleanup. Buff statuses (Protected/Blessed/Haste/Reflecting) are
+                    // already cleared via the buff fields above.
+                    teammate.RemoveStatus(StatusEffect.Protected);
+                    teammate.RemoveStatus(StatusEffect.Blessed);
+                    teammate.RemoveStatus(StatusEffect.Haste);
+                    teammate.RemoveStatus(StatusEffect.Reflecting);
+                    teammate.RemoveStatus(StatusEffect.Stunned);
+                    teammate.RemoveStatus(StatusEffect.Paralyzed);
+                    teammate.RemoveStatus(StatusEffect.Sleeping);
+                    teammate.RemoveStatus(StatusEffect.Frozen);
+                    teammate.RemoveStatus(StatusEffect.Slow);
                     terminal.WriteLine(Loc.Get("combat.teammate_entry", teammate.DisplayName, teammate.Level));
                 }
             }
@@ -1609,6 +1631,39 @@ public partial class CombatEngine
         player.RemoveStatus(StatusEffect.Blessed);
         player.RemoveStatus(StatusEffect.Haste);
         player.RemoveStatus(StatusEffect.Reflecting);
+        // v0.60.10 (druidah Lv.22 Cleric report): "Stunning from monster abilities doesn't
+        // clear upon ending combat on companions." Control effects that prevent action
+        // (Stunned / Paralyzed / Sleeping / Frozen) and Slow were never cleared at combat
+        // end on either side. If a monster stunned the player or a teammate near the end
+        // of a fight and the duration hadn't fully ticked, the status persisted across the
+        // combat boundary -- visible in /health and consuming the first turn of the next
+        // fight. DoTs (Poisoned, Bleeding, Burning, Diseased) are deliberately left alone
+        // here: persistent poison/disease is tracked via separate Character.Poison /
+        // PoisonTurns / HasDisease fields, and the in-status copies expire on next-combat
+        // ticks anyway.
+        player.RemoveStatus(StatusEffect.Stunned);
+        player.RemoveStatus(StatusEffect.Paralyzed);
+        player.RemoveStatus(StatusEffect.Sleeping);
+        player.RemoveStatus(StatusEffect.Frozen);
+        player.RemoveStatus(StatusEffect.Slow);
+        // Mirror cleanup to every teammate (companions and NPC teammates both) so they
+        // leave combat free of action-preventing statuses too.
+        if (result.Teammates != null)
+        {
+            foreach (var teammate in result.Teammates)
+            {
+                if (teammate == null) continue;
+                teammate.RemoveStatus(StatusEffect.Protected);
+                teammate.RemoveStatus(StatusEffect.Blessed);
+                teammate.RemoveStatus(StatusEffect.Haste);
+                teammate.RemoveStatus(StatusEffect.Reflecting);
+                teammate.RemoveStatus(StatusEffect.Stunned);
+                teammate.RemoveStatus(StatusEffect.Paralyzed);
+                teammate.RemoveStatus(StatusEffect.Sleeping);
+                teammate.RemoveStatus(StatusEffect.Frozen);
+                teammate.RemoveStatus(StatusEffect.Slow);
+            }
+        }
         player.ActiveTotemType = 0;
         player.ActiveTotemRounds = 0;
         player.ActiveTotemPower = 0;
@@ -3423,7 +3478,7 @@ public partial class CombatEngine
         result.CombatLog.Add($"Player attacks {target.Name} for {actualDamage} damage (roll: {attackRoll.NaturalRoll})");
 
         // Apply all post-hit enchantment effects (lifesteal, elemental procs, sunforged, poison)
-        ApplyPostHitEnchantments(attacker, target, actualDamage, result);
+        ApplyPostHitEnchantments(attacker, target, actualDamage, result, weaponSlot: isOffHandAttack ? EquipmentSlot.OffHand : EquipmentSlot.MainHand);
 
         // Mystic Shaman weapon enchantment bonus damage
         // v0.57.13: was `actualDamage * ShamanEnchantPower / 100.0`, which scaled the FINAL attack
@@ -3464,10 +3519,14 @@ public partial class CombatEngine
                 }
             }
 
-            // Frostbrand: slow the enemy (reduce defense, matching regular frost enchant)
+            // Frostbrand: slow the enemy. v0.60.10 (Coosh report): pre-fix this just shaved
+            // -3 Defence per proc to "match regular frost enchant" -- but the regular frost
+            // enchant was itself broken (advertised as slow, applied as defence shave). Both
+            // are now real Slow status applications.
             if (attacker.ShamanEnchantType == 2 && target.IsAlive)
             {
-                target.Defence = Math.Max(0, target.Defence - GameConfig.FrostEnchantAgiReduction);
+                target.IsSlowed = true;
+                target.SlowDuration = Math.Max(target.SlowDuration, GameConfig.FrostEnchantDuration);
             }
 
             // Ancestral Guidance: 25% of enchant damage dealt heals the party
@@ -4459,6 +4518,16 @@ public partial class CombatEngine
             monsterAttack = (long)(monsterAttack * 0.80);
         }
 
+        // v0.60.10 (druidah Lv.22 Cleric report): clamp post-multiplier monsterAttack to >= 1.
+        // GetAttackPower() floors at 1, but `(long)(1 * 0.80)` truncates to 0 (Earthbind on a
+        // weak monster, or DifficultySystem multiplier on Easy). A 0 here is a successful D20
+        // hit with effectively no damage, which then prints "swings wildly!" (the Miss-tier
+        // flavor from GetDamageTier when damage <= 0) AND "[0 damage vs 143 defense]" AND
+        // gets minimum-floor-bumped to 1 final damage. Three contradictory messages for one
+        // attack ("the angel swings wild! 0 damage vs 143 defense. 1 damage got through.").
+        // Clamping keeps the math internally consistent: a successful hit lands at least 1.
+        monsterAttack = Math.Max(1, monsterAttack);
+
         // Show critical hit message
         if (monsterRoll.IsCriticalSuccess)
         {
@@ -4623,9 +4692,17 @@ public partial class CombatEngine
         long minDamage = GetMinIncomingDamage(player, monsterAttack);
         long actualDamage = Math.Max(minDamage, monsterAttack - playerDefense);
 
-        // Show defense calculation so player understands damage reduction
-        terminal.SetColor("dark_gray");
-        terminal.WriteLine(Loc.Get("combat.damage_vs_defense", monsterAttack, playerDefense));
+        // Show defense calculation only when armor actually reduced the damage (and didn't
+        // fully absorb it). v0.60.10 (druidah report): pre-fix this fired unconditionally,
+        // so when monsterAttack was small relative to playerDefense the player saw a
+        // "[X damage vs Y defense]" line with no apparent connection to the damage they
+        // actually took (the minimum floor lands the real damage). Mirrors the gate at
+        // ApplySingleMonsterDamage:11321 in the player-attacks-monster path.
+        if (playerDefense > 0 && playerDefense < monsterAttack)
+        {
+            terminal.SetColor("dark_gray");
+            terminal.WriteLine(Loc.Get("combat.damage_vs_defense", monsterAttack, playerDefense));
+        }
 
         // Shield block: halve incoming damage on successful block
         if (blocked)
@@ -5027,6 +5104,13 @@ public partial class CombatEngine
                 terminal.WriteLine(Loc.Get("combat.afflicted_with", abilityResult.InflictStatus), "yellow");
                 result.CombatLog.Add($"Player afflicted with {abilityResult.InflictStatus}");
             }
+            else
+            {
+                // v0.60.10 (druidah): chance roll failed. The ability flavor line implies the
+                // status landed; without this branch the player only realizes it didn't when
+                // their next turn fires normally. Make the resist explicit.
+                terminal.WriteLine(Loc.Get("combat.shrug_off_status", abilityResult.InflictStatus.ToString().ToLower()), "gray");
+            }
         }
 
         // Apply life steal
@@ -5145,8 +5229,18 @@ public partial class CombatEngine
             }
         }
 
-        return abilityResult.SkipNormalAttack || abilityResult.DirectDamage > 0 || abilityResult.ManaDrain > 0
+        bool consumedTurn = abilityResult.SkipNormalAttack || abilityResult.DirectDamage > 0 || abilityResult.ManaDrain > 0
                || abilityResult.LifeStealPercent > 0 || (abilityResult.DamageMultiplier > 0 && abilityResult.LifeStealPercent == 0);
+        // v0.60.10 (druidah report): when a defensive self-buff ability (Flight, Vanish,
+        // Phase, etc.) fires but doesn't consume the turn, the caller falls through to a
+        // basic attack on the same monster turn. Without this pause, the ability message
+        // and the basic-attack flavor print back-to-back and read as a single action --
+        // player reported the Flight "becoming harder to hit" and the followup swing
+        // looked like the same action. Brief delay gives the player a beat to read the
+        // ability flavor before the basic attack lands.
+        if (!consumedTurn)
+            await Task.Delay(GetCombatDelay(600));
+        return consumedTurn;
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -5925,7 +6019,7 @@ public partial class CombatEngine
             result.CombatLog.Add($"{teammate.DisplayName} attacks {monster.Name} for {damage} damage");
 
             // Apply post-hit enchantment effects
-            ApplyPostHitEnchantments(teammate, monster, damage, result);
+            ApplyPostHitEnchantments(teammate, monster, damage, result, weaponSlot: isOffHandAttack ? EquipmentSlot.OffHand : EquipmentSlot.MainHand);
 
             if (s < swings - 1 && monster.IsAlive)
                 await Task.Delay(GetCombatDelay(500));
@@ -7103,12 +7197,21 @@ public partial class CombatEngine
     /// Consolidates lifesteal, elemental procs, sunforged healing, and poison coating.
     /// Set isSpellDamage=true to skip weapon-based enchantments (lifedrinker, elemental procs, poison coating).
     /// </summary>
-    private void ApplyPostHitEnchantments(Character attacker, Monster target, long damage, CombatResult result, bool isSpellDamage = false)
+    private void ApplyPostHitEnchantments(Character attacker, Monster target, long damage, CombatResult result, bool isSpellDamage = false, EquipmentSlot weaponSlot = EquipmentSlot.MainHand)
     {
         if (damage <= 0 || target == null) return;
 
         bool isPlayer = attacker == currentPlayer;
         string attackerName = attacker.DisplayName;
+        // v0.60.10 (druidah Lv.9 Cleric report): weapon-source enchants (Lifedrinker,
+        // Siphoning, elemental procs) used to read SUM-of-slots via SumEquipmentProperty
+        // or hardcode MainHand. So a Siphoning dagger in OffHand made every main-hand
+        // swing siphon mana too, and conversely an off-hand fire enchant never proc'd.
+        // Now route each post-hit enchant check through the SOURCE WEAPON's own
+        // properties via weaponSlot, so each strike only proc's the enchants on the
+        // weapon that swung. Armor-side passives (Thorns, regen, magic resist) keep
+        // summing slots; those are not per-strike.
+        var sourceWeapon = attacker.GetEquipment(weaponSlot);
 
         // v0.60.0 lifedrinker cap. Five lifesteal sources can fire on a single
         // attack: divine blessing, equipment Lifedrinker, divine boon, Abysswarden
@@ -7153,9 +7256,13 @@ public partial class CombatEngine
         // Equipment lifesteal (Lifedrinker enchant), weapon-based, skip for spells.
         // v0.60.0, issue #91: demons have no mortal life force; Lifedrinker can't
         // pull anything from them.
-        if (!isSpellDamage && !IsDemonMonster(target))
+        // v0.60.10: read LifeSteal from the SOURCE WEAPON only (not summed across
+        // all slots) so an off-hand Lifedrinker only fires on off-hand strikes.
+        // Per-weapon cap at MaxEquipmentLifeStealPercent matches the previous
+        // sum-cap intent: "no single weapon can lifedrink more than X% per hit."
+        if (!isSpellDamage && !IsDemonMonster(target) && sourceWeapon != null)
         {
-            int equipLifeSteal = attacker.GetEquipmentLifeSteal();
+            int equipLifeSteal = Math.Min(GameConfig.MaxEquipmentLifeStealPercent, sourceWeapon.LifeSteal);
             if (equipLifeSteal > 0)
             {
                 long requested = Math.Max(1, damage * equipLifeSteal / 100);
@@ -7218,7 +7325,7 @@ public partial class CombatEngine
 
         // Elemental enchant procs — weapon-based, skip for spells
         if (!isSpellDamage)
-            CheckElementalEnchantProcs(attacker, target, damage, result);
+            CheckElementalEnchantProcs(attacker, target, damage, result, weaponSlot);
 
         // Sunforged Blade: heals lowest-HP ally for 10% of damage dealt
         if (ArtifactSystem.Instance.HasSunforgedBlade() && currentTeammates != null && currentTeammates.Count > 0)
@@ -7348,9 +7455,13 @@ public partial class CombatEngine
         return true;
     }
 
-    private void CheckElementalEnchantProcs(Character attacker, Monster target, long damage, CombatResult result)
+    private void CheckElementalEnchantProcs(Character attacker, Monster target, long damage, CombatResult result, EquipmentSlot weaponSlot = EquipmentSlot.MainHand)
     {
-        var weapon = attacker.GetEquipment(EquipmentSlot.MainHand);
+        // v0.60.10: read elemental enchants from the source weapon (passed via
+        // weaponSlot) rather than hardcoded MainHand. Off-hand fire / frost /
+        // lightning enchants now proc on off-hand strikes; main-hand enchants
+        // no longer proc on off-hand swings.
+        var weapon = attacker.GetEquipment(weaponSlot);
         if (weapon == null) return;
 
         bool isPlayer = attacker == currentPlayer;
@@ -7378,9 +7489,25 @@ public partial class CombatEngine
 
         if (targetAlive && weapon.HasFrostEnchant && random.NextDouble() < GameConfig.FrostEnchantProcChance)
         {
-            target.Defence = Math.Max(0, target.Defence - GameConfig.FrostEnchantAgiReduction);
+            // v0.60.10 (Coosh Lv.83 Warrior report): "Frostbite says chance to apply slow
+            // but instead it just decreases defences, and by a small amount." Pre-fix this
+            // permanently mutated target.Defence by -3 per proc, which (a) is not a slow,
+            // (b) stacks every proc into the same fight, and (c) doesn't match the shop
+            // description "+20 power + chance to slow enemies". Now applies the real Slow
+            // status (Monster.IsSlowed halves attack count via CombatEngine:4266), refreshing
+            // duration on repeat procs to FrostEnchantDuration (2 rounds).
+            target.IsSlowed = true;
+            target.SlowDuration = Math.Max(target.SlowDuration, GameConfig.FrostEnchantDuration);
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine(Loc.Get("combat.enchant_frost", target.Name));
+            // v0.60.10 (druidah Lv.20 Cleric report): "Somehow Lyris can use the frost effect
+            // sometimes." The proc was correctly reading the source weapon's HasFrostEnchant,
+            // but the message had no attacker attribution -- so when a teammate's frost-enchanted
+            // weapon procced, the player saw "Frost spreads from the impact!" with no name and
+            // assumed her own staff's enchant had leaked across characters. Mirror the
+            // fire/lightning pattern that already differentiates player vs teammate.
+            terminal.WriteLine(isPlayer
+                ? Loc.Get("combat.enchant_frost", target.Name)
+                : Loc.Get("combat.enchant_frost_tm", name, target.Name));
         }
 
         if (targetAlive && weapon.HasLightningEnchant && random.NextDouble() < GameConfig.LightningEnchantProcChance)
@@ -7414,7 +7541,10 @@ public partial class CombatEngine
             long poisonDamage = Math.Max(1, poisonValue);
             target.HP = Math.Max(0, target.HP - poisonDamage);
             terminal.SetColor("green");
-            terminal.WriteLine(Loc.Get("combat.enchant_venom", poisonDamage));
+            // v0.60.10 (druidah report): attribute teammate procs by name (see frost note above).
+            terminal.WriteLine(isPlayer
+                ? Loc.Get("combat.enchant_venom", poisonDamage)
+                : Loc.Get("combat.enchant_venom_tm", name, poisonDamage));
             result.TotalDamageDealt += poisonDamage;
             attacker.Statistics?.RecordDamageDealt(poisonDamage, false);
         }
@@ -7438,9 +7568,15 @@ public partial class CombatEngine
                 long holyDamage = Math.Max(1, (long)(damage * holyMult));
                 target.HP = Math.Max(0, target.HP - holyDamage);
                 terminal.SetColor("bright_white");
-                terminal.WriteLine(isUndead
-                    ? Loc.Get("combat.enchant_holy_undead", holyDamage)
-                    : Loc.Get("combat.enchant_holy", holyDamage));
+                // v0.60.10 (druidah report): attribute teammate procs by name (see frost note above).
+                if (isPlayer)
+                    terminal.WriteLine(isUndead
+                        ? Loc.Get("combat.enchant_holy_undead", holyDamage)
+                        : Loc.Get("combat.enchant_holy", holyDamage));
+                else
+                    terminal.WriteLine(isUndead
+                        ? Loc.Get("combat.enchant_holy_undead_tm", name, holyDamage)
+                        : Loc.Get("combat.enchant_holy_tm", name, holyDamage));
                 result.TotalDamageDealt += holyDamage;
                 attacker.Statistics?.RecordDamageDealt(holyDamage, false);
             }
@@ -7460,14 +7596,23 @@ public partial class CombatEngine
                 long shadowDamage = Math.Max(1, (long)(damage * GameConfig.ShadowEnchantDamageMultiplier));
                 target.HP = Math.Max(0, target.HP - shadowDamage);
                 terminal.SetColor("dark_magenta");
-                terminal.WriteLine(Loc.Get("combat.enchant_shadow", shadowDamage));
+                // v0.60.10 (druidah report): attribute teammate procs by name (see frost note above).
+                terminal.WriteLine(isPlayer
+                    ? Loc.Get("combat.enchant_shadow", shadowDamage)
+                    : Loc.Get("combat.enchant_shadow_tm", name, shadowDamage));
                 result.TotalDamageDealt += shadowDamage;
                 attacker.Statistics?.RecordDamageDealt(shadowDamage, false);
             }
         }
 
         // Mana steal proc
-        int manaStealPct = attacker.GetEquipmentManaSteal();
+        // v0.60.10 (druidah Lv.9 Cleric report): "If you wield a staff and a siphoning
+        // dagger, both the main hand and the off hand attacks siphon mana." Was reading
+        // SUM of all-slots ManaSteal via GetEquipmentManaSteal() so an off-hand
+        // Siphoning enchant procced on every hit. Now reads only the source weapon's
+        // ManaSteal so each hand procs its own enchants. `weapon` is guaranteed non-null
+        // here -- the early-return at the top of this method bails when it's null.
+        int manaStealPct = weapon.ManaSteal;
         if (manaStealPct > 0 && damage > 0)
         {
             // v0.60.0, issue #91: angels carry no mana to siphon. The proc fizzles
@@ -7507,7 +7652,9 @@ public partial class CombatEngine
 
         if (targetAlive && weapon.HasFrostEnchant && random.NextDouble() < GameConfig.FrostEnchantProcChance)
         {
-            target.Defence = Math.Max(0, target.Defence - GameConfig.FrostEnchantAgiReduction);
+            // v0.60.10 (Coosh report): see twin in CheckElementalEnchantProcs above.
+            target.IsSlowed = true;
+            target.SlowDuration = Math.Max(target.SlowDuration, GameConfig.FrostEnchantDuration);
             terminal.SetColor("bright_cyan");
             terminal.WriteLine(Loc.Get("combat.enchant_frost_multi", target.Name));
         }
@@ -8278,8 +8425,19 @@ public partial class CombatEngine
                     // original recruit-time starting gear, so the companion visibly reverted. The
                     // Home/Inn/TeamCorner manual-equip flows already call SyncCompanionEquipment
                     // (v0.57.7 fix for Lyris); the combat-loot manual path was missing it.
-                    if (isCompanionEquip && player.IsCompanion)
-                        CompanionSystem.Instance?.SyncCompanionEquipment(player);
+                    //
+                    // v0.60.11 (Spud report): same shape gap for non-companion teammates. Team
+                    // NPCs recruited from Team Corner aren't Companions, so SyncCompanionEquipment
+                    // is a no-op for them. Without an additional SyncNPCTeammateToActiveNPCs the
+                    // equipment stayed on the orphaned combat reference and the canonical NPC in
+                    // ActiveNPCs (which is what SaveAllSharedState serializes) kept the old gear.
+                    if (isCompanionEquip)
+                    {
+                        if (player.IsCompanion)
+                            CompanionSystem.Instance?.SyncCompanionEquipment(player);
+                        else
+                            SyncNPCTeammateToActiveNPCs(player);
+                    }
                 }
                 else
                 {
@@ -8402,7 +8560,14 @@ public partial class CombatEngine
                                             terminal.WriteLine(Loc.Get("combat.loot_displaced_to_inventory", displaced[0].Name));
                                         }
                                     }
-                                    CompanionSystem.Instance?.SyncCompanionEquipment(teammate);
+                                    // v0.60.11 (Spud report): also sync to ActiveNPCs for non-companion
+                                    // teammates so combat auto-equip on pass-loot persists across relog
+                                    // (the equipment stayed on the orphaned combat reference and never
+                                    // reached the canonical NPC that SaveAllSharedState serializes).
+                                    if (teammate.IsCompanion)
+                                        CompanionSystem.Instance?.SyncCompanionEquipment(teammate);
+                                    else
+                                        SyncNPCTeammateToActiveNPCs(teammate);
                                     string teammateName = teammate.Name2 ?? teammate.Name1 ?? "Your ally";
                                     // v0.57.8: "You nod. Aldric gears up." moved here from the confirm
                                     // prompt so it only prints when the equip actually succeeds.
@@ -8876,7 +9041,14 @@ public partial class CombatEngine
                                             terminal.WriteLine(Loc.Get("combat.loot_displaced_to_inventory", displaced[0].Name));
                                         }
                                     }
-                                    CompanionSystem.Instance?.SyncCompanionEquipment(teammate);
+                                    // v0.60.11 (Spud report): mirror the single-monster fix for the
+                                    // grouped multi-monster path — non-companion teammates need
+                                    // SyncNPCTeammateToActiveNPCs to persist the equipment on
+                                    // the canonical NPC.
+                                    if (teammate.IsCompanion)
+                                        CompanionSystem.Instance?.SyncCompanionEquipment(teammate);
+                                    else
+                                        SyncNPCTeammateToActiveNPCs(teammate);
                                     string teammateName = teammate.Name2 ?? teammate.Name1 ?? "Your ally";
                                     // v0.57.8: "You nod. X gears up." only after the equip actually succeeds.
                                     terminal.SetColor("gray");
@@ -11800,8 +11972,27 @@ public partial class CombatEngine
 
                         // Critical hit chance
                         float rollMult = 1.0f;
-                        bool isCrit = random.Next(1, 21) == 20; // natural 20
-                        bool dexCrit = !isCrit && StatEffectsSystem.RollCriticalHit(player);
+
+                        // v0.60.11 (Zen Lv.9 Cyclebreaker report): Hidden status grants
+                        // a guaranteed crit on the next attack -- it's how every auto-crit-
+                        // setup ability delivers its payoff (Cyclebreaker Temporal Feint,
+                        // Abysswarden Umbral Step, Assassin shadow / vanish, basic [H]ide).
+                        // Power Strike and class abilities already consume Hidden (see
+                        // ~12327 and ~12842), but the basic [A]ttack path never checked
+                        // it. Net effect: every auto-crit-setup ability worked when
+                        // followed by Power Strike or an ability, but silently dropped the
+                        // crit when followed by a plain swing. Mirror the Power-Strike
+                        // pattern: stealth crit short-circuits the natural-20 / dex-crit
+                        // rolls so we don't accidentally double-apply.
+                        bool stealthCrit = player.HasStatus(StatusEffect.Hidden);
+                        if (stealthCrit)
+                        {
+                            player.RemoveStatus(StatusEffect.Hidden);
+                            rollMult = StatEffectsSystem.GetCriticalDamageMultiplier(player.Dexterity, player.GetEquipmentCritDamageBonus());
+                            terminal.WriteLine(Loc.Get("combat.stealth_crit"), "bright_yellow");
+                        }
+                        bool isCrit = !stealthCrit && random.Next(1, 21) == 20; // natural 20
+                        bool dexCrit = !stealthCrit && !isCrit && StatEffectsSystem.RollCriticalHit(player);
                         if (isCrit)
                         {
                             rollMult = 1.5f + (float)(random.NextDouble() * 0.5); // 1.5-2.0
@@ -11814,7 +12005,7 @@ public partial class CombatEngine
                         }
 
                         // Wavecaller Ocean's Voice: +20% bonus crit chance when buff active
-                        if (!isCrit && !dexCrit && player.Class == CharacterClass.Wavecaller
+                        if (!stealthCrit && !isCrit && !dexCrit && player.Class == CharacterClass.Wavecaller
                             && player.TempAttackBonus > 0 && player.TempAttackBonusDuration > 0)
                         {
                             if (random.Next(100) < (int)(GameConfig.WavecallerOceansVoiceCritBonus * 100))
@@ -11975,7 +12166,7 @@ public partial class CombatEngine
                         await ApplySingleMonsterDamage(target, damage, result, isOffHandAttack ? "off-hand strike" : "your attack", player);
 
                         // Apply all post-hit enchantment effects (lifesteal, elemental procs, sunforged, poison)
-                        ApplyPostHitEnchantments(player, target, damage, result);
+                        ApplyPostHitEnchantments(player, target, damage, result, weaponSlot: isOffHandAttack ? EquipmentSlot.OffHand : EquipmentSlot.MainHand);
 
                         // Mystic Shaman weapon enchantment bonus damage
                         // v0.57.13: same fix as single-monster path at ~line 3299 — scale off raw
@@ -12012,10 +12203,13 @@ public partial class CombatEngine
                                 }
                             }
 
-                            // Frostbrand: slow the enemy (reduce defense, matching regular frost enchant)
+                            // Frostbrand: slow the enemy. v0.60.10 (Coosh report): see twin
+                            // in ApplyPostHitEnchantments single-monster path; was Defence shave,
+                            // now real Slow status.
                             if (player.ShamanEnchantType == 2 && target.IsAlive)
                             {
-                                target.Defence = Math.Max(0, target.Defence - GameConfig.FrostEnchantAgiReduction);
+                                target.IsSlowed = true;
+                                target.SlowDuration = Math.Max(target.SlowDuration, GameConfig.FrostEnchantDuration);
                             }
 
                             // Ancestral Guidance: 25% of damage dealt heals the party
@@ -12917,7 +13111,16 @@ public partial class CombatEngine
             {
                 terminal.WriteLine("");
                 terminal.SetColor("bright_green");
-                terminal.WriteLine(Loc.Get(isPlayer ? "combat.off_hand_strike_at" : "combat.off_hand_strike_npc", actorName, offHandTarget.Name));
+                // v0.60.10 (druidah Lv.9 Cleric report): Holy Shite + dual-wield printed
+                // "Off-hand strike at You!" instead of "...at the spider!". `combat.off_hand_strike_at`
+                // is a {0}-only template -- passing (actorName, offHandTarget.Name) made
+                // actorName ("You") fill {0} and dropped the target name. NPC variant has
+                // a {0}=actor / {1}=target shape and was already correct. Branch cleanly so
+                // each key gets the args its template expects.
+                if (isPlayer)
+                    terminal.WriteLine(Loc.Get("combat.off_hand_strike_at", offHandTarget.Name));
+                else
+                    terminal.WriteLine(Loc.Get("combat.off_hand_strike_npc", actorName, offHandTarget.Name));
                 await Task.Delay(GetCombatDelay(500));
 
                 long ohDamage = player.Strength + GetEffectiveWeapPow(player.WeapPow) + random.Next(1, 15);
@@ -12926,7 +13129,7 @@ public partial class CombatEngine
                 ohDamage = DifficultySystem.ApplyPlayerDamageMultiplier(ohDamage);
 
                 await ApplySingleMonsterDamage(offHandTarget, ohDamage, result, "off-hand strike", player);
-                ApplyPostHitEnchantments(player, offHandTarget, ohDamage, result);
+                ApplyPostHitEnchantments(player, offHandTarget, ohDamage, result, weaponSlot: EquipmentSlot.OffHand);
             }
         }
 
@@ -16618,7 +16821,7 @@ public partial class CombatEngine
                 await ApplySingleMonsterDamage(target, damage, result, isOffHandAttack ? $"{teammate.DisplayName}'s off-hand strike" : $"{teammate.DisplayName}'s attack", teammate);
 
                 // Apply post-hit enchantment effects
-                ApplyPostHitEnchantments(teammate, target, damage, result);
+                ApplyPostHitEnchantments(teammate, target, damage, result, weaponSlot: isOffHandAttack ? EquipmentSlot.OffHand : EquipmentSlot.MainHand);
 
                 // If target died, retarget to next weakest
                 if (!target.IsAlive)
@@ -17852,10 +18055,23 @@ public partial class CombatEngine
                         // player-equivalent check at ~line 4801 also inspects HasStatusImmunity
                         // first, but we never mirrored it here, so Arcane Immunity cast on a
                         // companion did nothing against monster-inflicted fear/stun/etc. Match
-                        // the player-path order — immunity, then Calm Waters, then the roll.
+                        // the player-path order: immunity, Cyclebreaker, Paladin, Calm Waters,
+                        // then the roll.
+                        // v0.60.10 (druidah): the player-path order added Cyclebreaker
+                        // Probability Manipulation and Paladin Divine Resolve passive resists,
+                        // mirror those here so NPC Cyclebreakers / Paladins / Paladin companions
+                        // (Aldric is one) get their passive status resists.
                         if (companion.HasStatusImmunity && companion.StatusImmunityDuration > 0)
                         {
                             terminal.WriteLine(Loc.Get("combat.companion_iron_will_resists", companion.DisplayName, abilityResult.InflictStatus), "bright_white");
+                        }
+                        else if (companion.Class == CharacterClass.Cyclebreaker && random.Next(100) < (int)(GameConfig.CyclebreakerDebuffResistChance * 100))
+                        {
+                            terminal.WriteLine(Loc.Get("combat.companion_probability_negates", companion.DisplayName, abilityResult.InflictStatus), "bright_magenta");
+                        }
+                        else if (companion.Class == CharacterClass.Paladin && random.Next(100) < (int)(GameConfig.PaladinDivineResolveStatusResist * 100))
+                        {
+                            terminal.WriteLine(Loc.Get("combat.companion_divine_resolve", companion.DisplayName, abilityResult.InflictStatus), "bright_white");
                         }
                         else if (companion.CalmWatersRounds > 0 && random.Next(100) < (int)(GameConfig.CalmWatersResistChance * 100))
                         {
@@ -17866,10 +18082,42 @@ public partial class CombatEngine
                             companion.ApplyStatus(abilityResult.InflictStatus, abilityResult.StatusDuration);
                             terminal.WriteLine($"{companion.DisplayName} is afflicted with {abilityResult.InflictStatus}!", "yellow");
                         }
+                        else
+                        {
+                            // v0.60.10 (druidah): chance roll failed. Without this branch the
+                            // ability's flavor line ("the spider traps Aldric in webbing!")
+                            // implies the status landed, then Aldric acts next round normally
+                            // and the player thinks the stun was ignored. Make the resist
+                            // explicit so the player sees why their teammate can still act.
+                            terminal.WriteLine(Loc.Get("combat.companion_shrugs_off_status", companion.DisplayName, abilityResult.InflictStatus.ToString().ToLower()), "gray");
+                        }
                     }
                     await Task.Delay(GetCombatDelay(800));
                     // Fall through to death check below if companion died from ability
-                    if (companion.IsAlive) return;
+                    if (!companion.IsAlive) goto CompanionDeathCheck;
+
+                    // v0.60.10 (druidah Lv.20 Cleric report): "When a shadow uses its ability
+                    // which makes it flicker between planes, that one doesn't hit companions.
+                    // As far as I recall that's a damaging ability." Not damaging itself --
+                    // Incorporeal (and PhaseShift / Phase / Vanish / Flight / Invisibility /
+                    // TreeMeld) are defensive self-buffs that leave SkipNormalAttack=false
+                    // and deal no damage. For those, the monster's normal attack should still
+                    // fire on top, the same way it does on the player path
+                    // (TryMonsterSpecialAbility:5159 returns false -> caller falls through to
+                    // basic attack). Pre-fix, this branch always returned after the ability
+                    // resolved, so companions took zero damage from a monster that used a
+                    // self-buff ability that turn while the player took the followup hit.
+                    // Mirror the player-path "did the ability consume the turn?" check:
+                    bool abilityConsumedTurn = abilityResult.SkipNormalAttack
+                        || abilityResult.DirectDamage > 0
+                        || abilityResult.ManaDrain > 0
+                        || abilityResult.LifeStealPercent > 0
+                        || (abilityResult.DamageMultiplier > 0 && abilityResult.LifeStealPercent == 0);
+                    if (abilityConsumedTurn) return;
+                    // Otherwise fall through to the normal attack below. v0.60.10 (druidah
+                    // report): mirror the player-path pause so the ability flavor reads as
+                    // a separate beat from the followup attack.
+                    await Task.Delay(GetCombatDelay(600));
                 }
                 else if (monster.IsBoss)
                 {
@@ -20671,7 +20919,7 @@ public partial class CombatEngine
 
             terminal.SetColor("white");
             terminal.WriteLine(Loc.Get("combat.offhand_deals_damage", Math.Max(1, ohDamage)));
-            ApplyPostHitEnchantments(player, monster, Math.Max(1, ohDamage), result);
+            ApplyPostHitEnchantments(player, monster, Math.Max(1, ohDamage), result, weaponSlot: EquipmentSlot.OffHand);
 
             if (monster.HP <= 0)
             {

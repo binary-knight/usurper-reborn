@@ -26,7 +26,8 @@ public class FeatureInteractionSystem
         Character player,
         int dungeonLevel,
         DungeonTheme theme,
-        TerminalEmulator terminal)
+        TerminalEmulator terminal,
+        List<Character>? teammates = null)
     {
         var outcome = new FeatureOutcome();
 
@@ -48,7 +49,7 @@ public class FeatureInteractionSystem
                 break;
 
             case FeatureInteractionType.ClassSpecific:
-                await HandleClassSpecific(feature, player, dungeonLevel, terminal, outcome);
+                await HandleClassSpecific(feature, player, dungeonLevel, terminal, outcome, teammates);
                 break;
 
             case FeatureInteractionType.RiskReward:
@@ -1040,7 +1041,7 @@ public class FeatureInteractionSystem
     #region Class Specific
 
     private async Task HandleClassSpecific(RoomFeature feature, Character player, int level,
-        TerminalEmulator terminal, FeatureOutcome outcome)
+        TerminalEmulator terminal, FeatureOutcome outcome, List<Character>? teammates = null)
     {
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("feature.interact_with", feature.Interaction.ToString().ToLower(), feature.Name));
@@ -1054,14 +1055,14 @@ public class FeatureInteractionSystem
         terminal.WriteLine("");
         await Task.Delay(400);
 
-        await ApplyClassSpecificBonus(player, level, terminal, outcome);
+        await ApplyClassSpecificBonus(player, level, terminal, outcome, teammates);
 
         outcome.Success = true;
         await terminal.PressAnyKey();
     }
 
     private async Task ApplyClassSpecificBonus(Character player, int level,
-        TerminalEmulator terminal, FeatureOutcome outcome)
+        TerminalEmulator terminal, FeatureOutcome outcome, List<Character>? teammates = null)
     {
         switch (player.Class)
         {
@@ -1088,12 +1089,43 @@ public class FeatureInteractionSystem
 
             case CharacterClass.Cleric:
             case CharacterClass.Paladin:
+                // Player report (Lv.20 cleric): self-only heal here was redundant -- the
+                // cleric is back-row, rarely needs healing, and "if the cleric needs
+                // healing something already went bad." Class fantasy fits a party-wide
+                // divine presence radiating from the feature, not a pocket heal for the
+                // caster. Heal player and every alive teammate for 25% MaxHP each.
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine(Loc.Get("feature.divine_presence"));
-                long heal = player.MaxHP / 4;
-                player.HP = Math.Min(player.MaxHP, player.HP + heal);
+                long playerHeal = player.MaxHP / 4;
+                long playerHpBefore = player.HP;
+                player.HP = Math.Min(player.MaxHP, player.HP + playerHeal);
+                long actualPlayerHeal = player.HP - playerHpBefore;
                 terminal.SetColor("green");
-                terminal.WriteLine(Loc.Get("feature.divine_heal", heal));
+                terminal.WriteLine(Loc.Get("feature.divine_heal", actualPlayerHeal));
+                if (teammates != null && teammates.Count > 0)
+                {
+                    int healedCount = 0;
+                    foreach (var ally in teammates)
+                    {
+                        if (ally == null || !ally.IsAlive) continue;
+                        long allyHeal = ally.MaxHP / 4;
+                        long allyHpBefore = ally.HP;
+                        ally.HP = Math.Min(ally.MaxHP, ally.HP + allyHeal);
+                        long actualAllyHeal = ally.HP - allyHpBefore;
+                        if (actualAllyHeal > 0)
+                        {
+                            terminal.WriteLine(Loc.Get("feature.divine_heal_ally", ally.DisplayName, actualAllyHeal));
+                            healedCount++;
+                        }
+                    }
+                    if (healedCount == 0 && teammates.Any(t => t != null && t.IsAlive))
+                    {
+                        // Everyone else is already at full HP — keep the radiance flavor
+                        // line so the party-wide effect is visible even when there's nothing
+                        // to mend.
+                        terminal.WriteLine(Loc.Get("feature.divine_heal_all_full"));
+                    }
+                }
                 break;
 
             case CharacterClass.Assassin:

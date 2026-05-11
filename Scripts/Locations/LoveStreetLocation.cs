@@ -28,48 +28,54 @@ public class LoveStreetLocation : BaseLocation
     private Dictionary<string, HashSet<string>> _revealedTraits = new();
 
     // Courtesans (female workers) - based on Pascal WHORES.PAS
+    // v0.60.10 (Zen Lv.23 Cyclebreaker report): prices doubled across the board so a single
+    // visit is a more meaningful gold sink relative to the alignment shift it produces (paired
+    // movement via GiveDarkness now applies +darkness AND -chivalry from one transaction).
+    // Combined with the darkness-range cut in ShowIntimateEncounter, the gold-per-alignment-point
+    // cost is now ~10x higher than the pre-fix value.
     private static readonly List<Courtesan> Courtesans = new()
     {
-        new Courtesan("Elly", "Mutant", 500, 0.35f, "A strange mix between races - exotic and dangerous.",
+        new Courtesan("Elly", "Mutant", 1000, 0.35f, "A strange mix between races - exotic and dangerous.",
             "The mutant woman leads you to a small, dimly lit room upstairs. Her eyes glow faintly in the darkness as she approaches..."),
-        new Courtesan("Lusha", "Troll", 2000, 0.30f, "An experienced troll woman with dark, weathered skin.",
+        new Courtesan("Lusha", "Troll", 4000, 0.30f, "An experienced troll woman with dark, weathered skin.",
             "Lusha takes your hand with surprising gentleness and leads you to her chambers. Despite her rough exterior, there's a practiced grace to her movements..."),
-        new Courtesan("Irma", "Gnoll", 5000, 0.25f, "A young gnoll with nervous energy and exotic features.",
+        new Courtesan("Irma", "Gnoll", 10000, 0.25f, "A young gnoll with nervous energy and exotic features.",
             "The gnoll girl leads you upstairs with quick, darting movements. Her fur is soft and warm as she draws close..."),
-        new Courtesan("Elynthia", "Dwarf", 10000, 0.20f, "A middle-aged dwarven woman with knowing eyes.",
+        new Courtesan("Elynthia", "Dwarf", 20000, 0.20f, "A middle-aged dwarven woman with knowing eyes.",
             "Elynthia gives you a tired but genuine smile. 'Let mama show you how it's done,' she says, leading you to a surprisingly cozy room..."),
-        new Courtesan("Melissa", "Elf", 20000, 0.15f, "A beautiful elf maiden with sad, distant eyes.",
+        new Courtesan("Melissa", "Elf", 40000, 0.15f, "A beautiful elf maiden with sad, distant eyes.",
             "Melissa moves with ethereal grace, her long silver hair catching the candlelight. There's an ancient sadness in her eyes as she leads you to her chambers..."),
-        new Courtesan("Seraphina", "Human", 30000, 0.12f, "A stunning redhead with fiery passion in her eyes.",
+        new Courtesan("Seraphina", "Human", 60000, 0.12f, "A stunning redhead with fiery passion in her eyes.",
             "Seraphina's eyes burn with intensity as she takes your hand. 'Tonight, you're mine,' she whispers, pulling you toward the velvet curtains..."),
-        new Courtesan("Sonya", "Elf", 40000, 0.10f, "A voluptuous elf woman in her prime, radiating sensuality.",
+        new Courtesan("Sonya", "Elf", 80000, 0.10f, "A voluptuous elf woman in her prime, radiating sensuality.",
             "Sonya's curves are legendary in the district. She circles you slowly, appraising, before leading you to a room filled with silk and incense..."),
-        new Courtesan("Arabella", "Human", 70000, 0.08f, "A breathtaking beauty that makes hearts stop.",
+        new Courtesan("Arabella", "Human", 140000, 0.08f, "A breathtaking beauty that makes hearts stop.",
             "Arabella is perfection incarnate. Every movement is calculated to enchant. She leads you to the finest room, lit by a hundred candles..."),
-        new Courtesan("Loretta", "Elf", 100000, 0.05f, "The legendary Elf Princess - the crown jewel of Love Street.",
+        new Courtesan("Loretta", "Elf", 200000, 0.05f, "The legendary Elf Princess - the crown jewel of Love Street.",
             "Loretta, the Princess of Pleasure, graces you with her presence. Her touch is electric, her beauty beyond words. This night will change you forever...")
     };
 
     // Gigolos (male workers) - based on Pascal GIGOLOC.PAS
+    // v0.60.10 (Zen Lv.23 Cyclebreaker report): prices doubled, see Courtesans note above.
     private static readonly List<Gigolo> Gigolos = new()
     {
-        new Gigolo("Signori", "Human", 500, 0.35f, "A slender, effeminate young man with delicate features.",
+        new Gigolo("Signori", "Human", 1000, 0.35f, "A slender, effeminate young man with delicate features.",
             "Signori leads you to a small but clean room. His touch is surprisingly skilled as he helps you relax..."),
-        new Gigolo("Tod", "Human", 2000, 0.30f, "A muscular blonde viking type from the Northern lands.",
+        new Gigolo("Tod", "Human", 4000, 0.30f, "A muscular blonde viking type from the Northern lands.",
             "Tod's chamber is dominated by an enormous bed. He wastes no time, his powerful hands surprisingly gentle..."),
-        new Gigolo("Mbuto", "Human", 5000, 0.25f, "A dark, muscular man with an air of mystery.",
+        new Gigolo("Mbuto", "Human", 10000, 0.25f, "A dark, muscular man with an air of mystery.",
             "Mbuto leads you to a candlelit cell. He locks the door and extinguishes the candles, plunging you into darkness filled with anticipation..."),
-        new Gigolo("Merson", "Human", 10000, 0.20f, "A battle-scarred gladiator with intense eyes.",
+        new Gigolo("Merson", "Human", 20000, 0.20f, "A battle-scarred gladiator with intense eyes.",
             "Merson's room is spartan, like the warrior he is. But his touch reveals layers of tenderness beneath the hardened exterior..."),
-        new Gigolo("Brian", "Human", 20000, 0.15f, "A fallen prince with divine looks and refined manners.",
+        new Gigolo("Brian", "Human", 40000, 0.15f, "A fallen prince with divine looks and refined manners.",
             "Brian treats you like royalty, his noble bearing making you feel like the only person in the world..."),
-        new Gigolo("Rasputin", "Human", 30000, 0.12f, "A mysterious mage who never removes his top hat.",
+        new Gigolo("Rasputin", "Human", 60000, 0.12f, "A mysterious mage who never removes his top hat.",
             "Rasputin offers you a strange potion. 'To enhance the experience,' he says with a knowing smile. The night becomes dreamlike..."),
-        new Gigolo("Manhio", "Elf", 40000, 0.10f, "A tall, elegant elf aristocrat with centuries of experience.",
+        new Gigolo("Manhio", "Elf", 80000, 0.10f, "A tall, elegant elf aristocrat with centuries of experience.",
             "Manhio's chambers smell of exotic incense. His elven touch is unlike anything human, transcendent and electric..."),
-        new Gigolo("Jake", "Human", 70000, 0.08f, "A rugged ranger in his prime, adored by many.",
+        new Gigolo("Jake", "Human", 140000, 0.08f, "A rugged ranger in his prime, adored by many.",
             "Jake's wild nature comes through in passionate waves. The experience is primal, untamed, unforgettable..."),
-        new Gigolo("Banco", "Human", 100000, 0.05f, "The Lord of Jah - legendary lover whose skills are whispered of in awe.",
+        new Gigolo("Banco", "Human", 200000, 0.05f, "The Lord of Jah - legendary lover whose skills are whispered of in awe.",
             "Banco, the Lord of Pleasure himself, honors you with his attention. What follows defies description...")
     };
 
@@ -386,6 +392,12 @@ public class LoveStreetLocation : BaseLocation
     {
         terminal.SetColor("bright_cyan");
         terminal.WriteLine(Loc.Get("love_street.beauty_introduces"));
+        // v0.60.10 (Zen report): show daily-visit count up front so players know the cap
+        // exists before clicking through a partner intro.
+        terminal.SetColor("gray");
+        terminal.WriteLine(Loc.Get("love_street.daily_visits_remaining",
+            GameConfig.MaxLoveStreetVisitsPerDay - currentPlayer.LoveStreetVisitsToday,
+            GameConfig.MaxLoveStreetVisitsPerDay));
         terminal.WriteLine("");
 
         for (int i = 0; i < Courtesans.Count; i++)
@@ -438,6 +450,18 @@ public class LoveStreetLocation : BaseLocation
 
     private async Task EngageWithCourtesan(Courtesan courtesan)
     {
+        // v0.60.10 (Zen report): paid-encounter daily cap. Same plumbing pattern as
+        // MurdersToday / TeamWarsToday / DrinkingGamesToday. Counter increments inside
+        // ShowIntimateEncounter once the transaction succeeds; counts Courtesan + Gigolo
+        // visits combined.
+        if (currentPlayer.LoveStreetVisitsToday >= GameConfig.MaxLoveStreetVisitsPerDay)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine(Loc.Get("love_street.daily_cap_reached", GameConfig.MaxLoveStreetVisitsPerDay));
+            await terminal.WaitForKey();
+            return;
+        }
+
         terminal.ClearScreen();
         terminal.WriteLine("");
         WriteBoxHeader($"{courtesan.Name} the {courtesan.Race}", "bright_magenta", 77);
@@ -510,6 +534,11 @@ public class LoveStreetLocation : BaseLocation
     {
         terminal.SetColor("bright_cyan");
         terminal.WriteLine(Loc.Get("love_street.hall_introduces"));
+        // v0.60.10 (Zen report): show daily-visit count up front (see Courtesan twin).
+        terminal.SetColor("gray");
+        terminal.WriteLine(Loc.Get("love_street.daily_visits_remaining",
+            GameConfig.MaxLoveStreetVisitsPerDay - currentPlayer.LoveStreetVisitsToday,
+            GameConfig.MaxLoveStreetVisitsPerDay));
         terminal.WriteLine("");
 
         for (int i = 0; i < Gigolos.Count; i++)
@@ -562,6 +591,15 @@ public class LoveStreetLocation : BaseLocation
 
     private async Task EngageWithGigolo(Gigolo gigolo)
     {
+        // v0.60.10 (Zen report): paid-encounter daily cap. See twin in EngageWithCourtesan.
+        if (currentPlayer.LoveStreetVisitsToday >= GameConfig.MaxLoveStreetVisitsPerDay)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine(Loc.Get("love_street.daily_cap_reached", GameConfig.MaxLoveStreetVisitsPerDay));
+            await terminal.WaitForKey();
+            return;
+        }
+
         terminal.ClearScreen();
         terminal.WriteLine("");
         WriteBoxHeader($"{gigolo.Name} the {gigolo.Race}", "bright_blue", 77);
@@ -618,23 +656,30 @@ public class LoveStreetLocation : BaseLocation
         await GenerateIntimateScene(partnerName, race, price);
 
         // Calculate rewards
+        // v0.60.10 (Zen Lv.23 Cyclebreaker report): tier brackets re-tiered to match the
+        // doubled prices, and darkness ranges cut sharply -- pre-fix, the top bracket
+        // (150-650 darkness per visit) plus paired-movement chivalry penalty
+        // (amount/2 = up to -325 chivalry) could swing a balanced player's alignment by
+        // 800+ points in a single 100k visit, near the AlignmentCap of 1000. Now top
+        // bracket caps at 40-120 darkness (~60 chivalry penalty), so even the priciest
+        // visits read as a meaningful but not single-shot alignment shift.
         int baseXp = price switch
         {
-            <= 1000 => random.Next(5, 30),
-            <= 5000 => random.Next(10, 50),
-            <= 20000 => random.Next(25, 100),
-            <= 50000 => random.Next(50, 150),
+            <= 2000 => random.Next(5, 30),
+            <= 10000 => random.Next(10, 50),
+            <= 40000 => random.Next(25, 100),
+            <= 100000 => random.Next(50, 150),
             _ => random.Next(100, 300)
         };
         long xpGained = baseXp * currentPlayer.Level;
 
         int darkPoints = price switch
         {
-            <= 1000 => random.Next(15, 45),
-            <= 5000 => random.Next(25, 85),
-            <= 20000 => random.Next(50, 200),
-            <= 50000 => random.Next(100, 300),
-            _ => random.Next(150, 650)
+            <= 2000 => random.Next(5, 15),
+            <= 10000 => random.Next(8, 25),
+            <= 40000 => random.Next(15, 50),
+            <= 100000 => random.Next(25, 80),
+            _ => random.Next(40, 120)
         };
 
         terminal.WriteLine("");
@@ -647,6 +692,11 @@ public class LoveStreetLocation : BaseLocation
 
         currentPlayer.Experience += xpGained;
         GiveDarkness(currentPlayer, darkPoints);
+        // v0.60.10 (Zen report): daily cap counter. Incremented here so it only ticks when
+        // the encounter actually consummated (price was paid, scene played out). EngageWith*
+        // checks the cap before this point; cancellations and "can't afford" paths bail
+        // before reaching the increment.
+        currentPlayer.LoveStreetVisitsToday++;
 
         // Check for disease
         await CheckForDisease(partnerName, diseaseChance);
@@ -706,11 +756,14 @@ public class LoveStreetLocation : BaseLocation
         terminal.WriteLine("");
         await Task.Delay(1000);
 
-        if (price >= 50000)
+        // v0.60.10: scene-quality tiers re-tiered to match the doubled prices so the same
+        // partners still get their original-quality flavor (Loretta/Banco -> premium,
+        // Arabella/Jake/Sonya -> high-end, etc.).
+        if (price >= 100000)
             await ShowPremiumEncounter(partnerName, race);
-        else if (price >= 20000)
+        else if (price >= 40000)
             await ShowHighEndEncounter(partnerName, race);
-        else if (price >= 5000)
+        else if (price >= 10000)
             await ShowStandardEncounter(partnerName, race);
         else
             await ShowBasicEncounter(partnerName, race);

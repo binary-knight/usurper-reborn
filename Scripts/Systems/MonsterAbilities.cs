@@ -275,6 +275,11 @@ public static class MonsterAbilities
     {
         var result = new AbilityResult { AbilityUsed = ability };
 
+        // Target pronouns: player target reads as "you"/"your"; companions and NPC teammates use their name.
+        bool isPlayerTarget = target is Player;
+        string you = isPlayerTarget ? "you" : target.Name;
+        string your = isPlayerTarget ? "your" : $"{target.Name}'s";
+
         switch (ability)
         {
             case AbilityType.Multiattack:
@@ -343,7 +348,7 @@ public static class MonsterAbilities
             case AbilityType.LifeDrain:
                 result.DamageMultiplier = 0.7f;
                 result.LifeStealPercent = 50;
-                result.Message = $"{monster.Name} drains your life force!";
+                result.Message = $"{monster.Name} drains {your} life force!";
                 result.MessageColor = "magenta";
                 break;
 
@@ -411,7 +416,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 2;
                 result.StatusChance = 30;
                 result.SkipNormalAttack = true;
-                result.Message = $"{monster.Name}'s gaze freezes you in place!";
+                result.Message = $"{monster.Name}'s gaze freezes {you} in place!";
                 result.MessageColor = "gray";
                 break;
 
@@ -447,7 +452,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 4;
                 result.StatusChance = 40;
                 result.SkipNormalAttack = true;
-                result.Message = $"{monster.Name} silences your magic!";
+                result.Message = $"{monster.Name} silences {your} magic!";
                 result.MessageColor = "bright_blue";
                 break;
 
@@ -456,7 +461,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 4;
                 result.StatusChance = 50;
                 result.SkipNormalAttack = true;
-                result.Message = $"{monster.Name} saps your strength!";
+                result.Message = $"{monster.Name} saps {your} strength!";
                 result.MessageColor = "yellow";
                 break;
 
@@ -465,13 +470,13 @@ public static class MonsterAbilities
                 if (target.HP < target.MaxHP / 5)
                 {
                     result.DirectDamage = (int)target.HP; // Instant kill
-                    result.Message = $"{monster.Name} DEVOURS you whole!";
+                    result.Message = $"{monster.Name} DEVOURS {you} whole!";
                     result.MessageColor = "bright_red";
                 }
                 else
                 {
                     result.DamageMultiplier = 1.3f;
-                    result.Message = $"{monster.Name} tries to devour you!";
+                    result.Message = $"{monster.Name} tries to devour {you}!";
                     result.MessageColor = "red";
                 }
                 break;
@@ -507,13 +512,13 @@ public static class MonsterAbilities
                 if (_rnd.Next(100) < 5) // 5% chance
                 {
                     result.DirectDamage = (int)target.HP;
-                    result.Message = $"{monster.Name} reaps your soul!";
+                    result.Message = $"{monster.Name} reaps {your} soul!";
                     result.MessageColor = "bright_red";
                 }
                 else
                 {
                     result.DamageMultiplier = 1.5f;
-                    result.Message = $"{monster.Name} reaches for your soul!";
+                    result.Message = $"{monster.Name} reaches for {your} soul!";
                     result.MessageColor = "magenta";
                 }
                 break;
@@ -615,7 +620,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 2;
                 result.StatusChance = 35;
                 result.SkipNormalAttack = true;
-                result.Message = $"{monster.Name}'s touch paralyzes you!";
+                result.Message = $"{monster.Name}'s touch paralyzes {you}!";
                 result.MessageColor = "cyan";
                 break;
 
@@ -709,7 +714,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 3;
                 result.StatusChance = 50;
                 result.SkipNormalAttack = true;
-                result.Message = $"{monster.Name}'s draconic presence fills you with dread!";
+                result.Message = $"{monster.Name}'s draconic presence fills {you} with dread!";
                 result.MessageColor = "bright_yellow";
                 break;
 
@@ -732,7 +737,7 @@ public static class MonsterAbilities
                 result.EvasionBonus = 40;
                 result.DamageMultiplier = 0;
                 result.SkipNormalAttack = true;
-                result.Message = $"{monster.Name} teleports behind you!";
+                result.Message = $"{monster.Name} teleports behind {you}!";
                 result.MessageColor = "bright_magenta";
                 break;
 
@@ -742,7 +747,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 4;
                 result.StatusChance = 60;
                 result.SkipNormalAttack = true;
-                result.Message = $"{monster.Name} engulfs you in hellfire!";
+                result.Message = $"{monster.Name} engulfs {you} in hellfire!";
                 result.MessageColor = "bright_red";
                 break;
 
@@ -751,7 +756,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 5;
                 result.StatusChance = 50;
                 result.DamageMultiplier = 1.2f;
-                result.Message = $"{monster.Name} corrupts your very essence!";
+                result.Message = $"{monster.Name} corrupts {your} very essence!";
                 result.MessageColor = "magenta";
                 break;
 
@@ -760,7 +765,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 2;
                 result.StatusChance = 30;
                 result.SkipNormalAttack = true;
-                result.Message = $"{monster.Name} tries to dominate your will!";
+                result.Message = $"{monster.Name} tries to dominate {your} will!";
                 result.MessageColor = "bright_magenta";
                 break;
 
@@ -860,7 +865,7 @@ public static class MonsterAbilities
                 result.InflictStatus = StatusEffect.Burning;
                 result.StatusDuration = 3;
                 result.StatusChance = 60;
-                result.Message = $"{monster.Name} scorches you with fire!";
+                result.Message = $"{monster.Name} scorches {you} with fire!";
                 result.MessageColor = "bright_red";
                 break;
 
@@ -870,7 +875,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 4;
                 result.StatusChance = 70;
                 result.SkipNormalAttack = true;
-                result.Message = $"{monster.Name} immolates you in flames!";
+                result.Message = $"{monster.Name} immolates {you} in flames!";
                 result.MessageColor = "bright_red";
                 break;
 
@@ -916,7 +921,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 4;
                 result.StatusChance = 55;
                 result.DamageMultiplier = 0.8f;
-                result.Message = $"{monster.Name}'s acidic touch corrodes your equipment!";
+                result.Message = $"{monster.Name}'s acidic touch corrodes {your} equipment!";
                 result.MessageColor = "green";
                 break;
 
@@ -933,14 +938,14 @@ public static class MonsterAbilities
                 result.InflictStatus = StatusEffect.Stunned;
                 result.StatusDuration = 1;
                 result.StatusChance = 45;
-                result.Message = $"{monster.Name} engulfs you in its mass!";
+                result.Message = $"{monster.Name} engulfs {you} in its mass!";
                 result.MessageColor = "bright_green";
                 break;
 
             case AbilityType.Absorb:
                 result.DamageMultiplier = 1.0f;
                 result.LifeStealPercent = 75;
-                result.Message = $"{monster.Name} absorbs your life force!";
+                result.Message = $"{monster.Name} absorbs {your} life force!";
                 result.MessageColor = "bright_green";
                 break;
 
@@ -958,7 +963,7 @@ public static class MonsterAbilities
                 result.StatusChance = 35;
                 result.DirectDamage = CalculateBreathDamage(monster, 0.8f);
                 result.SkipNormalAttack = true;
-                result.Message = $"{monster.Name}'s alien form drives you to the brink of madness!";
+                result.Message = $"{monster.Name}'s alien form drives {you} to the brink of madness!";
                 result.MessageColor = "bright_magenta";
                 break;
 
@@ -968,7 +973,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 2;
                 result.StatusChance = 45;
                 result.SkipNormalAttack = true;
-                result.Message = $"{monster.Name} traps you in sticky webbing!";
+                result.Message = $"{monster.Name} traps {you} in sticky webbing!";
                 result.MessageColor = "white";
                 break;
 
@@ -986,7 +991,7 @@ public static class MonsterAbilities
                 result.InflictStatus = StatusEffect.Poisoned;
                 result.StatusDuration = 5;
                 result.StatusChance = 65;
-                result.Message = $"{monster.Name} injects you with poison!";
+                result.Message = $"{monster.Name} injects {you} with poison!";
                 result.MessageColor = "green";
                 break;
 
@@ -1097,7 +1102,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 2;
                 result.StatusChance = 40;
                 result.SkipNormalAttack = true;
-                result.Message = $"{monster.Name} sprinkles sleep dust over you!";
+                result.Message = $"{monster.Name} sprinkles sleep dust over {you}!";
                 result.MessageColor = "bright_cyan";
                 break;
 
@@ -1115,7 +1120,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 2;
                 result.StatusChance = 35;
                 result.SkipNormalAttack = true;
-                result.Message = $"{monster.Name} tries to charm you with fey magic!";
+                result.Message = $"{monster.Name} tries to charm {you} with fey magic!";
                 result.MessageColor = "bright_magenta";
                 break;
 
@@ -1133,7 +1138,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 2;
                 result.StatusChance = 50;
                 result.SkipNormalAttack = true;
-                result.Message = $"{monster.Name} entangles you in grasping roots!";
+                result.Message = $"{monster.Name} entangles {you} in grasping roots!";
                 result.MessageColor = "green";
                 break;
 
@@ -1212,7 +1217,7 @@ public static class MonsterAbilities
             case AbilityType.DivineJudgment:
                 result.DirectDamage = CalculateBreathDamage(monster, 2.2f);
                 result.SkipNormalAttack = true;
-                result.Message = $"{monster.Name} passes divine judgment upon you!";
+                result.Message = $"{monster.Name} passes divine judgment upon {you}!";
                 result.MessageColor = "bright_yellow";
                 break;
 
@@ -1246,7 +1251,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 4;
                 result.StatusChance = 55;
                 result.DamageMultiplier = 0.8f;
-                result.Message = $"{monster.Name} drains your strength!";
+                result.Message = $"{monster.Name} drains {your} strength!";
                 result.MessageColor = "gray";
                 break;
 
@@ -1256,7 +1261,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 3;
                 result.StatusChance = 45;
                 result.SkipNormalAttack = true;
-                result.Message = $"{monster.Name} fills your mind with visions of terror!";
+                result.Message = $"{monster.Name} fills {your} mind with visions of terror!";
                 result.MessageColor = "magenta";
                 break;
 
@@ -1264,7 +1269,9 @@ public static class MonsterAbilities
                 // Self-damage effect
                 result.DirectDamage = (int)Math.Max(1, target.Strength / 2);
                 result.SkipNormalAttack = true;
-                result.Message = $"{monster.Name} possesses you — you strike yourself!";
+                result.Message = isPlayerTarget
+                    ? $"{monster.Name} possesses you, and you strike yourself!"
+                    : $"{monster.Name} possesses {target.Name}, who strikes themself!";
                 result.MessageColor = "bright_magenta";
                 break;
 
@@ -1274,7 +1281,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 2;
                 result.StatusChance = 50;
                 result.SkipNormalAttack = true;
-                result.Message = $"{monster.Name} subjects you to a waking nightmare!";
+                result.Message = $"{monster.Name} subjects {you} to a waking nightmare!";
                 result.MessageColor = "magenta";
                 break;
 
@@ -1282,14 +1289,14 @@ public static class MonsterAbilities
                 if (_rnd.Next(100) < 5)
                 {
                     result.DirectDamage = (int)target.HP;
-                    result.Message = $"{monster.Name} devours your soul!";
+                    result.Message = $"{monster.Name} devours {your} soul!";
                     result.MessageColor = "bright_red";
                 }
                 else
                 {
                     result.DamageMultiplier = 1.5f;
                     result.LifeStealPercent = 40;
-                    result.Message = $"{monster.Name} tears at your soul!";
+                    result.Message = $"{monster.Name} tears at {your} soul!";
                     result.MessageColor = "magenta";
                 }
                 break;

@@ -61,6 +61,14 @@ public static class MonsterGenerator
         monster.Level = dungeonLevel;
         monster.IsBoss = isBoss;
         monster.IsMiniBoss = isMiniBoss;
+        // v0.60.10 (druidah Lv.22 Cleric report): "I used turn undead on a ghoul and the
+        // game says ghoul is not an undead." Pre-fix, MonsterGenerator only set FamilyName
+        // and never assigned monster.MonsterClass / monster.Undead, so every monster shipped
+        // with MonsterClass.Normal (0) and Undead=0. Turn Undead's gate at CombatEngine:15609
+        // (and ~20 similar undead/demon-vulnerable checks across the codebase) all read those
+        // fields, so they all answered "no" for Ghoul / Wight / Wraith / Lich / etc. Map the
+        // family name onto the enum + legacy Undead int here so every downstream check works.
+        ApplyMonsterClassification(monster, family.FamilyName);
 
         // Animals, insects, constructs, and mindless creatures can't speak
         monster.CanSpeak = family.FamilyName switch
@@ -176,9 +184,43 @@ public static class MonsterGenerator
     }
 
     /// <summary>
-    /// Calculate balanced stats for a monster
-    /// REBALANCED: Formulas designed for player to defeat monsters in 3-8 hits
-    /// at appropriate level, while monsters deal significant but survivable damage
+    /// Assign Monster.MonsterClass (and legacy Undead int) from the family name. v0.60.10
+    /// fix for the Turn-Undead-on-Ghoul report: pre-fix, MonsterClass was never assigned
+    /// during generation, so every monster carried MonsterClass.Normal regardless of its
+    /// family. The Undead and Demon enum values are the load-bearing ones (Turn Undead,
+    /// Divine Smite, Paladin alignment bonuses, Holy enchant scaling all read them); the
+    /// rest are mapped opportunistically for future class-keyed mechanics. Sets the legacy
+    /// int field too for any check that uses `Undead > 0` instead of the enum.
+    /// </summary>
+    private static void ApplyMonsterClassification(Monster monster, string familyName)
+    {
+        monster.MonsterClass = familyName switch
+        {
+            "Undead"     => MonsterClass.Undead,
+            "Demonic"    => MonsterClass.Demon,
+            "Draconic"   => MonsterClass.Dragon,
+            "Beast"      => MonsterClass.Beast,
+            "Insectoid"  => MonsterClass.Beast,
+            "Aquatic"    => MonsterClass.Beast,
+            "Elemental"  => MonsterClass.Elemental,
+            "Construct"  => MonsterClass.Construct,
+            "Aberration" => MonsterClass.Aberration,
+            "Shadow"     => MonsterClass.Aberration,
+            "Fey"        => MonsterClass.Plant,
+            "Celestial"  => MonsterClass.Humanoid,
+            "Giant"      => MonsterClass.Humanoid,
+            "Goblinoid"  => MonsterClass.Humanoid,
+            "Orcish"     => MonsterClass.Humanoid,
+            _            => MonsterClass.Normal
+        };
+        if (monster.MonsterClass == MonsterClass.Undead)
+            monster.Undead = 1;
+    }
+
+    /// <summary>
+    /// Calculate balanced stats for a monster.
+    /// REBALANCED: Formulas designed for player to defeat monsters in 3-8 hits at
+    /// appropriate level, while monsters deal significant but survivable damage.
     ///
     /// Design goals:
     /// - Level 1 player (Str 10, Weap 5) deals ~30 damage -> Monster HP ~80-120
@@ -466,6 +508,8 @@ public static class MonsterGenerator
                 monster.MonsterColor = tier.Color;
                 monster.AttackType = family.AttackType;
                 monster.Level = dungeonLevel;
+                // v0.60.10 (druidah report): see twin in GenerateMonster above.
+                ApplyMonsterClassification(monster, family.FamilyName);
                 monster.CanSpeak = family.FamilyName switch
                 {
                     "Beast" or "Insectoid" or "Construct" or "Aquatic" or "Aberration" or "Elemental" => false,

@@ -5511,6 +5511,7 @@ public partial class GameEngine
         player.MurdersToday = playerData.MurdersToday;
         player.TeamWarsToday = playerData.TeamWarsToday;
         player.DrinkingGamesToday = playerData.DrinkingGamesToday;
+        player.LoveStreetVisitsToday = playerData.LoveStreetVisitsToday;
         player.LastPartnerBondingUtc = playerData.LastPartnerBondingUtc;
         player.LoanAmount = playerData.LoanAmount;
         player.LoanDaysRemaining = playerData.LoanDaysRemaining;

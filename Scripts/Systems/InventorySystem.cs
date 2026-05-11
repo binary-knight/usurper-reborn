@@ -1420,6 +1420,12 @@ namespace UsurperRemake.Systems
             // Show current equipment in both slots
             var mainHandItem = player.GetEquipment(EquipmentSlot.MainHand);
             var offHandItem = player.GetEquipment(EquipmentSlot.OffHand);
+            // v0.60.10 (druidah report): when MainHand has a 2H weapon, equipping a 1H
+            // to OffHand is refused at Character.EquipItem. Surface that fact in the
+            // prompt so the player isn't surprised by the refusal -- they can pick (M)
+            // to swap the staff out, or cancel and unequip manually if they want to
+            // keep both items in play.
+            bool mainIs2H = player.IsTwoHanding;
 
             terminal.SetColor("white");
             terminal.Write($"  (M) {Loc.Get("inventory.slot_main_hand")}: ");
@@ -1443,8 +1449,18 @@ namespace UsurperRemake.Systems
             }
             else
             {
-                terminal.SetColor("gray");
-                terminal.WriteLine(Loc.Get("ui.empty"));
+                terminal.SetColor(mainIs2H ? "dark_gray" : "gray");
+                terminal.Write(Loc.Get("ui.empty"));
+                if (mainIs2H)
+                {
+                    terminal.SetColor("yellow");
+                    terminal.Write("  ");
+                    terminal.WriteLine(Loc.Get("equip.offhand_blocked_2h"));
+                }
+                else
+                {
+                    terminal.WriteLine("");
+                }
             }
 
             terminal.SetColor("white");

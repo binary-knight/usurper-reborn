@@ -902,6 +902,12 @@ public class MusicShopLocation : BaseLocation
         float value1 = 0f;
         float value2 = 0f;
         string songName = "";
+        // v0.60.10 (druidah Lv.9 Cleric report): the buff message used to read
+        // "The War March stirs something in you. (+15% for 5 combats)" without
+        // saying what the 15% applies to. Each song affects a different stat
+        // (attack damage / defense / gold / both), so add a per-song effect
+        // descriptor that the message and /health display both pick up.
+        string songEffect = "";
         (string Title, string Intro, string Color, string[] Verses)[] songPool;
 
         switch (input)
@@ -909,19 +915,23 @@ public class MusicShopLocation : BaseLocation
             case "1":
                 songType = 1; price = warMarchPrice; value1 = GameConfig.SongWarMarchBonus;
                 songName = Loc.Get("music_shop.song_war_march"); songPool = WarMarchSongs;
+                songEffect = Loc.Get("music_shop.song_effect_war_march");
                 break;
             case "2":
                 songType = 2; price = ironPrice; value1 = GameConfig.SongIronLullabyBonus;
                 songName = Loc.Get("music_shop.song_iron"); songPool = IronLullabySongs;
+                songEffect = Loc.Get("music_shop.song_effect_iron");
                 break;
             case "3":
                 songType = 3; price = fortunePrice; value1 = GameConfig.SongFortuneBonus;
                 songName = Loc.Get("music_shop.song_fortune"); songPool = FortuneSongs;
+                songEffect = Loc.Get("music_shop.song_effect_fortune");
                 break;
             case "4":
                 songType = 4; price = hymnPrice;
                 value1 = GameConfig.SongBattleHymnBonus; value2 = GameConfig.SongBattleHymnBonus;
                 songName = Loc.Get("music_shop.song_hymn"); songPool = BattleHymnSongs;
+                songEffect = Loc.Get("music_shop.song_effect_hymn");
                 break;
             default:
                 return;
@@ -989,7 +999,7 @@ public class MusicShopLocation : BaseLocation
         terminal.WriteLine(Loc.Get("music_shop.notes_fade"));
         await Task.Delay(300);
         terminal.SetColor("bright_green");
-        terminal.WriteLine(Loc.Get("music_shop.buff_gained", songName, (int)(value1 * 100), GameConfig.SongBuffDuration));
+        terminal.WriteLine(Loc.Get("music_shop.buff_gained", songName, (int)(value1 * 100), GameConfig.SongBuffDuration, songEffect));
         await terminal.PressAnyKey();
     }
 

@@ -5503,13 +5503,17 @@ public class DungeonLocation : BaseLocation
             _ => DungeonTheme.Catacombs
         };
 
-        // Use the new comprehensive feature interaction system
+        // Use the new comprehensive feature interaction system. teammates is passed
+        // through so class-specific bonuses can apply party-wide effects (e.g. the
+        // Cleric / Paladin "divine presence" heal radiates to every alive teammate
+        // instead of only the user, per Lv.20 player feedback).
         var outcome = await FeatureInteractionSystem.Instance.InteractWithFeature(
             feature,
             player!,
             currentDungeonLevel,
             theme,
-            terminal
+            terminal,
+            teammates
         );
 
         // Post-hoc reward split: FeatureInteractionSystem already awarded full amount to leader.

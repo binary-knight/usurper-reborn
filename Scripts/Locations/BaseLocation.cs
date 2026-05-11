@@ -6006,9 +6006,28 @@ public abstract class BaseLocation
             }
             if (currentPlayer.HasActiveSongBuff)
             {
-                string songName = currentPlayer.SongBuffType switch { 1 => "War March", 2 => "Lullaby of Iron", 3 => "Fortune's Tune", 4 => "Battle Hymn", _ => "Song" };
+                // v0.60.10 (druidah report): include the effect descriptor + percent so
+                // the player can tell at a glance what's running. Old display just said
+                // "War March (5 combats)" with no hint of attack/defense/gold.
+                string songName = currentPlayer.SongBuffType switch
+                {
+                    1 => Loc.Get("music_shop.song_war_march"),
+                    2 => Loc.Get("music_shop.song_iron"),
+                    3 => Loc.Get("music_shop.song_fortune"),
+                    4 => Loc.Get("music_shop.song_hymn"),
+                    _ => "Song"
+                };
+                string songEffect = currentPlayer.SongBuffType switch
+                {
+                    1 => Loc.Get("music_shop.song_effect_war_march"),
+                    2 => Loc.Get("music_shop.song_effect_iron"),
+                    3 => Loc.Get("music_shop.song_effect_fortune"),
+                    4 => Loc.Get("music_shop.song_effect_hymn"),
+                    _ => ""
+                };
+                int songPct = (int)(currentPlayer.SongBuffValue * 100);
                 terminal.SetColor("magenta");
-                terminal.WriteLine($"  - {songName} ({currentPlayer.SongBuffCombats} combats)");
+                terminal.WriteLine($"  - {songName}: +{songPct}% {songEffect} ({currentPlayer.SongBuffCombats} combats)");
             }
             if (currentPlayer.HasActiveHerbBuff)
             {

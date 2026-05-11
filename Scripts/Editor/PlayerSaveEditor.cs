@@ -1321,6 +1321,7 @@ internal static class PlayerSaveEditor
         p.MurdersToday = 0;
         p.TeamWarsToday = 0;
         p.DrinkingGamesToday = 0;
+        p.LoveStreetVisitsToday = 0;
         EditorIO.Success("Daily counters reset. Play as if a new day began.");
         EditorIO.Pause();
     }

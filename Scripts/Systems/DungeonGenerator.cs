@@ -102,9 +102,26 @@ namespace UsurperRemake.Systems
                 RoomType.Chamber, RoomType.Chamber, RoomType.Chamber, RoomType.Chamber,
                 RoomType.Hall, RoomType.Hall,
                 RoomType.Alcove, RoomType.Alcove, RoomType.Alcove,
-                RoomType.Shrine,
-                RoomType.Crypt, RoomType.Crypt
+                RoomType.Shrine
             };
+
+            // v0.60.10 (druidah Lv.15 Cleric report): "should the epitaphs and stuff from the
+            // crypt level seep through to the sewer theme?" Crypts only fit thematically in
+            // tomb-themed floors. Pre-fix, two Crypt slots were in the standard pool used by
+            // every theme, so a Sewers floor (Lv.11-20) consistently surfaced "Flooded Tomb"
+            // rooms with ancient-crypt and coffin flavor that read as out of place. Gate Crypt
+            // rooms to Catacombs and AncientRuins (the two themes where the flavor lands);
+            // other themes get Chamber/Alcove slots instead.
+            if (floor.Theme == DungeonTheme.Catacombs || floor.Theme == DungeonTheme.AncientRuins)
+            {
+                standardRoomTypes.Add(RoomType.Crypt);
+                standardRoomTypes.Add(RoomType.Crypt);
+            }
+            else
+            {
+                standardRoomTypes.Add(RoomType.Chamber);
+                standardRoomTypes.Add(RoomType.Alcove);
+            }
 
             // Special room types (appear less frequently)
             // NOTE: Removed PuzzleRoom, RiddleGate, TrapGauntlet as they implied mechanics that weren't implemented

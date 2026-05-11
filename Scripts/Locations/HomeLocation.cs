@@ -1647,6 +1647,11 @@ public class HomeLocation : BaseLocation
         // Show current equipment in both slots
         var mainHandItem = currentPlayer.GetEquipment(EquipmentSlot.MainHand);
         var offHandItem = currentPlayer.GetEquipment(EquipmentSlot.OffHand);
+        // v0.60.10 (druidah report): mirror the InventorySystem.PromptForWeaponSlot
+        // warning so the home equip flow surfaces the same "off-hand unavailable
+        // while wielding two-handed" hint. Otherwise picking (O) here just yields
+        // the EquipItem refusal with no preview, which reads as a bug.
+        bool mainIs2H = currentPlayer.IsTwoHanding;
 
         terminal.SetColor("white");
         terminal.Write(Loc.Get("home.equip_main_hand_label"));
@@ -1670,8 +1675,18 @@ public class HomeLocation : BaseLocation
         }
         else
         {
-            terminal.SetColor("gray");
-            terminal.WriteLine(Loc.Get("ui.empty"));
+            terminal.SetColor(mainIs2H ? "dark_gray" : "gray");
+            terminal.Write(Loc.Get("ui.empty"));
+            if (mainIs2H)
+            {
+                terminal.SetColor("yellow");
+                terminal.Write("  ");
+                terminal.WriteLine(Loc.Get("equip.offhand_blocked_2h"));
+            }
+            else
+            {
+                terminal.WriteLine("");
+            }
         }
 
         terminal.SetColor("white");

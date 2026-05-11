@@ -9,7 +9,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.60.9";
+    public const string Version = "0.60.10";
     public const string VersionName = "Beta";
 
     // v0.57.12: Alignment scale cap. Character.Chivalry and Character.Darkness setters clamp to [0, AlignmentCap]
@@ -708,6 +708,13 @@ public static partial class GameConfig
     // dedicated leveling track.
     public const int MaxDrinkingGamesPerDay = 5;
 
+    // v0.60.10 (Zen Lv.23 Cyclebreaker report): Love Street paid-encounter daily cap.
+    // Combined with the doubled prices and cut darkness ranges, prevents the
+    // "pay 200k -> swing alignment 100+ points -> rinse and repeat" pattern. Two visits
+    // per day at the new top tier means at most 240 darkness + 120 chivalry penalty net
+    // per day from paid encounters, comparable to the murder daily cap (750 + 375).
+    public const int MaxLoveStreetVisitsPerDay = 2;
+
     // Save bloat caps (v0.57.18 — single-player save reliability)
     // The v0.57.16 NPC-memory fix capped one bloat surface; player reports kept arriving
     // ("saves run out of memory after I quit", "single player file's gone"), so audit
@@ -1399,8 +1406,7 @@ public static partial class GameConfig
     public const float FireEnchantProcChance = 0.20f;         // 20% chance for fire damage per attack
     public const float FireEnchantDamageMultiplier = 0.15f;   // Fire damage = weapon damage * 15%
     public const float FrostEnchantProcChance = 0.15f;        // 15% chance for frost slow per attack
-    public const int FrostEnchantAgiReduction = 3;            // AGI reduction from frost slow
-    public const int FrostEnchantDuration = 2;                // Frost slow lasts 2 turns
+    public const int FrostEnchantDuration = 2;                // Frost slow lasts 2 turns (v0.60.10: was paired with FrostEnchantAgiReduction which mutated Defence -- removed when slow was correctly implemented via IsSlowed)
     public const float LightningEnchantProcChance = 0.15f;    // 15% chance to stun per attack
     public const float LightningEnchantDamageMultiplier = 0.12f; // Lightning damage = weapon damage * 12%
 

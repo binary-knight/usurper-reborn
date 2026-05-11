@@ -694,6 +694,7 @@ public class Character
     public int MurdersToday { get; set; } = 0;                  // v0.57.6: Daily non-bounty NPC-murder counter (cap: GameConfig.MaxMurdersPerDay)
     public int TeamWarsToday { get; set; } = 0;                 // v0.57.17: Team Corner team-war daily counter (cap: GameConfig.MaxTeamWarsPerDay). Plugs the "find a beatable team, spam wars for free 2x wager gold" exploit reported by a Lv.100 Barbarian.
     public int DrinkingGamesToday { get; set; } = 0;            // v0.57.17: Inn drinking-game daily counter (cap: GameConfig.MaxDrinkingGamesPerDay). Player report: high STR/CON = consistent wins for level*700 XP per ~30s, no limit, free leveling.
+    public int LoveStreetVisitsToday { get; set; } = 0;         // v0.60.10: Love Street paid-encounter daily counter (cap: GameConfig.MaxLoveStreetVisitsPerDay). Counts both Courtesan and Gigolo visits.
     public DateTime LastPartnerBondingUtc { get; set; } = DateTime.MinValue;  // v0.57.7: Wall-clock gate on Home "quality time with partner" rewards (XP/HP/Mana). Shared across dinner/walk/cuddle — one bonding event per 20 real hours. Rage reported "romantic dinner is infinite XP" — was looping Level*50 with no cooldown.
     public long LoanAmount { get; set; } = 0;                   // Active loan balance (principal + interest)
     public int LoanDaysRemaining { get; set; } = 0;             // Days until enforcer attack
@@ -915,13 +916,37 @@ public class Character
         // Handle shields/off-hand - must unequip 2H weapon first if equipping off-hand
         if (slot == EquipmentSlot.OffHand && IsTwoHanding)
         {
-            // Unequip the 2H weapon to allow off-hand equip
-            var twoHandItem = UnequipSlot(EquipmentSlot.MainHand);
-            if (twoHandItem != null)
+            // v0.60.10 (druidah Lv.9 Cleric report): "Aren't staves and quarterstaves
+            // two-handed? I somehow could equip a dagger in my off hand while wielding
+            // a quarterstaff." Confusion came from this block silently auto-unequipping
+            // the 2H weapon when ANY off-hand item was equipped. The behavior makes
+            // sense for shields (sword-and-board swap is a common, intentional one-click
+            // operation), but for one-handed weapons the silent staff drop reads as a
+            // bug -- the player thought both were equipped because the "Moved
+            // Quarterstaff to inventory" line was easy to miss.
+            //
+            // Split by handedness:
+            //   - OffHandOnly (shields/bucklers) -> keep auto-unequip-2H, sword-and-board
+            //     swap remains one click.
+            //   - OneHanded (daggers, swords, etc.) -> refuse with a clear message that
+            //     names both weapons and tells the player how to proceed. Player must
+            //     unequip the 2H first if they want to dual-wield, or equip the 1H to
+            //     main hand instead.
+            if (item.Handedness == WeaponHandedness.OneHanded)
             {
-                var legacyTwoHand = ConvertEquipmentToItem(twoHandItem);
+                var twoHandItem = GetEquipment(EquipmentSlot.MainHand);
+                string twoHandName = twoHandItem?.Name ?? "your two-handed weapon";
+                message = Loc.Get("equip.cannot_offhand_with_2h", item.Name, twoHandName);
+                return false;
+            }
+
+            // Shield (OffHandOnly) — unequip the 2H weapon to allow sword-and-board.
+            var displacedTwoHand = UnequipSlot(EquipmentSlot.MainHand);
+            if (displacedTwoHand != null)
+            {
+                var legacyTwoHand = ConvertEquipmentToItem(displacedTwoHand);
                 Inventory.Add(legacyTwoHand);
-                message += $"Moved {twoHandItem.Name} to inventory. ";
+                message += $"Moved {displacedTwoHand.Name} to inventory. ";
             }
         }
 
