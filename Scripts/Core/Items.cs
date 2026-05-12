@@ -1222,6 +1222,56 @@ public class Equipment
             Description = string.IsNullOrEmpty(Description) ? marker : Description + " " + marker;
     }
 
+    /// <summary>
+    /// Per-stat / per-named-enchant uniqueness tracker. Stored as a sibling marker
+    /// `[ES:code1,code2,...]` in Description alongside the existing `[E:N]` count.
+    /// Used by the Magic Shop to refuse a second enchant of the same kind on the
+    /// same piece -- without this, a player could stack +6 Dex twice or 5x Divine
+    /// Blessing on one item. Codes are 3-5 char shorthand:
+    ///   Stat enchants: pow, str, dex, def, wis, arm, con, int, cha, agi, sta
+    ///   Named enchants: bless, ocean, ward, pred, life, fire, frost
+    /// </summary>
+    public List<string> GetEnchantedKinds()
+    {
+        var list = new List<string>();
+        if (string.IsNullOrEmpty(Description)) return list;
+        var m = System.Text.RegularExpressions.Regex.Match(Description, @"\[ES:([a-z,]+)\]");
+        if (!m.Success) return list;
+        foreach (var code in m.Groups[1].Value.Split(','))
+        {
+            var trimmed = code.Trim();
+            if (!string.IsNullOrEmpty(trimmed)) list.Add(trimmed);
+        }
+        return list;
+    }
+
+    /// <summary>
+    /// Append an enchant-kind code to the `[ES:...]` marker. Creates the marker
+    /// if it doesn't yet exist. No-op if the code is already present.
+    /// </summary>
+    public void AddEnchantedKind(string code)
+    {
+        if (string.IsNullOrWhiteSpace(code)) return;
+        code = code.Trim().ToLowerInvariant();
+        var existing = GetEnchantedKinds();
+        if (existing.Contains(code)) return;
+        existing.Add(code);
+        string newMarker = $"[ES:{string.Join(",", existing)}]";
+        if (string.IsNullOrEmpty(Description))
+        {
+            Description = newMarker;
+        }
+        else if (System.Text.RegularExpressions.Regex.IsMatch(Description, @"\[ES:[a-z,]+\]"))
+        {
+            Description = System.Text.RegularExpressions.Regex.Replace(
+                Description, @"\[ES:[a-z,]+\]", newMarker);
+        }
+        else
+        {
+            Description = Description + " " + newMarker;
+        }
+    }
+
     #region Fluent Setters (for builder pattern)
 
     // Primary stat bonuses

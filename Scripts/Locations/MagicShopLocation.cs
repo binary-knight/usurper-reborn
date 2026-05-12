@@ -2027,6 +2027,22 @@ public partial class MagicShopLocation : BaseLocation
                 return;
         }
 
+        // Block stacking the same enchant kind on a single item. Pre-fix, a player
+        // could put +6 Dex twice on the same piece (and similarly for the named
+        // enchants -- 5x Divine Blessing was permitted). Each item can carry up
+        // to MaxEnchantments different enchants, but the same kind can never be
+        // applied twice. Refuse BEFORE gold deduction so it's a clean cancel.
+        string enchantKindCode = GetEnchantKindCode(tierChoice, statChoice);
+        if (!string.IsNullOrEmpty(enchantKindCode) &&
+            selectedEquip.GetEnchantedKinds().Contains(enchantKindCode))
+        {
+            DisplayMessage("");
+            DisplayMessage(Loc.Get("magic_shop.enchant_duplicate_kind", _ownerName), "red");
+            DisplayMessage(Loc.Get("magic_shop.enchant_duplicate_hint"), "cyan");
+            await terminal.WaitForKey();
+            return;
+        }
+
         // Confirm
         string enchantDesc = (tierChoice <= 4 || (tierChoice >= 10 && tierChoice <= 12)) ? $"+{selectedTier.bonus} {StatNames[statChoice - 1]}" : selectedTier.description;
         terminal.WriteLine("");
@@ -2155,6 +2171,10 @@ public partial class MagicShopLocation : BaseLocation
         // Clone the equipment
         var enchanted = selectedEquip.Clone();
         enchanted.IncrementEnchantmentCount();
+        // Record which kind was applied so future enchant attempts can refuse a
+        // duplicate of the same stat / named enchant on this item.
+        if (!string.IsNullOrEmpty(enchantKindCode))
+            enchanted.AddEnchantedKind(enchantKindCode);
 
         // Apply the enchantment
         string suffix;
@@ -2234,6 +2254,49 @@ public partial class MagicShopLocation : BaseLocation
             AchievementSystem.TryUnlock(player, "master_enchanter");
 
         await terminal.WaitForKey();
+    }
+
+    /// <summary>
+    /// Map a (tierChoice, statChoice) pair to a stable enchant-kind code stored on
+    /// the equipment via Equipment.AddEnchantedKind. Used to refuse a second
+    /// enchant of the same kind on the same item. Stat tiers (1-4, 10-12) collapse
+    /// to the chosen stat code so a player can't stack +6 Dex twice across two
+    /// different tiers either. Named tiers map to the enchant name.
+    /// </summary>
+    private static string GetEnchantKindCode(int tierChoice, int statChoice)
+    {
+        // Stat-bearing tiers all share their stat code -- enchanting +Dex at tier 1
+        // and then again at tier 10 is still "the same stat" and gets blocked.
+        bool isStatTier = (tierChoice >= 1 && tierChoice <= 4) || (tierChoice >= 10 && tierChoice <= 12);
+        if (isStatTier)
+        {
+            return statChoice switch
+            {
+                1  => "pow",
+                2  => "str",
+                3  => "dex",
+                4  => "def",
+                5  => "wis",
+                6  => "arm",
+                7  => "con",
+                8  => "int",
+                9  => "cha",
+                10 => "agi",
+                11 => "sta",
+                _  => ""
+            };
+        }
+        return tierChoice switch
+        {
+            5  => "bless",  // Divine Blessing
+            6  => "ocean",  // Ocean's Touch
+            7  => "ward",   // Ward
+            8  => "pred",   // Predator
+            9  => "life",   // Lifedrinker
+            13 => "fire",   // Phoenix Fire
+            14 => "frost",  // Frostbite
+            _  => ""
+        };
     }
 
     private void ApplyEquipmentStatBonus(Equipment equip, int statChoice, int bonus)

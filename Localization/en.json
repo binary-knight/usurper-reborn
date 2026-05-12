@@ -14765,6 +14765,8 @@
   "magic_shop.cursed_no_enchant": "\"I cannot enchant a cursed item!\"",
   "magic_shop.remove_curse_first": "\"Have the curse removed first.\"",
   "magic_shop.beyond_limits": "\"Even my magic has its limits.\"",
+  "magic_shop.enchant_duplicate_kind": "\"{0} shakes her head. 'This item already carries that enchantment -- the runes will not bond twice.'\"",
+  "magic_shop.enchant_duplicate_hint": "\"Choose a different stat, or a different enchantment, to layer onto this piece.\"",
   "magic_shop.select_enchantment": "Select enchantment: ",
   "magic_shop.need_gold_enchant": "\"You lack the gold for this enchantment.\"",
   "magic_shop.cures_smallpox": "Cures smallpox",

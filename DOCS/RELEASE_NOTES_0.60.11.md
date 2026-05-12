@@ -193,6 +193,23 @@ The Grand Champion combat bonus (+3% damage / +3% defense, applied at three comb
 
 ---
 
+## Fix: Stat enchants can no longer stack the same kind on a single item
+
+Player report: a player put two +6 Dex enchants on the same piece of gear. Confirmed -- `ApplyEquipmentStatBonus` did `equip.DexterityBonus += bonus` so picking the same stat twice (or the same named enchant twice, like 5x Divine Blessing for +15 to every stat) just summed up the bonuses. The existing `MaxEnchantments` count cap (5) was the only ceiling; *what kind* of enchant landed in each of those 5 slots was unenforced.
+
+Fix: per-item enchant-kind uniqueness, stored as a sibling `[ES:code1,code2,...]` marker in the item's Description alongside the existing `[E:N]` count marker (so the legacy count parser stays untouched). Each item still gets up to `MaxEnchantments` enchantments, but no two of those can be the same kind. Codes:
+
+- **Stat enchants** (tiers 1-4, 10-12): `pow / str / dex / def / wis / arm / con / int / cha / agi / sta`
+- **Named enchants** (tiers 5-9, 13-14): `bless / ocean / ward / pred / life / fire / frost`
+
+Stat tiers 1-4 and 10-12 all collapse to their stat code, so a player can't sneak around by enchanting +Dex at tier 1, then +Dex again at tier 10 -- both write the same `dex` code, and the second attempt is refused.
+
+Refusal lands BEFORE gold deduction with a clear message: "*Ravanella shakes her head. 'This item already carries that enchantment -- the runes will not bond twice.' Choose a different stat, or a different enchantment, to layer onto this piece.*" Two new loc keys (`magic_shop.enchant_duplicate_kind`, `magic_shop.enchant_duplicate_hint`).
+
+Pre-fix items with stacked same-kind enchants are unaffected -- the check only fires on new enchant attempts. Their existing stacked bonuses stay; they just can't keep stacking that kind.
+
+---
+
 ## Fix: Reforge cancel exploit at the Weapon Shop
 
 Player feedback: weapon reforging at the shop was risk-free. The flow let you (1) confirm you want to reforge and pay the cost, (2) see the rerolled stats, then (3) choose whether to keep the new version or revert to the original. So a player could pay, peek at the result, revert if the roll was worse, and try again -- the only downside ever was the gold cost, and there was no point in NOT spamming reforge on every weapon you owned. That undercut the whole design of reforging as a gamble.
@@ -231,3 +248,6 @@ Rewrote the warning + confirm prompts in all 5 languages (en/es/fr/it/hu) to mak
 - `Scripts/Locations/BaseLocation.cs` -- Preferences > Title picker now includes the player's earned arena tier title in `availableTitles` whenever `ArenaChampionTier > 0`.
 - `Scripts/Locations/AnchorRoadLocation.cs` -- On Gauntlet tier upgrade, auto-set `NobleTitle = tierTitle` and add it to `MetaProgressionSystem.UnlockedTitles`. Post-completion screen prints the "change in Preferences > Title" hint.
 - `Localization/en.json` -- New key `anchor_road.tier_title_change_hint`. (Other languages fall back to English, consistent with the other 16 v0.60.11 gauntlet keys.)
+- `Scripts/Core/Items.cs` -- New `Equipment.GetEnchantedKinds()` and `Equipment.AddEnchantedKind(string)` helpers backed by an `[ES:code1,code2,...]` sibling marker in Description. Sits alongside the existing `[E:N]` count marker (legacy count parser unchanged).
+- `Scripts/Locations/MagicShopLocation.cs` -- `EnchantEquipment` checks `selectedEquip.GetEnchantedKinds()` against the computed kind code BEFORE gold deduction, refuses duplicates with a flavor message. On successful enchant, `enchanted.AddEnchantedKind(code)` records the kind. New `GetEnchantKindCode(tierChoice, statChoice)` helper.
+- `Localization/en.json` -- Two new keys for the duplicate-kind refusal: `magic_shop.enchant_duplicate_kind`, `magic_shop.enchant_duplicate_hint`.
