@@ -194,7 +194,10 @@ public class SessionContext : IDisposable
         Alignment = new AlignmentSystem();
         Factions = new FactionSystem();
         Archetype = new ArchetypeTracker();
-        MetaProgression = new MetaProgressionSystem();
+        // Per-account meta progression file. Without the username scope, every new SSH
+        // account on the MUD server would inherit prestige-class unlocks from any other
+        // player on the server who had completed an ending.
+        MetaProgression = new MetaProgressionSystem(Username);
         DivineBlessing = new DivineBlessingSystem();
         PrisonActivity = new PrisonActivitySystem();
         Romance = new RomanceTracker();

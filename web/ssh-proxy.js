@@ -2522,7 +2522,7 @@ async function handleAdminRequest(req, res) {
           hp: p.hp || 0, maxHP: p.maxHP || 0,
           mana: p.mana || 0, maxMana: p.maxMana || 0,
           stamina: p.stamina || 0, maxStamina: p.maxStamina || 100,
-          strength: p.strength || 0, defense: p.defense || 0,
+          strength: p.strength || 0, defense: p.defence || 0,
           agility: p.agility || 0, dexterity: p.dexterity || 0,
           constitution: p.constitution || 0, intelligence: p.intelligence || 0,
           wisdom: p.wisdom || 0, charisma: p.charisma || 0,
@@ -2609,15 +2609,40 @@ async function handleAdminRequest(req, res) {
       const online = db.prepare("SELECT username FROM online_players WHERE LOWER(username) = LOWER(?)").get(playerUsername);
       let data = JSON.parse(row.player_data || '{}');
 
+      // Stat path translation. The admin UI sends paths like `player.strength` and
+      // `player.defense`, but the save format uses British `defence`, AND every core
+      // stat has a Base counterpart (`baseStrength`, `baseDefence`...). On load,
+      // `Character.RecalculateStats()` resets every derived stat from its Base value,
+      // so any edit that only touches the derived field is wiped on next login.
+      // Fix: for each core stat, write to BOTH the derived and Base field. Also
+      // translate US `defense` to British `defence`. Same shape as the v0.57.3 local-
+      // editor fix that didn't make it over to the web admin panel.
+      const STAT_MIRROR = {
+        'player.strength':     ['player.strength', 'player.baseStrength'],
+        'player.dexterity':    ['player.dexterity', 'player.baseDexterity'],
+        'player.constitution': ['player.constitution', 'player.baseConstitution'],
+        'player.intelligence': ['player.intelligence', 'player.baseIntelligence'],
+        'player.wisdom':       ['player.wisdom', 'player.baseWisdom'],
+        'player.charisma':     ['player.charisma', 'player.baseCharisma'],
+        'player.agility':      ['player.agility', 'player.baseAgility'],
+        'player.stamina':      ['player.stamina', 'player.baseStamina'],
+        'player.defense':      ['player.defence', 'player.baseDefence'],
+        'player.maxHP':        ['player.maxHP', 'player.baseMaxHP'],
+        'player.maxMana':      ['player.maxMana', 'player.baseMaxMana'],
+      };
+
       // Apply dot-path changes (e.g., "player.gold" -> data.player.gold = value)
       for (const [path, value] of Object.entries(body.changes)) {
-        const parts = path.split('.');
-        let obj = data;
-        for (let i = 0; i < parts.length - 1; i++) {
-          if (obj[parts[i]] === undefined) obj[parts[i]] = {};
-          obj = obj[parts[i]];
+        const targetPaths = STAT_MIRROR[path] || [path];
+        for (const targetPath of targetPaths) {
+          const parts = targetPath.split('.');
+          let obj = data;
+          for (let i = 0; i < parts.length - 1; i++) {
+            if (obj[parts[i]] === undefined) obj[parts[i]] = {};
+            obj = obj[parts[i]];
+          }
+          obj[parts[parts.length - 1]] = value;
         }
-        obj[parts[parts.length - 1]] = value;
       }
 
       dbWrite.prepare("UPDATE players SET player_data = ? WHERE LOWER(username) = LOWER(?)").run(JSON.stringify(data), playerUsername);

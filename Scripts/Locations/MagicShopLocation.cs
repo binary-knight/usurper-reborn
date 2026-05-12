@@ -1508,7 +1508,127 @@ public partial class MagicShopLocation : BaseLocation
         [13] = new[] { ("shadow_silk_thread", 1), ("fading_starlight_dust", 1) },              // Frostbite
     };
 
-    private static readonly string[] StatNames = { "Weapon Power", "Strength", "Dexterity", "Defence", "Wisdom", "Armor Power" };
+    private static readonly string[] StatNames = { "Weapon Power", "Strength", "Dexterity", "Defence", "Wisdom", "Armor Power", "Constitution", "Intelligence", "Charisma", "Agility", "Stamina" };
+
+    /// <summary>
+    /// Whether an inventory item is enchantable. Weapons, shields, armor, and
+    /// accessories occupy an equipment slot and can carry enchantments. Potions,
+    /// scrolls, food, quest items, materials etc. cannot.
+    /// </summary>
+    private static bool IsEnchantableInventoryItem(global::Item item)
+    {
+        if (item == null) return false;
+        switch (item.Type)
+        {
+            case ObjType.Weapon:
+            case ObjType.Shield:
+            case ObjType.Head:
+            case ObjType.Body:
+            case ObjType.Arms:
+            case ObjType.Hands:
+            case ObjType.Legs:
+            case ObjType.Feet:
+            case ObjType.Waist:
+            case ObjType.Face:
+            case ObjType.Abody:   // Cloak
+            case ObjType.Neck:
+            case ObjType.Fingers:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /// <summary>
+    /// Build a transient Equipment view of an inventory Item for the enchantment
+    /// flow. Mirrors the conversion in InventorySystem.EquipItem (LootEffects ->
+    /// Equipment fields). The resulting Equipment is used for display and for the
+    /// enchantment math; writeBack converts it back to an Item before storing.
+    /// </summary>
+    private static Equipment ConvertInventoryItemToEquipmentForEnchant(global::Item item)
+    {
+        EquipmentSlot slot = item.Type switch
+        {
+            ObjType.Weapon  => EquipmentSlot.MainHand,
+            ObjType.Shield  => EquipmentSlot.OffHand,
+            ObjType.Head    => EquipmentSlot.Head,
+            ObjType.Body    => EquipmentSlot.Body,
+            ObjType.Arms    => EquipmentSlot.Arms,
+            ObjType.Hands   => EquipmentSlot.Hands,
+            ObjType.Legs    => EquipmentSlot.Legs,
+            ObjType.Feet    => EquipmentSlot.Feet,
+            ObjType.Waist   => EquipmentSlot.Waist,
+            ObjType.Face    => EquipmentSlot.Face,
+            ObjType.Abody   => EquipmentSlot.Cloak,
+            ObjType.Neck    => EquipmentSlot.Neck,
+            ObjType.Fingers => EquipmentSlot.LFinger,
+            _ => EquipmentSlot.MainHand
+        };
+
+        var equip = new Equipment
+        {
+            Name = item.Name,
+            Slot = slot,
+            WeaponPower = item.Attack,
+            ArmorClass = item.Type == ObjType.Shield ? 0 : item.Armor,
+            ShieldBonus = item.Type == ObjType.Shield ? item.Armor : item.ShieldBonus,
+            BlockChance = item.BlockChance,
+            DefenceBonus = item.Defence,
+            StrengthBonus = item.Strength,
+            DexterityBonus = item.Dexterity,
+            AgilityBonus = item.Agility,
+            WisdomBonus = item.Wisdom,
+            CharismaBonus = item.Charisma,
+            StaminaBonus = item.Stamina,
+            MaxHPBonus = item.HP,
+            MaxManaBonus = item.Mana,
+            Value = item.Value,
+            IsCursed = item.IsCursed,
+            MinLevel = item.MinLevel,
+            Rarity = EquipmentRarity.Common
+        };
+
+        // Preserve enchantment markers and procs the item carries via LootEffects.
+        if (item.LootEffects != null)
+        {
+            foreach (var (effectType, value) in item.LootEffects)
+            {
+                var effect = (LootGenerator.SpecialEffect)effectType;
+                switch (effect)
+                {
+                    case LootGenerator.SpecialEffect.FireDamage: equip.HasFireEnchant = true; break;
+                    case LootGenerator.SpecialEffect.IceDamage: equip.HasFrostEnchant = true; break;
+                    case LootGenerator.SpecialEffect.LightningDamage: equip.HasLightningEnchant = true; break;
+                    case LootGenerator.SpecialEffect.PoisonDamage:
+                        equip.HasPoisonEnchant = true;
+                        equip.PoisonDamage = Math.Max(equip.PoisonDamage, value);
+                        break;
+                    case LootGenerator.SpecialEffect.HolyDamage: equip.HasHolyEnchant = true; break;
+                    case LootGenerator.SpecialEffect.ShadowDamage: equip.HasShadowEnchant = true; break;
+                    case LootGenerator.SpecialEffect.LifeSteal: equip.LifeSteal = Math.Max(equip.LifeSteal, Math.Max(5, value / 2)); break;
+                    case LootGenerator.SpecialEffect.ManaSteal: equip.ManaSteal = Math.Max(equip.ManaSteal, Math.Max(5, value / 2)); break;
+                    case LootGenerator.SpecialEffect.CriticalStrike: equip.CriticalChanceBonus = Math.Max(equip.CriticalChanceBonus, value); break;
+                    case LootGenerator.SpecialEffect.CriticalDamage: equip.CriticalDamageBonus = Math.Max(equip.CriticalDamageBonus, value); break;
+                    case LootGenerator.SpecialEffect.ArmorPiercing: equip.ArmorPiercing = Math.Max(equip.ArmorPiercing, value); break;
+                    case LootGenerator.SpecialEffect.Thorns: equip.Thorns = Math.Max(equip.Thorns, value); break;
+                    case LootGenerator.SpecialEffect.Regeneration: equip.HPRegen = Math.Max(equip.HPRegen, value); break;
+                    case LootGenerator.SpecialEffect.ManaRegen: equip.ManaRegen = Math.Max(equip.ManaRegen, value); break;
+                    case LootGenerator.SpecialEffect.MagicResist: equip.MagicResistance = Math.Max(equip.MagicResistance, value); break;
+                    case LootGenerator.SpecialEffect.Constitution: equip.ConstitutionBonus += value; break;
+                    case LootGenerator.SpecialEffect.Intelligence: equip.IntelligenceBonus += value; break;
+                    case LootGenerator.SpecialEffect.AllStats:
+                        equip.ConstitutionBonus += value;
+                        equip.IntelligenceBonus += value;
+                        equip.CharismaBonus += value;
+                        break;
+                    case LootGenerator.SpecialEffect.BossSlayer: equip.HasBossSlayer = true; break;
+                    case LootGenerator.SpecialEffect.TitanResolve: equip.HasTitanResolve = true; break;
+                }
+            }
+        }
+
+        return equip;
+    }
 
     private async Task EnchantEquipment(Character player)
     {
@@ -1536,69 +1656,106 @@ public partial class MagicShopLocation : BaseLocation
         terminal.WriteLine(Loc.Get("magic_shop.enchant_col_header"));
         WriteDivider(72);
 
-        var equippedItems = new List<(EquipmentSlot slot, Equipment equip)>();
-        int idx = 1;
+        // v0.60.11 hotfix: enchant targets unified across equipped + inventory. The
+        // listing builds a flat list of (label, equip, writeBack) entries -- equipped
+        // items get a writeBack that re-equips the modified copy, inventory items get
+        // a writeBack that replaces the Item at its inventory index. Downstream
+        // success and failure paths just call writeBack(modifiedEquip) without
+        // needing to know which kind of source it was.
+        var enchantTargets = new List<(string slotLabel, Equipment equip, System.Action<Equipment> writeBack)>();
+
         foreach (var slot in enchantableSlots)
         {
             var equip = player.GetEquipment(slot);
-            if (equip != null)
+            if (equip == null) continue;
+            string slotName = slot switch
             {
-                equippedItems.Add((slot, equip));
+                EquipmentSlot.MainHand => "Weapon",
+                EquipmentSlot.OffHand => "OffHand",
+                EquipmentSlot.LFinger => "L.Ring",
+                EquipmentSlot.RFinger => "R.Ring",
+                _ => slot.ToString()
+            };
+            var capturedSlot = slot;
+            enchantTargets.Add((slotName, equip, (newEq) =>
+            {
+                EquipmentDatabase.RegisterDynamic(newEq);
+                player.UnequipSlot(capturedSlot);
+                player.EquipItem(newEq, capturedSlot, out _);
+                player.RecalculateStats();
+            }));
+        }
 
-                // Number
-                terminal.SetColor("gray");
-                terminal.Write($"  [{idx,1}] ");
-
-                // Slot name (8 chars)
-                string slotName = slot switch
+        // Inventory items that occupy an enchantable slot type (weapons, armor,
+        // shields, accessories). Consumables / potions / quest items get filtered out.
+        if (player.Inventory != null)
+        {
+            for (int i = 0; i < player.Inventory.Count; i++)
+            {
+                var item = player.Inventory[i];
+                if (!IsEnchantableInventoryItem(item)) continue;
+                var equipFromBag = ConvertInventoryItemToEquipmentForEnchant(item);
+                var capturedIdx = i;
+                enchantTargets.Add(("Bag", equipFromBag, (newEq) =>
                 {
-                    EquipmentSlot.MainHand => "Weapon",
-                    EquipmentSlot.OffHand => "OffHand",
-                    EquipmentSlot.LFinger => "L.Ring",
-                    EquipmentSlot.RFinger => "R.Ring",
-                    _ => slot.ToString()
-                };
-                terminal.SetColor("darkgray");
-                terminal.Write($"{slotName,-9}");
-
-                // Item name with enchant/cursed tags
-                string enchTag = equip.GetEnchantmentCount() > 0 ? $" [E:{equip.GetEnchantmentCount()}/{GameConfig.MaxEnchantments}]" : "";
-                string cursedTag = equip.IsCursed ? Loc.Get("shop.cursed_tag") : "";
-                string displayName = equip.Name + enchTag + cursedTag;
-                if (displayName.Length > 34) displayName = displayName.Substring(0, 31) + "...";
-
-                if (equip.IsCursed)
-                    terminal.SetColor("red");
-                else if (equip.GetEnchantmentCount() >= GameConfig.MaxEnchantments)
-                    terminal.SetColor("darkgray");
-                else
-                    terminal.SetColor(equip.GetRarityColor());
-                terminal.Write($"{displayName,-35}");
-
-                // Stats inline
-                var stats = new List<string>();
-                if (equip.WeaponPower > 0) stats.Add($"{Loc.Get("ui.stat_pow")}:{equip.WeaponPower}");
-                if (equip.ArmorClass > 0) stats.Add($"{Loc.Get("ui.stat_ac")}:{equip.ArmorClass}");
-                if (equip.StrengthBonus != 0) stats.Add($"{Loc.Get("ui.stat_str")}{(equip.StrengthBonus > 0 ? "+" : "")}{equip.StrengthBonus}");
-                if (equip.DexterityBonus != 0) stats.Add($"{Loc.Get("ui.stat_dex")}{(equip.DexterityBonus > 0 ? "+" : "")}{equip.DexterityBonus}");
-                if (equip.AgilityBonus != 0) stats.Add($"{Loc.Get("ui.stat_agi")}{(equip.AgilityBonus > 0 ? "+" : "")}{equip.AgilityBonus}");
-                if (equip.ConstitutionBonus != 0) stats.Add($"{Loc.Get("ui.stat_con")}{(equip.ConstitutionBonus > 0 ? "+" : "")}{equip.ConstitutionBonus}");
-                if (equip.IntelligenceBonus != 0) stats.Add($"{Loc.Get("ui.stat_int")}{(equip.IntelligenceBonus > 0 ? "+" : "")}{equip.IntelligenceBonus}");
-                if (equip.WisdomBonus != 0) stats.Add($"{Loc.Get("ui.stat_wis")}{(equip.WisdomBonus > 0 ? "+" : "")}{equip.WisdomBonus}");
-                if (equip.CharismaBonus != 0) stats.Add($"{Loc.Get("ui.stat_cha")}{(equip.CharismaBonus > 0 ? "+" : "")}{equip.CharismaBonus}");
-                if (equip.DefenceBonus != 0) stats.Add($"{Loc.Get("ui.stat_def")}{(equip.DefenceBonus > 0 ? "+" : "")}{equip.DefenceBonus}");
-                if (equip.MaxHPBonus != 0) stats.Add($"{Loc.Get("ui.stat_hp")}{(equip.MaxHPBonus > 0 ? "+" : "")}{equip.MaxHPBonus}");
-                if (equip.MaxManaBonus != 0) stats.Add($"{Loc.Get("ui.stat_mana")}{(equip.MaxManaBonus > 0 ? "+" : "")}{equip.MaxManaBonus}");
-                if (equip.StaminaBonus != 0) stats.Add($"{Loc.Get("ui.stat_sta")}{(equip.StaminaBonus > 0 ? "+" : "")}{equip.StaminaBonus}");
-                terminal.SetColor("green");
-                terminal.Write(string.Join(" ", stats));
-
-                terminal.WriteLine("");
-                idx++;
+                    // Convert the enchanted Equipment back into an Item (LootEffects
+                    // and all) and replace at the original index so the player keeps
+                    // the upgrade in their backpack rather than auto-equipping it.
+                    EquipmentDatabase.RegisterDynamic(newEq);
+                    if (capturedIdx >= 0 && capturedIdx < player.Inventory.Count)
+                        player.Inventory[capturedIdx] = player.ConvertEquipmentToLegacyItem(newEq);
+                }));
             }
         }
 
-        if (equippedItems.Count == 0)
+        int idx = 1;
+        foreach (var (slotLabel, equip, _) in enchantTargets)
+        {
+            // Number
+            terminal.SetColor("gray");
+            terminal.Write($"  [{idx,2}] ");
+
+            // Slot label (9 chars) -- "Bag" for inventory items, slot name for equipped.
+            terminal.SetColor(slotLabel == "Bag" ? "dark_yellow" : "darkgray");
+            terminal.Write($"{slotLabel,-9}");
+
+            // Item name with enchant/cursed tags
+            string enchTag = equip.GetEnchantmentCount() > 0 ? $" [E:{equip.GetEnchantmentCount()}/{GameConfig.MaxEnchantments}]" : "";
+            string cursedTag = equip.IsCursed ? Loc.Get("shop.cursed_tag") : "";
+            string displayName = equip.Name + enchTag + cursedTag;
+            if (displayName.Length > 34) displayName = displayName.Substring(0, 31) + "...";
+
+            if (equip.IsCursed)
+                terminal.SetColor("red");
+            else if (equip.GetEnchantmentCount() >= GameConfig.MaxEnchantments)
+                terminal.SetColor("darkgray");
+            else
+                terminal.SetColor(equip.GetRarityColor());
+            terminal.Write($"{displayName,-35}");
+
+            // Stats inline
+            var stats = new List<string>();
+            if (equip.WeaponPower > 0) stats.Add($"{Loc.Get("ui.stat_pow")}:{equip.WeaponPower}");
+            if (equip.ArmorClass > 0) stats.Add($"{Loc.Get("ui.stat_ac")}:{equip.ArmorClass}");
+            if (equip.StrengthBonus != 0) stats.Add($"{Loc.Get("ui.stat_str")}{(equip.StrengthBonus > 0 ? "+" : "")}{equip.StrengthBonus}");
+            if (equip.DexterityBonus != 0) stats.Add($"{Loc.Get("ui.stat_dex")}{(equip.DexterityBonus > 0 ? "+" : "")}{equip.DexterityBonus}");
+            if (equip.AgilityBonus != 0) stats.Add($"{Loc.Get("ui.stat_agi")}{(equip.AgilityBonus > 0 ? "+" : "")}{equip.AgilityBonus}");
+            if (equip.ConstitutionBonus != 0) stats.Add($"{Loc.Get("ui.stat_con")}{(equip.ConstitutionBonus > 0 ? "+" : "")}{equip.ConstitutionBonus}");
+            if (equip.IntelligenceBonus != 0) stats.Add($"{Loc.Get("ui.stat_int")}{(equip.IntelligenceBonus > 0 ? "+" : "")}{equip.IntelligenceBonus}");
+            if (equip.WisdomBonus != 0) stats.Add($"{Loc.Get("ui.stat_wis")}{(equip.WisdomBonus > 0 ? "+" : "")}{equip.WisdomBonus}");
+            if (equip.CharismaBonus != 0) stats.Add($"{Loc.Get("ui.stat_cha")}{(equip.CharismaBonus > 0 ? "+" : "")}{equip.CharismaBonus}");
+            if (equip.DefenceBonus != 0) stats.Add($"{Loc.Get("ui.stat_def")}{(equip.DefenceBonus > 0 ? "+" : "")}{equip.DefenceBonus}");
+            if (equip.MaxHPBonus != 0) stats.Add($"{Loc.Get("ui.stat_hp")}{(equip.MaxHPBonus > 0 ? "+" : "")}{equip.MaxHPBonus}");
+            if (equip.MaxManaBonus != 0) stats.Add($"{Loc.Get("ui.stat_mana")}{(equip.MaxManaBonus > 0 ? "+" : "")}{equip.MaxManaBonus}");
+            if (equip.StaminaBonus != 0) stats.Add($"{Loc.Get("ui.stat_sta")}{(equip.StaminaBonus > 0 ? "+" : "")}{equip.StaminaBonus}");
+            terminal.SetColor("green");
+            terminal.Write(string.Join(" ", stats));
+
+            terminal.WriteLine("");
+            idx++;
+        }
+
+        if (enchantTargets.Count == 0)
         {
             terminal.WriteLine("");
             DisplayMessage($"  {Loc.Get("magic_shop.no_equipment_enchant")}", "gray");
@@ -1612,10 +1769,12 @@ public partial class MagicShopLocation : BaseLocation
         terminal.WriteLine(IsScreenReader ? "  0. Cancel" : "  [0] Cancel");
         terminal.WriteLine("");
         var slotInput = await terminal.GetInput($"  {Loc.Get("magic_shop.select_item_enchant")}");
-        if (!int.TryParse(slotInput, out int slotChoice) || slotChoice < 1 || slotChoice > equippedItems.Count)
+        if (!int.TryParse(slotInput, out int slotChoice) || slotChoice < 1 || slotChoice > enchantTargets.Count)
             return;
 
-        var (selectedSlot, selectedEquip) = equippedItems[slotChoice - 1];
+        var selectedTarget = enchantTargets[slotChoice - 1];
+        var selectedEquip = selectedTarget.equip;
+        var writeBack = selectedTarget.writeBack;
 
         if (selectedEquip.IsCursed)
         {
@@ -1980,10 +2139,7 @@ public partial class MagicShopLocation : BaseLocation
                         case 5: damaged.ArmorClass = Math.Max(0, damaged.ArmorClass - 5); break;
                     }
 
-                    EquipmentDatabase.RegisterDynamic(damaged);
-                    player.UnequipSlot(selectedSlot);
-                    player.EquipItem(damaged, selectedSlot, out _);
-                    player.RecalculateStats();
+                    writeBack(damaged);
                 }
 
                 DisplayMessage("");
@@ -2056,11 +2212,8 @@ public partial class MagicShopLocation : BaseLocation
         // Increase value
         enchanted.Value = (long)(enchanted.Value * 1.5);
 
-        // Register in database and equip
-        EquipmentDatabase.RegisterDynamic(enchanted);
-        player.UnequipSlot(selectedSlot);
-        player.EquipItem(enchanted, selectedSlot, out _);
-        player.RecalculateStats();
+        // Apply enchanted item back to its source (equipped slot or inventory index).
+        writeBack(enchanted);
 
         // Dramatic enchantment scene
         DisplayMessage("");
@@ -2087,12 +2240,17 @@ public partial class MagicShopLocation : BaseLocation
     {
         switch (statChoice)
         {
-            case 1: equip.WeaponPower += bonus; break;
-            case 2: equip.StrengthBonus += bonus; break;
-            case 3: equip.DexterityBonus += bonus; break;
-            case 4: equip.DefenceBonus += bonus; break;
-            case 5: equip.WisdomBonus += bonus; break;
-            case 6: equip.ArmorClass += bonus; break;
+            case 1:  equip.WeaponPower       += bonus; break;
+            case 2:  equip.StrengthBonus     += bonus; break;
+            case 3:  equip.DexterityBonus    += bonus; break;
+            case 4:  equip.DefenceBonus      += bonus; break;
+            case 5:  equip.WisdomBonus       += bonus; break;
+            case 6:  equip.ArmorClass        += bonus; break;
+            case 7:  equip.ConstitutionBonus += bonus; break;
+            case 8:  equip.IntelligenceBonus += bonus; break;
+            case 9:  equip.CharismaBonus     += bonus; break;
+            case 10: equip.AgilityBonus      += bonus; break;
+            case 11: equip.StaminaBonus      += bonus; break;
         }
     }
 

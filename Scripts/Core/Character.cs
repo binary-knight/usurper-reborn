@@ -695,6 +695,7 @@ public class Character
     public int TeamWarsToday { get; set; } = 0;                 // v0.57.17: Team Corner team-war daily counter (cap: GameConfig.MaxTeamWarsPerDay). Plugs the "find a beatable team, spam wars for free 2x wager gold" exploit reported by a Lv.100 Barbarian.
     public int DrinkingGamesToday { get; set; } = 0;            // v0.57.17: Inn drinking-game daily counter (cap: GameConfig.MaxDrinkingGamesPerDay). Player report: high STR/CON = consistent wins for level*700 XP per ~30s, no limit, free leveling.
     public int LoveStreetVisitsToday { get; set; } = 0;         // v0.60.10: Love Street paid-encounter daily counter (cap: GameConfig.MaxLoveStreetVisitsPerDay). Counts both Courtesan and Gigolo visits.
+    public int GauntletRunsToday { get; set; } = 0;             // v0.60.11 hotfix: Anchor Road Gauntlet daily counter (cap: GameConfig.MaxGauntletRunsPerDay).
     public DateTime LastPartnerBondingUtc { get; set; } = DateTime.MinValue;  // v0.57.7: Wall-clock gate on Home "quality time with partner" rewards (XP/HP/Mana). Shared across dinner/walk/cuddle — one bonding event per 20 real hours. Rage reported "romantic dinner is infinite XP" — was looping Level*50 with no cooldown.
     public long LoanAmount { get; set; } = 0;                   // Active loan balance (principal + interest)
     public int LoanDaysRemaining { get; set; } = 0;             // Days until enforcer attack
@@ -1577,6 +1578,14 @@ public class Character
     public int Fame { get; set; } = 0; // Fame/reputation level
     public string? NobleTitle { get; set; } = null; // Noble title (Sir, Dame, Lord, Lady, etc.)
     public bool IsKnighted { get; set; } // True only when knighted at the Castle by the King
+    // v0.60.11: Anchor Road Gauntlet completion tier. Set when the player full-clears the
+    // 10-fight Gauntlet (3 warmup + 7 Old God champions). Tier is gated on player level at
+    // moment of clear: Hopeful (Lv 5-19), Veteran (20-39), Master (40-59), Champion (60-79),
+    // GrandChampion (80-100). Highest-ever tier is displayed as a prefix in /who and the
+    // Main Street citizen list, replacing the knighthood Sir/Dame prefix when present.
+    // Knighthood combat bonus still applies via IsKnighted. GrandChampion grants its own
+    // permanent +3% damage / +3% defense passive (see GameConfig.GrandChampion* constants).
+    public int ArenaChampionTier { get; set; } = 0; // 0=None, 1=Hopeful, 2=Veteran, 3=Master, 4=Champion, 5=GrandChampion
     public string MudTitle { get; set; } = ""; // Custom /who title (set via /title command, ANSI codes allowed)
     public long RoyalLoanAmount { get; set; } = 0; // Outstanding loan from the king
     public int RoyalLoanDueDay { get; set; } = 0; // Day number when loan is due (0 = no loan)

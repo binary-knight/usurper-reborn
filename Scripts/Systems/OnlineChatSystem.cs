@@ -141,9 +141,10 @@ namespace UsurperRemake.Systems
                     if (mudServer != null && mudServer.ActiveSessions.TryGetValue(
                         player.DisplayName.ToLowerInvariant(), out var session))
                     {
-                        // Prepend knight title (Sir/Dame) if knighted
+                        // Arena Champion tiers flow through NobleTitle now, so the
+                        // player controls which title (if any) shows up here.
                         var livePlayer = session.Context?.Engine?.CurrentPlayer;
-                        if (livePlayer?.IsKnighted == true)
+                        if (!string.IsNullOrEmpty(livePlayer?.NobleTitle))
                             displayName = $"{livePlayer.NobleTitle} {displayName}";
 
                         if (session.IsSpectating && session.SpectatingSession != null)

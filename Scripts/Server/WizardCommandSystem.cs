@@ -100,6 +100,9 @@ public static class WizardCommandSystem
             case "pardon":
                 if (wizLevel < WizardLevel.Wizard) return NotEnoughPower(terminal);
                 return await HandlePardon(username, args, terminal);
+            case "anoint":
+                if (wizLevel < WizardLevel.Wizard) return NotEnoughPower(terminal);
+                return await HandleAnoint(username, terminal);
             case "mute":
                 if (wizLevel < WizardLevel.Wizard) return NotEnoughPower(terminal);
                 return await HandleMute(username, args, terminal);
@@ -504,6 +507,7 @@ public static class WizardCommandSystem
             terminal.WriteLine(sr ? "  /freeze / /thaw <p>   - Freeze/unfreeze a player" : "║  /freeze / /thaw <p>   - Freeze/unfreeze a player                          ║");
             terminal.WriteLine(sr ? "  /mute / /unmute <p>   - Mute/unmute a player" : "║  /mute / /unmute <p>   - Mute/unmute a player                              ║");
             terminal.WriteLine(sr ? "  /pardon <player>      - Release a player from prison instantly" : "║  /pardon <player>      - Release a player from prison instantly             ║");
+            terminal.WriteLine(sr ? "  /anoint               - Refill all online players' resurrections" : "║  /anoint               - Refill all online players' resurrections           ║");
         }
 
         if (level >= WizardLevel.Archwizard)
@@ -1536,6 +1540,111 @@ public static class WizardCommandSystem
     /// the next time they try to interact with it (PrisonLocation already
     /// checks DaysInPrison<=0 at every entry).
     /// </summary>
+    /// <summary>
+    /// /anoint -- restore every online player's resurrection counter to the configured
+    /// maximum. Broadcasts a short cinematic naming the calling wizard, then walks the
+    /// active-session list and writes Resurrections = MaxResurrections directly on the
+    /// in-memory Character object for each player (DB writes would race with the player's
+    /// next autosave; mutating live state means the autosave persists the new value). Also
+    /// zeroes ResurrectionsUsed and TempleResurrectionsUsed so the temple's per-life cap
+    /// resets too. Per-recipient personal line goes out via EnqueueMessage like /heal.
+    /// </summary>
+    private static async Task<bool> HandleAnoint(string callerUsername, TerminalEmulator terminal)
+    {
+        var server = UsurperRemake.Server.MudServer.Instance;
+        if (server == null)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine("  /anoint unavailable: MUD server instance not found.");
+            return true;
+        }
+
+        // Pretty-up the caller's name for the narration. Display name capitalizes the
+        // first letter; fall back to raw username if the live session lookup misses.
+        string callerName = callerUsername;
+        if (server.ActiveSessions.TryGetValue(callerUsername.ToLowerInvariant(), out var callerSession))
+        {
+            var cp = callerSession.Context?.Engine?.CurrentPlayer;
+            if (!string.IsNullOrEmpty(cp?.DisplayName))
+                callerName = cp.DisplayName;
+        }
+        if (callerName.Length > 0)
+            callerName = char.ToUpper(callerName[0]) + callerName.Substring(1);
+
+        DebugLogger.Instance.LogInfo("ANOINT",
+            $"Wizard '{callerUsername}' invoked /anoint -- refilling resurrections for all online players.");
+
+        // ── Act 1: a hush settles ───────────────────────────────────────
+        string[] act1 =
+        {
+            "",
+            "  [1;37m*  *  *[0m",
+            "  [37mA hush spreads through the realm.[0m",
+            "  [37mEvery torch in every tavern dims, then steadies.[0m",
+            "",
+        };
+        foreach (var line in act1) { server.BroadcastToAll(line); }
+        await Task.Delay(2500);
+
+        // ── Act 2: the wizard walks the threshold ───────────────────────
+        string[] act2 =
+        {
+            $"  [1;33m{callerName} walks the threshold between worlds,[0m",
+            "  [33mhands outstretched, gathering threads of unspent dawn.[0m",
+            "  [33mGrace, freely given, is the rarest currency a mortal will ever spend.[0m",
+            "",
+        };
+        foreach (var line in act2) { server.BroadcastToAll(line); await Task.Delay(1200); }
+        await Task.Delay(1500);
+
+        // ── Act 3: refill state + per-recipient flavor ──────────────────
+        int blessed = 0;
+        var sessions = server.ActiveSessions.Values.ToList();
+        foreach (var session in sessions)
+        {
+            var player = session.Context?.Engine?.CurrentPlayer;
+            if (player == null) continue;
+
+            int max = Math.Max(1, player.MaxResurrections);
+            player.Resurrections = max;
+            player.ResurrectionsUsed = 0;
+            player.TempleResurrectionsUsed = 0;
+            blessed++;
+
+            // Per-recipient personal note. Sent privately so it lands amid their
+            // own scroll buffer right after the broadcast lines above.
+            try
+            {
+                session.EnqueueMessage("[1;37m  A warmth that is not heat settles into your chest.[0m");
+                session.EnqueueMessage($"[1;33m  Your second chances have been restored ({max} of {max}).[0m");
+                session.EnqueueMessage("[33m  Your debts to death are forgiven. Spend the next ones wisely.[0m");
+            }
+            catch { /* recipient may have just disconnected */ }
+        }
+
+        await Task.Delay(1500);
+
+        // ── Act 4: closing line to the realm ────────────────────────────
+        string[] act4 =
+        {
+            "",
+            "  [37mThe light fades, but does not leave.[0m",
+            "  [1;37m*  *  *[0m",
+            "",
+        };
+        foreach (var line in act4) { server.BroadcastToAll(line); }
+
+        // ── Caller summary ──────────────────────────────────────────────
+        terminal.SetColor("bright_green");
+        terminal.WriteLine($"  /anoint complete: {blessed} player(s) had their resurrection counters restored.");
+        terminal.SetColor("dark_gray");
+        terminal.WriteLine("  Persistence is automatic -- each player's next autosave writes the new counter.");
+
+        LogAction(callerUsername, "anoint", "all", $"Refilled resurrections for {blessed} online players");
+
+        return true;
+    }
+
     private static async Task<bool> HandlePardon(string username, string args, TerminalEmulator terminal)
     {
         var targetName = args?.Trim();

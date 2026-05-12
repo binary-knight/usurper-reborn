@@ -2449,7 +2449,8 @@ namespace UsurperRemake.Systems
                         json_extract(p.player_data, '$.player.class') as class_id,
                         json_extract(p.player_data, '$.player.experience') as xp,
                         CASE WHEN op.username IS NOT NULL THEN 1 ELSE 0 END as is_online,
-                        json_extract(p.player_data, '$.player.nobleTitle') as noble_title
+                        json_extract(p.player_data, '$.player.nobleTitle') as noble_title,
+                        COALESCE(json_extract(p.player_data, '$.player.arenaChampionTier'), 0) as arena_tier
                     FROM players p
                     LEFT JOIN online_players op ON LOWER(p.username) = LOWER(op.username)
                         AND op.last_heartbeat >= datetime('now', '-300 seconds')
@@ -2473,7 +2474,8 @@ namespace UsurperRemake.Systems
                         ClassId = reader.IsDBNull(3) ? 0 : Convert.ToInt32(reader.GetValue(3)),
                         Experience = reader.IsDBNull(4) ? 0 : Convert.ToInt64(reader.GetValue(4)),
                         IsOnline = reader.GetInt32(5) == 1,
-                        NobleTitle = reader.IsDBNull(6) ? null : reader.GetString(6)
+                        NobleTitle = reader.IsDBNull(6) ? null : reader.GetString(6),
+                        ArenaChampionTier = reader.IsDBNull(7) ? 0 : Convert.ToInt32(reader.GetValue(7))
                     });
                 }
             }

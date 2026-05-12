@@ -4882,6 +4882,8 @@ public partial class GameEngine
             // Migration: pre-0.54.6 saves stored IsKnighted as a computed property.
             // If player has Sir/Dame title but IsKnighted is false, they were knighted before the flag existed.
             IsKnighted = playerData.IsKnighted || playerData.NobleTitle == "Sir" || playerData.NobleTitle == "Dame",
+            // v0.60.11: Anchor Road Gauntlet champion tier (0..5).
+            ArenaChampionTier = playerData.ArenaChampionTier,
 
             // Royal Mercenaries
             RoyalMercenaries = playerData.RoyalMercenaries?.Select(m => new RoyalMercenary
@@ -4975,6 +4977,28 @@ public partial class GameEngine
 
             Allowed = true // Always allow loaded players
         };
+
+        // Backward-compat heal for arena tier titles. Players who completed the
+        // Anchor Road Gauntlet under v0.60.11's first cut had their tier title
+        // prepended directly from ArenaChampionTier in display code, never written
+        // to NobleTitle. The follow-up fix routes all title display through
+        // NobleTitle, which would silently erase their earned title on first load.
+        // If they have a tier but no displayed title, auto-assign it now -- they
+        // can still change it via Preferences > Title.
+        if (player.ArenaChampionTier > 0 && string.IsNullOrEmpty(player.NobleTitle))
+        {
+            try
+            {
+                var earnedTier = (UsurperRemake.Data.GauntletChampionData.ArenaTier)player.ArenaChampionTier;
+                string tierTitle = UsurperRemake.Data.GauntletChampionData.GetTierTitle(earnedTier);
+                if (!string.IsNullOrEmpty(tierTitle))
+                {
+                    player.NobleTitle = tierTitle;
+                    MetaProgressionSystem.Instance.UnlockedTitles.Add(tierTitle);
+                }
+            }
+            catch { /* best-effort heal */ }
+        }
 
         // Restore character flavor text
         if (playerData.Phrases?.Count > 0)
@@ -5512,6 +5536,7 @@ public partial class GameEngine
         player.TeamWarsToday = playerData.TeamWarsToday;
         player.DrinkingGamesToday = playerData.DrinkingGamesToday;
         player.LoveStreetVisitsToday = playerData.LoveStreetVisitsToday;
+        player.GauntletRunsToday = playerData.GauntletRunsToday;
         player.LastPartnerBondingUtc = playerData.LastPartnerBondingUtc;
         player.LoanAmount = playerData.LoanAmount;
         player.LoanDaysRemaining = playerData.LoanDaysRemaining;

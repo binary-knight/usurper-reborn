@@ -1250,46 +1250,40 @@ public class WeaponShopLocation : BaseLocation
         ShowStatChange(Loc.Get("ui.stat_leech"), weapon.LifeSteal, reforged.LifeSteal);
         terminal.WriteLine("");
 
-        // Ask to accept or keep original
-        terminal.SetColor("bright_yellow");
-        var accept = await terminal.GetInput(Loc.Get("weapon_shop.reforge_accept"));
+        // v0.60.11: reforge commits unconditionally. Pre-fix the player was prompted to
+        // accept or keep the original AFTER seeing the rerolled stats -- meaning they
+        // could pay the cost, peek at the result, and roll back if the new stats were
+        // worse than the old. That made reforging risk-free scouting instead of the
+        // gamble it's meant to be. Now: once the pre-reforge confirmation is given and
+        // gold is deducted, the reforge sticks. The pre-confirm prompt at line ~1165
+        // is the commit point; the player saw the cost and the warning, that's their
+        // decision moment.
+        weapon.WeaponPower = reforged.WeaponPower;
+        weapon.Rarity = reforged.Rarity;
+        weapon.StrengthBonus = reforged.StrengthBonus;
+        weapon.DexterityBonus = reforged.DexterityBonus;
+        weapon.ConstitutionBonus = reforged.ConstitutionBonus;
+        weapon.IntelligenceBonus = reforged.IntelligenceBonus;
+        weapon.WisdomBonus = reforged.WisdomBonus;
+        weapon.CharismaBonus = reforged.CharismaBonus;
+        weapon.AgilityBonus = reforged.AgilityBonus;
+        weapon.MaxHPBonus = reforged.MaxHPBonus;
+        weapon.MaxManaBonus = reforged.MaxManaBonus;
+        weapon.DefenceBonus = reforged.DefenceBonus;
+        weapon.StaminaBonus = reforged.StaminaBonus;
+        weapon.CriticalChanceBonus = reforged.CriticalChanceBonus;
+        weapon.CriticalDamageBonus = reforged.CriticalDamageBonus;
+        weapon.LifeSteal = reforged.LifeSteal;
+        weapon.MagicResistance = reforged.MagicResistance;
+        weapon.PoisonDamage = reforged.PoisonDamage;
+        weapon.Value = reforged.Value;
 
-        if (accept?.Trim().ToUpper() == "Y")
-        {
-            // Apply the reforged stats directly to the existing equipment object
-            weapon.WeaponPower = reforged.WeaponPower;
-            weapon.Rarity = reforged.Rarity;
-            weapon.StrengthBonus = reforged.StrengthBonus;
-            weapon.DexterityBonus = reforged.DexterityBonus;
-            weapon.ConstitutionBonus = reforged.ConstitutionBonus;
-            weapon.IntelligenceBonus = reforged.IntelligenceBonus;
-            weapon.WisdomBonus = reforged.WisdomBonus;
-            weapon.CharismaBonus = reforged.CharismaBonus;
-            weapon.AgilityBonus = reforged.AgilityBonus;
-            weapon.MaxHPBonus = reforged.MaxHPBonus;
-            weapon.MaxManaBonus = reforged.MaxManaBonus;
-            weapon.DefenceBonus = reforged.DefenceBonus;
-            weapon.StaminaBonus = reforged.StaminaBonus;
-            weapon.CriticalChanceBonus = reforged.CriticalChanceBonus;
-            weapon.CriticalDamageBonus = reforged.CriticalDamageBonus;
-            weapon.LifeSteal = reforged.LifeSteal;
-            weapon.MagicResistance = reforged.MagicResistance;
-            weapon.PoisonDamage = reforged.PoisonDamage;
-            weapon.Value = reforged.Value;
+        // Recalculate player stats with new weapon values
+        currentPlayer.RecalculateStats();
 
-            // Recalculate player stats with new weapon values
-            currentPlayer.RecalculateStats();
-
-            terminal.WriteLine("");
-            terminal.SetColor("bright_green");
-            terminal.WriteLine(Loc.Get("weapon_shop.reforge_accepted", shopkeeperName));
-        }
-        else
-        {
-            terminal.WriteLine("");
-            terminal.SetColor("gray");
-            terminal.WriteLine(Loc.Get("weapon_shop.reforge_kept", shopkeeperName));
-        }
+        terminal.WriteLine("");
+        terminal.SetColor("bright_green");
+        terminal.WriteLine(Loc.Get("weapon_shop.reforge_accepted", shopkeeperName));
 
         await terminal.PressAnyKey();
     }

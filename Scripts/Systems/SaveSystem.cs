@@ -650,6 +650,9 @@ namespace UsurperRemake.Systems
                 NobleTitle = player.NobleTitle,
                 IsKnighted = player.IsKnighted,
 
+                // v0.60.11: Anchor Road Gauntlet champion tier.
+                ArenaChampionTier = player.ArenaChampionTier,
+
                 // Royal Mercenaries
                 RoyalMercenaries = player.RoyalMercenaries?.Count > 0
                     ? player.RoyalMercenaries.Select(m => new RoyalMercenarySaveData
@@ -926,6 +929,7 @@ namespace UsurperRemake.Systems
                 TeamWarsToday = player.TeamWarsToday,
                 DrinkingGamesToday = player.DrinkingGamesToday,
                 LoveStreetVisitsToday = player.LoveStreetVisitsToday,
+                GauntletRunsToday = player.GauntletRunsToday,
                 LastPartnerBondingUtc = player.LastPartnerBondingUtc,
                 LoanAmount = player.LoanAmount,
                 LoanDaysRemaining = player.LoanDaysRemaining,

@@ -9,7 +9,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.60.10";
+    public const string Version = "0.60.11";
     public const string VersionName = "Beta";
 
     // v0.57.12: Alignment scale cap. Character.Chivalry and Character.Darkness setters clamp to [0, AlignmentCap]
@@ -196,6 +196,16 @@ public static partial class GameConfig
     /// Monster damage multiplier for difficulty adjustment (1.0 = normal)
     /// </summary>
     public static float MonsterDamageMultiplier { get; set; } = 1.0f;
+
+    /// <summary>
+    /// Post-beta-launch baseline difficulty correction. Multiplies monster HP,
+    /// attack, and defense at every spawn chokepoint (regular monsters via
+    /// MonsterGenerator, Old Gods + Noctura betrayal via OldGodBossSystem, world
+    /// boss via WorldBossSystem). Independent of the runtime sysop knobs above
+    /// (MonsterHPMultiplier / MonsterDamageMultiplier) and the player-difficulty
+    /// system; stacks on top of both.
+    /// </summary>
+    public const float BaseMonsterDifficultyScale = 1.60f;
 
     /// <summary>
     /// Default color theme for new characters (set by SysOp via SysOp Console)
@@ -715,6 +725,13 @@ public static partial class GameConfig
     // per day from paid encounters, comparable to the murder daily cap (750 + 375).
     public const int MaxLoveStreetVisitsPerDay = 2;
 
+    // v0.60.11 hotfix: daily cap on Anchor Road Gauntlet runs. Without a cap, an endgame
+    // player can grind seven champion drops per attempt indefinitely -- even with the
+    // rarity rebalance and showpiece pre-roll, that's a lot of mid-tier loot per session
+    // and trivializes the rest of the loot economy. One run per day matches the cadence
+    // of the other daily-limited activities (Love Street, drinking games, team wars).
+    public const int MaxGauntletRunsPerDay = 1;
+
     // Save bloat caps (v0.57.18 — single-player save reliability)
     // The v0.57.16 NPC-memory fix capped one bloat surface; player reports kept arriving
     // ("saves run out of memory after I quit", "single player file's gone"), so audit
@@ -920,6 +937,10 @@ public static partial class GameConfig
     // Knighthood bonuses
     public const float KnightDamageBonus = 0.05f;              // +5% damage for knighted players
     public const float KnightDefenseBonus = 0.05f;             // +5% defense for knighted players
+    // v0.60.11 Grand Champion (full Gauntlet clear at Lv 80+) permanent passive. Stacks
+    // with the knighthood bonus -- a knighted Grand Champion gets +8% damage / +8% defense.
+    public const float GrandChampionDamageBonus = 0.03f;       // +3% damage for Lv 80+ Gauntlet completers
+    public const float GrandChampionDefenseBonus = 0.03f;      // +3% defense for Lv 80+ Gauntlet completers
     public const int KnightFameDecayResistance = 2;            // Fame loss reduced by this amount for knights
     public const int WorldBossDurationHours = 6;                // was 1 -- fight window extended for peak-hour pile-on
     public const int WorldBossMinLevel = 10;                    // Min player level to participate
@@ -2060,12 +2081,22 @@ Mystic Shaman - Tribal caster who summons totems and enchants weapons. Troll/Orc
     // Gauntlet Challenge (v0.40.3)
     public const int GauntletMinLevel = 5;
     public const int GauntletWaveCount = 10;
-    public const int GauntletEntryFeePerLevel = 100;        // Entry fee = 100 * level
+    // v0.60.11: entry fee scales quadratically with level so endgame players actually
+    // feel the cost. Pre-fix was linear `100 * level` -> Lv 100 = 10,000g (trivial). New
+    // formula `level^2 * 10` -> Lv 5 = 250g, Lv 20 = 4,000g, Lv 50 = 25,000g, Lv 100 = 100,000g.
+    public const int GauntletEntryFeeQuadraticCoefficient = 10;
     public const int GauntletGoldPerWavePerLevel = 50;       // Per-wave reward = 50 * level
     public const int GauntletXPPerWave = 25;                 // Base XP multiplier per wave
     public const int GauntletChampionGoldPerLevel = 500;     // Wave 10 bonus = 500 * level
     public const int GauntletChampionXPPerLevel = 250;       // Wave 10 XP bonus
     public const float GauntletHealBetweenWaves = 0.20f;     // 20% MaxHP heal between waves
+    // v0.60.11: Gauntlet loss now has a 25% chance of being a real death (resurrection
+    // consumed, normal death path). The other 75% is the legacy drag-out outcome but
+    // with new penalties: 5% of current XP lost + any Fame earned this run is forfeited
+    // + an extra -5 Fame on top.
+    public const int GauntletDeathChancePercent = 25;
+    public const float GauntletDragoutXPLossPercent = 0.05f;
+    public const int GauntletDragoutFameLossPenalty = 5;
     public const float GauntletManaRestoreBetweenWaves = 0.15f; // 15% MaxMana between waves
 
     // PvP Arena Configuration

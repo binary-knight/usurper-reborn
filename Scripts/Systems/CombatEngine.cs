@@ -3303,6 +3303,13 @@ public partial class CombatEngine
             attackPower += (long)(attackPower * GameConfig.KnightDamageBonus);
         }
 
+        // v0.60.11: Grand Champion bonus: +3% damage for Lv 80+ Gauntlet completers.
+        // Stacks with knighthood.
+        if (attacker.ArenaChampionTier >= (int)UsurperRemake.Data.GauntletChampionData.ArenaTier.GrandChampion)
+        {
+            attackPower += (long)(attackPower * GameConfig.GrandChampionDamageBonus);
+        }
+
         // BossSlayer effect: +10% damage vs bosses (from world boss exclusive loot)
         if (target is Monster monsterTarget && (monsterTarget.IsBoss || monsterTarget.IsMiniBoss))
         {
@@ -4665,6 +4672,13 @@ public partial class CombatEngine
         if (player.IsKnighted)
         {
             playerDefense += (long)(playerDefense * GameConfig.KnightDefenseBonus);
+        }
+
+        // v0.60.11: Grand Champion bonus: +3% defense for Lv 80+ Gauntlet completers.
+        // Stacks with knighthood.
+        if (player.ArenaChampionTier >= (int)UsurperRemake.Data.GauntletChampionData.ArenaTier.GrandChampion)
+        {
+            playerDefense += (long)(playerDefense * GameConfig.GrandChampionDefenseBonus);
         }
 
         // TitanResolve effect: +5% defense (from world boss exclusive loot)
@@ -12083,6 +12097,9 @@ public partial class CombatEngine
                             attackPower += (long)(attackPower * (player.HQArmoryLevel * 0.05));
                         if (player.IsKnighted)
                             attackPower += (long)(attackPower * GameConfig.KnightDamageBonus);
+                        // v0.60.11: Grand Champion +3% damage stacks with knighthood.
+                        if (player.ArenaChampionTier >= (int)UsurperRemake.Data.GauntletChampionData.ArenaTier.GrandChampion)
+                            attackPower += (long)(attackPower * GameConfig.GrandChampionDamageBonus);
 
                         // Divine boon damage bonus (multi-monster path)
                         var mmBoons = player.CachedBoonEffects;

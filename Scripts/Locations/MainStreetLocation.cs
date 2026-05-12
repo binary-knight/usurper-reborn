@@ -1409,8 +1409,11 @@ public class MainStreetLocation : BaseLocation
         // Build a list of all characters for ranking (now includes location)
         var allCharacters = new List<(string Name, int Level, string Class, long Experience, string Location, bool IsPlayer, bool IsAlive)>();
 
-        // Add player
-        string playerFameName = currentPlayer.IsKnighted ? $"{currentPlayer.NobleTitle} {currentPlayer.DisplayName}" : currentPlayer.DisplayName;
+        // Add player. Arena tier titles flow through NobleTitle, so what shows up
+        // here is whichever title the player picked in Preferences > Title.
+        string playerFameName = !string.IsNullOrEmpty(currentPlayer.NobleTitle)
+            ? $"{currentPlayer.NobleTitle} {currentPlayer.DisplayName}"
+            : currentPlayer.DisplayName;
         allCharacters.Add((playerFameName, currentPlayer.Level, currentPlayer.Class.ToString(), currentPlayer.Experience, "Main Street", true, currentPlayer.IsAlive));
 
         // Add other online players from the database
@@ -1427,7 +1430,11 @@ public class MainStreetLocation : BaseLocation
 
                     string className = ((CharacterClass)op.ClassId).ToString();
                     string onlineTag = op.IsOnline ? "[ON]" : "";
-                    string fameDisplayName = !string.IsNullOrEmpty(op.NobleTitle) ? $"{op.NobleTitle} {op.DisplayName}" : op.DisplayName;
+                    // NobleTitle is the single source of truth for title display -- arena
+                    // tiers, knighthood, and meta-progression titles all live here.
+                    string fameDisplayName = !string.IsNullOrEmpty(op.NobleTitle)
+                        ? $"{op.NobleTitle} {op.DisplayName}"
+                        : op.DisplayName;
                     allCharacters.Add((fameDisplayName, op.Level, className, op.Experience, onlineTag, false, true));
                 }
             }
@@ -1572,7 +1579,10 @@ public class MainStreetLocation : BaseLocation
             WriteSectionHeader(Loc.Get("main_street.section_players"), "bright_green");
             terminal.SetColor("yellow");
             string playerSex = currentPlayer.Sex == CharacterSex.Male ? "M" : "F";
-            string citizenName = currentPlayer.IsKnighted ? $"{currentPlayer.NobleTitle} {currentPlayer.DisplayName}" : currentPlayer.DisplayName;
+            // NobleTitle drives title display in the citizen list.
+            string citizenName = !string.IsNullOrEmpty(currentPlayer.NobleTitle)
+                ? $"{currentPlayer.NobleTitle} {currentPlayer.DisplayName}"
+                : currentPlayer.DisplayName;
             terminal.WriteLine($"  * {citizenName,-18} {playerSex} Lv{currentPlayer.Level,3} {currentPlayer.Class,-10} HP:{currentPlayer.HP}/{currentPlayer.MaxHP} {Loc.Get("main_street.citizens_you_tag")}");
             terminal.WriteLine("");
 

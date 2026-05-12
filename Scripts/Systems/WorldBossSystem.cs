@@ -85,7 +85,10 @@ namespace UsurperRemake.Systems
                 // Scale HP based on online player count
                 int avgLevel = backend.GetAverageOnlineLevel();
                 int bossLevel = Math.Max(bossDef.BaseLevel, avgLevel);
-                long scaledHP = (long)(bossDef.BaseHP * (1.0 + GameConfig.WorldBossHPScalePerPlayer * onlineCount));
+                // Post-beta-launch baseline difficulty correction (15%): brings the
+                // world boss in line with the same scale applied to regular monsters
+                // and Old Gods so server-wide difficulty stays consistent.
+                long scaledHP = (long)(bossDef.BaseHP * (1.0 + GameConfig.WorldBossHPScalePerPlayer * onlineCount) * GameConfig.BaseMonsterDifficultyScale);
 
                 // Create boss data JSON for phase tracking
                 var bossData = new WorldBossRuntimeData

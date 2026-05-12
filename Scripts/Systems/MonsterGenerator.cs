@@ -272,6 +272,19 @@ public static class MonsterGenerator
         long baseArmorPower = (long)((0.5 * level) + Math.Pow(level, 1.02) * 0.3);
         long armorPower = (long)(baseArmorPower * defenseTotal * 0.7f);
 
+        // Apply post-beta-launch baseline difficulty correction to all stats.
+        // Telemetry showed 99.7% server-wide win rate and 2.7 avg rounds; this
+        // 15% buff applies to HP, attack, and defense so monster durability,
+        // damage output, and damage resistance all rise together. Sysop and
+        // player-difficulty knobs below stack on top.
+        float baseScale = GameConfig.BaseMonsterDifficultyScale;
+        hp = (long)(hp * baseScale);
+        strength = (long)(strength * baseScale);
+        defence = (long)(defence * baseScale);
+        punch = (long)(punch * baseScale);
+        weaponPower = (long)(weaponPower * baseScale);
+        armorPower = (long)(armorPower * baseScale);
+
         // Apply server-wide SysOp HP multiplier
         hp = (long)(hp * GameConfig.MonsterHPMultiplier);
 

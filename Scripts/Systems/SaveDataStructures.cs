@@ -390,6 +390,9 @@ namespace UsurperRemake.Systems
         public string? NobleTitle { get; set; }
         public bool IsKnighted { get; set; }
 
+        // v0.60.11: Anchor Road Gauntlet champion tier (0=None .. 5=GrandChampion).
+        public int ArenaChampionTier { get; set; }
+
         // Royal Mercenaries (hired bodyguards for king's dungeon party)
         public List<RoyalMercenarySaveData>? RoyalMercenaries { get; set; }
 
@@ -636,6 +639,7 @@ namespace UsurperRemake.Systems
         public int TeamWarsToday { get; set; }
         public int DrinkingGamesToday { get; set; }
         public int LoveStreetVisitsToday { get; set; }
+        public int GauntletRunsToday { get; set; }
         public DateTime LastPartnerBondingUtc { get; set; }
         public long LoanAmount { get; set; }
         public int LoanDaysRemaining { get; set; }

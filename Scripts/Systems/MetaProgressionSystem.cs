@@ -33,6 +33,34 @@ namespace UsurperRemake.Systems
             data = LoadData();
         }
 
+        /// <summary>
+        /// Per-account meta progression. In MUD/online mode the server process is shared
+        /// across all SSH accounts, so the global meta_progression.json file would unlock
+        /// prestige classes for every new account the moment ANY player on the server
+        /// completes an ending. This overload scopes the file to a single account.
+        /// Empty/null username falls back to the global file (single-player local mode).
+        /// </summary>
+        public MetaProgressionSystem(string username)
+        {
+            string fileName = string.IsNullOrWhiteSpace(username)
+                ? "meta_progression.json"
+                : $"meta_progression_{SanitizeFilename(username)}.json";
+            saveFilePath = Path.Combine(Environment.CurrentDirectory, "saves", fileName);
+            data = LoadData();
+        }
+
+        private static string SanitizeFilename(string raw)
+        {
+            var invalid = Path.GetInvalidFileNameChars();
+            var sb = new System.Text.StringBuilder(raw.Length);
+            foreach (char c in raw.ToLowerInvariant())
+            {
+                if (System.Array.IndexOf(invalid, c) < 0 && c != ' ' && c != '.') sb.Append(c);
+                else sb.Append('_');
+            }
+            return sb.ToString();
+        }
+
         #region Data Properties
 
         /// <summary>

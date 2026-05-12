@@ -879,16 +879,21 @@ namespace UsurperRemake.Systems
             float hpScale = 1.0f + Math.Min(0.40f, artifactCount * GameConfig.OldGodDivineScalingHPPerArtifact);
             float dmgScale = 1.0f + Math.Min(0.20f, artifactCount * GameConfig.OldGodDivineScalingDamagePerArtifact);
 
-            long scaledHP = (long)(boss.HP * hpScale);
-            long scaledStrength = (long)(boss.Strength * dmgScale);
+            // Post-beta-launch baseline difficulty correction (15%): applied here as
+            // well so Old Gods scale alongside regular monsters. Stacks multiplicatively
+            // with the artifact-based Divine Scaling above.
+            float baseScale = GameConfig.BaseMonsterDifficultyScale;
+            long scaledHP = (long)(boss.HP * hpScale * baseScale);
+            long scaledStrength = (long)(boss.Strength * dmgScale * baseScale);
+            long scaledDefence = (long)(boss.Defence * baseScale);
 
             // Split scaled Strength into Monster Strength + WeapPow for CombatEngine's damage formula
             long monsterStrength = scaledStrength / 2;
             long monsterWeapPow = scaledStrength / 2;
 
             // Split boss Defence into Monster Defence + ArmPow
-            int monsterDefence = (int)(boss.Defence / 2);
-            long monsterArmPow = boss.Defence / 2;
+            int monsterDefence = (int)(scaledDefence / 2);
+            long monsterArmPow = scaledDefence / 2;
 
             var monster = new Monster
             {
@@ -1289,13 +1294,17 @@ namespace UsurperRemake.Systems
             int nocturaArtifactCount = ArtifactSystem.Instance.GetCollectedCount();
             float nocturaHpScale = 1.0f + Math.Min(0.40f, nocturaArtifactCount * GameConfig.OldGodDivineScalingHPPerArtifact);
             float nocturaDmgScale = 1.0f + Math.Min(0.20f, nocturaArtifactCount * GameConfig.OldGodDivineScalingDamagePerArtifact);
-            long nocturaScaledHP = (long)(betrayalData.HP * nocturaHpScale);
-            long nocturaScaledStrength = (long)(betrayalData.Strength * nocturaDmgScale);
+            // Post-beta-launch baseline difficulty correction (15%): stacks with
+            // artifact-based Divine Scaling.
+            float nocturaBaseScale = GameConfig.BaseMonsterDifficultyScale;
+            long nocturaScaledHP = (long)(betrayalData.HP * nocturaHpScale * nocturaBaseScale);
+            long nocturaScaledStrength = (long)(betrayalData.Strength * nocturaDmgScale * nocturaBaseScale);
+            long nocturaScaledDefence = (long)(betrayalData.Defence * nocturaBaseScale);
 
             long monsterStrength = nocturaScaledStrength / 2;
             long monsterWeapPow = nocturaScaledStrength / 2;
-            int monsterDefence = (int)(betrayalData.Defence / 2);
-            long monsterArmPow = betrayalData.Defence / 2;
+            int monsterDefence = (int)(nocturaScaledDefence / 2);
+            long monsterArmPow = nocturaScaledDefence / 2;
 
             var noctura = new Monster
             {

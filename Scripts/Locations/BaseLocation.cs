@@ -4037,6 +4037,18 @@ public abstract class BaseLocation
                     if (currentPlayer.IsKnighted)
                         availableTitles.Add(currentPlayer.Sex == CharacterSex.Female ? "Dame" : "Sir");
 
+                    // Arena Champion tier title. Earned by completing the Anchor Road
+                    // Gauntlet. The combat bonus (Grand Champion +3% / +3%) is gated on
+                    // ArenaChampionTier independently, so hiding the title here doesn't
+                    // lose the bonus.
+                    if (currentPlayer.ArenaChampionTier > 0)
+                    {
+                        var earnedTier = (UsurperRemake.Data.GauntletChampionData.ArenaTier)currentPlayer.ArenaChampionTier;
+                        string arenaTitle = UsurperRemake.Data.GauntletChampionData.GetTierTitle(earnedTier);
+                        if (!string.IsNullOrEmpty(arenaTitle) && !availableTitles.Contains(arenaTitle))
+                            availableTitles.Add(arenaTitle);
+                    }
+
                     // MetaProgression titles (earned across NG+ cycles)
                     var metaTitles = MetaProgressionSystem.Instance.UnlockedTitles;
                     foreach (var mt in metaTitles)
@@ -5847,7 +5859,9 @@ public abstract class BaseLocation
         }
 
         // Show temporary combat buffs (well-rested, god slayer, song, herbs)
-        bool hasAnyBuff = currentPlayer.IsKnighted || currentPlayer.WellRestedCombats > 0 || currentPlayer.HasGodSlayerBuff
+        bool hasAnyBuff = currentPlayer.IsKnighted
+            || currentPlayer.ArenaChampionTier >= (int)UsurperRemake.Data.GauntletChampionData.ArenaTier.GrandChampion
+            || currentPlayer.WellRestedCombats > 0 || currentPlayer.HasGodSlayerBuff
             || currentPlayer.HasDarkPactBuff || currentPlayer.HasSettlementBuff
             || currentPlayer.HasActiveSongBuff || currentPlayer.HasActiveHerbBuff
             || currentPlayer.LoversBlissCombats > 0 || currentPlayer.DivineBlessingCombats > 0
@@ -5890,6 +5904,14 @@ public abstract class BaseLocation
             {
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine($"  - {currentPlayer.NobleTitle}'s Honor: +{(int)(GameConfig.KnightDamageBonus * 100)}% damage, +{(int)(GameConfig.KnightDefenseBonus * 100)}% defense (permanent)");
+            }
+            // v0.60.11: Grand Champion permanent passive line. Earned by full-clearing the
+            // Anchor Road Gauntlet at Lv 80+. Stacks with knighthood (so a Knighted Grand
+            // Champion gets +8% damage / +8% defense lifetime).
+            if (currentPlayer.ArenaChampionTier >= (int)UsurperRemake.Data.GauntletChampionData.ArenaTier.GrandChampion)
+            {
+                terminal.SetColor("bright_magenta");
+                terminal.WriteLine($"  - Grand Champion's Mantle: +{(int)(GameConfig.GrandChampionDamageBonus * 100)}% damage, +{(int)(GameConfig.GrandChampionDefenseBonus * 100)}% defense (permanent)");
             }
             if (currentPlayer.Class == CharacterClass.Alchemist)
             {

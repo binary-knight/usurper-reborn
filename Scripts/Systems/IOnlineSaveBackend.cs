@@ -195,6 +195,10 @@ namespace UsurperRemake.Systems
         public long Experience { get; set; }
         public bool IsOnline { get; set; }
         public string? NobleTitle { get; set; }
+        // v0.60.11: Anchor Road Gauntlet champion tier (0=None .. 5=GrandChampion).
+        // Used by the Fame board / citizen list to show "Grand Champion Rage" etc.
+        // instead of "Sir Rage" when the player has earned the arena title.
+        public int ArenaChampionTier { get; set; }
     }
 
     /// <summary>

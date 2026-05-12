@@ -339,6 +339,7 @@ public class DailySystemManager
         player.TeamWarsToday = 0;     // v0.57.17: Team Corner team-war daily cap
         player.DrinkingGamesToday = 0; // v0.57.17: Inn drinking-game daily cap
         player.LoveStreetVisitsToday = 0; // v0.60.10: Love Street paid-encounter daily cap
+        player.GauntletRunsToday = 0;     // v0.60.11 hotfix: Anchor Road Gauntlet daily cap
 
         // Reset session XP tracking (prevents bypass by logging out/in to clear diminishing returns)
         player.SessionXPEarned = 0;

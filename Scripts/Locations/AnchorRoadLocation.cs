@@ -846,7 +846,22 @@ public class AnchorRoadLocation : BaseLocation
             return;
         }
 
-        long entryFee = GameConfig.GauntletEntryFeePerLevel * currentPlayer.Level;
+        // v0.60.11 hotfix: daily run cap. Stops endgame players from farming the gauntlet
+        // for stacks of mid-tier loot in a single session. Matches the cadence of the
+        // other daily caps (Love Street, drinking games, team wars).
+        if (currentPlayer.GauntletRunsToday >= GameConfig.MaxGauntletRunsPerDay)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine(Loc.Get("anchor_road.gauntlet_daily_cap_reached", GameConfig.MaxGauntletRunsPerDay));
+            terminal.WriteLine("");
+            terminal.SetColor("darkgray");
+            terminal.WriteLine(Loc.Get("ui.press_enter"));
+            await terminal.ReadKeyAsync();
+            return;
+        }
+
+        // v0.60.11: quadratic entry fee scaling. Pre-fix `100 * level` was trivial at endgame.
+        long entryFee = (long)GameConfig.GauntletEntryFeeQuadraticCoefficient * currentPlayer.Level * currentPlayer.Level;
 
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("anchor_road.gauntlet_details"));
@@ -867,6 +882,13 @@ public class AnchorRoadLocation : BaseLocation
         terminal.Write(Loc.Get("anchor_road.your_hp"));
         terminal.SetColor(currentPlayer.HP > currentPlayer.MaxHP / 2 ? "bright_green" : "red");
         terminal.WriteLine($"{currentPlayer.HP}/{currentPlayer.MaxHP}");
+        // v0.60.11 hotfix: surface the daily-cap state so the player sees their
+        // remaining runs before committing to the entry fee.
+        int runsRemaining = System.Math.Max(0, GameConfig.MaxGauntletRunsPerDay - currentPlayer.GauntletRunsToday);
+        terminal.SetColor("white");
+        terminal.Write(Loc.Get("anchor_road.gauntlet_runs_today"));
+        terminal.SetColor(runsRemaining > 0 ? "bright_green" : "red");
+        terminal.WriteLine($"{runsRemaining}/{GameConfig.MaxGauntletRunsPerDay}");
         if (!IsScreenReader)
         {
             terminal.SetColor("darkgray");
@@ -904,6 +926,10 @@ public class AnchorRoadLocation : BaseLocation
         // Deduct entry fee and fight
         currentPlayer.Gold -= entryFee;
         currentPlayer.PFights--;
+        // v0.60.11 hotfix: count this run against the daily cap. Increments on commit
+        // (regardless of outcome -- whether the player wins, loses, surrenders, or
+        // gets dragged out, the daily slot is spent).
+        currentPlayer.GauntletRunsToday++;
 
         terminal.WriteLine("");
         terminal.SetColor("bright_red");
@@ -915,51 +941,82 @@ public class AnchorRoadLocation : BaseLocation
         int wavesCompleted = 0;
         long totalGoldEarned = 0;
         long totalXPEarned = 0;
+        int fameEarnedThisRun = 0; // v0.60.11: tracked so we can forfeit it on a loss
+
+        // v0.60.11 hotfix: pre-roll the "showpiece" champion for this run -- exactly ONE
+        // of the 7 champions drops at the player's earned top rarity (Artifact at Lv 80+,
+        // Rare at Lv 22, etc.); the other 6 drop one or two notches below. Weighted so the
+        // Tyrant (wave 10, the final fight) has a higher chance of being the showpiece --
+        // payoff-on-hardest-fight matches loot-game expectations -- but any champion can
+        // roll into it so the whole run feels meaningful.
+        //
+        // Wave-to-champion-index mapping: wave - 4 (waves 4-10 -> champion 0-6, champion 6
+        // is the Tyrant). Weights: Tyrant 35%, each other champion ~10.83%.
+        int showpieceChampionIdx;
+        {
+            int roll = random.Next(100);
+            // Tyrant gets 35%. Remaining 65% split evenly across 6 champions = 10.83% each.
+            if (roll < 35) showpieceChampionIdx = 6;       // Tyrant
+            else if (roll < 46) showpieceChampionIdx = 0;  // Vargash
+            else if (roll < 57) showpieceChampionIdx = 1;  // Selithea
+            else if (roll < 68) showpieceChampionIdx = 2;  // Korr
+            else if (roll < 79) showpieceChampionIdx = 3;  // Black Twin
+            else if (roll < 89) showpieceChampionIdx = 4;  // Aedric
+            else                 showpieceChampionIdx = 5; // Grok
+        }
 
         for (int wave = 1; wave <= GameConfig.GauntletWaveCount; wave++)
         {
-            // Determine monster level and type
-            int monsterLevel;
-            bool isBoss = false;
-            bool isMiniBoss = false;
-
-            if (wave <= 3)
+            // v0.60.11: pre-roll the death die per wave. If this wave's loss would be a
+            // "real death" (25% chance), don't set IsExhibitionCombat -- the combat engine
+            // will then run the normal death path (consume resurrection, possibly permadeath).
+            // If it would be a "drag-out" (75% chance), set the flag so combat protects HP=1
+            // and we apply the lighter XP / Fame penalty post-combat. Only one of these dice
+            // matters per run because the player only LOSES a single wave (the one that
+            // ends their run); the rest are wasted rolls.
+            // v0.60.11: between fights -- offer surrender (clean exit, no penalty) and
+            // print a crowd-ambiance line for atmosphere. First wave skips this since the
+            // player just paid the entry fee and committed.
+            if (wave > 1)
             {
-                monsterLevel = Math.Max(1, currentPlayer.Level - 3 + wave);
-            }
-            else if (wave <= 6)
-            {
-                monsterLevel = currentPlayer.Level + wave - 2;
-            }
-            else if (wave <= 9)
-            {
-                monsterLevel = currentPlayer.Level + wave;
-                isMiniBoss = true;
-            }
-            else
-            {
-                monsterLevel = currentPlayer.Level + 10;
-                isBoss = true;
+                if (await OfferGauntletSurrender(wave, wavesCompleted, totalGoldEarned, totalXPEarned, fameEarnedThisRun))
+                {
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine("");
+                    terminal.WriteLine(Loc.Get("anchor_road.gauntlet_surrender_taken"));
+                    return;
+                }
+                PrintGauntletCrowdAmbiance();
             }
 
-            monsterLevel = Math.Max(1, Math.Min(100, monsterLevel));
+            bool deathRollThisWave = random.Next(100) < GameConfig.GauntletDeathChancePercent;
 
-            var monster = MonsterGenerator.GenerateMonster(monsterLevel, isBoss, isMiniBoss, random);
+            // v0.60.11: split spawning by wave kind.
+            //   Waves 1-3: themed warmup (random low-tier monster with arena flavor wrapper).
+            //   Waves 4-10: the 7 Old God champions in canonical order, hand-crafted stats
+            //   and announced entrance theater.
+            Monster monster;
+            UsurperRemake.Data.GauntletChampionData.GauntletChampion? championData = null;
+            bool isWarmupWave = wave <= 3;
 
             terminal.ClearScreen();
             WriteSectionHeader(Loc.Get("anchor_road.wave_header", wave, GameConfig.GauntletWaveCount), "bright_yellow");
             terminal.WriteLine("");
 
-            terminal.SetColor("white");
-            terminal.Write(Loc.Get("anchor_road.opponent_label"));
-            if (isBoss)
-                terminal.SetColor("bright_red");
-            else if (isMiniBoss)
-                terminal.SetColor("bright_magenta");
+            if (isWarmupWave)
+            {
+                int monsterLevel = Math.Max(1, Math.Min(100, currentPlayer.Level - 3 + wave));
+                monster = MonsterGenerator.GenerateMonster(monsterLevel, false, false, random);
+                AnnounceWarmupWave(monster);
+            }
             else
-                terminal.SetColor("bright_cyan");
-            terminal.WriteLine($"{monster.Name} (Level {monster.Level})");
+            {
+                championData = UsurperRemake.Data.GauntletChampionData.Champions[wave - 4];
+                monster = SpawnChampionMonster(championData, currentPlayer.Level);
+                await AnnounceChampionEntrance(championData, monster);
+            }
 
+            terminal.WriteLine("");
             terminal.SetColor("white");
             terminal.Write(Loc.Get("anchor_road.your_hp"));
             terminal.SetColor(currentPlayer.HP > currentPlayer.MaxHP / 2 ? "bright_green" : "red");
@@ -970,11 +1027,14 @@ public class AnchorRoadLocation : BaseLocation
             // Real combat. v0.60.8: mark as exhibition so a wave loss doesn't
             // burn a resurrection -- the entry fee + daily PFight slot are
             // already the cost of admission. HP=1 restore happens inside
-            // HandlePlayerDeath; the wave loop ends in the defeat branch
-            // below.
+            // HandlePlayerDeath; the wave loop ends in the defeat branch below.
+            // v0.60.11: only mark as exhibition when the death-roll says
+            // "drag-out." When the roll said "real death," leave the flag
+            // false and let the combat engine's normal death path consume
+            // a resurrection (or trigger permadeath in online mode).
             var combatEngine = new CombatEngine(terminal);
             CombatResult result;
-            currentPlayer.IsExhibitionCombat = true;
+            currentPlayer.IsExhibitionCombat = !deathRollThisWave;
             try
             {
                 result = await combatEngine.PlayerVsMonster(currentPlayer, monster, null, false);
@@ -996,26 +1056,118 @@ public class AnchorRoadLocation : BaseLocation
                 currentPlayer.Gold += waveGold;
                 currentPlayer.Experience += waveXP;
 
+                // v0.60.11: Fame per wave. Curve matches the difficulty tiers:
+                // waves 1-3 (warmup, sub-level monsters) give +1 each, waves 4-6
+                // (at/over level) give +2 each, waves 7-9 (mini-boss tier) give
+                // +3 each, wave 10 (boss) gives +5. Champion bonus below adds
+                // another +20. Full clear = 1+1+1+2+2+2+3+3+3+5+20 = 43 Fame.
+                // Partial-clear progress earns scaling Fame so even reaching
+                // wave 5-6 is a meaningful renown bump (~7 Fame).
+                int waveFame = wave switch
+                {
+                    <= 3 => 1,
+                    <= 6 => 2,
+                    <= 9 => 3,
+                    _    => 5
+                };
+                currentPlayer.Fame += waveFame;
+                fameEarnedThisRun += waveFame;
+
                 terminal.SetColor("bright_green");
                 terminal.WriteLine(Loc.Get("anchor_road.wave_complete", wave, $"{waveGold:N0}", $"{waveXP:N0}"));
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine(Loc.Get("anchor_road.wave_fame", waveFame));
 
-                // Wave 10 champion bonus
+                // v0.60.11: drop the champion's themed equipment on defeat. Stats scaled
+                // to player level so the drop is always relevant. Warmup waves don't drop
+                // champion gear -- they're opening acts, gold/XP only.
+                // Hotfix: only ONE champion per run drops at the player's top rarity tier
+                // (the "showpiece"); the rest drop one or two notches below so a clear
+                // doesn't produce a full set of top-tier gear.
+                if (championData != null)
+                {
+                    int championIdx = wave - 4;
+                    bool isShowpiece = championIdx == showpieceChampionIdx;
+                    GenerateAndAwardChampionDrop(championData, currentPlayer.Level, isShowpiece);
+                }
+
+                // v0.60.11: full-clear (wave 10) tier-based reward. Tier is gated on player
+                // level at this moment: Hopeful (5-19), Veteran (20-39), Master (40-59),
+                // Champion (60-79), GrandChampion (80+). Each tier scales gold/XP/Fame
+                // dramatically and grants a tier-keyed achievement. Player's stored tier
+                // upgrades only -- a Lv 80 re-clear from a Lv 25 Veteran becomes Grand
+                // Champion permanently; a Lv 25 re-clear from a Lv 80 Grand Champion does
+                // NOT downgrade (the higher honor sticks).
                 if (wave == GameConfig.GauntletWaveCount)
                 {
-                    long championGold = GameConfig.GauntletChampionGoldPerLevel * currentPlayer.Level;
-                    long championXP = GameConfig.GauntletChampionXPPerLevel * currentPlayer.Level;
-                    totalGoldEarned += championGold;
-                    totalXPEarned += championXP;
-                    currentPlayer.Gold += championGold;
-                    currentPlayer.Experience += championXP;
+                    var earnedTier = UsurperRemake.Data.GauntletChampionData.GetTierForLevel(currentPlayer.Level);
+                    var rewards = UsurperRemake.Data.GauntletChampionData.GetTierRewards(earnedTier);
+                    string tierTitle = UsurperRemake.Data.GauntletChampionData.GetTierTitle(earnedTier);
+                    string tierAchievementId = UsurperRemake.Data.GauntletChampionData.GetTierAchievementId(earnedTier);
+
+                    long tierGold = (long)rewards.GoldMultiplierPerLevel * currentPlayer.Level;
+                    long tierXP = (long)rewards.XpMultiplierPerLevel * currentPlayer.Level;
+                    int tierFame = rewards.FameBonus;
+
+                    totalGoldEarned += tierGold;
+                    totalXPEarned += tierXP;
+                    currentPlayer.Gold += tierGold;
+                    currentPlayer.Experience += tierXP;
+                    currentPlayer.Fame += tierFame;
+                    fameEarnedThisRun += tierFame;
+
+                    // Upgrade tier only -- never downgrade on a lower-level re-clear.
+                    bool newHighWaterMark = (int)earnedTier > currentPlayer.ArenaChampionTier;
+                    if (newHighWaterMark)
+                    {
+                        currentPlayer.ArenaChampionTier = (int)earnedTier;
+                        // Auto-set NobleTitle on tier upgrade (same UX as the knighting
+                        // ceremony's auto-assign). Player can change it or remove it via
+                        // Preferences > Title at any time. Persist to MetaProgressionSystem
+                        // so the title survives NG+ cycles.
+                        currentPlayer.NobleTitle = tierTitle;
+                        try
+                        {
+                            MetaProgressionSystem.Instance.UnlockedTitles.Add(tierTitle);
+                            MetaProgressionSystem.Instance.SaveData();
+                        }
+                        catch { /* best-effort meta-persist */ }
+                    }
 
                     terminal.WriteLine("");
-                    WriteSectionHeader(Loc.Get("anchor_road.gauntlet_champion"), "bright_yellow");
+                    WriteSectionHeader(Loc.Get("anchor_road.gauntlet_full_clear", tierTitle), "bright_yellow");
                     terminal.SetColor("bright_yellow");
-                    terminal.WriteLine(Loc.Get("anchor_road.champion_bonus", $"{championGold:N0}", $"{championXP:N0}"));
+                    terminal.WriteLine(Loc.Get("anchor_road.tier_reward", $"{tierGold:N0}", $"{tierXP:N0}", tierFame));
+                    if (newHighWaterMark)
+                    {
+                        terminal.SetColor("bright_magenta");
+                        terminal.WriteLine(Loc.Get("anchor_road.tier_title_earned", tierTitle));
+                        terminal.SetColor("dark_gray");
+                        terminal.WriteLine(Loc.Get("anchor_road.tier_title_change_hint"));
+                        if (earnedTier == UsurperRemake.Data.GauntletChampionData.ArenaTier.GrandChampion)
+                        {
+                            terminal.SetColor("bright_cyan");
+                            terminal.WriteLine(Loc.Get("anchor_road.grand_champion_passive",
+                                (int)(GameConfig.GrandChampionDamageBonus * 100),
+                                (int)(GameConfig.GrandChampionDefenseBonus * 100)));
+                        }
+                    }
+                    else
+                    {
+                        terminal.SetColor("dark_gray");
+                        terminal.WriteLine(Loc.Get("anchor_road.tier_title_already_held",
+                            UsurperRemake.Data.GauntletChampionData.GetTierTitle((UsurperRemake.Data.GauntletChampionData.ArenaTier)currentPlayer.ArenaChampionTier)));
+                    }
 
-                    AchievementSystem.TryUnlock(currentPlayer, "gauntlet_champion");
-                    NewsSystem.Instance.Newsy(true, $"{currentPlayer.DisplayName} conquered The Gauntlet!");
+                    AchievementSystem.TryUnlock(currentPlayer, tierAchievementId);
+                    NewsSystem.Instance.Newsy(true, $"{tierTitle} {currentPlayer.DisplayName} has conquered the Anchor Road Gauntlet!");
+                    try
+                    {
+                        if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                            UsurperRemake.Server.MudServer.Instance?.BroadcastToAll(
+                                $"[1;33m*** {tierTitle} {currentPlayer.DisplayName} has conquered the Anchor Road Gauntlet! ***[0m");
+                    }
+                    catch { /* broadcast best-effort */ }
                 }
                 else
                 {
@@ -1036,19 +1188,57 @@ public class AnchorRoadLocation : BaseLocation
             }
             else
             {
-                // Player went down or fled -- gauntlet over. v0.60.8:
-                // exhibition flag in HandlePlayerDeath already restored HP=1;
-                // surface a recovery line so the player understands no
-                // resurrection was consumed.
+                // Player went down or fled -- gauntlet over.
                 terminal.SetColor("red");
                 terminal.WriteLine("");
+
                 if (result.Outcome == CombatOutcome.PlayerEscaped)
+                {
+                    // Flee. No real death, no drag-out penalty -- the flee itself
+                    // already cost them the entry fee + daily fight slot.
                     terminal.WriteLine(Loc.Get("anchor_road.flee_disgrace"));
+                }
+                else if (deathRollThisWave)
+                {
+                    // v0.60.11: real death. Combat already ran the normal death
+                    // path (consumed a resurrection in online mode, possibly
+                    // triggered permadeath if Resurrections was 0). HandlePlayerDeath
+                    // already printed the appropriate death narrative. We just need
+                    // a gauntlet-specific flavor line and to forfeit any Fame
+                    // earned this run (the run is voided since they "died").
+                    terminal.SetColor("bright_red");
+                    terminal.WriteLine(Loc.Get("anchor_road.gauntlet_claims_you"));
+                    if (fameEarnedThisRun > 0)
+                    {
+                        currentPlayer.Fame = Math.Max(0, currentPlayer.Fame - fameEarnedThisRun);
+                        terminal.SetColor("dark_gray");
+                        terminal.WriteLine(Loc.Get("anchor_road.gauntlet_fame_forfeit_dead", fameEarnedThisRun));
+                    }
+                }
                 else
                 {
+                    // v0.60.11: drag-out. Exhibition flag protected the player from
+                    // resurrection consumption (HP=1 restore in HandlePlayerDeath).
+                    // Apply the lighter penalty: 5% of current XP + forfeit Fame
+                    // earned this run + extra -5 Fame for the loss itself.
+                    long xpLost = (long)(currentPlayer.Experience * GameConfig.GauntletDragoutXPLossPercent);
+                    int fameLost = fameEarnedThisRun + GameConfig.GauntletDragoutFameLossPenalty;
+                    currentPlayer.Experience = Math.Max(0, currentPlayer.Experience - xpLost);
+                    currentPlayer.Fame = Math.Max(0, currentPlayer.Fame - fameLost);
+
                     terminal.WriteLine(Loc.Get("anchor_road.collapse_arena"));
                     terminal.SetColor("dark_gray");
                     terminal.WriteLine(Loc.Get("anchor_road.gauntlet_recovered"));
+                    if (xpLost > 0)
+                    {
+                        terminal.SetColor("yellow");
+                        terminal.WriteLine(Loc.Get("anchor_road.gauntlet_xp_loss", $"{xpLost:N0}"));
+                    }
+                    if (fameLost > 0)
+                    {
+                        terminal.SetColor("yellow");
+                        terminal.WriteLine(Loc.Get("anchor_road.gauntlet_fame_loss", fameLost));
+                    }
                 }
                 break;
             }
@@ -1074,6 +1264,253 @@ public class AnchorRoadLocation : BaseLocation
         terminal.SetColor("darkgray");
         terminal.WriteLine(Loc.Get("ui.press_enter"));
         await terminal.ReadKeyAsync();
+    }
+
+    // ====================================================================================
+    // v0.60.11 Anchor Road Gauntlet helpers -- champion encounters, ambiance, surrender.
+    // ====================================================================================
+
+    /// <summary>Themed warmup-wave announcement. Random pick from the WarmupWaveFlavor pool
+    /// in GauntletChampionData. Waves 1-3 use this; the monster is still a real
+    /// MonsterGenerator spawn but framed as a condemned criminal / escaped slave / dire
+    /// beast / drunk gladiator / etc., delivering the "opening acts" feel.</summary>
+    private void AnnounceWarmupWave(Monster monster)
+    {
+        var flavor = UsurperRemake.Data.GauntletChampionData.WarmupWaveFlavor;
+        string line = flavor[random.Next(flavor.Length)];
+
+        terminal.SetColor("white");
+        terminal.WriteLine(line);
+        terminal.WriteLine("");
+        terminal.SetColor("bright_cyan");
+        terminal.Write(Loc.Get("anchor_road.opponent_label"));
+        terminal.WriteLine($"{monster.Name} (Level {monster.Level})");
+    }
+
+    /// <summary>Multi-line champion entrance theater with timing. Reads the herald's
+    /// announcement, prints the god-lore reveal in italics, and shows the crowd's reaction.
+    /// 600ms beat between each line so the player can read.</summary>
+    private async Task AnnounceChampionEntrance(
+        UsurperRemake.Data.GauntletChampionData.GauntletChampion champion, Monster monster)
+    {
+        terminal.SetColor("bright_yellow");
+        foreach (var line in champion.EntranceAnnouncement)
+        {
+            terminal.WriteLine(line);
+            await Task.Delay(600);
+        }
+        terminal.WriteLine("");
+
+        // Lore line: italicized via dark color, leading two-space indent for emphasis.
+        terminal.SetColor("dark_gray");
+        terminal.WriteLine($"  {champion.LoreLine}");
+        terminal.WriteLine("");
+        await Task.Delay(800);
+
+        // Crowd reaction (sets the mood for this specific fight).
+        terminal.SetColor("white");
+        terminal.WriteLine(champion.CrowdReaction);
+        terminal.WriteLine("");
+        await Task.Delay(600);
+
+        // Stat banner: the champion's title, the patron god, the level.
+        terminal.SetColor("bright_red");
+        terminal.WriteLine($"  {champion.Name}, {champion.Title} (Level {monster.Level})");
+        terminal.SetColor("dark_gray");
+        terminal.WriteLine($"  Patron: {champion.GodPatron}");
+    }
+
+    /// <summary>Build a real Monster from a champion data entry, scaled to the player's
+    /// current level. Champion's effective level = playerLevel + champion.LevelBonus;
+    /// stats scale via MonsterGenerator at that level, then we multiply HP/ATK/DEF by the
+    /// champion's role-specific multipliers and override the name/title/abilities.</summary>
+    private Monster SpawnChampionMonster(
+        UsurperRemake.Data.GauntletChampionData.GauntletChampion champion, long playerLevel)
+    {
+        int effLevel = (int)Math.Max(1, Math.Min(100, playerLevel + champion.LevelBonus));
+        var monster = MonsterGenerator.GenerateMonster(effLevel, isBoss: true, isMiniBoss: false, random);
+
+        monster.Name = champion.Name;
+        monster.MonsterColor = "bright_yellow";
+        monster.HP = (long)(monster.HP * champion.HpMultiplier);
+        monster.MaxHP = (long)(monster.MaxHP * champion.HpMultiplier);
+        monster.Strength = (int)(monster.Strength * champion.AttackMultiplier);
+        monster.Defence = (int)(monster.Defence * champion.DefenseMultiplier);
+        monster.ArmPow = (int)(monster.ArmPow * champion.DefenseMultiplier);
+
+        // Override the random ability roll with the champion's themed kit.
+        if (champion.SpecialAbilities != null && champion.SpecialAbilities.Length > 0)
+        {
+            monster.SpecialAbilities.Clear();
+            foreach (var ab in champion.SpecialAbilities)
+                monster.SpecialAbilities.Add(ab);
+        }
+
+        return monster;
+    }
+
+    /// <summary>Print one random crowd-ambiance line between fights, in dark gray italics.
+    /// Keeps the arena feeling alive between confrontations.</summary>
+    private void PrintGauntletCrowdAmbiance()
+    {
+        var lines = UsurperRemake.Data.GauntletChampionData.CrowdAmbiance;
+        terminal.SetColor("dark_gray");
+        terminal.WriteLine("");
+        terminal.WriteLine($"  {lines[random.Next(lines.Length)]}");
+        terminal.WriteLine("");
+    }
+
+    /// <summary>Prompt the player to surrender between fights. Surrender is a clean exit:
+    /// no real-death roll, no XP/Fame penalty, no resurrection consumed. The player keeps
+    /// whatever gold/XP/Fame they earned in waves already completed. Returns true if
+    /// the player chose to yield.</summary>
+    private async Task<bool> OfferGauntletSurrender(int nextWave, int wavesCompleted, long totalGold, long totalXp, int fameEarned)
+    {
+        terminal.WriteLine("");
+        terminal.SetColor("yellow");
+        terminal.WriteLine(Loc.Get("anchor_road.surrender_prompt_header", nextWave - 1, GameConfig.GauntletWaveCount));
+        terminal.SetColor("dark_gray");
+        terminal.WriteLine(Loc.Get("anchor_road.surrender_prompt_keep", $"{totalGold:N0}", $"{totalXp:N0}", fameEarned));
+        terminal.WriteLine("");
+        terminal.SetColor("white");
+        terminal.Write(Loc.Get("anchor_road.surrender_prompt_question"));
+        string? response = await terminal.ReadLineAsync();
+        return response != null && response.Trim().StartsWith("y", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Generate and award the champion's themed equipment drop. Stats scale to
+    /// the player's current level so a Lv 10 player gets a Lv 10 version, a Lv 80 player
+    /// gets a Lv 80 version. Same item name and slot regardless of tier; only stats differ.</summary>
+    private void GenerateAndAwardChampionDrop(
+        UsurperRemake.Data.GauntletChampionData.GauntletChampion champion, long playerLevel, bool isShowpiece)
+    {
+        // Map slot hint to EquipmentSlot for the drop.
+        EquipmentSlot slot = champion.Drop.SlotHint switch
+        {
+            "MainHand" => EquipmentSlot.MainHand,
+            "OffHand"  => EquipmentSlot.OffHand,
+            "Body"     => EquipmentSlot.Body,
+            "Head"     => EquipmentSlot.Head,
+            "Legs"     => EquipmentSlot.Legs,
+            "Feet"     => EquipmentSlot.Feet,
+            "Arms"     => EquipmentSlot.Arms,
+            "Hands"    => EquipmentSlot.Hands,
+            "Waist"    => EquipmentSlot.Waist,
+            "Cloak"    => EquipmentSlot.Cloak,
+            "Face"     => EquipmentSlot.Face,
+            "Neck"     => EquipmentSlot.Neck,
+            "LFinger"  => EquipmentSlot.LFinger,
+            "RFinger"  => EquipmentSlot.RFinger,
+            _          => EquipmentSlot.MainHand
+        };
+
+        bool isWeapon = slot == EquipmentSlot.MainHand || slot == EquipmentSlot.OffHand;
+        bool isAccessory = slot == EquipmentSlot.Neck || slot == EquipmentSlot.LFinger || slot == EquipmentSlot.RFinger;
+
+        // Top-tier rarity earned at this player level. The "showpiece" champion drop
+        // (one random pick per run) lands at this rarity; the other six drops land one
+        // or two notches below it -- so a full clear gives one chase-tier piece and six
+        // mixed mid-tier pieces, not seven top-tier pieces.
+        EquipmentRarity topRarity = playerLevel >= 80 ? EquipmentRarity.Artifact
+                                  : playerLevel >= 60 ? EquipmentRarity.Legendary
+                                  : playerLevel >= 40 ? EquipmentRarity.Epic
+                                  : playerLevel >= 20 ? EquipmentRarity.Rare
+                                  : EquipmentRarity.Uncommon;
+
+        EquipmentRarity rarity;
+        if (isShowpiece)
+        {
+            rarity = topRarity;
+        }
+        else
+        {
+            // Roll between one and two notches below the top tier (50/50). Floors at
+            // Common so even a Lv 5 Hopeful run's filler drops have a defined rarity.
+            var rarityScale = new[]
+            {
+                EquipmentRarity.Common,
+                EquipmentRarity.Uncommon,
+                EquipmentRarity.Rare,
+                EquipmentRarity.Epic,
+                EquipmentRarity.Legendary,
+                EquipmentRarity.Artifact
+            };
+            int topIdx = System.Array.IndexOf(rarityScale, topRarity);
+            int notchesDown = random.Next(1, 3); // 1 or 2
+            int rolledIdx = System.Math.Max(0, topIdx - notchesDown);
+            rarity = rarityScale[rolledIdx];
+        }
+
+        var drop = new Equipment
+        {
+            Name = champion.Drop.ItemName,
+            Slot = slot,
+            Rarity = rarity,
+            MinLevel = (int)Math.Max(1, playerLevel - 2),
+            Description = champion.Drop.FlavorDescription
+        };
+
+        // Stat power matches the rarity label, using the same `basePower * levelScale *
+        // rarityMult` curve LootGenerator applies to regular dungeon drops. Pre-fix the
+        // formula was `playerLevel * 10` flat (Lv 22 = WP:198 / AP:198), which delivered
+        // Artifact-tier stats regardless of the rarity label -- 2-4x too powerful at
+        // every level. Now an arena drop reads roughly like a top-rarity equivalent of
+        // a typical dungeon template for the same slot.
+        float rarityMult = rarity switch
+        {
+            EquipmentRarity.Uncommon  => 1.3f,
+            EquipmentRarity.Rare      => 1.7f,
+            EquipmentRarity.Epic      => 2.2f,
+            EquipmentRarity.Legendary => 3.0f,
+            EquipmentRarity.Artifact  => 4.0f,
+            _ => 1.0f
+        };
+        float levelScale = 1.0f + (playerLevel / 80.0f);
+
+        // Slot-appropriate base power, calibrated against representative LootGenerator
+        // templates so arena drops live in the same value space as dungeon loot.
+        int slotBasePower = slot switch
+        {
+            EquipmentSlot.MainHand or EquipmentSlot.OffHand           => 35,   // ~Broadsword
+            EquipmentSlot.Body                                        => 28,
+            EquipmentSlot.Head                                        => 18,
+            EquipmentSlot.Face                                        => 14,
+            EquipmentSlot.Cloak or EquipmentSlot.Waist                => 10,
+            EquipmentSlot.Arms  or EquipmentSlot.Legs
+              or EquipmentSlot.Hands or EquipmentSlot.Feet            => 14,
+            EquipmentSlot.Neck  or EquipmentSlot.LFinger
+              or EquipmentSlot.RFinger                                =>  8,
+            _ => 15
+        };
+        int power = (int)Math.Max(5, slotBasePower * levelScale * rarityMult);
+
+        // Per-slot stat distribution. Mirrors LootGenerator proportions roughly.
+        if (isWeapon)
+        {
+            drop.WeaponPower   = power;
+            drop.StrengthBonus = Math.Max(1, power / 6);
+        }
+        else if (isAccessory)
+        {
+            drop.StrengthBonus     = Math.Max(1, power / 2);
+            drop.ConstitutionBonus = Math.Max(1, power / 2);
+        }
+        else // Armor
+        {
+            drop.ArmorClass        = power;
+            drop.DefenceBonus      = Math.Max(1, power / 4);
+            drop.ConstitutionBonus = Math.Max(1, power / 8);
+        }
+
+        drop.Id = EquipmentDatabase.RegisterDynamic(drop);
+
+        // Hand it to the player. Combat already showed the champion's death; this fires
+        // immediately after the wave-complete reward print, in cyan to stand out.
+        currentPlayer.Inventory.Add(currentPlayer.ConvertEquipmentToLegacyItem(drop));
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine(Loc.Get("anchor_road.champion_drop", drop.Name));
+        terminal.SetColor("dark_gray");
+        terminal.WriteLine($"  {drop.Description}");
     }
 
     /// <summary>

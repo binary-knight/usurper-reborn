@@ -390,15 +390,60 @@ public static class AchievementSystem
             GoldReward = 5000
         },
 
+        // v0.60.11 Anchor Road Gauntlet redesign -- replaced the single `gauntlet_champion`
+        // achievement with five tier-keyed entries, one per ArenaTier from GauntletChampionData.
+        // Tier is gated on player level at moment of full clear so a Lv 5 clear vs a Lv 80
+        // clear feel categorically different. Highest-tier achievement is the visible prestige;
+        // lower tiers are still earnable / collectable for completionists.
         new Achievement
         {
-            Id = "gauntlet_champion",
-            Name = "Gauntlet Champion",
-            Description = "Survived all 10 waves of The Gauntlet",
+            Id = "arena_hopeful",
+            Name = "Arena Hopeful",
+            Description = "Survived all 10 fights of the Anchor Road Gauntlet at level 5-19",
+            Category = AchievementCategory.Combat,
+            Tier = AchievementTier.Bronze,
+            PointValue = 20,
+            GoldReward = 100
+        },
+        new Achievement
+        {
+            Id = "arena_veteran",
+            Name = "Arena Veteran",
+            Description = "Survived all 10 fights of the Anchor Road Gauntlet at level 20-39",
+            Category = AchievementCategory.Combat,
+            Tier = AchievementTier.Silver,
+            PointValue = 35,
+            GoldReward = 250
+        },
+        new Achievement
+        {
+            Id = "arena_master",
+            Name = "Arena Master",
+            Description = "Survived all 10 fights of the Anchor Road Gauntlet at level 40-59",
             Category = AchievementCategory.Combat,
             Tier = AchievementTier.Gold,
             PointValue = 50,
-            GoldReward = 250
+            GoldReward = 500
+        },
+        new Achievement
+        {
+            Id = "arena_champion",
+            Name = "Arena Champion",
+            Description = "Survived all 10 fights of the Anchor Road Gauntlet at level 60-79",
+            Category = AchievementCategory.Combat,
+            Tier = AchievementTier.Platinum,
+            PointValue = 75,
+            GoldReward = 1000
+        },
+        new Achievement
+        {
+            Id = "grand_champion",
+            Name = "Grand Champion",
+            Description = "Survived all 10 fights of the Anchor Road Gauntlet at level 80+. The Nameless Tyrant fell to your blade.",
+            Category = AchievementCategory.Combat,
+            Tier = AchievementTier.Diamond,
+            PointValue = 150,
+            GoldReward = 5000
         },
 
         // ============ PROGRESSION ACHIEVEMENTS ============

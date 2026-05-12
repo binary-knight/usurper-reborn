@@ -663,8 +663,12 @@ public static class MudChatSystem
                     ? char.ToUpper(rawName[0]) + rawName.Substring(1)
                     : rawName;
 
-                // Prepend noble title (Sir/Dame) for knighted players
-                if (player?.IsKnighted == true)
+                // Prepend honorific from the player's chosen title (NobleTitle). Arena
+                // Champion tiers now flow through the same NobleTitle field as knighthood
+                // and meta-progression titles, so the player can pick which title to
+                // display (or none) via Preferences > Title. The combat bonus for Grand
+                // Champion still applies under the hood via ArenaChampionTier.
+                if (!string.IsNullOrEmpty(player?.NobleTitle))
                     name = $"{player.NobleTitle} {name}";
 
                 // Title priority: custom > wizard rank > god rank > (none)
