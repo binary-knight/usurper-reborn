@@ -1676,6 +1676,10 @@ function renderStatsTab(data) {
       ${editableField('Wisdom', s.wisdom, 'player.wisdom')}
       ${editableField('Charisma', s.charisma, 'player.charisma')}
       ${editableField('Fatigue', s.fatigue, 'player.fatigue')}
+      ${editableField('Resurrections', s.resurrections, 'player.resurrections')}
+      ${editableField('Max Resurrections', s.maxResurrections, 'player.maxResurrections')}
+      ${editableField('Resurrections Used', s.resurrectionsUsed, 'player.resurrectionsUsed')}
+      ${editableField('Temple Rezzes Used', s.templeResurrectionsUsed, 'player.templeResurrectionsUsed')}
     </div>
     <div style="margin-top: 0.5rem; color: var(--dim); font-size: 11px;">
       Playtime: ${Math.floor(data.playtimeMinutes / 60)}h ${data.playtimeMinutes % 60}m

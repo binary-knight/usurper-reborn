@@ -2527,6 +2527,10 @@ async function handleAdminRequest(req, res) {
           constitution: p.constitution || 0, intelligence: p.intelligence || 0,
           wisdom: p.wisdom || 0, charisma: p.charisma || 0,
           fatigue: p.fatigue || 0,
+          resurrections: p.resurrections || 0,
+          maxResurrections: p.maxResurrections || 3,
+          resurrectionsUsed: p.resurrectionsUsed || 0,
+          templeResurrectionsUsed: p.templeResurrectionsUsed || 0,
         },
         resources: {
           gold: p.gold || 0, bankGold: p.bankGold || 0,

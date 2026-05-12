@@ -484,7 +484,7 @@ public class HomeLocation : BaseLocation
         ShowBBSMenuRow(("A", "bright_yellow", Loc.Get("home.gather_herbs")), ("T", "bright_yellow", Loc.Get("home.trophies")), ("F", "bright_yellow", Loc.Get("home.family")));
         ShowBBSMenuRow(("C", "bright_yellow", Loc.Get("home.children_interact")), ("P", "bright_yellow", Loc.Get("home.partner")), ("B", "bright_yellow", Loc.Get("home.bedroom")));
         ShowBBSMenuRow(("X", "bright_yellow", Loc.Get("home.resurrect")), ("I", "bright_yellow", Loc.Get("dungeon.inventory")), ("G", "bright_yellow", Loc.Get("home.gear_partner")));
-        ShowBBSMenuRow(("H", "bright_yellow", Loc.Get("home.heal_potion")));
+        ShowBBSMenuRow(("H", "bright_yellow", Loc.Get("home.heal_potion")), ("Y", "bright_yellow", Loc.Get("home.pet_roster")));
         if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && currentPlayer != null)
         {
             string zLabel = DailySystemManager.CanRestForNight(currentPlayer) ? Loc.Get("home.sleep") : Loc.Get("home.wait_night");
@@ -615,6 +615,9 @@ public class HomeLocation : BaseLocation
                 return false;
             case "X":
                 await ResurrectAlly();
+                return false;
+            case "Y":
+                await ShowPetRoster();
                 return false;
             case "R":
             case "Q":
@@ -4253,6 +4256,79 @@ public class HomeLocation : BaseLocation
     }
 
     /// <summary>
+    /// v0.61.0 Beast Taming: display the tamed-beasts roster and let the player set,
+    /// switch, or unset the active beast. Combat beasts (Dire Wolf, Storm Eagle) take
+    /// the 5th party slot when set active; passive beasts ride along quietly and
+    /// apply their bonus globally.
+    /// </summary>
+    private async Task ShowPetRoster()
+    {
+        terminal.ClearScreen();
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine(Loc.Get("home.pet_roster_header"));
+        terminal.WriteLine("");
+        terminal.SetColor("white");
+        terminal.WriteLine(Loc.Get("home.pet_roster_intro", currentPlayer.PetRoster.Count, UsurperRemake.Data.BeastData.MaxRosterSize));
+        terminal.WriteLine("");
+
+        if (currentPlayer.PetRoster.Count == 0)
+        {
+            terminal.SetColor("dark_gray");
+            terminal.WriteLine($"  {Loc.Get("home.pet_roster_empty")}");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        // List entries.
+        for (int i = 0; i < currentPlayer.PetRoster.Count; i++)
+        {
+            var pet = currentPlayer.PetRoster[i];
+            var def = pet.GetDefinition();
+            bool isActive = string.Equals(currentPlayer.ActivePetId, pet.Id, StringComparison.OrdinalIgnoreCase);
+            terminal.SetColor("gray");
+            terminal.Write($"  [{i + 1}] ");
+            terminal.SetColor(isActive ? "bright_green" : "white");
+            terminal.Write($"{pet.Name,-22}");
+            terminal.SetColor("dark_gray");
+            if (def != null)
+            {
+                string roleLabel = def.Role == UsurperRemake.Data.BeastData.BeastRole.Combat ? "[Combat]" : "[Passive]";
+                terminal.Write($"  Lv{pet.Level,-2} {roleLabel,-9}");
+            }
+            terminal.SetColor("cyan");
+            terminal.WriteLine($"  {def?.PassiveDescription ?? ""}");
+        }
+        terminal.WriteLine("");
+        terminal.SetColor("gray");
+        terminal.WriteLine(Loc.Get("home.pet_roster_active_prompt"));
+        terminal.WriteLine(Loc.Get("home.pet_roster_unset_prompt"));
+        terminal.WriteLine(IsScreenReader ? "  0. Cancel" : "  [0] Cancel");
+        terminal.WriteLine("");
+
+        var input = await terminal.GetInput(Loc.Get("home.pet_roster_select"));
+        if (string.IsNullOrWhiteSpace(input)) return;
+        var trimmed = input.Trim().ToUpperInvariant();
+
+        if (trimmed == "U")
+        {
+            currentPlayer.ActivePetId = "";
+            terminal.SetColor("yellow");
+            terminal.WriteLine(Loc.Get("home.pet_roster_unset"));
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        if (!int.TryParse(trimmed, out int choice) || choice < 1 || choice > currentPlayer.PetRoster.Count)
+            return;
+
+        var selected = currentPlayer.PetRoster[choice - 1];
+        currentPlayer.ActivePetId = selected.Id;
+        terminal.SetColor("bright_green");
+        terminal.WriteLine(Loc.Get("home.pet_roster_set_active", selected.Name));
+        await terminal.PressAnyKey();
+    }
+
+    /// <summary>
     /// Resurrect a dead teammate
     /// </summary>
     private async Task ResurrectAlly()
@@ -5012,6 +5088,7 @@ toResurrect.IsDead = false;
             new() { Key = "P", Label = "Spend Time with Spouse", Category = "social", Icon = "love" },
             new() { Key = "B", Label = "Bedroom", Category = "social", Icon = "bedroom" },
             new() { Key = "X", Label = "Resurrect Partner", Category = "service", Icon = "resurrect" },
+            new() { Key = "Y", Label = "Tamed Beasts", Category = "social", Icon = "pet" },
             new() { Key = "I", Label = "Inventory", Category = "info", Icon = "inventory" },
             new() { Key = "G", Label = "Gear for Partner", Category = "service", Icon = "gear" },
             new() { Key = "V", Label = "Party Inventory", Category = "info", Icon = "party" },

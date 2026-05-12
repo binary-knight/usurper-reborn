@@ -2,7 +2,7 @@
 
 ## A Persistent Online Text RPG with a Living World
 
-**BETA v0.60.8** | **FREE AND OPEN SOURCE** | **GPL v2**
+**BETA v0.61.0** | **FREE AND OPEN SOURCE** | **GPL v2**
 
 130+ autonomous NPCs wake up, go to work, visit taverns, fall in love, get married, have children, age, and eventually die of old age, all while you're offline. Log back in, read the news feed, and discover that the blacksmith married the barmaid, the king was assassinated, or a new generation just came of age. The world doesn't wait for you.
 
@@ -68,7 +68,7 @@ You wake with no memory. A letter in your own handwriting warns you: *"The gods 
 - Knighthood with combat buffs and Sir/Dame title prefix.
 
 ### Locations
-30+ player-visitable locations: Main Street, Inn, Bank, Weapon Shop, Armor Shop, Magic Shop, Music Shop, Healer, Temple, Church, Dark Alley, Level Master, Marketplace, Castle, Castle Courtyard, Pantheon, Hall of the Ascended, Prison, Prison Walk, Anchor Road, Team Corner, Quest Hall, Dungeons, Home (with 5-tier upgrade system), Wilderness, Outskirts settlement, Arena, and more.
+30+ player-visitable locations: Main Street, Inn, Bank, Weapon Shop, Armor Shop, Magic Shop, Music Shop, Healer, Temple, Church, Dark Alley, Level Master, Marketplace, Castle, Castle Courtyard, Pantheon, Hall of the Ascended, Prison, Prison Walk, Anchor Road, Team Corner, Quest Hall, Dungeons, Home (with 5-tier upgrade system and tamed-beasts menagerie), Wilderness (with Druid's Shrines pilgrimage and beast-taming encounters), Outskirts settlement, Arena, and more.
 
 ### Mod Support & Game Editor
 Opt-in JSON mods drop into a `GameData/` folder next to the executable: NPCs, monster families, dreams, achievements, dialogue lines, balance constants, and custom equipment are all overridable without a recompile. A bundled menu-driven editor (`UsurperReborn --editor`, or `[G] Game Editor` from the main menu in single-player) is the sysop-tool analogue of the DOS-era `USEDIT.EXE`: arrow-key / number-key navigation, edits saves and mods from one UI, auto-backs up before writes. See `DOCS/MODDING.md` for the full guide.
@@ -278,7 +278,8 @@ For detailed BBS setup, see [DOCS/BBS_DOOR_SETUP.md](DOCS/BBS_DOOR_SETUP.md).
 
 The game ships small patches frequently. Each version has a dedicated release notes file in `DOCS/RELEASE_NOTES_*.md`. Highlights of the recent arc:
 
-- **v0.60.x (Beta launch and post-launch hardening):** Online server wipe, founder statues for the 11 alpha-era pioneers, GMCP support for modern MUD clients, online-mode death system with 3 free resurrections, royal-guard arrest combat (replacing the phantom-arrest debuff), tank rebalance (75%-sticky AoE taunts), full ban-system rewrite (account + IP + CIDR + active-session kick + permadeath world-state purge), Discord bridge with login/logout announcements, server picker in `[O] Online Play`, AUTH security fix (loopback-only trusted auth), SR auto-detect false-positive fix on Steam and BBS.
+- **v0.61.0 (Wilderness Reborn):** Two new systems folded into the wilderness. **Druid's Shrines** -- 5 named shrines (one per remaining Old God: Terravok, Maelketh, Noctura, Aurelion, Veloura), each in a wilderness region, granting a 24-hour combat passive on attunement (HP regen / melee damage / crit + backstab / holy damage / charisma + reaction). One attunement at a time with alignment cost; per-shrine favor counter; favor-10 milestone grants a permanent stat lift themed to the god's domain. **Beast Taming** -- 8 tameable wild creatures, permanent roster (cap 8), per-encounter 3-attempt CHA+DEX skill check. 6 passives (hawk map-reveal, goat fatigue reduction, toad poison resist + daily antidote, sprite mana regen, spider crit + reaction penalty, wisp shadow proc + opening-fight Hidden) and 2 combat pets (Dire Wolf + Storm Eagle) that occupy a brand-new 5th party slot in dungeon combat. Plus a street-encounter NPC murder-cap bypass fix (was uncapped, now real-NPC kills count toward the 3/day limit), and the newborn notification text correction (children live at Home, not Love Corner). All 66 new keys translated into Spanish, French, Italian, Hungarian.
+- **v0.60.x (Beta launch and post-launch hardening):** Online server wipe, founder statues for the 11 alpha-era pioneers, GMCP support for modern MUD clients, online-mode death system with 3 free resurrections, royal-guard arrest combat (replacing the phantom-arrest debuff), tank rebalance (75%-sticky AoE taunts), full ban-system rewrite (account + IP + CIDR + active-session kick + permadeath world-state purge), Discord bridge with login/logout announcements, server picker in `[O] Online Play`, AUTH security fix (loopback-only trusted auth), SR auto-detect false-positive fix on Steam and BBS. The Gauntlet redesigned (v0.60.11) as a 7-champion gladiatorial arena with herald entrances, surrender option, tier-titled completions, daily run cap, and quadratic entry fee.
 - **v0.57.x (Alignment, Shields, and many hotfix rollups):** Paired chivalry/darkness movement, Temple Confession path, "Balanced" alignment with both-sides shop discounts, shield-required tank abilities, Warrior Shield Bash, Paladin Holy Shield Slam, save-file repair tooling, save-file resilience pass.
 - **v0.56.x (Class Completeness + Difficulty Tuning):** Tank second-taunt abilities at level 40, healer onboarding (Curative Tincture, Mending Meditation, etc.), Tidesworn cohesion, champion / floor-boss / Old God rebalance, stamina-mana economy.
 - **v0.55.x (The Specialist):** 24 NPC class specializations (2 per class), spec-driven AI ability priorities.
@@ -326,7 +327,7 @@ Join Discord for discussions, feedback, and updates: **https://discord.gg/EZhwgD
 
 *"You are not a wave fighting the ocean. You ARE the ocean, dreaming of being a wave."*
 
-## Known Issues (Beta v0.60.8)
+## Known Issues (Beta v0.61.0)
 
 - Save files from earlier alpha versions may not be fully compatible.
 - BBS FOSSIL mode not natively supported (use `--stdio` flag for FOSSIL-based BBSes via host pipe).
@@ -338,4 +339,4 @@ Join Discord for discussions, feedback, and updates: **https://discord.gg/EZhwgD
 
 ---
 
-**Status:** BETA v0.60.8. The world is running. [Watch it live.](https://usurper-reborn.net)
+**Status:** BETA v0.61.0. The world is running. [Watch it live.](https://usurper-reborn.net)

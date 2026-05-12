@@ -930,6 +930,19 @@ namespace UsurperRemake.Systems
                 DrinkingGamesToday = player.DrinkingGamesToday,
                 LoveStreetVisitsToday = player.LoveStreetVisitsToday,
                 GauntletRunsToday = player.GauntletRunsToday,
+                MarshToadAntidoteClaimedToday = player.MarshToadAntidoteClaimedToday,
+                AttunedShrineId = player.AttunedShrineId ?? "",
+                AttunedShrineExpiresUtc = player.AttunedShrineExpiresUtc,
+                ShrineFavor = player.ShrineFavor != null ? new Dictionary<string, int>(player.ShrineFavor) : new Dictionary<string, int>(),
+                PetRoster = player.PetRoster?.Select(p => new PetSaveData
+                {
+                    Id = p.Id,
+                    Name = p.Name,
+                    TamedAtUtc = p.TamedAtUtc,
+                    Level = p.Level,
+                    Experience = p.Experience
+                }).ToList() ?? new List<PetSaveData>(),
+                ActivePetId = player.ActivePetId ?? "",
                 LastPartnerBondingUtc = player.LastPartnerBondingUtc,
                 LoanAmount = player.LoanAmount,
                 LoanDaysRemaining = player.LoanDaysRemaining,

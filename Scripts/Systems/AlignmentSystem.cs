@@ -166,24 +166,43 @@ namespace UsurperRemake.Systems
 
             // Similar alignments get along better
             if ((playerAlignment == AlignmentType.Holy || playerAlignment == AlignmentType.Good) && npcIsGood)
-                return 1.5f; // 50% better reactions
+                return ApplyVeloraReactionBonus(player, 1.5f); // 50% better reactions
 
             if ((playerAlignment == AlignmentType.Evil || playerAlignment == AlignmentType.Dark) && npcIsEvil)
-                return 1.5f; // Evil characters respect each other
+                return ApplyVeloraReactionBonus(player, 1.5f); // Evil characters respect each other
 
             // v0.57.0 Balanced — good NPCs and evil NPCs both treat the player better than strangers,
             // because the player has meaningfully acted on both sides. Pragmatism earns respect.
             if (playerAlignment == AlignmentType.Balanced && (npcIsGood || npcIsEvil))
-                return 1.3f;
+                return ApplyVeloraReactionBonus(player, 1.3f);
 
             // Opposite alignments clash
             if ((playerAlignment == AlignmentType.Holy || playerAlignment == AlignmentType.Good) && npcIsEvil)
-                return 0.5f; // 50% worse reactions
+                return ApplyVeloraReactionBonus(player, 0.5f); // 50% worse reactions
 
             if ((playerAlignment == AlignmentType.Evil || playerAlignment == AlignmentType.Dark) && npcIsGood)
-                return 0.5f;
+                return ApplyVeloraReactionBonus(player, 0.5f);
 
-            return 1.0f; // Neutral reactions
+            return ApplyVeloraReactionBonus(player, 1.0f); // Neutral reactions
+        }
+
+        /// <summary>
+        /// v0.61.0 Druid's Shrines + Beast Taming: applies social-modifier deltas from
+        /// active long-term effects. Veloura attunement = +15% reactions (warmer);
+        /// Cave Spider active pet = -10% reactions (creepy). Both stack multiplicatively
+        /// on top of alignment-compatibility math.
+        /// </summary>
+        private static float ApplyVeloraReactionBonus(Character player, float baseModifier)
+        {
+            float modifier = baseModifier;
+            if (player != null)
+            {
+                if (player.IsAttunedTo("veloura"))
+                    modifier *= (1f + GameConfig.ShrineVeloraReactionBonus);
+                if (player.HasActivePet("cave_spider"))
+                    modifier *= 0.90f; // -10% reactions (creepy companion)
+            }
+            return modifier;
         }
 
         /// <summary>

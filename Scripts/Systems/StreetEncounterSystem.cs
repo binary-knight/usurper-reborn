@@ -1413,10 +1413,59 @@ public class StreetEncounterSystem
 
         if (result.Victory)
         {
+            // v0.61.x: count persistent-NPC kills against the daily murder cap. Before
+            // this, AttackNPC was the only path that enforced MaxMurdersPerDay -- street-
+            // encounter combat (this method) bypassed it entirely. Player report: a Lv 71
+            // Tidesworn killed 8 named NPCs in 20 minutes via street encounters for huge
+            // stacked XP, all while AttackNPC would have blocked after 3 a day.
+            //
+            // Distinguishes "real" persistent NPCs (lookup hit in NPCSpawnSystem) from
+            // throwaway random brawlers ("Burly Mercenary", "Mugger", "Drunk Sailor")
+            // which are CreateRandomHostileNPC stand-ins that don't exist in the world.
+            // Throwaway mobs stay uncapped (the player got jumped, defending is fine).
+            //
+            // Real-NPC kills: increment counter even though the encounter was hostile-
+            // initiated. Once player is over the cap, subsequent real-NPC kills via this
+            // path pay 10% XP and gold -- can't be fully zeroed because that breaks
+            // honor-duel / quest paths that legitimately rely on this method.
+            bool victimWasRealNpc = false;
+            try
+            {
+                var realLookup = NPCSpawnSystem.Instance?.GetNPCByName(npc.Name2 ?? npc.Name);
+                victimWasRealNpc = realLookup != null;
+            }
+            catch { /* defensive */ }
+
+            bool overCap = victimWasRealNpc
+                && !isBrawl
+                && !isHonorDuel
+                && player.MurdersToday >= GameConfig.MaxMurdersPerDay;
+
             // XP and gold are handled by the combat engine's HandleVictory — no double reward
             // Just track what the combat engine gave for display
             long expGain = combatResult.ExperienceGained;
             long goldGain = combatResult.GoldGained;
+
+            if (overCap)
+            {
+                // Strip 90% of the XP/gold AFTER the combat engine already awarded them.
+                long xpClawback = expGain - (expGain / 10);
+                long goldClawback = goldGain - (goldGain / 10);
+                player.Experience = Math.Max(0, player.Experience - xpClawback);
+                player.Gold = Math.Max(0, player.Gold - goldClawback);
+                expGain -= xpClawback;
+                goldGain -= goldClawback;
+                terminal.SetColor("bright_red");
+                terminal.WriteLine(Loc.Get("street.fight.over_cap_diminished"));
+                terminal.SetColor("gray");
+                terminal.WriteLine(Loc.Get("street.fight.over_cap_hint", GameConfig.MaxMurdersPerDay));
+            }
+            else if (victimWasRealNpc && !isBrawl && !isHonorDuel)
+            {
+                // Count the kill toward the daily cap. Don't block (encounter was hostile-
+                // initiated), but log it so the next murder pushes the player over.
+                player.MurdersToday++;
+            }
 
             if (isHonorDuel)
             {

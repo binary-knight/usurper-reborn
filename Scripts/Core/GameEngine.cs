@@ -5537,6 +5537,21 @@ public partial class GameEngine
         player.DrinkingGamesToday = playerData.DrinkingGamesToday;
         player.LoveStreetVisitsToday = playerData.LoveStreetVisitsToday;
         player.GauntletRunsToday = playerData.GauntletRunsToday;
+        player.MarshToadAntidoteClaimedToday = playerData.MarshToadAntidoteClaimedToday;
+        player.AttunedShrineId = playerData.AttunedShrineId ?? "";
+        player.AttunedShrineExpiresUtc = playerData.AttunedShrineExpiresUtc;
+        player.ShrineFavor = playerData.ShrineFavor != null
+            ? new Dictionary<string, int>(playerData.ShrineFavor)
+            : new Dictionary<string, int>();
+        player.PetRoster = playerData.PetRoster?.Select(p => new UsurperRemake.Data.Pet
+        {
+            Id = p.Id,
+            Name = p.Name,
+            TamedAtUtc = p.TamedAtUtc,
+            Level = p.Level,
+            Experience = p.Experience
+        }).ToList() ?? new List<UsurperRemake.Data.Pet>();
+        player.ActivePetId = playerData.ActivePetId ?? "";
         player.LastPartnerBondingUtc = playerData.LastPartnerBondingUtc;
         player.LoanAmount = playerData.LoanAmount;
         player.LoanDaysRemaining = playerData.LoanDaysRemaining;

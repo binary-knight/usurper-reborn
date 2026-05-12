@@ -640,6 +640,14 @@ namespace UsurperRemake.Systems
         public int DrinkingGamesToday { get; set; }
         public int LoveStreetVisitsToday { get; set; }
         public int GauntletRunsToday { get; set; }
+        public bool MarshToadAntidoteClaimedToday { get; set; }
+        // v0.61.0 Druid's Shrines
+        public string AttunedShrineId { get; set; } = "";
+        public DateTime AttunedShrineExpiresUtc { get; set; } = DateTime.MinValue;
+        public Dictionary<string, int> ShrineFavor { get; set; } = new();
+        // v0.61.0 Beast Taming
+        public List<PetSaveData> PetRoster { get; set; } = new();
+        public string ActivePetId { get; set; } = "";
         public DateTime LastPartnerBondingUtc { get; set; }
         public long LoanAmount { get; set; }
         public int LoanDaysRemaining { get; set; }
@@ -698,6 +706,20 @@ namespace UsurperRemake.Systems
         public int ExecuteLeft { get; set; }
         public int QuestsLeft { get; set; }
         public int PrisonActivitiesToday { get; set; }
+    }
+
+    /// <summary>
+    /// v0.61.0 Beast Taming. Persistent pet roster entry. The BeastDefinition is
+    /// looked up at runtime from BeastData by Id; only player-specific state lives
+    /// on the save (level, XP, custom name, tame date).
+    /// </summary>
+    public class PetSaveData
+    {
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+        public DateTime TamedAtUtc { get; set; } = DateTime.MinValue;
+        public int Level { get; set; } = 1;
+        public long Experience { get; set; } = 0;
     }
 
     /// <summary>

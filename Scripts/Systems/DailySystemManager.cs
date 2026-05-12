@@ -340,6 +340,7 @@ public class DailySystemManager
         player.DrinkingGamesToday = 0; // v0.57.17: Inn drinking-game daily cap
         player.LoveStreetVisitsToday = 0; // v0.60.10: Love Street paid-encounter daily cap
         player.GauntletRunsToday = 0;     // v0.60.11 hotfix: Anchor Road Gauntlet daily cap
+        player.MarshToadAntidoteClaimedToday = false; // v0.61.1 Beast Taming: Marsh Toad daily antidote refreshes
 
         // Reset session XP tracking (prevents bypass by logging out/in to clear diminishing returns)
         player.SessionXPEarned = 0;
@@ -1397,6 +1398,18 @@ public class DailySystemManager
             hoursCrossed = newHour - oldHour;
         else
             hoursCrossed = (24 - oldHour) + newHour;
+
+        // v0.61.1 Beast Taming: Tidepool Sprite active pet = +5% MaxMana regen per
+        // hour crossed in the game clock (out of combat). Quiet, additive trickle
+        // that keeps spellcasters topped up between dungeon delves.
+        if (hoursCrossed > 0 && player.HasActivePet("tidepool_sprite") && player.MaxMana > 0)
+        {
+            long regen = (player.MaxMana * 5 / 100) * hoursCrossed;
+            if (regen > 0 && player.Mana < player.MaxMana)
+            {
+                player.Mana = Math.Min(player.MaxMana, player.Mana + regen);
+            }
+        }
 
         return hoursCrossed;
     }

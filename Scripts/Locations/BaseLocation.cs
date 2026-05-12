@@ -5861,6 +5861,7 @@ public abstract class BaseLocation
         // Show temporary combat buffs (well-rested, god slayer, song, herbs)
         bool hasAnyBuff = currentPlayer.IsKnighted
             || currentPlayer.ArenaChampionTier >= (int)UsurperRemake.Data.GauntletChampionData.ArenaTier.GrandChampion
+            || currentPlayer.HasActiveShrineAttunement
             || currentPlayer.WellRestedCombats > 0 || currentPlayer.HasGodSlayerBuff
             || currentPlayer.HasDarkPactBuff || currentPlayer.HasSettlementBuff
             || currentPlayer.HasActiveSongBuff || currentPlayer.HasActiveHerbBuff
@@ -5912,6 +5913,17 @@ public abstract class BaseLocation
             {
                 terminal.SetColor("bright_magenta");
                 terminal.WriteLine($"  - Grand Champion's Mantle: +{(int)(GameConfig.GrandChampionDamageBonus * 100)}% damage, +{(int)(GameConfig.GrandChampionDefenseBonus * 100)}% defense (permanent)");
+            }
+            // v0.61.0 Druid's Shrines active attunement display.
+            if (currentPlayer.HasActiveShrineAttunement)
+            {
+                var shrine = UsurperRemake.Data.DruidShrineData.GetById(currentPlayer.AttunedShrineId);
+                if (shrine != null)
+                {
+                    var hoursLeft = (currentPlayer.AttunedShrineExpiresUtc - DateTime.UtcNow).TotalHours;
+                    terminal.SetColor("bright_magenta");
+                    terminal.WriteLine($"  - {shrine.Name}: {shrine.PassiveSummary} ({hoursLeft:F1}h remaining)");
+                }
             }
             if (currentPlayer.Class == CharacterClass.Alchemist)
             {

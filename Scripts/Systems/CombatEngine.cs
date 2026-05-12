@@ -494,6 +494,15 @@ public partial class CombatEngine
         player.TempThornReflectDuration = 0;
         player.TempPercentRegenPerRound = 0;
         player.TempPercentRegenDuration = 0;
+        // v0.61.1 Beast Taming: Bog Wisp active pet starts every fight already Hidden
+        // -- the wisp slides into the shadows and the player rides along until the
+        // first attack consumes it. Free guaranteed crit on the opening swing.
+        if (player.HasActivePet("bog_wisp"))
+        {
+            player.ApplyStatus(StatusEffect.Hidden, 2);
+            terminal.SetColor("dark_magenta");
+            terminal.WriteLine(Loc.Get("combat.bog_wisp_hide"));
+        }
         // Clear spell status effects that shouldn't persist between fights
         player.RemoveStatus(StatusEffect.Protected);
         player.RemoveStatus(StatusEffect.Blessed);
@@ -1090,6 +1099,19 @@ public partial class CombatEngine
                 terminal.WriteLine(Loc.Get("combat.troll_regen", actualRegen));
             }
 
+            // v0.61.0 Druid's Shrines: Terravok attunement = flat HP regen per round.
+            // The mountain breathes through the player; old wounds knit a little faster.
+            if (player.IsAttunedTo("terravok") && player.HP < player.MaxHP && player.IsAlive)
+            {
+                long terraRegen = Math.Min((long)GameConfig.ShrineTerravokHpRegenPerRound, player.MaxHP - player.HP);
+                if (terraRegen > 0)
+                {
+                    player.HP += terraRegen;
+                    terminal.SetColor("dark_green");
+                    terminal.WriteLine(Loc.Get("combat.shrine_terravok_regen", terraRegen));
+                }
+            }
+
             // Drug HPDrain: some drugs cost HP each round (e.g., Haste: -5 HP/round)
             {
                 var drugEffects = DrugSystem.GetDrugEffects(player);
@@ -1664,6 +1686,35 @@ public partial class CombatEngine
                 teammate.RemoveStatus(StatusEffect.Slow);
             }
         }
+
+        // v0.61.0 Beast Taming: combat pets cannot permadie. Restore each pet
+        // teammate to full HP after combat and grant a small XP nibble to the
+        // underlying Pet record if the fight ended in victory.
+        if (result.Teammates != null)
+        {
+            foreach (var teammate in result.Teammates)
+            {
+                if (teammate?.IsPet != true) continue;
+                teammate.HP = teammate.MaxHP;
+                if (result.Outcome == CombatOutcome.Victory)
+                {
+                    var underlying = player.PetRoster?.FirstOrDefault(p => string.Equals(p.Name, teammate.Name, StringComparison.OrdinalIgnoreCase));
+                    if (underlying != null)
+                    {
+                        underlying.Experience += Math.Max(5, result.ExperienceGained / 20); // ~5% of combat XP, min 5
+                        // Pet level-up at simple thresholds (50 * Level XP per next level).
+                        while (underlying.Experience >= underlying.Level * 50)
+                        {
+                            underlying.Experience -= underlying.Level * 50;
+                            underlying.Level++;
+                            terminal.SetColor("bright_yellow");
+                            terminal.WriteLine(Loc.Get("combat.pet_level_up", underlying.Name, underlying.Level));
+                        }
+                    }
+                }
+            }
+        }
+
         player.ActiveTotemType = 0;
         player.ActiveTotemRounds = 0;
         player.ActiveTotemPower = 0;
@@ -3308,6 +3359,13 @@ public partial class CombatEngine
         if (attacker.ArenaChampionTier >= (int)UsurperRemake.Data.GauntletChampionData.ArenaTier.GrandChampion)
         {
             attackPower += (long)(attackPower * GameConfig.GrandChampionDamageBonus);
+        }
+
+        // v0.61.0 Druid's Shrines: Maelketh attunement = +8% melee damage.
+        // Stacks with knighthood and Grand Champion bonuses.
+        if (attacker.IsAttunedTo("maelketh"))
+        {
+            attackPower += (long)(attackPower * GameConfig.ShrineMaelkethMeleeBonus);
         }
 
         // BossSlayer effect: +10% damage vs bosses (from world boss exclusive loot)
@@ -7579,6 +7637,9 @@ public partial class CombatEngine
                                 target.Name.Contains("Wraith") || target.Name.Contains("Vampire") ||
                                 target.Name.Contains("Undead") || target.Name.Contains("Revenant");
                 float holyMult = isUndead ? GameConfig.HolyEnchantDamageMultiplier * 2 : GameConfig.HolyEnchantDamageMultiplier;
+                // v0.61.0 Druid's Shrines: Aurelion attunement = +25% holy enchant proc damage.
+                if (attacker.IsAttunedTo("aurelion"))
+                    holyMult *= (1f + GameConfig.ShrineAurelionHolyProcBonus);
                 long holyDamage = Math.Max(1, (long)(damage * holyMult));
                 target.HP = Math.Max(0, target.HP - holyDamage);
                 terminal.SetColor("bright_white");
@@ -7617,6 +7678,20 @@ public partial class CombatEngine
                 result.TotalDamageDealt += shadowDamage;
                 attacker.Statistics?.RecordDamageDealt(shadowDamage, false);
             }
+        }
+
+        // v0.61.1 Beast Taming: Bog Wisp active pet adds an independent shadow-damage
+        // proc on top of any weapon enchants. 12% chance for ~10% bonus shadow damage.
+        // Demons still immune (same rule as enchant procs).
+        if (targetAlive && isPlayer && attacker.HasActivePet("bog_wisp")
+            && !IsDemonMonster(target) && random.NextDouble() < 0.12)
+        {
+            long wispDamage = Math.Max(1, (long)(damage * 0.10));
+            target.HP = Math.Max(0, target.HP - wispDamage);
+            terminal.SetColor("dark_magenta");
+            terminal.WriteLine(Loc.Get("combat.bog_wisp_proc", wispDamage));
+            result.TotalDamageDealt += wispDamage;
+            attacker.Statistics?.RecordDamageDealt(wispDamage, false);
         }
 
         // Mana steal proc
@@ -7711,6 +7786,9 @@ public partial class CombatEngine
                                 target.Name.Contains("Wraith") || target.Name.Contains("Vampire") ||
                                 target.Name.Contains("Undead") || target.Name.Contains("Revenant");
                 float holyMult = isUndead ? GameConfig.HolyEnchantDamageMultiplier * 2 : GameConfig.HolyEnchantDamageMultiplier;
+                // v0.61.0 Druid's Shrines: Aurelion attunement = +25% holy enchant proc damage.
+                if (attacker.IsAttunedTo("aurelion"))
+                    holyMult *= (1f + GameConfig.ShrineAurelionHolyProcBonus);
                 long holyDamage = Math.Max(1, (long)(damage * holyMult));
                 target.HP -= holyDamage;
                 terminal.SetColor("bright_white");
@@ -12100,6 +12178,9 @@ public partial class CombatEngine
                         // v0.60.11: Grand Champion +3% damage stacks with knighthood.
                         if (player.ArenaChampionTier >= (int)UsurperRemake.Data.GauntletChampionData.ArenaTier.GrandChampion)
                             attackPower += (long)(attackPower * GameConfig.GrandChampionDamageBonus);
+                        // v0.61.0 Druid's Shrines: Maelketh attunement = +8% melee damage.
+                        if (player.IsAttunedTo("maelketh"))
+                            attackPower += (long)(attackPower * GameConfig.ShrineMaelkethMeleeBonus);
 
                         // Divine boon damage bonus (multi-monster path)
                         var mmBoons = player.CachedBoonEffects;
@@ -13536,6 +13617,9 @@ public partial class CombatEngine
                     (target.MonsterClass == MonsterClass.Undead || target.MonsterClass == MonsterClass.Demon || target.Undead > 0))
                 {
                     long holyBonusDmg = abilityResult.Damage;
+                    // v0.61.0 Druid's Shrines: Aurelion attunement = +5% holy ability damage.
+                    if (result.Player != null && result.Player.IsAttunedTo("aurelion"))
+                        holyBonusDmg = (long)(holyBonusDmg * (1f + GameConfig.ShrineAurelionHolyDamageBonus));
                     target.HP -= holyBonusDmg;
                     result.TotalDamageDealt += holyBonusDmg;
                     result.Player?.Statistics.RecordDamageDealt(holyBonusDmg, false);
@@ -21219,6 +21303,9 @@ public partial class CombatEngine
                     (monster.MonsterClass == MonsterClass.Undead || monster.MonsterClass == MonsterClass.Demon || monster.Undead > 0))
                 {
                     long holyBonusDmg = abilityResult.Damage;
+                    // v0.61.0 Druid's Shrines: Aurelion attunement = +5% holy ability damage.
+                    if (player.IsAttunedTo("aurelion"))
+                        holyBonusDmg = (long)(holyBonusDmg * (1f + GameConfig.ShrineAurelionHolyDamageBonus));
                     monster.HP -= holyBonusDmg;
                     result.TotalDamageDealt += holyBonusDmg;
                     player.Statistics.RecordDamageDealt(holyBonusDmg, false);

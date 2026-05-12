@@ -322,6 +322,11 @@ public class Character
 
     // Royal mercenary (hired bodyguard for king's dungeon party)
     public bool IsMercenary { get; set; } = false;
+
+    // v0.61.0 Beast Taming: tamed beast (Pet) appearing as the 5th party slot in
+    // combat. Skipped by social / relationship / NPC flows. Cannot permadie -- HP
+    // is restored to MaxHP at combat end.
+    public bool IsPet { get; set; } = false;
     public string MercenaryName { get; set; } = ""; // For syncing death back to RoyalMercenaries list
 
     // Whether this class uses Mana (spellcasters) vs Stamina (ability users)
@@ -696,6 +701,56 @@ public class Character
     public int DrinkingGamesToday { get; set; } = 0;            // v0.57.17: Inn drinking-game daily counter (cap: GameConfig.MaxDrinkingGamesPerDay). Player report: high STR/CON = consistent wins for level*700 XP per ~30s, no limit, free leveling.
     public int LoveStreetVisitsToday { get; set; } = 0;         // v0.60.10: Love Street paid-encounter daily counter (cap: GameConfig.MaxLoveStreetVisitsPerDay). Counts both Courtesan and Gigolo visits.
     public int GauntletRunsToday { get; set; } = 0;             // v0.60.11 hotfix: Anchor Road Gauntlet daily counter (cap: GameConfig.MaxGauntletRunsPerDay).
+    public bool MarshToadAntidoteClaimedToday { get; set; } = false; // v0.61.1 Beast Taming: Marsh Toad daily free antidote claimed.
+
+    // v0.61.0 Druid's Shrines. One shrine attunement at a time, 24h timer enforces
+    // the daily cap. ShrineFavor tracks per-shrine visit count for milestone rewards.
+    public string AttunedShrineId { get; set; } = "";
+    public DateTime AttunedShrineExpiresUtc { get; set; } = DateTime.MinValue;
+    public Dictionary<string, int> ShrineFavor { get; set; } = new();
+    public bool HasActiveShrineAttunement =>
+        !string.IsNullOrEmpty(AttunedShrineId) && AttunedShrineExpiresUtc > DateTime.UtcNow;
+    /// <summary>True if the player is attuned to a specific shrine and the attunement hasn't expired.</summary>
+    public bool IsAttunedTo(string shrineId) =>
+        HasActiveShrineAttunement && string.Equals(AttunedShrineId, shrineId, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// v0.61.0 Druid's Shrines: returns the player's effective Charisma including the
+    /// Veloura attunement bonus. Use this in romance / dialogue / intimacy / merchant
+    /// reputation reads instead of raw Charisma so the buff actually flows through.
+    /// Base Charisma stat (used in stat displays and equipment recalculations) is
+    /// untouched.
+    /// </summary>
+    public long GetEffectiveCharisma() =>
+        IsAttunedTo("veloura") ? Charisma + GameConfig.ShrineVeloraCharismaBonus : Charisma;
+
+    // v0.61.0 Beast Taming. Permanent pet roster (cap BeastData.MaxRosterSize) and
+    // currently-active pet (single slot). Combat pets occupy the 5th party slot;
+    // passive pets ride along quietly and apply their bonus globally.
+    public List<UsurperRemake.Data.Pet> PetRoster { get; set; } = new();
+    public string ActivePetId { get; set; } = "";
+    /// <summary>Returns the currently-active pet, or null if none / not found.</summary>
+    public UsurperRemake.Data.Pet? GetActivePet()
+    {
+        if (string.IsNullOrEmpty(ActivePetId)) return null;
+        return PetRoster.FirstOrDefault(p => string.Equals(p.Id, ActivePetId, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>True if the player's currently-active pet is the named beast id.</summary>
+    public bool HasActivePet(string beastId) =>
+        !string.IsNullOrEmpty(ActivePetId) && string.Equals(ActivePetId, beastId, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// v0.61.1 Beast Taming: Marsh Toad active pet = 25% chance to fully resist
+    /// an incoming poison application. Returns true if the resist fired -- caller
+    /// should skip the poison-apply in that case. Static Random for the roll;
+    /// callers don't need to inject one.
+    /// </summary>
+    public bool TryResistPoison()
+    {
+        if (!HasActivePet("marsh_toad")) return false;
+        return Random.Shared.Next(100) < 25;
+    }
     public DateTime LastPartnerBondingUtc { get; set; } = DateTime.MinValue;  // v0.57.7: Wall-clock gate on Home "quality time with partner" rewards (XP/HP/Mana). Shared across dinner/walk/cuddle — one bonding event per 20 real hours. Rage reported "romantic dinner is infinite XP" — was looping Level*50 with no cooldown.
     public long LoanAmount { get; set; } = 0;                   // Active loan balance (principal + interest)
     public int LoanDaysRemaining { get; set; } = 0;             // Days until enforcer attack

@@ -94,6 +94,19 @@ public class WildernessLocation : BaseLocation
             int revisitsLeft = GameConfig.WildernessMaxDailyRevisits - currentPlayer.WildernessRevisitsToday;
             terminal.WriteLine(Loc.Get("wilderness.bbs_discoveries", currentPlayer.WildernessDiscoveries.Count, revisitsLeft));
         }
+        // v0.61.0: Druid's Shrines pilgrimage entry. Available outside the expedition
+        // flow so a shrine visit doesn't consume an expedition slot.
+        terminal.SetColor("bright_magenta");
+        if (currentPlayer.HasActiveShrineAttunement)
+        {
+            var shrine = UsurperRemake.Data.DruidShrineData.GetById(currentPlayer.AttunedShrineId);
+            var hoursLeft = (currentPlayer.AttunedShrineExpiresUtc - DateTime.UtcNow).TotalHours;
+            terminal.WriteLine(Loc.Get("wilderness.bbs_pilgrimage_active", shrine?.Name ?? currentPlayer.AttunedShrineId, $"{hoursLeft:F1}"));
+        }
+        else
+        {
+            terminal.WriteLine(Loc.Get("wilderness.bbs_pilgrimage"));
+        }
         terminal.WriteLine(Loc.Get("wilderness.bbs_return"));
         terminal.WriteLine("");
         ShowStatusLine();
@@ -115,6 +128,10 @@ public class WildernessLocation : BaseLocation
         {
             case "D":
                 await ShowDiscoveries();
+                return false;
+
+            case "P":
+                await ShowPilgrimageMenu();
                 return false;
 
             case "R":
@@ -196,6 +213,123 @@ public class WildernessLocation : BaseLocation
         // Chance to discover something new (10% per trip)
         if (Random.Shared.Next(100) < 10)
             await CheckForDiscovery(region);
+
+        // v0.61.0 Beast Taming: separate, additive chance to encounter a tameable beast
+        // after the main encounter resolves. Region- and level-gated; beasts already in
+        // the player's roster are excluded so each tame is a new addition.
+        if (Random.Shared.Next(100) < UsurperRemake.Data.BeastData.BeastEncounterChancePercent)
+            await TryBeastEncounter(region);
+    }
+
+    /// <summary>
+    /// v0.61.0 Beast Taming. Rolled at ~8% per expedition after the normal encounter.
+    /// Picks one region-eligible beast the player doesn't already own, presents an
+    /// encounter flavor block, gives the player 3 skill-check attempts (CHA + DEX vs
+    /// beast difficulty). Success = added to permanent roster. Failure on all 3 = beast
+    /// flees and despawns for this run (try again next expedition).
+    /// </summary>
+    private async Task TryBeastEncounter(WildernessRegion region)
+    {
+        // Pool: region-matching, level-gated, not already in roster.
+        var ownedIds = currentPlayer.PetRoster?.Select(p => p.Id).ToHashSet(StringComparer.OrdinalIgnoreCase)
+                       ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var beast = UsurperRemake.Data.BeastData.PickEligibleBeast(
+            region.DirectionKey, (int)currentPlayer.Level, Random.Shared, ownedIds);
+        if (beast == null) return; // Nothing in this region matches player level / not already owned.
+
+        // Roster full? Show a flavor "saw a beast but you're at capacity" line.
+        if (currentPlayer.PetRoster.Count >= UsurperRemake.Data.BeastData.MaxRosterSize)
+        {
+            terminal.WriteLine("");
+            terminal.SetColor("dark_gray");
+            terminal.WriteLine(Loc.Get("wilderness.beast_roster_full", beast.Name));
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        // Encounter flavor.
+        terminal.WriteLine("");
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine(Loc.Get("wilderness.beast_encounter_header", beast.Name, beast.Species));
+        terminal.SetColor("white");
+        foreach (var line in beast.EncounterFlavor.Split('\n'))
+            terminal.WriteLine($"  {line}");
+        terminal.WriteLine("");
+        terminal.SetColor("dark_gray");
+        terminal.WriteLine($"  {beast.PassiveDescription}");
+        terminal.WriteLine("");
+
+        terminal.SetColor("cyan");
+        terminal.WriteLine(Loc.Get("wilderness.beast_tame_prompt"));
+        terminal.WriteLine("");
+        var choice = await GetChoice();
+        if (choice.ToUpper() != "T")
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine(Loc.Get("wilderness.beast_walk_away", beast.Name));
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        // 3 attempts. Each attempt is (d20 + CHA/4 + DEX/8 + favor-bonus) vs TameDifficulty.
+        // CHA contributes more than DEX (taming is mostly a charisma act); DEX matters
+        // for handling the creature without spooking it.
+        int chaBonus = (int)(currentPlayer.GetEffectiveCharisma() / 4);
+        int dexBonus = (int)(currentPlayer.Dexterity / 8);
+        for (int attempt = 1; attempt <= UsurperRemake.Data.BeastData.TameAttempts; attempt++)
+        {
+            terminal.WriteLine("");
+            terminal.SetColor("white");
+            terminal.WriteLine(Loc.Get("wilderness.beast_attempt_header", attempt, UsurperRemake.Data.BeastData.TameAttempts));
+            terminal.SetColor("dark_gray");
+            terminal.WriteLine(Loc.Get("wilderness.beast_attempt_calc", chaBonus, dexBonus, beast.TameDifficulty));
+            await Task.Delay(1200);
+
+            int roll = Random.Shared.Next(1, 21); // d20
+            int total = roll + chaBonus + dexBonus;
+            bool success = total >= beast.TameDifficulty;
+
+            terminal.SetColor(success ? "bright_green" : "yellow");
+            terminal.WriteLine(Loc.Get("wilderness.beast_attempt_roll", roll, total, beast.TameDifficulty,
+                success ? Loc.Get("wilderness.beast_attempt_pass") : Loc.Get("wilderness.beast_attempt_fail")));
+
+            if (success)
+            {
+                // Tame succeeds. Add to roster.
+                var newPet = new UsurperRemake.Data.Pet
+                {
+                    Id = beast.Id,
+                    Name = beast.Name,
+                    TamedAtUtc = DateTime.UtcNow,
+                    Level = 1,
+                    Experience = 0
+                };
+                currentPlayer.PetRoster.Add(newPet);
+                if (string.IsNullOrEmpty(currentPlayer.ActivePetId))
+                    currentPlayer.ActivePetId = newPet.Id; // Auto-activate first tame.
+
+                terminal.WriteLine("");
+                terminal.SetColor("bright_green");
+                foreach (var line in beast.TameSuccessFlavor.Split('\n'))
+                    terminal.WriteLine($"  {line}");
+                terminal.WriteLine("");
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine(Loc.Get("wilderness.beast_tame_success", beast.Name, currentPlayer.PetRoster.Count, UsurperRemake.Data.BeastData.MaxRosterSize));
+                if (string.Equals(currentPlayer.ActivePetId, beast.Id, StringComparison.OrdinalIgnoreCase))
+                    terminal.WriteLine(Loc.Get("wilderness.beast_auto_active"));
+                else
+                    terminal.WriteLine(Loc.Get("wilderness.beast_switch_at_home"));
+
+                await terminal.PressAnyKey();
+                return;
+            }
+        }
+
+        // All 3 attempts failed.
+        terminal.WriteLine("");
+        terminal.SetColor("dark_red");
+        terminal.WriteLine(Loc.Get("wilderness.beast_flees", beast.Name));
+        await terminal.PressAnyKey();
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -606,6 +740,159 @@ public class WildernessLocation : BaseLocation
         NewsSystem.Instance?.Newsy($"☆ {currentPlayer.Name} discovered {discovery.Name} in the {region.Name}!");
 
         await Task.Delay(3000);
+    }
+
+    /// <summary>
+    /// v0.61.0 Druid's Shrines. Pilgrimage menu: list all five shrines and let the
+    /// player attune to one. A 24-hour timer enforces the daily cap -- re-attuning
+    /// before expiry just replaces the active buff with the new one (a real choice).
+    /// Per-shrine favor increments each visit; milestones unlock future encounters.
+    /// </summary>
+    private async Task ShowPilgrimageMenu()
+    {
+        terminal.ClearScreen();
+        terminal.SetColor("bright_magenta");
+        terminal.WriteLine(Loc.Get("wilderness.pilgrimage_header"));
+        terminal.WriteLine("");
+        terminal.SetColor("white");
+        terminal.WriteLine(Loc.Get("wilderness.pilgrimage_intro"));
+        terminal.WriteLine("");
+
+        if (currentPlayer.HasActiveShrineAttunement)
+        {
+            var active = UsurperRemake.Data.DruidShrineData.GetById(currentPlayer.AttunedShrineId);
+            var hoursLeft = (currentPlayer.AttunedShrineExpiresUtc - DateTime.UtcNow).TotalHours;
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine(Loc.Get("wilderness.pilgrimage_active",
+                active?.Name ?? currentPlayer.AttunedShrineId, $"{hoursLeft:F1}"));
+            terminal.SetColor("dark_gray");
+            terminal.WriteLine($"  ({active?.PassiveSummary ?? ""})");
+            terminal.WriteLine("");
+        }
+
+        var shrines = UsurperRemake.Data.DruidShrineData.Shrines;
+        for (int i = 0; i < shrines.Length; i++)
+        {
+            var s = shrines[i];
+            int favor = currentPlayer.ShrineFavor.TryGetValue(s.Id, out var f) ? f : 0;
+            bool isActive = string.Equals(currentPlayer.AttunedShrineId, s.Id, StringComparison.OrdinalIgnoreCase)
+                            && currentPlayer.HasActiveShrineAttunement;
+            terminal.SetColor("gray");
+            terminal.Write($"  [{i + 1}] ");
+            terminal.SetColor(isActive ? "bright_green" : "white");
+            terminal.Write($"{s.Name,-38}");
+            terminal.SetColor("dark_gray");
+            terminal.WriteLine($"  favor: {favor}");
+            terminal.SetColor("cyan");
+            terminal.WriteLine($"        {s.PassiveSummary}");
+        }
+        terminal.WriteLine("");
+        terminal.SetColor("gray");
+        terminal.WriteLine(IsScreenReader ? "  0. Cancel" : "  [0] Cancel");
+        terminal.WriteLine("");
+
+        var input = await terminal.GetInput(Loc.Get("wilderness.pilgrimage_select"));
+        if (!int.TryParse(input, out int choice) || choice < 1 || choice > shrines.Length)
+            return;
+
+        var selected = shrines[choice - 1];
+
+        // Confirm
+        terminal.WriteLine("");
+        terminal.SetColor("bright_magenta");
+        terminal.WriteLine($"  {selected.Name}");
+        terminal.SetColor("dark_gray");
+        foreach (var line in selected.FlavorDescription.Split('\n'))
+            terminal.WriteLine($"  {line}");
+        terminal.WriteLine("");
+        terminal.SetColor("cyan");
+        terminal.WriteLine($"  {selected.PassiveSummary}");
+        if (selected.ChivalryShift != 0)
+        {
+            terminal.SetColor(selected.ChivalryShift > 0 ? "bright_yellow" : "dark_red");
+            terminal.WriteLine($"  {Loc.Get("wilderness.pilgrimage_alignment", selected.ChivalryShift > 0 ? $"+{selected.ChivalryShift}" : selected.ChivalryShift.ToString())}");
+        }
+        terminal.WriteLine("");
+        var confirm = await terminal.GetInput(Loc.Get("wilderness.pilgrimage_confirm"));
+        if (confirm?.ToUpper() != "Y")
+            return;
+
+        // Apply attunement
+        currentPlayer.AttunedShrineId = selected.Id;
+        currentPlayer.AttunedShrineExpiresUtc = DateTime.UtcNow.AddHours(UsurperRemake.Data.DruidShrineData.AttunementHours);
+        if (!currentPlayer.ShrineFavor.ContainsKey(selected.Id))
+            currentPlayer.ShrineFavor[selected.Id] = 0;
+        currentPlayer.ShrineFavor[selected.Id]++;
+
+        // Alignment shift via paired-movement system.
+        if (selected.ChivalryShift != 0)
+        {
+            UsurperRemake.Systems.AlignmentSystem.Instance.ChangeAlignment(
+                currentPlayer, Math.Abs(selected.ChivalryShift), selected.ChivalryShift > 0,
+                $"Pilgrimage to {selected.Name}");
+        }
+
+        terminal.WriteLine("");
+        terminal.SetColor("gray");
+        foreach (var line in selected.AttunementDescription.Split('\n'))
+            terminal.WriteLine($"  {line}");
+        terminal.WriteLine("");
+        terminal.SetColor("bright_green");
+        terminal.WriteLine(Loc.Get("wilderness.pilgrimage_attuned",
+            selected.Name, UsurperRemake.Data.DruidShrineData.AttunementHours));
+
+        // Milestone check -- crossing 10 visits earns a one-time tangible gift from
+        // that god. 25 and 50 visit milestones still print the favor-recognition line
+        // but their rewards land in a future polish pass.
+        int newFavor = currentPlayer.ShrineFavor[selected.Id];
+        if (UsurperRemake.Data.DruidShrineData.FavorMilestones.Contains(newFavor))
+        {
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine("");
+            terminal.WriteLine(Loc.Get("wilderness.pilgrimage_milestone", newFavor, selected.GodPatron));
+            if (newFavor == 10)
+                await ApplyShrineMilestone10Reward(selected);
+        }
+
+        await terminal.PressAnyKey();
+    }
+
+    /// <summary>
+    /// v0.61.1: tangible reward when the player crosses 10 visits to a shrine. Each
+    /// god gives a permanent stat lift themed to their domain. Bumps BaseMaxHP /
+    /// BaseStat fields directly so RecalculateStats() preserves them across loads.
+    /// </summary>
+    private async Task ApplyShrineMilestone10Reward(UsurperRemake.Data.DruidShrineData.DruidShrine shrine)
+    {
+        terminal.WriteLine("");
+        terminal.SetColor("bright_cyan");
+        switch (shrine.Id)
+        {
+            case "terravok":
+                currentPlayer.BaseMaxHP += 25;
+                currentPlayer.MaxHP += 25;
+                currentPlayer.HP += 25;
+                terminal.WriteLine(Loc.Get("wilderness.milestone_terravok_gift"));
+                break;
+            case "maelketh":
+                currentPlayer.BaseStrength += 3;
+                terminal.WriteLine(Loc.Get("wilderness.milestone_maelketh_gift"));
+                break;
+            case "noctura":
+                currentPlayer.BaseDexterity += 3;
+                terminal.WriteLine(Loc.Get("wilderness.milestone_noctura_gift"));
+                break;
+            case "aurelion":
+                currentPlayer.BaseWisdom += 5;
+                terminal.WriteLine(Loc.Get("wilderness.milestone_aurelion_gift"));
+                break;
+            case "veloura":
+                currentPlayer.BaseCharisma += 5;
+                terminal.WriteLine(Loc.Get("wilderness.milestone_veloura_gift"));
+                break;
+        }
+        currentPlayer.RecalculateStats();
+        await Task.Delay(2000);
     }
 
     private async Task ShowDiscoveries()

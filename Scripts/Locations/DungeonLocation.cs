@@ -267,6 +267,10 @@ public class DungeonLocation : BaseLocation
         // Restore NPC teammates (spouses, team members, lovers) from saved state
         await RestoreNPCTeammates(term);
 
+        // v0.61.0 Beast Taming: if the player's active pet is a Combat beast, attach
+        // it as a 5th-slot teammate. Passive pets are handled out-of-combat elsewhere.
+        AddActivePetToParty(player, term);
+
         // Restore player echoes ONLY if not in a real player group
         // (real group members join live via EnterAsGroupFollower, not as AI echoes)
         var myGroup = GroupSystem.Instance?.GetGroupFor(SessionContext.Current?.Username ?? "");
@@ -1119,6 +1123,56 @@ public class DungeonLocation : BaseLocation
             term.WriteLine("");
             await Task.Delay(1500);
         }
+    }
+
+    /// <summary>
+    /// v0.61.0 Beast Taming: attach the player's active Combat-role pet (Dire Wolf,
+    /// Storm Eagle) as a teammate. Sits in a dedicated 5th slot outside the normal
+    /// 4-teammate cap. Stats scale with player level. The Character wrapper has
+    /// IsPet=true so social / relationship flows skip it. HP restores to full
+    /// automatically at combat end (handled in CombatEngine end-of-combat cleanup).
+    /// </summary>
+    private void AddActivePetToParty(Character player, TerminalEmulator term)
+    {
+        var pet = player.GetActivePet();
+        if (pet == null) return;
+        var def = pet.GetDefinition();
+        if (def == null) return;
+        if (def.Role != UsurperRemake.Data.BeastData.BeastRole.Combat) return; // Passive pets don't enter combat.
+
+        // Skip if already in the teammates list (e.g., we re-entered the dungeon mid-session).
+        if (teammates.Any(t => t.IsPet && string.Equals(t.Name, pet.Name, StringComparison.OrdinalIgnoreCase)))
+            return;
+
+        // Stat scaling: pet level matters somewhat, player level matters more (the bond grows).
+        // Effective level = max(pet.Level, player.Level / 2).
+        int effLevel = Math.Max(pet.Level, (int)player.Level / 2);
+        long scaledHP = def.CombatBaseHP + (long)(def.CombatBaseHP * (effLevel - 1) * 0.10);
+        long scaledAtk = def.CombatBaseAttack + (long)(def.CombatBaseAttack * (effLevel - 1) * 0.08);
+        long scaledDef = def.CombatBaseDefence + (long)(def.CombatBaseDefence * (effLevel - 1) * 0.05);
+
+        var wrapper = new Character
+        {
+            Name1 = pet.Name,
+            Name2 = pet.Name,
+            Level = effLevel,
+            HP = scaledHP,
+            MaxHP = scaledHP,
+            Strength = scaledAtk,
+            WeapPow = scaledAtk / 2,
+            Defence = (long)scaledDef,
+            ArmPow = scaledDef / 2,
+            Mana = 0,
+            MaxMana = 0,
+            Class = CharacterClass.Warrior, // Marker class so the basic-attack AI path runs.
+            Race = CharacterRace.Troll,     // Beast-ish marker; no race bonuses apply since IsPet.
+            IsPet = true,
+            Allowed = true,
+        };
+
+        teammates.Add(wrapper);
+        term.SetColor("bright_yellow");
+        term.WriteLine(Loc.Get("dungeon.pet_joins_party", pet.Name, def.Species));
     }
 
     /// <summary>
@@ -3655,6 +3709,33 @@ public class DungeonLocation : BaseLocation
                     {
                         entranceRoom.IsCleared = true;
                     }
+                    // v0.61.0 Beast Taming: Forest Hawk active pet reveals ~5% of the
+                    // floor's rooms at entry (scouted from above). Doesn't clear them,
+                    // just marks them visible on the map.
+                    var hawkOwner = GetCurrentPlayer();
+                    if (hawkOwner != null && hawkOwner.HasActivePet("forest_hawk") && currentFloor.Rooms != null)
+                    {
+                        var allRooms = currentFloor.Rooms.ToList();
+                        int revealCount = Math.Max(1, allRooms.Count / 20); // 5%
+                        var rng = new Random();
+                        for (int i = 0; i < revealCount && allRooms.Count > 0; i++)
+                        {
+                            var idx = rng.Next(allRooms.Count);
+                            allRooms[idx].IsExplored = true;
+                            allRooms.RemoveAt(idx);
+                        }
+                        terminal.SetColor("dark_yellow");
+                        terminal.WriteLine(Loc.Get("dungeon.hawk_scout", revealCount));
+                    }
+                    // v0.61.1 Beast Taming: Marsh Toad active pet hands the player one
+                    // free antidote per day. Fires on first dungeon entry of the day.
+                    if (hawkOwner != null && hawkOwner.HasActivePet("marsh_toad") && !hawkOwner.MarshToadAntidoteClaimedToday)
+                    {
+                        hawkOwner.Antidotes++;
+                        hawkOwner.MarshToadAntidoteClaimedToday = true;
+                        terminal.SetColor("bright_green");
+                        terminal.WriteLine(Loc.Get("dungeon.toad_antidote_gift"));
+                    }
                 }
                 terminal.WriteLine(Loc.Get("dungeon.entering_dungeon"), "gray");
                 await Task.Delay(1500);
@@ -4386,6 +4467,10 @@ public class DungeonLocation : BaseLocation
                         _ => GameConfig.HeavyArmorFatigueMult
                     };
                     int dungeonFatigueCost = Math.Max(1, (int)(GameConfig.FatigueCostDungeonRoom * dungeonArmorFatigueMult));
+                    // v0.61.1 Beast Taming: Mountain Goat active pet reduces fatigue gain
+                    // per room by 1 (floored at 0). The goat carries pack weight cheerfully.
+                    if (timePlayer.HasActivePet("mountain_goat"))
+                        dungeonFatigueCost = Math.Max(0, dungeonFatigueCost - 1);
                     timePlayer.Fatigue = Math.Min(100, timePlayer.Fatigue + dungeonFatigueCost);
                 }
             }
@@ -4724,8 +4809,16 @@ public class DungeonLocation : BaseLocation
             case 1:
                 var dartDmg = currentDungeonLevel * 2 + dungeonRandom.Next(8);
                 player.HP = Math.Max(1, player.HP - dartDmg);
-                player.Poison = Math.Max(player.Poison, 1);
-                player.PoisonTurns = Math.Max(player.PoisonTurns, 5 + currentDungeonLevel / 5);
+                // v0.61.1 Beast Taming: Marsh Toad active pet rolls to absorb the poison.
+                if (player.TryResistPoison())
+                {
+                    terminal.WriteLine(Loc.Get("dungeon.toad_resist_poison"), "bright_green");
+                }
+                else
+                {
+                    player.Poison = Math.Max(player.Poison, 1);
+                    player.PoisonTurns = Math.Max(player.PoisonTurns, 5 + currentDungeonLevel / 5);
+                }
                 terminal.WriteLine(Loc.Get("dungeon.trap_darts", dartDmg));
                 BroadcastDungeonEvent($"\u001b[31m  Poison darts! {player!.Name2} takes {dartDmg} damage and is poisoned!\u001b[0m");
                 break;
@@ -7737,9 +7830,17 @@ public class DungeonLocation : BaseLocation
                             var poisonDmg = currentDungeonLevel * 5;
                             currentPlayer.HP = Math.Max(1, currentPlayer.HP - poisonDmg);
                             terminal.WriteLine(Loc.Get("dungeon.chest_poison_gas", poisonDmg));
-                            currentPlayer.Poison = Math.Max(currentPlayer.Poison, 1);
-                            currentPlayer.PoisonTurns = Math.Max(currentPlayer.PoisonTurns, 5 + currentDungeonLevel / 5);
-                            terminal.WriteLine(Loc.Get("dungeon.chest_poisoned"), "magenta");
+                            // v0.61.1 Marsh Toad rolls to absorb.
+                            if (currentPlayer.TryResistPoison())
+                            {
+                                terminal.WriteLine(Loc.Get("dungeon.toad_resist_poison"), "bright_green");
+                            }
+                            else
+                            {
+                                currentPlayer.Poison = Math.Max(currentPlayer.Poison, 1);
+                                currentPlayer.PoisonTurns = Math.Max(currentPlayer.PoisonTurns, 5 + currentDungeonLevel / 5);
+                                terminal.WriteLine(Loc.Get("dungeon.chest_poisoned"), "magenta");
+                            }
                             break;
                         case 1:
                             var spikeDmg = currentDungeonLevel * 8;
@@ -8424,9 +8525,17 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("dungeon.trap_poison_darts"), "white");
                 var dartDmg = currentDungeonLevel * 2 + dungeonRandom.Next(8);
                 currentPlayer.HP = Math.Max(1, currentPlayer.HP - dartDmg);
-                currentPlayer.Poison = Math.Max(currentPlayer.Poison, 1);
-                currentPlayer.PoisonTurns = Math.Max(currentPlayer.PoisonTurns, 5 + currentDungeonLevel / 5);
-                terminal.WriteLine(Loc.Get("dungeon.trap_dart_damage_poisoned", dartDmg), "magenta");
+                // v0.61.1 Marsh Toad rolls to absorb.
+                if (currentPlayer.TryResistPoison())
+                {
+                    terminal.WriteLine(Loc.Get("dungeon.toad_resist_poison"), "bright_green");
+                }
+                else
+                {
+                    currentPlayer.Poison = Math.Max(currentPlayer.Poison, 1);
+                    currentPlayer.PoisonTurns = Math.Max(currentPlayer.PoisonTurns, 5 + currentDungeonLevel / 5);
+                    terminal.WriteLine(Loc.Get("dungeon.trap_dart_damage_poisoned", dartDmg), "magenta");
+                }
                 break;
             case 2:
                 terminal.WriteLine(Loc.Get("dungeon.trap_rune_explodes"), "bright_magenta");
@@ -12723,10 +12832,19 @@ public class DungeonLocation : BaseLocation
                         terminal.SetColor("dark_magenta");
                         terminal.WriteLine(Loc.Get("dungeon.pixie_dust"));
 
-                        player.Poison = Math.Max(player.Poison, 1);
-                        player.PoisonTurns = Math.Max(player.PoisonTurns, 5 + currentDungeonLevel / 5);
-                        terminal.SetColor("green");
-                        terminal.WriteLine(Loc.Get("dungeon.pixie_poisoned"));
+                        // v0.61.1 Marsh Toad rolls to absorb the pixie's curse.
+                        if (player.TryResistPoison())
+                        {
+                            terminal.SetColor("bright_green");
+                            terminal.WriteLine(Loc.Get("dungeon.toad_resist_poison"));
+                        }
+                        else
+                        {
+                            player.Poison = Math.Max(player.Poison, 1);
+                            player.PoisonTurns = Math.Max(player.PoisonTurns, 5 + currentDungeonLevel / 5);
+                            terminal.SetColor("green");
+                            terminal.WriteLine(Loc.Get("dungeon.pixie_poisoned"));
+                        }
 
                         long stolenGold = Math.Min(player.Gold, currentDungeonLevel * 50 + dungeonRandom.Next(100));
                         if (stolenGold > 0)

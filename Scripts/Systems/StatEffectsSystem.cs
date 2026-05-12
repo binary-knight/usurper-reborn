@@ -444,7 +444,26 @@ public static class StatEffectsSystem
         if (attacker.CachedBoonEffects?.CritPercent > 0)
             critChance = Math.Clamp(critChance + (int)(attacker.CachedBoonEffects.CritPercent * 100), 5, 50);
 
+        // v0.61.0 Druid's Shrines: Noctura attunement = +5% crit chance for 24h.
+        // Same clamp as the other bonuses so the cap stays sane.
+        if (attacker.IsAttunedTo("noctura"))
+            critChance = Math.Clamp(critChance + (int)GameConfig.ShrineNocturaCritChanceBonus, 5, GetCriticalHitChanceCapped(attacker.Dexterity));
+
+        // v0.61.0 Beast Taming: Cave Spider active pet = +5% crit chance.
+        // Stacks with Noctura attunement, capped via the same DEX-scaled limit.
+        if (attacker.HasActivePet("cave_spider"))
+            critChance = Math.Clamp(critChance + 5, 5, GetCriticalHitChanceCapped(attacker.Dexterity));
+
         return _random.Next(100) < critChance;
+    }
+
+    /// <summary>v0.61.0: helper to keep crit-cap logic in one place. Returns the DEX-scaled
+    /// cap (50% base, +25% scaling with DEX). Used by RollCriticalHit when stacking buffs.</summary>
+    private static int GetCriticalHitChanceCapped(long dexterity)
+    {
+        // Mirror the cap from GetCriticalHitChance: 50 + min(25, dex/30).
+        int dexBonus = Math.Min(25, (int)(dexterity / 30));
+        return 50 + dexBonus;
     }
 
     /// <summary>

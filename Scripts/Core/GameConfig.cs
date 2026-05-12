@@ -9,7 +9,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.60.11";
+    public const string Version = "0.61.0";
     public const string VersionName = "Beta";
 
     // v0.57.12: Alignment scale cap. Character.Chivalry and Character.Darkness setters clamp to [0, AlignmentCap]
@@ -731,6 +731,17 @@ public static partial class GameConfig
     // and trivializes the rest of the loot economy. One run per day matches the cadence
     // of the other daily-limited activities (Love Street, drinking games, team wars).
     public const int MaxGauntletRunsPerDay = 1;
+
+    // v0.61.0 Druid's Shrines passive bonuses. Each shrine's attunement applies
+    // its own combat passive for 24 hours after visiting; one shrine at a time.
+    public const float ShrineTerravokHpRegenPerRound = 5.0f;     // Flat HP regen per round in combat (mountain endurance).
+    public const float ShrineMaelkethMeleeBonus = 0.08f;         // +8% melee attack damage (war forge).
+    public const float ShrineNocturaCritChanceBonus = 5.0f;      // +5% crit chance (shadow weave).
+    public const float ShrineNocturaBackstabBonus = 0.10f;       // +10% damage to Backstab and stealth-crit abilities.
+    public const float ShrineAurelionHolyDamageBonus = 0.05f;    // +5% damage on holy ability hits.
+    public const float ShrineAurelionHolyProcBonus = 0.25f;      // +25% damage on holy weapon-enchant procs.
+    public const int ShrineVeloraCharismaBonus = 5;              // +5 effective Charisma stat while attuned.
+    public const float ShrineVeloraReactionBonus = 0.15f;        // +15% NPC reaction modifier multiplier.
 
     // Save bloat caps (v0.57.18 — single-player save reliability)
     // The v0.57.16 NPC-memory fix capped one bloat surface; player reports kept arriving
