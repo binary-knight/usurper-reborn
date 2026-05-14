@@ -7361,6 +7361,13 @@ public partial class GameEngine
         terminal.SetColor("bright_green");
         terminal.WriteLine("bbs.lizardmaster.com");
 
+        terminal.SetColor("bright_white");
+        terminal.Write("  Looney Bin BBS                 ");
+        terminal.SetColor("gray");
+        terminal.Write("-           ");
+        terminal.SetColor("bright_green");
+        terminal.WriteLine("looneybinbbs.com:2023");
+
         // --- End BBS Entries ---
 
         terminal.WriteLine("");

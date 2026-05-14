@@ -25760,14 +25760,19 @@ public partial class CombatEngine
 
     /// <summary>
     /// Apply diminishing returns to weapon power for combat calculations.
-    /// First 1200 WeapPow has full effect; above that, 50% effectiveness.
-    /// This prevents extreme weapon stacking from producing absurd damage
-    /// while preserving normal high-level progression.
+    /// First 800 WeapPow has full effect; above that, 50% effectiveness.
+    /// v0.61.1: lowered from 1200 to 800 in the comprehensive damage-curve
+    /// pass that also bumped BaseMonsterDifficultyScale to 2.25 and tightened
+    /// per-stat ability scaling. Telemetry showed players with stacked WeapPow
+    /// were hitting 18-37k avg damage at endgame, with 147k single-hit ceilings
+    /// from Voidreaver, while the +60% monster buff alone wasn't moving win
+    /// rate off 99.5%. Capping at 800 forces stacked-WeapPow builds to feel
+    /// the diminishing returns earlier so monster scaling can catch up.
     /// Display/UI code should still show raw WeapPow.
     /// </summary>
     private static long GetEffectiveWeapPow(long weapPow)
     {
-        const long SoftCap = 1200;
+        const long SoftCap = 800;
         const float DiminishingRate = 0.50f;
         if (weapPow <= SoftCap) return weapPow;
         return SoftCap + (long)((weapPow - SoftCap) * DiminishingRate);

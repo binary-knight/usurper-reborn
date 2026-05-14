@@ -768,7 +768,9 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Ensure at least 3 gay/lesbian and 3 bisexual NPCs exist for romance viability
+        /// Ensure minimum diversity (2 gay males, 2 lesbians, 2 bisexuals) exists
+        /// among living NPCs so the romance system always has viable candidates
+        /// regardless of how the initial orientation roll fell.
         /// </summary>
         private void EnsureOrientationDiversity()
         {
@@ -776,43 +778,93 @@ namespace UsurperRemake.Systems
             const int minLesbianFemale = 2;
             const int minBisexual = 2;
 
-            // Only count living NPCs — dead NPCs shouldn't satisfy diversity requirements
+            // Only count living NPCs. Dead NPCs shouldn't satisfy diversity requirements.
             var livingNPCs = spawnedNPCs.Where(n => !n.IsDead).ToList();
 
             int gayMaleCount = livingNPCs.Count(n => n.Brain?.Personality?.Orientation == SexualOrientation.Gay);
             int lesbianCount = livingNPCs.Count(n => n.Brain?.Personality?.Orientation == SexualOrientation.Lesbian);
             int bisexualCount = livingNPCs.Count(n => n.Brain?.Personality?.Orientation == SexualOrientation.Bisexual);
 
-            // Convert some straight living NPCs to fill minimums
-            var straightNPCs = livingNPCs
-                .Where(n => n.Brain?.Personality?.Orientation == SexualOrientation.Straight)
+            // Split the straight pool by gender so the gay-male loop can't consume
+            // females it can't convert (which would then be missing from the lesbian
+            // loop). Previous implementation shared a single idx across all three
+            // loops, and under an unlucky shuffle order this could leave the function
+            // unable to hit its 2/2/2 minimum even when enough candidates existed.
+            var straightMales = livingNPCs
+                .Where(n => n.Brain?.Personality?.Orientation == SexualOrientation.Straight
+                         && n.Brain.Personality.Gender == GenderIdentity.Male)
+                .OrderBy(_ => Random.Shared.Next())
+                .ToList();
+            var straightFemales = livingNPCs
+                .Where(n => n.Brain?.Personality?.Orientation == SexualOrientation.Straight
+                         && n.Brain.Personality.Gender == GenderIdentity.Female)
                 .OrderBy(_ => Random.Shared.Next())
                 .ToList();
 
-            int idx = 0;
-            while (gayMaleCount < minGayMale && idx < straightNPCs.Count)
+            for (int i = 0; i < straightMales.Count && gayMaleCount < minGayMale; i++)
             {
-                var npc = straightNPCs[idx++];
-                if (npc.Brain?.Personality?.Gender == GenderIdentity.Male)
-                {
-                    npc.Brain!.Personality!.Orientation = SexualOrientation.Gay;
-                    gayMaleCount++;
-                }
+                straightMales[i].Brain!.Personality!.Orientation = SexualOrientation.Gay;
+                gayMaleCount++;
             }
-            while (lesbianCount < minLesbianFemale && idx < straightNPCs.Count)
+            for (int i = 0; i < straightFemales.Count && lesbianCount < minLesbianFemale; i++)
             {
-                var npc = straightNPCs[idx++];
-                if (npc.Brain?.Personality?.Gender == GenderIdentity.Female)
-                {
-                    npc.Brain!.Personality!.Orientation = SexualOrientation.Lesbian;
-                    lesbianCount++;
-                }
+                straightFemales[i].Brain!.Personality!.Orientation = SexualOrientation.Lesbian;
+                lesbianCount++;
             }
-            while (bisexualCount < minBisexual && idx < straightNPCs.Count)
+
+            // Bisexual minimum is gender-agnostic, so re-query for whatever is still
+            // straight after the first two loops.
+            var remainingStraights = livingNPCs
+                .Where(n => n.Brain?.Personality?.Orientation == SexualOrientation.Straight)
+                .OrderBy(_ => Random.Shared.Next())
+                .ToList();
+            for (int i = 0; i < remainingStraights.Count && bisexualCount < minBisexual; i++)
             {
-                var npc = straightNPCs[idx++];
-                npc.Brain!.Personality!.Orientation = SexualOrientation.Bisexual;
+                remainingStraights[i].Brain!.Personality!.Orientation = SexualOrientation.Bisexual;
                 bisexualCount++;
+            }
+        }
+
+        /// <summary>
+        /// Nudge a single late-joining NPC's orientation toward filling the diversity
+        /// floor. Called from immigrant generation and child-coming-of-age so the
+        /// world doesn't dilute back toward straight-only as the initial roster turns
+        /// over. EnsureOrientationDiversity only fires at world birth, so without
+        /// this hook, every immigrant gets the default ~95/2/3 roll and the
+        /// long-running population trends straight as elders die.
+        /// </summary>
+        public void NudgeLateJoinerOrientation(NPC npc)
+        {
+            if (npc.Brain?.Personality == null) return;
+            // Only consider straights for nudging. If the default roll already
+            // produced a non-straight orientation, leave it.
+            if (npc.Brain.Personality.Orientation != SexualOrientation.Straight) return;
+
+            const int minGayMale = 2;
+            const int minLesbianFemale = 2;
+            const int minBisexual = 2;
+            const int nudgeChance = 60; // percent chance to fill a gap when one exists
+
+            var living = spawnedNPCs.Where(n => !n.IsDead).ToList();
+            int gayMaleCount = living.Count(n => n.Brain?.Personality?.Orientation == SexualOrientation.Gay
+                                              && n.Brain.Personality.Gender == GenderIdentity.Male);
+            int lesbianCount = living.Count(n => n.Brain?.Personality?.Orientation == SexualOrientation.Lesbian
+                                              && n.Brain.Personality.Gender == GenderIdentity.Female);
+            int bisexualCount = living.Count(n => n.Brain?.Personality?.Orientation == SexualOrientation.Bisexual);
+
+            var gender = npc.Brain.Personality.Gender;
+
+            if (gender == GenderIdentity.Male && gayMaleCount < minGayMale && Random.Shared.Next(100) < nudgeChance)
+            {
+                npc.Brain.Personality.Orientation = SexualOrientation.Gay;
+            }
+            else if (gender == GenderIdentity.Female && lesbianCount < minLesbianFemale && Random.Shared.Next(100) < nudgeChance)
+            {
+                npc.Brain.Personality.Orientation = SexualOrientation.Lesbian;
+            }
+            else if (bisexualCount < minBisexual && Random.Shared.Next(100) < nudgeChance)
+            {
+                npc.Brain.Personality.Orientation = SexualOrientation.Bisexual;
             }
         }
 
@@ -1265,6 +1317,12 @@ namespace UsurperRemake.Systems
                 personality.Gender = sex == CharacterSex.Female ? GenderIdentity.Female : GenderIdentity.Male;
                 npc.Personality = personality;
                 npc.Brain = new NPCBrain(npc, personality);
+
+                // Pull the new arrival toward whatever diversity gap currently exists
+                // in the living population. The default GenerateForArchetype roll is
+                // ~95/2/3, so without this nudge the long-running population trends
+                // straight as the diversity-floored initial roster ages out.
+                NudgeLateJoinerOrientation(npc);
 
                 // Assign faction based on class, alignment, and personality
                 npc.NPCFaction = DetermineFactionForNPC(npc);

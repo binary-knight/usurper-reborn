@@ -1428,6 +1428,24 @@ namespace UsurperRemake.Systems
 
             await Task.Delay(2000);
 
+            // v0.61.0 hotfix (issue #106): if CombatEngine.HandlePlayerDeath already ran
+            // permadeath in this same fight (player was out of resurrections and got
+            // erased by ExecutePermadeath), do NOT run the "you wake up battered but
+            // alive" recovery. The character has just been deleted from the DB and the
+            // session is in IsIntentionalExit mode. Printing the wake-up message and
+            // restoring HP directly contradicts the permadeath cinematic the player
+            // just saw, and leaves them in a zombie state in the dungeon until logout.
+            // Short-circuit straight to the result struct instead.
+            if (UsurperRemake.Server.SessionContext.Current?.IsIntentionalExit == true)
+            {
+                return new BossEncounterResult
+                {
+                    Success = false,
+                    Outcome = BossOutcome.PlayerDefeated,
+                    God = boss.Type
+                };
+            }
+
             // Player doesn't die permanently in boss fights - they're sent back
             terminal.WriteLine($"  {Loc.Get("old_god.defeat_goes_dark")}", "gray");
             terminal.WriteLine($"  {Loc.Get("old_god.defeat_pulls_back")}", "bright_magenta");

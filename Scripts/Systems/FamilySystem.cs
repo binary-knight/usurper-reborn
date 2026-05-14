@@ -354,6 +354,13 @@ namespace UsurperRemake.Systems
             npc.Personality = personality;
             npc.Brain = new NPCBrain(npc, personality);
 
+            // Pull the new adult toward whatever diversity gap currently exists in
+            // the living population. Without this nudge, every child reaching 18
+            // gets the default ~95/2/3 roll from GenerateForArchetype and the
+            // long-running population trends straight as the diversity-floored
+            // initial roster ages out.
+            NPCSpawnSystem.Instance?.NudgeLateJoinerOrientation(npc);
+
             // Assign faction based on class, alignment, and personality
             npc.NPCFaction = NPCSpawnSystem.Instance?.DetermineFactionForNPC(npc);
 

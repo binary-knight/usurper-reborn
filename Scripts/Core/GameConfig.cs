@@ -9,7 +9,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.61.0";
+    public const string Version = "0.61.1";
     public const string VersionName = "Beta";
 
     // v0.57.12: Alignment scale cap. Character.Chivalry and Character.Darkness setters clamp to [0, AlignmentCap]
@@ -205,7 +205,7 @@ public static partial class GameConfig
     /// (MonsterHPMultiplier / MonsterDamageMultiplier) and the player-difficulty
     /// system; stacks on top of both.
     /// </summary>
-    public const float BaseMonsterDifficultyScale = 1.60f;
+    public const float BaseMonsterDifficultyScale = 2.25f;
 
     /// <summary>
     /// Default color theme for new characters (set by SysOp via SysOp Console)

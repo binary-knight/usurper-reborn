@@ -123,7 +123,20 @@ namespace UsurperRemake.Systems
             try
             {
                 var ctx = UsurperRemake.Server.SessionContext.Current;
-                string username = ctx?.Username ?? player.Name1 ?? player.Name2 ?? "";
+                // v0.61.1: route delete + world-state purge through CharacterKey
+                // so alt characters delete the alt's DB row, not the main account's.
+                // Username is the SSH account name (= main char save key) and is
+                // init-only on SessionContext, so it never tracks
+                // SwitchToAltCharacter. Pre-fix, dying on an alt with 0
+                // resurrections deleted the main character (potentially the
+                // player's immortal) while leaving the alt row that actually died
+                // sitting in the DB. CharacterKey fallback covers single-player /
+                // BBS where it may be empty.
+                string username = (!string.IsNullOrEmpty(ctx?.CharacterKey) ? ctx!.CharacterKey : ctx?.Username) ?? player.Name1 ?? player.Name2 ?? "";
+                // ActiveSessions is keyed by SSH account (one socket per account,
+                // shared by main + alt), so SuppressDisconnectSave lookup must use
+                // Username regardless of which character died.
+                string sessionLookupKey = ctx?.Username ?? username;
                 string displayName = player.Name2 ?? player.Name1 ?? username;
                 int finalLevel = player.Level;
                 string className = player.Class.ToString();
@@ -145,7 +158,7 @@ namespace UsurperRemake.Systems
                     try
                     {
                         var session = UsurperRemake.Server.MudServer.Instance?.ActiveSessions
-                            .TryGetValue(username.ToLowerInvariant(), out var s) == true ? s : null;
+                            .TryGetValue(sessionLookupKey.ToLowerInvariant(), out var s) == true ? s : null;
                         if (session != null) session.SuppressDisconnectSave = true;
                     }
                     catch (Exception ex) { DebugLogger.Instance.LogWarning("DEATH_CAP", $"SuppressDisconnectSave set failed: {ex.Message}"); }
@@ -212,6 +225,40 @@ namespace UsurperRemake.Systems
 
             var sessionCtx = UsurperRemake.Server.SessionContext.Current;
             if (sessionCtx != null) sessionCtx.IsIntentionalExit = true;
+
+            // v0.61.0 hotfix (issue #106): actively close the session socket. Without
+            // this, IsIntentionalExit is just a "don't save on disconnect" marker --
+            // it doesn't unwind the running game loop. The player stays in whatever
+            // location they died in (dungeon, in fastfinge's report), with their
+            // character already deleted from the DB, until they manually log off.
+            // Closing the socket here unblocks the session's blocking ReadLineAsync,
+            // which propagates through the session-loop catch and tears down cleanly.
+            // Fire-and-forget so we don't await the 2s message delay inside
+            // DisconnectAsync -- by the time the caller's caller (combat / boss /
+            // dungeon) tries to continue, the socket is already gone.
+            try
+            {
+                var ctx = UsurperRemake.Server.SessionContext.Current;
+                // Session lookup MUST use Username (the SSH account name), not
+                // CharacterKey — ActiveSessions is keyed by account, and the alt
+                // and main share one socket. CharacterKey here would miss the
+                // session entirely when on an alt.
+                string sessionKey = ctx?.Username ?? "";
+                if (!string.IsNullOrEmpty(sessionKey))
+                {
+                    var session = UsurperRemake.Server.MudServer.Instance?.ActiveSessions
+                        .TryGetValue(sessionKey.ToLowerInvariant(), out var s) == true ? s : null;
+                    if (session != null)
+                    {
+                        _ = session.DisconnectAsync("You have been permadied.");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogWarning("DEATH_CAP",
+                    $"Force-disconnect after permadeath failed: {ex.Message}");
+            }
         }
     }
 }

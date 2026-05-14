@@ -2621,8 +2621,15 @@ public static class ClassAbilitySystem
             statScale += Math.Max(0, (user.Intelligence - 10) * 0.03);
         }
 
-        // Cap stat scaling — abilities cap at 6.0x (spells cap at 8.0x but cost mana)
-        statScale = Math.Min(statScale, 6.0);
+        // Cap stat scaling. Abilities cap at 4.5x (spells cap at 8.0x but cost mana).
+        // v0.61.1: lowered from 6.0 to 4.5 in the comprehensive damage-curve pass.
+        // The 6.0 cap was reached at ~160 STR which is comfortably mid-game; endgame
+        // ability damage was therefore running at the full 6.0x multiplier on top of
+        // base + weapon + level + Pain Threshold + execute multipliers, producing the
+        // 147k single-hit ceilings telemetry surfaced. 4.5 keeps mid-game scaling
+        // feeling responsive (capped at ~98 STR) but stops endgame builds from
+        // multiplying themselves into one-shot territory.
+        statScale = Math.Min(statScale, 4.5);
 
         double totalScale = levelScale * statScale;
 
