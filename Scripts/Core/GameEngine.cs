@@ -5536,6 +5536,7 @@ public partial class GameEngine
         player.TeamWarsToday = playerData.TeamWarsToday;
         player.DrinkingGamesToday = playerData.DrinkingGamesToday;
         player.LoveStreetVisitsToday = playerData.LoveStreetVisitsToday;
+        player.IntimateEncountersToday = playerData.IntimateEncountersToday;
         player.GauntletRunsToday = playerData.GauntletRunsToday;
         player.MarshToadAntidoteClaimedToday = playerData.MarshToadAntidoteClaimedToday;
         player.AttunedShrineId = playerData.AttunedShrineId ?? "";

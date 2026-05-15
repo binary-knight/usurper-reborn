@@ -45,8 +45,11 @@ namespace UsurperRemake.Systems
             this.player = player;
             this.terminal = term;
 
+            if (!await EnforceDailyIntimateCap()) return;
+
             var partners = new List<NPC> { partner };
             await RunIntimateScene(partners, IntimacyMood.Passionate, false);
+            player.IntimateEncountersToday++;
         }
 
         /// <summary>
@@ -69,7 +72,10 @@ namespace UsurperRemake.Systems
             this.player = player;
             this.terminal = term;
 
+            if (!await EnforceDailyIntimateCap()) return;
+
             await RunIntimateScene(partners, IntimacyMood.Playful, false);
+            player.IntimateEncountersToday++;
         }
 
         /// <summary>
@@ -82,6 +88,9 @@ namespace UsurperRemake.Systems
 
             this.player = player;
             this.terminal = term;
+
+            if (!await EnforceDailyIntimateCap()) return;
+            player.IntimateEncountersToday++;
 
             var partners = new List<NPC> { partner };
             bool isFirstTime = !RomanceTracker.Instance.EncounterHistory.Any(e => e.PartnerIds.Contains(partner.ID));
@@ -282,6 +291,28 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
+        /// v0.61.x: enforce the daily intimate-scene cap. Returns true if the
+        /// scene may proceed, false if the player has hit MaxIntimateEncountersPerDay
+        /// and the caller should bail. Prints a localised flavor line on the
+        /// rejection path so the player understands why nothing is happening.
+        /// </summary>
+        private async Task<bool> EnforceDailyIntimateCap()
+        {
+            if (player == null) return true; // Should not happen; permissive.
+            if (player.IntimateEncountersToday < GameConfig.MaxIntimateEncountersPerDay) return true;
+
+            if (terminal != null)
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine("");
+                terminal.WriteLine($"  {Get("intimacy.daily_cap_reached")}");
+                terminal.WriteLine("");
+                await Task.Delay(1500);
+            }
+            return false;
+        }
+
+        /// <summary>
         /// Check if this intimate encounter results in pregnancy
         /// </summary>
         private async Task CheckForPregnancy(NPC partner)
@@ -293,6 +324,14 @@ namespace UsurperRemake.Systems
             // Only married couples have pregnancy chance (or lovers for bastard children)
             var romanceType = RomanceTracker.Instance.GetRelationType(partner.ID);
             if (romanceType != RomanceRelationType.Spouse && romanceType != RomanceRelationType.Lover)
+                return;
+
+            // v0.61.x: hard cap on living biological children. Once the player
+            // has MaxPlayerChildren non-deleted entries in the family registry,
+            // pregnancy rolls quietly stop firing. Slot reopens when a child
+            // grows to adult (ConvertChildToNPC marks Deleted=true) or dies.
+            int livingChildren = FamilySystem.Instance.GetChildrenOf(player!).Count;
+            if (livingChildren >= GameConfig.MaxPlayerChildren)
                 return;
 
             // Base pregnancy chance: 15% for spouses, 5% for lovers

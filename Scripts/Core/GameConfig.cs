@@ -1116,6 +1116,26 @@ public static partial class GameConfig
     public static readonly int[] HomeRestsPerDay = { 1, 2, 2, 3, 4, 5 };
     // Bed: fertility modifier per level (negative = penalty)
     public static readonly float[] BedFertilityModifier = { -0.50f, 0f, 0.10f, 0.20f, 0.35f, 0.50f };
+
+    // Hard cap on living biological children per player. Pregnancy rolls in
+    // IntimacySystem.CheckForPregnancy short-circuit when the player already
+    // has this many non-deleted entries in FamilySystem. Children who grow up
+    // to NPCs (Deleted=true after ConvertChildToNPC) and dead children stop
+    // counting, so the slot reopens naturally over time. Diminishing-returns
+    // on ChildBonuses already caps useful gameplay value at 5; this just stops
+    // players from spamming pregnancies past that point.
+    public const int MaxPlayerChildren = 5;
+
+    // Daily cap on intimate scene encounters. Mirrors the LoveStreetVisitsToday
+    // / MurdersToday / TeamWarsToday daily-counter pattern. Resets at midnight.
+    // LoveStreet has its own separate 2/day counter so the two don't interact.
+    // Intended as anti-spam: a player observed creating 14 newborn children in
+    // about an hour by chaining bedroom encounters with their spouse to dodge
+    // the pregnancy probability curve. With this cap a player can have at most
+    // 3 intimate scenes per day, and combined with the 5-children cap the
+    // long-running spam vector is closed.
+    public const int MaxIntimateEncountersPerDay = 3;
+
     // Chest: capacity per level (0 = no chest)
     public static readonly int[] ChestCapacity = { 0, 10, 25, 50, 75, 100 };
     // Hearth: damage/defense bonus % and combat duration per level

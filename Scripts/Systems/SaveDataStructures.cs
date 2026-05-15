@@ -639,6 +639,7 @@ namespace UsurperRemake.Systems
         public int TeamWarsToday { get; set; }
         public int DrinkingGamesToday { get; set; }
         public int LoveStreetVisitsToday { get; set; }
+        public int IntimateEncountersToday { get; set; }
         public int GauntletRunsToday { get; set; }
         public bool MarshToadAntidoteClaimedToday { get; set; }
         // v0.61.0 Druid's Shrines

@@ -929,6 +929,7 @@ namespace UsurperRemake.Systems
                 TeamWarsToday = player.TeamWarsToday,
                 DrinkingGamesToday = player.DrinkingGamesToday,
                 LoveStreetVisitsToday = player.LoveStreetVisitsToday,
+                IntimateEncountersToday = player.IntimateEncountersToday,
                 GauntletRunsToday = player.GauntletRunsToday,
                 MarshToadAntidoteClaimedToday = player.MarshToadAntidoteClaimedToday,
                 AttunedShrineId = player.AttunedShrineId ?? "",

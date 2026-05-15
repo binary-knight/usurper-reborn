@@ -291,7 +291,12 @@ public class HomeLocation : BaseLocation
         var hasChildrenAtHome = FamilySystem.Instance.GetChildrenOf(currentPlayer)
             .Any(c => c.Age < FamilySystem.ADULT_AGE && c.Location == GameConfig.ChildLocationHome && !c.Deleted && !c.Kidnapped);
         WriteMenuCol(" ", "F", Loc.Get("home.family"), true);
-        WriteMenuNL("", "C", Loc.Get("home.children_interact"), hasChildrenAtHome);
+        WriteMenuCol("", "C", Loc.Get("home.children_interact"), hasChildrenAtHome);
+        // v0.61.1: Tamed Beasts entry was wired into the BBS menu and the Electron
+        // menu data but not the visual / SSH / web text menu. Same class of bug as
+        // the Pilgrimage menu fix earlier in this version. Input handler at case
+        // "Y" already worked; only the menu row was missing.
+        WriteMenuNL("", "Y", Loc.Get("home.pet_roster"), true);
 
         // Row 4: Romance
         WriteMenuCol(" ", "P", Loc.Get("home.partner"), true);

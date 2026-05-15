@@ -700,6 +700,7 @@ public class Character
     public int TeamWarsToday { get; set; } = 0;                 // v0.57.17: Team Corner team-war daily counter (cap: GameConfig.MaxTeamWarsPerDay). Plugs the "find a beatable team, spam wars for free 2x wager gold" exploit reported by a Lv.100 Barbarian.
     public int DrinkingGamesToday { get; set; } = 0;            // v0.57.17: Inn drinking-game daily counter (cap: GameConfig.MaxDrinkingGamesPerDay). Player report: high STR/CON = consistent wins for level*700 XP per ~30s, no limit, free leveling.
     public int LoveStreetVisitsToday { get; set; } = 0;         // v0.60.10: Love Street paid-encounter daily counter (cap: GameConfig.MaxLoveStreetVisitsPerDay). Counts both Courtesan and Gigolo visits.
+    public int IntimateEncountersToday { get; set; } = 0;       // v0.61.x: bedroom / spouse / lover intimate-scene daily counter (cap: GameConfig.MaxIntimateEncountersPerDay). LoveStreet has its own separate counter.
     public int GauntletRunsToday { get; set; } = 0;             // v0.60.11 hotfix: Anchor Road Gauntlet daily counter (cap: GameConfig.MaxGauntletRunsPerDay).
     public bool MarshToadAntidoteClaimedToday { get; set; } = false; // v0.61.1 Beast Taming: Marsh Toad daily free antidote claimed.
 

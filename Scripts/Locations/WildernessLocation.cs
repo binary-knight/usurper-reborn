@@ -64,6 +64,28 @@ public class WildernessLocation : BaseLocation
                 : Loc.Get("wilderness.discoveries_visual", discoveryCount, revisitsLeft));
         }
 
+        terminal.WriteLine("");
+
+        // v0.61.0: Druid's Shrines pilgrimage entry. Outside the expedition flow so
+        // a shrine visit doesn't consume an expedition slot. Was originally only
+        // wired into the BBS code path; restored to the visual path here so SSH /
+        // web / Electron sessions can see and pick it.
+        terminal.SetColor("bright_magenta");
+        if (currentPlayer.HasActiveShrineAttunement)
+        {
+            var shrine = UsurperRemake.Data.DruidShrineData.GetById(currentPlayer.AttunedShrineId);
+            var hoursLeft = (currentPlayer.AttunedShrineExpiresUtc - DateTime.UtcNow).TotalHours;
+            string shrineName = shrine?.Name ?? currentPlayer.AttunedShrineId;
+            terminal.WriteLine(Loc.Get(
+                IsScreenReader ? "wilderness.pilgrimage_active_sr" : "wilderness.pilgrimage_active_visual",
+                shrineName, $"{hoursLeft:F1}"));
+        }
+        else
+        {
+            terminal.WriteLine(Loc.Get(
+                IsScreenReader ? "wilderness.pilgrimage_sr" : "wilderness.pilgrimage_visual"));
+        }
+
         terminal.SetColor("gray");
         terminal.WriteLine(IsScreenReader ? Loc.Get("wilderness.return_sr") : Loc.Get("wilderness.return_visual"));
         terminal.WriteLine("");
