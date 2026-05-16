@@ -2858,12 +2858,14 @@ public class WorldSimulator
             member.UpdateLocation("Dungeon");
         }
 
-        // Determine dungeon level. Old roll was avgLevel + (-2 to +3) so a
-        // team could end up on a +3 floor where 2-4 monsters of that level
-        // routinely wipe them. New baseline: avgLevel - 2 to avgLevel. Brave
-        // and ambitious leader (>0.7 on both stats) push one floor each.
+        // Determine dungeon level. First-day telemetry showed the
+        // avgLevel - 2 to avgLevel range still produced 45% deaths and 6.5%
+        // completions for teams. New baseline (avgLevel - 5 to avgLevel - 3)
+        // matches the solo path's safer floor choice so teams complete more
+        // runs and feed the progression loop instead of stalling on flees and
+        // deaths. Brave / ambitious leaders still push one floor each.
         int avgLevel = (int)teamMembers.Average(m => m.Level);
-        int dungeonLevel = avgLevel - 2 + random.Next(0, 3);
+        int dungeonLevel = avgLevel - 5 + random.Next(0, 3);
         if (leaderPersonality != null)
         {
             if (leaderPersonality.Courage > 0.7f) dungeonLevel += random.Next(0, 2);
@@ -2878,6 +2880,8 @@ public class WorldSimulator
         {
             monsters.Add(MonsterGenerator.GenerateMonster(dungeonLevel));
         }
+        // Snapshot total monster HP for the partial-XP-on-loss calc below.
+        long groupStartHP = monsters.Sum(m => m.HP);
 
         // Team combat simulation
         bool teamWon = SimulateTeamVsMonsterCombat(teamMembers, monsters, out long totalExp, out long totalGold);
@@ -2926,6 +2930,34 @@ public class WorldSimulator
                 foreach (var deadMember in dead)
                 {
                     MarkNPCDead(deadMember, GameConfig.PermadeathChanceDungeonTeam, killerName, "the Dungeon");
+                }
+            }
+
+            // Partial XP for surviving members when the team dealt meaningful
+            // damage before the loss. Same threshold as the solo flee path
+            // (>=30% of monster group HP). Telemetry showed team-dungeon at
+            // 45% deaths / 6.5% completions with zero XP on the other 88%
+            // of attempts; surviving members ate damage but got nothing for
+            // their effort. Capped at 50% of the win reward to keep losing
+            // strictly worse than winning. Basis is the full hypothetical
+            // win reward (not the kill-discounted `totalExp`), since the
+            // partial-credit signal is damage dealt, not kills landed.
+            long groupEndHP = monsters.Sum(m => Math.Max(0L, m.HP));
+            long groupDamageDealt = Math.Max(0, groupStartHP - groupEndHP);
+            float groupDealtPct = groupStartHP > 0 ? (float)groupDamageDealt / groupStartHP : 0f;
+            if (groupDealtPct >= 0.30f)
+            {
+                var survivors = teamMembers.Where(m => m.IsAlive).ToList();
+                if (survivors.Count > 0)
+                {
+                    long fullReward = monsters.Sum(m => m.GetExperienceReward());
+                    float xpScale = Math.Min(0.50f, groupDealtPct * 0.50f);
+                    long partialExpShare = (long)(fullReward * xpScale * NpcXpMultiplier / survivors.Count);
+                    if (partialExpShare > 0)
+                    {
+                        foreach (var member in survivors)
+                            member.GainExperience(partialExpShare);
+                    }
                 }
             }
 
@@ -3172,13 +3204,15 @@ public class WorldSimulator
 
         npc.UpdateLocation("Dungeon");
 
-        // Determine dungeon level based on NPC level. Old roll was npc.Level
-        // +/- 3 (so a Lv 20 NPC could end up fighting a Lv 23 monster) plus
-        // +0..3 again for brave/ambitious NPCs, meaning a +6 floor was on the
-        // table for any NPC with one high personality stat. New baseline rolls
-        // EASIER floors (Lv-2 to Lv) for cautious play; Courage and Ambition
-        // each push +0..1, capped at 100.
-        int dungeonLevel = npc.Level - 2 + random.Next(0, 3); // npc.Level - 2 to npc.Level
+        // Determine dungeon level based on NPC level. Per the first-day
+        // telemetry pass, the v0.61.2 baseline (npc.Level - 2 to npc.Level)
+        // was still too aggressive: only ~1% of attempts won, mid-level
+        // NPCs got carved through 60-80% HP and fled before completing.
+        // The baseline rolls EASIER floors (npc.Level - 5 to npc.Level - 3)
+        // so NPCs are comfortably above the floor's monster level and the
+        // simulated combat is winnable. Courage/Ambition still push +0..1
+        // each for risk-takers. Clamped at 1.
+        int dungeonLevel = npc.Level - 5 + random.Next(0, 3); // npc.Level - 5 to npc.Level - 3
         if (personality != null)
         {
             if (personality.Courage > 0.7f) dungeonLevel += random.Next(0, 2);
@@ -3188,6 +3222,7 @@ public class WorldSimulator
 
         // Generate a monster
         var monster = MonsterGenerator.GenerateMonster(dungeonLevel);
+        long monsterStartHP = monster.HP; // Snapshot for partial-XP-on-flee calc below.
 
         // Simulate combat
         int rounds = 0;
@@ -3281,7 +3316,24 @@ public class WorldSimulator
         }
         else if (fled)
         {
-            // Fled mid-fight — head to healer if wounded
+            // Fled mid-fight — head to healer if wounded.
+            // Telemetry showed NPCs fight through 60-80% HP loss before fleeing
+            // (they're dealing real damage, just can't finish the kill). With
+            // zero XP on flee, the progression loop stalls — NPCs almost never
+            // level up. Grant partial XP when the NPC inflicted at least 30% of
+            // the monster's HP, scaled to the damage actually dealt. This lets
+            // valid effort pay off without turning flee into a no-risk farming
+            // strategy: max 50% of the win-reward, and only if the NPC really
+            // hurt the monster.
+            long damageDealt = Math.Max(0, monsterStartHP - monster.HP);
+            float dealtPct = monsterStartHP > 0 ? (float)damageDealt / monsterStartHP : 0f;
+            if (dealtPct >= 0.30f)
+            {
+                float xpScale = Math.Min(0.50f, dealtPct * 0.50f); // 30% dealt -> 15% reward, 90%+ -> 45%
+                long partialXP = (long)(monster.GetExperienceReward() * NpcXpMultiplier * xpScale);
+                if (partialXP > 0)
+                    npc.GainExperience(partialXP);
+            }
             npc.UpdateLocation(npc.HP < npc.MaxHP * 0.5 ? "Healer" : "Main Street");
             LogDungeonDecision("fled");
         }
