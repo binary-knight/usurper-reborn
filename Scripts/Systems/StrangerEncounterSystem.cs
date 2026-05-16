@@ -855,7 +855,26 @@ namespace UsurperRemake.Systems
                 EncounterNumber = encounterNum,
                 PlayerSuspects = suspects,
                 ContextualDialogueId = chosen.Id,
-                ResponseOptions = chosen.Responses
+                // Player report (Lv.5 Elf Sage, Hungarian session): "A bug in the
+                // Stranger encounter. ... instead of a proper response text, the
+                // game displayed: '2. stranger.ctx_early_dormitory.response.2.text'".
+                // The v0.61.2 refactor converted ContextualDialoguePool's Responses
+                // to hold localization keys instead of literal English, and the
+                // Dialogue field above was correctly resolved at construction time.
+                // But the ResponseOptions assignment was a raw passthrough
+                // (`ResponseOptions = chosen.Responses`) which leaked the key
+                // strings to the BaseLocation.DisplayStrangerEncounter consumer
+                // that iterates them directly. Clone the list with Text and
+                // StrangerReply resolved through Loc.Get so the display layer
+                // gets rendered strings, matching how Dialogue is treated.
+                ResponseOptions = chosen.Responses.Select(r => new StrangerResponseOption
+                {
+                    Key = r.Key,
+                    Text = UsurperRemake.Systems.Loc.Get(r.Text),
+                    StrangerReply = r.StrangerReply.Select(k => UsurperRemake.Systems.Loc.Get(k)).ToArray(),
+                    ResponseType = r.ResponseType,
+                    ReceptivityChange = r.ReceptivityChange
+                }).ToList()
             };
         }
 
