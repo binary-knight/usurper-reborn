@@ -714,6 +714,12 @@ public class DailySystemManager
         var terminal = GameEngine.Instance?.Terminal;
         var player = GameEngine.Instance?.CurrentPlayer;
 
+        // v0.61.3: refill companion + NPC-teammate potion stashes on daily reset.
+        // Pre-fix, party AI had no refill path after recruit-time, so any
+        // long-lived character's teammates ran their stash dry permanently.
+        if (player != null)
+            CompanionSystem.Instance?.RefillAllPartyPotions(player);
+
         // Decrement player prison sentence
         if (player != null && player.DaysInPrison > 0)
         {

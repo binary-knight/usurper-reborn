@@ -645,6 +645,8 @@ namespace UsurperRemake.Systems
         // v0.61.0 Druid's Shrines
         public string AttunedShrineId { get; set; } = "";
         public DateTime AttunedShrineExpiresUtc { get; set; } = DateTime.MinValue;
+        // v0.61.3: single-player game-day expiration. See Character.AttunedShrineExpiresGameDay.
+        public int AttunedShrineExpiresGameDay { get; set; } = 0;
         public Dictionary<string, int> ShrineFavor { get; set; } = new();
         // v0.61.0 Beast Taming
         public List<PetSaveData> PetRoster { get; set; } = new();
@@ -797,6 +799,14 @@ namespace UsurperRemake.Systems
         public string Team { get; set; } = "";
         public bool IsTeamLeader { get; set; }
         public bool IsKing { get; set; }
+
+        // v0.61.3: Potion counts. NPCs spawn with role-scaled potion counts
+        // (NPCSpawnSystem.cs:601-607) and the AI consumes them mid-combat
+        // at <30% HP. Pre-fix these were never persisted -- on the next
+        // world-sim reload or save load they reset to 0. Round-trip
+        // restored at GameEngine.RestoreNPCs / WorldSimService.RestoreNPCsFromData.
+        public int HealingPotions { get; set; }
+        public int ManaPotions { get; set; }
 
         // Death status - permanent death tracking
         public bool IsDead { get; set; }

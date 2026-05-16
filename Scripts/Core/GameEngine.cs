@@ -5541,6 +5541,7 @@ public partial class GameEngine
         player.MarshToadAntidoteClaimedToday = playerData.MarshToadAntidoteClaimedToday;
         player.AttunedShrineId = playerData.AttunedShrineId ?? "";
         player.AttunedShrineExpiresUtc = playerData.AttunedShrineExpiresUtc;
+        player.AttunedShrineExpiresGameDay = playerData.AttunedShrineExpiresGameDay;
         player.ShrineFavor = playerData.ShrineFavor != null
             ? new Dictionary<string, int>(playerData.ShrineFavor)
             : new Dictionary<string, int>();
@@ -5983,7 +5984,12 @@ public partial class GameEngine
                 // Inventory
                 Gold = data.Gold,
                 BankGold = data.BankGold,
-                AI = CharacterAI.Computer
+                AI = CharacterAI.Computer,
+                // v0.61.3: NPC potion counts. Default-zero for pre-v0.61.3 saves;
+                // refilled on next daily reset / Inn rest via CompanionSystem's
+                // teammate refill helper.
+                Healing = data.HealingPotions,
+                ManaPotions = data.ManaPotions
             };
 
             // Restore items

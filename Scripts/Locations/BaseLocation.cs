@@ -5961,9 +5961,10 @@ public abstract class BaseLocation
                 var shrine = UsurperRemake.Data.DruidShrineData.GetById(currentPlayer.AttunedShrineId);
                 if (shrine != null)
                 {
-                    var hoursLeft = (currentPlayer.AttunedShrineExpiresUtc - DateTime.UtcNow).TotalHours;
+                    // v0.61.3: helper returns "12.5h" online or game-day count
+                    // single-player so the unit matches each mode's time source.
                     terminal.SetColor("bright_magenta");
-                    terminal.WriteLine($"  - {shrine.Name}: {shrine.PassiveSummary} ({hoursLeft:F1}h remaining)");
+                    terminal.WriteLine($"  - {shrine.Name}: {shrine.PassiveSummary} ({currentPlayer.GetShrineTimeRemainingLabel()} {Loc.Get("shrine.remaining_suffix")})");
                 }
             }
             if (currentPlayer.Class == CharacterClass.Alchemist)

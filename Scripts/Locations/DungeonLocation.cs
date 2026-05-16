@@ -4996,21 +4996,42 @@ public class DungeonLocation : BaseLocation
         // Generate monsters appropriate for this room
         var monsters = MonsterGenerator.GenerateMonsterGroup(effectiveMonsterLevel, dungeonRandom);
 
-        // Make boss room monsters tougher (HP only — STR boost removed to prevent
-        // double-dipping with Monster.GetAttackPower()'s 1.3x IsBoss multiplier)
+        // v0.61.3 (player report, post-v0.61.2 cleared floors): "champions
+        // typically have more HP than the floor boss, regular enemies often
+        // have equal to the boss." Pre-fix this method called
+        // GenerateMonsterGroup (which generates regulars at 1.0x HP or, 10%
+        // of the time, a champion at 2.2x HP — but NEVER a true boss) and
+        // then patched up the boss room by multiplying every monster's HP
+        // by 1.5x and flipping IsBoss=true on monsters[0] AFTER stats had
+        // already been calculated. Because CalculateMonsterStats branches
+        // on the `isBoss` parameter at construction time (2.8x HP), the
+        // post-hoc flag flip missed the boss-tier multiplier entirely.
+        //
+        // Net effect of the pre-fix code:
+        //   * Floor "boss":        1.0x * 1.5x = 1.5x HP  (should be 2.8x)
+        //   * Champion in room:    2.2x * 1.5x = 3.3x HP  (should be 2.2x)
+        //   * Regular in room:     1.0x * 1.5x = 1.5x HP  (equal to "boss")
+        //
+        // So a champion that happened to spawn near the boss outclassed the
+        // boss, and regulars in the boss room matched the boss tick for tick.
+        //
+        // Fix: regenerate the lead slot via GenerateMonster(isBoss: true) so
+        // the boss-tier 2.8x HP / 1.25x damage / 1.2x defense multipliers
+        // actually land. Drop the universal 1.5x HP boost to bystanders: the
+        // boss room should be dangerous because the BOSS is dangerous, not
+        // because every minion is also buffed. Champions in boss rooms now
+        // sit at their intended 2.2x, regulars at 1.0x, boss at 2.8x.
         if (room.IsBossRoom)
         {
-            foreach (var m in monsters)
-            {
-                m.HP = (long)(m.HP * 1.5);
-                m.MaxHP = m.HP;  // Keep MaxHP in sync with boosted HP
-            }
-            // Ensure there's a boss
             if (!monsters.Any(m => m.IsBoss))
             {
-                monsters[0].IsBoss = true;
-                monsters[0].Name = GetBossName(currentFloor.Theme);
-                monsters[0].Phrase = GetBossPhrase(currentFloor.Theme);
+                var boss = MonsterGenerator.GenerateMonster(effectiveMonsterLevel, isBoss: true, random: dungeonRandom);
+                boss.Name = GetBossName(currentFloor.Theme);
+                boss.Phrase = GetBossPhrase(currentFloor.Theme);
+                if (monsters.Count == 0)
+                    monsters.Add(boss);
+                else
+                    monsters[0] = boss;
             }
         }
 
@@ -10986,6 +11007,10 @@ public class DungeonLocation : BaseLocation
                 }
                 if (player.ManaPotions > 0 && allPartyMembers.Any(m => m.MaxMana > 0 && m.Mana < m.MaxMana))
                     WriteSRMenuOption("G", Loc.Get("dungeon.give_mana_teammate", player.ManaPotions));
+                // v0.61.3: gift potions to teammate stash (so their AI auto-heal works mid-fight).
+                // Distinct from [T] / [G] which drink the potion to instant-heal/restore.
+                if ((player.Healing > 0 || player.ManaPotions > 0) && allPartyMembers.Count > 0)
+                    WriteSRMenuOption("I", Loc.Get("dungeon.issue_potion_teammate"));
                 if (player.Antidotes > 0 && player.Poison > 0)
                     WriteSRMenuOption("D", Loc.Get("dungeon.use_antidote", player.Antidotes));
                 else if (player.Antidotes > 0)
@@ -11103,6 +11128,22 @@ public class DungeonLocation : BaseLocation
                     terminal.WriteLine(Loc.Get("dungeon.give_mana_teammate", player.ManaPotions));
                 }
 
+                // v0.61.3: Issue potions to teammate stash. Distinct from [T] /
+                // [G] which drink the player's potion to instant-restore the
+                // teammate's HP/MP. [I] transfers the potion to the teammate's
+                // own stash so their combat AI can self-heal at <30% HP later.
+                if ((player.Healing > 0 || player.ManaPotions > 0) && allPartyMembers.Count > 0)
+                {
+                    terminal.SetColor("darkgray");
+                    terminal.Write("  [");
+                    terminal.SetColor("bright_green");
+                    terminal.Write("I");
+                    terminal.SetColor("darkgray");
+                    terminal.Write("] ");
+                    terminal.SetColor("white");
+                    terminal.WriteLine(Loc.Get("dungeon.issue_potion_teammate"));
+                }
+
                 // Antidote option
                 if (player.Antidotes > 0 && player.Poison > 0)
                 {
@@ -11209,6 +11250,13 @@ public class DungeonLocation : BaseLocation
                     if (player.ManaPotions > 0 && allPartyMembers.Count > 0)
                     {
                         await GiveManaPotsToTeammate(player, allPartyMembers);
+                    }
+                    break;
+
+                case "I":
+                    if ((player.Healing > 0 || player.ManaPotions > 0) && allPartyMembers.Count > 0)
+                    {
+                        await IssuePotionToTeammateStash(player, allPartyMembers);
                     }
                     break;
 
@@ -11368,6 +11416,185 @@ public class DungeonLocation : BaseLocation
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("dungeon.mana_potions_remaining", player.ManaPotions));
         await Task.Delay(1500);
+    }
+
+    /// <summary>
+    /// v0.61.3: Transfer a potion from the player's stash to a teammate's
+    /// stash (rather than drinking it for an instant heal). The teammate's
+    /// AI then uses the potion during combat when their HP / MP drops
+    /// below the threshold. Companion potion counts flow back via
+    /// CompanionSystem.SyncCompanionPotions; NPC teammates are real
+    /// references in NPCSpawnSystem.ActiveNPCs so the mutation persists
+    /// directly. Online mode triggers SaveAllSharedState so the NPC
+    /// change reaches world_state.npcs (per v0.61.3 serialization fix).
+    /// </summary>
+    private async Task IssuePotionToTeammateStash(Character player, List<Character> partyMembers)
+    {
+        if (player.Healing <= 0 && player.ManaPotions <= 0) return;
+        if (partyMembers.Count == 0) return;
+
+        // Step 1: pick potion type
+        terminal.WriteLine("");
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine(Loc.Get("dungeon.issue_pick_type"));
+        terminal.WriteLine("");
+        terminal.SetColor("white");
+        if (player.Healing > 0)
+            terminal.WriteLine($"  [1] {Loc.Get("dungeon.issue_type_healing", player.Healing)}");
+        if (player.ManaPotions > 0)
+            terminal.WriteLine($"  [2] {Loc.Get("dungeon.issue_type_mana", player.ManaPotions)}");
+        terminal.SetColor("gray");
+        terminal.WriteLine($"  [0] {Loc.Get("dungeon.cancel")}");
+        terminal.WriteLine("");
+        terminal.SetColor("white");
+        terminal.Write(Loc.Get("ui.choice"));
+        string typeChoice = (await terminal.GetInput("")).Trim();
+        if (typeChoice == "0" || string.IsNullOrEmpty(typeChoice)) return;
+
+        bool givingMana;
+        if (typeChoice == "1" && player.Healing > 0) givingMana = false;
+        else if (typeChoice == "2" && player.ManaPotions > 0) givingMana = true;
+        else
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine(Loc.Get("ui.invalid_choice"));
+            await Task.Delay(1000);
+            return;
+        }
+
+        // Step 2: filter teammates and pick target. Mana potions are only
+        // useful to caster teammates (mana classes); healing potions are
+        // useful to everyone but cap at the teammate's MaxHealingPotions /
+        // MaxManaPotions so we don't overflow their stash.
+        var candidates = partyMembers
+            .Where(m => givingMana ? m.IsManaClass : true)
+            .Where(m => HasStashRoom(m, givingMana))
+            .ToList();
+        if (candidates.Count == 0)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine(Loc.Get(givingMana
+                ? "dungeon.issue_no_mana_candidates"
+                : "dungeon.issue_no_healing_candidates"));
+            await Task.Delay(1500);
+            return;
+        }
+
+        terminal.WriteLine("");
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine(Loc.Get("dungeon.issue_pick_teammate"));
+        terminal.WriteLine("");
+        for (int i = 0; i < candidates.Count; i++)
+        {
+            var m = candidates[i];
+            (int stash, int max) = GetStashState(m, givingMana);
+            terminal.SetColor("white");
+            terminal.WriteLine($"  [{i + 1}] {m.DisplayName,-20} ({Loc.Get("dungeon.issue_stash_count", stash, max)})");
+        }
+        terminal.SetColor("gray");
+        terminal.WriteLine($"  [0] {Loc.Get("dungeon.cancel")}");
+        terminal.WriteLine("");
+        terminal.SetColor("white");
+        terminal.Write(Loc.Get("ui.choice"));
+        string targetChoice = (await terminal.GetInput("")).Trim();
+        if (!int.TryParse(targetChoice, out int targetIdx) || targetIdx < 1 || targetIdx > candidates.Count) return;
+        var target = candidates[targetIdx - 1];
+
+        // Step 3: how many to give. Cap at min(player has, room in their stash).
+        int playerHas = givingMana ? (int)player.ManaPotions : (int)player.Healing;
+        (int stashHas, int stashMax) = GetStashState(target, givingMana);
+        int roomLeft = stashMax - stashHas;
+        int maxGiveable = System.Math.Min(playerHas, roomLeft);
+
+        terminal.WriteLine("");
+        terminal.SetColor("white");
+        terminal.WriteLine($"  [1] {Loc.Get("dungeon.issue_give_one")}");
+        if (maxGiveable > 1)
+            terminal.WriteLine($"  [F] {Loc.Get("dungeon.issue_give_full", maxGiveable)}");
+        terminal.SetColor("gray");
+        terminal.WriteLine($"  [0] {Loc.Get("dungeon.cancel")}");
+        terminal.WriteLine("");
+        terminal.SetColor("white");
+        terminal.Write(Loc.Get("ui.choice"));
+        string countChoice = (await terminal.GetInput("")).Trim().ToUpper();
+        if (countChoice == "0" || string.IsNullOrEmpty(countChoice)) return;
+
+        int give = 1;
+        if (countChoice == "F" && maxGiveable > 1) give = maxGiveable;
+        else if (countChoice != "1") return;
+        give = System.Math.Min(give, maxGiveable);
+        if (give <= 0) return;
+
+        // Step 4: execute the transfer.
+        if (givingMana)
+        {
+            player.ManaPotions -= give;
+            target.ManaPotions += give;
+        }
+        else
+        {
+            player.Healing -= give;
+            target.Healing += give;
+        }
+
+        // Step 5: persist. Companions need explicit sync (the wrapper's
+        // Healing/ManaPotions don't auto-flow back to Companion.HealingPotions).
+        // NPCs are real references; the mutation is already on the live object.
+        // Online: nudge SaveAllSharedState so world_state.npcs picks up the
+        // change before the next world-sim reload could clobber it.
+        if (target.IsCompanion)
+            UsurperRemake.Systems.CompanionSystem.Instance?.SyncCompanionPotions(target);
+
+        if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+        {
+            try
+            {
+                _ = UsurperRemake.Systems.OnlineStateManager.Instance?.SaveAllSharedState();
+            }
+            catch (Exception ex)
+            {
+                UsurperRemake.Systems.DebugLogger.Instance.LogError("DUNGEON",
+                    $"[IssuePotionToTeammateStash] SaveAllSharedState failed: {ex.Message}");
+            }
+        }
+
+        terminal.WriteLine("");
+        terminal.SetColor("bright_green");
+        terminal.WriteLine(Loc.Get(givingMana
+            ? "dungeon.issue_gave_mana"
+            : "dungeon.issue_gave_healing",
+            give, target.DisplayName));
+        terminal.SetColor("cyan");
+        (int newStash, int newMax) = GetStashState(target, givingMana);
+        terminal.WriteLine(Loc.Get("dungeon.issue_stash_now", target.DisplayName, newStash, newMax));
+        await Task.Delay(1500);
+    }
+
+    /// <summary>v0.61.3 helper: read a teammate's potion stash + cap for the chosen type.</summary>
+    private (int stash, int max) GetStashState(Character target, bool mana)
+    {
+        if (target.IsCompanion && target.CompanionId.HasValue
+            && UsurperRemake.Systems.CompanionSystem.Instance != null
+            && UsurperRemake.Systems.CompanionSystem.Instance.GetCompanion(target.CompanionId.Value) is { } companion)
+        {
+            return mana
+                ? (companion.ManaPotions, companion.MaxManaPotions)
+                : (companion.HealingPotions, companion.MaxHealingPotions);
+        }
+        // NPC teammate path: NPC inherits Character.Healing / Character.ManaPotions (long).
+        // Cap mirrors Companion's MaxHealing / MaxMana formula so the math is consistent.
+        int maxHealing = 5 + target.Level;
+        int maxMana = 3 + (int)target.Level / 2;
+        return mana
+            ? ((int)target.ManaPotions, maxMana)
+            : ((int)target.Healing, maxHealing);
+    }
+
+    /// <summary>v0.61.3 helper: does this teammate have room for one more of the given potion type?</summary>
+    private bool HasStashRoom(Character target, bool mana)
+    {
+        var (stash, max) = GetStashState(target, mana);
+        return stash < max;
     }
 
     private async Task HealTeammate(Character player, List<Character> companions)

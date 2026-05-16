@@ -1321,7 +1321,14 @@ namespace UsurperRemake.Systems
                     Darkness = AlignmentSystem.HealOverflowDarkness(data.Chivalry, data.Darkness),
                     Gold = data.Gold,
                     BankGold = data.BankGold,
-                    AI = CharacterAI.Computer
+                    AI = CharacterAI.Computer,
+                    // v0.61.3: Restore NPC potion counts. Mirrors the write side
+                    // in OnlineStateManager.SerializeCurrentNPCs. Default-zero
+                    // for pre-v0.61.3 world_state rows; the next save cycle will
+                    // populate them, and the next refill (daily reset / Inn rest
+                    // through the player flow) tops them back up.
+                    Healing = data.HealingPotions,
+                    ManaPotions = data.ManaPotions
                 };
 
                 // Restore items

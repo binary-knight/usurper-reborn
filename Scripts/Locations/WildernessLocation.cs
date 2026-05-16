@@ -74,11 +74,13 @@ public class WildernessLocation : BaseLocation
         if (currentPlayer.HasActiveShrineAttunement)
         {
             var shrine = UsurperRemake.Data.DruidShrineData.GetById(currentPlayer.AttunedShrineId);
-            var hoursLeft = (currentPlayer.AttunedShrineExpiresUtc - DateTime.UtcNow).TotalHours;
             string shrineName = shrine?.Name ?? currentPlayer.AttunedShrineId;
+            // v0.61.3: GetShrineTimeRemainingLabel returns "12.5h" online or
+            // "2 days" / "1 day" / "today" in single-player so the same
+            // template renders the right unit per game mode.
             terminal.WriteLine(Loc.Get(
                 IsScreenReader ? "wilderness.pilgrimage_active_sr" : "wilderness.pilgrimage_active_visual",
-                shrineName, $"{hoursLeft:F1}"));
+                shrineName, currentPlayer.GetShrineTimeRemainingLabel()));
         }
         else
         {
@@ -122,8 +124,9 @@ public class WildernessLocation : BaseLocation
         if (currentPlayer.HasActiveShrineAttunement)
         {
             var shrine = UsurperRemake.Data.DruidShrineData.GetById(currentPlayer.AttunedShrineId);
-            var hoursLeft = (currentPlayer.AttunedShrineExpiresUtc - DateTime.UtcNow).TotalHours;
-            terminal.WriteLine(Loc.Get("wilderness.bbs_pilgrimage_active", shrine?.Name ?? currentPlayer.AttunedShrineId, $"{hoursLeft:F1}"));
+            terminal.WriteLine(Loc.Get("wilderness.bbs_pilgrimage_active",
+                shrine?.Name ?? currentPlayer.AttunedShrineId,
+                currentPlayer.GetShrineTimeRemainingLabel()));
         }
         else
         {
@@ -389,6 +392,30 @@ public class WildernessLocation : BaseLocation
         monster.SpecialAbilities.Clear();
         foreach (var ability in profile.Abilities)
             monster.SpecialAbilities.Add(ability);
+
+        // Player report (Lv.30 Elf Sage, post-v0.61.2 deploy): "I fought a black
+        // bear crackling with elemental fury and a bandit scout breathing fire."
+        // The v0.61.2 fix overrode family / class / abilities / etc. but missed
+        // monster.Phrase, which MonsterGenerator had set from the randomly-picked
+        // family's intro flavor (Elemental: "crackles with raw elemental fury";
+        // Draconic Drake: "roars and breathes a gout of fire!"). Reset Phrase
+        // to a family-appropriate default that matches the wilderness family
+        // override, mirroring MonsterGenerator.GetMonsterPhrase's defaults.
+        monster.Phrase = profile.Family switch
+        {
+            "Beast" => "snarls and growls menacingly.",
+            "Humanoid" => "draws steel and prepares to fight.",
+            "Undead" => "The living shall join the dead...",
+            "Insectoid" => "clicks and hisses aggressively.",
+            "Construct" => "grinds to life with a mechanical whir.",
+            "Elemental" => "crackles with raw elemental fury.",
+            "Aquatic" => "lets out a deep, gurgling roar.",
+            "Draconic" => "roars menacingly!",
+            "Plant" => "rustles ominously, branches reaching toward you.",
+            "Fey" => "Let's play a game...",
+            "Giant" => "Fe Fi Fo Fum!",
+            _ => "" // unknown family -> silent intro
+        };
 
         // Run full combat
         var combatEngine = new CombatEngine(terminal);
@@ -801,10 +828,10 @@ public class WildernessLocation : BaseLocation
         if (currentPlayer.HasActiveShrineAttunement)
         {
             var active = UsurperRemake.Data.DruidShrineData.GetById(currentPlayer.AttunedShrineId);
-            var hoursLeft = (currentPlayer.AttunedShrineExpiresUtc - DateTime.UtcNow).TotalHours;
             terminal.SetColor("bright_cyan");
             terminal.WriteLine(Loc.Get("wilderness.pilgrimage_active",
-                active?.Name ?? currentPlayer.AttunedShrineId, $"{hoursLeft:F1}"));
+                active?.Name ?? currentPlayer.AttunedShrineId,
+                currentPlayer.GetShrineTimeRemainingLabel()));
             terminal.SetColor("dark_gray");
             terminal.WriteLine($"  ({active?.PassiveSummary ?? ""})");
             terminal.WriteLine("");
@@ -857,9 +884,21 @@ public class WildernessLocation : BaseLocation
         if (confirm?.ToUpper() != "Y")
             return;
 
-        // Apply attunement
+        // Apply attunement. Two timers set so the right one fires per game mode:
+        //   * Online: real-time `AttunedShrineExpiresUtc`. Server runs 24/7 so
+        //     wall-clock 24h is the natural reference.
+        //   * Single-player: `AttunedShrineExpiresGameDay`. Player report (v0.61.2,
+        //     Lv.8 Elf Sage): "buff lasts for real time 24 hours, not in game
+        //     time. Is that intentional?" No. Single-player time advances via
+        //     sleep / [Z] Wait / dungeon descent, not wall-clock, so the buff
+        //     now expires `AttunementHours/24` game days after attunement (so
+        //     24h => 1 game day; if AttunementHours rises, the math still
+        //     rounds up to whole game days, minimum 1).
         currentPlayer.AttunedShrineId = selected.Id;
         currentPlayer.AttunedShrineExpiresUtc = DateTime.UtcNow.AddHours(UsurperRemake.Data.DruidShrineData.AttunementHours);
+        int gameDaysToAdd = System.Math.Max(1, (int)System.Math.Ceiling(UsurperRemake.Data.DruidShrineData.AttunementHours / 24.0));
+        int currentGameDay = UsurperRemake.Systems.StoryProgressionSystem.Instance?.CurrentGameDay ?? 1;
+        currentPlayer.AttunedShrineExpiresGameDay = currentGameDay + gameDaysToAdd;
         if (!currentPlayer.ShrineFavor.ContainsKey(selected.Id))
             currentPlayer.ShrineFavor[selected.Id] = 0;
         currentPlayer.ShrineFavor[selected.Id]++;

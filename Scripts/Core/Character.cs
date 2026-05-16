@@ -761,12 +761,56 @@ public class Character
     // the daily cap. ShrineFavor tracks per-shrine visit count for milestone rewards.
     public string AttunedShrineId { get; set; } = "";
     public DateTime AttunedShrineExpiresUtc { get; set; } = DateTime.MinValue;
+    // v0.61.3 (player report, Lv.8 Elf Sage, single-player): "In single player
+    // buff from Wilderness pilgrimage lasts for real time 24 hours, not in
+    // game time. Is that intentional?" No. Single-player game-time advances
+    // through sleep / [Z] Wait / dungeon descent, NOT through wall-clock,
+    // so a real-time 24h expiry was inconsistent with how every other timed
+    // system in single-player works. Online keeps real-time (server runs 24/7
+    // regardless of player presence, real-time is the natural reference).
+    // For single-player, this field tracks the in-game day on which the buff
+    // expires; the buff is active while `StoryProgressionSystem.CurrentGameDay
+    // <= AttunedShrineExpiresGameDay`. Default 0 means no expiration set.
+    public int AttunedShrineExpiresGameDay { get; set; } = 0;
     public Dictionary<string, int> ShrineFavor { get; set; } = new();
-    public bool HasActiveShrineAttunement =>
-        !string.IsNullOrEmpty(AttunedShrineId) && AttunedShrineExpiresUtc > DateTime.UtcNow;
+    public bool HasActiveShrineAttunement
+    {
+        get
+        {
+            if (string.IsNullOrEmpty(AttunedShrineId)) return false;
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                return AttunedShrineExpiresUtc > DateTime.UtcNow;
+            // Single-player: use game-day counter. Buff stays active until
+            // the player sleeps / [Z] Waits past the expiration day.
+            var story = UsurperRemake.Systems.StoryProgressionSystem.Instance;
+            int currentDay = story?.CurrentGameDay ?? 1;
+            return AttunedShrineExpiresGameDay > 0 && currentDay <= AttunedShrineExpiresGameDay;
+        }
+    }
     /// <summary>True if the player is attuned to a specific shrine and the attunement hasn't expired.</summary>
     public bool IsAttunedTo(string shrineId) =>
         HasActiveShrineAttunement && string.Equals(AttunedShrineId, shrineId, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// v0.61.3: human-readable "X remaining" label for the shrine attunement,
+    /// using the right time unit per game mode. Online: real-time hours
+    /// (e.g. "12.5h"). Single-player: game-day count (e.g. "2 days", "1 day",
+    /// or "today" if the buff expires this same in-game day).
+    /// </summary>
+    public string GetShrineTimeRemainingLabel()
+    {
+        if (!HasActiveShrineAttunement) return "";
+        if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+        {
+            double hoursLeft = (AttunedShrineExpiresUtc - DateTime.UtcNow).TotalHours;
+            return UsurperRemake.Systems.Loc.Get("shrine.time_hours", $"{hoursLeft:F1}");
+        }
+        int currentDay = UsurperRemake.Systems.StoryProgressionSystem.Instance?.CurrentGameDay ?? 1;
+        int daysLeft = AttunedShrineExpiresGameDay - currentDay;
+        if (daysLeft <= 0) return UsurperRemake.Systems.Loc.Get("shrine.time_today");
+        if (daysLeft == 1) return UsurperRemake.Systems.Loc.Get("shrine.time_one_day");
+        return UsurperRemake.Systems.Loc.Get("shrine.time_n_days", daysLeft);
+    }
 
     /// <summary>
     /// v0.61.0 Druid's Shrines: returns the player's effective Charisma including the

@@ -2426,6 +2426,13 @@ public class InnLocation : BaseLocation
         currentPlayer.Mana = Math.Min(currentPlayer.MaxMana, currentPlayer.Mana + manaAmount);
         currentPlayer.CurrentCombatStamina = Math.Min(currentPlayer.MaxCombatStamina, currentPlayer.CurrentCombatStamina + staminaAmount);
 
+        // v0.61.3: refill companion + NPC-teammate potion stashes when the
+        // player sleeps at the Inn. Pre-fix the comment on
+        // RefillCompanionPotions claimed "called on recruit, rest, new day"
+        // but only the recruit caller existed -- party AI auto-heal stash
+        // monotonically decreased over a character's lifetime once burned.
+        CompanionSystem.Instance?.RefillAllPartyPotions(currentPlayer);
+
         if (currentPlayer.MurderWeight >= 3f)
         {
             terminal.WriteLine(Loc.Get("inn.sleep_dark_memories"), "dark_red");

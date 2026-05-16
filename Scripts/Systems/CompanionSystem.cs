@@ -2201,6 +2201,60 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
+        /// v0.61.3: Refill potion stashes for the player's entire party
+        /// (companions, NPCs on the player's team, and NPCs in the player's
+        /// dungeon party). Called from Inn sleep and from the daily reset
+        /// so a long-running character's AI teammates don't permanently dry
+        /// out after burning their recruit-time stash mid-combat. Mirrors
+        /// the original `RefillCompanionPotions` formula for NPCs:
+        /// role-scaled base count + Level/2 bonus for healing, mana for
+        /// spellcasters. Non-spellcasters get no mana potions.
+        /// </summary>
+        public void RefillAllPartyPotions(global::Character player)
+        {
+            // Companions: keep using the existing per-role formula.
+            RefillAllCompanionPotions();
+
+            if (player == null) return;
+
+            // NPC teammates: refill anyone on the player's team or in their
+            // dungeon party. Same role-scaled formula `RefillCompanionPotions`
+            // uses, applied to NPC.Healing / NPC.ManaPotions directly.
+            var npcSystem = global::UsurperRemake.Systems.NPCSpawnSystem.Instance;
+            if (npcSystem == null) return;
+
+            var partyNpcIds = global::GameEngine.Instance?.DungeonPartyNPCIds
+                ?? new System.Collections.Generic.List<string>();
+
+            foreach (var npc in npcSystem.ActiveNPCs)
+            {
+                if (npc == null || npc.IsDead || !npc.IsAlive) continue;
+
+                bool onPlayerTeam = !string.IsNullOrEmpty(player.Team) && !string.IsNullOrEmpty(npc.Team)
+                    && string.Equals(player.Team, npc.Team, System.StringComparison.OrdinalIgnoreCase);
+                bool inPartyList = !string.IsNullOrEmpty(npc.ID) && partyNpcIds.Contains(npc.ID);
+                if (!onPlayerTeam && !inPartyList) continue;
+
+                // Healers / casters carry fewer healing potions (they self-cast)
+                // but spellcasters get mana potions. NPCs don't have a CombatRole
+                // field, so use ClassAbilitySystem.IsSpellcaster as the proxy.
+                bool isCaster = global::ClassAbilitySystem.IsSpellcaster(npc.Class);
+                int basePotions = isCaster ? 2 : 5;
+                int maxHealing = 5 + npc.Level;
+                int newHealing = System.Math.Min(basePotions + npc.Level / 2, maxHealing);
+                if (npc.Healing < newHealing) npc.Healing = newHealing;
+
+                if (isCaster)
+                {
+                    int baseMana = 3 + npc.Level / 3;
+                    int maxMana = 3 + npc.Level / 2;
+                    int newMana = System.Math.Min(baseMana, maxMana);
+                    if (npc.ManaPotions < newMana) npc.ManaPotions = newMana;
+                }
+            }
+        }
+
+        /// <summary>
         /// Scale companion base stats based on their current level
         /// </summary>
         private void ScaleCompanionStatsToLevel(Companion companion)

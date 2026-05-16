@@ -682,6 +682,9 @@ public class HomeLocation : BaseLocation
         currentPlayer.HP = Math.Min(currentPlayer.MaxHP, currentPlayer.HP + healAmount);
         currentPlayer.Mana = Math.Min(currentPlayer.MaxMana, currentPlayer.Mana + manaAmount);
 
+        // v0.61.3: refill companion + NPC-teammate potion stashes when resting at Home.
+        CompanionSystem.Instance?.RefillAllPartyPotions(currentPlayer);
+
         if (currentPlayer.MurderWeight >= 3f)
         {
             terminal.WriteLine(Loc.Get("home.rest_grief"), "dark_red");

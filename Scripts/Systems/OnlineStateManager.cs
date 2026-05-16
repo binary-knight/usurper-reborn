@@ -1233,6 +1233,12 @@ namespace UsurperRemake.Systems
                     IsTeamLeader = npc.CTurf,
                     IsKing = currentKing != null && currentKing.Name == npc.Name,
                     IsDead = npc.IsDead,
+                    // v0.61.3: NPC potion counts. Mirrors the single-player path
+                    // in SaveSystem.SerializeNPCs. Pre-fix these were never written
+                    // to world_state, so any potion consumption / player gift was
+                    // wiped on the next world-sim reload.
+                    HealingPotions = (int)npc.Healing,
+                    ManaPotions = (int)npc.ManaPotions,
                     IsMarried = npc.IsMarried,
                     Married = npc.Married,
                     SpouseName = npc.SpouseName ?? "",

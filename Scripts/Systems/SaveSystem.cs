@@ -934,6 +934,7 @@ namespace UsurperRemake.Systems
                 MarshToadAntidoteClaimedToday = player.MarshToadAntidoteClaimedToday,
                 AttunedShrineId = player.AttunedShrineId ?? "",
                 AttunedShrineExpiresUtc = player.AttunedShrineExpiresUtc,
+                AttunedShrineExpiresGameDay = player.AttunedShrineExpiresGameDay,
                 ShrineFavor = player.ShrineFavor != null ? new Dictionary<string, int>(player.ShrineFavor) : new Dictionary<string, int>(),
                 PetRoster = player.PetRoster?.Select(p => new PetSaveData
                 {
@@ -1200,6 +1201,16 @@ namespace UsurperRemake.Systems
                     Team = npc.Team ?? "",
                     IsTeamLeader = npc.CTurf,
                     IsKing = currentKing != null && currentKing.Name == npc.Name,
+
+                    // v0.61.3: Potion counts. NPCs spawn with role-scaled potion
+                    // counts (NPCSpawnSystem.cs:601-607) and the AI consumes them
+                    // mid-combat at <30% HP. Pre-fix these were never serialized,
+                    // so any potion consumption / player gift was wiped on the
+                    // next save reload. NPCData fields are int; Character.Healing
+                    // is long but values are bounded by NPCSpawnSystem caps so
+                    // the int cast is safe.
+                    HealingPotions = (int)npc.Healing,
+                    ManaPotions = (int)npc.ManaPotions,
 
                     // Death status - permanent death tracking
                     IsDead = npc.IsDead,
