@@ -722,6 +722,7 @@ public class HealerLocation : BaseLocation
         // Purchase potions
         player.Gold -= potionTotalWithTax;
         player.Statistics.RecordPurchase(potionTotalWithTax);
+        AchievementSystem.CheckAchievements(player); // v0.61.3: immediate achievement check
         CityControlSystem.Instance.ProcessSaleTax(cost);
         player.Healing += quantity;
 
@@ -792,6 +793,7 @@ public class HealerLocation : BaseLocation
         player.Gold -= potionTotalWithTax;
         player.Statistics.RecordPurchase(potionTotalWithTax);
         player.Statistics.RecordGoldSpent(potionTotalWithTax);
+        AchievementSystem.CheckAchievements(player); // v0.61.3: immediate achievement check
         CityControlSystem.Instance.ProcessSaleTax(cost);
         player.ManaPotions += quantity;
 
@@ -855,6 +857,7 @@ public class HealerLocation : BaseLocation
 
         player.Gold -= totalWithTax;
         player.Statistics.RecordPurchase(totalWithTax);
+        AchievementSystem.CheckAchievements(player); // v0.61.3: immediate achievement check
         CityControlSystem.Instance.ProcessSaleTax(cost);
         player.Antidotes += quantity;
 

@@ -2830,6 +2830,7 @@ public partial class MagicShopLocation : BaseLocation
 
         player.Statistics?.RecordPurchase(totalWithTax);
         player.Statistics?.RecordAccessoryPurchase(totalWithTax);
+        AchievementSystem.CheckAchievements(player); // v0.61.3: immediate achievement check
         CityControlSystem.Instance.ProcessSaleTax(price);
         // Check for equipment quest completion
         QuestSystem.OnEquipmentPurchased(player, item);

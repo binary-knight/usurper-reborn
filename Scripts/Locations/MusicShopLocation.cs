@@ -594,6 +594,7 @@ public class MusicShopLocation : BaseLocation
 
         currentPlayer.Gold -= totalCost;
         currentPlayer.Statistics?.RecordPurchase(totalCost);
+        AchievementSystem.CheckAchievements(currentPlayer); // v0.61.3: immediate achievement check
 
         // Process city tax
         CityControlSystem.Instance.ProcessSaleTax(item.Value);

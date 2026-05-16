@@ -1167,6 +1167,7 @@ public class DungeonLocation : BaseLocation
             Class = CharacterClass.Warrior, // Marker class so the basic-attack AI path runs.
             Race = CharacterRace.Troll,     // Beast-ish marker; no race bonuses apply since IsPet.
             IsPet = true,
+            PetSpeciesId = pet.Id,          // v0.61.2: carry species id for per-beast combat behavior.
             Allowed = true,
         };
 
@@ -1272,11 +1273,10 @@ public class DungeonLocation : BaseLocation
 
         const int maxPartySize = 4;
         int restoredCount = 0;
+        int skippedCount = 0;
 
         foreach (var name in playerNames)
         {
-            if (teammates.Count >= maxPartySize) break;
-
             // Skip if already in party
             if (teammates.Any(t => t.DisplayName.Equals(name, StringComparison.OrdinalIgnoreCase)))
                 continue;
@@ -1296,6 +1296,17 @@ public class DungeonLocation : BaseLocation
                         term.WriteLine(Loc.Get("dungeon.not_on_team", name));
                         continue;
                     }
+                }
+
+                // Cap check moved AFTER duplicate / save-data / team filters so
+                // the "X echoes couldn't join" count only reflects echoes that
+                // would have fit but were squeezed out by the party cap.
+                // Otherwise dead / off-team / unloadable echoes inflate the
+                // warning ("5 couldn't join" when only 1 was actually capped).
+                if (teammates.Count >= maxPartySize)
+                {
+                    skippedCount++;
+                    continue;
                 }
 
                 // Create echo character
@@ -1318,6 +1329,21 @@ public class DungeonLocation : BaseLocation
             term.WriteLine(Loc.Get("dungeon.echoes_info"));
             term.WriteLine("");
             await Task.Delay(1500);
+        }
+
+        // Player report (Lv.68 Voidreaver): echoes recruited at Team Corner silently
+        // failed to load into the dungeon party. Companions fill the maxPartySize=4 cap
+        // before this method runs, so the break-on-cap above was invisible. Mirror
+        // the NPC-teammate overflow warning pattern so the player understands what
+        // happened and how to make room.
+        if (skippedCount > 0)
+        {
+            term.WriteLine("");
+            term.SetColor("yellow");
+            term.WriteLine(Loc.Get("dungeon.echoes_skipped", skippedCount, maxPartySize));
+            term.WriteLine(Loc.Get("dungeon.echoes_skipped_hint"));
+            term.WriteLine("");
+            await Task.Delay(2000);
         }
     }
 
@@ -3858,7 +3884,7 @@ public class DungeonLocation : BaseLocation
                 foreach (var quest in activeQuests.Take(5))
                 {
                     terminal.SetColor("bright_yellow");
-                    terminal.Write($"  • {quest.Title ?? "(unnamed)"}");
+                    terminal.Write($"  • {quest.GetDisplayTitle()}");
 
                     // Show objective summary inline
                     if (quest.Objectives != null && quest.Objectives.Count > 0)
@@ -3874,7 +3900,7 @@ public class DungeonLocation : BaseLocation
                                 ? $" ({obj.CurrentProgress}/{obj.RequiredProgress})"
                                 : "";
                             terminal.SetColor(obj.IsComplete ? "green" : "gray");
-                            terminal.WriteLine($"    [{check}] {obj.Description}{progress}");
+                            terminal.WriteLine($"    [{check}] {obj.GetDisplayDescription()}{progress}");
                         }
                     }
                     else
@@ -9283,6 +9309,7 @@ public class DungeonLocation : BaseLocation
             player.Statistics?.RecordPurchase(item.Price);
             player.Statistics?.RecordGoldSpent(item.Price);
             player.Statistics?.RecordGoldChange(player.Gold);
+            AchievementSystem.CheckAchievements(player); // v0.61.3: immediate achievement check
 
             if (item.LootItem != null)
             {
@@ -11884,6 +11911,7 @@ public class DungeonLocation : BaseLocation
         applyPurchase(amount);
         player.Statistics?.RecordPurchase(totalCost);
         player.Statistics?.RecordGoldSpent(totalCost);
+        AchievementSystem.CheckAchievements(player); // v0.61.3: immediate achievement check
 
         string color = potionType == "mana" ? "blue" : "bright_green";
         terminal.WriteLine("");
@@ -13188,6 +13216,9 @@ public class DungeonLocation : BaseLocation
                 case PuzzleType.MemoryMatch:
                     solved = await HandleMemoryPuzzle(puzzle, player);
                     break;
+                case PuzzleType.PressurePlates:
+                    solved = await HandlePressurePlatesPuzzle(puzzle, player);
+                    break;
                 default:
                     // Fallback to simple choice for other types
                     solved = await HandleSimplePuzzle(puzzle, player);
@@ -13264,6 +13295,38 @@ public class DungeonLocation : BaseLocation
         {
             if (!int.TryParse(parts[i], out int lever)) return false;
             if (lever.ToString() != puzzle.Solution[i]) return false;
+        }
+
+        return true;
+    }
+
+    // v0.61.3: dedicated handler for PressurePlates puzzles. Player report:
+    // "I just pressed think carefully and deduce the answer, option 1, and it
+    // autofilled itself. Was this supposed to happen? It wrote the plates so
+    // i thought i needed to remember them or something?" Confirmed: the puzzle
+    // generator (PuzzleSystem.GeneratePressurePuzzle) builds a real solution
+    // sequence of plate numbers and wear-pattern hints that reveal it, but
+    // PuzzleType.PressurePlates had no case in the dispatch switch -- it fell
+    // through to HandleSimplePuzzle's [1] / [2] / [3] menu, which just rolls
+    // an Intelligence check. So the player saw "study the wear patterns to
+    // determine the safe path" and a list of hints, then got a generic menu
+    // instead of the sequence input prompt. Solution structure is identical
+    // to lever sequences (List<string> of 1-indexed numbers), so the handler
+    // mirrors HandleLeverPuzzle.
+    private async Task<bool> HandlePressurePlatesPuzzle(PuzzleInstance puzzle, Character player)
+    {
+        int plateCount = puzzle.Solution.Count;
+        terminal.WriteLine(Loc.Get("dungeon.pressure_plates_prompt", plateCount), "white");
+
+        var input = await terminal.GetInput("> ");
+        var parts = input.Split(',', ' ').Select(s => s.Trim()).Where(s => !string.IsNullOrEmpty(s)).ToList();
+
+        if (parts.Count != plateCount) return false;
+
+        for (int i = 0; i < plateCount; i++)
+        {
+            if (!int.TryParse(parts[i], out int plate)) return false;
+            if (plate.ToString() != puzzle.Solution[i]) return false;
         }
 
         return true;
@@ -16878,7 +16941,7 @@ public class DungeonLocation : BaseLocation
                     foreach (var quest in activeQuests.Take(5))
                     {
                         term.SetColor("yellow");
-                        term.Write($"    - {quest.Title}");
+                        term.Write($"    - {quest.GetDisplayTitle()}");
                         term.SetColor("gray");
                         term.WriteLine($" ({quest.GetDifficultyString()})");
                     }

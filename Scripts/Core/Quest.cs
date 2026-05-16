@@ -47,6 +47,81 @@ public partial class Quest
     // Display title used in mails / UI (not part of original Pascal structure but referenced by systems)
     public string Title { get; set; } = "(unnamed quest)";
 
+    // v0.61.3: localization-aware fields. When a key is non-empty, the
+    // display layer renders Loc.Get(...) in the viewer's session language
+    // instead of returning the static string. Pre-fix, every quest's text
+    // got rendered to English at world-bootstrap (when no player session was
+    // active) and then never re-translated for non-English players.
+    public string TitleKey { get; set; } = "";
+    public List<string> TitleArgs { get; set; } = new();
+    public string CommentKey { get; set; } = "";
+    public List<string> CommentArgs { get; set; } = new();
+    public string InitiatorKey { get; set; } = "";
+
+    /// <summary>
+    /// Resolves any arg with the `loc:` prefix to its localized form at display
+    /// time. The release notes for v0.61.2 quest localization called out a
+    /// known limitation: when a creator did `Loc.Get(innerKey)` and stuffed the
+    /// resolved English into TitleArgs, non-English viewers got the wrapper
+    /// translated but the embedded sub-string stayed in bootstrap language.
+    /// The `loc:` prefix is the fix: an arg of "loc:quest.foo.bandit_leader"
+    /// resolves to the bandit-leader name in the VIEWER's language at render
+    /// time. Plain string args (NPC names, numbers) pass through unchanged.
+    /// </summary>
+    private static object[] ResolveLocArgs(List<string> args)
+    {
+        if (args == null || args.Count == 0) return System.Array.Empty<object>();
+        var result = new object[args.Count];
+        for (int i = 0; i < args.Count; i++)
+        {
+            var a = args[i] ?? "";
+            if (a.StartsWith("loc:", StringComparison.Ordinal))
+            {
+                result[i] = Loc.Get(a.Substring(4));
+            }
+            else
+            {
+                result[i] = a;
+            }
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// v0.61.3: returns the title in the current viewer's language by rendering
+    /// TitleKey at display time. Falls back to Title for legacy quests.
+    /// </summary>
+    public string GetDisplayTitle()
+    {
+        if (!string.IsNullOrEmpty(TitleKey))
+        {
+            return TitleArgs.Count > 0
+                ? Loc.Get(TitleKey, ResolveLocArgs(TitleArgs))
+                : Loc.Get(TitleKey);
+        }
+        return Title;
+    }
+
+    /// <summary>v0.61.3: viewer-language Comment.</summary>
+    public string GetDisplayComment()
+    {
+        if (!string.IsNullOrEmpty(CommentKey))
+        {
+            return CommentArgs.Count > 0
+                ? Loc.Get(CommentKey, ResolveLocArgs(CommentArgs))
+                : Loc.Get(CommentKey);
+        }
+        return Comment;
+    }
+
+    /// <summary>v0.61.3: viewer-language Initiator (e.g. "Royal Council").</summary>
+    public string GetDisplayInitiator()
+    {
+        if (!string.IsNullOrEmpty(InitiatorKey))
+            return Loc.Get(InitiatorKey);
+        return Initiator;
+    }
+
     // Target NPC name for bounty/assassination quests
     public string TargetNPCName { get; set; } = "";
 
@@ -401,7 +476,7 @@ public enum QuestObjectiveType
 public class QuestObjective
 {
     public string Id { get; set; } = "";
-    public string Description { get; set; } = "";
+    public string Description { get; set; } = "";       // Legacy field; English snapshot for backward compat.
     public QuestObjectiveType ObjectiveType { get; set; }
     public string TargetId { get; set; } = "";          // Monster type, NPC name, location, etc.
     public string TargetName { get; set; } = "";        // Display name for target
@@ -409,6 +484,15 @@ public class QuestObjective
     public int CurrentProgress { get; set; } = 0;       // Current count
     public bool IsOptional { get; set; } = false;       // Optional bonus objectives
     public int BonusReward { get; set; } = 0;           // Extra reward for optional objectives
+
+    // v0.61.3: localization-aware fields. When DescriptionKey is non-empty, the
+    // display layer renders Loc.Get(DescriptionKey, DescriptionArgs) using the
+    // current player session's language, instead of the static Description
+    // string (which was rendered ONCE at creation time and locked to whatever
+    // language the creator's session was in). Pre-fix every quest's text was
+    // locked in English at world-bootstrap because no session was active.
+    public string DescriptionKey { get; set; } = "";
+    public List<string> DescriptionArgs { get; set; } = new();
 
     public bool IsComplete => CurrentProgress >= RequiredProgress;
     public float ProgressPercent => RequiredProgress > 0 ? (float)CurrentProgress / RequiredProgress : 0f;
@@ -429,12 +513,73 @@ public class QuestObjective
     }
 
     /// <summary>
+    /// v0.61.3: factory for the localization-aware path. Stores the key and
+    /// args so display can render in the viewer's language. Description is
+    /// still set to the English-rendered text so legacy save readers and
+    /// non-localized display sites get something sensible.
+    /// </summary>
+    public static QuestObjective Localized(QuestObjectiveType type, string descriptionKey, object[] descriptionArgs,
+        int required, string targetId = "", string targetName = "")
+    {
+        var obj = new QuestObjective
+        {
+            Id = $"OBJ{Guid.NewGuid():N}",
+            ObjectiveType = type,
+            Description = Loc.Get(descriptionKey, descriptionArgs),
+            DescriptionKey = descriptionKey,
+            DescriptionArgs = descriptionArgs.Select(a => a?.ToString() ?? "").ToList(),
+            RequiredProgress = required,
+            TargetId = targetId,
+            TargetName = targetName
+        };
+        return obj;
+    }
+
+    /// <summary>
+    /// v0.61.3: returns the description in the current viewer's language by
+    /// rendering DescriptionKey at display time. Falls back to Description
+    /// (English snapshot) when no key is set, so quests created before this
+    /// change still render correctly.
+    /// </summary>
+    public string GetDisplayDescription()
+    {
+        if (!string.IsNullOrEmpty(DescriptionKey))
+        {
+            return DescriptionArgs.Count > 0
+                ? Loc.Get(DescriptionKey, ResolveLocArgs(DescriptionArgs))
+                : Loc.Get(DescriptionKey);
+        }
+        return Description;
+    }
+
+    /// <summary>
+    /// Mirror of `Quest.ResolveLocArgs` for objective-side args. An arg of
+    /// "loc:some.key" resolves via Loc.Get in the viewer's session language;
+    /// plain string args pass through unchanged. See Quest.ResolveLocArgs for
+    /// the why.
+    /// </summary>
+    private static object[] ResolveLocArgs(List<string> args)
+    {
+        if (args == null || args.Count == 0) return System.Array.Empty<object>();
+        var result = new object[args.Count];
+        for (int i = 0; i < args.Count; i++)
+        {
+            var a = args[i] ?? "";
+            if (a.StartsWith("loc:", StringComparison.Ordinal))
+                result[i] = Loc.Get(a.Substring(4));
+            else
+                result[i] = a;
+        }
+        return result;
+    }
+
+    /// <summary>
     /// Get display string for objective status
     /// </summary>
     public string GetDisplayString()
     {
         var status = IsComplete ? Loc.Get("quest.objective.complete") : Loc.Get("quest.objective.progress", CurrentProgress, RequiredProgress);
         var optional = IsOptional ? " " + Loc.Get("quest.objective.optional") : "";
-        return $"{status} {Description}{optional}";
+        return $"{status} {GetDisplayDescription()}{optional}";
     }
 } 

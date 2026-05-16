@@ -1095,6 +1095,13 @@ namespace UsurperRemake.Systems
         public string Title { get; set; } = "";
         public string Initiator { get; set; } = "";
         public string Comment { get; set; } = "";
+        // v0.61.3: localization keys for viewer-language quest rendering.
+        // Empty for legacy quests (falls back to Title/Initiator/Comment).
+        public string TitleKey { get; set; } = "";
+        public List<string> TitleArgs { get; set; } = new();
+        public string CommentKey { get; set; } = "";
+        public List<string> CommentArgs { get; set; } = new();
+        public string InitiatorKey { get; set; } = "";
         public QuestStatus Status { get; set; }
         public DateTime StartTime { get; set; }
         public int QuestType { get; set; }
@@ -1123,6 +1130,9 @@ namespace UsurperRemake.Systems
     {
         public string Id { get; set; } = "";
         public string Description { get; set; } = "";
+        // v0.61.3: localization key for viewer-language objective text.
+        public string DescriptionKey { get; set; } = "";
+        public List<string> DescriptionArgs { get; set; } = new();
         public int ObjectiveType { get; set; }
         public string TargetId { get; set; } = "";
         public string TargetName { get; set; } = "";

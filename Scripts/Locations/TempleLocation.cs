@@ -23,26 +23,29 @@ public partial class TempleLocation : BaseLocation
     private bool refreshMenu = true;
     private Random random = Random.Shared;
 
-    // Old Gods integration
-    private static readonly string[] OldGodsProphecies = new[]
+    // Old Gods integration. Keys instead of literal strings so the prophecies
+    // and whispers render in the viewer's session language; `Loc.Get` resolves
+    // at display time. Both arrays are still accessed by index (the per-god
+    // prophecy mapping is positional — index 0 = Broken Blade, etc.).
+    private static readonly string[] OldGodsProphecyKeys = new[]
     {
-        "The Broken Blade weeps in halls of bone...",
-        "Love withers where the heart turns cold...",
-        "Justice blind becomes tyranny's tool...",
-        "In shadow's web, truth and lies entwine...",
-        "The light that fades leaves only dark behind...",
-        "Mountains sleep while the world forgets...",
-        "The Weary Creator watches, waits, and wonders..."
+        "temple.prophecy.broken_blade",
+        "temple.prophecy.love_withers",
+        "temple.prophecy.justice_blind",
+        "temple.prophecy.shadow_web",
+        "temple.prophecy.light_fades",
+        "temple.prophecy.mountains_sleep",
+        "temple.prophecy.weary_creator"
     };
 
-    private static readonly string[] DivineWhispers = new[]
+    private static readonly string[] DivineWhisperKeys = new[]
     {
-        "You hear whispers from beyond the veil...",
-        "The candles flicker as something ancient stirs...",
-        "A cold wind carries the scent of forgotten ages...",
-        "The stones remember when gods walked among mortals...",
-        "Prayers echo back, transformed into warnings...",
-        "The altar trembles with barely contained power..."
+        "temple.whisper.beyond_veil",
+        "temple.whisper.candles_flicker",
+        "temple.whisper.cold_wind",
+        "temple.whisper.stones_remember",
+        "temple.whisper.prayers_echo",
+        "temple.whisper.altar_trembles"
     };
     
     public TempleLocation(TerminalEmulator terminal, LocationManager locationManager, GodSystem godSystem)
@@ -1563,16 +1566,28 @@ public partial class TempleLocation : BaseLocation
         terminal.WriteLine(Loc.Get("temple.good_deeds", currentPlayer.ChivNr), "green");
         terminal.WriteLine(Loc.Get("temple.evil_deeds", currentPlayer.DarkNr), "red");
 
+        // v0.61.3: player report — "when you contribute to an altar while you
+        // worship a player, and press stats on the sacrificing screen, the game
+        // writes you are worshiping noone." `GetPlayerGod` only returns elder
+        // gods from the GodSystem registry, so player-immortal worshippers
+        // (Character.WorshippedGod) fell through to the "god_none" line. Other
+        // temple display sites already fall back to WorshippedGod when the
+        // elder-god lookup is empty; this status screen was just missing the
+        // same fallback. Mirror the pattern from DisplayWelcomeMessage / DisplayMenu.
         string playerGod = godSystem.GetPlayerGod(currentPlayer.Name2);
         if (!string.IsNullOrEmpty(playerGod))
         {
             terminal.WriteLine(Loc.Get("temple.god_label", playerGod), "cyan");
         }
+        else if (!string.IsNullOrEmpty(currentPlayer.WorshippedGod))
+        {
+            terminal.WriteLine(Loc.Get("temple.god_label", currentPlayer.WorshippedGod), "bright_yellow");
+        }
         else
         {
             terminal.WriteLine(Loc.Get("temple.god_none"), "gray");
         }
-        
+
         await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
     }
 
@@ -1589,7 +1604,7 @@ public partial class TempleLocation : BaseLocation
         terminal.WriteLine("");
 
         // Random divine whisper intro
-        terminal.WriteLine(DivineWhispers[random.Next(DivineWhispers.Length)], "gray");
+        terminal.WriteLine(Loc.Get(DivineWhisperKeys[random.Next(DivineWhisperKeys.Length)]), "gray");
         await Task.Delay(1500);
         terminal.WriteLine("");
 
@@ -1605,12 +1620,12 @@ public partial class TempleLocation : BaseLocation
             else if (maelkethState.Status == GodStatus.Saved)
                 terminal.WriteLine(Loc.Get("temple.prophecy_maelketh_saved"), "bright_green");
             else
-                terminal.WriteLine(OldGodsProphecies[0], "red");
+                terminal.WriteLine(Loc.Get(OldGodsProphecyKeys[0]), "red");
             propheciesRevealed++;
         }
         else if (currentPlayer.Level >= 50)
         {
-            terminal.WriteLine(OldGodsProphecies[0], "red");
+            terminal.WriteLine(Loc.Get(OldGodsProphecyKeys[0]), "red");
             propheciesRevealed++;
         }
 
@@ -1622,12 +1637,12 @@ public partial class TempleLocation : BaseLocation
             else if (velouraState.Status == GodStatus.Saved)
                 terminal.WriteLine(Loc.Get("temple.prophecy_veloura_saved"), "bright_magenta");
             else
-                terminal.WriteLine(OldGodsProphecies[1], "red");
+                terminal.WriteLine(Loc.Get(OldGodsProphecyKeys[1]), "red");
             propheciesRevealed++;
         }
         else if (currentPlayer.Level >= 40)
         {
-            terminal.WriteLine(OldGodsProphecies[1], "red");
+            terminal.WriteLine(Loc.Get(OldGodsProphecyKeys[1]), "red");
             propheciesRevealed++;
         }
 
@@ -1637,12 +1652,12 @@ public partial class TempleLocation : BaseLocation
             if (thorgrimState.Status == GodStatus.Defeated)
                 terminal.WriteLine(Loc.Get("temple.prophecy_thorgrim_defeated"), "yellow");
             else
-                terminal.WriteLine(OldGodsProphecies[2], "red");
+                terminal.WriteLine(Loc.Get(OldGodsProphecyKeys[2]), "red");
             propheciesRevealed++;
         }
         else if (currentPlayer.Level >= 60)
         {
-            terminal.WriteLine(OldGodsProphecies[2], "red");
+            terminal.WriteLine(Loc.Get(OldGodsProphecyKeys[2]), "red");
             propheciesRevealed++;
         }
 
@@ -1654,12 +1669,12 @@ public partial class TempleLocation : BaseLocation
             else if (nocturaState.Status == GodStatus.Defeated)
                 terminal.WriteLine(Loc.Get("temple.prophecy_noctura_defeated"), "gray");
             else
-                terminal.WriteLine(OldGodsProphecies[3], "red");
+                terminal.WriteLine(Loc.Get(OldGodsProphecyKeys[3]), "red");
             propheciesRevealed++;
         }
         else if (currentPlayer.Level >= 70)
         {
-            terminal.WriteLine(OldGodsProphecies[3], "red");
+            terminal.WriteLine(Loc.Get(OldGodsProphecyKeys[3]), "red");
             propheciesRevealed++;
         }
 
@@ -1671,12 +1686,12 @@ public partial class TempleLocation : BaseLocation
             else if (aurelionState.Status == GodStatus.Saved)
                 terminal.WriteLine(Loc.Get("temple.prophecy_aurelion_saved"), "bright_yellow");
             else
-                terminal.WriteLine(OldGodsProphecies[4], "red");
+                terminal.WriteLine(Loc.Get(OldGodsProphecyKeys[4]), "red");
             propheciesRevealed++;
         }
         else if (currentPlayer.Level >= 55)
         {
-            terminal.WriteLine(OldGodsProphecies[4], "red");
+            terminal.WriteLine(Loc.Get(OldGodsProphecyKeys[4]), "red");
             propheciesRevealed++;
         }
 
@@ -1688,12 +1703,12 @@ public partial class TempleLocation : BaseLocation
             else if (terravokState.Status == GodStatus.Saved)
                 terminal.WriteLine(Loc.Get("temple.prophecy_terravok_saved"), "bright_green");
             else
-                terminal.WriteLine(OldGodsProphecies[5], "red");
+                terminal.WriteLine(Loc.Get(OldGodsProphecyKeys[5]), "red");
             propheciesRevealed++;
         }
         else if (currentPlayer.Level >= 75)
         {
-            terminal.WriteLine(OldGodsProphecies[5], "red");
+            terminal.WriteLine(Loc.Get(OldGodsProphecyKeys[5]), "red");
             propheciesRevealed++;
         }
 
@@ -1703,12 +1718,12 @@ public partial class TempleLocation : BaseLocation
             if (manweState.Status != GodStatus.Imprisoned)
                 terminal.WriteLine(Loc.Get("temple.prophecy_manwe_resolved"), "bright_white");
             else
-                terminal.WriteLine(OldGodsProphecies[6], "bright_magenta");
+                terminal.WriteLine(Loc.Get(OldGodsProphecyKeys[6]), "bright_magenta");
             propheciesRevealed++;
         }
         else if (currentPlayer.Level >= 90)
         {
-            terminal.WriteLine(OldGodsProphecies[6], "bright_magenta");
+            terminal.WriteLine(Loc.Get(OldGodsProphecyKeys[6]), "bright_magenta");
             propheciesRevealed++;
         }
 
@@ -3377,6 +3392,29 @@ public partial class TempleLocation : BaseLocation
         terminal.WriteLine(Loc.Get("temple.gold_upon_altar", amount.ToString("N0"), currentPlayer.WorshippedGod));
         terminal.SetColor("bright_cyan");
         terminal.WriteLine(Loc.Get("temple.offering_burns", power));
+
+        // v0.61.3: player report — "when you are affiliated with a player god,
+        // sacrificing gold to your deity doesn't make faith standing go higher."
+        // Confirmed: this function delivered divine experience to the immortal
+        // god correctly, but never updated the worshipper's Faith faction
+        // reputation or alignment the way the elder-god sacrifice path does
+        // (TempleLocation.ProcessGoldSacrifice, lines 1466-1495). Mirror that
+        // logic here: paired-movement alignment shift, faction reputation
+        // bump, capped per sacrifice to match the v0.60.0 anti-cheese cap.
+        // Player-immortal worshippers are treated as faithful by default
+        // (most player-immortals run good-aligned campaigns); a future patch
+        // could read the immortal's own Chivalry/Darkness if we want to
+        // route evil-immortal sacrifices to TheShadows instead.
+        int standingGain = Math.Min(GameConfig.MaxAlignmentGainPerTempleSacrifice,
+            Math.Max(1, (int)(amount / 100)));
+        if (standingGain > 0)
+        {
+            currentPlayer.ChivNr++;
+            AlignmentSystem.Instance.ChangeAlignment(currentPlayer, standingGain, isGood: true, "temple.immortal_sacrifice");
+            UsurperRemake.Systems.FactionSystem.Instance.ModifyReputation(UsurperRemake.Systems.Faction.TheFaith, standingGain);
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine(Loc.Get("temple.devotion_noted", standingGain));
+        }
 
         // Small blessing for the worshipper
         if (power >= 3)

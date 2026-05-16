@@ -1901,6 +1901,13 @@ namespace UsurperRemake.Systems
                 // Process quest maintenance
                 QuestSystem.ProcessDailyQuestMaintenance();
 
+                // Prune npc_decision_log rows older than 30 days so the
+                // telemetry table doesn't grow unboundedly. The helper was
+                // shipped in v0.61.2 but no caller was wired; this runs once
+                // per world-daily reset (cheap single DELETE on an indexed
+                // column).
+                _ = sqlBackend.PruneOldNPCDecisionLog(daysToKeep: 30);
+
                 NewsSystem.Instance?.Newsy(false, "A new day dawns in the realm...");
             }
             catch (Exception ex)

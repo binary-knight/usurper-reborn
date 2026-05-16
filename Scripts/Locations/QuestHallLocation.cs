@@ -282,7 +282,7 @@ public class QuestHallLocation : BaseLocation
                 };
                 if (IsScreenReader)
                 {
-                    WriteSRMenuOption($"{i + 1}", $"{quest.GetDifficultyString()} - {quest.Title ?? quest.GetTargetDescription()}");
+                    WriteSRMenuOption($"{i + 1}", $"{quest.GetDifficultyString()} - {quest.GetDisplayTitle()}");
                 }
                 else
                 {
@@ -292,7 +292,7 @@ public class QuestHallLocation : BaseLocation
                     terminal.SetColor(diffColor);
                     terminal.Write($"[{quest.GetDifficultyString()}] ");
                     terminal.SetColor("white");
-                    terminal.WriteLine(quest.Title ?? quest.GetTargetDescription());
+                    terminal.WriteLine(quest.GetDisplayTitle());
                 }
             }
 
@@ -393,7 +393,7 @@ public class QuestHallLocation : BaseLocation
             {
                 var quest = quests[i];
                 var progress = QuestSystem.GetQuestProgressSummary(quest);
-                WriteSRMenuOption($"{i + 1}", $"{quest.Title ?? quest.GetTargetDescription()} - {progress}");
+                WriteSRMenuOption($"{i + 1}", $"{quest.GetDisplayTitle()} - {progress}");
             }
 
             WriteSRMenuOption("0", Loc.Get("ui.cancel"));
@@ -458,7 +458,7 @@ public class QuestHallLocation : BaseLocation
             {
                 var quest = quests[i];
                 var progress = QuestSystem.GetQuestProgressSummary(quest);
-                WriteSRMenuOption($"{i + 1}", $"{quest.Title ?? quest.GetTargetDescription()} - {progress}");
+                WriteSRMenuOption($"{i + 1}", $"{quest.GetDisplayTitle()} - {progress}");
             }
 
             WriteSRMenuOption("0", Loc.Get("ui.cancel"));
@@ -470,7 +470,7 @@ public class QuestHallLocation : BaseLocation
         {
             var quest = quests[selection - 1];
             terminal.WriteLine("");
-            terminal.WriteLine(Loc.Get("quest_hall.abandon_confirm", quest.Title ?? quest.GetTargetDescription()), "yellow");
+            terminal.WriteLine(Loc.Get("quest_hall.abandon_confirm", quest.GetDisplayTitle()), "yellow");
             terminal.WriteLine(Loc.Get("quest_hall.progress_lost"), "gray");
             var confirm = await terminal.GetInput(Loc.Get("ui.confirm"));
 
@@ -529,11 +529,11 @@ public class QuestHallLocation : BaseLocation
                 terminal.SetColor("red");
                 terminal.Write(Loc.Get("quest_hall.wanted"));
                 terminal.SetColor("bright_white");
-                terminal.WriteLine(bounty.Title ?? Loc.Get("quest_hall.dangerous_criminal"));
+                terminal.WriteLine(bounty.GetDisplayTitle());
                 terminal.SetColor("white");
-                terminal.WriteLine($"  {bounty.Comment}", "gray");
+                terminal.WriteLine($"  {bounty.GetDisplayComment()}", "gray");
                 terminal.WriteLine($"  {Loc.Get("quest_hall.reward", bounty.GetRewardDescription())}", "yellow");
-                terminal.WriteLine($"  {Loc.Get("quest_hall.difficulty_posted", bounty.GetDifficultyString(), bounty.Initiator)}", "gray");
+                terminal.WriteLine($"  {Loc.Get("quest_hall.difficulty_posted", bounty.GetDifficultyString(), bounty.GetDisplayInitiator())}", "gray");
                 terminal.WriteLine("");
             }
         }
@@ -554,9 +554,9 @@ public class QuestHallLocation : BaseLocation
         terminal.SetColor(diffColor);
         terminal.Write($"[{quest.GetDifficultyString()}] ");
         terminal.SetColor("bright_white");
-        terminal.WriteLine(quest.Title ?? quest.GetTargetDescription());
+        terminal.WriteLine(quest.GetDisplayTitle());
         terminal.SetColor("gray");
-        terminal.WriteLine($"  {Loc.Get("quest_hall.from_levels", quest.Initiator, quest.MinLevel, quest.MaxLevel)}");
+        terminal.WriteLine($"  {Loc.Get("quest_hall.from_levels", quest.GetDisplayInitiator(), quest.MinLevel, quest.MaxLevel)}");
     }
 
     private void DisplayQuestDetails(Quest quest)
@@ -569,17 +569,18 @@ public class QuestHallLocation : BaseLocation
             _ => "red"
         };
 
-        WriteSectionHeader(quest.Title ?? quest.GetTargetDescription(), "bright_white");
+        WriteSectionHeader(quest.GetDisplayTitle(), "bright_white");
 
-        if (!string.IsNullOrEmpty(quest.Comment))
+        var displayComment = quest.GetDisplayComment();
+        if (!string.IsNullOrEmpty(displayComment))
         {
-            terminal.WriteLine($"  \"{quest.Comment}\"", "cyan");
+            terminal.WriteLine($"  \"{displayComment}\"", "cyan");
         }
 
         terminal.Write($"  {Loc.Get("quest_hall.difficulty_label")}");
         terminal.WriteLine(quest.GetDifficultyString(), diffColor);
 
-        terminal.WriteLine($"  {Loc.Get("quest_hall.posted_by", quest.Initiator)}");
+        terminal.WriteLine($"  {Loc.Get("quest_hall.posted_by", quest.GetDisplayInitiator())}");
         terminal.WriteLine($"  {Loc.Get("quest_hall.level_range", quest.MinLevel, quest.MaxLevel)}");
         terminal.WriteLine($"  {Loc.Get("quest_hall.time_limit", quest.DaysToComplete)}");
         terminal.WriteLine($"  {Loc.Get("quest_hall.quest_reward", quest.GetRewardDescription())}", "yellow");
@@ -592,7 +593,7 @@ public class QuestHallLocation : BaseLocation
             {
                 var status = obj.IsComplete ? "[+]" : "[ ]";
                 var color = obj.IsComplete ? "green" : "white";
-                terminal.WriteLine($"    {status} {obj.Description} ({obj.CurrentProgress}/{obj.RequiredProgress})", color);
+                terminal.WriteLine($"    {status} {obj.GetDisplayDescription()} ({obj.CurrentProgress}/{obj.RequiredProgress})", color);
             }
         }
 
@@ -674,8 +675,8 @@ public class QuestHallLocation : BaseLocation
         return new ElectronBridge.QuestSummaryData
         {
             Key = key,
-            Title = quest.Title ?? quest.GetTargetDescription(),
-            Description = string.IsNullOrEmpty(quest.Comment) ? null : quest.Comment,
+            Title = quest.GetDisplayTitle(),
+            Description = string.IsNullOrEmpty(quest.GetDisplayComment()) ? null : quest.GetDisplayComment(),
             Difficulty = quest.GetDifficultyString(),
             MinLevel = quest.MinLevel,
             MaxLevel = quest.MaxLevel,
@@ -694,7 +695,7 @@ public class QuestHallLocation : BaseLocation
         foreach (var obj in quest.Objectives)
         {
             string check = obj.IsComplete ? "[+]" : "[ ]";
-            objectives.Add($"{check} {obj.Description} ({obj.CurrentProgress}/{obj.RequiredProgress})");
+            objectives.Add($"{check} {obj.GetDisplayDescription()} ({obj.CurrentProgress}/{obj.RequiredProgress})");
         }
         if (quest.Objectives.Count == 0 && quest.Monsters.Count > 0)
         {
@@ -738,13 +739,13 @@ public class QuestHallLocation : BaseLocation
         return new ElectronBridge.QuestDetailData
         {
             Id = quest.Id,
-            Title = quest.Title ?? quest.GetTargetDescription(),
-            Description = quest.Comment ?? "",
+            Title = quest.GetDisplayTitle(),
+            Description = quest.GetDisplayComment() ?? "",
             Difficulty = quest.GetDifficultyString(),
             MinLevel = quest.MinLevel,
             MaxLevel = quest.MaxLevel,
             Objectives = objectives,
-            Giver = quest.Initiator,
+            Giver = quest.GetDisplayInitiator(),
             Status = status,
             TimeLimit = quest.DaysToComplete > 0 ? $"{quest.DaysToComplete} days" : null,
             Reward = reward

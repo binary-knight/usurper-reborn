@@ -742,6 +742,7 @@ public class ArmorShopLocation : BaseLocation
         // Process purchase (total includes tax)
         currentPlayer.Gold -= armorTotalWithTax;
         currentPlayer.Statistics.RecordPurchase(armorTotalWithTax);
+        AchievementSystem.CheckAchievements(currentPlayer); // v0.61.3: immediate achievement check
 
         // Show tax hint on first purchase
         HintSystem.Instance.TryShowHint(HintSystem.HINT_FIRST_PURCHASE_TAX, terminal, currentPlayer.HintsShown);
@@ -1111,6 +1112,7 @@ public class ArmorShopLocation : BaseLocation
                         // Purchase the armor (total includes tax)
                         currentPlayer.Gold -= abItemTotal;
                         currentPlayer.Statistics.RecordPurchase(abItemTotal);
+                        AchievementSystem.CheckAchievements(currentPlayer); // v0.61.3: immediate achievement check
                         totalSpent += abItemTotal;
 
                         // Process city tax share from this sale

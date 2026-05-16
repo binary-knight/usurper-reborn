@@ -7871,6 +7871,7 @@ public class CastleLocation : BaseLocation
         currentPlayer.Gold -= price;
         currentPlayer.Statistics?.RecordPurchase(price);
         currentPlayer.Statistics?.RecordGoldSpent(price);
+        AchievementSystem.CheckAchievements(currentPlayer); // v0.61.3: immediate achievement check
 
         // Register as dynamic equipment so it gets a valid ID for EquippedItems lookup
         EquipmentDatabase.RegisterDynamic(item);

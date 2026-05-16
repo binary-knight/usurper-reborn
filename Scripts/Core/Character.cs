@@ -327,6 +327,11 @@ public class Character
     // combat. Skipped by social / relationship / NPC flows. Cannot permadie -- HP
     // is restored to MaxHP at combat end.
     public bool IsPet { get; set; } = false;
+    // v0.61.2: species id (e.g. "storm_eagle", "dire_wolf") on combat-pet wrappers
+    // so species-specific behavior (Storm Eagle lightning + stun proc) can fire
+    // regardless of what the player named the pet. AddActivePetToParty sets this
+    // from the underlying Pet.Id when building the wrapper.
+    public string PetSpeciesId { get; set; } = "";
     public string MercenaryName { get; set; } = ""; // For syncing death back to RoyalMercenaries list
 
     // Whether this class uses Mana (spellcasters) vs Stamina (ability users)
@@ -703,6 +708,54 @@ public class Character
     public int IntimateEncountersToday { get; set; } = 0;       // v0.61.x: bedroom / spouse / lover intimate-scene daily counter (cap: GameConfig.MaxIntimateEncountersPerDay). LoveStreet has its own separate counter.
     public int GauntletRunsToday { get; set; } = 0;             // v0.60.11 hotfix: Anchor Road Gauntlet daily counter (cap: GameConfig.MaxGauntletRunsPerDay).
     public bool MarshToadAntidoteClaimedToday { get; set; } = false; // v0.61.1 Beast Taming: Marsh Toad daily free antidote claimed.
+
+    // v0.61.2 Last-Stand cap: prevents monster / boss / environmental damage from
+    // one-shotting a player who started the round above 50% MaxHP. Transient
+    // (per-round combat state, not serialized).
+    [System.Text.Json.Serialization.JsonIgnore] public long RoundStartHP { get; set; } = 0;
+    [System.Text.Json.Serialization.JsonIgnore] public bool LastStandFiredThisRound { get; set; } = false;
+
+    /// <summary>
+    /// v0.61.2 Last-Stand cap. Call at the top of each combat round before any
+    /// damage can land on the player. Captures the HP value the round-start
+    /// check uses, and resets the per-round "did we save them" flag.
+    /// </summary>
+    public void CaptureRoundStartHP()
+    {
+        RoundStartHP = HP;
+        LastStandFiredThisRound = false;
+    }
+
+    /// <summary>
+    /// v0.61.2 Last-Stand cap. Called at the end of a combat round AFTER all
+    /// monster damage has landed and BEFORE the death check runs. If the
+    /// player died this round but started above 50% MaxHP, rescue them by
+    /// setting HP to 1 and flagging LastStandFiredThisRound so the combat
+    /// loop can render the flavor line. The player gets one more turn to
+    /// pot, retreat, ability, or pray. End-of-round check (rather than per-
+    /// damage clamp) lets us cover all damage sources -- basic attacks,
+    /// ability damage, multi-monster pile-on, DoT ticks, boss specials -- in
+    /// one place without touching every damage application site.
+    ///
+    /// Bypassed for:
+    ///   * Nightmare difficulty (player opted into the harshest experience)
+    ///   * PvP combat (pass isPvP=true; players agreed to PvP rules)
+    ///   * Players who started the round already at or below 50% HP (made the
+    ///     calculated risk to engage wounded; the rule respects that decision)
+    ///
+    /// Returns true if the rescue fired this call.
+    /// </summary>
+    public bool LastStandCheckAndApply(bool isPvP = false)
+    {
+        if (isPvP) return false;
+        if (DifficultySystem.IsPermadeath()) return false;
+        if (HP > 0) return false;                 // Not dead; nothing to rescue.
+        if (RoundStartHP <= MaxHP / 2) return false; // Started wounded; player took the risk.
+
+        HP = 1;
+        LastStandFiredThisRound = true;
+        return true;
+    }
 
     // v0.61.0 Druid's Shrines. One shrine attunement at a time, 24h timer enforces
     // the daily cap. ShrineFavor tracks per-shrine visit count for milestone rewards.

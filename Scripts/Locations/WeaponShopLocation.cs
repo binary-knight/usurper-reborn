@@ -835,6 +835,12 @@ public class WeaponShopLocation : BaseLocation
 
         currentPlayer.Gold -= totalWithTax;
         currentPlayer.Statistics.RecordPurchase(totalWithTax);
+        // v0.61.3: check achievements immediately so threshold-crossing unlocks
+        // (shopaholic at 50 items, big_spender at 100k spent) fire at the purchase
+        // moment instead of being deferred to the next post-combat sweep. The
+        // notification still surfaces via the standard BaseLocation hook on
+        // next location entry, but the unlock itself is now correctly timed.
+        AchievementSystem.CheckAchievements(currentPlayer);
 
         // Show tax hint on first purchase
         HintSystem.Instance.TryShowHint(HintSystem.HINT_FIRST_PURCHASE_TAX, terminal, currentPlayer.HintsShown);
@@ -1430,6 +1436,7 @@ public class WeaponShopLocation : BaseLocation
                     // Purchase this weapon (total includes tax)
                     currentPlayer.Gold -= abTotal;
                     currentPlayer.Statistics.RecordPurchase(abTotal);
+                    AchievementSystem.CheckAchievements(currentPlayer); // v0.61.3: immediate achievement check
                     CityControlSystem.Instance.ProcessSaleTax(adjustedPrice);
 
                     // For one-handed weapons, ask which slot to use

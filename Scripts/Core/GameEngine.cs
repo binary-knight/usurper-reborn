@@ -3557,7 +3557,7 @@ public partial class GameEngine
             player.ActiveQuests.Remove(quest);
 
             terminal.WriteLine($"  Quest Update: {targetDisplay} has perished.", "yellow");
-            terminal.WriteLine($"  \"{quest.Title ?? "Quest"}\" auto-completed. Reward: {rewardAmount:N0} gold.", "bright_green");
+            terminal.WriteLine($"  \"{quest.GetDisplayTitle()}\" auto-completed. Reward: {rewardAmount:N0} gold.", "bright_green");
             terminal.WriteLine("");
 
             DebugLogger.Instance.LogInfo("QUEST", $"Auto-completed quest '{quest.Title}' for {player.DisplayName} — target NPC '{targetDisplay}' is permadead. Reward: {rewardAmount:N0}g");

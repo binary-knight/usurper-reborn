@@ -1518,6 +1518,11 @@ namespace UsurperRemake.Systems
                     Title = quest.Title,
                     Initiator = quest.Initiator,
                     Comment = quest.Comment,
+                    TitleKey = quest.TitleKey,
+                    TitleArgs = new List<string>(quest.TitleArgs),
+                    CommentKey = quest.CommentKey,
+                    CommentArgs = new List<string>(quest.CommentArgs),
+                    InitiatorKey = quest.InitiatorKey,
                     Status = quest.IsAbandoned ? QuestStatus.Abandoned :
                              quest.Deleted ? QuestStatus.Completed :
                              QuestStatus.Active,
@@ -1548,6 +1553,10 @@ namespace UsurperRemake.Systems
                     {
                         Id = objective.Id,
                         Description = objective.Description,
+                        DescriptionKey = objective.DescriptionKey,
+                        DescriptionArgs = objective.DescriptionArgs != null
+                            ? new List<string>(objective.DescriptionArgs)
+                            : new List<string>(),
                         ObjectiveType = (int)objective.ObjectiveType,
                         TargetId = objective.TargetId,
                         TargetName = objective.TargetName,

@@ -152,9 +152,9 @@ public class HomeLocation : BaseLocation
         // Chest and garden on second line if upgraded
         var extras = new List<string>();
         if (currentPlayer.ChestLevel > 0)
-            extras.Add(ChestNames[Math.Clamp(currentPlayer.ChestLevel, 0, 5)].ToLower());
+            extras.Add(GetTierName(ChestKeys, currentPlayer.ChestLevel).ToLower());
         if (currentPlayer.GardenLevel > 0)
-            extras.Add(GardenNames[Math.Clamp(currentPlayer.GardenLevel, 0, 5)].ToLower());
+            extras.Add(GetTierName(GardenKeys, currentPlayer.GardenLevel).ToLower());
         if (currentPlayer.HasStudy)
             extras.Add(Loc.Get("home.extra_study"));
         if (currentPlayer.HasServants)
@@ -3877,11 +3877,23 @@ public class HomeLocation : BaseLocation
 
     #region Home Upgrade System - v0.44.0 Overhaul
 
-    private static readonly string[] LivingQuartersNames = { "Dilapidated Shack", "Patched Walls", "Sturdy Cottage", "Comfortable Home", "Fine Manor", "Grand Estate" };
-    private static readonly string[] BedNames = { "Moth-Eaten Straw Pile", "Simple Cot", "Wooden Bed Frame", "Feather Mattress", "Four-Poster Bed", "Royal Canopy Bed" };
-    private static readonly string[] ChestNames = { "No Chest", "Wooden Crate", "Iron-Bound Chest", "Reinforced Vault", "Enchanted Vault", "Dimensional Vault" };
-    private static readonly string[] HearthNames = { "Cold Firepit", "Simple Hearth", "Stone Fireplace", "Iron Stove", "Grand Fireplace", "Eternal Flame" };
-    private static readonly string[] GardenNames = { "Bare Dirt", "Small Herb Patch", "Tended Garden", "Flourishing Garden", "Alchemist's Garden", "Enchanted Greenhouse" };
+    // v0.61.2 (player report): pre-fix these tier names were
+    // hardcoded English string arrays. The "You also have ..." line on the
+    // home screen, the renovations menu, and the "Upgraded to ..." confirmation
+    // all surfaced raw English to non-English players. Now the arrays hold
+    // localization keys instead, resolved through GetTierName() at render time
+    // using the current session's language.
+    private static readonly string[] LivingQuartersKeys = { "home.tier.quarters.0", "home.tier.quarters.1", "home.tier.quarters.2", "home.tier.quarters.3", "home.tier.quarters.4", "home.tier.quarters.5" };
+    private static readonly string[] BedKeys             = { "home.tier.bed.0", "home.tier.bed.1", "home.tier.bed.2", "home.tier.bed.3", "home.tier.bed.4", "home.tier.bed.5" };
+    private static readonly string[] ChestKeys           = { "home.tier.chest.0", "home.tier.chest.1", "home.tier.chest.2", "home.tier.chest.3", "home.tier.chest.4", "home.tier.chest.5" };
+    private static readonly string[] HearthKeys          = { "home.tier.hearth.0", "home.tier.hearth.1", "home.tier.hearth.2", "home.tier.hearth.3", "home.tier.hearth.4", "home.tier.hearth.5" };
+    private static readonly string[] GardenKeys          = { "home.tier.garden.0", "home.tier.garden.1", "home.tier.garden.2", "home.tier.garden.3", "home.tier.garden.4", "home.tier.garden.5" };
+
+    private static string GetTierName(string[] keys, int level)
+    {
+        int idx = Math.Clamp(level, 0, keys.Length - 1);
+        return Loc.Get(keys[idx]);
+    }
 
     private async Task ShowHomeUpgrades()
     {
@@ -3901,7 +3913,7 @@ public class HomeLocation : BaseLocation
         // Living Quarters
         int hlCur = Math.Clamp(currentPlayer.HomeLevel, 0, 5);
         int hlNext = Math.Clamp(currentPlayer.HomeLevel + 1, 0, 5);
-        ShowTieredOption(opt++, "Living Quarters", LivingQuartersNames, currentPlayer.HomeLevel, 5, GetLivingQuartersCost(currentPlayer.HomeLevel),
+        ShowTieredOption(opt++, Loc.Get("home.upgrade_type.quarters"), LivingQuartersKeys, currentPlayer.HomeLevel, 5, GetLivingQuartersCost(currentPlayer.HomeLevel),
             $"{(int)(GameConfig.HomeRecoveryPercent[hlCur] * 100)}% rest, {GameConfig.HomeRestsPerDay[hlCur]}x/day",
             $"{(int)(GameConfig.HomeRecoveryPercent[hlNext] * 100)}% rest, {GameConfig.HomeRestsPerDay[hlNext]}x/day");
 
@@ -3910,12 +3922,12 @@ public class HomeLocation : BaseLocation
         int blNext = Math.Clamp(currentPlayer.BedLevel + 1, 0, 5);
         string bedCurStr = blCur == 0 ? "-50% fertility" : (GameConfig.BedFertilityModifier[blCur] == 0f ? "No modifier" : $"+{(int)(GameConfig.BedFertilityModifier[blCur] * 100)}% fertility");
         string bedNextStr = GameConfig.BedFertilityModifier[blNext] == 0f ? "No penalty" : $"+{(int)(GameConfig.BedFertilityModifier[blNext] * 100)}% fertility";
-        ShowTieredOption(opt++, "Bed", BedNames, currentPlayer.BedLevel, 5, GetBedCost(currentPlayer.BedLevel), bedCurStr, bedNextStr);
+        ShowTieredOption(opt++, Loc.Get("home.upgrade_type.bed"), BedKeys, currentPlayer.BedLevel, 5, GetBedCost(currentPlayer.BedLevel), bedCurStr, bedNextStr);
 
         // Storage Chest
         int clCur = Math.Clamp(currentPlayer.ChestLevel, 0, 5);
         int clNext = Math.Clamp(currentPlayer.ChestLevel + 1, 0, 5);
-        ShowTieredOption(opt++, "Storage Chest", ChestNames, currentPlayer.ChestLevel, 5, GetChestUpgradeCost(currentPlayer.ChestLevel),
+        ShowTieredOption(opt++, Loc.Get("home.upgrade_type.chest"), ChestKeys, currentPlayer.ChestLevel, 5, GetChestUpgradeCost(currentPlayer.ChestLevel),
             $"{GameConfig.ChestCapacity[clCur]} items",
             $"{GameConfig.ChestCapacity[clNext]} items");
 
@@ -3924,12 +3936,12 @@ public class HomeLocation : BaseLocation
         int heNext = Math.Clamp(currentPlayer.HearthLevel + 1, 0, 5);
         string hearthCurStr = heCur == 0 ? "No buff" : $"+{(int)(GameConfig.HearthDamageBonus[heCur] * 100)}% dmg/def, {GameConfig.HearthCombatDuration[heCur]} combats";
         string hearthNextStr = $"+{(int)(GameConfig.HearthDamageBonus[heNext] * 100)}% dmg/def, {GameConfig.HearthCombatDuration[heNext]} combats";
-        ShowTieredOption(opt++, "Hearth", HearthNames, currentPlayer.HearthLevel, 5, GetHearthCost(currentPlayer.HearthLevel), hearthCurStr, hearthNextStr);
+        ShowTieredOption(opt++, Loc.Get("home.upgrade_type.hearth"), HearthKeys, currentPlayer.HearthLevel, 5, GetHearthCost(currentPlayer.HearthLevel), hearthCurStr, hearthNextStr);
 
         // Herb Garden
         int glCur = Math.Clamp(currentPlayer.GardenLevel, 0, 5);
         int glNext = Math.Clamp(currentPlayer.GardenLevel + 1, 0, 5);
-        ShowTieredOption(opt++, "Herb Garden", GardenNames, currentPlayer.GardenLevel, 5, GetGardenCost(currentPlayer.GardenLevel),
+        ShowTieredOption(opt++, Loc.Get("home.upgrade_type.garden"), GardenKeys, currentPlayer.GardenLevel, 5, GetGardenCost(currentPlayer.GardenLevel),
             $"{GameConfig.HerbsPerDay[glCur]} herbs/day",
             $"{GameConfig.HerbsPerDay[glNext]} herbs/day");
 
@@ -3984,53 +3996,53 @@ public class HomeLocation : BaseLocation
         switch (choice)
         {
             case 1:
-                await PurchaseUpgrade("Living Quarters", GetLivingQuartersCost(currentPlayer.HomeLevel),
+                await PurchaseUpgrade(Loc.Get("home.upgrade_type.quarters"), GetLivingQuartersCost(currentPlayer.HomeLevel),
                     currentPlayer.HomeLevel < 5, () => {
                         currentPlayer.HomeLevel++;
                         int lvl = Math.Clamp(currentPlayer.HomeLevel, 0, 5);
                         terminal.SetColor("cyan");
-                        terminal.WriteLine(Loc.Get("home.upgraded_to", LivingQuartersNames[lvl]));
+                        terminal.WriteLine(Loc.Get("home.upgraded_to", GetTierName(LivingQuartersKeys, lvl)));
                         terminal.WriteLine(Loc.Get("home.upgrade_rest_stats", (int)(GameConfig.HomeRecoveryPercent[lvl] * 100), GameConfig.HomeRestsPerDay[lvl]));
                     });
                 break;
             case 2:
-                await PurchaseUpgrade("Bed", GetBedCost(currentPlayer.BedLevel),
+                await PurchaseUpgrade(Loc.Get("home.upgrade_type.bed"), GetBedCost(currentPlayer.BedLevel),
                     currentPlayer.BedLevel < 5, () => {
                         currentPlayer.BedLevel++;
                         int lvl = Math.Clamp(currentPlayer.BedLevel, 0, 5);
                         terminal.SetColor("cyan");
-                        terminal.WriteLine(Loc.Get("home.upgraded_to", BedNames[lvl]));
+                        terminal.WriteLine(Loc.Get("home.upgraded_to", GetTierName(BedKeys, lvl)));
                         float mod = GameConfig.BedFertilityModifier[lvl];
                         terminal.WriteLine(mod <= 0 ? Loc.Get("home.fertility_removed") : Loc.Get("home.fertility_bonus", (int)(mod * 100)));
                     });
                 break;
             case 3:
-                await PurchaseUpgrade("Storage Chest", GetChestUpgradeCost(currentPlayer.ChestLevel),
+                await PurchaseUpgrade(Loc.Get("home.upgrade_type.chest"), GetChestUpgradeCost(currentPlayer.ChestLevel),
                     currentPlayer.ChestLevel < 5, () => {
                         currentPlayer.ChestLevel++;
                         int lvl = Math.Clamp(currentPlayer.ChestLevel, 0, 5);
                         terminal.SetColor("cyan");
-                        terminal.WriteLine(Loc.Get("home.upgraded_to", ChestNames[lvl]));
+                        terminal.WriteLine(Loc.Get("home.upgraded_to", GetTierName(ChestKeys, lvl)));
                         terminal.WriteLine(Loc.Get("home.upgrade_chest_holds", GameConfig.ChestCapacity[lvl]));
                     });
                 break;
             case 4:
-                await PurchaseUpgrade("Hearth", GetHearthCost(currentPlayer.HearthLevel),
+                await PurchaseUpgrade(Loc.Get("home.upgrade_type.hearth"), GetHearthCost(currentPlayer.HearthLevel),
                     currentPlayer.HearthLevel < 5, () => {
                         currentPlayer.HearthLevel++;
                         int lvl = Math.Clamp(currentPlayer.HearthLevel, 0, 5);
                         terminal.SetColor("cyan");
-                        terminal.WriteLine(Loc.Get("home.upgraded_to", HearthNames[lvl]));
+                        terminal.WriteLine(Loc.Get("home.upgraded_to", GetTierName(HearthKeys, lvl)));
                         terminal.WriteLine(Loc.Get("home.upgrade_hearth_buff", (int)(GameConfig.HearthDamageBonus[lvl] * 100), GameConfig.HearthCombatDuration[lvl]));
                     });
                 break;
             case 5:
-                await PurchaseUpgrade("Herb Garden", GetGardenCost(currentPlayer.GardenLevel),
+                await PurchaseUpgrade(Loc.Get("home.upgrade_type.garden"), GetGardenCost(currentPlayer.GardenLevel),
                     currentPlayer.GardenLevel < 5, () => {
                         currentPlayer.GardenLevel++;
                         int lvl = Math.Clamp(currentPlayer.GardenLevel, 0, 5);
                         terminal.SetColor("cyan");
-                        terminal.WriteLine(Loc.Get("home.upgraded_to", GardenNames[lvl]));
+                        terminal.WriteLine(Loc.Get("home.upgraded_to", GetTierName(GardenKeys, lvl)));
                         terminal.WriteLine(Loc.Get("home.upgrade_herbs_day", GameConfig.HerbsPerDay[lvl]));
                         if (lvl >= 1 && lvl <= 5)
                         {
@@ -4086,12 +4098,17 @@ public class HomeLocation : BaseLocation
         }
     }
 
-    private void ShowTieredOption(int num, string name, string[]? tierNames, int level, int maxLevel, long cost, string currentBonus, string nextBonus)
+    // v0.61.2: tierKeys is a localization-key array (e.g. ChestKeys = ["home.tier.chest.0", ...]).
+    // Pre-fix this was a string[] of pre-rendered English names. The method resolves the
+    // key for the current level + next level via Loc.Get so the displayed tier name
+    // honors the player's session language. The `name` argument (the upgrade type label,
+    // "Living Quarters" / "Bed" / etc.) is already a localized string from the caller.
+    private void ShowTieredOption(int num, string name, string[]? tierKeys, int level, int maxLevel, long cost, string currentBonus, string nextBonus)
     {
         bool maxed = level >= maxLevel;
         bool affordable = currentPlayer.Gold >= cost;
-        string currentTierName = tierNames != null && level < tierNames.Length ? tierNames[level] : "";
-        string nextTierName = tierNames != null && level + 1 < tierNames.Length ? tierNames[level + 1] : "";
+        string currentTierName = tierKeys != null && level < tierKeys.Length ? Loc.Get(tierKeys[level]) : "";
+        string nextTierName = tierKeys != null && level + 1 < tierKeys.Length ? Loc.Get(tierKeys[level + 1]) : "";
 
         if (IsScreenReader)
         {

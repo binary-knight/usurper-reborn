@@ -494,6 +494,7 @@ public class LevelMasterLocation : BaseLocation
             {
                 currentPlayer.Statistics.RecordLevelUp(startLevel + i + 1);
             }
+            AchievementSystem.CheckAchievements(currentPlayer); // v0.61.3: immediate achievement check so level_X unlocks fire at the moment of leveling up, not on the next location entry
 
             // Log level up
             UsurperRemake.Systems.DebugLogger.Instance.LogLevelUp(currentPlayer.Name, startLevel, currentPlayer.Level);
@@ -1340,6 +1341,7 @@ public class LevelMasterLocation : BaseLocation
                 if (lvl % 10 == 0)
                     player.Fame += 5;
             }
+            AchievementSystem.CheckAchievements(player); // v0.61.3: immediate achievement check so level_X unlocks fire at the moment of leveling up
 
             // Log level up
             UsurperRemake.Systems.DebugLogger.Instance.LogLevelUp(player.Name, startLevel, player.Level);

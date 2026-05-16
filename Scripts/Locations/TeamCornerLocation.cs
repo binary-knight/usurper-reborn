@@ -1521,12 +1521,68 @@ public class TeamCornerLocation : BaseLocation
             return;
         }
 
+        // Player report (Lv.32 Abysswarden, online): "I am hiring NPCs for my
+        // dungeon team, but it is still listing them as available for hire. I
+        // can still hire the same person and lose my gold even though he is
+        // currently in my team." Root cause: `RecruitNPCToTeam` captures
+        // `allNPCs = NPCSpawnSystem.Instance.ActiveNPCs` at menu entry and
+        // passes references through to `ConfirmAndRecruit`. If
+        // `WorldSimService.LoadWorldState` fires between menu and Y-confirm
+        // (triggered by another online player's save bumping the world_state
+        // version), `ClearAllNPCs` destroys the in-memory NPC objects and
+        // builds new ones from DB. The `recruit` parameter is now an orphan
+        // reference — mutating its Team field writes to a discarded object,
+        // and the next `SaveAllSharedState` serializes the live list (where
+        // the new NPC still has the pre-recruit Team value). Result: gold
+        // gets deducted on every retry, NPC's live Team flag stays empty,
+        // recruit list re-shows the NPC. Defense: re-resolve `recruit` to a
+        // live ActiveNPCs reference by ID before any mutation. If the live
+        // NPC is gone (rare — permadied or evicted by another path), refuse.
+        var liveRecruit = NPCSpawnSystem.Instance.ActiveNPCs
+            .FirstOrDefault(n => !string.IsNullOrEmpty(n.ID) && n.ID == recruit.ID);
+        if (liveRecruit == null)
+        {
+            DebugLogger.Instance.LogWarning("RECRUIT",
+                $"Player '{currentPlayer.DisplayName}' attempted to recruit '{recruit.DisplayName}' " +
+                $"(ID={recruit.ID}) but no live NPC with that ID exists. Likely a stale orphan " +
+                $"reference from a world-sim reload between menu and confirm.");
+            terminal.SetColor("red");
+            terminal.WriteLine(Loc.Get("team.recruit_unavailable_now", recruit.DisplayName));
+            terminal.WriteLine("");
+            terminal.SetColor("darkgray");
+            terminal.WriteLine(Loc.Get("ui.press_enter"));
+            await terminal.ReadKeyAsync();
+            return;
+        }
+        if (!ReferenceEquals(liveRecruit, recruit))
+        {
+            DebugLogger.Instance.LogInfo("RECRUIT",
+                $"Re-resolved recruit '{recruit.DisplayName}' (ID={recruit.ID}) to live ActiveNPCs " +
+                $"reference. Previous reference was a stale orphan (world-sim reload mid-recruit).");
+            recruit = liveRecruit;
+        }
+
         // Live re-check (closes the race window): an NPC could have died or
         // joined another team between list render and confirm, or the player's
         // relationship could have changed (e.g. a companion quest fired between
         // screens and shifted the NPC to Hate).
         if (!TeamSystem.IsRecruitable(currentPlayer, recruit, out var liveBand))
         {
+            // Defense-in-depth: surface a specific "already on your team"
+            // refusal so the player learns the recruit succeeded (probably
+            // an earlier attempt during the same session) instead of a vague
+            // "unavailable" message. Doesn't deduct gold.
+            if (!string.IsNullOrEmpty(recruit.Team) &&
+                string.Equals(recruit.Team, currentPlayer.Team, StringComparison.OrdinalIgnoreCase))
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine(Loc.Get("team.recruit_already_on_team", recruit.DisplayName));
+                terminal.WriteLine("");
+                terminal.SetColor("darkgray");
+                terminal.WriteLine(Loc.Get("ui.press_enter"));
+                await terminal.ReadKeyAsync();
+                return;
+            }
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.recruit_unavailable_now", recruit.DisplayName));
             terminal.WriteLine("");
@@ -2072,6 +2128,26 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine(Loc.Get("team.echo_will_join", selected.DisplayName));
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("team.echo_ai_note"));
+
+            // Player report (Lv.68 Voidreaver): echoes silently failed to load
+            // into the dungeon party because companions had already filled the
+            // 4-slot cap. Warn at recruit time so the player can plan ahead
+            // (companion dismiss, NPC un-recruit) instead of finding out only
+            // after dungeon entry.
+            int companionCount = UsurperRemake.Systems.CompanionSystem.Instance?
+                .GetCompanionsAsCharacters()?.Count(c => c.IsAlive) ?? 0;
+            int npcCount = GameEngine.Instance?.DungeonPartyNPCIds?.Count ?? 0;
+            int echoCount = names.Count;
+            int total = companionCount + npcCount + echoCount;
+            const int maxPartySize = 4;
+            if (total > maxPartySize)
+            {
+                terminal.WriteLine("");
+                terminal.SetColor("yellow");
+                terminal.WriteLine(Loc.Get("team.recruit_party_overflow", total, maxPartySize));
+                terminal.SetColor("gray");
+                terminal.WriteLine(Loc.Get("team.recruit_party_overflow_hint"));
+            }
         }
 
         terminal.WriteLine("");

@@ -974,6 +974,7 @@ public class StreetEncounterSystem
                 player.Statistics?.RecordPurchase(item.Price);
                 player.Statistics?.RecordGoldSpent(item.Price);
                 player.Statistics?.RecordGoldChange(player.Gold);
+                AchievementSystem.CheckAchievements(player); // v0.61.3: immediate achievement check
                 ApplyMerchantItem(player, item);
 
                 terminal.SetColor("green");
@@ -1936,22 +1937,38 @@ public class StreetEncounterSystem
     /// <summary>
     /// Attack a specific character in the current location
     /// </summary>
-    public async Task<EncounterResult> AttackCharacter(Character player, Character target, TerminalEmulator terminal)
+    // v0.61.2 (player report: "Do honourable duels count as murder? ... daily murder
+    // cap reached"): BaseLocation.DuelNPC routes the honorable [D]uel action through
+    // this method, which previously called FightNPC with the default isHonorDuel=false
+    // -- so FightNPC's murder-cap counter and over-cap reward clawback both fired on
+    // legitimate duels. Also added +10 Darkness unconditionally, which a duel shouldn't.
+    // New isHonorDuel parameter flows through to FightNPC and gates the darkness gain.
+    // Default false preserves the murder/assault semantics for every other caller.
+    public async Task<EncounterResult> AttackCharacter(Character player, Character target, TerminalEmulator terminal, bool isHonorDuel = false)
     {
         var result = new EncounterResult { EncounterOccurred = true, Type = EncounterType.HostileNPC };
 
         terminal.ClearScreen();
-        UIHelper.WriteBoxHeader(terminal, Loc.Get("street_encounter.attack.title"), "bright_red");
-        terminal.WriteLine("");
-
-        terminal.SetColor("red");
-        terminal.WriteLine(Loc.Get("street_encounter.attack.you_attack", target.Name2));
+        if (isHonorDuel)
+        {
+            UIHelper.WriteBoxHeader(terminal, Loc.Get("street_encounter.duel.title"), "yellow");
+            terminal.WriteLine("");
+            terminal.SetColor("yellow");
+            terminal.WriteLine(Loc.Get("street_encounter.duel.you_duel", target.Name2));
+        }
+        else
+        {
+            UIHelper.WriteBoxHeader(terminal, Loc.Get("street_encounter.attack.title"), "bright_red");
+            terminal.WriteLine("");
+            terminal.SetColor("red");
+            terminal.WriteLine(Loc.Get("street_encounter.attack.you_attack", target.Name2));
+        }
         terminal.WriteLine("");
 
         // Convert target to NPC if needed
         if (target is NPC npc)
         {
-            await FightNPC(player, npc, result, terminal);
+            await FightNPC(player, npc, result, terminal, isHonorDuel: isHonorDuel);
         }
         else
         {
@@ -1970,11 +1987,13 @@ public class StreetEncounterSystem
                 ArmPow = target.ArmPow,
                 Class = target.Class,
             };
-            await FightNPC(player, tempNPC, result, terminal);
+            await FightNPC(player, tempNPC, result, terminal, isHonorDuel: isHonorDuel);
         }
 
-        // Attacking someone increases darkness
-        player.Darkness += 10;
+        // Attacking someone increases darkness (skipped for honorable duels --
+        // accepting / issuing a challenge isn't a moral wrong).
+        if (!isHonorDuel)
+            player.Darkness += 10;
 
         return result;
     }

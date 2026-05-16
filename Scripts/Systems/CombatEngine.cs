@@ -17,6 +17,16 @@ using UsurperRemake.Utils;
 /// </summary>
 public partial class CombatEngine
 {
+    // v0.61.2 (player suggestion: "Make a way of cancelling targetable abilities like
+    // cure wounds, i didn't figure out how to cancel them if they can be."). Sentinel
+    // returned by target-selection prompts (SelectHealTarget / SelectBuffTarget /
+    // GetTargetSelection) when the player typed Q/C/X to back out. The quickbar
+    // dispatcher checks for this value and loops back to the action menu without
+    // consuming mana / stamina / the action slot. Valid target indices are 0+, and
+    // null already means self (for ally targeting) or random (for monster targeting),
+    // so int.MinValue is the only safe out-of-band sentinel here.
+    private const int TargetCancelled = int.MinValue;
+
     private TerminalEmulator terminal;
     private Random random = Random.Shared;
     private bool _lastMonsterTargetedGroupPlayer; // Set by ProcessMonsterAction when monster attacks a grouped player
@@ -903,6 +913,11 @@ public partial class CombatEngine
                     "\u001b[1;31m  *** AMBUSH! Monsters strike before the party can react! ***\u001b[0m");
             }
 
+            // v0.61.2 Last-Stand cap also covers the ambush phase. Capture
+            // the player's pre-ambush HP so the no-one-shot rule fires even
+            // if all the damage is from monsters that got the jump on them.
+            player.CaptureRoundStartHP();
+
             // Process free attacks for monsters that won the initiative roll
             foreach (var ambushMonster in ambushingMonsters)
             {
@@ -943,6 +958,11 @@ public partial class CombatEngine
         {
             roundNumber++;
             result.CurrentRound = roundNumber;
+
+            // v0.61.2 Last-Stand cap: snapshot the player's HP at the top of the
+            // round so TakeIncomingDamage can decide whether they qualify for
+            // the no-one-shot rule. Captured BEFORE any monster damage lands.
+            player.CaptureRoundStartHP();
 
             // BBS/compact — clear screen at start of each round so combat fits one page
             if (DoorMode.IsInDoorMode || GameConfig.CompactMode)
@@ -1733,9 +1753,18 @@ public partial class CombatEngine
         // for the next location transition.
         if (UsurperRemake.Server.GmcpBridge.IsActive)
         {
+            // v0.61.2: report the actual outcome to MUD clients. When the player
+            // died and got resurrected, HandlePlayerDeath rewrites result.Outcome
+            // to PlayerEscaped so C# callers don't apply double death penalties,
+            // but that's an internal control-flow trick -- the client should see
+            // "PlayerDied" because the player did die (and Char.Death already
+            // fired with the killer info before the resurrection ran).
+            string outcomeStr = result.PlayerActuallyDied
+                ? CombatOutcome.PlayerDied.ToString()
+                : result.Outcome.ToString();
             UsurperRemake.Server.GmcpBridge.Emit("Char.Combat.End", new
             {
-                outcome = result.Outcome.ToString(),
+                outcome = outcomeStr,
                 kills = result.DefeatedMonsters?.Count ?? 0,
                 xpGained = result.ExperienceGained,
                 goldGained = result.GoldGained
@@ -3029,6 +3058,27 @@ public partial class CombatEngine
 
     private async Task ExecuteSingleAttack(Character attacker, Monster target, CombatResult result, bool isExtra, bool isOffHandAttack = false)
     {
+        // v0.61.2 (player report: Incorporeal "doesn't really have any effect"). If the
+        // target has an active evasion buff from Incorporeal / Phase / PhaseShift / TreeMeld
+        // / Vanish / Flight / Invisibility / Teleport / InkCloud, roll the dodge BEFORE
+        // the D20 attack roll. If it procs, the entire swing passes through harmlessly --
+        // no damage, no post-hit enchantment procs (lifesteal, fire/lightning/etc.), no
+        // proficiency-improvement roll. The buff round counter ticks down at the start
+        // of the next monster-action cycle (see ProcessMonsterAction).
+        if (target.EvasionRounds > 0 && target.EvasionMissChance > 0
+            && random.Next(100) < target.EvasionMissChance)
+        {
+            if (isOffHandAttack)
+            {
+                terminal.SetColor("cyan");
+                terminal.WriteLine(Loc.Get("combat.off_hand_strike"));
+            }
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine(Loc.Get("combat.evasion_miss", target.Name));
+            result.CombatLog.Add($"Player attack passes through evasive {target.Name}");
+            return;
+        }
+
         // === D20 ROLL SYSTEM FOR HIT DETERMINATION ===
         // Calculate monster AC based on level and defense (v0.41.4: Level/3→/2, Defence/15→/10)
         int monsterAC = 10 + (target.Level / 2) + (int)(target.Defence / 10);
@@ -4283,6 +4333,18 @@ public partial class CombatEngine
         if (monster.WeakenRounds > 0)
         {
             monster.WeakenRounds--;
+        }
+
+        // v0.61.2 — tick Evasion buff duration from Incorporeal / Phase / PhaseShift /
+        // TreeMeld / Vanish / Flight / Invisibility / Teleport / InkCloud. Same pattern
+        // as WeakenRounds: counter set when the ability fires, decrements once per
+        // monster-action cycle, falls off when it hits 0. Clear EvasionMissChance on
+        // expiry so a future ability re-set is unambiguous.
+        if (monster.EvasionRounds > 0)
+        {
+            monster.EvasionRounds--;
+            if (monster.EvasionRounds <= 0)
+                monster.EvasionMissChance = 0;
         }
 
         // Tick corrosion duration
@@ -7275,6 +7337,30 @@ public partial class CombatEngine
 
         bool isPlayer = attacker == currentPlayer;
         string attackerName = attacker.DisplayName;
+
+        // v0.61.2 Storm Eagle signature mechanic. The pet's BeastData description
+        // promises "lightning-themed strikes; occasional stun on hit" but pre-fix
+        // the combat-pet wrapper just ran the basic-attack path with no species-
+        // specific behavior, so Storm Eagle was mechanically identical to a
+        // higher-stat Dire Wolf. Detection uses PetSpeciesId (set in
+        // DungeonLocation.AddActivePetToParty) so a renamed pet still procs.
+        // Lightning chip damage on every hit (10% of base damage rolled into the
+        // target HP directly so it stacks on top of the swing), plus a 15% stun
+        // chance routed through TryStunMonster so boss resist, DR, and the
+        // immunity window all apply correctly. Skipped for spell paths since
+        // this is a melee-strike effect.
+        if (!isSpellDamage && attacker.IsPet && attacker.PetSpeciesId == "storm_eagle" && target.IsAlive)
+        {
+            long lightningBonus = Math.Max(1, damage / 10);
+            target.HP = Math.Max(0, target.HP - lightningBonus);
+            terminal.WriteLine(Loc.Get("combat.storm_eagle_lightning", attackerName, target.Name, lightningBonus), "bright_cyan");
+
+            if (target.IsAlive && random.Next(100) < 15)
+            {
+                if (TryStunMonster(target, 1))
+                    terminal.WriteLine(Loc.Get("combat.storm_eagle_stun", target.Name), "bright_yellow");
+            }
+        }
         // v0.60.10 (druidah Lv.9 Cleric report): weapon-source enchants (Lifedrinker,
         // Siphoning, elemental procs) used to read SUM-of-slots via SumEquipmentProperty
         // or hardcode MainHand. So a Siphoning dagger in OffHand made every main-hand
@@ -11315,7 +11401,17 @@ public partial class CombatEngine
             return null;
         }
 
-        if (int.TryParse(input.Trim(), out int targetNum) && targetNum >= 1 && targetNum <= monsters.Count)
+        // v0.61.2: Q/C/X = cancel the spell/ability entirely (no mana/stamina spent,
+        // no turn consumed). Caller checks for TargetCancelled and loops back to the
+        // action menu.
+        string trimmed = input.Trim();
+        string upper = trimmed.ToUpperInvariant();
+        if (upper == "Q" || upper == "C" || upper == "X")
+        {
+            return TargetCancelled;
+        }
+
+        if (int.TryParse(trimmed, out int targetNum) && targetNum >= 1 && targetNum <= monsters.Count)
         {
             int index = targetNum - 1;
             if (monsters[index].IsAlive)
@@ -11376,6 +11472,17 @@ public partial class CombatEngine
         for (int i = 0; i < livingMonsters.Count; i++)
         {
             var monster = livingMonsters[i];
+
+            // v0.61.2: same evasion check as ApplySingleMonsterDamage. If the monster
+            // has an active Incorporeal / Phase / etc. buff and the dodge procs, skip
+            // damage to this monster (flavor line). Other targets in the AoE still get hit.
+            if (monster.EvasionRounds > 0 && monster.EvasionMissChance > 0
+                && random.Next(100) < monster.EvasionMissChance)
+            {
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine(Loc.Get("combat.evasion_miss", monster.Name));
+                continue;
+            }
 
             // Diminishing returns: 100%, 75%, 50%, 25% floor
             double diminish = i switch
@@ -11455,6 +11562,22 @@ public partial class CombatEngine
     private async Task ApplySingleMonsterDamage(Monster target, long damage, CombatResult result, string damageSource = "attack", Character? attacker = null, bool isSpellDamage = false)
     {
         if (target == null || !target.IsAlive) return;
+
+        // v0.61.2 (player report: "The monster becoming incorporeal combat ability
+        // doesn't really have any effect"). When a monster has an active evasion
+        // buff from Incorporeal / Phase / PhaseShift / TreeMeld / Vanish / Flight /
+        // Invisibility / Teleport / InkCloud, roll the dodge chance. If it procs, the
+        // attack passes through harmlessly — 0 damage, flavor message. Pre-fix these
+        // abilities all set AbilityResult.AvoidAllDamage or EvasionBonus, but nothing
+        // ever read those flags, so the buffs were cosmetic only. Rounds decrement
+        // happens once per monster-action cycle (see ProcessMonsterAction).
+        if (target.EvasionRounds > 0 && target.EvasionMissChance > 0
+            && random.Next(100) < target.EvasionMissChance)
+        {
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine(Loc.Get("combat.evasion_miss", target.Name));
+            return;
+        }
 
         // Boss phase immunity — apply only the matching type. Previously this hardcoded
         // isMagicalDamage:true and missed IsPhysicalImmune entirely, so physical abilities
@@ -11797,6 +11920,8 @@ public partial class CombatEngine
                     action.Type = CombatActionType.Attack;
                     // Get target selection
                     action.TargetIndex = await GetTargetSelection(monsters, allowRandom: true);
+                    // v0.61.2: player typed Q/C/X at the target prompt — loop back to menu.
+                    if (action.TargetIndex == TargetCancelled) continue;
                     return (action, false);
 
                 case "D":
@@ -11918,29 +12043,36 @@ public partial class CombatEngine
                     continue; // Invalid or cancelled, show menu again
 
                 // Tactical actions with target selection (same keys as single-monster combat)
+                // v0.61.2: each target prompt accepts Q/C/X to cancel — loops back to menu
+                // without consuming the action or any resource.
                 case "P":
                     action.Type = CombatActionType.PowerAttack;
                     action.TargetIndex = await GetTargetSelection(monsters, allowRandom: true);
+                    if (action.TargetIndex == TargetCancelled) continue;
                     return (action, false);
 
                 case "E":
                     action.Type = CombatActionType.PreciseStrike;
                     action.TargetIndex = await GetTargetSelection(monsters, allowRandom: true);
+                    if (action.TargetIndex == TargetCancelled) continue;
                     return (action, false);
 
                 case "K":
                     action.Type = CombatActionType.Backstab;
                     action.TargetIndex = await GetTargetSelection(monsters, allowRandom: true);
+                    if (action.TargetIndex == TargetCancelled) continue;
                     return (action, false);
 
                 case "T":
                     action.Type = CombatActionType.Taunt;
                     action.TargetIndex = await GetTargetSelection(monsters, allowRandom: true);
+                    if (action.TargetIndex == TargetCancelled) continue;
                     return (action, false);
 
                 case "W":
                     action.Type = CombatActionType.Disarm;
                     action.TargetIndex = await GetTargetSelection(monsters, allowRandom: true);
+                    if (action.TargetIndex == TargetCancelled) continue;
                     return (action, false);
 
                 case "L":
@@ -13182,6 +13314,33 @@ public partial class CombatEngine
                         terminal.SetColor("dark_red");
                         terminal.WriteLine(Loc.Get("combat.shadow_harvest_drain", actualShadowHeal));
                     }
+                }
+
+                // v0.61.2 (player report: Voidreaver Hungering Strike "doesn't seem to be draining
+                // HP every hit. Even in a single fight it flip flops on working"). Same bug-class
+                // as Shadow Harvest's v0.57.2 fix: lifesteal_20 / lifesteal_30 lived in a post-
+                // damage switch case that (a) re-applied damage as a second hit (~2x effective
+                // damage when the first hit didn't kill), and (b) gated both the second hit AND
+                // the heal on `target.IsAlive`. At Lv.66 the base hit usually killed orcs/goblins
+                // in one shot, so neither the redundant damage nor the heal fired — heal-on-kill
+                // skipped, heal-on-survive worked, which read to the player as a "flip flop."
+                // Inlined here so the heal scales with actualDamage (after Pain Threshold +20%,
+                // crits, marked +30%) and fires regardless of whether the base hit killed.
+                // Always emit feedback (even when MaxHP clamp swallows the heal) so the player
+                // sees consistent visible confirmation that the ability fired.
+                if ((abilityResult.SpecialEffect == "lifesteal_20" || abilityResult.SpecialEffect == "lifesteal_30")
+                    && actualDamage > 0 && player != null)
+                {
+                    float lifestealPct = abilityResult.SpecialEffect == "lifesteal_20" ? 0.20f : 0.30f;
+                    long heal = (long)(actualDamage * lifestealPct);
+                    long oldHP = player.HP;
+                    player.HP = Math.Min(player.MaxHP, player.HP + heal);
+                    long actualHeal = player.HP - oldHP;
+                    terminal.SetColor("red");
+                    if (actualHeal > 0)
+                        terminal.WriteLine(Loc.Get("combat.ability_lifesteal_drain", target.Name, actualDamage, actualHeal));
+                    else
+                        terminal.WriteLine(Loc.Get("combat.ability_lifesteal_capped", target.Name, actualDamage));
                 }
 
                 if (target.HP <= 0)
@@ -15020,26 +15179,12 @@ public partial class CombatEngine
             // ═══════════════════════════════════════════════════════════════════════
             case "lifesteal_20":
             case "lifesteal_30":
-            {
-                // Damage + lifesteal (20% for Hungering Strike, 30% for legacy)
-                float lifestealPct = abilityResult.SpecialEffect == "lifesteal_20" ? 0.20f : 0.30f;
-                if (target != null && target.IsAlive)
-                {
-                    int dmg = abilityResult.Damage;
-                    target.HP -= dmg;
-                    int heal = (int)(dmg * lifestealPct);
-                    player.HP = Math.Min(player.MaxHP, player.HP + heal);
-                    terminal.SetColor("red");
-                    terminal.WriteLine(Loc.Get("combat.ability_lifesteal_30", target.Name, dmg, heal));
-                    if (target.HP <= 0)
-                    {
-                        target.HP = 0;
-                        if (!result.DefeatedMonsters.Contains(target))
-                            result.DefeatedMonsters.Add(target);
-                    }
-                }
+                // v0.61.2 — no-op here. Damage already applied in the base block above
+                // and lifesteal heal is applied inline alongside Shadow Harvest's heal
+                // (see comment in the inline block). Pre-fix this case re-applied damage
+                // and gated the heal on target.IsAlive, which broke Hungering Strike at
+                // high level (one-shots skipped the heal entirely).
                 break;
-            }
 
             case "offer_flesh":
             {
@@ -16728,6 +16873,9 @@ public partial class CombatEngine
             }
 
             terminal.WriteLine("");
+            // v0.61.2: cancel hint added per player suggestion.
+            terminal.SetColor("gray");
+            terminal.WriteLine(Loc.Get("combat.target_cancel_hint"));
             terminal.SetColor("white");
             terminal.Write(Loc.Get("combat.target_label"));
             var input = await terminal.GetInput("");
@@ -16735,6 +16883,13 @@ public partial class CombatEngine
             if (string.IsNullOrWhiteSpace(input))
             {
                 return null; // Empty input = self
+            }
+
+            // v0.61.2: Q/C/X = cancel the spell entirely (no mana spent, no turn consumed).
+            string trimmed = input.Trim().ToUpperInvariant();
+            if (trimmed == "Q" || trimmed == "C" || trimmed == "X")
+            {
+                return TargetCancelled;
             }
 
             if (!int.TryParse(input, out int choice))
@@ -16790,6 +16945,9 @@ public partial class CombatEngine
             }
 
             terminal.WriteLine("");
+            // v0.61.2: cancel hint added per player suggestion.
+            terminal.SetColor("gray");
+            terminal.WriteLine(Loc.Get("combat.target_cancel_hint"));
             terminal.SetColor("white");
             terminal.Write(Loc.Get("combat.target_label"));
             var input = await terminal.GetInput("");
@@ -16797,6 +16955,13 @@ public partial class CombatEngine
             if (string.IsNullOrWhiteSpace(input))
             {
                 return null; // Empty input = self
+            }
+
+            // v0.61.2: Q/C/X = cancel the spell entirely (no mana spent, no turn consumed).
+            string trimmed = input.Trim().ToUpperInvariant();
+            if (trimmed == "Q" || trimmed == "C" || trimmed == "X")
+            {
+                return TargetCancelled;
             }
 
             if (!int.TryParse(input, out int choice))
@@ -19665,6 +19830,51 @@ public partial class CombatEngine
     /// </summary>
     private async Task HandlePlayerDeath(CombatResult result)
     {
+        // v0.61.2 Last-Stand cap: every monster / boss / environmental damage
+        // path that can kill the player funnels through here. Intercept BEFORE
+        // anything death-related runs (GMCP emit, arrest/exhibition short-
+        // circuits, permadeath cinematic, resurrection deduction). If the
+        // player started this round above 50% MaxHP, rescue them by setting
+        // HP=1 and rendering the flavor line. They get one more turn to react.
+        // Bypassed for Nightmare difficulty. PvP combat doesn't route through
+        // this method (it has its own death path), so PvP is naturally excluded.
+        if (result.Player.LastStandCheckAndApply(isPvP: false))
+        {
+            // Render the flavor line in the player's local terminal. Group
+            // followers see the broadcast version a few lines below.
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine("");
+            terminal.WriteLine($"  {Loc.Get("combat.last_stand")}");
+            terminal.WriteLine("");
+            await Task.Delay(GetCombatDelay(1500));
+
+            // For grouped sessions, broadcast a third-person version so the
+            // rest of the party sees what happened.
+            if (result.Teammates?.Any(t => t.IsGroupedPlayer) == true)
+            {
+                BroadcastGroupCombatEvent(result,
+                    $"[1;33m  {Loc.Get("combat.last_stand_broadcast", result.Player.DisplayName)}[0m");
+            }
+
+            // The caller set Outcome=PlayerDied before invoking HandlePlayerDeath
+            // (e.g., PlayerVsMonsters line 1602). Now that Last-Stand rescued the
+            // player to HP=1, correct the outcome so GMCP / location callers see
+            // the truth: player survived. If all monsters are dead, Victory;
+            // otherwise PlayerEscaped (combat ends with player still alive but
+            // the round loop won't resume).
+            if (result.Monsters != null && !result.Monsters.Any(m => m.IsAlive))
+                result.Outcome = CombatOutcome.Victory;
+            else
+                result.Outcome = CombatOutcome.PlayerEscaped;
+            return;
+        }
+
+        // v0.61.2: Last-Stand rescue did NOT fire, so the player is genuinely
+        // entering the death pipeline. Mark the result so the outer Char.Combat.End
+        // emit reports "PlayerDied" even when the resurrection branch below
+        // rewrites Outcome to PlayerEscaped for C# control-flow reasons.
+        result.PlayerActuallyDied = true;
+
         // v0.60.3: GMCP Char.Death — emit BEFORE the resurrection / permadeath
         // path runs so MUD clients see the death event regardless of which
         // branch handles it. Char.Combat.End follows in the normal exit flow.
@@ -20987,6 +21197,25 @@ public partial class CombatEngine
                     terminal.SetColor("dark_red");
                     terminal.WriteLine(Loc.Get("combat.shadow_harvest_drain", actualShadowHeal));
                 }
+            }
+
+            // v0.61.2 — Voidreaver lifesteal_20 / lifesteal_30 inlined like Shadow Harvest.
+            // See ApplyAbilityEffectsMultiMonster for the bug-class write-up. Always emit
+            // feedback so the player sees consistent confirmation that the proc fired
+            // (even when MaxHP clamp swallows the heal — the "flip flop" symptom).
+            if ((abilityResult.SpecialEffect == "lifesteal_20" || abilityResult.SpecialEffect == "lifesteal_30")
+                && actualDamage > 0 && player != null)
+            {
+                float lifestealPct = abilityResult.SpecialEffect == "lifesteal_20" ? 0.20f : 0.30f;
+                long heal = (long)(actualDamage * lifestealPct);
+                long oldHP = player.HP;
+                player.HP = Math.Min(player.MaxHP, player.HP + heal);
+                long actualHeal = player.HP - oldHP;
+                terminal.SetColor("red");
+                if (actualHeal > 0)
+                    terminal.WriteLine(Loc.Get("combat.ability_lifesteal_drain", monster.Name, actualDamage, actualHeal));
+                else
+                    terminal.WriteLine(Loc.Get("combat.ability_lifesteal_capped", monster.Name, actualDamage));
             }
 
             if (monster.HP <= 0)
@@ -22585,26 +22814,8 @@ public partial class CombatEngine
 
             case "lifesteal_20":
             case "lifesteal_30":
-            {
-                // Damage + lifesteal (20% for Hungering Strike, 30% for legacy)
-                float lsPct = abilityResult.SpecialEffect == "lifesteal_20" ? 0.20f : 0.30f;
-                if (monster != null && monster.IsAlive)
-                {
-                    int dmg = abilityResult.Damage;
-                    monster.HP -= dmg;
-                    int lsHeal = (int)(dmg * lsPct);
-                    player.HP = Math.Min(player.MaxHP, player.HP + lsHeal);
-                    terminal.SetColor("red");
-                    terminal.WriteLine(Loc.Get("combat.ability_lifesteal_30", monster.Name, dmg, lsHeal));
-                    if (monster.HP <= 0)
-                    {
-                        monster.HP = 0;
-                        if (!result.DefeatedMonsters.Contains(monster))
-                            result.DefeatedMonsters.Add(monster);
-                    }
-                }
+                // v0.61.2 — no-op here. See multi-monster sibling case for write-up.
                 break;
-            }
 
             case "offer_flesh":
             {
@@ -26310,6 +26521,9 @@ public partial class CombatEngine
                     {
                         allyTarget = await SelectBuffTarget(player);
                     }
+                    // v0.61.2: player typed Q/C/X to cancel — back out without
+                    // consuming mana or the action slot. Outer loop shows menu again.
+                    if (allyTarget == TargetCancelled) return null;
                 }
                 return (CombatActionType.CastSpell, null, "", spLevel.Value, allyTarget, false);
             }
@@ -26322,6 +26536,7 @@ public partial class CombatEngine
             {
                 // Single target attack/debuff spell
                 var targetIdx = await GetTargetSelection(monsters, allowRandom: true);
+                if (targetIdx == TargetCancelled) return null;
                 return (CombatActionType.CastSpell, targetIdx, "", spLevel.Value, null, false);
             }
         }
@@ -26338,6 +26553,7 @@ public partial class CombatEngine
             else
             {
                 var targetIdx = await GetTargetSelection(monsters, allowRandom: true);
+                if (targetIdx == TargetCancelled) return null;
                 return (CombatActionType.ClassAbility, targetIdx, matched.slotId, 0, null, false);
             }
         }
@@ -28317,6 +28533,14 @@ public class CombatResult
 
     // Nightmare permadeath — save was deleted, exit to menu
     public bool IsPermadeath { get; set; }
+
+    // v0.61.2: true when HandlePlayerDeath was reached and the death pipeline
+    // ran (Char.Death GMCP emit, resurrection prompt, permadeath check, etc.).
+    // Distinct from Outcome — when a player dies and gets resurrected (online
+    // auto-res, single-player Veil-of-Death), Outcome is rewritten to
+    // PlayerEscaped so callers don't apply double penalties. PlayerActuallyDied
+    // stays true so GMCP / news / telemetry can report the truth.
+    public bool PlayerActuallyDied { get; set; }
 }
 
 /// <summary>

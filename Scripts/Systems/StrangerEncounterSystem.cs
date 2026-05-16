@@ -416,85 +416,92 @@ namespace UsurperRemake.Systems
         {
             // ── EARLY GAME (encounters 1-4, levels 1-25): Death Omens ──
 
+            // v0.61.2 (player report: encounter dialogue not translated). The Dialogue
+            // and StrangerReply string[] fields and Text field now contain localization
+            // KEYS instead of literal English. The consumption sites (GenerateEncounter
+            // line ~843 and GetResponseOptions line ~968) call Loc.Get on each element
+            // before rendering, so dialogue translates in the current player's session
+            // language. The literal English lives only in en.json under stranger.*
+            // namespace; other languages inherit until translation pass runs.
             new() { Id = "ctx_early_graveyard", MinEncounters = 1, MaxEncounters = 4, MinLevel = 1, MaxLevel = 30,
                 Dialogue = new[] {
-                    "\"The flowers in the graveyard bloom brightest. Did you know that?\"",
-                    "\"The dead feed the living. The living become the dead.\"",
-                    "\"It is not a tragedy. It is a circle.\""
+                    "stranger.ctx_early_graveyard.dialogue.1",
+                    "stranger.ctx_early_graveyard.dialogue.2",
+                    "stranger.ctx_early_graveyard.dialogue.3"
                 },
                 Responses = new List<StrangerResponseOption> {
-                    new() { Key = "1", Text = "That's a morbid way to look at flowers.", ResponseType = StrangerResponseType.Engaged, ReceptivityChange = 8,
-                        StrangerReply = new[] { "\"Morbid? I'd call it honest.\"" } },
-                    new() { Key = "2", Text = "Death feeding life... there's a certain beauty to that.", ResponseType = StrangerResponseType.Reflective, ReceptivityChange = 12,
-                        StrangerReply = new[] { "\"You see it. Most don't. Most see only the grave, never the bloom.\"" } },
-                    new() { Key = "3", Text = "I'd rather not think about graveyards.", ResponseType = StrangerResponseType.Dismissed, ReceptivityChange = -5,
-                        StrangerReply = new[] { "\"Sure. Most people would rather not.\"" } },
-                    new() { Key = "0", Text = "Say nothing and leave.", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
-                        StrangerReply = new[] { "They watch you go with an expression that might be amusement, or might be sorrow." } }
+                    new() { Key = "1", Text = "stranger.ctx_early_graveyard.response.1.text", ResponseType = StrangerResponseType.Engaged, ReceptivityChange = 8,
+                        StrangerReply = new[] { "stranger.ctx_early_graveyard.response.1.reply.1" } },
+                    new() { Key = "2", Text = "stranger.ctx_early_graveyard.response.2.text", ResponseType = StrangerResponseType.Reflective, ReceptivityChange = 12,
+                        StrangerReply = new[] { "stranger.ctx_early_graveyard.response.2.reply.1" } },
+                    new() { Key = "3", Text = "stranger.ctx_early_graveyard.response.3.text", ResponseType = StrangerResponseType.Dismissed, ReceptivityChange = -5,
+                        StrangerReply = new[] { "stranger.ctx_early_graveyard.response.3.reply.1" } },
+                    new() { Key = "0", Text = "stranger.ctx_early_graveyard.response.0.text", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
+                        StrangerReply = new[] { "stranger.ctx_early_graveyard.response.0.reply.1" } }
                 }
             },
 
             new() { Id = "ctx_early_seasons", MinEncounters = 1, MaxEncounters = 4, MinLevel = 1, MaxLevel = 30,
                 Dialogue = new[] {
-                    "\"Do you know why autumn is beautiful?\"",
-                    "\"Because every leaf knows it is dying.\"",
-                    "\"And instead of hiding, it burns brightest just before the end.\""
+                    "stranger.ctx_early_seasons.dialogue.1",
+                    "stranger.ctx_early_seasons.dialogue.2",
+                    "stranger.ctx_early_seasons.dialogue.3"
                 },
                 Responses = new List<StrangerResponseOption> {
-                    new() { Key = "1", Text = "I never thought of it that way.", ResponseType = StrangerResponseType.Reflective, ReceptivityChange = 12,
-                        StrangerReply = new[] { "\"Most people dont. Too busy being sad about the falling part.\"" } },
-                    new() { Key = "2", Text = "Are you always this philosophical?", ResponseType = StrangerResponseType.Challenged, ReceptivityChange = 5,
-                        StrangerReply = new[] { "\"Only when I meet someone worth philosophizing at.\"" } },
-                    new() { Key = "0", Text = "Say nothing and leave.", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
-                        StrangerReply = new[] { "*A leaf drifts between you, though there are no trees nearby.*" } }
+                    new() { Key = "1", Text = "stranger.ctx_early_seasons.response.1.text", ResponseType = StrangerResponseType.Reflective, ReceptivityChange = 12,
+                        StrangerReply = new[] { "stranger.ctx_early_seasons.response.1.reply.1" } },
+                    new() { Key = "2", Text = "stranger.ctx_early_seasons.response.2.text", ResponseType = StrangerResponseType.Challenged, ReceptivityChange = 5,
+                        StrangerReply = new[] { "stranger.ctx_early_seasons.response.2.reply.1" } },
+                    new() { Key = "0", Text = "stranger.ctx_early_seasons.response.0.text", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
+                        StrangerReply = new[] { "stranger.ctx_early_seasons.response.0.reply.1" } }
                 }
             },
 
             new() { Id = "ctx_early_dormitory", MinEncounters = 1, MaxEncounters = 3, MinLevel = 1, MaxLevel = 20,
                 Dialogue = new[] {
-                    "\"The dormitory has seen many who wake without memories.\"",
-                    "\"Each one was someone before. Each one died before they woke.\"",
-                    "\"Does that trouble you? That the person you were... is gone?\""
+                    "stranger.ctx_early_dormitory.dialogue.1",
+                    "stranger.ctx_early_dormitory.dialogue.2",
+                    "stranger.ctx_early_dormitory.dialogue.3"
                 },
                 Responses = new List<StrangerResponseOption> {
-                    new() { Key = "1", Text = "I... hadn't thought about it like that. A death before waking.", ResponseType = StrangerResponseType.Reflective, ReceptivityChange = 12,
-                        StrangerReply = new[] { "\"Your first death, and you don't even remember it.\"", "\"Perhaps that is a mercy.\"" } },
-                    new() { Key = "2", Text = "I'm more concerned with who I am NOW.", ResponseType = StrangerResponseType.Challenged, ReceptivityChange = 5,
-                        StrangerReply = new[] { "\"Fair enough. But you might want to think about it eventually.\"" } },
-                    new() { Key = "0", Text = "Say nothing and leave.", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
-                        StrangerReply = new[] { "\"Think on it. When you're ready, the answer will find you.\"" } }
+                    new() { Key = "1", Text = "stranger.ctx_early_dormitory.response.1.text", ResponseType = StrangerResponseType.Reflective, ReceptivityChange = 12,
+                        StrangerReply = new[] { "stranger.ctx_early_dormitory.response.1.reply.1", "stranger.ctx_early_dormitory.response.1.reply.2" } },
+                    new() { Key = "2", Text = "stranger.ctx_early_dormitory.response.2.text", ResponseType = StrangerResponseType.Challenged, ReceptivityChange = 5,
+                        StrangerReply = new[] { "stranger.ctx_early_dormitory.response.2.reply.1" } },
+                    new() { Key = "0", Text = "stranger.ctx_early_dormitory.response.0.text", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
+                        StrangerReply = new[] { "stranger.ctx_early_dormitory.response.0.reply.1" } }
                 }
             },
 
             new() { Id = "ctx_early_after_death", MinEncounters = 1, MaxEncounters = 5, MinLevel = 1, MaxLevel = 40,
                 RequiredRecentEvent = StrangerContextEvent.PlayerDied,
                 Dialogue = new[] {
-                    "\"I heard you visited the other side recently.\"",
-                    "\"How was it? Cold? Or did it feel like... remembering?\""
+                    "stranger.ctx_early_after_death.dialogue.1",
+                    "stranger.ctx_early_after_death.dialogue.2"
                 },
                 Responses = new List<StrangerResponseOption> {
-                    new() { Key = "1", Text = "How do you know about that?", ResponseType = StrangerResponseType.Challenged, ReceptivityChange = 5,
-                        StrangerReply = new[] { "\"I know about all deaths. It is my nature.\"" } },
-                    new() { Key = "2", Text = "It felt... familiar. Like I'd been there before.", ResponseType = StrangerResponseType.Reflective, ReceptivityChange = 12,
-                        StrangerReply = new[] { "\"Because you have. More times than you can imagine.\"" } },
-                    new() { Key = "0", Text = "Say nothing and leave.", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
-                        StrangerReply = new[] { "\"The dead keep their secrets. For now.\"" } }
+                    new() { Key = "1", Text = "stranger.ctx_early_after_death.response.1.text", ResponseType = StrangerResponseType.Challenged, ReceptivityChange = 5,
+                        StrangerReply = new[] { "stranger.ctx_early_after_death.response.1.reply.1" } },
+                    new() { Key = "2", Text = "stranger.ctx_early_after_death.response.2.text", ResponseType = StrangerResponseType.Reflective, ReceptivityChange = 12,
+                        StrangerReply = new[] { "stranger.ctx_early_after_death.response.2.reply.1" } },
+                    new() { Key = "0", Text = "stranger.ctx_early_after_death.response.0.text", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
+                        StrangerReply = new[] { "stranger.ctx_early_after_death.response.0.reply.1" } }
                 }
             },
 
             new() { Id = "ctx_early_candle", MinEncounters = 2, MaxEncounters = 5, MinLevel = 5, MaxLevel = 35,
                 Dialogue = new[] {
-                    "\"A candle does not fear the darkness. Did you know that?\"",
-                    "\"It knows that when it goes out, it was not defeated.\"",
-                    "\"It simply gave all its light. Every last drop.\""
+                    "stranger.ctx_early_candle.dialogue.1",
+                    "stranger.ctx_early_candle.dialogue.2",
+                    "stranger.ctx_early_candle.dialogue.3"
                 },
                 Responses = new List<StrangerResponseOption> {
-                    new() { Key = "1", Text = "And then another candle is lit from the first.", ResponseType = StrangerResponseType.Accepted, ReceptivityChange = 15,
-                        StrangerReply = new[] { "*Her eyes widen with something like delight.*", "\"Yes! You understand! The flame passes on. Only the wax is lost.\"" } },
-                    new() { Key = "2", Text = "Pretty words, but candles don't have feelings.", ResponseType = StrangerResponseType.Dismissed, ReceptivityChange = -5,
-                        StrangerReply = new[] { "\"No. But you do. And one day, your light will pass to another.\"", "\"Will that be loss, or legacy?\"" } },
-                    new() { Key = "0", Text = "Say nothing and leave.", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
-                        StrangerReply = new[] { "A candle flame flickers nearby, though there is no wind." } }
+                    new() { Key = "1", Text = "stranger.ctx_early_candle.response.1.text", ResponseType = StrangerResponseType.Accepted, ReceptivityChange = 15,
+                        StrangerReply = new[] { "stranger.ctx_early_candle.response.1.reply.1", "stranger.ctx_early_candle.response.1.reply.2" } },
+                    new() { Key = "2", Text = "stranger.ctx_early_candle.response.2.text", ResponseType = StrangerResponseType.Dismissed, ReceptivityChange = -5,
+                        StrangerReply = new[] { "stranger.ctx_early_candle.response.2.reply.1", "stranger.ctx_early_candle.response.2.reply.2" } },
+                    new() { Key = "0", Text = "stranger.ctx_early_candle.response.0.text", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
+                        StrangerReply = new[] { "stranger.ctx_early_candle.response.0.reply.1" } }
                 }
             },
 
@@ -502,86 +509,86 @@ namespace UsurperRemake.Systems
 
             new() { Id = "ctx_mid_wave", MinEncounters = 4, MaxEncounters = 8, MinLevel = 15, MaxLevel = 55,
                 Dialogue = new[] {
-                    "\"Have you ever watched a wave?\"",
-                    "\"It rises, it crests, it crashes. And we mourn the wave.\"",
-                    "\"But the water? The water is still there.\"",
-                    "\"It was never the wave that mattered. It was always the ocean.\""
+                    "stranger.ctx_mid_wave.dialogue.1",
+                    "stranger.ctx_mid_wave.dialogue.2",
+                    "stranger.ctx_mid_wave.dialogue.3",
+                    "stranger.ctx_mid_wave.dialogue.4"
                 },
                 Responses = new List<StrangerResponseOption> {
-                    new() { Key = "1", Text = "The wave doesn't know it's the ocean.", ResponseType = StrangerResponseType.Reflective, ReceptivityChange = 12,
-                        StrangerReply = new[] { "\"No it doesnt. Thats kind of the whole point, isnt it.\"" } },
-                    new() { Key = "2", Text = "You're talking about more than waves, aren't you?", ResponseType = StrangerResponseType.Engaged, ReceptivityChange = 8,
-                        StrangerReply = new[] { "\"What do you think? Im not talking about the seaside.\"" } },
-                    new() { Key = "0", Text = "Say nothing and leave.", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
-                        StrangerReply = new[] { "You walk away, but you swear you hear the sound of distant waves." } }
+                    new() { Key = "1", Text = "stranger.ctx_mid_wave.response.1.text", ResponseType = StrangerResponseType.Reflective, ReceptivityChange = 12,
+                        StrangerReply = new[] { "stranger.ctx_mid_wave.response.1.reply.1" } },
+                    new() { Key = "2", Text = "stranger.ctx_mid_wave.response.2.text", ResponseType = StrangerResponseType.Engaged, ReceptivityChange = 8,
+                        StrangerReply = new[] { "stranger.ctx_mid_wave.response.2.reply.1" } },
+                    new() { Key = "0", Text = "stranger.ctx_mid_wave.response.0.text", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
+                        StrangerReply = new[] { "stranger.ctx_mid_wave.response.0.reply.1" } }
                 }
             },
 
             new() { Id = "ctx_mid_after_god", MinEncounters = 4, MaxEncounters = 10, MinLevel = 20, MaxLevel = 70,
                 RequiredRecentEvent = StrangerContextEvent.OldGodDefeated,
                 Dialogue = new[] {
-                    "\"Another god has fallen. Or risen. The distinction is thinner than you think.\"",
-                    "\"When a god dies, the power doesn't vanish.\"",
-                    "\"It transforms. Into rain. Into dreams. Into you.\""
+                    "stranger.ctx_mid_after_god.dialogue.1",
+                    "stranger.ctx_mid_after_god.dialogue.2",
+                    "stranger.ctx_mid_after_god.dialogue.3"
                 },
                 Responses = new List<StrangerResponseOption> {
-                    new() { Key = "1", Text = "Into me? What do you mean?", ResponseType = StrangerResponseType.Engaged, ReceptivityChange = 8,
-                        StrangerReply = new[] { "\"You absorbed some of what they were. It changes you.\"", "\"Whether you wanted it to or not.\"" } },
-                    new() { Key = "2", Text = "I can feel their power. It frightens me sometimes.", ResponseType = StrangerResponseType.Reflective, ReceptivityChange = 12,
-                        StrangerReply = new[] { "\"Should be scared. Means you're paying attention.\"" } },
-                    new() { Key = "0", Text = "Say nothing and leave.", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
-                        StrangerReply = new[] { "\"The gods are watching you. Even the dead ones.\"" } }
+                    new() { Key = "1", Text = "stranger.ctx_mid_after_god.response.1.text", ResponseType = StrangerResponseType.Engaged, ReceptivityChange = 8,
+                        StrangerReply = new[] { "stranger.ctx_mid_after_god.response.1.reply.1", "stranger.ctx_mid_after_god.response.1.reply.2" } },
+                    new() { Key = "2", Text = "stranger.ctx_mid_after_god.response.2.text", ResponseType = StrangerResponseType.Reflective, ReceptivityChange = 12,
+                        StrangerReply = new[] { "stranger.ctx_mid_after_god.response.2.reply.1" } },
+                    new() { Key = "0", Text = "stranger.ctx_mid_after_god.response.0.text", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
+                        StrangerReply = new[] { "stranger.ctx_mid_after_god.response.0.reply.1" } }
                 }
             },
 
             new() { Id = "ctx_mid_companion_grief", MinEncounters = 3, MaxEncounters = 10, MinLevel = 10, MaxLevel = 70,
                 RequiredRecentEvent = StrangerContextEvent.CompanionDied,
                 Dialogue = new[] {
-                    "\"You carry a heaviness I recognize.\"",
-                    "\"The weight of someone who wasn't ready to lose what they loved.\"",
-                    "\"That weight is a gift. It means what you had was real.\""
+                    "stranger.ctx_mid_companion_grief.dialogue.1",
+                    "stranger.ctx_mid_companion_grief.dialogue.2",
+                    "stranger.ctx_mid_companion_grief.dialogue.3"
                 },
                 Responses = new List<StrangerResponseOption> {
-                    new() { Key = "1", Text = "A gift? It feels like a curse.", ResponseType = StrangerResponseType.Engaged, ReceptivityChange = 8,
-                        StrangerReply = new[] { "\"Feels like a curse because you cared about them. Thats not a bad thing.\"" } },
-                    new() { Key = "2", Text = "You're right. I wouldn't trade the memories to stop the pain.", ResponseType = StrangerResponseType.Accepted, ReceptivityChange = 15,
-                        StrangerReply = new[] { "\"Yeah. You get it then.\"" } },
-                    new() { Key = "0", Text = "Say nothing and leave.", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
-                        StrangerReply = new[] { "She watches you go, carrying the weight. She has carried it too, for longer than you know." } }
+                    new() { Key = "1", Text = "stranger.ctx_mid_companion_grief.response.1.text", ResponseType = StrangerResponseType.Engaged, ReceptivityChange = 8,
+                        StrangerReply = new[] { "stranger.ctx_mid_companion_grief.response.1.reply.1" } },
+                    new() { Key = "2", Text = "stranger.ctx_mid_companion_grief.response.2.text", ResponseType = StrangerResponseType.Accepted, ReceptivityChange = 15,
+                        StrangerReply = new[] { "stranger.ctx_mid_companion_grief.response.2.reply.1" } },
+                    new() { Key = "0", Text = "stranger.ctx_mid_companion_grief.response.0.text", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
+                        StrangerReply = new[] { "stranger.ctx_mid_companion_grief.response.0.reply.1" } }
                 }
             },
 
             new() { Id = "ctx_mid_phoenix", MinEncounters = 4, MaxEncounters = 8, MinLevel = 20, MaxLevel = 50,
                 Dialogue = new[] {
-                    "\"In the old stories, the phoenix does not fear the flame.\"",
-                    "\"It flies INTO it. Willingly. Joyfully.\"",
-                    "\"Because it knows what waits on the other side of burning.\"",
-                    "\"Not ash. Renewal.\""
+                    "stranger.ctx_mid_phoenix.dialogue.1",
+                    "stranger.ctx_mid_phoenix.dialogue.2",
+                    "stranger.ctx_mid_phoenix.dialogue.3",
+                    "stranger.ctx_mid_phoenix.dialogue.4"
                 },
                 Responses = new List<StrangerResponseOption> {
-                    new() { Key = "1", Text = "I've seen renewal. After every battle, after every loss.", ResponseType = StrangerResponseType.Accepted, ReceptivityChange = 15,
-                        StrangerReply = new[] { "\"Good. You're a quick study.\"" } },
-                    new() { Key = "2", Text = "Easy to say when you're not the one burning.", ResponseType = StrangerResponseType.Challenged, ReceptivityChange = 5,
-                        StrangerReply = new[] { "*She gives you a look.*", "\"You think Im just talking? Ive been through worse than you can imagine.\"" } },
-                    new() { Key = "0", Text = "Say nothing and leave.", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
-                        StrangerReply = new[] { "A warmth brushes past you. Like standing near a fire that gives light but cannot burn." } }
+                    new() { Key = "1", Text = "stranger.ctx_mid_phoenix.response.1.text", ResponseType = StrangerResponseType.Accepted, ReceptivityChange = 15,
+                        StrangerReply = new[] { "stranger.ctx_mid_phoenix.response.1.reply.1" } },
+                    new() { Key = "2", Text = "stranger.ctx_mid_phoenix.response.2.text", ResponseType = StrangerResponseType.Challenged, ReceptivityChange = 5,
+                        StrangerReply = new[] { "stranger.ctx_mid_phoenix.response.2.reply.1", "stranger.ctx_mid_phoenix.response.2.reply.2" } },
+                    new() { Key = "0", Text = "stranger.ctx_mid_phoenix.response.0.text", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
+                        StrangerReply = new[] { "stranger.ctx_mid_phoenix.response.0.reply.1" } }
                 }
             },
 
             new() { Id = "ctx_mid_sleep", MinEncounters = 4, MaxEncounters = 8, MinLevel = 20, MaxLevel = 55,
                 Dialogue = new[] {
-                    "\"What if death is just... sleep?\"",
-                    "\"You close your eyes. The world dissolves.\"",
-                    "\"And when you open them, you are somewhere new.\"",
-                    "\"Different, but still yourself. Always yourself.\""
+                    "stranger.ctx_mid_sleep.dialogue.1",
+                    "stranger.ctx_mid_sleep.dialogue.2",
+                    "stranger.ctx_mid_sleep.dialogue.3",
+                    "stranger.ctx_mid_sleep.dialogue.4"
                 },
                 Responses = new List<StrangerResponseOption> {
-                    new() { Key = "1", Text = "That's... oddly comforting.", ResponseType = StrangerResponseType.Reflective, ReceptivityChange = 12,
-                        StrangerReply = new[] { "\"Good. Hold onto that.\"" } },
-                    new() { Key = "2", Text = "Sleep doesn't usually involve swords.", ResponseType = StrangerResponseType.Challenged, ReceptivityChange = 5,
-                        StrangerReply = new[] { "*A flicker of amusement.*", "\"No. But the principle is the same.\"", "\"The letting go. The trust that something waits on the other side.\"" } },
-                    new() { Key = "0", Text = "Say nothing and leave.", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
-                        StrangerReply = new[] { "\"Sleep well, when you do. And don't fear the waking.\"" } }
+                    new() { Key = "1", Text = "stranger.ctx_mid_sleep.response.1.text", ResponseType = StrangerResponseType.Reflective, ReceptivityChange = 12,
+                        StrangerReply = new[] { "stranger.ctx_mid_sleep.response.1.reply.1" } },
+                    new() { Key = "2", Text = "stranger.ctx_mid_sleep.response.2.text", ResponseType = StrangerResponseType.Challenged, ReceptivityChange = 5,
+                        StrangerReply = new[] { "stranger.ctx_mid_sleep.response.2.reply.1", "stranger.ctx_mid_sleep.response.2.reply.2", "stranger.ctx_mid_sleep.response.2.reply.3" } },
+                    new() { Key = "0", Text = "stranger.ctx_mid_sleep.response.0.text", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
+                        StrangerReply = new[] { "stranger.ctx_mid_sleep.response.0.reply.1" } }
                 }
             },
 
@@ -589,72 +596,72 @@ namespace UsurperRemake.Systems
 
             new() { Id = "ctx_late_cycle", MinEncounters = 7, MinLevel = 40, MinAwakening = 2,
                 Dialogue = new[] {
-                    "\"You're beginning to feel it, aren't you?\"",
-                    "\"That ache at the edge of memory.\"",
-                    "\"You've been here before. Done this before.\"",
-                    "\"Death and rebirth. Death and rebirth. The wheel turns.\""
+                    "stranger.ctx_late_cycle.dialogue.1",
+                    "stranger.ctx_late_cycle.dialogue.2",
+                    "stranger.ctx_late_cycle.dialogue.3",
+                    "stranger.ctx_late_cycle.dialogue.4"
                 },
                 Responses = new List<StrangerResponseOption> {
-                    new() { Key = "1", Text = "The wheel... is that what this is? A cycle?", ResponseType = StrangerResponseType.Engaged, ReceptivityChange = 8,
-                        StrangerReply = new[] { "\"Call it what you want. Cycle, spiral, whatever.\"", "\"Point is you keep coming back. Question is why.\"" } },
-                    new() { Key = "2", Text = "I feel like I've known you for lifetimes.", ResponseType = StrangerResponseType.Reflective, ReceptivityChange = 12,
-                        StrangerReply = new[] { "\"You have. And every time, you forget.\"", "\"Maybe this time you wont.\"" } },
-                    new() { Key = "0", Text = "Say nothing and leave.", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
-                        StrangerReply = new[] { "\"Getting warmer.\"" } }
+                    new() { Key = "1", Text = "stranger.ctx_late_cycle.response.1.text", ResponseType = StrangerResponseType.Engaged, ReceptivityChange = 8,
+                        StrangerReply = new[] { "stranger.ctx_late_cycle.response.1.reply.1", "stranger.ctx_late_cycle.response.1.reply.2" } },
+                    new() { Key = "2", Text = "stranger.ctx_late_cycle.response.2.text", ResponseType = StrangerResponseType.Reflective, ReceptivityChange = 12,
+                        StrangerReply = new[] { "stranger.ctx_late_cycle.response.2.reply.1", "stranger.ctx_late_cycle.response.2.reply.2" } },
+                    new() { Key = "0", Text = "stranger.ctx_late_cycle.response.0.text", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
+                        StrangerReply = new[] { "stranger.ctx_late_cycle.response.0.reply.1" } }
                 }
             },
 
             new() { Id = "ctx_late_identity", MinEncounters = 7, MinLevel = 45, MinAwakening = 3,
                 Dialogue = new[] {
-                    "\"Have you noticed?\"",
-                    "\"Every time you die, you come back the same.\"",
-                    "\"Every time THEY die, they stay dead.\"",
-                    "\"Why is that?\"",
-                    "\"What makes you so... different?\""
+                    "stranger.ctx_late_identity.dialogue.1",
+                    "stranger.ctx_late_identity.dialogue.2",
+                    "stranger.ctx_late_identity.dialogue.3",
+                    "stranger.ctx_late_identity.dialogue.4",
+                    "stranger.ctx_late_identity.dialogue.5"
                 },
                 Responses = new List<StrangerResponseOption> {
-                    new() { Key = "1", Text = "I've wondered that. I'm afraid of the answer.", ResponseType = StrangerResponseType.Reflective, ReceptivityChange = 12,
-                        StrangerReply = new[] { "\"Good. You should be.\"", "\"But you already know, dont you? Deep down.\"" } },
-                    new() { Key = "2", Text = "Because I'm not mortal. Not really. Am I?", ResponseType = StrangerResponseType.Accepted, ReceptivityChange = 15,
-                        StrangerReply = new[] { "She goes quiet for a long time.", "\"No. You're not.\"" } },
-                    new() { Key = "0", Text = "Say nothing and leave.", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
-                        StrangerReply = new[] { "\"Youll figure it out. Sooner than you think.\"" } }
+                    new() { Key = "1", Text = "stranger.ctx_late_identity.response.1.text", ResponseType = StrangerResponseType.Reflective, ReceptivityChange = 12,
+                        StrangerReply = new[] { "stranger.ctx_late_identity.response.1.reply.1", "stranger.ctx_late_identity.response.1.reply.2" } },
+                    new() { Key = "2", Text = "stranger.ctx_late_identity.response.2.text", ResponseType = StrangerResponseType.Accepted, ReceptivityChange = 15,
+                        StrangerReply = new[] { "stranger.ctx_late_identity.response.2.reply.1", "stranger.ctx_late_identity.response.2.reply.2" } },
+                    new() { Key = "0", Text = "stranger.ctx_late_identity.response.0.text", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
+                        StrangerReply = new[] { "stranger.ctx_late_identity.response.0.reply.1" } }
                 }
             },
 
             new() { Id = "ctx_late_after_seal", MinEncounters = 5, MinLevel = 30,
                 RequiredRecentEvent = StrangerContextEvent.SealCollected,
                 Dialogue = new[] {
-                    "\"Another seal. Another piece of the story.\"",
-                    "\"Do you see the pattern yet?\"",
-                    "\"Creation. Separation. Forgetting. Suffering.\"",
-                    "\"And then... remembering. The hardest part.\""
+                    "stranger.ctx_late_after_seal.dialogue.1",
+                    "stranger.ctx_late_after_seal.dialogue.2",
+                    "stranger.ctx_late_after_seal.dialogue.3",
+                    "stranger.ctx_late_after_seal.dialogue.4"
                 },
                 Responses = new List<StrangerResponseOption> {
-                    new() { Key = "1", Text = "The seals tell the story of the gods. And of us.", ResponseType = StrangerResponseType.Reflective, ReceptivityChange = 12,
-                        StrangerReply = new[] { "\"Close. Its more like a confession.\"", "\"Keep collecting them. Youll understand when you have them all.\"" } },
-                    new() { Key = "2", Text = "I'm still putting the pieces together.", ResponseType = StrangerResponseType.Engaged, ReceptivityChange = 8,
-                        StrangerReply = new[] { "\"Good. Dont rush it.\"", "\"Some things hit harder when you figure them out yourself.\"" } },
-                    new() { Key = "0", Text = "Say nothing and leave.", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
-                        StrangerReply = new[] { "\"Keep reading. Its almost at the good part.\"" } }
+                    new() { Key = "1", Text = "stranger.ctx_late_after_seal.response.1.text", ResponseType = StrangerResponseType.Reflective, ReceptivityChange = 12,
+                        StrangerReply = new[] { "stranger.ctx_late_after_seal.response.1.reply.1", "stranger.ctx_late_after_seal.response.1.reply.2" } },
+                    new() { Key = "2", Text = "stranger.ctx_late_after_seal.response.2.text", ResponseType = StrangerResponseType.Engaged, ReceptivityChange = 8,
+                        StrangerReply = new[] { "stranger.ctx_late_after_seal.response.2.reply.1", "stranger.ctx_late_after_seal.response.2.reply.2" } },
+                    new() { Key = "0", Text = "stranger.ctx_late_after_seal.response.0.text", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
+                        StrangerReply = new[] { "stranger.ctx_late_after_seal.response.0.reply.1" } }
                 }
             },
 
             new() { Id = "ctx_late_manwe", MinEncounters = 8, MinLevel = 50, MinAwakening = 4,
                 Dialogue = new[] {
-                    "\"Manwe is tired. Can you feel it?\"",
-                    "\"He made the gods because he was lonely.\"",
-                    "\"But he never understood them. Not really.\"",
-                    "\"So he sent pieces of himself out to live as mortals.\"",
-                    "\"To find out what dying feels like.\""
+                    "stranger.ctx_late_manwe.dialogue.1",
+                    "stranger.ctx_late_manwe.dialogue.2",
+                    "stranger.ctx_late_manwe.dialogue.3",
+                    "stranger.ctx_late_manwe.dialogue.4",
+                    "stranger.ctx_late_manwe.dialogue.5"
                 },
                 Responses = new List<StrangerResponseOption> {
-                    new() { Key = "1", Text = "You're talking about me. I am Manwe's fragment.", ResponseType = StrangerResponseType.Accepted, ReceptivityChange = 15,
-                        StrangerReply = new[] { "\"Yeah.\"", "\"Every time you died, he felt it. Thats the whole point.\"" } },
-                    new() { Key = "2", Text = "Manwe... the Creator. Why would he choose suffering?", ResponseType = StrangerResponseType.Reflective, ReceptivityChange = 12,
-                        StrangerReply = new[] { "\"Because you cant understand something you never felt.\"", "\"He needed to know what death was. So he died. A thousand times. Through you.\"" } },
-                    new() { Key = "0", Text = "Say nothing and leave.", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
-                        StrangerReply = new[] { "\"Remember this when you meet him.\"" } }
+                    new() { Key = "1", Text = "stranger.ctx_late_manwe.response.1.text", ResponseType = StrangerResponseType.Accepted, ReceptivityChange = 15,
+                        StrangerReply = new[] { "stranger.ctx_late_manwe.response.1.reply.1", "stranger.ctx_late_manwe.response.1.reply.2" } },
+                    new() { Key = "2", Text = "stranger.ctx_late_manwe.response.2.text", ResponseType = StrangerResponseType.Reflective, ReceptivityChange = 12,
+                        StrangerReply = new[] { "stranger.ctx_late_manwe.response.2.reply.1", "stranger.ctx_late_manwe.response.2.reply.2" } },
+                    new() { Key = "0", Text = "stranger.ctx_late_manwe.response.0.text", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
+                        StrangerReply = new[] { "stranger.ctx_late_manwe.response.0.reply.1" } }
                 }
             },
 
@@ -662,17 +669,17 @@ namespace UsurperRemake.Systems
 
             new() { Id = "ctx_suspects_identity", MinEncounters = 4, RequiresSuspicion = true,
                 Dialogue = new[] {
-                    "\"You've noticed, haven't you?\"",
-                    "\"The same eyes in every face. The same shadow.\"",
-                    "\"You're wondering if all the strangers are the same stranger.\""
+                    "stranger.ctx_suspects_identity.dialogue.1",
+                    "stranger.ctx_suspects_identity.dialogue.2",
+                    "stranger.ctx_suspects_identity.dialogue.3"
                 },
                 Responses = new List<StrangerResponseOption> {
-                    new() { Key = "1", Text = "Are you? Are you always the same person?", ResponseType = StrangerResponseType.Engaged, ReceptivityChange = 8,
-                        StrangerReply = new[] { "\"Every face. Every disguise. Yeah, that was me.\"", "\"Surprised it took you this long to notice.\"" } },
-                    new() { Key = "2", Text = "I know what you are. You're Noctura.", ResponseType = StrangerResponseType.Challenged, ReceptivityChange = 5,
-                        StrangerReply = new[] { "\"Took you long enough.\"", "\"Knowing my name doesnt change anything though. Pay attention to what Im telling you.\"" } },
-                    new() { Key = "0", Text = "Say nothing and leave.", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
-                        StrangerReply = new[] { "\"Go on then. Youll say it eventually.\"" } }
+                    new() { Key = "1", Text = "stranger.ctx_suspects_identity.response.1.text", ResponseType = StrangerResponseType.Engaged, ReceptivityChange = 8,
+                        StrangerReply = new[] { "stranger.ctx_suspects_identity.response.1.reply.1", "stranger.ctx_suspects_identity.response.1.reply.2" } },
+                    new() { Key = "2", Text = "stranger.ctx_suspects_identity.response.2.text", ResponseType = StrangerResponseType.Challenged, ReceptivityChange = 5,
+                        StrangerReply = new[] { "stranger.ctx_suspects_identity.response.2.reply.1", "stranger.ctx_suspects_identity.response.2.reply.2" } },
+                    new() { Key = "0", Text = "stranger.ctx_suspects_identity.response.0.text", ResponseType = StrangerResponseType.Silent, ReceptivityChange = 0,
+                        StrangerReply = new[] { "stranger.ctx_suspects_identity.response.0.reply.1" } }
                 }
             }
         };
@@ -840,7 +847,10 @@ namespace UsurperRemake.Systems
             {
                 Disguise = disguise,
                 DisguiseData = disguiseData,
-                Dialogue = string.Join("\n", chosen.Dialogue),
+                // v0.61.2: chosen.Dialogue holds localization keys (e.g. "stranger.ctx_mid_wave.dialogue.1").
+                // Resolve each key via Loc.Get at consumption time so the dialogue renders in the
+                // current player's session language.
+                Dialogue = string.Join("\n", chosen.Dialogue.Select(k => UsurperRemake.Systems.Loc.Get(k))),
                 Location = location,
                 EncounterNumber = encounterNum,
                 PlayerSuspects = suspects,
@@ -965,18 +975,24 @@ namespace UsurperRemake.Systems
             {
                 foreach (var opt in encounter.ResponseOptions)
                 {
-                    options.Add((opt.Key, opt.Text, string.Join(" ", opt.StrangerReply)));
+                    // v0.61.2: opt.Text and opt.StrangerReply elements hold localization
+                    // keys (e.g. "stranger.ctx_mid_wave.response.2.text"). Resolve via
+                    // Loc.Get at render time so dialogue renders in the player's session
+                    // language. Pre-fix these were literal English strings.
+                    string textLoc = UsurperRemake.Systems.Loc.Get(opt.Text);
+                    string replyLoc = string.Join(" ", opt.StrangerReply.Select(k => UsurperRemake.Systems.Loc.Get(k)));
+                    options.Add((opt.Key, textLoc, replyLoc));
                 }
             }
             else
             {
-                // Fallback for encounters without response options
-                options.Add(("1", "Listen carefully",
-                    "\"Smart. Most people dont bother.\""));
-                options.Add(("2", "Ask what they mean",
-                    "\"Youll figure it out. Or you wont. Either way.\""));
-                options.Add(("0", "Say nothing and leave",
-                    "They watch you go. Hard to tell if theyre amused or disappointed."));
+                // Fallback for encounters without response options (legacy path).
+                options.Add(("1", UsurperRemake.Systems.Loc.Get("stranger.fallback.option.1.text"),
+                    UsurperRemake.Systems.Loc.Get("stranger.fallback.option.1.reply")));
+                options.Add(("2", UsurperRemake.Systems.Loc.Get("stranger.fallback.option.2.text"),
+                    UsurperRemake.Systems.Loc.Get("stranger.fallback.option.2.reply")));
+                options.Add(("0", UsurperRemake.Systems.Loc.Get("stranger.fallback.option.0.text"),
+                    UsurperRemake.Systems.Loc.Get("stranger.fallback.option.0.reply")));
             }
 
             return options;

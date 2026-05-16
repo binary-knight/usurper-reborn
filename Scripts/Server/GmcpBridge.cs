@@ -286,9 +286,19 @@ public static class GmcpBridge
     /// </summary>
     public static void EmitCombatPartyIfChanged(System.Collections.Generic.List<global::Character>? party)
     {
-        if (party == null || party.Count == 0 || !IsActive) return;
+        if (!IsActive) return;
         var ctx = SessionContext.Current;
         if (ctx == null) return;
+
+        // v0.61.2: do NOT early-return on null / empty party. Player report:
+        // "when no team left gmcp should send an empty team block to update
+        // the client." If the party transitions from "had members" to empty
+        // (companions died, team disbanded, dungeon group left), the client
+        // needs an explicit empty frame to clear its party display. The
+        // snapshot mechanism below correctly handles the transition: previous
+        // snapshot has content, new snapshot is "", they differ, one emit
+        // fires, then subsequent empty calls compare ""=="" and no-op.
+        var safeParty = party ?? new System.Collections.Generic.List<global::Character>();
 
         // Build a compact snapshot string for change detection.
         // Format: "name|hp|maxHp|mana|maxMana|alive|status1,status2,...;" per member.
@@ -297,7 +307,7 @@ public static class GmcpBridge
         // mid-round without HP movement) MUST trigger a re-emit -- clients render
         // status icons off this frame.
         var sb = new System.Text.StringBuilder();
-        foreach (var m in party)
+        foreach (var m in safeParty)
         {
             sb.Append($"{m.DisplayName}|{m.HP}|{m.MaxHP}|{m.Mana}|{m.MaxMana}|{m.IsAlive}|");
             foreach (var s in m.ActiveStatuses.Keys.Select(k => k.ToString()).OrderBy(k => k, System.StringComparer.Ordinal))
@@ -309,7 +319,7 @@ public static class GmcpBridge
         if (snapshot == ctx.LastGmcpPartySnapshot) return;
         ctx.LastGmcpPartySnapshot = snapshot;
 
-        EmitCombatPartyInternal(party);
+        EmitCombatPartyInternal(safeParty);
     }
 
     /// <summary>

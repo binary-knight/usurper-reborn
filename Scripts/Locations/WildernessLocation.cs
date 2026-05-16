@@ -372,6 +372,24 @@ public class WildernessLocation : BaseLocation
         var monster = MonsterGenerator.GenerateMonster(monsterLevel);
         monster.Name = monsterName;
 
+        // v0.61.2 (player report: "Feral Cat takes flight, becoming harder to hit!"):
+        // MonsterGenerator picked a random dungeon family/tier with that level's stats,
+        // and the line above only overwrote Name -- the underlying abilities (e.g. Angel's
+        // Flight), family, MonsterClass, color, and combat dialogue all leaked through.
+        // Rewrite the family-specific fields so the creature actually behaves like its
+        // name implies. Names not in the lookup default to a plain Beast.
+        var profile = WildernessData.GetMonsterProfile(monsterName);
+        monster.FamilyName = profile.Family;
+        monster.TierName = monsterName;
+        monster.AttackType = profile.AttackType;
+        monster.MonsterColor = profile.Color;
+        monster.CanSpeak = profile.CanSpeak;
+        monster.MonsterClass = profile.MonsterClass;
+        monster.Undead = profile.MonsterClass == MonsterClass.Undead ? 1 : 0;
+        monster.SpecialAbilities.Clear();
+        foreach (var ability in profile.Abilities)
+            monster.SpecialAbilities.Add(ability);
+
         // Run full combat
         var combatEngine = new CombatEngine(terminal);
         var teammates = new List<Character>();

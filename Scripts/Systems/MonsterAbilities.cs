@@ -397,6 +397,10 @@ public static class MonsterAbilities
             case AbilityType.Vanish:
                 result.DamageMultiplier = 0; // Evasion buff — no damage
                 result.EvasionBonus = 30;
+                // v0.61.2: persist evasion onto the monster so player attacks
+                // during the buff window actually have a chance to miss.
+                monster.EvasionRounds = 2;
+                monster.EvasionMissChance = 30;
                 result.Message = $"{monster.Name} fades into the shadows!";
                 result.MessageColor = "darkgray";
                 break;
@@ -406,6 +410,8 @@ public static class MonsterAbilities
                 if (_rnd.Next(100) < 25)
                 {
                     result.AvoidAllDamage = true;
+                    monster.EvasionRounds = 2;
+                    monster.EvasionMissChance = 50;
                     result.Message = $"{monster.Name} phases out of reality!";
                     result.MessageColor = "bright_cyan";
                 }
@@ -628,7 +634,13 @@ public static class MonsterAbilities
                 result.AvoidAllDamage = _rnd.Next(100) < 30;
                 result.DamageMultiplier = 0;
                 if (result.AvoidAllDamage)
+                {
+                    // v0.61.2: persist evasion onto the monster (2 rounds at 50% miss chance)
+                    // so the player's next 2 swings can actually pass through.
+                    monster.EvasionRounds = 2;
+                    monster.EvasionMissChance = 50;
                     result.Message = $"{monster.Name} becomes incorporeal — attacks pass through!";
+                }
                 else
                     result.Message = $"{monster.Name} flickers between planes!";
                 result.MessageColor = "bright_cyan";
@@ -705,6 +717,9 @@ public static class MonsterAbilities
             case AbilityType.Flight:
                 result.EvasionBonus = 25;
                 result.DamageMultiplier = 0;
+                // v0.61.2: persist evasion onto the monster (2 rounds at 25% miss chance).
+                monster.EvasionRounds = 2;
+                monster.EvasionMissChance = 25;
                 result.Message = $"{monster.Name} takes flight, becoming harder to hit!";
                 result.MessageColor = "bright_cyan";
                 break;
@@ -729,6 +744,9 @@ public static class MonsterAbilities
             case AbilityType.Invisibility:
                 result.EvasionBonus = 35;
                 result.DamageMultiplier = 0;
+                // v0.61.2: persist evasion onto the monster (2 rounds at 35% miss chance).
+                monster.EvasionRounds = 2;
+                monster.EvasionMissChance = 35;
                 result.Message = $"{monster.Name} fades from sight!";
                 result.MessageColor = "gray";
                 break;
@@ -737,6 +755,9 @@ public static class MonsterAbilities
                 result.EvasionBonus = 40;
                 result.DamageMultiplier = 0;
                 result.SkipNormalAttack = true;
+                // v0.61.2: persist evasion onto the monster (2 rounds at 40% miss chance).
+                monster.EvasionRounds = 2;
+                monster.EvasionMissChance = 40;
                 result.Message = $"{monster.Name} teleports behind {you}!";
                 result.MessageColor = "bright_magenta";
                 break;
@@ -980,6 +1001,12 @@ public static class MonsterAbilities
             case AbilityType.PhaseShift:
                 result.AvoidAllDamage = _rnd.Next(100) < 30;
                 result.DamageMultiplier = 0;
+                if (result.AvoidAllDamage)
+                {
+                    // v0.61.2: persist evasion onto the monster (2 rounds at 50% miss chance).
+                    monster.EvasionRounds = 2;
+                    monster.EvasionMissChance = 50;
+                }
                 result.Message = result.AvoidAllDamage
                     ? $"{monster.Name} phase shifts out of reality!"
                     : $"{monster.Name} flickers between dimensions!";
@@ -1109,6 +1136,13 @@ public static class MonsterAbilities
             case AbilityType.TreeMeld:
                 result.AvoidAllDamage = _rnd.Next(100) < 35;
                 result.DamageMultiplier = 0;
+                if (result.AvoidAllDamage)
+                {
+                    // v0.61.2: persist evasion onto the monster (2 rounds at 55% miss chance —
+                    // higher than Phase/Incorporeal because "untouchable" reads stronger).
+                    monster.EvasionRounds = 2;
+                    monster.EvasionMissChance = 55;
+                }
                 result.Message = result.AvoidAllDamage
                     ? $"{monster.Name} melds with a nearby tree, becoming untouchable!"
                     : $"{monster.Name} partially melds with nature!";
@@ -1175,6 +1209,10 @@ public static class MonsterAbilities
                 result.StatusChance = 55;
                 result.EvasionBonus = 30;
                 result.SkipNormalAttack = true;
+                // v0.61.2: persist evasion onto the monster (3 rounds at 30% miss chance,
+                // matching the 3-round Blinded duration the ability applies).
+                monster.EvasionRounds = 3;
+                monster.EvasionMissChance = 30;
                 result.Message = $"{monster.Name} releases a cloud of ink!";
                 result.MessageColor = "gray";
                 break;

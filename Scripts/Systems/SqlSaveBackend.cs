@@ -653,6 +653,33 @@ namespace UsurperRemake.Systems
                         snapshot_at TEXT NOT NULL,
                         snapshot_json TEXT NOT NULL
                     );
+
+                    -- v0.61.2 Phase 1 of the NPC AI project: every NPC action the
+                    -- world sim takes is logged here so we can measure baseline
+                    -- behavior (survival rates by class, gold accumulation, dungeon
+                    -- success rates) BEFORE the AI subset lands. Once AI NPCs ship,
+                    -- the is_ai_driven column lets us split the rollup and compare
+                    -- AI vs heuristic cohorts on the same metrics. Pruned to last
+                    -- 30 days on a periodic sweep to keep table size bounded.
+                    CREATE TABLE IF NOT EXISTS npc_decision_log (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        npc_name TEXT NOT NULL,
+                        npc_level INTEGER NOT NULL,
+                        npc_class TEXT NOT NULL,
+                        action TEXT NOT NULL,
+                        location_before TEXT,
+                        location_after TEXT,
+                        outcome TEXT,
+                        gold_delta INTEGER DEFAULT 0,
+                        xp_delta INTEGER DEFAULT 0,
+                        hp_before INTEGER DEFAULT 0,
+                        hp_after INTEGER DEFAULT 0,
+                        is_ai_driven INTEGER DEFAULT 0,
+                        created_at TEXT DEFAULT (datetime('now'))
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_npc_decision_log_npc ON npc_decision_log(npc_name, created_at DESC);
+                    CREATE INDEX IF NOT EXISTS idx_npc_decision_log_action_outcome ON npc_decision_log(action, outcome);
+                    CREATE INDEX IF NOT EXISTS idx_npc_decision_log_created ON npc_decision_log(created_at DESC);
                 ";
                 cmd.ExecuteNonQuery();
             }
@@ -1984,6 +2011,75 @@ namespace UsurperRemake.Systems
             catch (Exception ex)
             {
                 DebugLogger.Instance.LogError("SQL", $"Failed to log combat event: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// v0.61.2 Phase 1 of NPC AI project: log every world-sim NPC decision so
+        /// we can measure baseline behavior (survival rates by class, gold delta
+        /// per action, dungeon outcome distribution) BEFORE the AI subset lands.
+        /// Once AI NPCs ship, the isAiDriven flag lets us split rollups and
+        /// compare AI vs heuristic cohorts on the same metrics. Fire-and-forget
+        /// from the call site so a write failure doesn't break world sim.
+        /// </summary>
+        public void LogNPCDecision(
+            string npcName, int npcLevel, string npcClass,
+            string action, string? locationBefore, string? locationAfter,
+            string? outcome, long goldDelta, long xpDelta,
+            long hpBefore, long hpAfter, bool isAiDriven)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    INSERT INTO npc_decision_log (
+                        npc_name, npc_level, npc_class,
+                        action, location_before, location_after, outcome,
+                        gold_delta, xp_delta, hp_before, hp_after, is_ai_driven
+                    ) VALUES (
+                        @name, @level, @class,
+                        @action, @locBefore, @locAfter, @outcome,
+                        @goldDelta, @xpDelta, @hpBefore, @hpAfter, @aiDriven
+                    );
+                ";
+                cmd.Parameters.AddWithValue("@name", npcName ?? "");
+                cmd.Parameters.AddWithValue("@level", npcLevel);
+                cmd.Parameters.AddWithValue("@class", npcClass ?? "");
+                cmd.Parameters.AddWithValue("@action", action ?? "");
+                cmd.Parameters.AddWithValue("@locBefore", (object?)locationBefore ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@locAfter", (object?)locationAfter ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@outcome", (object?)outcome ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@goldDelta", goldDelta);
+                cmd.Parameters.AddWithValue("@xpDelta", xpDelta);
+                cmd.Parameters.AddWithValue("@hpBefore", hpBefore);
+                cmd.Parameters.AddWithValue("@hpAfter", hpAfter);
+                cmd.Parameters.AddWithValue("@aiDriven", isAiDriven ? 1 : 0);
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to log NPC decision: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Prune npc_decision_log rows older than the cutoff so the table stays
+        /// bounded. Called from the daily maintenance pass.
+        /// </summary>
+        public async Task PruneOldNPCDecisionLog(int daysToKeep = 30)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"DELETE FROM npc_decision_log WHERE created_at < datetime('now', @cutoff);";
+                cmd.Parameters.AddWithValue("@cutoff", $"-{daysToKeep} days");
+                await cmd.ExecuteNonQueryAsync();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to prune npc_decision_log: {ex.Message}");
             }
         }
 

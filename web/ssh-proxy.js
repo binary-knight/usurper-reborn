@@ -1611,6 +1611,119 @@ async function handleBalanceRequest(req, res) {
     return true;
   }
 
+  // GET /api/balance/npc-behavior
+  // v0.61.2 Phase 1 NPC AI telemetry surface. Returns aggregates from
+  // npc_decision_log so we can measure baseline behavior of the heuristic
+  // NPCs before the AI subset lands.
+  if (method === 'GET' && url === '/api/balance/npc-behavior') {
+    try {
+      // Overview cards
+      const total = db.prepare('SELECT COUNT(*) as c FROM npc_decision_log').get();
+      const totalUnique = db.prepare('SELECT COUNT(DISTINCT npc_name) as c FROM npc_decision_log').get();
+      const totalDeaths = db.prepare("SELECT COUNT(*) as c FROM npc_decision_log WHERE outcome = 'died'").get();
+      const totalLevels = db.prepare("SELECT COUNT(*) as c FROM npc_decision_log WHERE outcome = 'leveled_up'").get();
+      const last24h = db.prepare(`SELECT COUNT(*) as c FROM npc_decision_log WHERE created_at >= datetime('now', '-24 hours')`).get();
+
+      // Action distribution (which actions NPCs spend time on)
+      const actionDist = db.prepare(`
+        SELECT action, COUNT(*) as total,
+          SUM(CASE WHEN outcome = 'died' THEN 1 ELSE 0 END) as deaths,
+          SUM(CASE WHEN outcome = 'leveled_up' THEN 1 ELSE 0 END) as level_ups,
+          ROUND(AVG(gold_delta), 1) as avg_gold_delta,
+          ROUND(AVG(xp_delta), 1) as avg_xp_delta
+        FROM npc_decision_log
+        GROUP BY action
+        ORDER BY total DESC
+      `).all();
+
+      // Outcome distribution overall
+      const outcomeDist = db.prepare(`
+        SELECT outcome, COUNT(*) as total,
+          ROUND(100.0 * COUNT(*) / (SELECT COUNT(*) FROM npc_decision_log), 2) as pct
+        FROM npc_decision_log
+        WHERE outcome IS NOT NULL
+        GROUP BY outcome
+        ORDER BY total DESC
+      `).all();
+
+      // Class performance: survival rate, gold accumulation, level progression
+      const classPerf = db.prepare(`
+        SELECT npc_class,
+          COUNT(DISTINCT npc_name) as living_npcs,
+          COUNT(*) as actions,
+          SUM(CASE WHEN outcome = 'died' THEN 1 ELSE 0 END) as deaths,
+          ROUND(100.0 * SUM(CASE WHEN outcome = 'died' THEN 1 ELSE 0 END) / COUNT(*), 2) as death_pct,
+          SUM(gold_delta) as net_gold,
+          SUM(xp_delta) as net_xp,
+          MAX(npc_level) as max_level
+        FROM npc_decision_log
+        GROUP BY npc_class
+        ORDER BY actions DESC
+      `).all();
+
+      // Dungeon-specific breakdown (rich outcomes from NPCExploreDungeon)
+      const dungeonBreakdown = db.prepare(`
+        SELECT outcome, COUNT(*) as total,
+          ROUND(100.0 * COUNT(*) / (SELECT COUNT(*) FROM npc_decision_log WHERE action = 'dungeon'), 2) as pct
+        FROM npc_decision_log
+        WHERE action = 'dungeon'
+        GROUP BY outcome
+        ORDER BY total DESC
+      `).all();
+
+      // Recent deaths (who died doing what)
+      const recentDeaths = db.prepare(`
+        SELECT npc_name, npc_level, npc_class, action, location_before, hp_before, created_at
+        FROM npc_decision_log
+        WHERE outcome = 'died'
+        ORDER BY created_at DESC
+        LIMIT 30
+      `).all();
+
+      // Recent decisions (live feed for inspection)
+      const recent = db.prepare(`
+        SELECT npc_name, npc_level, npc_class, action, location_before, location_after,
+          outcome, gold_delta, xp_delta, hp_before, hp_after, is_ai_driven, created_at
+        FROM npc_decision_log
+        ORDER BY id DESC
+        LIMIT 50
+      `).all();
+
+      // Wealth leaderboard - top NPCs by net gold accumulated
+      const wealthBoard = db.prepare(`
+        SELECT npc_name, npc_class, MAX(npc_level) as level,
+          SUM(gold_delta) as net_gold,
+          SUM(xp_delta) as net_xp,
+          COUNT(*) as actions
+        FROM npc_decision_log
+        GROUP BY npc_name
+        HAVING net_gold > 0
+        ORDER BY net_gold DESC
+        LIMIT 20
+      `).all();
+
+      sendJson(res, 200, {
+        overview: {
+          total: total.c,
+          uniqueNpcs: totalUnique.c,
+          deaths: totalDeaths.c,
+          levelUps: totalLevels.c,
+          last24h: last24h.c
+        },
+        actionDist,
+        outcomeDist,
+        classPerf,
+        dungeonBreakdown,
+        recentDeaths,
+        recent,
+        wealthBoard
+      });
+    } catch (e) {
+      sendJson(res, 500, { error: e.message });
+    }
+    return true;
+  }
+
   sendJson(res, 404, { error: 'Not found' });
   return true;
 }

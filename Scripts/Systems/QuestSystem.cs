@@ -102,7 +102,7 @@ public partial class QuestSystem
         // GD.Print($"[QuestSystem] Quest claimed by {player.Name2}: {foundQuest.Id}");
 
         // Send confirmation mail (Pascal: Quest claim notification)
-        MailSystem.SendQuestClaimedMail(player.Name2, foundQuest.Title);
+        MailSystem.SendQuestClaimedMail(player.Name2, foundQuest.GetDisplayTitle());
 
         return QuestClaimResult.CanClaim;
     }
@@ -182,7 +182,7 @@ public partial class QuestSystem
             {
                 factionSystem.FactionStanding[questFaction.Value] += 50;
                 factionSystem.CompletedFactionQuests.Add(quest.Id);
-                terminal.WriteLine(Loc.Get("quest.standing_improved", quest.Initiator), "bright_cyan");
+                terminal.WriteLine(Loc.Get("quest.standing_improved", quest.GetDisplayInitiator()), "bright_cyan");
             }
         }
 
@@ -259,7 +259,7 @@ public partial class QuestSystem
         quest.Forced = forced;
         
         // Send quest offer mail (Pascal: Quest offer mail)
-        MailSystem.SendQuestOfferMail(playerName, quest.Title);
+        MailSystem.SendQuestOfferMail(playerName, quest.GetDisplayTitle());
         
         // GD.Print($"[QuestSystem] Quest offered to {playerName}: {quest.Id}");
     }
@@ -377,11 +377,14 @@ public partial class QuestSystem
                 // Use base tier name as targetId so it matches OnMonsterKilled tierId
                 var bossName = Loc.Get("quest.title.champion", tier.Name);
                 var bossId = tier.Name.ToLower().Replace(" ", "_");
-                quest.Objectives.Add(new QuestObjective(
+                quest.Objectives.Add(QuestObjective.Localized(
                     QuestObjectiveType.KillBoss,
-                    Loc.Get("quest.objective.defeat_boss", bossName),
+                    "quest.objective.defeat_boss",
+                    new object[] { bossName },
                     1, bossId, bossName));
                 quest.Title = Loc.Get("quest.title.defeat_boss", bossName);
+                quest.TitleKey = "quest.title.defeat_boss";
+                quest.TitleArgs = new List<string> { bossName };
                 break;
 
             case QuestTarget.ReachFloor:
@@ -393,45 +396,57 @@ public partial class QuestSystem
                 // If still can't go deeper (at max accessible), fall through to a different quest type
                 if (expeditionFloor <= deepestFloor && deepestFloor >= maxAccessibleFloor)
                     expeditionFloor = maxAccessibleFloor; // At cap, just use max — kill req still adds challenge
-                quest.Objectives.Add(new QuestObjective(
+                quest.Objectives.Add(QuestObjective.Localized(
                     QuestObjectiveType.ReachDungeonFloor,
-                    Loc.Get("quest.objective.reach_floor", expeditionFloor),
+                    "quest.objective.reach_floor",
+                    new object[] { expeditionFloor },
                     expeditionFloor, "", $"Floor {expeditionFloor}"));
                 // Required: kill monsters on the target floor to prove you fought there
                 int expeditionKillCount = 3 + quest.Difficulty * 2;
-                quest.Objectives.Add(new QuestObjective(
+                quest.Objectives.Add(QuestObjective.Localized(
                     QuestObjectiveType.KillMonsters,
-                    Loc.Get("quest.objective.defeat_monsters_expedition", expeditionKillCount),
+                    "quest.objective.defeat_monsters_expedition",
+                    new object[] { expeditionKillCount },
                     expeditionKillCount, "", "Monsters"));
                 quest.Title = Loc.Get("quest.title.expedition", expeditionFloor);
+                quest.TitleKey = "quest.title.expedition";
+                quest.TitleArgs = new List<string> { expeditionFloor.ToString() };
                 break;
 
             case QuestTarget.ClearFloor:
                 // Clear all monsters on a specific floor - capped to accessible range
                 var clearFloor = CapFloor(playerLevel + quest.Difficulty + random.Next(-1, 3));
-                quest.Objectives.Add(new QuestObjective(
+                quest.Objectives.Add(QuestObjective.Localized(
                     QuestObjectiveType.ReachDungeonFloor,
-                    Loc.Get("quest.objective.descend_floor", clearFloor),
+                    "quest.objective.descend_floor",
+                    new object[] { clearFloor },
                     clearFloor, "", $"Floor {clearFloor}"));
-                quest.Objectives.Add(new QuestObjective(
+                quest.Objectives.Add(QuestObjective.Localized(
                     QuestObjectiveType.ClearDungeonFloor,
-                    Loc.Get("quest.objective.clear_monsters", clearFloor),
+                    "quest.objective.clear_monsters",
+                    new object[] { clearFloor },
                     1, clearFloor.ToString(), $"Floor {clearFloor}"));
                 quest.Title = Loc.Get("quest.title.clear_floor", clearFloor);
+                quest.TitleKey = "quest.title.clear_floor";
+                quest.TitleArgs = new List<string> { clearFloor.ToString() };
                 break;
 
             case QuestTarget.SurviveDungeon:
                 // Survive multiple floors - based on difficulty but within reason
                 var surviveFloors = Math.Min(quest.Difficulty * 3 + random.Next(2, 5), 15);
-                quest.Objectives.Add(new QuestObjective(
+                quest.Objectives.Add(QuestObjective.Localized(
                     QuestObjectiveType.ReachDungeonFloor,
-                    Loc.Get("quest.objective.survive_floors", surviveFloors),
+                    "quest.objective.survive_floors",
+                    new object[] { surviveFloors },
                     surviveFloors, "", "Floors"));
-                quest.Objectives.Add(new QuestObjective(
+                quest.Objectives.Add(QuestObjective.Localized(
                     QuestObjectiveType.KillMonsters,
-                    Loc.Get("quest.objective.defeat_minimum"),
-                    10, "", "Monsters") { IsOptional = false });
+                    "quest.objective.defeat_minimum",
+                    Array.Empty<object>(),
+                    10, "", "Monsters"));
                 quest.Title = Loc.Get("quest.title.survive_floors", surviveFloors);
+                quest.TitleKey = "quest.title.survive_floors";
+                quest.TitleArgs = new List<string> { surviveFloors.ToString() };
                 break;
         }
     }
@@ -693,11 +708,11 @@ public partial class QuestSystem
     private static void ProcessQuestFailure(Quest quest)
     {
         // Send failure mail to player
-        MailSystem.SendQuestFailureMail(quest.Occupier, quest.Title);
-        
-        // Send failure notification to king
+        MailSystem.SendQuestFailureMail(quest.Occupier, quest.GetDisplayTitle());
+
+        // Send failure notification to king (in king's language at the time, best-effort)
         var kingName = quest.Initiator;
-        MailSystem.SendQuestFailureNotificationMail(kingName, quest.Title);
+        MailSystem.SendQuestFailureNotificationMail(kingName, quest.GetDisplayTitle());
         
         // Apply penalty if configured
         ApplyQuestPenalty(quest);
@@ -739,8 +754,8 @@ public partial class QuestSystem
         // Log the penalty
         DebugLogger.Instance.LogInfo("QUEST", $"QUEST FAILED: {playerName} failed quest '{quest.Title}' (difficulty {quest.Difficulty})");
 
-        // Announce the failure
-        NewsSystem.Instance?.Newsy(true, Loc.Get("quest.failure_news", playerName, quest.Title));
+        // Announce the failure (news rendered to bootstrap language at write time; out of scope for v0.61.3)
+        NewsSystem.Instance?.Newsy(true, Loc.Get("quest.failure_news", playerName, quest.GetDisplayTitle()));
     }
     
     /// <summary>
@@ -748,7 +763,7 @@ public partial class QuestSystem
     /// </summary>
     private static void SendQuestCompletionMail(Character player, Quest quest, long rewardAmount)
     {
-        MailSystem.SendQuestCompletionMail(player.Name2, quest.Title, rewardAmount);
+        MailSystem.SendQuestCompletionMail(player.Name2, quest.GetDisplayTitle(), rewardAmount);
     }
     
     /// <summary>
@@ -838,6 +853,11 @@ public partial class QuestSystem
                 Title = questData.Title,
                 Initiator = questData.Initiator,
                 Comment = questData.Comment,
+                TitleKey = questData.TitleKey ?? "",
+                TitleArgs = questData.TitleArgs != null ? new List<string>(questData.TitleArgs) : new List<string>(),
+                CommentKey = questData.CommentKey ?? "",
+                CommentArgs = questData.CommentArgs != null ? new List<string>(questData.CommentArgs) : new List<string>(),
+                InitiatorKey = questData.InitiatorKey ?? "",
                 Date = questData.StartTime,
                 QuestType = (QuestType)questData.QuestType,
                 QuestTarget = (QuestTarget)questData.QuestTarget,
@@ -865,6 +885,10 @@ public partial class QuestSystem
                 {
                     Id = objData.Id,
                     Description = objData.Description,
+                    DescriptionKey = objData.DescriptionKey ?? "",
+                    DescriptionArgs = objData.DescriptionArgs != null
+                        ? new List<string>(objData.DescriptionArgs)
+                        : new List<string>(),
                     ObjectiveType = (QuestObjectiveType)objData.ObjectiveType,
                     TargetId = objData.TargetId,
                     TargetName = objData.TargetName,
@@ -913,6 +937,11 @@ public partial class QuestSystem
                 Title = questData.Title,
                 Initiator = questData.Initiator,
                 Comment = questData.Comment,
+                TitleKey = questData.TitleKey ?? "",
+                TitleArgs = questData.TitleArgs != null ? new List<string>(questData.TitleArgs) : new List<string>(),
+                CommentKey = questData.CommentKey ?? "",
+                CommentArgs = questData.CommentArgs != null ? new List<string>(questData.CommentArgs) : new List<string>(),
+                InitiatorKey = questData.InitiatorKey ?? "",
                 Date = questData.StartTime,
                 QuestType = (QuestType)questData.QuestType,
                 QuestTarget = (QuestTarget)questData.QuestTarget,
@@ -939,6 +968,10 @@ public partial class QuestSystem
                 {
                     Id = objData.Id,
                     Description = objData.Description,
+                    DescriptionKey = objData.DescriptionKey ?? "",
+                    DescriptionArgs = objData.DescriptionArgs != null
+                        ? new List<string>(objData.DescriptionArgs)
+                        : new List<string>(),
                     ObjectiveType = (QuestObjectiveType)objData.ObjectiveType,
                     TargetId = objData.TargetId,
                     TargetName = objData.TargetName,
@@ -988,6 +1021,11 @@ public partial class QuestSystem
                 Title = questData.Title,
                 Initiator = questData.Initiator,
                 Comment = questData.Comment,
+                TitleKey = questData.TitleKey ?? "",
+                TitleArgs = questData.TitleArgs != null ? new List<string>(questData.TitleArgs) : new List<string>(),
+                CommentKey = questData.CommentKey ?? "",
+                CommentArgs = questData.CommentArgs != null ? new List<string>(questData.CommentArgs) : new List<string>(),
+                InitiatorKey = questData.InitiatorKey ?? "",
                 Date = questData.StartTime,
                 QuestType = (QuestType)questData.QuestType,
                 QuestTarget = (QuestTarget)questData.QuestTarget,
@@ -1014,6 +1052,10 @@ public partial class QuestSystem
                 {
                     Id = objData.Id,
                     Description = objData.Description,
+                    DescriptionKey = objData.DescriptionKey ?? "",
+                    DescriptionArgs = objData.DescriptionArgs != null
+                        ? new List<string>(objData.DescriptionArgs)
+                        : new List<string>(),
                     ObjectiveType = (QuestObjectiveType)objData.ObjectiveType,
                     TargetId = objData.TargetId,
                     TargetName = objData.TargetName,
@@ -1387,18 +1429,38 @@ public partial class QuestSystem
         // the remove/recreate cycle in MUD mode without changing IDs
         string stableId = "STARTER_" + stableKey.ToUpper().Replace(" ", "_");
 
-        // Skip if this starter quest already exists (claimed or unclaimed)
-        if (questDatabase.Any(q => q.Id == stableId))
+        // v0.61.3: if this starter quest already exists, back-populate its
+        // localization keys when they're missing. Saves from before v0.61.3
+        // have the keys empty even though the keys themselves match what
+        // CreateStarterQuest would generate now. Skip the rest of the work
+        // (don't reset progress / occupier / objectives) since the quest is
+        // already in the DB.
+        var existing = questDatabase.FirstOrDefault(q => q.Id == stableId);
+        if (existing != null)
+        {
+            if (string.IsNullOrEmpty(existing.TitleKey)) existing.TitleKey = titleKey;
+            if (string.IsNullOrEmpty(existing.CommentKey)) existing.CommentKey = descKey;
+            if (string.IsNullOrEmpty(existing.InitiatorKey)) existing.InitiatorKey = "quest.initiator.royal_council";
             return;
+        }
 
+        // v0.61.3: store both the rendered (English fallback) text AND the
+        // localization keys. Display sites prefer the keys via GetDisplayTitle
+        // / GetDisplayComment so each viewer sees the quest in their own
+        // session language. Pre-fix, the rendered text was locked to whatever
+        // language the bootstrap process happened in -- usually English since
+        // bootstrap runs before any player session attaches a language.
         var quest = new Quest
         {
             Title = Loc.Get(titleKey),
+            TitleKey = titleKey,
             Initiator = Loc.Get("quest.initiator.royal_council"),
+            InitiatorKey = "quest.initiator.royal_council",
             QuestType = QuestType.SingleQuest,
             QuestTarget = target,
             Difficulty = difficulty,
             Comment = Loc.Get(descKey),
+            CommentKey = descKey,
             Date = DateTime.Now,
             MinLevel = minLevel,
             MaxLevel = maxLevel,
@@ -1419,12 +1481,16 @@ public partial class QuestSystem
         // Add objectives based on quest type
         if (target == QuestTarget.Monster && monsters != null)
         {
-            // Create a KillSpecificMonster objective for each monster type
+            // Create a KillSpecificMonster objective for each monster type.
+            // v0.61.3: use QuestObjective.Localized so DescriptionKey + args
+            // travel with the objective and translate at display time.
             foreach (var (name, count) in monsters)
             {
-                quest.Objectives.Add(new QuestObjective(
+                string displayName = count > 1 ? GetPluralName(name) : name;
+                quest.Objectives.Add(QuestObjective.Localized(
                     QuestObjectiveType.KillSpecificMonster,
-                    Loc.Get("quest.objective.kill_count", count, (count > 1 ? GetPluralName(name) : name)),
+                    "quest.objective.kill_count",
+                    new object[] { count, displayName },
                     count,
                     name.ToLower().Replace(" ", "_"),
                     name
@@ -1433,9 +1499,10 @@ public partial class QuestSystem
         }
         else if (target == QuestTarget.ReachFloor && floorTarget > 0)
         {
-            quest.Objectives.Add(new QuestObjective(
+            quest.Objectives.Add(QuestObjective.Localized(
                 QuestObjectiveType.ReachDungeonFloor,
-                Loc.Get("quest.objective.reach_floor_short", floorTarget),
+                "quest.objective.reach_floor_short",
+                new object[] { floorTarget },
                 floorTarget,
                 "",
                 $"Floor {floorTarget}"
@@ -1444,9 +1511,10 @@ public partial class QuestSystem
         else if (target == QuestTarget.ClearBoss)
         {
             var bossName = monsters?.FirstOrDefault().name ?? "Boss";
-            quest.Objectives.Add(new QuestObjective(
+            quest.Objectives.Add(QuestObjective.Localized(
                 QuestObjectiveType.KillBoss,
-                Loc.Get("quest.objective.defeat_boss", bossName),
+                "quest.objective.defeat_boss",
+                new object[] { bossName },
                 1,
                 "",
                 bossName
@@ -1609,18 +1677,30 @@ public partial class QuestSystem
             "quest.crime.plotting_rebellion"
         };
 
-        var crime = Loc.Get(crimeKeys[random.Next(crimeKeys.Length)]);
+        var crimeKey = crimeKeys[random.Next(crimeKeys.Length)];
+        var crime = Loc.Get(crimeKey);  // bootstrap-language snapshot for the legacy Comment field
         var difficulty = (byte)Math.Min(4, Math.Max(1, target.Level / 15 + 1));
         var reward = target.Level * 100 * difficulty;
 
         var bounty = new Quest
         {
             Title = Loc.Get("quest.bounty.wanted", target.Name),
+            TitleKey = "quest.bounty.wanted",
+            TitleArgs = new List<string> { target.Name },
             Initiator = KING_BOUNTY_INITIATOR,
+            // KING_BOUNTY_INITIATOR is a literal English string "The Crown" -- the
+            // initiator-key path lets us localize it per viewer.
+            InitiatorKey = "quest.initiator.the_crown",
             QuestType = QuestType.SingleQuest,
             QuestTarget = QuestTarget.DefeatNPC,
             Difficulty = difficulty,
             Comment = Loc.Get("quest.bounty.comment_npc", target.Name, crime),
+            CommentKey = "quest.bounty.comment_npc",
+            // Crime name is a localization key, not the target's name. Use the
+            // "loc:" prefix so GetDisplayComment resolves the crime in the
+            // viewer's language at render time. target.Name is a real string
+            // (NPC name), no prefix needed.
+            CommentArgs = new List<string> { target.Name, "loc:" + crimeKey },
             Date = DateTime.Now,
             MinLevel = Math.Max(1, target.Level - 10),
             MaxLevel = 9999,
@@ -1630,9 +1710,10 @@ public partial class QuestSystem
             TargetNPCName = target.Name
         };
 
-        bounty.Objectives.Add(new QuestObjective(
+        bounty.Objectives.Add(QuestObjective.Localized(
             QuestObjectiveType.DefeatNPC,
-            Loc.Get("quest.objective.defeat_npc", target.Name),
+            "quest.objective.defeat_npc",
+            new object[] { target.Name },
             1,
             target.Name,
             target.Name
@@ -1656,28 +1737,38 @@ public partial class QuestSystem
         };
 
         var (titleKey, descKey, killCount) = bountyTypeKeys[random.Next(bountyTypeKeys.Length)];
-        var title = Loc.Get(titleKey);
+        var title = Loc.Get(titleKey);  // bootstrap-language snapshot for legacy Title field
         var desc = Loc.Get(descKey);
         var difficulty = (byte)(random.Next(1, 5)); // 1-4 difficulty
         killCount += difficulty * 2; // Scale kills with difficulty
 
         var bounty = new Quest
         {
+            // Title (legacy string) is rendered in bootstrap language for back-
+            // compat with non-localized display sites. The display layer prefers
+            // TitleKey+TitleArgs; passing "loc:<innerKey>" makes Quest.GetDisplayTitle
+            // resolve the criminal-type name in the VIEWER's session language at
+            // render time instead of freezing the bootstrap-language string.
             Title = Loc.Get("quest.bounty.wanted", title),
+            TitleKey = "quest.bounty.wanted",
+            TitleArgs = new List<string> { "loc:" + titleKey },
             Initiator = KING_BOUNTY_INITIATOR,
+            InitiatorKey = "quest.initiator.the_crown",
             QuestType = QuestType.SingleQuest,
             QuestTarget = QuestTarget.Monster,
             Difficulty = difficulty,
             Comment = desc,
+            CommentKey = descKey,
             Date = DateTime.Now,
             MinLevel = difficulty * 5,
             MaxLevel = 9999,
             DaysToComplete = 14
         };
 
-        bounty.Objectives.Add(new QuestObjective(
+        bounty.Objectives.Add(QuestObjective.Localized(
             QuestObjectiveType.KillMonsters,
-            Loc.Get("quest.objective.slay_monsters", killCount),
+            "quest.objective.slay_monsters",
+            new object[] { killCount },
             killCount
         ));
 

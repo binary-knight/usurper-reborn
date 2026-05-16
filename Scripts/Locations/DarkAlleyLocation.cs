@@ -1532,7 +1532,7 @@ namespace UsurperRemake.Locations
                 foreach (var quest in activeQuests.Take(5))
                 {
                     terminal.SetColor("cyan");
-                    terminal.WriteLine($"  {quest.Title}: {quest.GetTargetDescription()}");
+                    terminal.WriteLine($"  {quest.GetDisplayTitle()}: {quest.GetTargetDescription()}");
                 }
             }
 

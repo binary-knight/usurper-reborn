@@ -259,6 +259,7 @@
       <div class="tab" data-tab="deaths">Death Hotspots</div>
       <div class="tab" data-tab="players">Player Activity</div>
       <div class="tab" data-tab="suspects">Suspects</div>
+      <div class="tab" data-tab="npc">NPC Behavior</div>
     </div>
 
     <div class="tab-content active" id="tab-recent">
@@ -278,6 +279,39 @@
     </div>
     <div class="tab-content" id="tab-suspects">
       <div class="section-body" id="suspects-table"></div>
+    </div>
+    <div class="tab-content" id="tab-npc">
+      <div id="npc-overview-cards" class="grid"></div>
+      <div class="grid two-col">
+        <div class="section">
+          <div class="section-title">Action Distribution</div>
+          <div class="section-body"><div class="chart-container"><canvas id="npcActionChart"></canvas></div></div>
+        </div>
+        <div class="section">
+          <div class="section-title">Outcome Distribution</div>
+          <div class="section-body"><div class="chart-container"><canvas id="npcOutcomeChart"></canvas></div></div>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-title">Class Performance</div>
+        <div class="section-body" id="npc-class-table"></div>
+      </div>
+      <div class="section">
+        <div class="section-title">Dungeon Outcomes (rich classification)</div>
+        <div class="section-body" id="npc-dungeon-table"></div>
+      </div>
+      <div class="section">
+        <div class="section-title">Wealthiest NPCs (net gold this window)</div>
+        <div class="section-body" id="npc-wealth-table"></div>
+      </div>
+      <div class="section">
+        <div class="section-title">Recent NPC Deaths</div>
+        <div class="section-body" id="npc-deaths-table"></div>
+      </div>
+      <div class="section">
+        <div class="section-title">Recent Decisions (live)</div>
+        <div class="section-body" id="npc-recent-table"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -396,7 +430,8 @@ async function refreshAll() {
       loadOneHitKills(),
       loadBossFights(),
       loadPlayers(),
-      loadSuspects()
+      loadSuspects(),
+      loadNPCBehavior()
     ]);
     document.getElementById('last-refresh').textContent =
       'Updated ' + new Date().toLocaleTimeString();
@@ -635,6 +670,144 @@ async function loadSuspects() {
       r.one_hit_kills
     ])
   );
+}
+
+// v0.61.2 Phase 1 NPC AI telemetry surface. Pulls /npc-behavior and renders
+// overview cards + action distribution chart + outcome chart + class table +
+// dungeon table + wealth board + recent deaths + recent decisions.
+async function loadNPCBehavior() {
+  const d = await apiFetch('/npc-behavior');
+
+  // Overview cards
+  const ov = d.overview || {};
+  document.getElementById('npc-overview-cards').innerHTML = [
+    card('Total Decisions', fmtNum(ov.total)),
+    card('Unique NPCs', fmtNum(ov.uniqueNpcs)),
+    card('Last 24h', fmtNum(ov.last24h), 'good'),
+    card('Deaths', fmtNum(ov.deaths), ov.deaths > 20 ? 'danger' : ov.deaths > 0 ? 'warn' : ''),
+    card('Level-Ups', fmtNum(ov.levelUps), 'good'),
+  ].join('');
+
+  // Action distribution chart
+  const actions = d.actionDist || [];
+  updateChart('npcActionChart', {
+    type: 'bar',
+    data: {
+      labels: actions.map(r => r.action),
+      datasets: [{
+        label: 'Decisions',
+        data: actions.map(r => r.total),
+        backgroundColor: actions.map((_, i) => `hsla(${i * 28}, 70%, 55%, 0.7)`),
+        borderColor: actions.map((_, i) => `hsl(${i * 28}, 70%, 55%)`),
+        borderWidth: 1
+      }]
+    },
+    options: chartOpts('Decisions')
+  });
+
+  // Outcome distribution chart
+  const outcomes = d.outcomeDist || [];
+  const outcomeColors = {
+    'died': '#ff3860', 'leveled_up': '#23d160', 'healed': '#3273dc',
+    'earned': '#ffdd57', 'spent': '#9b59b6', 'took_damage': '#ff7043',
+    'completed': '#888', 'won': '#23d160', 'fled': '#ffdd57',
+    'aborted_wounded': '#3273dc', 'aborted_cautious': '#9b59b6', 'stalemate': '#aaa',
+    'exception': '#ff3860'
+  };
+  updateChart('npcOutcomeChart', {
+    type: 'doughnut',
+    data: {
+      labels: outcomes.map(r => `${r.outcome} (${r.pct}%)`),
+      datasets: [{
+        data: outcomes.map(r => r.total),
+        backgroundColor: outcomes.map(r => outcomeColors[r.outcome] || '#888'),
+        borderColor: '#000',
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: true, position: 'right', labels: { color: '#888', font: { size: 10 } } } }
+    }
+  });
+
+  // Class performance table
+  const cls = d.classPerf || [];
+  document.getElementById('npc-class-table').innerHTML = cls.length
+    ? makeTable(
+        ['Class', 'Living NPCs', 'Actions', 'Deaths', 'Death %', 'Net Gold', 'Net XP', 'Max Level'],
+        cls.map(r => [
+          r.npc_class,
+          r.living_npcs,
+          fmtNum(r.actions),
+          r.deaths,
+          r.death_pct > 5 ? `<span style="color:var(--red)">${r.death_pct}%</span>` : r.death_pct + '%',
+          fmtNum(r.net_gold),
+          fmtNum(r.net_xp),
+          r.max_level
+        ])
+      )
+    : '<p style="color:var(--dim)">No NPC decision data yet.</p>';
+
+  // Dungeon-specific breakdown table
+  const dung = d.dungeonBreakdown || [];
+  document.getElementById('npc-dungeon-table').innerHTML = dung.length
+    ? makeTable(
+        ['Outcome', 'Count', '% of dungeon runs'],
+        dung.map(r => [
+          `<span class="tag" style="background:${outcomeColors[r.outcome] || '#888'};color:#000">${r.outcome}</span>`,
+          fmtNum(r.total),
+          r.pct + '%'
+        ])
+      )
+    : '<p style="color:var(--dim)">No dungeon decisions logged yet.</p>';
+
+  // Wealthiest NPCs
+  const wealth = d.wealthBoard || [];
+  document.getElementById('npc-wealth-table').innerHTML = wealth.length
+    ? makeTable(
+        ['NPC', 'Class', 'Level', 'Actions', 'Net Gold', 'Net XP'],
+        wealth.map(r => [r.npc_name, r.npc_class, r.level, fmtNum(r.actions), fmtNum(r.net_gold), fmtNum(r.net_xp)])
+      )
+    : '<p style="color:var(--dim)">No wealth accumulated yet.</p>';
+
+  // Recent deaths
+  const deaths = d.recentDeaths || [];
+  document.getElementById('npc-deaths-table').innerHTML = deaths.length
+    ? makeTable(
+        ['NPC', 'Lv', 'Class', 'Action', 'Where', 'HP at start', 'When'],
+        deaths.map(r => [
+          r.npc_name,
+          r.npc_level,
+          r.npc_class,
+          r.action,
+          r.location_before || '-',
+          r.hp_before,
+          fmtTime(r.created_at)
+        ])
+      )
+    : '<p style="color:var(--dim)">No NPC deaths logged yet. That\'s good news.</p>';
+
+  // Recent decisions (live feed)
+  const recent = d.recent || [];
+  document.getElementById('npc-recent-table').innerHTML = recent.length
+    ? makeTable(
+        ['NPC', 'Lv', 'Class', 'Action', 'Before → After', 'Outcome', 'Gold Δ', 'XP Δ', 'HP', 'AI?', 'When'],
+        recent.map(r => [
+          r.npc_name,
+          r.npc_level,
+          r.npc_class,
+          r.action,
+          (r.location_before || '-') + ' → ' + (r.location_after || '-'),
+          `<span class="tag" style="background:${outcomeColors[r.outcome] || '#888'};color:#000">${r.outcome || '?'}</span>`,
+          r.gold_delta > 0 ? `<span style="color:var(--green)">+${fmtNum(r.gold_delta)}</span>` : r.gold_delta < 0 ? `<span style="color:var(--red)">${fmtNum(r.gold_delta)}</span>` : '0',
+          r.xp_delta > 0 ? `<span style="color:var(--green)">+${fmtNum(r.xp_delta)}</span>` : '0',
+          `${r.hp_before} → ${r.hp_after}`,
+          r.is_ai_driven ? '<span style="color:var(--cyan)">AI</span>' : '',
+          fmtTime(r.created_at)
+        ])
+      )
+    : '<p style="color:var(--dim)">No decisions logged yet.</p>';
 }
 
 // --- Helpers ---

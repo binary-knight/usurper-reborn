@@ -1173,12 +1173,26 @@ public abstract class BaseLocation
             terminal.WriteLine($"  {TownNPCStorySystem.GetLocalizedChoicePrompt(npcKey, stage)}");
             terminal.WriteLine("");
 
+            // v0.61.2 (player report: "In the encounters with pip the orphan thief, it
+            // doesn't tell you which letters to use for the different options. I wanted
+            // to choose mentor for the one encounter, but I didn't know which letter to
+            // use."). Pre-fix the display rendered the option's full-word data key in
+            // brackets ("[forgive] Let her keep it") and the input prompt expected the
+            // player to type that whole word. Players reasonably expected a single-key
+            // hotkey like the rest of the game's menus. Switched to numbered hotkeys
+            // (`[1] ... [2] ... [3]`) matching the convention of combat actions and
+            // healing-target prompts. Input matcher below accepts the number, the first
+            // letter of the data Key, or the full data Key (case-insensitive) so the new
+            // hotkey works alongside muscle memory of any player who had learned the
+            // old typing convention.
+            int idx = 0;
             foreach (var option in stage.Choice.Options)
             {
+                idx++;
                 terminal.SetColor("white");
                 terminal.Write("    [");
                 terminal.SetColor("bright_yellow");
-                terminal.Write(option.Key);
+                terminal.Write(idx.ToString());
                 terminal.SetColor("white");
                 terminal.Write("] ");
                 terminal.SetColor("white");
@@ -1187,8 +1201,32 @@ public abstract class BaseLocation
             terminal.WriteLine("");
 
             var input = await GetChoice();
-            var selected = stage.Choice.Options.FirstOrDefault(o =>
-                o.Key.Equals(input, StringComparison.OrdinalIgnoreCase));
+            string inputTrim = input?.Trim() ?? "";
+            NPCChoiceOption? selected = null;
+            // Try number first (1-based index into Options list).
+            if (int.TryParse(inputTrim, out int choiceNum)
+                && choiceNum >= 1 && choiceNum <= stage.Choice.Options.Length)
+            {
+                selected = stage.Choice.Options[choiceNum - 1];
+            }
+            // Fallback: full data-key match (legacy input form, kept for muscle memory).
+            if (selected == null)
+            {
+                selected = stage.Choice.Options.FirstOrDefault(o =>
+                    o.Key.Equals(inputTrim, StringComparison.OrdinalIgnoreCase));
+            }
+            // Fallback: first-letter of the data-key (defensive — unique-letter check
+            // disambiguates pairs where two options share a first letter, e.g. an
+            // imagined "rescue" / "refuse"; the option only matches if the letter is
+            // unambiguous across the choice set).
+            if (selected == null && inputTrim.Length == 1)
+            {
+                var letterMatches = stage.Choice.Options
+                    .Where(o => o.Key.Length > 0
+                        && char.ToUpperInvariant(o.Key[0]) == char.ToUpperInvariant(inputTrim[0]))
+                    .ToList();
+                if (letterMatches.Count == 1) selected = letterMatches[0];
+            }
 
             if (selected != null)
             {
@@ -3006,7 +3044,7 @@ public abstract class BaseLocation
             foreach (var quest in activeQuests.Take(8))
             {
                 terminal.SetColor("bright_yellow");
-                terminal.WriteLine($"  {quest.Title ?? Loc.Get("base.unknown_quest")}");
+                terminal.WriteLine($"  {quest.GetDisplayTitle()}");
                 terminal.SetColor("gray");
                 terminal.WriteLine($"    {Loc.Get("base.quest_type")}: {quest.GetTargetDescription()}  |  {quest.GetDifficultyString()}  |  {Loc.Get("base.quest_days_left", quest.DaysRemaining)}");
 
@@ -3021,7 +3059,7 @@ public abstract class BaseLocation
                             ? $" ({obj.CurrentProgress}/{obj.RequiredProgress})"
                             : "";
                         terminal.SetColor(done ? "green" : "white");
-                        terminal.WriteLine($"    [{check}] {obj.Description}{progress}");
+                        terminal.WriteLine($"    [{check}] {obj.GetDisplayDescription()}{progress}");
                     }
                 }
                 else
@@ -5083,8 +5121,11 @@ public abstract class BaseLocation
 
         await Task.Delay(1500);
 
-        // Initiate combat through StreetEncounterSystem
-        var result = await StreetEncounterSystem.Instance.AttackCharacter(currentPlayer, npc, terminal);
+        // Initiate combat through StreetEncounterSystem.
+        // v0.61.2: pass isHonorDuel: true so the murder-cap counter / over-cap
+        // reward clawback / +10 Darkness penalty all skip this path. A duel is
+        // a consensual challenge, not an assault.
+        var result = await StreetEncounterSystem.Instance.AttackCharacter(currentPlayer, npc, terminal, isHonorDuel: true);
 
         if (result.Victory)
         {
@@ -7098,29 +7139,18 @@ public abstract class BaseLocation
     /// <summary>
     /// Get location name for display
     /// </summary>
+    // v0.61.2 (player report: "the locations when you move about aren't translated.
+    // see stuff like 'Úton ide: Home.'"). Pre-fix this was a hardcoded English switch
+    // that only covered 17 of the ~50 GameLocation enum values; everything else fell
+    // through to `location.ToString()` which renders the bare enum name (e.g. "Home",
+    // "MainStreet"). Even the 17 covered names were English literals, so non-English
+    // players saw English location names interleaved with localized prefix text like
+    // "Úton ide: Home" or "Heading to: Home" in their language. Now uses Loc.Get with
+    // a `location.name.{enum_value}` key namespace; missing keys still fall back to
+    // the enum name via Loc.Get's standard fallback chain.
     public static string GetLocationName(GameLocation location)
     {
-        return location switch
-        {
-            GameLocation.MainStreet => "Main Street",
-            GameLocation.TheInn => "The Inn",
-            GameLocation.DarkAlley => "Dark Alley",
-            GameLocation.Church => "Church",
-            GameLocation.WeaponShop => "Weapon Shop",
-            GameLocation.ArmorShop => "Armor Shop",
-            GameLocation.Bank => "Bank",
-            GameLocation.AuctionHouse => "Auction House",
-            GameLocation.Dungeons => "Dungeons",
-            GameLocation.Castle => "Royal Castle",
-            GameLocation.Dormitory => "Dormitory",
-            GameLocation.AnchorRoad => "Anchor Road",
-            GameLocation.Temple => "Temple",
-            GameLocation.BobsBeer => "Bob's Beer",
-            GameLocation.Healer => "Healer",
-            GameLocation.MagicShop => "Magic Shop",
-            GameLocation.Master => "Level Master",
-            _ => location.ToString()
-        };
+        return Loc.Get($"location.name.{location}");
     }
 
     /// <summary>

@@ -163,6 +163,99 @@ public static class WildernessData
 
     public static WildernessRegion? GetRegionByKey(string key) =>
         Array.Find(Regions, r => r.DirectionKey.Equals(key, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// v0.61.2 (player report: "Feral Cat takes flight, becoming harder to hit!"):
+    /// Wilderness combat called MonsterGenerator.GenerateMonster which picks a
+    /// random dungeon family/tier (Celestial Angel, Construct Golem, etc.) and
+    /// then overwrote only the Name field -- so the underlying abilities, family,
+    /// MonsterClass, color, and combat dialogue all leaked through from whatever
+    /// random monster was generated. A Feral Cat could use Angel's Flight ability.
+    ///
+    /// This lookup table provides a deterministic family/class/abilities profile
+    /// for every named wilderness monster so the generated creature actually
+    /// matches its name. Names not in the table fall back to a plain Beast with
+    /// no special abilities. Ability strings must match values in the
+    /// MonsterAbilities.AbilityType enum since combat parses them with Enum.TryParse.
+    /// </summary>
+    public static readonly Dictionary<string, WildernessMonsterProfile> MonsterProfiles = new(StringComparer.OrdinalIgnoreCase)
+    {
+        // Forest
+        { "Timber Wolf",      new() { Family = "Beast",      MonsterClass = MonsterClass.Beast,    AttackType = "physical", Color = "gray",         CanSpeak = false, Abilities = new() { "BleedingWound" } } },
+        { "Forest Spider",    new() { Family = "Insectoid",  MonsterClass = MonsterClass.Beast,    AttackType = "poison",   Color = "dark_green",   CanSpeak = false, Abilities = new() { "VenomousBite" } } },
+        { "Wild Boar",        new() { Family = "Beast",      MonsterClass = MonsterClass.Beast,    AttackType = "physical", Color = "yellow",       CanSpeak = false, Abilities = new() { "CrushingBlow" } } },
+        { "Bandit Scout",     new() { Family = "Humanoid",   MonsterClass = MonsterClass.Humanoid, AttackType = "physical", Color = "yellow",       CanSpeak = true,  Abilities = new() { "Backstab" } } },
+        { "Black Bear",       new() { Family = "Beast",      MonsterClass = MonsterClass.Beast,    AttackType = "physical", Color = "dark_gray",    CanSpeak = false, Abilities = new() { "CrushingBlow" } } },
+        { "Giant Wasp",       new() { Family = "Insectoid",  MonsterClass = MonsterClass.Beast,    AttackType = "poison",   Color = "yellow",       CanSpeak = false, Abilities = new() { "Poison" } } },
+        { "Feral Cat",        new() { Family = "Beast",      MonsterClass = MonsterClass.Beast,    AttackType = "physical", Color = "gray",         CanSpeak = false, Abilities = new() { } } },
+        { "Forest Troll",     new() { Family = "Giant",      MonsterClass = MonsterClass.Beast,    AttackType = "physical", Color = "green",        CanSpeak = true,  Abilities = new() { "Regeneration" } } },
+
+        // Mountains
+        { "Mountain Lion",    new() { Family = "Beast",      MonsterClass = MonsterClass.Beast,    AttackType = "physical", Color = "yellow",       CanSpeak = false, Abilities = new() { "BleedingWound" } } },
+        { "Stone Golem",      new() { Family = "Construct",  MonsterClass = MonsterClass.Construct,AttackType = "physical", Color = "gray",         CanSpeak = false, Abilities = new() { "Stoneskin", "CrushingBlow" } } },
+        { "Wyvern Hatchling", new() { Family = "Draconic",   MonsterClass = MonsterClass.Dragon,   AttackType = "fire",     Color = "red",          CanSpeak = false, Abilities = new() { "FireBreath" } } },
+        { "Hill Giant",       new() { Family = "Giant",      MonsterClass = MonsterClass.Humanoid, AttackType = "physical", Color = "bright_yellow",CanSpeak = true,  Abilities = new() { "CrushingBlow", "Boulder" } } },
+        { "Rock Basilisk",    new() { Family = "Beast",      MonsterClass = MonsterClass.Beast,    AttackType = "physical", Color = "gray",         CanSpeak = false, Abilities = new() { "PetrifyingGaze" } } },
+        { "Mountain Bandit",  new() { Family = "Humanoid",   MonsterClass = MonsterClass.Humanoid, AttackType = "physical", Color = "yellow",       CanSpeak = true,  Abilities = new() { "Backstab" } } },
+        { "Cliff Raptor",     new() { Family = "Beast",      MonsterClass = MonsterClass.Beast,    AttackType = "physical", Color = "bright_yellow",CanSpeak = false, Abilities = new() { "Multiattack" } } },
+        { "Ice Troll",        new() { Family = "Giant",      MonsterClass = MonsterClass.Beast,    AttackType = "cold",     Color = "cyan",         CanSpeak = true,  Abilities = new() { "Regeneration", "FrostBreath" } } },
+
+        // Swamp
+        { "Bog Lurker",       new() { Family = "Aquatic",    MonsterClass = MonsterClass.Beast,    AttackType = "physical", Color = "dark_green",   CanSpeak = false, Abilities = new() { "TentacleGrab" } } },
+        { "Swamp Hag",        new() { Family = "Fey",        MonsterClass = MonsterClass.Plant,    AttackType = "magic",    Color = "magenta",      CanSpeak = true,  Abilities = new() { "Curse", "Spellcasting" } } },
+        { "Poison Toad",      new() { Family = "Beast",      MonsterClass = MonsterClass.Beast,    AttackType = "poison",   Color = "green",        CanSpeak = false, Abilities = new() { "Poison" } } },
+        { "Mire Zombie",      new() { Family = "Undead",     MonsterClass = MonsterClass.Undead,   AttackType = "necrotic", Color = "dark_green",   CanSpeak = false, Abilities = new() { "BleedingWound" } } },
+        { "Giant Leech",      new() { Family = "Insectoid",  MonsterClass = MonsterClass.Beast,    AttackType = "physical", Color = "red",          CanSpeak = false, Abilities = new() { "LifeDrain" } } },
+        { "Marsh Wraith",     new() { Family = "Undead",     MonsterClass = MonsterClass.Undead,   AttackType = "necrotic", Color = "blue",         CanSpeak = true,  Abilities = new() { "LifeDrain", "Incorporeal" } } },
+        { "Crocodile",        new() { Family = "Aquatic",    MonsterClass = MonsterClass.Beast,    AttackType = "physical", Color = "dark_green",   CanSpeak = false, Abilities = new() { "CrushingBlow", "BleedingWound" } } },
+        { "Fungal Horror",    new() { Family = "Aberration", MonsterClass = MonsterClass.Plant,    AttackType = "poison",   Color = "magenta",      CanSpeak = false, Abilities = new() { "PoisonCloud" } } },
+
+        // Coast
+        { "Sea Serpent",      new() { Family = "Aquatic",    MonsterClass = MonsterClass.Beast,    AttackType = "physical", Color = "blue",         CanSpeak = false, Abilities = new() { "CrushingBlow", "VenomousBite" } } },
+        { "Shore Pirate",     new() { Family = "Humanoid",   MonsterClass = MonsterClass.Humanoid, AttackType = "physical", Color = "yellow",       CanSpeak = true,  Abilities = new() { "Backstab" } } },
+        { "Giant Crab",       new() { Family = "Aquatic",    MonsterClass = MonsterClass.Beast,    AttackType = "physical", Color = "red",          CanSpeak = false, Abilities = new() { "ArmorHarden" } } },
+        { "Siren",            new() { Family = "Fey",        MonsterClass = MonsterClass.Plant,    AttackType = "magic",    Color = "cyan",         CanSpeak = true,  Abilities = new() { "Charm" } } },
+        { "Drowned Sailor",   new() { Family = "Undead",     MonsterClass = MonsterClass.Undead,   AttackType = "necrotic", Color = "blue",         CanSpeak = true,  Abilities = new() { "LifeDrain" } } },
+        { "Reef Shark",       new() { Family = "Aquatic",    MonsterClass = MonsterClass.Beast,    AttackType = "physical", Color = "gray",         CanSpeak = false, Abilities = new() { "BleedingWound", "Multiattack" } } },
+        { "Kraken Spawn",     new() { Family = "Aquatic",    MonsterClass = MonsterClass.Beast,    AttackType = "physical", Color = "bright_blue",  CanSpeak = false, Abilities = new() { "TentacleGrab", "InkCloud" } } },
+        { "Storm Elemental",  new() { Family = "Elemental",  MonsterClass = MonsterClass.Elemental,AttackType = "lightning",Color = "bright_cyan",  CanSpeak = false, Abilities = new() { "Lightning" } } },
+    };
+
+    /// <summary>
+    /// Returns the wilderness profile for a monster name, or a plain Beast
+    /// default if the name isn't in the table. Used by WildernessLocation
+    /// after MonsterGenerator to rewrite family-specific fields so the
+    /// creature behaves like its name implies.
+    /// </summary>
+    public static WildernessMonsterProfile GetMonsterProfile(string name)
+    {
+        if (MonsterProfiles.TryGetValue(name ?? "", out var profile))
+            return profile;
+        // Default: plain physical Beast with no special abilities.
+        return new WildernessMonsterProfile
+        {
+            Family = "Beast",
+            MonsterClass = MonsterClass.Beast,
+            AttackType = "physical",
+            Color = "gray",
+            CanSpeak = false,
+            Abilities = new List<string>()
+        };
+    }
+}
+
+/// <summary>
+/// v0.61.2: per-name profile used to rewrite the random dungeon-monster
+/// fields from MonsterGenerator into a wilderness-appropriate creature.
+/// </summary>
+public class WildernessMonsterProfile
+{
+    public string Family { get; set; } = "Beast";
+    public MonsterClass MonsterClass { get; set; } = MonsterClass.Beast;
+    public string AttackType { get; set; } = "physical";
+    public string Color { get; set; } = "gray";
+    public bool CanSpeak { get; set; } = false;
+    public List<string> Abilities { get; set; } = new();
 }
 
 public class WildernessRegion

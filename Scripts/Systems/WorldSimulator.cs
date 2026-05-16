@@ -1769,23 +1769,41 @@ public class WorldSimulator
             activities.Add(("dungeon", 0.15));
         }
 
-        // Shopping - if has gold
+        // v0.61.3 progression-weight rebalance. First telemetry pass showed
+        // shop/train/levelup at <1% of all actions while move/inn/team_recruit
+        // dominated at 50%+. NPCs were wandering instead of progressing.
+        // Bumped shop, train, and levelup weights so when an NPC has the
+        // resources for progression actions, they actually take them.
+
+        // Shopping - if has gold. Was 0.20; bumped to 0.30. Greed bonus
+        // separately so the merchant-soul NPCs shop more aggressively.
         if (npc.Gold > 100)
         {
-            activities.Add(("shop", 0.20));
+            float shopWeight = 0.30f;
+            if (npc.Brain?.Personality != null)
+                shopWeight += npc.Brain.Personality.Greed * 0.10f;
+            activities.Add(("shop", shopWeight));
         }
 
-        // Training at gym
+        // Training at gym. Was 0.15; bumped to 0.25. Higher Ambition NPCs
+        // train more (they're trying to climb), Courage doesn't really matter
+        // for gym work.
         if (npc.Gold > 50)
         {
-            activities.Add(("train", 0.15));
+            float trainWeight = 0.25f;
+            if (npc.Brain?.Personality != null)
+                trainWeight += npc.Brain.Personality.Ambition * 0.15f;
+            activities.Add(("train", trainWeight));
         }
 
-        // Visit level master if eligible
+        // Visit level master if eligible. Was 0.30; bumped to 0.80 because if
+        // an NPC has enough XP to level up, they really should do it. Sitting
+        // on unspent XP is the kind of bad-decision pattern the heuristic was
+        // making before this rebalance.
         long expForNextLevel = GameConfig.GetExperienceForLevel(npc.Level + 1);
         if (npc.Experience >= expForNextLevel && npc.Level < 100)
         {
-            activities.Add(("levelup", 0.30));
+            activities.Add(("levelup", 0.80));
         }
 
         // Heal if wounded
@@ -1794,8 +1812,11 @@ public class WorldSimulator
             activities.Add(("heal", 0.35));
         }
 
-        // Socialize/move around town
-        activities.Add(("move", 0.15));
+        // Socialize/move around town. Was 0.15; dropped to 0.05 because the
+        // first telemetry showed "move" was the #1 action (17% of all events)
+        // and it produces nothing -- pure wandering. Still kept as a fallback
+        // so NPCs can drift between locations naturally.
+        activities.Add(("move", 0.05));
 
         // Romance/Love Street - based on personality
         if (npc.Gold > 500 && npc.Brain?.Personality != null)
@@ -1910,9 +1931,15 @@ public class WorldSimulator
             activities.Add(("settlement", settlementWeight));
         }
 
-        // Inn - rest, socialize, drink, gossip (main social hub)
+        // Inn - rest, socialize, drink, gossip (main social hub).
+        // v0.61.3: dropped base 0.15 -> 0.08. Inn was the #2 action overall
+        // (17% of all events) in the first telemetry pass, drowning out
+        // progression actions. Still has sociability and time-of-day bonuses
+        // that let it spike when contextually appropriate (evening, sociable
+        // NPC, wounded), so the inn stays the natural social hub without
+        // monopolising the action picker.
         {
-            float innWeight = 0.15f; // Strong base — the Inn is where everyone gathers
+            float innWeight = 0.08f;
             // Wounded NPCs rest at the inn
             if (npc.HP < npc.MaxHP * 0.7)
                 innWeight += 0.10f;
@@ -1926,14 +1953,17 @@ public class WorldSimulator
             activities.Add(("inn", innWeight));
         }
 
-        // Team activities
+        // Team activities. v0.61.3: dropped team_recruit weights since the
+        // first telemetry pass showed 1729 recruit attempts producing very
+        // few actual recruits -- NPCs were spending too many ticks shopping
+        // for teammates that weren't there. Halved both rates.
         if (string.IsNullOrEmpty(npc.Team))
         {
-            // Not in a team - consider joining or forming one
-            // Always offer the option; personality check happens inside formation methods
-            float teamWeight = 0.25f;
+            // Not in a team - consider joining or forming one. Was 0.25 base
+            // / 0.35 gang-affinity; now 0.12 / 0.18.
+            float teamWeight = 0.12f;
             if (npc.Brain?.Personality?.IsLikelyToJoinGang() == true)
-                teamWeight = 0.35f; // Gang-oriented NPCs try harder
+                teamWeight = 0.18f;
             activities.Add(("team_recruit", teamWeight));
         }
         else
@@ -1943,7 +1973,9 @@ public class WorldSimulator
             {
                 activities.Add(("team_dungeon", 0.12)); // Team dungeon run
             }
-            activities.Add(("team_recruit", 0.15)); // Recruit more members
+            // Was 0.15; now 0.06 — once in a team, ongoing recruiting is a
+            // background activity, not a primary one.
+            activities.Add(("team_recruit", 0.06));
         }
 
         if (activities.Count == 0) return;
@@ -1979,101 +2011,111 @@ public class WorldSimulator
         switch (selectedAction)
         {
             case "dungeon":
+                // NPCExploreDungeon has its own internal telemetry hook with
+                // richer outcome strings (won / died / fled / stalemate / aborted_*)
+                // so we don't double-log it through TelemetryWrap.
                 NPCExploreDungeon(npc);
-                npc.CurrentActivity = "exploring the dungeon depths";
-                npc.EmotionalState?.AddEmotion(EmotionType.Confidence, 0.5f, 90);
-                npc.EmotionalState?.AddEmotion(EmotionType.Fear, 0.3f, 60);
+                // v0.61.2: only stamp the dungeon-flavor activity / emotions if
+                // the NPC actually went. Self-preservation gates in
+                // NPCExploreDungeon can redirect them to Healer or Main Street
+                // and set a different activity; don't overwrite that.
+                if (npc.CurrentLocation == "Dungeon")
+                {
+                    npc.CurrentActivity = "exploring the dungeon depths";
+                    npc.EmotionalState?.AddEmotion(EmotionType.Confidence, 0.5f, 90);
+                    npc.EmotionalState?.AddEmotion(EmotionType.Fear, 0.3f, 60);
+                }
                 break;
             case "shop":
-                NPCGoShopping(npc);
+                TelemetryWrap(npc, "shop", () => NPCGoShopping(npc));
                 npc.CurrentActivity = npc.CurrentLocation == "Weapon Shop"
                     ? "examining a blade on the rack"
                     : "browsing the armor on display";
                 npc.EmotionalState?.AddEmotion(EmotionType.Greed, 0.3f, 60);
                 break;
             case "train":
-                NPCTrainAtGym(npc);
+                TelemetryWrap(npc, "train", () => NPCTrainAtGym(npc));
                 npc.CurrentActivity = "training with the practice dummies";
                 npc.EmotionalState?.AddEmotion(EmotionType.Confidence, 0.4f, 90);
                 npc.EmotionalState?.AddEmotion(EmotionType.Pride, 0.3f, 60);
                 break;
             case "levelup":
-                NPCVisitMaster(npc);
+                TelemetryWrap(npc, "levelup", () => NPCVisitMaster(npc));
                 npc.CurrentActivity = "consulting with the Level Master";
                 npc.EmotionalState?.AddEmotion(EmotionType.Pride, 0.6f, 120);
                 npc.EmotionalState?.AddEmotion(EmotionType.Joy, 0.5f, 120);
                 npc.EmotionalState?.AddEmotion(EmotionType.Hope, 0.4f, 90);
                 break;
             case "heal":
-                NPCVisitHealer(npc);
+                TelemetryWrap(npc, "heal", () => NPCVisitHealer(npc));
                 npc.CurrentActivity = "browsing the healing potions";
                 npc.EmotionalState?.AddEmotion(EmotionType.Hope, 0.4f, 60);
                 npc.EmotionalState?.AddEmotion(EmotionType.Peace, 0.3f, 90);
                 break;
             case "move":
-                MoveNPCToRandomLocation(npc);
+                TelemetryWrap(npc, "move", () => MoveNPCToRandomLocation(npc));
                 npc.CurrentActivity = "passing through";
                 break;
             case "team_recruit":
-                NPCTeamRecruitment(npc);
+                TelemetryWrap(npc, "team_recruit", () => NPCTeamRecruitment(npc));
                 npc.CurrentActivity = "looking for recruits";
                 npc.EmotionalState?.AddEmotion(EmotionType.Hope, 0.3f, 60);
                 break;
             case "team_dungeon":
-                NPCTeamDungeonRun(npc);
+                TelemetryWrap(npc, "team_dungeon", () => NPCTeamDungeonRun(npc));
                 npc.CurrentActivity = "rallying the team for a dungeon run";
                 npc.EmotionalState?.AddEmotion(EmotionType.Confidence, 0.5f, 90);
                 npc.EmotionalState?.AddEmotion(EmotionType.Confidence, 0.4f, 90);
                 break;
             case "love_street":
-                NPCVisitLoveStreet(npc);
+                TelemetryWrap(npc, "love_street", () => NPCVisitLoveStreet(npc));
                 npc.CurrentActivity = "enjoying the evening company";
                 npc.EmotionalState?.AddEmotion(EmotionType.Joy, 0.5f, 120);
                 npc.EmotionalState?.AddEmotion(EmotionType.Peace, 0.3f, 90);
                 break;
             case "temple":
-                NPCVisitTemple(npc);
+                TelemetryWrap(npc, "temple", () => NPCVisitTemple(npc));
                 npc.CurrentActivity = "praying quietly";
                 npc.EmotionalState?.AddEmotion(EmotionType.Peace, 0.5f, 120);
                 npc.EmotionalState?.AddEmotion(EmotionType.Hope, 0.4f, 90);
                 break;
             case "bank":
-                NPCVisitBank(npc);
+                TelemetryWrap(npc, "bank", () => NPCVisitBank(npc));
                 npc.CurrentActivity = "counting coins at the counter";
                 npc.EmotionalState?.AddEmotion(EmotionType.Greed, 0.3f, 60);
                 break;
             case "marketplace":
-                NPCVisitMarketplace(npc);
+                TelemetryWrap(npc, "marketplace", () => NPCVisitMarketplace(npc));
                 npc.CurrentActivity = "haggling with a merchant";
                 npc.EmotionalState?.AddEmotion(EmotionType.Greed, 0.4f, 60);
                 npc.EmotionalState?.AddEmotion(EmotionType.Joy, 0.2f, 60);
                 break;
             case "castle":
-                NPCVisitCastle(npc);
+                TelemetryWrap(npc, "castle", () => NPCVisitCastle(npc));
                 npc.CurrentActivity = "attending to court business";
                 npc.EmotionalState?.AddEmotion(EmotionType.Pride, 0.4f, 90);
                 npc.EmotionalState?.AddEmotion(EmotionType.Confidence, 0.3f, 60);
                 break;
             case "go_home":
-                NPCGoHome(npc);
+                TelemetryWrap(npc, "go_home", () => NPCGoHome(npc));
                 npc.CurrentActivity = "heading home for the day";
                 npc.EmotionalState?.AddEmotion(EmotionType.Peace, 0.4f, 120);
                 npc.EmotionalState?.AddEmotion(EmotionType.Joy, 0.3f, 90);
                 break;
             case "dark_alley":
-                NPCVisitDarkAlley(npc);
+                TelemetryWrap(npc, "dark_alley", () => NPCVisitDarkAlley(npc));
                 npc.CurrentActivity = "lurking in the shadows";
                 npc.EmotionalState?.AddEmotion(EmotionType.Greed, 0.4f, 90);
                 npc.EmotionalState?.AddEmotion(EmotionType.Confidence, 0.3f, 60);
                 break;
             case "inn":
-                NPCVisitInn(npc);
+                TelemetryWrap(npc, "inn", () => NPCVisitInn(npc));
                 npc.CurrentActivity = "having a drink at the bar";
                 npc.EmotionalState?.AddEmotion(EmotionType.Joy, 0.3f, 60);
                 npc.EmotionalState?.AddEmotion(EmotionType.Peace, 0.3f, 90);
                 break;
             case "settlement":
-                npc.CurrentLocation = "Settlement";
+                TelemetryWrap(npc, "settlement", () => { npc.CurrentLocation = "Settlement"; });
                 npc.CurrentActivity = "helping build the settlement";
                 npc.EmotionalState?.AddEmotion(EmotionType.Joy, 0.3f, 60);
                 npc.EmotionalState?.AddEmotion(EmotionType.Hope, 0.3f, 90);
@@ -2743,14 +2785,69 @@ public class WorldSimulator
         if (string.IsNullOrEmpty(npc.Team)) return;
         if (npc.IsInConversation) return;
 
-        // Get all alive team members (skip any engaged with players)
+        // v0.61.2 Phase 1 telemetry: capture leader state for log row.
+        string locationBefore = npc.CurrentLocation;
+        long hpBefore = npc.HP;
+        long goldBefore = npc.Gold;
+        long xpBefore = npc.Experience;
+        void LogTeamDungeonDecision(string outcome)
+        {
+            SqlBackend?.LogNPCDecision(
+                npc.Name2 ?? npc.Name1 ?? "(unknown)",
+                (int)npc.Level,
+                npc.Class.ToString(),
+                "team_dungeon",
+                locationBefore,
+                npc.CurrentLocation,
+                outcome,
+                npc.Gold - goldBefore,
+                npc.Experience - xpBefore,
+                hpBefore,
+                npc.HP,
+                false);
+        }
+
+        // v0.61.3 self-preservation gates for team_dungeon, mirroring the
+        // v0.61.2 pattern applied to NPCExploreDungeon. The first telemetry
+        // pass (13K rows / 13 hours) showed team_dungeon dying at 71% with
+        // ZERO successful flees vs solo dungeon at 10.6% death and 84.8%
+        // successful flees. The asymmetry was protection scope: the v0.61.2
+        // fix only touched NPCExploreDungeon. Team_dungeon kept the pre-fix
+        // 25% flee threshold + "must take 2 rounds of damage first" gate.
+        // This block applies the same gates the solo path now uses.
+        var leaderPersonality = npc.Brain?.Personality;
+
+        // Gate 1: wounded leader doesn't lead a dungeon run.
+        if (npc.HP < npc.MaxHP * 0.7)
+        {
+            npc.UpdateLocation("Healer");
+            npc.CurrentActivity = "tending to wounds before any expedition";
+            LogTeamDungeonDecision("aborted_wounded");
+            return;
+        }
+
+        // Gate 2: cautious leaders (low Courage AND low Ambition) don't
+        // rally the team for dungeon runs. 90% abort rate; the 10% slip-
+        // through preserves the rare bad-judgment case for narrative color.
+        if (leaderPersonality != null && leaderPersonality.Courage < 0.3f && leaderPersonality.Ambition < 0.3f
+            && random.Next(100) < 90)
+        {
+            npc.UpdateLocation("Inn");
+            npc.CurrentActivity = "talking up a dungeon run that never quite happens";
+            LogTeamDungeonDecision("aborted_cautious");
+            return;
+        }
+
+        // Get all alive team members (skip any engaged with players or below
+        // 50% HP). Same 50% threshold the existing code used, just clearer.
         var teamMembers = npcs
             .Where(n => n.Team == npc.Team && n.IsAlive && n.HP > n.MaxHP * 0.5 && !n.IsInConversation)
             .ToList();
 
         if (teamMembers.Count < 2)
         {
-            // Not enough healthy teammates, do solo dungeon run
+            // Not enough healthy teammates, do solo dungeon run. Solo path has
+            // its own telemetry hook so we don't log a row here.
             NPCExploreDungeon(npc);
             return;
         }
@@ -2761,10 +2858,18 @@ public class WorldSimulator
             member.UpdateLocation("Dungeon");
         }
 
-        // Determine dungeon level based on average team level
+        // Determine dungeon level. Old roll was avgLevel + (-2 to +3) so a
+        // team could end up on a +3 floor where 2-4 monsters of that level
+        // routinely wipe them. New baseline: avgLevel - 2 to avgLevel. Brave
+        // and ambitious leader (>0.7 on both stats) push one floor each.
         int avgLevel = (int)teamMembers.Average(m => m.Level);
-        int dungeonLevel = Math.Max(1, avgLevel + random.Next(-2, 4));
-        dungeonLevel = Math.Min(dungeonLevel, 100);
+        int dungeonLevel = avgLevel - 2 + random.Next(0, 3);
+        if (leaderPersonality != null)
+        {
+            if (leaderPersonality.Courage > 0.7f) dungeonLevel += random.Next(0, 2);
+            if (leaderPersonality.Ambition > 0.7f) dungeonLevel += random.Next(0, 2);
+        }
+        dungeonLevel = Math.Clamp(dungeonLevel, 1, 100);
 
         // Generate monster group (teams fight groups of monsters)
         int monsterCount = Math.Min(teamMembers.Count, random.Next(2, 5));
@@ -2809,6 +2914,7 @@ public class WorldSimulator
                     member.UpdateLocation(member.HP < member.MaxHP * 0.5 ? "Healer" : "Inn");
                 }
             }
+            LogTeamDungeonDecision("won");
         }
         else
         {
@@ -2828,6 +2934,9 @@ public class WorldSimulator
             {
                 survivor.UpdateLocation("Main Street");
             }
+            // Outcome from the leader's perspective: if leader died, log "died";
+            // if leader survived but team lost, log "fled".
+            LogTeamDungeonDecision(npc.IsAlive ? "fled" : "died");
         }
     }
 
@@ -2845,21 +2954,35 @@ public class WorldSimulator
         {
             rounds++;
 
-            // Team members flee when badly wounded (below 25% HP)
-            if (rounds > 2)
+            // v0.61.3: flee gate rewritten to match the v0.61.2 solo path.
+            // Old: HP < 25% AND rounds > 2. With 2-4 monsters hitting the team
+            // each round, 25% HP was usually one hit from dead by the time the
+            // gate triggered, AND the 2-round delay meant the team ate 4-8
+            // monster swings before anyone considered fleeing. Telemetry showed
+            // this produced a 71% death rate with ZERO successful flees.
+            // New: HP < 50% baseline (Courage-scaled like solo: 60% for low-
+            // Courage members, 35% for brave), no rounds gate, base flee
+            // chance bumped 55%->70% so successful flees actually stick.
+            foreach (var member in team.Where(m => m.IsAlive).ToList())
             {
-                foreach (var member in team.Where(m => m.IsAlive && m.HP < m.MaxHP * 0.25).ToList())
+                float fleeThreshold = 0.50f;
+                var p = member.Brain?.Personality;
+                if (p != null)
                 {
-                    int fleeChance = 55 + (int)(member.Agility / 3);
-                    if (random.Next(100) < Math.Min(85, fleeChance))
-                    {
-                        // Flee — remove from combat but keep alive
-                        member.UpdateLocation("Healer");
-                    }
+                    if (p.Courage < 0.3f) fleeThreshold = 0.60f;
+                    else if (p.Courage > 0.7f) fleeThreshold = 0.35f;
                 }
-                // If all team members fled, end combat
-                if (!team.Any(m => m.IsAlive && m.Location == "Dungeon")) break;
+                if (member.HP >= member.MaxHP * fleeThreshold) continue;
+
+                int fleeChance = 70 + (int)(member.Agility / 3);
+                if (random.Next(100) < Math.Min(95, fleeChance))
+                {
+                    // Flee — remove from combat but keep alive
+                    member.UpdateLocation("Healer");
+                }
             }
+            // If all team members fled, end combat
+            if (!team.Any(m => m.IsAlive && m.Location == "Dungeon")) break;
 
             // Team attacks monsters
             foreach (var member in team.Where(m => m.IsAlive && m.Location == "Dungeon"))
@@ -2900,6 +3023,89 @@ public class WorldSimulator
     }
 
     /// <summary>
+    /// v0.61.2 Phase 1 NPC AI telemetry: wraps a dispatcher action call with
+    /// before/after state capture, derives a simple outcome string from the
+    /// state delta, and logs a row to npc_decision_log. Used for every action
+    /// type except "dungeon" (NPCExploreDungeon has its own internal logging
+    /// with richer outcome strings like "won" / "fled" / "stalemate" that the
+    /// generic delta-based classifier can't produce). One row per NPC action
+    /// per tick, enough resolution to compute cohort baselines (survival rate,
+    /// gold accumulation, action distribution) for AI-vs-heuristic comparison
+    /// once the AI subset lands.
+    /// </summary>
+    private void TelemetryWrap(NPC npc, string action, Action runAction)
+    {
+        string locationBefore = npc.CurrentLocation;
+        long hpBefore = npc.HP;
+        long goldBefore = npc.Gold;
+        long xpBefore = npc.Experience;
+        long levelBefore = npc.Level;
+
+        try
+        {
+            runAction();
+        }
+        catch (Exception ex)
+        {
+            // Never let a telemetry wrapper swallow exceptions; rethrow so the
+            // world-sim catch in SimulateTick handles it the same way it would
+            // without the wrapper. But log the action so we can correlate.
+            DebugLogger.Instance.LogError("WORLDSIM", $"NPC action '{action}' threw for {npc.Name2 ?? npc.Name1}: {ex.Message}");
+            // Still try to log the failed-action row before rethrowing.
+            try { SqlBackend?.LogNPCDecision(
+                npc.Name2 ?? npc.Name1 ?? "(unknown)",
+                (int)levelBefore,
+                npc.Class.ToString(),
+                action,
+                locationBefore,
+                npc.CurrentLocation,
+                "exception",
+                npc.Gold - goldBefore,
+                npc.Experience - xpBefore,
+                hpBefore,
+                npc.HP,
+                false); } catch { }
+            throw;
+        }
+
+        // Derive outcome from state delta. Priority order: died > leveled_up >
+        // took_damage > healed > earned > spent > completed. Single classifier
+        // per row so SQL rollups stay simple. NPCs that aborted an action via
+        // an internal early-return get an "abort_*" outcome from the action
+        // method itself if it surfaces it; otherwise the generic classifier
+        // calls them "completed" since the dispatcher can't see the difference.
+        string outcome;
+        if (!npc.IsAlive)
+            outcome = "died";
+        else if (npc.Level > levelBefore)
+            outcome = "leveled_up";
+        else if (npc.HP < hpBefore)
+            outcome = "took_damage";
+        else if (npc.HP > hpBefore)
+            outcome = "healed";
+        else if (npc.Gold > goldBefore)
+            outcome = "earned";
+        else if (npc.Gold < goldBefore)
+            outcome = "spent";
+        else
+            outcome = "completed";
+
+        SqlBackend?.LogNPCDecision(
+            npc.Name2 ?? npc.Name1 ?? "(unknown)",
+            (int)levelBefore,
+            npc.Class.ToString(),
+            action,
+            locationBefore,
+            npc.CurrentLocation,
+            outcome,
+            npc.Gold - goldBefore,
+            npc.Experience - xpBefore,
+            hpBefore,
+            npc.HP,
+            false);
+    }
+
+    /// <summary>
     /// NPC explores the dungeon and fights monsters
     /// </summary>
     private void NPCExploreDungeon(NPC npc)
@@ -2907,17 +3113,78 @@ public class WorldSimulator
         // Don't send NPCs on dungeon runs if they're engaged with a player
         if (npc.IsInConversation) return;
 
+        // v0.61.2 Phase 1 NPC AI telemetry: capture before-state once at entry
+        // so every outcome path can log a (before, after, outcome) row to
+        // npc_decision_log. Local helper centralises the write. is_ai_driven
+        // will become real in Phase 2 once Character.IsAIDriven lands; for now
+        // every NPC is heuristic so we log false.
+        string locationBefore = npc.CurrentLocation;
+        long hpBefore = npc.HP;
+        long goldBefore = npc.Gold;
+        long xpBefore = npc.Experience;
+        void LogDungeonDecision(string outcome)
+        {
+            SqlBackend?.LogNPCDecision(
+                npc.Name2 ?? npc.Name1 ?? "(unknown)",
+                (int)npc.Level,
+                npc.Class.ToString(),
+                "dungeon",
+                locationBefore,
+                npc.CurrentLocation,
+                outcome,
+                npc.Gold - goldBefore,
+                npc.Experience - xpBefore,
+                hpBefore,
+                npc.HP,
+                false);
+        }
+
+        // v0.61.2 self-preservation gates. Pre-fix the world feed was full of
+        // "NPC slain by Golem at the Dungeon" entries because nothing here
+        // checked whether an NPC should be doing this run at all. Three gates
+        // now refuse the trip when the survival math is bad. Dispatcher checks
+        // npc.CurrentLocation after this returns -- if we redirected the NPC,
+        // the dungeon-flavor activity message won't fire.
+        var personality = npc.Brain?.Personality;
+
+        // Gate 1: wounded NPCs go to the healer, not the dungeon. 70% HP floor
+        // because a fresh fight can easily eat 30% in the first round or two.
+        if (npc.HP < npc.MaxHP * 0.7)
+        {
+            npc.UpdateLocation("Healer");
+            npc.CurrentActivity = "tending to wounds";
+            LogDungeonDecision("aborted_wounded");
+            return;
+        }
+
+        // Gate 2: cautious NPCs (low Courage AND low Ambition) are not
+        // adventurers and shouldn't act like ones. 90% chance to abort and
+        // hang around town instead. The 10% slip-through preserves the
+        // occasional bad-decision-by-a-coward edge case for narrative color.
+        if (personality != null && personality.Courage < 0.3f && personality.Ambition < 0.3f
+            && random.Next(100) < 90)
+        {
+            npc.UpdateLocation("Main Street");
+            npc.CurrentActivity = "lingering near the safety of the gates";
+            LogDungeonDecision("aborted_cautious");
+            return;
+        }
+
         npc.UpdateLocation("Dungeon");
 
-        // Determine dungeon level based on NPC level
-        int dungeonLevel = Math.Max(1, npc.Level + random.Next(-3, 4));
-        // Ambitious/courageous NPCs push slightly deeper
-        if (npc.Brain?.Personality != null &&
-            (npc.Brain.Personality.Courage > 0.7f || npc.Brain.Personality.Ambition > 0.7f))
+        // Determine dungeon level based on NPC level. Old roll was npc.Level
+        // +/- 3 (so a Lv 20 NPC could end up fighting a Lv 23 monster) plus
+        // +0..3 again for brave/ambitious NPCs, meaning a +6 floor was on the
+        // table for any NPC with one high personality stat. New baseline rolls
+        // EASIER floors (Lv-2 to Lv) for cautious play; Courage and Ambition
+        // each push +0..1, capped at 100.
+        int dungeonLevel = npc.Level - 2 + random.Next(0, 3); // npc.Level - 2 to npc.Level
+        if (personality != null)
         {
-            dungeonLevel += random.Next(0, 3);
+            if (personality.Courage > 0.7f) dungeonLevel += random.Next(0, 2);
+            if (personality.Ambition > 0.7f) dungeonLevel += random.Next(0, 2);
         }
-        dungeonLevel = Math.Min(dungeonLevel, 100);
+        dungeonLevel = Math.Clamp(dungeonLevel, 1, 100);
 
         // Generate a monster
         var monster = MonsterGenerator.GenerateMonster(dungeonLevel);
@@ -2927,16 +3194,27 @@ public class WorldSimulator
         bool npcWon = false;
 
         bool fled = false;
+        // v0.61.2: flee threshold lifted from 30% to 50% baseline. Old code
+        // also gated flee behind "rounds > 2" so an NPC took two rounds of
+        // hits before considering it -- against a Golem (high STR) two rounds
+        // was often a one-way trip. New: no rounds gate. Personality nudges
+        // the threshold: cowardly NPCs (Courage < 0.3) flee at 60%, brave
+        // NPCs (Courage > 0.7) hold to 35%.
+        float fleeThreshold = 0.50f;
+        if (personality != null)
+        {
+            if (personality.Courage < 0.3f) fleeThreshold = 0.60f;
+            else if (personality.Courage > 0.7f) fleeThreshold = 0.35f;
+        }
         while (npc.IsAlive && monster.IsAlive && rounds < 50)
         {
             rounds++;
 
-            // NPC flees when HP drops below 30% (smarter survival behavior)
-            if (npc.HP < npc.MaxHP * 0.3 && rounds > 2)
+            if (npc.HP < npc.MaxHP * fleeThreshold)
             {
-                // Higher AGI = better flee chance; base 60%
-                int fleeChance = 60 + (int)(npc.Agility / 3);
-                if (random.Next(100) < Math.Min(90, fleeChance))
+                // Higher AGI = better flee chance; base 70%.
+                int fleeChance = 70 + (int)(npc.Agility / 3);
+                if (random.Next(100) < Math.Min(95, fleeChance))
                 {
                     fled = true;
                     break;
@@ -2993,16 +3271,25 @@ public class WorldSimulator
             npc.UpdateLocation(npc.HP < npc.MaxHP * 0.5
                 ? "Healer"  // Wounded NPCs head to the healer
                 : returnLocations[random.Next(returnLocations.Length)]);
+            LogDungeonDecision("won");
         }
         else if (!npc.IsAlive)
         {
             // NPC died in solo dungeon crawl — permadeath roll
             MarkNPCDead(npc, GameConfig.PermadeathChanceDungeonSolo, monster.Name, "the Dungeon");
+            LogDungeonDecision("died");
+        }
+        else if (fled)
+        {
+            // Fled mid-fight — head to healer if wounded
+            npc.UpdateLocation(npc.HP < npc.MaxHP * 0.5 ? "Healer" : "Main Street");
+            LogDungeonDecision("fled");
         }
         else
         {
-            // Fled or timeout — head to healer if wounded
+            // 50-round timeout (stalemate) — head to healer if wounded
             npc.UpdateLocation(npc.HP < npc.MaxHP * 0.5 ? "Healer" : "Main Street");
+            LogDungeonDecision("stalemate");
         }
     }
 

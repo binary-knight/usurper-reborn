@@ -110,6 +110,18 @@ public class Monster
     public bool IsStunned { get; set; } = false;
     public int StunDuration { get; set; } = 0;
     public int StunImmunityRounds { get; set; } = 0;  // Prevents re-stun immediately after recovery
+
+    // v0.61.2 (player report: "The monster becoming incorporeal combat ability
+    // doesn't really have any effect"). Pre-fix, Incorporeal / Phase / PhaseShift
+    // / TreeMeld / Vanish / Flight / Invisibility set AvoidAllDamage or EvasionBonus on
+    // the per-call AbilityResult, but nothing in CombatEngine ever read those flags --
+    // the buffs were strictly cosmetic flavor text. EvasionRounds + EvasionMissChance
+    // persist the buff onto the monster so player attacks during the buff window can
+    // miss. EvasionRounds ticks down once per monster-action cycle (same place as
+    // WeakenRounds--), so a 2-round buff covers the player's next 2 swings.
+    public int EvasionRounds { get; set; } = 0;
+    public int EvasionMissChance { get; set; } = 0;  // 0-100 percent
+
     // v0.60.0 stun-lock audit: diminishing-returns tracking. Each successful stun
     // application increments RecentStunCount and resets RoundsSinceLastStun. The
     // DR window in GameConfig.StunDRWindowRounds gradually decays the count back to

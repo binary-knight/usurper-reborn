@@ -430,7 +430,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("");
             terminal.SetColor("bright_yellow");
             string babyPronoun = child.Sex == CharacterSex.Male ? Get("intimacy.pronoun_him") : Get("intimacy.pronoun_her");
-            terminal.WriteLine($"  What will you name {babyPronoun}? (Enter for {child.Name})");
+            terminal.WriteLine($"  {Get("intimacy.name_prompt", babyPronoun, child.Name)}");
             terminal.SetColor("white");
             string nameInput = (await terminal.GetInput("  Name: ")).Trim();
             if (!string.IsNullOrEmpty(nameInput) && nameInput.Length <= 20)
@@ -640,38 +640,39 @@ namespace UsurperRemake.Systems
             terminal.ClearScreen();
             await ShowSceneHeader(partner, mood);
 
+            string theirCap = their.Substring(0, 1).ToUpper() + their.Substring(1);
             switch (choice)
             {
                 case "1":
                     terminal.SetColor("white");
-                    terminal.WriteLine($"  You reach out slowly, fingertips brushing {their} cheek with feather-light");
-                    terminal.WriteLine($"  touch. {genderCap} shivers at the contact, eyes fluttering closed.");
+                    terminal.WriteLine($"  {Get("intimacy.anticipation.slow_l1", their)}");
+                    terminal.WriteLine($"  {Get("intimacy.anticipation.slow_l2", genderCap)}");
                     terminal.WriteLine("");
-                    terminal.WriteLine($"  \"{player!.Name}...\" {gender} breathes, voice barely a whisper.");
+                    terminal.WriteLine($"  {Get("intimacy.anticipation.slow_l3", player!.Name, gender)}");
                     terminal.WriteLine("");
-                    terminal.WriteLine($"  You trace the line of {their} jaw, then cup {their} face gently,");
-                    terminal.WriteLine($"  tilting {their} chin up. Your lips hover just a breath apart.");
+                    terminal.WriteLine($"  {Get("intimacy.anticipation.slow_l4", their)}");
+                    terminal.WriteLine($"  {Get("intimacy.anticipation.slow_l5", their)}");
                     break;
 
                 case "2":
                     terminal.SetColor("white");
-                    terminal.WriteLine($"  You can't wait any longer. You pull {partner.Name2} against you,");
-                    terminal.WriteLine($"  feeling the heat of {their} body through your clothes.");
+                    terminal.WriteLine($"  {Get("intimacy.anticipation.urgent_l1", partner.Name2)}");
+                    terminal.WriteLine($"  {Get("intimacy.anticipation.urgent_l2", their)}");
                     terminal.WriteLine("");
-                    terminal.WriteLine($"  {genderCap} gasps at your urgency, but {their} arms wrap around you");
-                    terminal.WriteLine($"  immediately, fingers digging into your back.");
+                    terminal.WriteLine($"  {Get("intimacy.anticipation.urgent_l3", genderCap, their)}");
+                    terminal.WriteLine($"  {Get("intimacy.anticipation.urgent_l4")}");
                     terminal.WriteLine("");
-                    terminal.WriteLine($"  \"I've wanted this...\" {gender} murmurs against your neck.");
+                    terminal.WriteLine($"  {Get("intimacy.anticipation.urgent_l5", gender)}");
                     break;
 
                 case "3":
                 default:
                     terminal.SetColor("white");
-                    terminal.WriteLine($"  You stand still, letting {partner.Name2} come to you.");
-                    terminal.WriteLine($"  {genderCap} approaches with predatory grace, eyes never leaving yours.");
+                    terminal.WriteLine($"  {Get("intimacy.anticipation.passive_l1", partner.Name2)}");
+                    terminal.WriteLine($"  {Get("intimacy.anticipation.passive_l2", genderCap)}");
                     terminal.WriteLine("");
-                    terminal.WriteLine($"  {their.Substring(0, 1).ToUpper() + their.Substring(1)} hands find your chest, sliding up slowly.");
-                    terminal.WriteLine($"  \"Let me show you what I've been thinking about...\" {gender} whispers.");
+                    terminal.WriteLine($"  {Get("intimacy.anticipation.passive_l3", theirCap)}");
+                    terminal.WriteLine($"  {Get("intimacy.anticipation.passive_l4", gender)}");
                     break;
             }
 
@@ -696,55 +697,57 @@ namespace UsurperRemake.Systems
             string their = partner.Sex == CharacterSex.Female ? "her" : "his";
             string them = partner.Sex == CharacterSex.Female ? "her" : "him";
 
+            string theirCap = their.Substring(0, 1).ToUpper() + their.Substring(1);
+
             // The kiss
             terminal.SetColor("white");
             if (isFirstTime)
             {
-                terminal.WriteLine($"  Your lips finally meet, and it's electric. {partner.Name2} tastes like");
-                terminal.WriteLine($"  honey and desire. {genderCap} pulls you closer, deepening the kiss.");
+                terminal.WriteLine($"  {Get("intimacy.exploration.kiss_first_l1", partner.Name2)}");
+                terminal.WriteLine($"  {Get("intimacy.exploration.kiss_first_l2", genderCap)}");
             }
             else
             {
-                terminal.WriteLine($"  You know each other's rhythm by now. The kiss is deep and familiar,");
-                terminal.WriteLine($"  but no less intoxicating. {partner.Name2} moans softly against your mouth.");
+                terminal.WriteLine($"  {Get("intimacy.exploration.kiss_familiar_l1")}");
+                terminal.WriteLine($"  {Get("intimacy.exploration.kiss_familiar_l2", partner.Name2)}");
             }
             terminal.WriteLine("");
 
             await Task.Delay(1500);
 
             // Undressing
-            terminal.WriteLine($"  Hands find clasps and ties. Clothes begin to fall away.");
+            terminal.WriteLine($"  {Get("intimacy.exploration.undress_intro")}");
 
             float sensuality = profile?.Sensuality ?? 0.6f;
             if (sensuality > 0.7f)
             {
-                terminal.WriteLine($"  {partner.Name2} undresses slowly, teasingly, watching your reaction");
-                terminal.WriteLine($"  with a knowing smile. Every reveal is deliberate, tantalizing.");
+                terminal.WriteLine($"  {Get("intimacy.exploration.undress_sensual_l1", partner.Name2)}");
+                terminal.WriteLine($"  {Get("intimacy.exploration.undress_sensual_l2")}");
             }
             else if (sensuality > 0.4f)
             {
-                terminal.WriteLine($"  There's an eager fumbling, both of you too hungry to be graceful.");
-                terminal.WriteLine($"  Fabric tears slightly - neither of you cares.");
+                terminal.WriteLine($"  {Get("intimacy.exploration.undress_eager_l1")}");
+                terminal.WriteLine($"  {Get("intimacy.exploration.undress_eager_l2")}");
             }
             else
             {
-                terminal.WriteLine($"  {genderCap} seems almost shy, turning slightly as {gender} undresses.");
-                terminal.WriteLine($"  You find the vulnerability endearing, touching.");
+                terminal.WriteLine($"  {Get("intimacy.exploration.undress_shy_l1", genderCap, gender)}");
+                terminal.WriteLine($"  {Get("intimacy.exploration.undress_shy_l2")}");
             }
             terminal.WriteLine("");
 
             await Task.Delay(1000);
 
             // Physical description based on NPC
-            terminal.WriteLine($"  Bare skin meets bare skin. The sensation is overwhelming.");
+            terminal.WriteLine($"  {Get("intimacy.exploration.skin_meet")}");
 
             string physicalDesc = partner.Race switch
             {
-                CharacterRace.Elf => $"  {their.Substring(0, 1).ToUpper() + their.Substring(1)} elven form is lithe and graceful, skin almost luminous in the dim light.",
-                CharacterRace.Dwarf => $"  {their.Substring(0, 1).ToUpper() + their.Substring(1)} sturdy frame is surprisingly soft in your arms, skin warm against yours.",
-                CharacterRace.Orc => $"  {their.Substring(0, 1).ToUpper() + their.Substring(1)} powerful body is impressive, green-tinged skin warm with desire.",
-                CharacterRace.Hobbit => $"  {their.Substring(0, 1).ToUpper() + their.Substring(1)} smaller frame fits perfectly against you, soft and inviting.",
-                _ => $"  {their.Substring(0, 1).ToUpper() + their.Substring(1)} body is warm and welcoming, curves and planes you want to memorize."
+                CharacterRace.Elf => $"  {Get("intimacy.exploration.body_elf", theirCap)}",
+                CharacterRace.Dwarf => $"  {Get("intimacy.exploration.body_dwarf", theirCap)}",
+                CharacterRace.Orc => $"  {Get("intimacy.exploration.body_orc", theirCap)}",
+                CharacterRace.Hobbit => $"  {Get("intimacy.exploration.body_hobbit", theirCap)}",
+                _ => $"  {Get("intimacy.exploration.body_default", theirCap)}"
             };
             terminal.WriteLine(physicalDesc);
             terminal.WriteLine("");
@@ -774,25 +777,25 @@ namespace UsurperRemake.Systems
             float tenderness = profile?.Tenderness ?? 0.5f;
 
             terminal.SetColor("white");
-            terminal.WriteLine($"  Your hands explore {partner.Name2}'s body, learning what makes {them} gasp.");
+            terminal.WriteLine($"  {Get("intimacy.escalation.explore_intro", partner.Name2, them)}");
             terminal.WriteLine("");
 
             if (passion > 0.7f)
             {
-                terminal.WriteLine($"  {genderCap} is insatiable, pulling you closer, demanding more.");
-                terminal.WriteLine($"  Nails rake down your back. Teeth find your shoulder.");
-                terminal.WriteLine($"  \"Don't hold back,\" {gender} growls. \"I can take it.\"");
+                terminal.WriteLine($"  {Get("intimacy.escalation.passion_l1", genderCap)}");
+                terminal.WriteLine($"  {Get("intimacy.escalation.passion_l2")}");
+                terminal.WriteLine($"  {Get("intimacy.escalation.passion_l3", gender)}");
             }
             else if (tenderness > 0.7f)
             {
-                terminal.WriteLine($"  Every touch is deliberate, worshipful. {genderCap} traces patterns");
-                terminal.WriteLine($"  on your skin, leaving trails of fire in {their} wake.");
-                terminal.WriteLine($"  \"You're beautiful,\" {gender} whispers. \"Let me show you how much I want you.\"");
+                terminal.WriteLine($"  {Get("intimacy.escalation.tender_l1", genderCap)}");
+                terminal.WriteLine($"  {Get("intimacy.escalation.tender_l2", their)}");
+                terminal.WriteLine($"  {Get("intimacy.escalation.tender_l3", gender)}");
             }
             else
             {
-                terminal.WriteLine($"  {genderCap} responds eagerly, matching your rhythm, finding yours.");
-                terminal.WriteLine($"  Breath quickens. Hearts pound. The world narrows to just the two of you.");
+                terminal.WriteLine($"  {Get("intimacy.escalation.neutral_l1", genderCap)}");
+                terminal.WriteLine($"  {Get("intimacy.escalation.neutral_l2")}");
             }
             terminal.WriteLine("");
 
@@ -842,24 +845,24 @@ namespace UsurperRemake.Systems
             {
                 case "1":
                     terminal.SetColor("white");
-                    terminal.WriteLine($"  \"You're so beautiful,\" you murmur against {their} skin.");
-                    terminal.WriteLine($"  {partner.Name2} shudders, pulling you closer.");
-                    terminal.WriteLine($"  \"And you make me feel beautiful,\" {gender} replies, voice thick with emotion.");
+                    terminal.WriteLine($"  {Get("intimacy.escalation.whisper_beautiful_l1", their)}");
+                    terminal.WriteLine($"  {Get("intimacy.escalation.whisper_beautiful_l2", partner.Name2)}");
+                    terminal.WriteLine($"  {Get("intimacy.escalation.whisper_beautiful_l3", gender)}");
                     break;
 
                 case "2":
                     terminal.SetColor("white");
-                    terminal.WriteLine($"  \"I need you. Now,\" you say, voice rough with desire.");
-                    terminal.WriteLine($"  {partner.Name2}'s breath catches. {genderCap} nods, eyes blazing.");
-                    terminal.WriteLine($"  \"Then take me,\" {gender} says. \"I'm yours.\"");
+                    terminal.WriteLine($"  {Get("intimacy.escalation.whisper_need_l1")}");
+                    terminal.WriteLine($"  {Get("intimacy.escalation.whisper_need_l2", partner.Name2, genderCap)}");
+                    terminal.WriteLine($"  {Get("intimacy.escalation.whisper_need_l3", gender)}");
                     break;
 
                 case "3":
                 default:
                     terminal.SetColor("white");
-                    terminal.WriteLine($"  \"Tell me what you want,\" you say, pausing to meet {their} eyes.");
-                    terminal.WriteLine($"  {partner.Name2} considers, then leans close to whisper in your ear.");
-                    terminal.WriteLine($"  What {gender} describes makes your heart race faster.");
+                    terminal.WriteLine($"  {Get("intimacy.escalation.whisper_tell_l1", their)}");
+                    terminal.WriteLine($"  {Get("intimacy.escalation.whisper_tell_l2", partner.Name2)}");
+                    terminal.WriteLine($"  {Get("intimacy.escalation.whisper_tell_l3", gender)}");
                     break;
             }
 
@@ -885,41 +888,41 @@ namespace UsurperRemake.Systems
             string them = partner.Sex == CharacterSex.Female ? "her" : "him";
 
             terminal.SetColor("white");
-            terminal.WriteLine($"  Bodies intertwine, moving together in a rhythm as old as time.");
-            terminal.WriteLine($"  {partner.Name2}'s eyes lock with yours, and in that gaze is everything -");
-            terminal.WriteLine($"  trust, desire, vulnerability, need.");
+            terminal.WriteLine($"  {Get("intimacy.climax.intertwine_l1")}");
+            terminal.WriteLine($"  {Get("intimacy.climax.intertwine_l2", partner.Name2)}");
+            terminal.WriteLine($"  {Get("intimacy.climax.intertwine_l3")}");
             terminal.WriteLine("");
 
             await Task.Delay(1500);
 
-            terminal.WriteLine($"  The tension builds, an inexorable tide. Breath comes faster.");
-            terminal.WriteLine($"  Whispered words become moans, then cries of pleasure.");
+            terminal.WriteLine($"  {Get("intimacy.climax.tension_l1")}");
+            terminal.WriteLine($"  {Get("intimacy.climax.tension_l2")}");
             terminal.WriteLine("");
 
             float passion = profile?.Passion ?? 0.6f;
 
             if (passion > 0.7f)
             {
-                terminal.WriteLine($"  {partner.Name2} is loud and unashamed, urging you on with breathless demands.");
-                terminal.WriteLine($"  \"Yes! More! Don't stop!\" {genderCap} arches against you, lost in sensation.");
+                terminal.WriteLine($"  {Get("intimacy.climax.loud_l1", partner.Name2)}");
+                terminal.WriteLine($"  {Get("intimacy.climax.loud_l2", genderCap)}");
             }
             else
             {
-                terminal.WriteLine($"  {partner.Name2}'s sounds are softer but no less intense - gasps and sighs");
-                terminal.WriteLine($"  that speak volumes. {genderCap} clings to you like you're {their} anchor.");
+                terminal.WriteLine($"  {Get("intimacy.climax.soft_l1", partner.Name2)}");
+                terminal.WriteLine($"  {Get("intimacy.climax.soft_l2", genderCap, their)}");
             }
             terminal.WriteLine("");
 
             await Task.Delay(1500);
 
-            terminal.WriteLine($"  The wave crests and breaks. {partner.Name2} cries out your name as");
-            terminal.WriteLine($"  pleasure overwhelms {them}. You follow moments later, the world");
-            terminal.WriteLine($"  dissolving into pure sensation.");
+            terminal.WriteLine($"  {Get("intimacy.climax.crest_l1", partner.Name2)}");
+            terminal.WriteLine($"  {Get("intimacy.climax.crest_l2", them)}");
+            terminal.WriteLine($"  {Get("intimacy.climax.crest_l3")}");
             terminal.WriteLine("");
 
             terminal.SetColor("bright_magenta");
-            terminal.WriteLine($"  For a timeless moment, nothing exists but the two of you,");
-            terminal.WriteLine($"  suspended in shared ecstasy.");
+            terminal.WriteLine($"  {Get("intimacy.climax.timeless_l1")}");
+            terminal.WriteLine($"  {Get("intimacy.climax.timeless_l2")}");
             terminal.WriteLine("");
 
             await terminal.GetInput($"  {Get("ui.press_enter")}");
@@ -943,8 +946,8 @@ namespace UsurperRemake.Systems
             string them = partner.Sex == CharacterSex.Female ? "her" : "him";
 
             terminal.SetColor("white");
-            terminal.WriteLine($"  You lie tangled together, hearts gradually slowing, skin cooling.");
-            terminal.WriteLine($"  {partner.Name2}'s head rests on your chest, fingers tracing lazy patterns.");
+            terminal.WriteLine($"  {Get("intimacy.afterglow.tangled_l1")}");
+            terminal.WriteLine($"  {Get("intimacy.afterglow.tangled_l2", partner.Name2)}");
             terminal.WriteLine("");
 
             await Task.Delay(1000);
@@ -954,19 +957,19 @@ namespace UsurperRemake.Systems
 
             if (romanticism > 0.7f || romanceType == RomanceRelationType.Spouse)
             {
-                terminal.WriteLine($"  \"I love you,\" {gender} murmurs, voice drowsy and content.");
-                terminal.WriteLine($"  \"Every time with you feels like the first time. And the last time.");
-                terminal.WriteLine($"  Like something precious I never want to lose.\"");
+                terminal.WriteLine($"  {Get("intimacy.afterglow.spouse_l1", gender)}");
+                terminal.WriteLine($"  {Get("intimacy.afterglow.spouse_l2")}");
+                terminal.WriteLine($"  {Get("intimacy.afterglow.spouse_l3")}");
             }
             else if (romanceType == RomanceRelationType.Lover)
             {
-                terminal.WriteLine($"  \"That was...\" {gender} starts, then laughs softly.");
-                terminal.WriteLine($"  \"I don't have words. You render me speechless every time.\"");
+                terminal.WriteLine($"  {Get("intimacy.afterglow.lover_l1", gender)}");
+                terminal.WriteLine($"  {Get("intimacy.afterglow.lover_l2")}");
             }
             else
             {
-                terminal.WriteLine($"  {genderCap} stretches languidly, a satisfied smile on {their} face.");
-                terminal.WriteLine($"  \"Not bad at all,\" {gender} teases. \"Same time next week?\"");
+                terminal.WriteLine($"  {Get("intimacy.afterglow.casual_l1", genderCap, their)}");
+                terminal.WriteLine($"  {Get("intimacy.afterglow.casual_l2", gender)}");
             }
             terminal.WriteLine("");
 
@@ -1015,26 +1018,26 @@ namespace UsurperRemake.Systems
             {
                 case "1":
                     terminal.SetColor("white");
-                    terminal.WriteLine($"  \"Stay with me tonight,\" you say, pulling {them} closer.");
-                    terminal.WriteLine($"  {partner.Name2} smiles, snuggling deeper into your embrace.");
-                    terminal.WriteLine($"  \"Wild horses couldn't drag me away.\"");
+                    terminal.WriteLine($"  {Get("intimacy.afterglow.stay_l1", them)}");
+                    terminal.WriteLine($"  {Get("intimacy.afterglow.stay_l2", partner.Name2)}");
+                    terminal.WriteLine($"  {Get("intimacy.afterglow.stay_l3")}");
                     terminal.WriteLine("");
-                    terminal.WriteLine($"  You drift off to sleep together, warm and content.");
+                    terminal.WriteLine($"  {Get("intimacy.afterglow.stay_l4")}");
                     break;
 
                 case "2":
                     terminal.SetColor("white");
-                    terminal.WriteLine($"  \"That was amazing,\" you say, kissing the top of {their} head.");
-                    terminal.WriteLine($"  {partner.Name2} looks up at you with a grin.");
-                    terminal.WriteLine($"  \"Flatterer. But I'll allow it.\"");
+                    terminal.WriteLine($"  {Get("intimacy.afterglow.amazing_l1", their)}");
+                    terminal.WriteLine($"  {Get("intimacy.afterglow.amazing_l2", partner.Name2)}");
+                    terminal.WriteLine($"  {Get("intimacy.afterglow.amazing_l3")}");
                     break;
 
                 case "3":
                 default:
                     terminal.SetColor("white");
-                    terminal.WriteLine($"  No words are needed. You hold {partner.Name2} close,");
-                    terminal.WriteLine($"  letting your heartbeat say everything.");
-                    terminal.WriteLine($"  {genderCap} sighs contentedly, and you both rest.");
+                    terminal.WriteLine($"  {Get("intimacy.afterglow.silent_l1", partner.Name2)}");
+                    terminal.WriteLine($"  {Get("intimacy.afterglow.silent_l2")}");
+                    terminal.WriteLine($"  {Get("intimacy.afterglow.silent_l3", genderCap)}");
                     break;
             }
 
