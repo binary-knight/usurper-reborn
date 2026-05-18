@@ -1,5 +1,6 @@
 using System.Linq;
 using UsurperRemake.Utils;
+using UsurperRemake.Systems;
 using System.Collections.Generic;
 
 /// <summary>
@@ -9,7 +10,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.61.3";
+    public const string Version = "0.61.4";
     public const string VersionName = "Beta";
 
     // v0.57.12: Alignment scale cap. Character.Chivalry and Character.Darkness setters clamp to [0, AlignmentCap]
@@ -1919,12 +1920,54 @@ public static partial class GameConfig
     };
 
     // Indexed by CharacterClass enum value (alphabetical: Alchemist=0 ... Warrior=10, then prestige, then Shaman)
+    // English fallback names. Use GetLocalizedClassName() for display so the
+    // session language wins. Keep this array for legacy callers (admin tools,
+    // logs, debug output) where English is appropriate.
     public static readonly string[] ClassNames = {
         "Alchemist", "Assassin", "Barbarian", "Bard", "Cleric",      // 0-4
         "Jester", "Magician", "Paladin", "Ranger", "Sage", "Warrior", // 5-10
         "Tidesworn", "Wavecaller", "Cyclebreaker", "Abysswarden", "Voidreaver", // 11-15
         "Mystic Shaman"                                                // 16
     };
+
+    // Per-class loc keys for GetLocalizedClassName below. Indexed by enum value.
+    private static readonly string[] ClassLocKeys = {
+        "class.alchemist", "class.assassin", "class.barbarian", "class.bard", "class.cleric",
+        "class.jester", "class.magician", "class.paladin", "class.ranger", "class.sage", "class.warrior",
+        "class.tidesworn", "class.wavecaller", "class.cyclebreaker", "class.abysswarden", "class.voidreaver",
+        "class.mystic_shaman"
+    };
+
+    /// <summary>
+    /// Returns the class name in the current session language. Falls back to
+    /// the English `ClassNames` array if the loc key is missing or the index
+    /// is out of range. Use this for any player-facing display of a class name
+    /// instead of `ClassNames[i]` directly.
+    /// </summary>
+    public static string GetLocalizedClassName(int classId)
+    {
+        if (classId < 0 || classId >= ClassLocKeys.Length)
+            return classId >= 0 && classId < ClassNames.Length ? ClassNames[classId] : "?";
+        return Loc.Get(ClassLocKeys[classId]);
+    }
+
+    /// <summary>Overload taking the enum directly.</summary>
+    public static string GetLocalizedClassName(CharacterClass cls) => GetLocalizedClassName((int)cls);
+
+    /// <summary>
+    /// Best-effort: takes a class-enum's string form ("Cleric", "MysticShaman"),
+    /// parses back to enum, and returns the localized display name. Used by
+    /// display sites that only have the string (e.g. SaveInfo.ClassName from
+    /// the backend). Returns the input string unchanged if it doesn't parse
+    /// to a known enum.
+    /// </summary>
+    public static string GetLocalizedClassNameFromString(string? enumName)
+    {
+        if (string.IsNullOrEmpty(enumName)) return "";
+        if (System.Enum.TryParse<CharacterClass>(enumName, ignoreCase: true, out var cls))
+            return GetLocalizedClassName(cls);
+        return enumName!;
+    }
 
     // Race Descriptions for Character Creation
     public static readonly Dictionary<CharacterRace, string> RaceDescriptions = new()

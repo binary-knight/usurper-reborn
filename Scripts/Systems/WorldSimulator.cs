@@ -3016,6 +3016,19 @@ public class WorldSimulator
             // If all team members fled, end combat
             if (!team.Any(m => m.IsAlive && m.Location == "Dungeon")) break;
 
+            // v0.61.3 Cleric sim self-heal (team path). Same shape as solo:
+            // Clerics restore 10% MaxHP per round when below 50% HP. Also
+            // covers party Clerics helping the team survive longer, which
+            // raises completion rate beyond the solo case.
+            foreach (var member in team.Where(m => m.IsAlive && m.Location == "Dungeon"))
+            {
+                if (member.Class == CharacterClass.Cleric && member.HP > 0 && member.HP < member.MaxHP * 0.5)
+                {
+                    long heal = member.MaxHP / 10;
+                    member.HP = Math.Min(member.MaxHP, member.HP + heal);
+                }
+            }
+
             // Team attacks monsters
             foreach (var member in team.Where(m => m.IsAlive && m.Location == "Dungeon"))
             {
@@ -3046,6 +3059,14 @@ public class WorldSimulator
                 long damage = Math.Max(1, monster.Strength + monster.WeapPow - target.Defence - target.ArmPow);
                 damage += random.Next(1, (int)Math.Max(2, monster.WeapPow / 3));
                 damage = (long)(damage * 0.85); // 15% damage reduction due to team support
+
+                // v0.61.3 Warrior sim damage reduction (team path). Stacks
+                // multiplicatively with the existing 15% team-support reduction.
+                // Net incoming for a Warrior in a team = 0.85 * 0.85 = 0.7225x
+                // (~28% reduction), reflecting both team coordination AND the
+                // shield/heavy-armor archetype.
+                if (target.Class == CharacterClass.Warrior)
+                    damage = (long)(damage * 0.85);
 
                 target.TakeDamage(damage);
             }
@@ -3245,6 +3266,18 @@ public class WorldSimulator
         {
             rounds++;
 
+            // v0.61.3 Cleric sim self-heal. Telemetry over 12h showed Clerics
+            // at 0% wins / 17.9% deaths in solo dungeon -- worst class by far.
+            // Root: real combat AI casts Cure Wounds at low HP, but the sim
+            // doesn't model spell-casting. Apply a 10% MaxHP heal per round
+            // when below 50% HP. Mirrors the real-combat behavior at a coarse
+            // grain: Clerics shouldn't die just because the sim is simpler.
+            if (npc.Class == CharacterClass.Cleric && npc.HP > 0 && npc.HP < npc.MaxHP * 0.5)
+            {
+                long heal = npc.MaxHP / 10;
+                npc.HP = Math.Min(npc.MaxHP, npc.HP + heal);
+            }
+
             if (npc.HP < npc.MaxHP * fleeThreshold)
             {
                 // Higher AGI = better flee chance; base 70%.
@@ -3270,6 +3303,21 @@ public class WorldSimulator
             // Monster attacks
             long monsterDamage = Math.Max(1, monster.Strength + monster.WeapPow - npc.Defence);
             monsterDamage += random.Next(1, (int)Math.Max(1, monster.WeapPow / 2));
+
+            // v0.61.3 Warrior sim damage reduction. Telemetry showed Warriors
+            // at 0% wins / 5.5% deaths -- they survive (lots of HP) but never
+            // kill. Real Warriors stack BlockChance / ShieldBonus / DefenceBonus
+            // from heavy armor and shields; the sim's flat
+            // `monster.Strength + WeapPow - npc.Defence` formula ignores those.
+            // 15% incoming-damage reduction on Warriors approximates the
+            // tank-archetype shield/armor advantage that lets them sustain
+            // long enough to actually finish the kill. Barbarian is similarly
+            // 0-win but high-death (no defense kit) -- leaving them alone for
+            // now; a Rage-style "below 30% HP get attack bonus" is the right
+            // shape for them but bigger scope.
+            if (npc.Class == CharacterClass.Warrior)
+                monsterDamage = (long)(monsterDamage * 0.85);
+
             npc.TakeDamage(monsterDamage);
         }
 

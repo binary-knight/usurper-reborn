@@ -2076,6 +2076,21 @@ public class TeamCornerLocation : BaseLocation
         terminal.WriteLine(Loc.Get("team.team_label", currentPlayer.Team));
         terminal.WriteLine("");
 
+        // Show currently-recruited echoes up front so the player can see the
+        // state of their party at Team Corner instead of finding out at
+        // dungeon entry. Bug report: player thought their recruit hadn't
+        // landed (echo never appeared in dungeon) and re-tried, was told
+        // "already in party" with no way to verify or recover.
+        var currentRecruits = GameEngine.Instance?.DungeonPartyPlayerNames ?? new List<string>();
+        if (currentRecruits.Count > 0)
+        {
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine(Loc.Get("team.echo_currently_recruited", string.Join(", ", currentRecruits)));
+            terminal.SetColor("gray");
+            terminal.WriteLine(Loc.Get("team.echo_unrecruit_hint"));
+            terminal.WriteLine("");
+        }
+
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("team.available_player_allies"));
         terminal.SetColor("white");
@@ -2092,7 +2107,11 @@ public class TeamCornerLocation : BaseLocation
             var tm = teammates[i];
             string className = tm.ClassId >= 0 ? ((CharacterClass)tm.ClassId).ToString() : "Unknown";
             string status = tm.IsOnline ? Loc.Get("team.status_online") : Loc.Get("team.status_offline");
-            terminal.WriteLine($"{i + 1,-3} {tm.DisplayName,-18} {className,-12} {tm.Level,-6} {status,-10}");
+            // Mark teammates already recruited with a [recruited] tag so the
+            // player can see at a glance which slots are filled.
+            bool alreadyRecruited = currentRecruits.Contains(tm.DisplayName, StringComparer.OrdinalIgnoreCase);
+            string tag = alreadyRecruited ? " " + Loc.Get("team.echo_recruited_tag") : "";
+            terminal.WriteLine($"{i + 1,-3} {tm.DisplayName,-18} {className,-12} {tm.Level,-6} {status,-10}{tag}");
         }
 
         terminal.WriteLine("");
@@ -2105,6 +2124,15 @@ public class TeamCornerLocation : BaseLocation
         terminal.SetColor("white");
         string input = await terminal.ReadLineAsync();
 
+        // [U] Un-recruit flow: lets the player dismiss a stuck or
+        // changed-their-mind echo without entering the dungeon. Recovery
+        // path for the v0.61.5 "echo recruited but never materialized" bug.
+        if (!string.IsNullOrEmpty(input) && input.Trim().Equals("U", StringComparison.OrdinalIgnoreCase))
+        {
+            await UnrecruitPlayerAlly(currentRecruits);
+            return;
+        }
+
         if (int.TryParse(input, out int choice) && choice >= 1 && choice <= teammates.Count)
         {
             var selected = teammates[choice - 1];
@@ -2115,7 +2143,9 @@ public class TeamCornerLocation : BaseLocation
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine(Loc.Get("team.echo_already_in_party", selected.DisplayName));
-                await Task.Delay(2000);
+                terminal.SetColor("gray");
+                terminal.WriteLine(Loc.Get("team.echo_already_in_party_hint"));
+                await Task.Delay(2500);
                 return;
             }
 
@@ -2154,6 +2184,48 @@ public class TeamCornerLocation : BaseLocation
         terminal.SetColor("darkgray");
         terminal.WriteLine(Loc.Get("ui.press_enter"));
         await terminal.ReadKeyAsync();
+    }
+
+    /// <summary>
+    /// Manual un-recruit flow for player echoes. Lets the player dismiss an
+    /// echo from `DungeonPartyPlayerNames` without entering the dungeon.
+    /// Recovery path for the case where an echo was recruited but failed to
+    /// materialize (save deleted, off-team, load error) -- and also lets
+    /// players who change their mind un-recruit cleanly.
+    /// </summary>
+    private async Task UnrecruitPlayerAlly(List<string> currentRecruits)
+    {
+        if (currentRecruits.Count == 0)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine(Loc.Get("team.echo_unrecruit_none"));
+            await Task.Delay(2000);
+            return;
+        }
+
+        terminal.WriteLine("");
+        terminal.SetColor("cyan");
+        terminal.WriteLine(Loc.Get("team.echo_unrecruit_header"));
+        terminal.SetColor("white");
+        for (int i = 0; i < currentRecruits.Count; i++)
+        {
+            terminal.WriteLine($"  [{i + 1}] {currentRecruits[i]}");
+        }
+        terminal.WriteLine("");
+        terminal.SetColor("cyan");
+        terminal.Write(Loc.Get("team.echo_unrecruit_prompt"));
+        terminal.SetColor("white");
+        string input = await terminal.ReadLineAsync();
+
+        if (int.TryParse(input, out int choice) && choice >= 1 && choice <= currentRecruits.Count)
+        {
+            string toRemove = currentRecruits[choice - 1];
+            var cleaned = currentRecruits.Where(n => !n.Equals(toRemove, StringComparison.OrdinalIgnoreCase)).ToList();
+            GameEngine.Instance?.SetDungeonPartyPlayers(cleaned);
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine(Loc.Get("team.echo_unrecruit_done", toRemove));
+            await Task.Delay(2000);
+        }
     }
 
     #endregion

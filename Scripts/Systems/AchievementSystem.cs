@@ -1323,6 +1323,7 @@ public static class AchievementSystem
         if (stats.HighestGoldHeld >= 1000000) TryUnlock(player, "gold_1000000");
         if (stats.TotalGoldSpent >= 100000) TryUnlock(player, "big_spender");
         if (stats.TotalItemsBought >= 50) TryUnlock(player, "shopaholic");
+        if (stats.TotalMagicShopGoldSpent >= 100000) TryUnlock(player, "big_spender_magic");
 
         // Exploration achievements
         if (stats.DeepestDungeonLevel >= 5) TryUnlock(player, "dungeon_5");

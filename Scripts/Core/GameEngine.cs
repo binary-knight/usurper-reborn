@@ -2234,11 +2234,16 @@ public partial class GameEngine
                         : mostRecentSave.IsRecovered ? "yellow"
                         : "";
 
+                    // SaveInfo.ClassName is populated by the backend with the raw
+                    // enum name (e.g. "Cleric", "MysticShaman"). Localize at
+                    // display time so non-English sessions see the translated name.
+                    string localizedClass = GameConfig.GetLocalizedClassNameFromString(mostRecentSave.ClassName);
+
                     if (GameConfig.ScreenReaderMode)
                     {
                         terminal.SetColor("white");
                         string saveTimeStr = mostRecentSave.SaveTime.Year >= 2020 ? mostRecentSave.SaveTime.ToString("yyyy-MM-dd HH:mm:ss") : "";
-                        terminal.WriteLine(Loc.Get("engine.save_slot_sr_display", i + 1, mostRecentSave.PlayerName, mostRecentSave.ClassName, mostRecentSave.Level, mostRecentSave.SaveType, saveTimeStr) + statusTag);
+                        terminal.WriteLine(Loc.Get("engine.save_slot_sr_display", i + 1, mostRecentSave.PlayerName, localizedClass, mostRecentSave.Level, mostRecentSave.SaveType, saveTimeStr) + statusTag);
                     }
                     else
                     {
@@ -2258,7 +2263,7 @@ public partial class GameEngine
                         else
                         {
                             terminal.SetColor("cyan");
-                            terminal.Write($" ({mostRecentSave.ClassName})");
+                            terminal.Write($" ({localizedClass})");
                         }
                         terminal.SetColor("gray");
                         terminal.Write(Loc.Get("engine.save_slot_level", mostRecentSave.Level));
@@ -3595,7 +3600,7 @@ public partial class GameEngine
             {
                 terminal.WriteLine("");
                 terminal.SetColor("yellow");
-                terminal.WriteLine($"  Your {player.LoginStreak}-day login streak has ended!");
+                terminal.WriteLine(Loc.Get("engine.streak_ended", player.LoginStreak));
                 terminal.WriteLine("");
             }
             player.LoginStreak = 1;
@@ -3617,52 +3622,52 @@ public partial class GameEngine
         if (streak >= 100)
         {
             goldReward = 1000;
-            specialMessage = $"Day {streak} streak! Here's your daily loyalty bonus.";
+            specialMessage = Loc.Get("engine.streak_msg_100plus", streak);
         }
         else if (streak == 90)
         {
             goldReward = 50000;
             achievementId = "legendary_devotion";
-            specialMessage = "90 days! Your legendary devotion is unmatched!";
+            specialMessage = Loc.Get("engine.streak_msg_90");
         }
         else if (streak == 60)
         {
             goldReward = 25000;
-            specialMessage = "60 days! Your dedication is truly remarkable!";
+            specialMessage = Loc.Get("engine.streak_msg_60");
         }
         else if (streak == 30)
         {
             goldReward = 10000;
             achievementId = "devoted_champion";
-            specialMessage = "30 days! You are a Devoted Champion!";
+            specialMessage = Loc.Get("engine.streak_msg_30");
         }
         else if (streak == 14)
         {
             goldReward = 5000;
             herbsReward = 5;
-            specialMessage = "Two weeks straight! Here's a rare herb collection!";
+            specialMessage = Loc.Get("engine.streak_msg_14");
         }
         else if (streak == 7)
         {
             goldReward = 2500;
             achievementId = "dedicated_adventurer";
-            specialMessage = "One full week! You're a Dedicated Adventurer!";
+            specialMessage = Loc.Get("engine.streak_msg_7");
         }
         else if (streak == 3)
         {
             goldReward = 1000;
             potionsReward = 3;
-            specialMessage = "Three days running! Have some supplies!";
+            specialMessage = Loc.Get("engine.streak_msg_3");
         }
         else if (streak == 1)
         {
             goldReward = 500;
-            specialMessage = "Welcome back! Start a new streak!";
+            specialMessage = Loc.Get("engine.streak_msg_1");
         }
         else if (streak == 2)
         {
             goldReward = 500;
-            specialMessage = "Two days in a row! Keep it going!";
+            specialMessage = Loc.Get("engine.streak_msg_2");
         }
         else
         {

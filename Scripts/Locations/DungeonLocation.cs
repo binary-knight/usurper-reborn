@@ -1275,6 +1275,15 @@ public class DungeonLocation : BaseLocation
         int restoredCount = 0;
         int skippedCount = 0;
 
+        // Player report (Lv.12 Elf Sage): recruited an echo, never appeared in the
+        // dungeon, but Team Corner kept refusing re-recruit with "echo already in
+        // party." Root cause: when an echo couldn't be loaded for non-cap reasons
+        // (save data missing, team mismatch, load exception), the name stayed
+        // permanently in DungeonPartyPlayerNames. Re-entering the dungeon would
+        // hit the same failure forever. Now we track stuck names and prune them
+        // after the loop so Team Corner reflects reality.
+        var stuckNames = new List<string>();
+
         foreach (var name in playerNames)
         {
             // Skip if already in party
@@ -1285,7 +1294,13 @@ public class DungeonLocation : BaseLocation
             {
                 // Load player's save data from database
                 var saveData = await backend.ReadGameData(name.ToLower());
-                if (saveData?.Player == null) continue;
+                if (saveData?.Player == null)
+                {
+                    term.SetColor("yellow");
+                    term.WriteLine(Loc.Get("dungeon.echo_no_save", name));
+                    stuckNames.Add(name);
+                    continue;
+                }
 
                 // Verify they're still on the same team
                 if (currentPlayer != null && !string.IsNullOrEmpty(currentPlayer.Team))
@@ -1294,6 +1309,7 @@ public class DungeonLocation : BaseLocation
                     {
                         term.SetColor("yellow");
                         term.WriteLine(Loc.Get("dungeon.not_on_team", name));
+                        stuckNames.Add(name);
                         continue;
                     }
                 }
@@ -1320,6 +1336,9 @@ public class DungeonLocation : BaseLocation
             catch (Exception ex)
             {
                 DebugLogger.Instance.LogError("DUNGEON", $"Failed to load player echo '{name}': {ex.Message}");
+                term.SetColor("yellow");
+                term.WriteLine(Loc.Get("dungeon.echo_load_error", name));
+                stuckNames.Add(name);
             }
         }
 
@@ -1344,6 +1363,20 @@ public class DungeonLocation : BaseLocation
             term.WriteLine(Loc.Get("dungeon.echoes_skipped_hint"));
             term.WriteLine("");
             await Task.Delay(2000);
+        }
+
+        // Prune stuck echoes (save missing / team mismatch / load error) from the
+        // persistent recruit list so Team Corner stops claiming they're "in party."
+        // Cap-skipped echoes are kept -- they're still valid recruits, just deferred.
+        if (stuckNames.Count > 0)
+        {
+            var cleaned = playerNames.Where(n => !stuckNames.Contains(n, StringComparer.OrdinalIgnoreCase)).ToList();
+            GameEngine.Instance?.SetDungeonPartyPlayers(cleaned);
+            term.WriteLine("");
+            term.SetColor("gray");
+            term.WriteLine(Loc.Get("dungeon.echoes_pruned", stuckNames.Count));
+            term.WriteLine("");
+            await Task.Delay(1500);
         }
     }
 
@@ -5657,17 +5690,33 @@ public class DungeonLocation : BaseLocation
         );
 
         // Post-hoc reward split: FeatureInteractionSystem already awarded full amount to leader.
-        // Reduce leader to their share and distribute to teammates.
+        // Reduce leader to their share and distribute to grouped players.
+        //
+        // Player report (Lv.52 Barbarian): feature said "+12,000g" but only a
+        // small portion landed in the player's wallet. Root cause: the original
+        // code split gold across ALL alive teammates (companions, NPC mercs,
+        // echoes, pets, royal bodyguards). Those have their own Gold field
+        // separate from the player -- giving them gold "vanished" from the
+        // player's pocket. Only IsGroupedPlayer (real human co-op players)
+        // hold separate wallets that should share the loot. Companions and
+        // NPCs are extensions of the player's party, not independent recipients.
+        // Fix: filter the gold-split list to grouped players only, mirroring
+        // ShareEventRewardsWithGroup's pattern. XP still splits to NPC mates
+        // at 0.75x (gives them progression) but companions are excluded as before.
         if (teammates.Count > 0 && (outcome.GoldGained > 0 || outcome.ExperienceGained > 0))
         {
-            int totalMembers = 1 + teammates.Count;
-            long goldPerMember = outcome.GoldGained > 0 ? outcome.GoldGained / totalMembers : 0;
+            var groupedPlayers = teammates.Where(t => t != null && t.IsAlive && t.IsGroupedPlayer).ToList();
+            int totalGoldRecipients = 1 + groupedPlayers.Count;
+            long goldPerMember = outcome.GoldGained > 0 ? outcome.GoldGained / totalGoldRecipients : 0;
 
-            // Split gold: reduce leader to their share, give rest to teammates
-            if (outcome.GoldGained > 0)
+            // Split gold ONLY with grouped players (real human co-op).
+            // Companions and NPCs do not receive a share -- they share the
+            // player's loot pool conceptually, so the player keeps it all
+            // when only companions are present.
+            if (outcome.GoldGained > 0 && groupedPlayers.Count > 0)
             {
                 player!.Gold -= (outcome.GoldGained - goldPerMember);
-                foreach (var t in teammates.Where(t => t != null && t.IsAlive))
+                foreach (var t in groupedPlayers)
                     t.Gold += goldPerMember;
             }
 

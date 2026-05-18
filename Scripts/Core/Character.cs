@@ -149,11 +149,10 @@ public class Character
     public bool TeamXPIsExplicit { get; set; } = false;  // v0.57.2: true once the player has manually set their XP split, so AutoDistributeTeamXP doesn't override intentional 100/0 (keep-all-xp) configs
     public CharacterClass Class { get; set; }       // class
 
-    /// <summary>Display-friendly class name (handles multi-word names like "Mystic Shaman")</summary>
+    /// <summary>Display-friendly class name, localized to current session language.
+    /// Handles multi-word names like "Mystic Shaman" / "Misztikus Sámán".</summary>
     [System.Text.Json.Serialization.JsonIgnore]
-    public string ClassName => (int)Class < GameConfig.ClassNames.Length
-        ? GameConfig.ClassNames[(int)Class]
-        : Class.ToString();
+    public string ClassName => GameConfig.GetLocalizedClassName(Class);
 
     public int Loyalty { get; set; }                // loyalty% (0-100)
     public int Haunt { get; set; }                  // how many demons haunt player

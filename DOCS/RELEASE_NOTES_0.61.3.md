@@ -133,6 +133,32 @@ The 24-hour `DruidShrineData.AttunementHours` constant maps to 1 game day in sin
 
 **Save compatibility.** Pre-v0.61.3 saves have `AttunedShrineExpiresGameDay = 0`. If those saves are loaded into single-player mode, `HasActiveShrineAttunement` returns false (the guard `AttunedShrineExpiresGameDay > 0` fails) -- the player loses their active attunement, but can attune again immediately at zero cost beyond the standard pilgrimage cooldown. Acceptable trade-off for the small window of affected saves; the alternative (auto-migrate UTC-based expiry into a single-player game-day count at load time) would need to know what "today" was at the moment the save was written, which isn't preserved.
 
+## Telemetry-driven: Cleric and Warrior sim-combat class fixes
+
+Twelve hours of post-deploy `npc_decision_log` data surfaced an uneven class distribution in solo dungeon outcomes:
+
+| Class | Wins | Deaths | Note |
+| --- | --- | --- | --- |
+| Bard / Paladin / Jester | 9-12% | 9-10% | balanced |
+| Sage / Ranger / Assassin | 5-7% | 4-13% | OK |
+| Magician / Alchemist / MysticShaman | 2-3% | 6-14% | weak |
+| **Cleric** | **0%** | **17.9%** | **broken** |
+| **Warrior** | **0%** | 5.5% | flees but never finishes the kill |
+| Barbarian | 0% | 17.8% | dies headlong, no defense kit |
+
+**Cleric** was the standout problem. Zero wins across 56 attempts, highest death rate of any class. Root cause: `WorldSimulator.NPCExploreDungeon`'s combat loop is a simple `damage = Strength + WeapPow - Defence` exchange; it never models the spell-casting kit. Real-combat Cleric AI casts Cure Wounds at low HP, but the sim has no equivalent, so Clerics walk into fights they can't sustain and bleed out.
+
+**Warrior** is the inverse: HP is fine (5.5% deaths, lowest in the win-zero group), but they never deal enough damage to finish a monster before HP drops below the flee threshold. They survive plenty of fights, they just turn every fight into a flee. The tank archetype expects to TRADE blows over many rounds; the flee-at-50%-HP gate cuts that loop short. Real Warriors stack BlockChance / ShieldBonus / DefenceBonus from heavy armor and shields; the sim's flat formula ignores those.
+
+**Fix.** Two small per-round adjustments inside both the solo (`NPCExploreDungeon`) and team (`SimulateTeamVsMonsterCombat`) combat loops:
+
+- **Cleric self-heal.** If `npc.Class == Cleric` AND `npc.HP < 50% MaxHP`, heal 10% MaxHP at the top of the round before flee check or damage. Approximates the real-combat Cure Wounds cadence at a coarse grain; the sim doesn't track mana, so the heal is "free" in sim terms but matches the design intent of "Cleric self-sustains long fights."
+- **Warrior damage reduction.** If `target.Class == Warrior`, the incoming monster damage is reduced by 15% (multiplicative). Approximates the shield + heavy armor stack a real Warrior brings. In team combat this stacks with the existing 15% team-support reduction, so a Warrior in a team takes 0.85 * 0.85 = ~72% of monster damage. That extra buffer lets them sustain enough rounds to finish the kill instead of always fleeing.
+
+Barbarian (also 0 wins, 17.8% deaths) is intentionally left alone for now. Their issue is offensive, not defensive: their low-Courage flee threshold pushes them into death rolls before they can output damage. The right shape is a Rage-style "below 30% HP get +15% damage bonus" to push them to wins, but it's a bigger scope than a one-line per-round adjustment. Captured for a follow-up balance pass after another telemetry window.
+
+Expected effect: Cleric solo win rate rises from 0% toward the 5-8% band, deaths drop from 17.9% toward the 5-10% band. Warrior win rate rises from 0% toward the 7-10% band, deaths stay low (probably under 5%). Team-combat composition with a Cleric should also see a modest completion-rate lift (~2-4 percentage points) since the Cleric stays alive long enough to keep contributing damage.
+
 ## Files Changed
 
 - `Scripts/Core/GameConfig.cs` -- Version 0.61.3.
@@ -156,3 +182,4 @@ The 24-hour `DruidShrineData.AttunementHours` constant maps to 1 game day in sin
 - `Scripts/Locations/WildernessLocation.cs` -- attunement application sets BOTH `AttunedShrineExpiresUtc = UtcNow + AttunementHours` and `AttunedShrineExpiresGameDay = CurrentGameDay + ceil(AttunementHours/24)` so saves loaded under either mode have the right timer. Three display sites updated to call `GetShrineTimeRemainingLabel()` instead of computing hours-left from UTC inline.
 - `Scripts/Locations/BaseLocation.cs` -- `/health` shrine display uses `GetShrineTimeRemainingLabel()`.
 - `Localization/{en,hu,es,fr,it}.json` -- 5 new shrine-time keys per language (`shrine.time_hours`, `shrine.time_today`, `shrine.time_one_day`, `shrine.time_n_days`, `shrine.remaining_suffix`). Existing `wilderness.pilgrimage_active*` / `wilderness.bbs_pilgrimage_active` templates dropped their hardcoded "h" suffix so the helper's label supplies the unit.
+- `Scripts/Systems/WorldSimulator.cs` -- `NPCExploreDungeon` and `SimulateTeamVsMonsterCombat` got two per-round class-specific adjustments. (1) Cleric self-heal: if `npc.Class == Cleric` AND HP < 50% MaxHP, restore 10% MaxHP at top of round (before flee check and damage). Closes the "Cleric goes in, can't cast Cure Wounds in sim, dies" loop. (2) Warrior damage reduction: incoming monster damage on a Warrior multiplied by 0.85x. Mirrors the shield + heavy armor stack the sim's flat damage formula doesn't read. Team combat: stacks with the existing 15% team-support reduction, so a Warrior in a team takes ~72% of monster damage. Both changes intentionally narrow (Cleric / Warrior only) -- Barbarian's 0-win 18%-death pattern needs an offensive Rage-style fix that's bigger scope for a future release.

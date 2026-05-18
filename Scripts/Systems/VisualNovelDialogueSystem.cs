@@ -344,6 +344,14 @@ namespace UsurperRemake.Systems
         private async Task ShowGreeting(NPC npc, int relationLevel, RomanceRelationType romanceType)
         {
             string greeting = GenerateContextualGreeting(npc, relationLevel, romanceType);
+
+            // Phase 1.5 dialogue enhancer: layer contextual flavor (mood / memory /
+            // witness / personality / faction / etc) on top of the base greeting.
+            // Language-gated to en/hu inside Enhance() so non-supported languages
+            // get the unmodified base greeting.
+            if (player != null)
+                greeting = UsurperRemake.Systems.DialogueEnhancer.Enhance(greeting, npc, player);
+
             _pendingNPCNarration = greeting;
 
             if (GameConfig.ElectronMode)
@@ -389,113 +397,56 @@ namespace UsurperRemake.Systems
 
         private string GetSpouseGreeting(NPC npc)
         {
-            var greetings = new[]
-            {
-                $"My love, I've been thinking about you all day.",
-                $"There you are! Come here and kiss me.",
-                $"I was hoping you'd find me. I've missed your touch.",
-                $"My heart beats faster every time I see you, even now.",
-                $"Finally! Let me look at you... yes, still the one I love."
-            };
-            return greetings[random.Next(greetings.Length)];
+            int idx = random.Next(5) + 1;
+            return Loc.Get($"dialogue.vn.greeting.spouse_{idx}");
         }
 
         private string GetLoverGreeting(NPC npc)
         {
-            var greetings = new[]
-            {
-                $"*smiles warmly* I was just thinking about our last night together...",
-                $"There's my favorite person. Come closer.",
-                $"*eyes light up* I was hoping to run into you.",
-                $"You have no idea how good it is to see you.",
-                $"*glances around* Is there somewhere more... private we could talk?"
-            };
-            return greetings[random.Next(greetings.Length)];
+            int idx = random.Next(5) + 1;
+            return Loc.Get($"dialogue.vn.greeting.lover_{idx}");
         }
 
         private string GetFWBGreeting(NPC npc)
         {
-            var greetings = new[]
-            {
-                $"*winks* Back for more?",
-                $"Well, if it isn't my favorite distraction.",
-                $"*grins* I know that look in your eyes...",
-                $"Good timing. I was getting... restless.",
-                $"Always a pleasure to see you. Among other things."
-            };
-            return greetings[random.Next(greetings.Length)];
+            int idx = random.Next(5) + 1;
+            return Loc.Get($"dialogue.vn.greeting.fwb_{idx}");
         }
 
         private string GetIntimateGreeting(NPC npc)
         {
-            var greetings = new[]
-            {
-                $"*blushes* Oh! You're here. I was hoping to see you.",
-                $"My heart skips a beat every time I see you.",
-                $"*smiles shyly* I've been thinking about you...",
-                $"You always know how to brighten my day."
-            };
-            return greetings[random.Next(greetings.Length)];
+            int idx = random.Next(4) + 1;
+            return Loc.Get($"dialogue.vn.greeting.intimate_{idx}");
         }
 
         private string GetFriendlyGreeting(NPC npc)
         {
-            var greetings = new[]
-            {
-                $"Hey there, friend! Good to see you!",
-                $"*waves* What's new with you?",
-                $"I was just talking about you! Come, let's chat.",
-                $"There's a face I'm always happy to see."
-            };
-            return greetings[random.Next(greetings.Length)];
+            int idx = random.Next(4) + 1;
+            return Loc.Get($"dialogue.vn.greeting.friendly_{idx}");
         }
 
         private string GetRespectfulGreeting(NPC npc)
         {
-            var greetings = new[]
-            {
-                $"Ah, {player!.Name}. Good to see you.",
-                $"*nods respectfully* How can I help you?",
-                $"Welcome. What brings you here?",
-                $"A pleasant surprise. What's on your mind?"
-            };
-            return greetings[random.Next(greetings.Length)];
+            int idx = random.Next(4) + 1;
+            return Loc.Get($"dialogue.vn.greeting.respectful_{idx}", player!.Name);
         }
 
         private string GetNeutralGreeting(NPC npc)
         {
-            var greetings = new[]
-            {
-                $"*looks up* Oh, hello there.",
-                $"Can I help you with something?",
-                $"Yes? What do you want?",
-                $"*glances over* Hmm?"
-            };
-            return greetings[random.Next(greetings.Length)];
+            int idx = random.Next(4) + 1;
+            return Loc.Get($"dialogue.vn.greeting.neutral_{idx}");
         }
 
         private string GetWaryGreeting(NPC npc)
         {
-            var greetings = new[]
-            {
-                $"*eyes narrow* What do YOU want?",
-                $"I have nothing to say to you.",
-                $"*crosses arms* Make it quick.",
-                $"*sighs heavily* Fine. Speak."
-            };
-            return greetings[random.Next(greetings.Length)];
+            int idx = random.Next(4) + 1;
+            return Loc.Get($"dialogue.vn.greeting.wary_{idx}");
         }
 
         private string GetHostileGreeting(NPC npc)
         {
-            var greetings = new[]
-            {
-                $"*glares* Get away from me before I hurt you.",
-                $"You have some nerve showing your face here.",
-                $"*hand moves to weapon* We have nothing to discuss.",
-                $"I'd sooner spit on you than speak to you."
-            };
-            return greetings[random.Next(greetings.Length)];
+            int idx = random.Next(4) + 1;
+            return Loc.Get($"dialogue.vn.greeting.hostile_{idx}");
         }
 
         /// <summary>
@@ -900,28 +851,15 @@ namespace UsurperRemake.Systems
             // If we've asked many questions, offer deeper ones at good relationship
             if (state.PersonalQuestionsAsked >= 3 && relationLevel <= 40)
             {
-                var deepQuestions = new[]
-                {
-                    "What's your deepest fear?",
-                    "What do you dream about at night?",
-                    "Have you ever loved someone?",
-                    "What would you change about your past?",
-                    "What makes you truly happy?"
-                };
-                return deepQuestions[random.Next(deepQuestions.Length)];
+                int idx = random.Next(5) + 1;
+                return Loc.Get($"dialogue.vn.personal.deep_{idx}");
             }
             else if (state.PersonalQuestionsAsked >= 1)
             {
-                var followUpQuestions = new[]
-                {
-                    "Tell me more about your past...",
-                    "What's your story really?",
-                    "How did you end up here?",
-                    "What drives you?"
-                };
-                return followUpQuestions[random.Next(followUpQuestions.Length)];
+                int idx = random.Next(4) + 1;
+                return Loc.Get($"dialogue.vn.personal.followup_{idx}");
             }
-            return "Tell me about yourself.";
+            return Loc.Get("dialogue.vn.personal.default");
         }
 
         /// <summary>
@@ -932,63 +870,36 @@ namespace UsurperRemake.Systems
             // First flirt of conversation - be subtle
             if (sessionFlirts == 0)
             {
-                var subtleFlirts = new[]
-                {
-                    "You have really nice eyes, you know that?",
-                    "There's something about you... I can't quite put my finger on it.",
-                    "I enjoy talking to you. More than most people, honestly.",
-                    "You're interesting. Not like the others around here."
-                };
-                return subtleFlirts[random.Next(subtleFlirts.Length)];
+                int idx = random.Next(4) + 1;
+                return Loc.Get($"dialogue.vn.flirt.subtle_{idx}");
             }
             // Second flirt - a bit bolder
             else if (sessionFlirts == 1)
             {
                 if (state.LastFlirtWasPositive)
                 {
-                    var bolderFlirts = new[]
-                    {
-                        "*holds eye contact a bit longer than usual*",
-                        "I find myself looking forward to seeing you...",
-                        "You're quite attractive, you know.",
-                        "I think about you sometimes. When you're not around."
-                    };
-                    return bolderFlirts[random.Next(bolderFlirts.Length)];
+                    int idx = random.Next(4) + 1;
+                    return Loc.Get($"dialogue.vn.flirt.bolder_{idx}");
                 }
                 else
                 {
                     // They weren't receptive before - be more careful
-                    var carefulFlirts = new[]
-                    {
-                        "I hope I wasn't too forward earlier...",
-                        "Anyway... you're nice to talk to.",
-                        "Sorry if I made things awkward."
-                    };
-                    return carefulFlirts[random.Next(carefulFlirts.Length)];
+                    int idx = random.Next(3) + 1;
+                    return Loc.Get($"dialogue.vn.flirt.careful_{idx}");
                 }
             }
             // Third flirt - make it count
             else if (sessionFlirts == 2)
             {
                 // Direct flirts if they've been receptive
-                var directFlirts = new[]
-                {
-                    "*moves closer* I really enjoy being around you...",
-                    "I have to admit, you've been on my mind a lot.",
-                    "Is it just me, or is there something between us?"
-                };
-                return directFlirts[random.Next(directFlirts.Length)];
+                int idx = random.Next(3) + 1;
+                return Loc.Get($"dialogue.vn.flirt.direct_{idx}");
             }
             // Allow more flirt attempts if still building relationship
             else if (sessionFlirts >= 3 && state.FlirtSuccessCount < 2)
             {
-                var persistentFlirts = new[]
-                {
-                    "I just... I like being around you.",
-                    "You make me smile, you know?",
-                    "Sorry, I can't help myself around you."
-                };
-                return persistentFlirts[random.Next(persistentFlirts.Length)];
+                int idx = random.Next(3) + 1;
+                return Loc.Get($"dialogue.vn.flirt.persistent_{idx}");
             }
             return null;
         }
@@ -1009,43 +920,37 @@ namespace UsurperRemake.Systems
                 {
                     case CharacterClass.Warrior:
                     case CharacterClass.Barbarian:
-                        compliments.Add("You look like you could handle yourself in a fight.");
-                        compliments.Add("I can tell you've seen real combat.");
+                        compliments.Add(Loc.Get("dialogue.vn.compliment.warrior_1"));
+                        compliments.Add(Loc.Get("dialogue.vn.compliment.warrior_2"));
                         break;
                     case CharacterClass.Magician:
                     case CharacterClass.Sage:
-                        compliments.Add("You seem very knowledgeable.");
-                        compliments.Add("There's a wisdom in your eyes.");
+                        compliments.Add(Loc.Get("dialogue.vn.compliment.mage_1"));
+                        compliments.Add(Loc.Get("dialogue.vn.compliment.mage_2"));
                         break;
                     case CharacterClass.Cleric:
                     case CharacterClass.Paladin:
-                        compliments.Add("You have a calming presence about you.");
-                        compliments.Add("Your faith is admirable.");
+                        compliments.Add(Loc.Get("dialogue.vn.compliment.cleric_1"));
+                        compliments.Add(Loc.Get("dialogue.vn.compliment.cleric_2"));
                         break;
                     default:
-                        compliments.Add("You carry yourself with confidence.");
-                        compliments.Add("You seem like someone who knows what they're doing.");
+                        compliments.Add(Loc.Get("dialogue.vn.compliment.default_1"));
+                        compliments.Add(Loc.Get("dialogue.vn.compliment.default_2"));
                         break;
                 }
 
                 if (profile?.Sociability > 0.6f)
-                    compliments.Add("You have a way of putting people at ease.");
+                    compliments.Add(Loc.Get("dialogue.vn.compliment.sociable"));
                 if (npc.Level > 20)
-                    compliments.Add($"Level {npc.Level}? That's impressive.");
+                    compliments.Add(Loc.Get("dialogue.vn.compliment.high_level", npc.Level));
 
                 return compliments[random.Next(compliments.Count)];
             }
             else
             {
                 // Second compliment - more personal
-                var personalCompliments = new[]
-                {
-                    "I like the way you think.",
-                    "You're easy to talk to.",
-                    "You have a good heart. I can tell.",
-                    "I appreciate your honesty."
-                };
-                return personalCompliments[random.Next(personalCompliments.Length)];
+                int idx = random.Next(4) + 1;
+                return Loc.Get($"dialogue.vn.compliment.personal_{idx}");
             }
         }
 
@@ -1129,6 +1034,11 @@ namespace UsurperRemake.Systems
             // Generate response based on topic
             string response = GenerateTopicResponse(npc, topicId ?? "generic", relationLevel);
 
+            // Phase 1.5 dialogue enhancer: layer contextual flavor on the NPC's
+            // topic reply. Language-gated inside Enhance().
+            if (player != null)
+                response = UsurperRemake.Systems.DialogueEnhancer.Enhance(response, npc, player);
+
             terminal!.SetColor("yellow");
             terminal.WriteLine($"  {Loc.Get("dialogue.narr_considers", npc.Name2)}");
             terminal.WriteLine("");
@@ -1176,137 +1086,70 @@ namespace UsurperRemake.Systems
             {
                 // Warrior topics
                 case "warrior_training":
-                    return isOpen
-                        ? "Training every day, fighting often. There's no shortcut to strength. You either earn it or you don't."
-                        : "I train. A lot.";
+                    return Loc.Get(isOpen ? "dialogue.vn.topic.warrior_training_open" : "dialogue.vn.topic.warrior_training_closed");
                 case "warrior_battles":
-                    var battleStories = new[]
-                    {
-                        "There was this ogre chieftain on the third level... took me three hours and two healing potions. Still have the scar.",
-                        "Fought a band of orcs that had cornered a merchant caravan. Seven of them. It was... messy.",
-                        "I'd rather not talk about the worst ones. Some things stay with you.",
-                        "Every fight is tough when your life's on the line. The easy ones just mean you trained harder."
-                    };
-                    return battleStories[random.Next(battleStories.Length)];
+                    return Loc.Get($"dialogue.vn.topic.warrior_battles_{random.Next(4) + 1}");
                 case "warrior_weapons":
-                    return $"I prefer something with weight to it. When you hit someone, you want them to stay down.";
+                    return Loc.Get("dialogue.vn.topic.warrior_weapons");
 
                 // Mage topics
                 case "mage_magic":
-                    return isOpen
-                        ? "Years of study, sleepless nights, and one too many singed eyebrows. Magic isn't learned, it's earned through dedication."
-                        : "Books. Lots of books.";
+                    return Loc.Get(isOpen ? "dialogue.vn.topic.mage_magic_open" : "dialogue.vn.topic.mage_magic_closed");
                 case "mage_spells":
-                    var spellStories = new[]
-                    {
-                        "I once managed to conjure lightning during a clear sky. The power was... intoxicating. Also terrifying.",
-                        "There's a spell I've been working on that could change everything. But it's not ready yet.",
-                        "Power isn't about the biggest spell. It's about using the right spell at the right moment."
-                    };
-                    return spellStories[random.Next(spellStories.Length)];
+                    return Loc.Get($"dialogue.vn.topic.mage_spells_{random.Next(3) + 1}");
                 case "mage_research":
-                    return "Always. The arcane arts are infinite. I'll never run out of questions to answer.";
+                    return Loc.Get("dialogue.vn.topic.mage_research");
 
                 // Cleric/Paladin topics
                 case "cleric_faith":
-                    var faithResponses = new[]
-                    {
-                        "I follow the light. In all its forms. It guides me even in the darkest places.",
-                        "The gods are real. I've felt their power flow through me. Once you experience that, doubt becomes impossible.",
-                        "Faith isn't about which god you pray to. It's about believing in something greater than yourself."
-                    };
-                    return faithResponses[random.Next(faithResponses.Length)];
+                    return Loc.Get($"dialogue.vn.topic.cleric_faith_{random.Next(3) + 1}");
                 case "cleric_calling":
-                    return isOpen
-                        ? "I was lost once. The temple took me in. Now I try to help others find their way."
-                        : "It's a long story.";
+                    return Loc.Get(isOpen ? "dialogue.vn.topic.cleric_calling_open" : "dialogue.vn.topic.cleric_calling_closed");
                 case "cleric_miracles":
-                    return "Every healing is a miracle. Every life saved. We just forget to see them that way.";
+                    return Loc.Get("dialogue.vn.topic.cleric_miracles");
 
                 // Rogue topics
                 case "rogue_shadows":
-                    return isOpen
-                        ? "*grins* Practice. And learning to read people. Most don't pay attention to what's actually around them."
-                        : "Trade secret.";
+                    return Loc.Get(isOpen ? "dialogue.vn.topic.rogue_shadows_open" : "dialogue.vn.topic.rogue_shadows_closed");
                 case "rogue_jobs":
-                    return "Everyone has regrets. The trick is learning from them without drowning in them.";
+                    return Loc.Get("dialogue.vn.topic.rogue_jobs");
                 case "rogue_secrets":
-                    return "*raises eyebrow* Maybe. But secrets lose their value when shared. Why do you ask?";
+                    return Loc.Get("dialogue.vn.topic.rogue_secrets");
 
                 // Ranger topics
                 case "ranger_wilds":
-                    var wildStories = new[]
-                    {
-                        "A clearing where the trees grew in a perfect circle. Ancient magic, I think. Gave me chills.",
-                        "Wolves that watched me for three days but never attacked. Like they were... studying me.",
-                        "There are things in the deep forest that don't have names. Some of them aren't hostile. Some are."
-                    };
-                    return wildStories[random.Next(wildStories.Length)];
+                    return Loc.Get($"dialogue.vn.topic.ranger_wilds_{random.Next(3) + 1}");
                 case "ranger_tracking":
-                    return "Everything leaves a trail. Broken twigs, bent grass, the way animals go quiet. You just have to learn to see.";
+                    return Loc.Get("dialogue.vn.topic.ranger_tracking");
 
                 // Monk topics
                 case "monk_discipline":
-                    return "The body and mind are one. Train one, and you train the other. Neglect one, and both suffer.";
+                    return Loc.Get("dialogue.vn.topic.monk_discipline");
                 case "monk_meditation":
-                    return "Daily. It's not about emptying your mind - it's about learning what fills it.";
+                    return Loc.Get("dialogue.vn.topic.monk_meditation");
 
                 // Universal topics
                 case "dungeon_rumors":
-                    var dungeonRumors = new[]
-                    {
-                        "They say there's something stirring on the deeper levels. Something old.",
-                        "A party went down to level 40 last week. Only one came back. She won't talk about what happened.",
-                        "The monsters have been more organized lately. Almost like something's... directing them.",
-                        "I heard there's treasure on level 25 that no one's been able to claim. Cursed, some say."
-                    };
-                    return dungeonRumors[random.Next(dungeonRumors.Length)];
+                    return Loc.Get($"dialogue.vn.topic.dungeon_rumors_{random.Next(4) + 1}");
                 case "town_news":
-                    var gossip = new[]
-                    {
-                        "The inn's been busier than usual. Lots of new adventurers coming through.",
-                        "Someone said the King's raising taxes again. As if we don't pay enough already.",
-                        "There was a fight at the arena yesterday. Someone got hurt badly.",
-                        "The weapon shop got a new shipment. Might be worth checking out."
-                    };
-                    return gossip[random.Next(gossip.Length)];
+                    return Loc.Get($"dialogue.vn.topic.town_news_{random.Next(4) + 1}");
                 case "weather":
-                    return "It's been strange lately. The old-timers say it means something's changing. Then again, they say that about everything.";
+                    return Loc.Get("dialogue.vn.topic.weather");
                 case "life_goals":
-                    return isOpen
-                        ? "Survival first. Gold second. Maybe find something worth fighting for along the way."
-                        : "Getting by. Same as everyone.";
+                    return Loc.Get(isOpen ? "dialogue.vn.topic.life_goals_open" : "dialogue.vn.topic.life_goals_closed");
                 case "origins":
-                    return isOpen
-                        ? $"Somewhere else. Somewhere that's not here anymore, if you take my meaning."
-                        : "Does it matter? We're all here now.";
+                    return Loc.Get(isOpen ? "dialogue.vn.topic.origins_open" : "dialogue.vn.topic.origins_closed");
                 case "hobbies":
-                    var hobbies = new[]
-                    {
-                        "When you spend your days fighting for your life, relaxing is a hobby in itself.",
-                        "I read when I can. There's a bookshop in town that gets interesting things sometimes.",
-                        "Drinking at the inn counts, right? *laughs*"
-                    };
-                    return hobbies[random.Next(hobbies.Length)];
+                    return Loc.Get($"dialogue.vn.topic.hobbies_{random.Next(3) + 1}");
                 case "romance_views":
-                    return isOpen
-                        ? "True love? Maybe. I've seen people do incredible things for love. Terrible things too."
-                        : "*looks away* That's... personal.";
+                    return Loc.Get(isOpen ? "dialogue.vn.topic.romance_views_open" : "dialogue.vn.topic.romance_views_closed");
                 case "friends":
-                    return "A few. Quality over quantity. Trust is hard to come by here.";
+                    return Loc.Get("dialogue.vn.topic.friends");
                 case "family":
-                    return isOpen
-                        ? "That's a complicated question. Family isn't always about blood."
-                        : "I'd rather not talk about that.";
+                    return Loc.Get(isOpen ? "dialogue.vn.topic.family_open" : "dialogue.vn.topic.family_closed");
 
                 default:
-                    var generic = new[]
-                    {
-                        "Things have been... interesting lately.",
-                        "Same as usual, I suppose. Fighting, surviving, trying to make gold.",
-                        "Nothing too exciting. Just the usual dangers and drama."
-                    };
-                    return generic[random.Next(generic.Length)];
+                    return Loc.Get($"dialogue.vn.topic.generic_{random.Next(3) + 1}");
             }
         }
 
@@ -1324,30 +1167,38 @@ namespace UsurperRemake.Systems
 
             var profile = npc.Brain?.Personality;
 
-            // They open up more at better relationships
+            // They open up more at better relationships. Phase 1.5 enhancer wraps
+            // the NPC's actual personal-story reply with mood / memory / witness /
+            // personality / faction flavor.
             if (relationLevel <= 40) // Friend or better
             {
+                string personalLine = GeneratePersonalStory(npc, true);
+                if (player != null)
+                    personalLine = UsurperRemake.Systems.DialogueEnhancer.Enhance(personalLine, npc, player);
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  {Loc.Get("dialogue.narr_opens_up", npc.Name2)}");
                 terminal.SetColor("white");
-                terminal.WriteLine($"  \"{GeneratePersonalStory(npc, true)}\"");
+                terminal.WriteLine($"  \"{personalLine}\"");
 
                 // Relationship boost for showing interest
                 RelationshipSystem.UpdateRelationship(player!, npc, 1);
             }
             else if (relationLevel <= 70)
             {
+                string personalLine = GeneratePersonalStory(npc, false);
+                if (player != null)
+                    personalLine = UsurperRemake.Systems.DialogueEnhancer.Enhance(personalLine, npc, player);
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  {Loc.Get("dialogue.narr_shares_little", npc.Name2)}");
                 terminal.SetColor("white");
-                terminal.WriteLine($"  \"{GeneratePersonalStory(npc, false)}\"");
+                terminal.WriteLine($"  \"{personalLine}\"");
             }
             else
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  {Loc.Get("dialogue.narr_guarded", npc.Name2)}");
                 terminal.SetColor("white");
-                terminal.WriteLine($"  \"Why do you want to know? We barely know each other.\"");
+                terminal.WriteLine($"  \"{Loc.Get("dialogue.vn.personal.guarded_reply")}\"");
             }
 
             terminal.WriteLine("");
@@ -1356,28 +1207,9 @@ namespace UsurperRemake.Systems
 
         private string GeneratePersonalStory(NPC npc, bool intimate)
         {
-            if (intimate)
-            {
-                var stories = new[]
-                {
-                    $"I became a {npc.ClassName} because I had no other choice. My family... it's a long story.",
-                    $"Sometimes I wonder if there's more to life than fighting and surviving.",
-                    $"I trust you, so I'll tell you - I'm looking for someone I lost long ago.",
-                    $"Between you and me? I'm not as tough as I seem. Everyone has their vulnerabilities."
-                };
-                return stories[random.Next(stories.Length)];
-            }
-            else
-            {
-                var stories = new[]
-                {
-                    $"I've been a {npc.ClassName} for many years now. It's a living.",
-                    $"Not much to tell, really. I do my job and try to stay alive.",
-                    $"I came to Dorashire looking for opportunity. Still looking.",
-                    $"The usual story - trying to make gold and not die."
-                };
-                return stories[random.Next(stories.Length)];
-            }
+            int idx = random.Next(4) + 1;
+            string keyBase = intimate ? "dialogue.vn.story.intimate_" : "dialogue.vn.story.casual_";
+            return Loc.Get(keyBase + idx, npc.ClassName);
         }
 
         private async Task HandleFlirtOption(NPC npc, int relationLevel)
@@ -1395,8 +1227,6 @@ namespace UsurperRemake.Systems
                 // Note: flirtCountThisSession is incremented by the caller (ProcessConversationChoice)
 
                 terminal!.SetColor("bright_magenta");
-                string their = npc.Sex == CharacterSex.Female ? "her" : "his";
-                string gender = npc.Sex == CharacterSex.Female ? "she" : "he";
 
                 if (flirtCountThisSession == 1)
                     terminal.WriteLine($"  {Loc.Get("dialogue.narr_catch_eye_grin", npc.Name2)}");
@@ -1406,15 +1236,9 @@ namespace UsurperRemake.Systems
                 await Task.Delay(500);
 
                 terminal.SetColor("yellow");
-                var loverResponses = new[]
-                {
-                    $"  *{gender} grins back* \"You're incorrigible... and I love it.\"",
-                    $"  *laughs softly* \"Even after all this time, you make me blush.\"",
-                    $"  *moves closer* \"Keep looking at me like that and we won't make it home.\"",
-                    $"  *{their} eyes sparkle* \"You always know how to make me smile.\"",
-                    $"  *playfully* \"Careful, or I'll drag you somewhere private.\""
-                };
-                terminal.WriteLine(loverResponses[random.Next(loverResponses.Length)]);
+                int loverIdx = random.Next(5) + 1;
+                string loverLine = Loc.Get($"dialogue.vn.flirt.lover_response_{loverIdx}");
+                terminal.WriteLine($"  {loverLine}");
 
                 RelationshipSystem.UpdateRelationship(player!, npc, 1, 1, false, true);
                 terminal.WriteLine("");
@@ -1675,31 +1499,23 @@ namespace UsurperRemake.Systems
                 // Varied positive responses
                 if (flirtReceptiveness > 0.5f && state.FlirtSuccessCount >= 2)
                 {
-                    var responses = new[]
-                    {
-                        $"  *moves closer* \"I was hoping you'd say something like that...\"",
-                        $"  *blushes deeply* \"You're making it hard to think straight.\"",
-                        $"  *laughs softly* \"Keep talking like that and who knows what might happen...\""
-                    };
-                    terminal.WriteLine(responses[random.Next(responses.Length)]);
+                    int idx = random.Next(3) + 1;
+                    string line = Loc.Get($"dialogue.vn.flirt.strong_pos_{idx}");
+                    terminal.WriteLine($"  {line}");
                     // Strong flirt success - allow breaking through friendship cap
                     RelationshipSystem.UpdateRelationship(player!, npc, 1, 3, false, true);
                 }
                 else if (state.FlirtSuccessCount == 1)
                 {
-                    var responses = new[]
-                    {
-                        $"  *blushes and smiles* \"Well, aren't you charming...\"",
-                        $"  *looks down shyly* \"You certainly know how to make someone feel special.\"",
-                        $"  *grins* \"I'm glad someone noticed.\""
-                    };
-                    terminal.WriteLine(responses[random.Next(responses.Length)]);
+                    int idx = random.Next(3) + 1;
+                    string line = Loc.Get($"dialogue.vn.flirt.med_pos_{idx}");
+                    terminal.WriteLine($"  {line}");
                     // Successful flirt - allow progression with override
                     RelationshipSystem.UpdateRelationship(player!, npc, 1, 2, false, true);
                 }
                 else
                 {
-                    terminal.WriteLine($"  *smiles* \"That's... sweet of you to say.\"");
+                    terminal.WriteLine($"  {Loc.Get("dialogue.vn.flirt.mild_pos")}");
                     // First successful flirt - modest boost with override
                     RelationshipSystem.UpdateRelationship(player!, npc, 1, 1, false, true);
                 }
@@ -1713,13 +1529,9 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine($"  {Loc.Get("dialogue.narr_unsure", npc.Name2)}");
                 terminal.SetColor("gray");
 
-                var responses = new[]
-                {
-                    $"  *awkward laugh* \"Oh... um, thanks?\"",
-                    $"  *clears throat* \"That's... nice of you.\"",
-                    $"  *looks away* \"I'm not sure what to say to that.\""
-                };
-                terminal.WriteLine(responses[random.Next(responses.Length)]);
+                int idx = random.Next(3) + 1;
+                string line = Loc.Get($"dialogue.vn.flirt.neutral_{idx}");
+                terminal.WriteLine($"  {line}");
             }
             else
             {
@@ -1732,43 +1544,33 @@ namespace UsurperRemake.Systems
 
                 if (!isAttracted)
                 {
-                    terminal.WriteLine($"  \"Flattering, but you're not really my type.\"");
+                    terminal.WriteLine($"  \"{Loc.Get("dialogue.vn.flirt.neg_not_type")}\"");
+                    // (already quoted at call site -- pure speech)
                 }
                 else if (playerIsMarried)
                 {
-                    var responses = new[]
-                    {
-                        $"  \"Aren't you married? I don't appreciate this.\"",
-                        $"  *eyes your ring* \"I think your spouse might have something to say about that.\"",
-                        $"  \"I don't get involved with married people. Period.\""
-                    };
-                    terminal.WriteLine(responses[random.Next(responses.Length)]);
+                    int idx = random.Next(3) + 1;
+                    string line = Loc.Get($"dialogue.vn.flirt.neg_married_{idx}");
+                    // Wrap speech-only lines (those without asterisk action) in quotes for VN format
+                    terminal.WriteLine(line.StartsWith("*") ? $"  {line}" : $"  \"{line}\"");
                     RelationshipSystem.UpdateRelationship(player!, npc, -2);
                 }
                 else if (flirtCountThisSession > 1)
                 {
-                    terminal.WriteLine($"  \"You're being a bit... persistent, aren't you?\"");
+                    terminal.WriteLine($"  \"{Loc.Get("dialogue.vn.flirt.neg_persistent")}\"");
                     RelationshipSystem.UpdateRelationship(player!, npc, -1);
                 }
                 else if (relationLevel > 60)
                 {
-                    var responses = new[]
-                    {
-                        $"  \"We barely know each other. Maybe slow down?\"",
-                        $"  *steps back* \"I don't know you well enough for this.\"",
-                        $"  \"Perhaps we should get to know each other better first.\""
-                    };
-                    terminal.WriteLine(responses[random.Next(responses.Length)]);
+                    int idx = random.Next(3) + 1;
+                    string line = Loc.Get($"dialogue.vn.flirt.neg_too_soon_{idx}");
+                    terminal.WriteLine(line.StartsWith("*") ? $"  {line}" : $"  \"{line}\"");
                 }
                 else
                 {
-                    var responses = new[]
-                    {
-                        $"  *frowns* \"I don't appreciate that kind of talk.\"",
-                        $"  \"Let's keep things professional, shall we?\"",
-                        $"  \"I'm not interested in... whatever that was.\""
-                    };
-                    terminal.WriteLine(responses[random.Next(responses.Length)]);
+                    int idx = random.Next(3) + 1;
+                    string line = Loc.Get($"dialogue.vn.flirt.neg_general_{idx}");
+                    terminal.WriteLine(line.StartsWith("*") ? $"  {line}" : $"  \"{line}\"");
                     RelationshipSystem.UpdateRelationship(player!, npc, -1);
                 }
             }
@@ -2411,21 +2213,28 @@ namespace UsurperRemake.Systems
             terminal!.WriteLine("");
             terminal.SetColor("yellow");
 
-            string farewell = romanceType switch
+            // Spoken line only (no speaker prefix) so the enhancer can wrap it.
+            string spoken = romanceType switch
             {
-                RomanceRelationType.Spouse => $"  {npc.Name2}: \"Don't be gone too long, my love...\"",
-                RomanceRelationType.Lover => $"  {npc.Name2}: \"Until next time... I'll be thinking of you.\"",
-                RomanceRelationType.FWB => $"  {npc.Name2}: *winks* \"You know where to find me.\"",
+                RomanceRelationType.Spouse => Loc.Get("dialogue.vn.farewell.spouse"),
+                RomanceRelationType.Lover  => Loc.Get("dialogue.vn.farewell.lover"),
+                RomanceRelationType.FWB    => Loc.Get("dialogue.vn.farewell.fwb"),
                 _ => relationLevel switch
                 {
-                    <= 30 => $"  {npc.Name2}: \"Stay safe out there... for me.\"",
-                    <= 50 => $"  {npc.Name2}: \"Good luck, friend!\"",
-                    <= 70 => $"  {npc.Name2}: \"Farewell.\"",
-                    _ => $"  {npc.Name2}: \"Good riddance.\""
+                    <= 30 => Loc.Get("dialogue.vn.farewell.close"),
+                    <= 50 => Loc.Get("dialogue.vn.farewell.friend"),
+                    <= 70 => Loc.Get("dialogue.vn.farewell.neutral"),
+                    _     => Loc.Get("dialogue.vn.farewell.hostile")
                 }
             };
 
-            terminal.WriteLine(farewell);
+            // Phase 1.5 enhancer: layer contextual flavor on the farewell.
+            if (player != null)
+                spoken = UsurperRemake.Systems.DialogueEnhancer.Enhance(spoken, npc, player);
+
+            // FWB keeps the *winks* action prefix.
+            string prefix = romanceType == RomanceRelationType.FWB ? "*winks* " : "";
+            terminal.WriteLine($"  {npc.Name2}: {prefix}\"{spoken}\"");
             terminal.WriteLine("");
 
             await Task.Delay(1500);

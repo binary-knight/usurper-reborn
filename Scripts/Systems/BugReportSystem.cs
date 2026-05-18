@@ -63,6 +63,8 @@ public static class BugReportSystem
         terminal.SetColor("white");
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("bug_report.describe_bug"));
+        terminal.SetColor("gray");
+        terminal.WriteLine(Loc.Get("bug_report.cancel_hint"));
         terminal.WriteLine("");
 
         // Get bug description from user
