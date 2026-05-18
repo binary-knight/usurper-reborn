@@ -222,16 +222,30 @@ The streak-broken notification ("Your N-day login streak has ended!") and the 9 
 
 Fix: extracted 10 strings to `engine.streak_*` loc keys. Refactored both the streak-broken branch and all milestone branches to use `Loc.Get`. Translated into all 5 languages (50 new translations total).
 
-## Steam achievement wiring
+## Steam achievement coverage: 79/79 achievements live
 
-Found one in-game achievement defined in `AchievementSystem.cs` but never triggered: `big_spender_magic` (Magical Patron, Gold tier, 100k gold spent at Magic Shop). The `StatisticsSystem` already tracked `TotalMagicShopGoldSpent` so the missing piece was the threshold check in `CheckStatAchievements`. Added: `if (stats.TotalMagicShopGoldSpent >= 100000) TryUnlock(player, "big_spender_magic");`. All 79 in-game achievements are now reachable via at least one `TryUnlock` call path.
+Comprehensive audit and Steamworks Partner-site pass. v0.61.4 closes the gap between in-game achievement definitions and Steam-side registration.
 
-Also produced three new docs:
-- `DOCS/STEAM_ACHIEVEMENTS.md` -- catalog of all 79 in-game achievements with tier, secret flag, and trigger type (auto / manual)
-- `DOCS/STEAM_ACHIEVEMENTS_MISSING.md` -- diff against the 50 currently-registered Steamworks Partner entries, lists the 30 that need to be added (plus a flagged typo: `bouny_hunter` registered on Steam should be `bounty_hunter`)
-- `DOCS/STEAM_ACHIEVEMENT_ICON_PROMPTS.md` -- image-generation prompts for the 30 missing icons with tier-appropriate frames
+**Code side.** Found one in-game achievement defined in `AchievementSystem.cs` but never triggered: `big_spender_magic` (Magical Patron, Gold tier, 100k gold spent at Magic Shop). The `StatisticsSystem` already tracked `TotalMagicShopGoldSpent` so the missing piece was the threshold check in `CheckStatAchievements`. Added: `if (stats.TotalMagicShopGoldSpent >= 100000) TryUnlock(player, "big_spender_magic");`. All 79 in-game achievements are now reachable via at least one `TryUnlock` call path.
 
-The Steam unlock bridge is already in place: every call to `AchievementSystem.TryUnlock(player, id)` automatically calls `SteamIntegration.UnlockAchievement(id)` at line 1196. The achievement ID is used 1:1 as the Steam API Name. No additional per-achievement Steam code is needed for the 30 missing ones -- just create them on the Partner site with matching API names and the in-game unlock will fire automatically.
+**Steamworks Partner-site side.** 30 in-game achievements were defined in code but had never been registered on the Steamworks Partner dashboard, so they would never fire on Steam even though the in-game unlock path worked. Plus a typo on the Steam side (`bouny_hunter` registered, code unlocks `bounty_hunter`) that would have meant the bounty-hunter achievement never fired for any player. **All 30 missing achievements have been registered on the Partner site** with their API names matching the in-game IDs 1:1, and the `bouny_hunter` typo has been corrected to `bounty_hunter`. The Partner-site registration covers all five tiers:
+
+| Tier | Newly registered |
+| --- | --- |
+| Diamond | 2 (`grand_champion`, `world_boss_25_total`) |
+| Platinum | 5 (`arena_champion`, `ascended`, `dark_alley_king`, `legendary_devotion`, `world_boss_5_unique`) |
+| Gold | 9 (`angel_of_death`, `arena_master`, `big_spender_magic`, `corruption_fragment`, `dark_alley_pit_champion`, `devoted_champion`, `pvp_veteran`, `world_boss_first`, `world_boss_mvp`) |
+| Silver | 7 (`arena_veteran`, `bounty_hunter`, `dark_alley_gambler`, `dark_alley_pickpocket`, `dark_magician`, `love_magician`, `master_enchanter`) |
+| Bronze | 7 (`accessory_collector`, `arena_hopeful`, `dark_alley_debt_free`, `dedicated_adventurer`, `first_enchant`, `first_steps`, `guardian_slayer`) |
+
+**Icon artwork.** All 30 newly-registered achievements have unique icon art.
+
+- **Gauntlet tier series** (`arena_hopeful` → `arena_veteran` → `arena_master` → `arena_champion` → `grand_champion`) escalates from "young fighter with simple sword" through "battle-worn warrior with chipped sword" to "crowned gladiator with blood-stained spear over a shattered tyrant crown"
+- **Login-streak series** (`dedicated_adventurer` 7d → `devoted_champion` 30d → `legendary_devotion` 90d) escalates 7 small stars → 30 stars in a banner → 90 candles forming a circle around an eternal flame
+- **World boss series** (`world_boss_first` → `world_boss_5_unique` → `world_boss_25_total`) reads as solo victory pose → 5 mounted trophy heads → mountain of skulls forming a throne
+- **Hidden achievements** (`angel_of_death`, `corruption_fragment`, `dark_magician`) have spoiler-aware prompts; Steam reveals the icon only after unlock so the artwork matches the actual content
+
+The Steam unlock bridge was already in place: every call to `AchievementSystem.TryUnlock(player, id)` automatically calls `SteamIntegration.UnlockAchievement(id)` at line 1196. The achievement ID is used 1:1 as the Steam API Name. After v0.61.4 ships, players will be able to unlock all 79 achievements on Steam, with existing in-game unlocks back-syncing on next login via `AchievementSystem.SyncUnlockedToSteam(player)`.
 
 ## Files changed (post-initial-release-notes work)
 
