@@ -53,9 +53,6 @@ public partial class MagicShopLocation : BaseLocation
         _currentAccessoryCategory = null;
         _accessoryPage = 0;
     }
-
-    protected override string GetMudPromptName() => "Magic Shop";
-
     protected override string[]? GetAmbientMessages() => new[]
     {
         "A faint arcane hum pulses from somewhere behind the shelves.",

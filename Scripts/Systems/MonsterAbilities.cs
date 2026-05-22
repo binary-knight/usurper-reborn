@@ -992,7 +992,12 @@ public static class MonsterAbilities
             case AbilityType.WebTrap:
                 result.InflictStatus = StatusEffect.Stunned;
                 result.StatusDuration = 2;
-                result.StatusChance = 45;
+                // v0.61.5 balance pass: production telemetry showed Floor 8 Giant Spider
+                // at 60% death rate (3 of 5 encounters) vs Floor 5 Giant Spider 0/5. The
+                // difference was WebTrap's 45% stun chance giving the spider two free
+                // hits against underleveled players. Reduced 45 -> 30 to lower the
+                // free-hit frequency without removing the threat entirely.
+                result.StatusChance = 30;
                 result.SkipNormalAttack = true;
                 result.Message = $"{monster.Name} traps {you} in sticky webbing!";
                 result.MessageColor = "white";

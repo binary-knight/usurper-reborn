@@ -2453,11 +2453,14 @@ public abstract class BaseLocation
 
     /// <summary>
     /// Short location name shown in the MUD streaming prompt, e.g. "Inn > ".
-    /// Override in subclasses for a better name than the default class-name stripping.
+    /// Defaults to the localized location name via `GetLocationName(LocationId)`,
+    /// which routes through `location.name.{enum}` loc keys. Override in subclasses
+    /// only when the prompt needs dynamic content beyond the location name (e.g.
+    /// Dungeon prepends the current floor number).
     /// </summary>
     protected virtual string GetMudPromptName()
     {
-        return GetType().Name.Replace("Location", "");
+        return GetLocationName(LocationId);
     }
 
     /// <summary>

@@ -1001,7 +1001,7 @@ public class Equipment
         bool isPrestige = character.Class >= CharacterClass.Tidesworn;
         if (!isPrestige && ClassRestrictions.Count > 0 && !ClassRestrictions.Contains(character.Class))
         {
-            reason = Loc.Get("ui.cannot_use_class", character.Class);
+            reason = Loc.Get("ui.cannot_use_class", GameConfig.GetLocalizedClassName(character.Class));
             return false;
         }
 
@@ -1018,7 +1018,7 @@ public class Equipment
                            WeaponType == WeaponType.Maul;
             if (!allowed)
             {
-                reason = Loc.Get("ui.cannot_use_class", character.Class);
+                reason = Loc.Get("ui.cannot_use_class", GameConfig.GetLocalizedClassName(character.Class));
                 return false;
             }
         }

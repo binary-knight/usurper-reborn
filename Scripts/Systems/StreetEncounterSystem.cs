@@ -270,7 +270,7 @@ public class StreetEncounterSystem
         terminal.WriteLine("");
 
         terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("street_encounter.hostile.stats", attacker.Name, attacker.Level, attacker.Class, attacker.HP, attacker.MaxHP));
+        terminal.WriteLine(Loc.Get("street_encounter.hostile.stats", attacker.Name, attacker.Level, GameConfig.GetLocalizedClassName(attacker.Class), attacker.HP, attacker.MaxHP));
         terminal.WriteLine("");
 
         terminal.Write("  [", "white");
@@ -507,7 +507,7 @@ public class StreetEncounterSystem
         terminal.WriteLine("");
 
         terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("street_encounter.challenge.info", challenger.Name, challenger.Level, challenger.Class));
+        terminal.WriteLine(Loc.Get("street_encounter.challenge.info", challenger.Name, challenger.Level, GameConfig.GetLocalizedClassName(challenger.Class)));
         terminal.WriteLine("");
 
         terminal.Write("  [", "white");
@@ -2072,32 +2072,88 @@ public class StreetEncounterSystem
 
     private NPC? FindGrudgeNPC(Character player, List<NPC> npcs)
     {
-        // Prioritize murder grudges — the victim who respawned and wants revenge
-        var murderGrudge = npcs.FirstOrDefault(npc =>
+        // v0.61.5: NPCs now learn from repeated losses. An NPC who has been defeated
+        // by this player MaxGrudgeLossesPerPlayer times stops seeking revenge. Plus
+        // per-NPC cooldown (so they don't spam-confront within a single play session)
+        // and HP gate (a wounded NPC doesn't pick fights with someone who just beat
+        // them up). Selection is randomized within eligible pool so the same NPC
+        // isn't always picked even when multiple have grudges.
+
+        // Murder grudges -- highest priority, wider level range, but still subject
+        // to the loss-count cap and cooldown. A player who keeps murdering the same
+        // NPC over and over (online: NPC respawns) eventually stops triggering
+        // the same victim's revenge encounter.
+        var murderCandidates = npcs.Where(npc =>
             !npc.IsDead && npc.IsAlive &&
             npc.Memory != null &&
             npc.Memory.HasMemoryOfEvent(MemoryType.Murdered, player.Name2, hoursAgo: 720) && // 30 days
-            Math.Abs(npc.Level - player.Level) <= 15); // Wider level range for murder revenge
+            Math.Abs(npc.Level - player.Level) <= 15 &&
+            IsGrudgeEligible(npc, player)).ToList();
+        if (murderCandidates.Count > 0)
+            return murderCandidates[_random.Next(murderCandidates.Count)];
 
-        if (murderGrudge != null) return murderGrudge;
-
-        // Then check witness revenge — NPCs who saw the player murder someone
-        var witnessGrudge = npcs.FirstOrDefault(npc =>
+        // Witness revenge -- saw player murder someone, impression very low.
+        var witnessCandidates = npcs.Where(npc =>
             !npc.IsDead && npc.IsAlive &&
             npc.Memory != null &&
             npc.Memory.GetCharacterImpression(player.Name2) <= -0.5f &&
             npc.Memory.HasMemoryOfEvent(MemoryType.SawDeath, player.Name2, hoursAgo: 336) && // 14 days
-            Math.Abs(npc.Level - player.Level) <= 10);
+            Math.Abs(npc.Level - player.Level) <= 10 &&
+            IsGrudgeEligible(npc, player)).ToList();
+        if (witnessCandidates.Count > 0)
+            return witnessCandidates[_random.Next(witnessCandidates.Count)];
 
-        if (witnessGrudge != null) return witnessGrudge;
-
-        // Standard grudge — defeated in combat
-        return npcs.FirstOrDefault(npc =>
+        // Standard grudge -- defeated in combat.
+        var defeatCandidates = npcs.Where(npc =>
             !npc.IsDead && npc.IsAlive &&
             npc.Memory != null &&
             npc.Memory.GetCharacterImpression(player.Name2) <= -0.5f &&
             npc.Memory.HasMemoryOfEvent(MemoryType.Defeated, player.Name2, hoursAgo: 168) && // 7 days
-            Math.Abs(npc.Level - player.Level) <= 10);
+            Math.Abs(npc.Level - player.Level) <= 10 &&
+            IsGrudgeEligible(npc, player)).ToList();
+        if (defeatCandidates.Count > 0)
+            return defeatCandidates[_random.Next(defeatCandidates.Count)];
+
+        return null;
+    }
+
+    /// <summary>
+    /// Apply the three NPC-learning gates to a grudge candidate:
+    /// (1) loss-count cap (NPC gives up after losing N times),
+    /// (2) per-NPC cooldown (don't spam-confront within an hour),
+    /// (3) HP gate (don't pick fights at near-death).
+    /// </summary>
+    private bool IsGrudgeEligible(NPC npc, Character player)
+    {
+        if (npc.Memory == null) return false;
+
+        // (1) Loss-count cap: count Defeated memories about this player within the
+        // 7-day eligibility window. If the NPC has lost more than MaxGrudgeLosses
+        // times already, they've learned -- skip them. They can grudge again after
+        // the memories age out of the window.
+        int lossCount = npc.Memory.AllMemories.Count(m =>
+            m.Type == MemoryType.Defeated &&
+            m.InvolvedCharacter == player.Name2 &&
+            (DateTime.Now - m.Timestamp).TotalHours <= 168);
+        if (lossCount >= GameConfig.MaxGrudgeLossesPerPlayer)
+            return false;
+
+        // (2) Per-NPC cooldown: most recent loss must be at least N minutes ago.
+        // Prevents the same NPC from re-attacking within minutes of getting beaten.
+        var mostRecentLoss = npc.Memory.AllMemories
+            .Where(m => m.Type == MemoryType.Defeated && m.InvolvedCharacter == player.Name2)
+            .OrderByDescending(m => m.Timestamp)
+            .FirstOrDefault();
+        if (mostRecentLoss != null &&
+            (DateTime.Now - mostRecentLoss.Timestamp).TotalMinutes < GameConfig.GrudgeNpcCooldownMinutes)
+            return false;
+
+        // (3) HP gate: NPC must be at or above the threshold to seek revenge.
+        // Near-dead NPCs lick their wounds first.
+        if (npc.MaxHP > 0 && (float)npc.HP / npc.MaxHP < GameConfig.GrudgeNpcMinHpPercent)
+            return false;
+
+        return true;
     }
 
     /// <summary>
@@ -2182,7 +2238,7 @@ public class StreetEncounterSystem
                 terminal.WriteLine(Loc.Get("street_encounter.grudge.steps_out", grudgeNpc.Name2));
                 terminal.WriteLine(Loc.Get("street_encounter.grudge.hesitates"));
                 terminal.SetColor("dark_yellow");
-                terminal.WriteLine(Loc.Get("street_encounter.grudge.thinks_better", grudgeNpc.Level, grudgeNpc.Class));
+                terminal.WriteLine(Loc.Get("street_encounter.grudge.thinks_better", grudgeNpc.Level, GameConfig.GetLocalizedClassName(grudgeNpc.Class)));
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("street_encounter.grudge.self_preservation", levelGap));
                 await terminal.PressAnyKey();
@@ -2241,7 +2297,7 @@ public class StreetEncounterSystem
             UIHelper.DrawBoxLine(terminal, Loc.Get("street_encounter.grudge.murder_quote_1"), "dark_red", "bright_red");
             UIHelper.DrawBoxLine(terminal, Loc.Get("street_encounter.grudge.murder_quote_2"), "dark_red", "bright_red");
             UIHelper.DrawBoxEmpty(terminal, "dark_red");
-            UIHelper.DrawBoxLine(terminal, Loc.Get("street_encounter.grudge.enraged_stats", grudgeNpc.Level, grudgeNpc.Class, grudgeNpc.HP, grudgeNpc.MaxHP), "dark_red", "bright_yellow");
+            UIHelper.DrawBoxLine(terminal, Loc.Get("street_encounter.grudge.enraged_stats", grudgeNpc.Level, GameConfig.GetLocalizedClassName(grudgeNpc.Class), grudgeNpc.HP, grudgeNpc.MaxHP), "dark_red", "bright_yellow");
             UIHelper.DrawBoxEmpty(terminal, "dark_red");
             UIHelper.DrawBoxSeparator(terminal, "dark_red");
             UIHelper.DrawMenuOption(terminal, "F", Loc.Get("street_encounter.grudge.opt_fight"), "dark_red", "bright_yellow", "white");
@@ -2311,7 +2367,7 @@ public class StreetEncounterSystem
             else
                 UIHelper.DrawBoxLine(terminal, Loc.Get("street_encounter.witness.saw_murder"), "bright_red", "bright_cyan");
             UIHelper.DrawBoxEmpty(terminal, "bright_red");
-            UIHelper.DrawBoxLine(terminal, Loc.Get("street_encounter.witness.stats", grudgeNpc.Level, grudgeNpc.Class, grudgeNpc.HP, grudgeNpc.MaxHP), "bright_red", "yellow");
+            UIHelper.DrawBoxLine(terminal, Loc.Get("street_encounter.witness.stats", grudgeNpc.Level, GameConfig.GetLocalizedClassName(grudgeNpc.Class), grudgeNpc.HP, grudgeNpc.MaxHP), "bright_red", "yellow");
             UIHelper.DrawBoxEmpty(terminal, "bright_red");
             UIHelper.DrawBoxSeparator(terminal, "bright_red");
             UIHelper.DrawMenuOption(terminal, "F", Loc.Get("street_encounter.grudge.opt_fight"), "bright_red", "bright_yellow", "white");
@@ -2399,7 +2455,7 @@ public class StreetEncounterSystem
             UIHelper.DrawBoxEmpty(terminal, "bright_red");
             UIHelper.DrawBoxLine(terminal, Loc.Get("street_encounter.grudge.think_again"), "bright_red", "bright_cyan");
             UIHelper.DrawBoxEmpty(terminal, "bright_red");
-            UIHelper.DrawBoxLine(terminal, Loc.Get("street_encounter.witness.stats", grudgeNpc.Level, grudgeNpc.Class, grudgeNpc.HP, grudgeNpc.MaxHP), "bright_red", "yellow");
+            UIHelper.DrawBoxLine(terminal, Loc.Get("street_encounter.witness.stats", grudgeNpc.Level, GameConfig.GetLocalizedClassName(grudgeNpc.Class), grudgeNpc.HP, grudgeNpc.MaxHP), "bright_red", "yellow");
             UIHelper.DrawBoxEmpty(terminal, "bright_red");
             UIHelper.DrawBoxSeparator(terminal, "bright_red");
             UIHelper.DrawMenuOption(terminal, "F", Loc.Get("street_encounter.grudge.opt_fight"), "bright_red", "bright_yellow", "white");
@@ -2675,7 +2731,7 @@ public class StreetEncounterSystem
         terminal.ClearScreen();
         UIHelper.DrawBoxTop(terminal, Loc.Get("street_encounter.throne.title"), "bright_yellow");
         UIHelper.DrawBoxEmpty(terminal, "bright_yellow");
-        UIHelper.DrawBoxLine(terminal, Loc.Get("street_encounter.throne.confronts", challenger.Name2, challenger.Level, challenger.Class), "bright_yellow", "white");
+        UIHelper.DrawBoxLine(terminal, Loc.Get("street_encounter.throne.confronts", challenger.Name2, challenger.Level, GameConfig.GetLocalizedClassName(challenger.Class)), "bright_yellow", "white");
         UIHelper.DrawBoxEmpty(terminal, "bright_yellow");
         UIHelper.DrawBoxLine(terminal, Loc.Get("street_encounter.throne.times_up"), "bright_yellow", "bright_cyan");
         UIHelper.DrawBoxEmpty(terminal, "bright_yellow");

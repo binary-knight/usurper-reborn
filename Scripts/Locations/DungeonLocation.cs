@@ -1447,7 +1447,7 @@ public class DungeonLocation : BaseLocation
                 term.SetColor("white");
                 term.Write($"    {t.DisplayName}");
                 term.SetColor("gray");
-                term.WriteLine(Loc.Get("dungeon.merc_level_class", t.Level, t.Class));
+                term.WriteLine(Loc.Get("dungeon.merc_level_class", t.Level, GameConfig.GetLocalizedClassName(t.Class)));
             }
             term.WriteLine("");
         }
@@ -2334,7 +2334,7 @@ public class DungeonLocation : BaseLocation
         };
     }
 
-    protected override string GetMudPromptName() => $"Dungeon Fl.{currentDungeonLevel}";
+    protected override string GetMudPromptName() => Loc.Get("dungeon.mud_prompt", currentDungeonLevel);
 
     protected override string[]? GetAmbientMessages() => new[]
     {
@@ -8584,6 +8584,33 @@ public class DungeonLocation : BaseLocation
     }
 
     /// <summary>
+    /// Apply the Settlement Prison TrapResist buff to incoming trap / puzzle /
+    /// riddle damage if active. Player report (v0.61.5): "Prison says -50%
+    /// trap damage for 5 combats. I never saw traps in combats." Root cause
+    /// was that this buff was only being applied at riddle-failure and
+    /// puzzle-failure sites, never at the actual trap-room handler where
+    /// real damaging traps live (floor collapse, poison darts, explosive
+    /// runes). This helper centralises the mitigation so all five damaging
+    /// sites stay in sync and the buff actually does what its description
+    /// says. Each call that mitigates decrements the buff charge.
+    /// </summary>
+    private int ApplyTrapResistBuff(Character player, int rawDamage)
+    {
+        if (!player.HasSettlementBuff) return rawDamage;
+        if (player.SettlementBuffType != (int)UsurperRemake.Systems.SettlementBuffType.TrapResist) return rawDamage;
+        if (rawDamage <= 0) return rawDamage;
+
+        int mitigated = (int)(rawDamage * (1f - player.SettlementBuffValue));
+        player.SettlementBuffCombats--;
+        if (player.SettlementBuffCombats <= 0)
+        {
+            player.SettlementBuffType = 0;
+            player.SettlementBuffValue = 0f;
+        }
+        return mitigated;
+    }
+
+    /// <summary>
     /// Trap encounter - Various dungeon hazards
     /// </summary>
     private async Task TrapEncounter()
@@ -8614,12 +8641,14 @@ public class DungeonLocation : BaseLocation
             case 0:
                 terminal.WriteLine(Loc.Get("dungeon.trap_floor_gives_way"), "white");
                 var fallDmg = currentDungeonLevel * 3 + dungeonRandom.Next(10);
+                fallDmg = ApplyTrapResistBuff(currentPlayer, fallDmg);
                 currentPlayer.HP = Math.Max(1, currentPlayer.HP - fallDmg);
                 terminal.WriteLine(Loc.Get("dungeon.trap_fall_damage", fallDmg), "red");
                 break;
             case 1:
                 terminal.WriteLine(Loc.Get("dungeon.trap_poison_darts"), "white");
                 var dartDmg = currentDungeonLevel * 2 + dungeonRandom.Next(8);
+                dartDmg = ApplyTrapResistBuff(currentPlayer, dartDmg);
                 currentPlayer.HP = Math.Max(1, currentPlayer.HP - dartDmg);
                 // v0.61.1 Marsh Toad rolls to absorb.
                 if (currentPlayer.TryResistPoison())
@@ -8636,6 +8665,7 @@ public class DungeonLocation : BaseLocation
             case 2:
                 terminal.WriteLine(Loc.Get("dungeon.trap_rune_explodes"), "bright_magenta");
                 var runeDmg = currentDungeonLevel * 5 + dungeonRandom.Next(15);
+                runeDmg = ApplyTrapResistBuff(currentPlayer, runeDmg);
                 currentPlayer.HP = Math.Max(1, currentPlayer.HP - runeDmg);
                 terminal.WriteLine(Loc.Get("dungeon.trap_magic_damage", runeDmg), "red");
                 break;
@@ -13416,19 +13446,9 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("dungeon.gate_sealed"));
 
-            // Take damage on failure
+            // Take damage on failure (Settlement Prison TrapResist applies)
             int damage = riddle.FailureDamage * currentDungeonLevel / 5;
-            // Settlement Prison trap resistance
-            if (player.HasSettlementBuff && player.SettlementBuffType == (int)UsurperRemake.Systems.SettlementBuffType.TrapResist)
-            {
-                damage = (int)(damage * (1f - player.SettlementBuffValue));
-                player.SettlementBuffCombats--;
-                if (player.SettlementBuffCombats <= 0)
-                {
-                    player.SettlementBuffType = 0;
-                    player.SettlementBuffValue = 0f;
-                }
-            }
+            damage = ApplyTrapResistBuff(player, damage);
             if (damage > 0)
             {
                 player.HP = Math.Max(1, player.HP - damage);
@@ -13536,17 +13556,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("dungeon.puzzle_failed"));
 
             int damage = (int)(player.MaxHP * (puzzle.FailureDamagePercent / 100.0));
-            // Settlement Prison trap resistance
-            if (player.HasSettlementBuff && player.SettlementBuffType == (int)UsurperRemake.Systems.SettlementBuffType.TrapResist)
-            {
-                damage = (int)(damage * (1f - player.SettlementBuffValue));
-                player.SettlementBuffCombats--;
-                if (player.SettlementBuffCombats <= 0)
-                {
-                    player.SettlementBuffType = 0;
-                    player.SettlementBuffValue = 0f;
-                }
-            }
+            damage = ApplyTrapResistBuff(player, damage);
             if (damage > 0)
             {
                 player.HP = Math.Max(1, player.HP - damage);

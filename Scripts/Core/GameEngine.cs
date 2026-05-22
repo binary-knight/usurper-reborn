@@ -2873,6 +2873,13 @@ public partial class GameEngine
             {
                 _sleepLocationOnLogin = await HandleSleepReport(sqlBackend);
                 await ShowWhileYouWereGone(sqlBackend);
+
+                // v0.61.5: deliver any pending inheritance from team NPCs who
+                // died of old age while the player was offline. Belongings go
+                // into the player's inventory (or excess gold added directly).
+                // Inventory cap is the 50-item soft limit; overflow stays queued
+                // so the player can free up space and re-trigger delivery.
+                await DeliverPendingInheritance(sqlBackend);
             }
 
             // Ensure quests are regenerated with corrected data
@@ -3983,6 +3990,119 @@ public partial class GameEngine
         {
             DebugLogger.Instance.LogError("SLEEP", $"Failed to process sleep report: {ex.Message}");
             return null;
+        }
+    }
+
+    /// <summary>
+    /// v0.61.5: Deliver any pending inheritance queued by `WorldSimulator.BequeathItemsToTeamLeader`
+    /// when a team NPC died of old age. Items go into the player's inventory; gold goes into
+    /// their pocket. Inventory overflow (above 50 items) stays queued so the player can free
+    /// space and re-trigger delivery on next login. Each delivered row is cleared from the
+    /// pending_inheritance table atomically.
+    /// </summary>
+    private async Task DeliverPendingInheritance(SqlSaveBackend backend)
+    {
+        if (currentPlayer == null) return;
+        var username = UsurperRemake.Server.SessionContext.Current?.Username
+            ?? UsurperRemake.BBS.DoorMode.GetPlayerName()?.ToLowerInvariant()
+            ?? currentPlayer.Name2?.ToLowerInvariant()
+            ?? "";
+        if (string.IsNullOrEmpty(username)) return;
+
+        try
+        {
+            var pending = backend.GetPendingInheritance(username);
+            if (pending.Count == 0) return;
+
+            // Group by source NPC for cleaner narration ("Aldric leaves you 3 items + 250 gold").
+            var bySource = pending.GroupBy(p => p.SourceNpc).ToList();
+            var deliveredIds = new List<long>();
+            int inventoryCap = 50;
+            int itemsDelivered = 0;
+            int itemsOverflowed = 0;
+            long goldDelivered = 0;
+
+            var jsonOpts = new System.Text.Json.JsonSerializerOptions
+            {
+                PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+                IncludeFields = true
+            };
+
+            terminal.WriteLine("");
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine(Loc.Get("engine.inheritance_header"));
+            terminal.WriteLine("");
+
+            foreach (var group in bySource)
+            {
+                int sourceItemsDelivered = 0;
+                long sourceGold = 0;
+                foreach (var row in group)
+                {
+                    if (row.Gold > 0)
+                    {
+                        currentPlayer.Gold += row.Gold;
+                        sourceGold += row.Gold;
+                        goldDelivered += row.Gold;
+                        deliveredIds.Add(row.Id);
+                        continue;
+                    }
+                    if (string.IsNullOrEmpty(row.ItemJson)) { deliveredIds.Add(row.Id); continue; }
+
+                    // Inventory cap check
+                    if ((currentPlayer.Inventory?.Count ?? 0) >= inventoryCap)
+                    {
+                        itemsOverflowed++;
+                        // Don't add this id to deliveredIds — leave queued for next login.
+                        continue;
+                    }
+
+                    try
+                    {
+                        var item = System.Text.Json.JsonSerializer.Deserialize<global::Item>(row.ItemJson, jsonOpts);
+                        if (item != null)
+                        {
+                            currentPlayer.Inventory ??= new List<global::Item>();
+                            currentPlayer.Inventory.Add(item);
+                            itemsDelivered++;
+                            sourceItemsDelivered++;
+                            deliveredIds.Add(row.Id);
+                        }
+                        else
+                        {
+                            // Bad JSON — drop the row, don't loop forever on it.
+                            deliveredIds.Add(row.Id);
+                        }
+                    }
+                    catch
+                    {
+                        deliveredIds.Add(row.Id); // bad row, discard
+                    }
+                }
+
+                if (sourceItemsDelivered > 0 || sourceGold > 0)
+                {
+                    terminal.SetColor("white");
+                    terminal.WriteLine(Loc.Get("engine.inheritance_from", group.Key, sourceItemsDelivered, sourceGold));
+                }
+            }
+
+            terminal.WriteLine("");
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine(Loc.Get("engine.inheritance_total", itemsDelivered, goldDelivered));
+            if (itemsOverflowed > 0)
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine(Loc.Get("engine.inheritance_overflow", itemsOverflowed));
+            }
+            terminal.WriteLine("");
+
+            backend.ClearInheritance(deliveredIds);
+            await Task.Delay(1500);
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("INHERITANCE", $"Failed to deliver pending inheritance: {ex.Message}");
         }
     }
 
@@ -6864,7 +6984,7 @@ public partial class GameEngine
         {
             var deathName = currentPlayer.Name2 ?? currentPlayer.Name1;
             _ = UsurperRemake.Systems.OnlineStateManager.Instance!.AddNews(
-                $"{deathName} has fallen in battle and was carried back to the Inn.", "combat");
+                Loc.Get("engine.news_carried_to_inn", deathName), "combat");
         }
 
         terminal.SetColor("gray");

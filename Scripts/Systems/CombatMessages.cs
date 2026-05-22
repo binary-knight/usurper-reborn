@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using UsurperRemake.Systems;
 
 /// <summary>
 /// Combat message system - generates varied attack descriptions based on damage
@@ -175,15 +176,8 @@ public static class CombatMessages
     /// </summary>
     public static string GetDeathMessage(string name, string color = "white")
     {
-        var messages = new List<string>
-        {
-            $"[{color}]{name}[/] has been [bright_red]slain[/]!",
-            $"[{color}]{name}[/] [bright_red]collapses[/] in defeat!",
-            $"[{color}]{name}[/] has been [bright_red]defeated[/]!",
-            $"[{color}]{name}[/] [bright_red]falls[/] in combat!"
-        };
-
-        return messages[Random.Shared.Next(messages.Count)];
+        int idx = Random.Shared.Next(4) + 1;
+        return Loc.Get($"combat.death_msg_{idx}", color, name);
     }
 
     /// <summary>
@@ -193,16 +187,16 @@ public static class CombatMessages
     {
         if (monstersDefeated == 1)
         {
-            return "Victory!";
+            return Loc.Get("combat.victory_solo");
         }
 
         return monstersDefeated switch
         {
-            2 => "Double kill!",
-            3 => "Triple kill!",
-            4 => "Quadra kill!",
-            5 => "PENTA KILL!",
-            _ => $"{monstersDefeated} MONSTERS SLAIN!"
+            2 => Loc.Get("combat.victory_double"),
+            3 => Loc.Get("combat.victory_triple"),
+            4 => Loc.Get("combat.victory_quadra"),
+            5 => Loc.Get("combat.victory_penta"),
+            _ => Loc.Get("combat.victory_many", monstersDefeated)
         };
     }
 }

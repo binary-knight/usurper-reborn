@@ -5010,7 +5010,7 @@ public class CastleLocation : BaseLocation
                     terminal.SetColor("white");
                     terminal.Write($"  {i + 1}. {merc.Name}");
                     terminal.SetColor("gray");
-                    terminal.Write(Loc.Get("castle.merc_level_entry", merc.Level, merc.Class, merc.Role));
+                    terminal.Write(Loc.Get("castle.merc_level_entry", merc.Level, GameConfig.GetLocalizedClassName(merc.Class), merc.Role));
                     terminal.SetColor(hpColor);
                     terminal.Write(Loc.Get("castle.merc_hp_entry", merc.HP, merc.MaxHP));
                     if (merc.MaxMana > 0)
@@ -5157,7 +5157,7 @@ public class CastleLocation : BaseLocation
         terminal.SetColor("bright_green");
         terminal.WriteLine(Loc.Get("castle.hired_bodyguard", merc.Name));
         terminal.SetColor("gray");
-        terminal.WriteLine(Loc.Get("castle.merc_role", merc.Role, merc.Class, merc.Level));
+        terminal.WriteLine(Loc.Get("castle.merc_role", merc.Role, GameConfig.GetLocalizedClassName(merc.Class), merc.Level));
         terminal.WriteLine(Loc.Get("castle.merc_hp_str_def", merc.MaxHP, merc.Strength, merc.Defence));
         terminal.WriteLine(Loc.Get("castle.merc_weap_arm", merc.WeapPow, merc.ArmPow));
         if (merc.MaxMana > 0)
@@ -8180,7 +8180,7 @@ public class CastleLocation : BaseLocation
         terminal.SetColor("bright_cyan");
         terminal.WriteLine(Loc.Get("castle.siege_your_force"));
         terminal.SetColor("bright_green");
-        terminal.WriteLine(Loc.Get("castle.siege_you", currentPlayer.DisplayName, currentPlayer.Level, currentPlayer.Class));
+        terminal.WriteLine(Loc.Get("castle.siege_you", currentPlayer.DisplayName, currentPlayer.Level, GameConfig.GetLocalizedClassName(currentPlayer.Class)));
         foreach (var member in teamMembers)
         {
             terminal.SetColor("cyan");

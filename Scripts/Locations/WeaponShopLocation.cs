@@ -39,9 +39,6 @@ public class WeaponShopLocation : BaseLocation
         currentCategory = null;
         currentPage = 0;
     }
-
-    protected override string GetMudPromptName() => "Weapon Shop";
-
     protected override string[]? GetAmbientMessages() => new[]
     {
         Loc.Get("weapon_shop.ambient_steel"),

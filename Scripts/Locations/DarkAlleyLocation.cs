@@ -209,9 +209,6 @@ namespace UsurperRemake.Locations
                     return await base.ProcessChoice(choice);
             }
         }
-
-        protected override string GetMudPromptName() => "Dark Alley";
-
         protected override string[]? GetAmbientMessages() => new[]
         {
             Loc.Get("dark_alley.ambient_footstep"),

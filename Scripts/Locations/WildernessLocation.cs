@@ -171,9 +171,6 @@ public class WildernessLocation : BaseLocation
                 return false;
         }
     }
-
-    protected override string GetMudPromptName() => "Wilderness";
-
     // ═══════════════════════════════════════════════════════════════
     // EXPLORATION
     // ═══════════════════════════════════════════════════════════════

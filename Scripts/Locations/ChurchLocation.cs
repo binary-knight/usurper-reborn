@@ -1033,7 +1033,7 @@ namespace UsurperRemake.Locations
             await Task.Delay(2000);
 
             terminal.WriteLine("");
-            var ceremonyMsg = GameConfig.WeddingCeremonyMessages[Random.Shared.Next(0, GameConfig.WeddingCeremonyMessages.Length)];
+            var weddingMsgs = GameConfig.GetWeddingCeremonyMessages(); var ceremonyMsg = weddingMsgs[Random.Shared.Next(0, weddingMsgs.Length)];
             terminal.WriteLine($"\"{ceremonyMsg}\"", "bright_magenta");
             await Task.Delay(2000);
 
@@ -1057,7 +1057,7 @@ namespace UsurperRemake.Locations
             }
 
             // Create news entry
-            await CreateNewsEntry("Wedding Bells", $"{currentPlayer.DisplayName} married {targetNPC.Name2} in a beautiful ceremony!", "The whole kingdom celebrates this union!");
+            await CreateNewsEntry(Loc.Get("church.wedding_news_title"), Loc.Get("church.wedding_news_body", currentPlayer.DisplayName, targetNPC.Name2), Loc.Get("church.wedding_news_footer"));
 
             await Task.Delay(4000);
         }

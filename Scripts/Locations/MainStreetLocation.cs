@@ -55,9 +55,6 @@ public class MainStreetLocation : BaseLocation
             "Inventory"            // (*) Inventory
         };
     }
-
-    protected override string GetMudPromptName() => "Main Street";
-
     /// <summary>
     /// Returns the menu disclosure tier based on player level.
     /// Tier 1 (Level 1-2): Core combat loop only
@@ -1947,7 +1944,7 @@ public class MainStreetLocation : BaseLocation
             terminal.SetColor("white");
             terminal.Write($"{npc.Name}");
             terminal.SetColor("gray");
-            terminal.WriteLine($" - {Loc.Get("main_street.attack_npc_info", npc.Level, npc.Class)}");
+            terminal.WriteLine($" - {Loc.Get("main_street.attack_npc_info", npc.Level, GameConfig.GetLocalizedClassName(npc.Class))}");
         }
 
         terminal.WriteLine("");

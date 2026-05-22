@@ -782,62 +782,62 @@ namespace UsurperRemake.Systems
             {
                 case CharacterClass.Warrior:
                 case CharacterClass.Barbarian:
-                    topics.Add(new ChatTopic { TopicId = "warrior_training", PlayerLine = "How do you stay in such good fighting shape?", Category = "class", Priority = 3 });
-                    topics.Add(new ChatTopic { TopicId = "warrior_battles", PlayerLine = "What's the toughest fight you've ever been in?", Category = "class", Priority = 4 });
-                    topics.Add(new ChatTopic { TopicId = "warrior_weapons", PlayerLine = "What's your weapon of choice?", Category = "class", Priority = 2 });
+                    topics.Add(new ChatTopic { TopicId = "warrior_training", PlayerLine = Loc.Get("dialogue.vn.chat_topic.warrior_training"), Category = "class", Priority = 3 });
+                    topics.Add(new ChatTopic { TopicId = "warrior_battles", PlayerLine = Loc.Get("dialogue.vn.chat_topic.warrior_battles"), Category = "class", Priority = 4 });
+                    topics.Add(new ChatTopic { TopicId = "warrior_weapons", PlayerLine = Loc.Get("dialogue.vn.chat_topic.warrior_weapons"), Category = "class", Priority = 2 });
                     break;
                 case CharacterClass.Magician:
                 case CharacterClass.Sage:
-                    topics.Add(new ChatTopic { TopicId = "mage_magic", PlayerLine = "How did you learn magic?", Category = "class", Priority = 4 });
-                    topics.Add(new ChatTopic { TopicId = "mage_spells", PlayerLine = "What's the most powerful spell you know?", Category = "class", Priority = 3 });
-                    topics.Add(new ChatTopic { TopicId = "mage_research", PlayerLine = "Are you researching anything interesting?", Category = "class", Priority = 2 });
+                    topics.Add(new ChatTopic { TopicId = "mage_magic", PlayerLine = Loc.Get("dialogue.vn.chat_topic.mage_magic"), Category = "class", Priority = 4 });
+                    topics.Add(new ChatTopic { TopicId = "mage_spells", PlayerLine = Loc.Get("dialogue.vn.chat_topic.mage_spells"), Category = "class", Priority = 3 });
+                    topics.Add(new ChatTopic { TopicId = "mage_research", PlayerLine = Loc.Get("dialogue.vn.chat_topic.mage_research"), Category = "class", Priority = 2 });
                     break;
                 case CharacterClass.Cleric:
                 case CharacterClass.Paladin:
-                    topics.Add(new ChatTopic { TopicId = "cleric_faith", PlayerLine = "Which gods do you follow?", Category = "class", Priority = 4 });
-                    topics.Add(new ChatTopic { TopicId = "cleric_calling", PlayerLine = "What drew you to the holy life?", Category = "class", Priority = 3 });
-                    topics.Add(new ChatTopic { TopicId = "cleric_miracles", PlayerLine = "Have you ever witnessed a miracle?", Category = "class", Priority = 2 });
+                    topics.Add(new ChatTopic { TopicId = "cleric_faith", PlayerLine = Loc.Get("dialogue.vn.chat_topic.cleric_faith"), Category = "class", Priority = 4 });
+                    topics.Add(new ChatTopic { TopicId = "cleric_calling", PlayerLine = Loc.Get("dialogue.vn.chat_topic.cleric_calling"), Category = "class", Priority = 3 });
+                    topics.Add(new ChatTopic { TopicId = "cleric_miracles", PlayerLine = Loc.Get("dialogue.vn.chat_topic.cleric_miracles"), Category = "class", Priority = 2 });
                     break;
                 case CharacterClass.Assassin:
-                    topics.Add(new ChatTopic { TopicId = "rogue_shadows", PlayerLine = "How do you move so quietly?", Category = "class", Priority = 3 });
-                    topics.Add(new ChatTopic { TopicId = "rogue_jobs", PlayerLine = "Ever take on a job you regretted?", Category = "class", Priority = 4 });
-                    topics.Add(new ChatTopic { TopicId = "rogue_secrets", PlayerLine = "I bet you know a lot of secrets around here...", Category = "class", Priority = 2 });
+                    topics.Add(new ChatTopic { TopicId = "rogue_shadows", PlayerLine = Loc.Get("dialogue.vn.chat_topic.rogue_shadows"), Category = "class", Priority = 3 });
+                    topics.Add(new ChatTopic { TopicId = "rogue_jobs", PlayerLine = Loc.Get("dialogue.vn.chat_topic.rogue_jobs"), Category = "class", Priority = 4 });
+                    topics.Add(new ChatTopic { TopicId = "rogue_secrets", PlayerLine = Loc.Get("dialogue.vn.chat_topic.rogue_secrets"), Category = "class", Priority = 2 });
                     break;
                 case CharacterClass.Ranger:
-                    topics.Add(new ChatTopic { TopicId = "ranger_wilds", PlayerLine = "What's the strangest thing you've seen in the wilds?", Category = "class", Priority = 4 });
-                    topics.Add(new ChatTopic { TopicId = "ranger_tracking", PlayerLine = "How do you track so well?", Category = "class", Priority = 3 });
+                    topics.Add(new ChatTopic { TopicId = "ranger_wilds", PlayerLine = Loc.Get("dialogue.vn.chat_topic.ranger_wilds"), Category = "class", Priority = 4 });
+                    topics.Add(new ChatTopic { TopicId = "ranger_tracking", PlayerLine = Loc.Get("dialogue.vn.chat_topic.ranger_tracking"), Category = "class", Priority = 3 });
                     break;
                 case CharacterClass.Bard:
                 case CharacterClass.Jester:
-                    topics.Add(new ChatTopic { TopicId = "bard_stories", PlayerLine = "What's the best tale you know?", Category = "class", Priority = 4 });
-                    topics.Add(new ChatTopic { TopicId = "bard_music", PlayerLine = "Do you play any instruments?", Category = "class", Priority = 3 });
+                    topics.Add(new ChatTopic { TopicId = "bard_stories", PlayerLine = Loc.Get("dialogue.vn.chat_topic.bard_stories"), Category = "class", Priority = 4 });
+                    topics.Add(new ChatTopic { TopicId = "bard_music", PlayerLine = Loc.Get("dialogue.vn.chat_topic.bard_music"), Category = "class", Priority = 3 });
                     break;
                 case CharacterClass.Alchemist:
-                    topics.Add(new ChatTopic { TopicId = "alchemist_potions", PlayerLine = "What's the strangest potion you've ever brewed?", Category = "class", Priority = 4 });
-                    topics.Add(new ChatTopic { TopicId = "alchemist_ingredients", PlayerLine = "Where do you find your ingredients?", Category = "class", Priority = 3 });
+                    topics.Add(new ChatTopic { TopicId = "alchemist_potions", PlayerLine = Loc.Get("dialogue.vn.chat_topic.alchemist_potions"), Category = "class", Priority = 4 });
+                    topics.Add(new ChatTopic { TopicId = "alchemist_ingredients", PlayerLine = Loc.Get("dialogue.vn.chat_topic.alchemist_ingredients"), Category = "class", Priority = 3 });
                     break;
                 default:
-                    topics.Add(new ChatTopic { TopicId = "generic_work", PlayerLine = "How's work been treating you?", Category = "generic", Priority = 2 });
+                    topics.Add(new ChatTopic { TopicId = "generic_work", PlayerLine = Loc.Get("dialogue.vn.chat_topic.generic_work"), Category = "generic", Priority = 2 });
                     break;
             }
 
             // Universal topics
-            topics.Add(new ChatTopic { TopicId = "dungeon_rumors", PlayerLine = "Heard any rumors about the dungeons?", Category = "adventure", Priority = 3 });
-            topics.Add(new ChatTopic { TopicId = "town_news", PlayerLine = "What's the latest gossip in town?", Category = "social", Priority = 2 });
-            topics.Add(new ChatTopic { TopicId = "weather", PlayerLine = "Strange weather we've been having...", Category = "generic", Priority = 1 });
-            topics.Add(new ChatTopic { TopicId = "life_goals", PlayerLine = "What are you hoping to achieve here?", Category = "personal", Priority = 3 });
-            topics.Add(new ChatTopic { TopicId = "origins", PlayerLine = "Where are you from originally?", Category = "personal", Priority = 4 });
-            topics.Add(new ChatTopic { TopicId = "hobbies", PlayerLine = "What do you do when you're not adventuring?", Category = "personal", Priority = 2 });
+            topics.Add(new ChatTopic { TopicId = "dungeon_rumors", PlayerLine = Loc.Get("dialogue.vn.chat_topic.dungeon_rumors"), Category = "adventure", Priority = 3 });
+            topics.Add(new ChatTopic { TopicId = "town_news", PlayerLine = Loc.Get("dialogue.vn.chat_topic.town_news"), Category = "social", Priority = 2 });
+            topics.Add(new ChatTopic { TopicId = "weather", PlayerLine = Loc.Get("dialogue.vn.chat_topic.weather"), Category = "generic", Priority = 1 });
+            topics.Add(new ChatTopic { TopicId = "life_goals", PlayerLine = Loc.Get("dialogue.vn.chat_topic.life_goals"), Category = "personal", Priority = 3 });
+            topics.Add(new ChatTopic { TopicId = "origins", PlayerLine = Loc.Get("dialogue.vn.chat_topic.origins"), Category = "personal", Priority = 4 });
+            topics.Add(new ChatTopic { TopicId = "hobbies", PlayerLine = Loc.Get("dialogue.vn.chat_topic.hobbies"), Category = "personal", Priority = 2 });
 
             // Personality-based topics
             if (profile != null)
             {
                 if (profile.Romanticism > 0.6f)
-                    topics.Add(new ChatTopic { TopicId = "romance_views", PlayerLine = "Do you believe in true love?", Category = "romantic", Priority = 3 });
+                    topics.Add(new ChatTopic { TopicId = "romance_views", PlayerLine = Loc.Get("dialogue.vn.chat_topic.romance_views"), Category = "romantic", Priority = 3 });
                 if (profile.Sociability > 0.7f)
-                    topics.Add(new ChatTopic { TopicId = "friends", PlayerLine = "Who are your closest friends here?", Category = "social", Priority = 3 });
+                    topics.Add(new ChatTopic { TopicId = "friends", PlayerLine = Loc.Get("dialogue.vn.chat_topic.friends"), Category = "social", Priority = 3 });
                 if (profile.Commitment > 0.7f)
-                    topics.Add(new ChatTopic { TopicId = "family", PlayerLine = "Do you have any family?", Category = "personal", Priority = 4 });
+                    topics.Add(new ChatTopic { TopicId = "family", PlayerLine = Loc.Get("dialogue.vn.chat_topic.family"), Category = "personal", Priority = 4 });
             }
 
             return topics;
@@ -1591,7 +1591,7 @@ namespace UsurperRemake.Systems
             terminal.SetColor("yellow");
             terminal.WriteLine($"  {Loc.Get("dialogue.narr_pleased", npc.Name2)}");
             terminal.SetColor("white");
-            terminal.WriteLine($"  \"That's very kind of you. Thank you.\"");
+            terminal.WriteLine($"  \"{Loc.Get("dialogue.compliment_reply")}\"");
 
             RelationshipSystem.UpdateRelationship(player!, npc, 1);
 
@@ -1633,7 +1633,7 @@ namespace UsurperRemake.Systems
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  {Loc.Get("dialogue.narr_eyes_soften", npc.Name2)}");
                 terminal.SetColor("bright_magenta");
-                terminal.WriteLine($"  *takes your hand* \"I... I've felt the same way. I was afraid to say it.\"");
+                terminal.WriteLine($"  {Loc.Get("dialogue.confession_reciprocate")}");
                 terminal.WriteLine("");
 
                 // Becoming lovers is a major relationship boost - use override to break friendship cap
@@ -1655,7 +1655,7 @@ namespace UsurperRemake.Systems
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  {Loc.Get("dialogue.narr_looks_surprised", npc.Name2)}");
                 terminal.SetColor("white");
-                terminal.WriteLine($"  \"I... I don't know what to say. This is sudden. Can I think about it?\"");
+                terminal.WriteLine($"  \"{Loc.Get("dialogue.confession_need_time")}\"");
 
                 RelationshipSystem.UpdateRelationship(player!, npc, 1);
             }
@@ -1665,7 +1665,7 @@ namespace UsurperRemake.Systems
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  {Loc.Get("dialogue.narr_looks_uncomfortable", npc.Name2)}");
                 terminal.SetColor("gray");
-                terminal.WriteLine($"  \"I'm flattered, truly. But... I don't feel the same way. I'm sorry.\"");
+                terminal.WriteLine($"  \"{Loc.Get("dialogue.confession_rejected")}\"");
             }
 
             terminal.WriteLine("");
@@ -1693,9 +1693,9 @@ namespace UsurperRemake.Systems
                 terminal.SetColor("white");
                 terminal.WriteLine($"  {Loc.Get("dialogue.narr_tender_kiss", npc.Name2)}");
                 terminal.SetColor("gray");
-                terminal.WriteLine($"  *After a long moment, you reluctantly part*");
+                terminal.WriteLine($"  {Loc.Get("dialogue.kiss_part")}");
                 terminal.SetColor("yellow");
-                terminal.WriteLine($"  {npc.Name2}: \"I never tire of that...\"");
+                terminal.WriteLine($"  {npc.Name2}: \"{Loc.Get("dialogue.kiss_never_tire")}\"");
             }
             else
             {
@@ -1707,10 +1707,10 @@ namespace UsurperRemake.Systems
                 if (roll < kissChance && relationLevel <= 30)
                 {
                     terminal.SetColor("white");
-                    terminal.WriteLine($"  {npc.Name2} doesn't pull away. Your first kiss is soft, questioning,");
-                    terminal.WriteLine($"  then deeper as they respond. Time seems to stop.");
+                    terminal.WriteLine($"  {Loc.Get("dialogue.first_kiss_prose_1", npc.Name2)}");
+                    terminal.WriteLine($"  {Loc.Get("dialogue.first_kiss_prose_2")}");
                     terminal.SetColor("yellow");
-                    terminal.WriteLine($"  {npc.Name2}: *breathless* \"That was... unexpected. But nice.\"");
+                    terminal.WriteLine($"  {npc.Name2}: {Loc.Get("dialogue.first_kiss_reaction")}");
 
                     // First kiss is meaningful - use override to allow progression beyond friendship
                     RelationshipSystem.UpdateRelationship(player!, npc, 1, 4, false, true);
@@ -1718,9 +1718,9 @@ namespace UsurperRemake.Systems
                 else
                 {
                     terminal.SetColor("yellow");
-                    terminal.WriteLine($"  {npc.Name2} gently pushes you away.");
+                    terminal.WriteLine($"  {Loc.Get("dialogue.kiss_pushed_away", npc.Name2)}");
                     terminal.SetColor("white");
-                    terminal.WriteLine($"  \"Not here. Not yet. Let's... take it slower.\"");
+                    terminal.WriteLine($"  \"{Loc.Get("dialogue.kiss_slow_down")}\"");
                 }
             }
 
@@ -1747,7 +1747,7 @@ namespace UsurperRemake.Systems
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  {Loc.Get("dialogue.narr_eyes_desire", npc.Name2)}");
                 terminal.SetColor("bright_red");
-                terminal.WriteLine($"  *takes your hand* \"I thought you'd never ask...\"");
+                terminal.WriteLine($"  {Loc.Get("dialogue.prop_accept_takes_hand")}");
                 terminal.WriteLine("");
 
                 terminal.SetColor("bright_cyan");
@@ -1780,7 +1780,7 @@ namespace UsurperRemake.Systems
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  {Loc.Get("dialogue.narr_looks_surprised_prop", npc.Name2)}");
                 terminal.SetColor("gray");
-                terminal.WriteLine($"  \"That's... forward. We're not at that point yet.\"");
+                terminal.WriteLine($"  \"{Loc.Get("dialogue.prop_too_early")}\"");
 
                 // Might hurt relationship if too early
                 if (relationLevel > 40)
@@ -1809,7 +1809,7 @@ namespace UsurperRemake.Systems
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  {Loc.Get("dialogue.narr_eyes_anger", npc.Name2)}");
                 terminal.SetColor("red");
-                terminal.WriteLine($"  \"Watch your tongue, or I'll cut it out!\"");
+                terminal.WriteLine($"  \"{Loc.Get("dialogue.provoke_threat")}\"");
 
                 RelationshipSystem.UpdateRelationship(player!, npc, -1, 2);
             }
@@ -1818,7 +1818,7 @@ namespace UsurperRemake.Systems
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  {Loc.Get("dialogue.narr_scoffs", npc.Name2)}");
                 terminal.SetColor("gray");
-                terminal.WriteLine($"  \"Is that supposed to impress me? Pathetic.\"");
+                terminal.WriteLine($"  \"{Loc.Get("dialogue.provoke_dismiss")}\"");
 
                 RelationshipSystem.UpdateRelationship(player!, npc, -1);
             }
@@ -1926,7 +1926,7 @@ namespace UsurperRemake.Systems
                 {
                     terminal.SetColor("gray");
                     terminal.WriteLine($"  {Loc.Get("dialogue.affair_confused", npc.Name2)}");
-                    terminal.WriteLine($"  \"You asked ME to leave and now you back out?!\"");
+                    terminal.WriteLine($"  \"{Loc.Get("dialogue.spouse_back_out")}\"");
                     RelationshipSystem.UpdateRelationship(player!, npc, -3);
                 }
             }
@@ -1939,19 +1939,19 @@ namespace UsurperRemake.Systems
                 {
                     terminal.WriteLine($"  {npc.Name2} pulls their hand away.");
                     terminal.SetColor("white");
-                    terminal.WriteLine($"  \"What we have is... exciting. But I made vows to {npc.SpouseName}. I can't just throw that away.\"");
+                    terminal.WriteLine($"  \"{Loc.Get("dialogue.affair_vows", npc.SpouseName)}\"");
                 }
                 else if (affair.AffairProgress < 120)
                 {
                     terminal.WriteLine($"  {npc.Name2} hesitates, conflicted.");
                     terminal.SetColor("white");
-                    terminal.WriteLine($"  \"I... I'm not ready for that. Not yet. Give me more time.\"");
+                    terminal.WriteLine($"  \"{Loc.Get("dialogue.affair_not_ready")}\"");
                 }
                 else
                 {
                     terminal.WriteLine($"  {npc.Name2} looks away, torn.");
                     terminal.SetColor("white");
-                    terminal.WriteLine($"  \"I want to... but I'm afraid. What if it all goes wrong?\"");
+                    terminal.WriteLine($"  \"{Loc.Get("dialogue.affair_afraid")}\"");
                 }
 
                 // Asking still pushes the affair forward a bit
@@ -2042,9 +2042,9 @@ namespace UsurperRemake.Systems
                 await Task.Delay(1000);
 
                 terminal.SetColor("bright_magenta");
-                terminal.WriteLine($"  *{npc.Name2} throws their arms around you*");
+                terminal.WriteLine($"  {Loc.Get("dialogue.propose_arms_around", npc.Name2)}");
                 terminal.SetColor("white");
-                terminal.WriteLine($"  \"YES! A thousand times YES! I will marry you!\"");
+                terminal.WriteLine($"  \"{Loc.Get("dialogue.propose_yes")}\"");
                 terminal.WriteLine("");
 
                 await Task.Delay(1500);
@@ -2061,8 +2061,8 @@ namespace UsurperRemake.Systems
                 await Task.Delay(1000);
 
                 terminal.SetColor("white");
-                terminal.WriteLine($"  \"I love you, I really do. But... I'm not ready for marriage.");
-                terminal.WriteLine($"   Can we keep things as they are for now? Please don't give up on me.\"");
+                terminal.WriteLine($"  \"{Loc.Get("dialogue.propose_maybe_1")}");
+                terminal.WriteLine($"   {Loc.Get("dialogue.propose_maybe_2")}\"");
 
                 // Small relationship boost for the meaningful moment
                 RelationshipSystem.UpdateRelationship(player, npc, 1);
@@ -2076,8 +2076,8 @@ namespace UsurperRemake.Systems
                 await Task.Delay(1000);
 
                 terminal.SetColor("gray");
-                terminal.WriteLine($"  \"I'm so sorry. I care about you, but marriage... that's not");
-                terminal.WriteLine($"   something I can commit to. I hope we can still be together.\"");
+                terminal.WriteLine($"  \"{Loc.Get("dialogue.propose_no_1")}");
+                terminal.WriteLine($"   {Loc.Get("dialogue.propose_no_2")}\"");
 
                 // Relationship takes a small hit
                 RelationshipSystem.UpdateRelationship(player, npc, -1);
@@ -2130,7 +2130,7 @@ namespace UsurperRemake.Systems
             await Task.Delay(1000);
 
             // Random ceremony message
-            var ceremonyMessages = GameConfig.WeddingCeremonyMessages;
+            var ceremonyMessages = GameConfig.GetWeddingCeremonyMessages();
             string ceremonyMessage = ceremonyMessages[random.Next(ceremonyMessages.Length)];
 
             terminal.SetColor("yellow");

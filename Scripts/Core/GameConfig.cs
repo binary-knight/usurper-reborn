@@ -10,7 +10,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.61.4";
+    public const string Version = "0.61.5";
     public const string VersionName = "Beta";
 
     // v0.57.12: Alignment scale cap. Character.Chivalry and Character.Darkness setters clamp to [0, AlignmentCap]
@@ -690,6 +690,15 @@ public static partial class GameConfig
     public const int MinMovesBetweenConsequences = 5;       // Min location changes between consequences
     public const int MinMinutesBetweenConsequences = 3;     // Min real minutes between consequences
     public const float GrudgeConfrontationChance = 0.30f;   // 30% chance when eligible
+
+    // v0.61.5 grudge-NPC behavior caps. Player report (Lv.? Hungarian session): a single
+    // NPC (Blamo Bramblewood) attacked them 4 times in 30 minutes with no apparent learning.
+    // Root cause: FindGrudgeNPC had no per-NPC cooldown, no loss-count cap, no HP gate, and
+    // used FirstOrDefault so the same NPC kept getting picked. These caps give the NPC a
+    // chance to "take their lesson" after a couple losses, mirroring real-world behavior.
+    public const int MaxGrudgeLossesPerPlayer = 2;          // NPC gives up after losing this many times to same player
+    public const int GrudgeNpcCooldownMinutes = 60;         // Min minutes between this NPC's grudge attempts on this player
+    public const float GrudgeNpcMinHpPercent = 0.50f;       // NPC must be at >=50% HP to seek revenge
     public const float SpouseConfrontationChance = 0.25f;   // 25% chance when suspicious spouse found
     public const float ThroneEncounterChance = 0.08f;       // 8% base throne challenge
     public const float CityContestChance = 0.10f;           // 10% base city contest
@@ -1714,8 +1723,10 @@ public static partial class GameConfig
     public const int ParentingAlignmentBonusMax = 10;    // Max bonus soul from parent alignment match
     public const int ParentingAlignmentPenaltyMax = 5;   // Max penalty from parent alignment mismatch
     
-    // Wedding Ceremony Messages (Pascal authentic)
-    public static readonly string[] WeddingCeremonyMessages = 
+    // Wedding Ceremony Messages (Pascal authentic). English fallbacks live in
+    // the array; player-facing display should use GetWeddingCeremonyMessages()
+    // which routes through Loc.Get for the active session language.
+    public static readonly string[] WeddingCeremonyMessages =
     {
         "The priest says a few holy words and you are married!",
         "A beautiful ceremony filled with love and joy!",
@@ -1728,6 +1739,24 @@ public static partial class GameConfig
         "The kingdom celebrates your union!",
         "True love has prevailed!"
     };
+
+    /// <summary>
+    /// Returns the wedding ceremony messages in the current session language.
+    /// Falls back to the English `WeddingCeremonyMessages` array for any
+    /// missing loc key.
+    /// </summary>
+    public static string[] GetWeddingCeremonyMessages()
+    {
+        var result = new string[WeddingCeremonyMessages.Length];
+        for (int i = 0; i < WeddingCeremonyMessages.Length; i++)
+        {
+            string key = $"wedding.ceremony_msg_{i + 1}";
+            string localized = Loc.Get(key);
+            // Loc.Get returns the key unchanged when the key is missing.
+            result[i] = localized == key ? WeddingCeremonyMessages[i] : localized;
+        }
+        return result;
+    }
     
     // Relationship Maintenance Settings
     public const int RelationshipMaintenanceInterval = 24; // hours
@@ -1953,6 +1982,68 @@ public static partial class GameConfig
 
     /// <summary>Overload taking the enum directly.</summary>
     public static string GetLocalizedClassName(CharacterClass cls) => GetLocalizedClassName((int)cls);
+
+    /// <summary>
+    /// Returns the localized display name of an equipment slot (e.g. "Main Hand",
+    /// "Off Hand", "Left Ring") in the current session language. Falls back to
+    /// the English enum name when the loc key is missing.
+    /// </summary>
+    public static string GetLocalizedSlotName(EquipmentSlot slot)
+    {
+        return Loc.Get($"equip.slot.{slot}");
+    }
+
+    /// <summary>
+    /// Returns the localized subject pronoun ("She"/"He" in English, "Elle"/"Il"
+    /// in French, empty in pro-drop languages like Hungarian / Spanish / Italian
+    /// where the verb conjugation carries the subject). Use for filling `{0}`
+    /// arguments in narrative loc keys; pair with the `CleanFormat` helper to
+    /// strip the leading whitespace that an empty substitution leaves behind.
+    /// </summary>
+    public static string GetLocalizedSubjectPronoun(CharacterSex sex)
+    {
+        string key = sex == CharacterSex.Female ? "ui.pronoun_subject_female" : "ui.pronoun_subject_male";
+        return Loc.Get(key);
+    }
+
+    /// <summary>
+    /// Returns the localized capitalized subject pronoun. Same semantics as
+    /// `GetLocalizedSubjectPronoun` -- both helpers point at the same loc keys
+    /// since the capitalized form is the natural sentence-initial form.
+    /// </summary>
+    public static string GetLocalizedSubjectPronounCap(CharacterSex sex) => GetLocalizedSubjectPronoun(sex);
+
+    /// <summary>
+    /// Returns the localized possessive pronoun ("her"/"his" in English, empty
+    /// in languages where translators handled possession via article, noun
+    /// suffix, or other grammatical means). Pair with `CleanFormat` to
+    /// suppress the extra whitespace left by an empty substitution.
+    /// </summary>
+    public static string GetLocalizedPossessivePronoun(CharacterSex sex)
+    {
+        string key = sex == CharacterSex.Female ? "ui.pronoun_possessive_female" : "ui.pronoun_possessive_male";
+        return Loc.Get(key);
+    }
+
+    /// <summary>
+    /// Sanitizes a Loc.Get result that may contain leading whitespace or doubled
+    /// spaces left by empty pronoun substitutions in pro-drop languages.
+    /// Collapses runs of whitespace into a single space, strips leading
+    /// whitespace, and capitalizes the first letter so sentences read naturally
+    /// even when the leading `{0}` pronoun was empty.
+    /// </summary>
+    public static string CleanFormat(string raw)
+    {
+        if (string.IsNullOrEmpty(raw)) return raw;
+        // Capture any leading non-text decoration (asterisks, brackets, etc.)
+        // so we can restore them after trimming. Only treat space + tab as
+        // leading whitespace to clean.
+        var collapsed = System.Text.RegularExpressions.Regex.Replace(raw, @"[ \t]{2,}", " ");
+        var trimmed = collapsed.TrimStart(' ', '\t');
+        if (trimmed.Length > 0 && char.IsLower(trimmed[0]))
+            trimmed = char.ToUpper(trimmed[0]) + trimmed.Substring(1);
+        return trimmed;
+    }
 
     /// <summary>
     /// Best-effort: takes a class-enum's string form ("Cleric", "MysticShaman"),

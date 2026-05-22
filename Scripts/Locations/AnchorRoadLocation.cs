@@ -36,9 +36,6 @@ public class AnchorRoadLocation : BaseLocation
             "Prison Grounds"
         };
     }
-
-    protected override string GetMudPromptName() => "Anchor Road";
-
     protected override void DisplayLocation()
     {
         if (IsScreenReader) { DisplayLocationSR(); return; }
@@ -704,7 +701,7 @@ public class AnchorRoadLocation : BaseLocation
 
                 WriteSectionHeader(Loc.Get("anchor_road.fight_header", f + 1, enemyTeamMembers.Count), "bright_magenta");
                 terminal.SetColor("white");
-                terminal.WriteLine(Loc.Get("anchor_road.face_opponent", enemy.DisplayName, enemy.Level, enemy.Class));
+                terminal.WriteLine(Loc.Get("anchor_road.face_opponent", enemy.DisplayName, enemy.Level, GameConfig.GetLocalizedClassName(enemy.Class)));
                 terminal.WriteLine("");
                 await Task.Delay(1000);
 
@@ -1811,7 +1808,7 @@ public class AnchorRoadLocation : BaseLocation
             foreach (var prisoner in prisoners)
             {
                 terminal.SetColor("white");
-                terminal.WriteLine(Loc.Get("anchor_road.prisoner_info", prisoner.DisplayName, prisoner.Level, prisoner.Class));
+                terminal.WriteLine(Loc.Get("anchor_road.prisoner_info", prisoner.DisplayName, prisoner.Level, GameConfig.GetLocalizedClassName(prisoner.Class)));
             }
         }
 

@@ -1126,7 +1126,7 @@ public class InnLocation : BaseLocation
 
             // Show NPC info
             terminal.SetColor("white");
-            terminal.WriteLine($"  {Loc.Get("inn.npc_level_class", npc.Level, npc.Class)}");
+            terminal.WriteLine($"  {Loc.Get("inn.npc_level_class", npc.Level, GameConfig.GetLocalizedClassName(npc.Class))}");
             terminal.WriteLine($"  {GetNPCMood(npc)}");
             terminal.WriteLine("");
 

@@ -1610,7 +1610,7 @@ public partial class CombatEngine
                 {
                     // Leader died and no grouped players survived — total defeat
                     result.Outcome = CombatOutcome.PlayerDied;
-                    UsurperRemake.Server.RoomRegistry.BroadcastAction($"{player.DisplayName} has fallen in combat!");
+                    UsurperRemake.Server.RoomRegistry.BroadcastAction(Loc.Get("combat.player_fallen_room", player.DisplayName));
                     await HandlePlayerDeath(result);
 
                     // If leader died, disband the group so followers return to town
@@ -10335,15 +10335,7 @@ public partial class CombatEngine
 
         // Show slot name in comparison header — distinguish Left/Right Ring so the
         // player sees which slot the comparison is showing.
-        string slotDisplayName = targetSlot switch
-        {
-            EquipmentSlot.MainHand => "Main Hand",
-            EquipmentSlot.OffHand => "Off Hand",
-            EquipmentSlot.LFinger => "Left Ring",
-            EquipmentSlot.RFinger => "Right Ring",
-            EquipmentSlot.Neck => "Necklace",
-            _ => targetSlot.ToString()
-        };
+        string slotDisplayName = GameConfig.GetLocalizedSlotName(targetSlot);
         terminal.SetColor("white");
         terminal.Write(Loc.Get("combat.comparison_header", character.Name, slotDisplayName));
         terminal.WriteLine("");
@@ -10360,7 +10352,7 @@ public partial class CombatEngine
             {
                 terminal.SetColor("red");
                 terminal.WriteLine("");
-                terminal.WriteLine(Loc.Get("combat.loot_spell_req_warning", character.Class, spellReq));
+                terminal.WriteLine(Loc.Get("combat.loot_spell_req_warning", GameConfig.GetLocalizedClassName(character.Class), spellReq));
                 terminal.WriteLine(Loc.Get("combat.loot_spell_req_block", inferredType));
                 terminal.WriteLine("");
                 lootBroadcastSb.AppendLine($"\u001b[31m  NOTE: Requires {spellReq} for spells\u001b[0m");
@@ -13140,8 +13132,22 @@ public partial class CombatEngine
         // AoE abilities with EXTERNAL damage handlers (outside the base damage block)
         // These skip the generic single-target base damage to avoid double-dipping
         // NOTE: "aoe" handler is INSIDE the base damage block so must NOT be skipped
+        //
+        // v0.61.5 (Lv.3 Alchemist player report): "fire" was previously in this list,
+        // but the "fire" handler at line ~13751 is single-target, applies BONUS damage
+        // to Plant/Beast only, and a burn DoT. It does NOT have an AoE damage loop.
+        // Including it here caused Throw Bomb's base damage to be skipped entirely --
+        // the bomb explodes for 0 damage against non-Plant/Beast and HALF damage
+        // against vulnerable targets, neither of which matches the "Hurl an explosive
+        // concoction at enemies" description. Player report: bonus damage killed a
+        // wolf but no death message displayed because the "fire" case had no kill
+        // check (compared to "holy" / "lifesteal" which both check IsAlive post-damage).
+        // Fix: remove "fire" from the AoE list so the base damage block fires for
+        // Throw Bomb. Base block has its own kill check; the "fire" case below also
+        // gets a kill check for the edge case where base damage doesn't kill but
+        // the fire bonus does.
         bool isAoEAbility = abilityResult.SpecialEffect is "crescendo_aoe"
-            or "aoe_holy" or "fire" or "void_rupture"
+            or "aoe_holy" or "void_rupture"
             or "dissonant_wave" or "aoe_taunt" or "grand_finale_jester" or "execute_all"
             or "shaman_chain_lightning";
 
@@ -13760,14 +13766,29 @@ public partial class CombatEngine
                         result.Player?.Statistics.RecordDamageDealt(fireBonusDmg, false);
                         terminal.SetColor("bright_red");
                         terminal.WriteLine(Loc.Get("combat.ability_fire_bonus", fireBonusDmg));
+
+                        // Kill check: fire bonus damage may push a wounded target over the edge
+                        // when the base damage was not the killing blow. Without this, the target
+                        // dies silently (no message, no DefeatedMonsters entry -> no XP / gold credit).
+                        if (target.HP <= 0)
+                        {
+                            target.HP = 0;
+                            terminal.SetColor("bright_green");
+                            terminal.WriteLine(Loc.Get("combat.ability_target_slain", target.Name));
+                            if (!result.DefeatedMonsters.Contains(target))
+                                result.DefeatedMonsters.Add(target);
+                        }
                     }
                     else
                     {
                         terminal.SetColor("red");
                         terminal.WriteLine(Loc.Get("combat.ability_fire_explode"));
                     }
-                    target.IsBurning = true;
-                    target.BurnRounds = Math.Max(target.BurnRounds, 2);
+                    if (target.IsAlive)
+                    {
+                        target.IsBurning = true;
+                        target.BurnRounds = Math.Max(target.BurnRounds, 2);
+                    }
                 }
                 break;
 
@@ -18589,7 +18610,7 @@ public partial class CombatEngine
             if (!companion.IsGroupedPlayer)
             {
                 BroadcastGroupCombatEvent(result,
-                    $"\u001b[1;31m  ═══ {companion.DisplayName} has fallen in battle! ═══\u001b[0m");
+                    $"\u001b[1;31m  ═══ {Loc.Get("combat.npc_fallen_battle_banner", companion.DisplayName)} ═══\u001b[0m");
             }
 
             if (companion.IsEcho)
@@ -18616,7 +18637,7 @@ public partial class CombatEngine
             {
                 // Grouped player death — remove from combat but DON'T do NPC-specific cleanup
                 terminal.SetColor("dark_red");
-                terminal.WriteLine($"  {companion.DisplayName} has fallen in battle!");
+                terminal.WriteLine($"  {Loc.Get("combat.npc_fallen_battle_inline", companion.DisplayName)}");
                 result.Teammates?.Remove(companion);
                 result.CombatLog.Add($"{companion.DisplayName} was slain by {monster.Name}");
 
@@ -21516,14 +21537,29 @@ public partial class CombatEngine
                         player.Statistics.RecordDamageDealt(fireBonusDmg, false);
                         terminal.SetColor("bright_red");
                         terminal.WriteLine(Loc.Get("combat.ability_fire_bonus", fireBonusDmg));
+
+                        // Kill check: fire bonus damage may push a wounded target over the edge
+                        // when the base damage was not the killing blow. Without this, the monster
+                        // dies silently (no message, no DefeatedMonsters entry -> no XP / gold credit).
+                        if (monster.HP <= 0)
+                        {
+                            monster.HP = 0;
+                            terminal.SetColor("bright_green");
+                            terminal.WriteLine(Loc.Get("combat.ability_target_slain", monster.Name));
+                            if (!result.DefeatedMonsters.Contains(monster))
+                                result.DefeatedMonsters.Add(monster);
+                        }
                     }
                     else
                     {
                         terminal.SetColor("red");
                         terminal.WriteLine(Loc.Get("combat.ability_fire_explode"));
                     }
-                    monster.IsBurning = true;
-                    monster.BurnRounds = Math.Max(monster.BurnRounds, 2);
+                    if (monster.IsAlive)
+                    {
+                        monster.IsBurning = true;
+                        monster.BurnRounds = Math.Max(monster.BurnRounds, 2);
+                    }
                 }
                 break;
 

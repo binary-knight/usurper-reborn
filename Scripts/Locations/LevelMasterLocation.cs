@@ -103,9 +103,6 @@ public class LevelMasterLocation : BaseLocation
             _ => NeutralMaster
         };
     }
-
-    protected override string GetMudPromptName() => "Level Master";
-
     private void DisplayLocationSR()
     {
         terminal.ClearScreen();
@@ -794,7 +791,7 @@ public class LevelMasterLocation : BaseLocation
                 player.BaseStrength += 4;
                 player.BaseAgility += 4;
                 player.BaseIntelligence += 3;
-                player.BaseConstitution += 2;
+                player.BaseConstitution += 3;
                 player.BaseMaxHP += 8;
                 player.BaseMaxMana += 10;
                 break;
@@ -1437,7 +1434,7 @@ public class LevelMasterLocation : BaseLocation
             {
                 var npc = npcs[i];
                 string status = npc.IsDead ? Loc.Get("level_master.crystal_dead_tag") : "";
-                terminal.WriteLine(Loc.Get("level_master.crystal_npc_entry", i + 1, npc.Name, npc.Level, npc.Class, status));
+                terminal.WriteLine(Loc.Get("level_master.crystal_npc_entry", i + 1, npc.Name, npc.Level, GameConfig.GetLocalizedClassName(npc.Class), status));
             }
 
             terminal.WriteLine("");
@@ -1507,7 +1504,7 @@ public class LevelMasterLocation : BaseLocation
         terminal.WriteLine("");
 
         terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("level_master.crystal_class", target.Class));
+        terminal.WriteLine(Loc.Get("level_master.crystal_class", GameConfig.GetLocalizedClassName(target.Class)));
         terminal.WriteLine(Loc.Get("level_master.crystal_level", target.Level));
         terminal.WriteLine(Loc.Get("level_master.crystal_status", target.IsAlive ? Loc.Get("level_master.crystal_alive") : Loc.Get("level_master.crystal_dead")));
         terminal.WriteLine(Loc.Get("level_master.crystal_location", target.CurrentLocation));

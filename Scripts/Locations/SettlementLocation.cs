@@ -311,9 +311,6 @@ public class SettlementLocation : BaseLocation
                 return false;
         }
     }
-
-    protected override string GetMudPromptName() => "Settlement";
-
     // ═══════════════════════════════════════════════════════════════
     // BUILDING DETAILS
     // ═══════════════════════════════════════════════════════════════

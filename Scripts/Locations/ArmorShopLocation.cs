@@ -43,9 +43,6 @@ public class ArmorShopLocation : BaseLocation
         base.SetupLocation();
         shopkeeperName = "Reese";
     }
-
-    protected override string GetMudPromptName() => "Armor Shop";
-
     protected override string[]? GetAmbientMessages() => new[]
     {
         Loc.Get("armor_shop.ambient_chainmail"),

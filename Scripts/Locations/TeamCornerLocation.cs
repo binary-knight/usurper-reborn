@@ -46,9 +46,6 @@ public class TeamCornerLocation : BaseLocation
             "Send Team Message"
         };
     }
-
-    protected override string GetMudPromptName() => "Team Corner";
-
     protected override void DisplayLocation()
     {
         if (IsScreenReader) { DisplayLocationSR(); return; }
@@ -1693,41 +1690,150 @@ public class TeamCornerLocation : BaseLocation
             return;
         }
 
-        // Show detailed stats
+        // Show detailed stats. Expanded v0.61.5: identity (age/sex/race/class),
+        // alignment, attitude (NPC dominant emotion + impression of player),
+        // personality traits (top 3 deviated from neutral), social context
+        // (marriage, faction, worship), and combat stats. Player report:
+        // "Need a way to view stats about each of their team mates."
         terminal.ClearScreen();
         WriteSectionHeader(member.DisplayName.ToUpper(), "bright_cyan");
         terminal.WriteLine("");
 
+        // --- Identity ---
+        terminal.SetColor("bright_white");
+        terminal.WriteLine(Loc.Get("team.examine_section_identity"));
         terminal.SetColor("white");
-        terminal.WriteLine($"{Loc.Get("status.class")}: {member.ClassName}");
+        terminal.WriteLine($"  {Loc.Get("status.class")}: {member.ClassName}");
         if (member.Specialization != ClassSpecialization.None)
         {
             var specDef = UsurperRemake.Data.SpecializationData.GetSpec(member.Specialization);
             terminal.SetColor("cyan");
-            terminal.WriteLine($"{Loc.Get("spec.label")}: {specDef?.Name ?? member.Specialization.ToString()} ({specDef?.Role})");
+            terminal.WriteLine($"  {Loc.Get("spec.label")}: {specDef?.Name ?? member.Specialization.ToString()} ({specDef?.Role})");
             terminal.SetColor("white");
         }
-        terminal.WriteLine($"{Loc.Get("status.race")}: {member.Race}");
-        terminal.WriteLine($"{Loc.Get("ui.level")}: {member.Level}");
+        terminal.WriteLine($"  {Loc.Get("status.race")}: {member.Race}");
+        terminal.WriteLine($"  {Loc.Get("team.examine_sex")}: {member.Sex}");
+        terminal.WriteLine($"  {Loc.Get("team.examine_age")}: {member.Age}");
+        terminal.WriteLine($"  {Loc.Get("ui.level")}: {member.Level}");
 
         if (member.IsAlive)
         {
             terminal.SetColor("bright_green");
-            terminal.WriteLine(Loc.Get("team.status_label_alive"));
+            terminal.WriteLine($"  {Loc.Get("team.status_label_alive")}");
         }
         else
         {
             terminal.SetColor("red");
-            terminal.WriteLine(Loc.Get("team.status_label_dead"));
+            terminal.WriteLine($"  {Loc.Get("team.status_label_dead")}");
         }
         terminal.WriteLine("");
 
+        // --- Alignment & Faction ---
+        terminal.SetColor("bright_white");
+        terminal.WriteLine(Loc.Get("team.examine_section_alignment"));
         terminal.SetColor("white");
-        terminal.WriteLine($"{Loc.Get("combat.bar_hp")}: {member.HP}/{member.MaxHP}");
-        terminal.WriteLine($"{Loc.Get("ui.mana_label")}: {member.Mana}/{member.MaxMana}");
-        terminal.WriteLine($"{Loc.Get("ui.gold")}: {member.Gold:N0}");
+        var (alignLabel, alignColor) = AlignmentSystem.Instance.GetAlignmentDisplay(member);
+        terminal.Write($"  {Loc.Get("team.examine_alignment")}: ");
+        terminal.SetColor(alignColor);
+        terminal.WriteLine(alignLabel);
+        terminal.SetColor("white");
+        terminal.WriteLine($"  {Loc.Get("team.examine_chivalry")}: {member.Chivalry}   {Loc.Get("team.examine_darkness")}: {member.Darkness}");
+        if (member.NPCFaction.HasValue)
+        {
+            terminal.WriteLine($"  {Loc.Get("team.examine_faction")}: {member.NPCFaction.Value}");
+        }
+        if (!string.IsNullOrEmpty(member.WorshippedGod))
+        {
+            terminal.WriteLine($"  {Loc.Get("team.examine_worships")}: {member.WorshippedGod}");
+        }
         terminal.WriteLine("");
 
+        // --- Attitude (toward player + dominant emotion) ---
+        terminal.SetColor("bright_white");
+        terminal.WriteLine(Loc.Get("team.examine_section_attitude"));
+        terminal.SetColor("white");
+        if (member.EmotionalState != null)
+        {
+            var dom = member.EmotionalState.GetDominantEmotion();
+            string moodLabel = dom.HasValue ? dom.Value.ToString() : Loc.Get("team.examine_mood_neutral");
+            terminal.WriteLine($"  {Loc.Get("team.examine_current_mood")}: {moodLabel}");
+        }
+        if (member.Brain?.Memory != null && currentPlayer.Name2 != null)
+        {
+            float impression = member.Brain.Memory.GetCharacterImpression(currentPlayer.Name2);
+            string impressionLabel = impression >= 0.5f ? Loc.Get("team.examine_impression_loyal")
+                : impression >= 0.2f ? Loc.Get("team.examine_impression_friendly")
+                : impression >= -0.2f ? Loc.Get("team.examine_impression_neutral")
+                : impression >= -0.5f ? Loc.Get("team.examine_impression_wary")
+                : Loc.Get("team.examine_impression_hostile");
+            string impressionColor = impression >= 0.2f ? "bright_green"
+                : impression >= -0.2f ? "gray"
+                : "red";
+            terminal.Write($"  {Loc.Get("team.examine_impression_label")}: ");
+            terminal.SetColor(impressionColor);
+            terminal.WriteLine($"{impressionLabel} ({impression:F2})");
+            terminal.SetColor("white");
+        }
+        terminal.WriteLine("");
+
+        // --- Personality traits (top 3 strongly-deviated from neutral 0.5) ---
+        if (member.Personality != null)
+        {
+            terminal.SetColor("bright_white");
+            terminal.WriteLine(Loc.Get("team.examine_section_personality"));
+            terminal.SetColor("white");
+            var p = member.Personality;
+            var traits = new (string label, float deviation)[]
+            {
+                (Loc.Get("team.examine_trait_aggression"), Math.Abs(p.Aggression - 0.5f) * Math.Sign(p.Aggression - 0.5f)),
+                (Loc.Get("team.examine_trait_greed"), Math.Abs(p.Greed - 0.5f) * Math.Sign(p.Greed - 0.5f)),
+                (Loc.Get("team.examine_trait_courage"), Math.Abs(p.Courage - 0.5f) * Math.Sign(p.Courage - 0.5f)),
+                (Loc.Get("team.examine_trait_loyalty"), Math.Abs(p.Loyalty - 0.5f) * Math.Sign(p.Loyalty - 0.5f)),
+                (Loc.Get("team.examine_trait_vengefulness"), Math.Abs(p.Vengefulness - 0.5f) * Math.Sign(p.Vengefulness - 0.5f)),
+                (Loc.Get("team.examine_trait_sociability"), Math.Abs(p.Sociability - 0.5f) * Math.Sign(p.Sociability - 0.5f)),
+                (Loc.Get("team.examine_trait_ambition"), Math.Abs(p.Ambition - 0.5f) * Math.Sign(p.Ambition - 0.5f)),
+                (Loc.Get("team.examine_trait_trustworthy"), Math.Abs(p.Trustworthiness - 0.5f) * Math.Sign(p.Trustworthiness - 0.5f)),
+                (Loc.Get("team.examine_trait_caution"), Math.Abs(p.Caution - 0.5f) * Math.Sign(p.Caution - 0.5f)),
+            };
+            // Top 3 by absolute deviation
+            var topTraits = traits.OrderByDescending(t => Math.Abs(t.deviation)).Take(3).ToList();
+            foreach (var (label, deviation) in topTraits)
+            {
+                string strength = Math.Abs(deviation) >= 0.30f ? Loc.Get("team.examine_trait_very")
+                    : Math.Abs(deviation) >= 0.15f ? Loc.Get("team.examine_trait_somewhat")
+                    : Loc.Get("team.examine_trait_mildly");
+                string direction = deviation >= 0 ? "+" : "-";
+                terminal.WriteLine($"  {direction} {strength} {label}");
+            }
+            terminal.WriteLine("");
+        }
+
+        // --- Social ---
+        terminal.SetColor("bright_white");
+        terminal.WriteLine(Loc.Get("team.examine_section_social"));
+        terminal.SetColor("white");
+        if (member.IsMarried && !string.IsNullOrEmpty(member.SpouseName))
+        {
+            terminal.WriteLine($"  {Loc.Get("team.examine_married_to", member.SpouseName)}");
+        }
+        else
+        {
+            terminal.WriteLine($"  {Loc.Get("team.examine_unmarried")}");
+        }
+        if (member.Kids > 0)
+        {
+            terminal.WriteLine($"  {Loc.Get("team.examine_children", member.Kids)}");
+        }
+        terminal.WriteLine("");
+
+        // --- Combat stats ---
+        terminal.SetColor("bright_white");
+        terminal.WriteLine(Loc.Get("team.examine_section_combat"));
+        terminal.SetColor("white");
+        terminal.WriteLine($"  {Loc.Get("combat.bar_hp")}: {member.HP}/{member.MaxHP}");
+        terminal.WriteLine($"  {Loc.Get("ui.mana_label")}: {member.Mana}/{member.MaxMana}");
+        terminal.WriteLine($"  {Loc.Get("ui.gold")}: {member.Gold:N0}");
+        terminal.WriteLine("");
         terminal.WriteLine($"  STR: {member.Strength}  DEX: {member.Dexterity}  AGI: {member.Agility}  CON: {member.Constitution}");
         terminal.WriteLine($"  INT: {member.Intelligence}  WIS: {member.Wisdom}  CHA: {member.Charisma}  DEF: {member.Defence}");
         terminal.WriteLine($"  STA: {member.Stamina}  WeapPow: {member.WeapPow}  ArmPow: {member.ArmPow}");
@@ -2327,7 +2433,7 @@ public class TeamCornerLocation : BaseLocation
 
             // Show target's stats
             terminal.SetColor("white");
-            terminal.WriteLine(Loc.Get("team.examine_level", target.Level, target.Class, target.Race));
+            terminal.WriteLine(Loc.Get("team.examine_level", target.Level, GameConfig.GetLocalizedClassName(target.Class), target.Race));
             terminal.WriteLine(Loc.Get("team.examine_hp", target.HP, target.MaxHP, target.Mana, target.MaxMana));
             terminal.WriteLine(Loc.Get("team.examine_stats1", target.Strength, target.Dexterity, target.Agility, target.Constitution));
             terminal.WriteLine(Loc.Get("team.examine_stats2", target.Intelligence, target.Wisdom, target.Charisma, target.Defence));

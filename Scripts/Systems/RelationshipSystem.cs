@@ -396,7 +396,7 @@ public partial class RelationshipSystem
         }
 
         // Generate wedding announcement
-        var ceremonyMessage = GameConfig.WeddingCeremonyMessages[_random.Next(GameConfig.WeddingCeremonyMessages.Length)];
+        var weddingMsgs = GameConfig.GetWeddingCeremonyMessages(); var ceremonyMessage = weddingMsgs[_random.Next(weddingMsgs.Length)];
         
         message = $"Wedding Ceremony Complete!\n" +
                  $"{character1.Name} and {character2.Name} are now married!\n" +

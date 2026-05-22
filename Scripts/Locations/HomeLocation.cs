@@ -173,7 +173,7 @@ public class HomeLocation : BaseLocation
         terminal.SetColor("gray");
         terminal.Write($"  {Loc.Get("home.stat_rest")}");
         terminal.SetColor(restsLeft > 0 ? "bright_green" : "red");
-        terminal.Write($"{restsLeft}/{maxRests} today ({recoveryPct}%)");
+        terminal.Write(Loc.Get("home.stat_rest_remaining", restsLeft, maxRests, recoveryPct));
         if (currentPlayer.ChestLevel > 0)
         {
             int maxCapacity = GameConfig.ChestCapacity[Math.Clamp(currentPlayer.ChestLevel, 0, 5)];
@@ -1968,29 +1968,29 @@ public class HomeLocation : BaseLocation
         // Child action menu
         terminal.WriteLine();
         terminal.Write("  [S] ", "bright_yellow");
-        terminal.WriteLine("Spend time", "white");
+        terminal.WriteLine(Loc.Get("home.child_action_spend"), "white");
         terminal.Write("  [N] ", "bright_yellow");
-        terminal.WriteLine($"Rename {selectedChild.Name}", "white");
+        terminal.WriteLine(Loc.Get("home.child_action_rename", selectedChild.Name), "white");
         terminal.WriteLine();
         string action = (await GetChoice()).ToUpper().Trim();
 
         if (action == "N")
         {
             terminal.SetColor("bright_yellow");
-            terminal.WriteLine($"  Current name: {selectedChild.Name}");
+            terminal.WriteLine(Loc.Get("home.child_current_name", selectedChild.Name));
             // Extract surname
             string surname = "";
             int spIdx = selectedChild.Name.IndexOf(' ');
             if (spIdx > 0) surname = selectedChild.Name.Substring(spIdx);
 
             terminal.SetColor("white");
-            string newFirst = (await terminal.GetInput($"  New first name (Enter to keep): ")).Trim();
+            string newFirst = (await terminal.GetInput("  " + Loc.Get("home.child_new_name_prompt"))).Trim();
             if (!string.IsNullOrEmpty(newFirst) && newFirst.Length <= 20)
             {
                 string oldName = selectedChild.Name;
                 selectedChild.Name = newFirst + surname;
                 terminal.SetColor("bright_green");
-                terminal.WriteLine($"  {oldName} is now known as {selectedChild.Name}.");
+                terminal.WriteLine(Loc.Get("home.child_renamed", oldName, selectedChild.Name));
 
                 // Persist the rename to world_state immediately so it survives a server
                 // restart before WorldSim's next tick. In single-player mode the next
@@ -2003,7 +2003,7 @@ public class HomeLocation : BaseLocation
             else
             {
                 terminal.SetColor("gray");
-                terminal.WriteLine("  Name unchanged.");
+                terminal.WriteLine(Loc.Get("home.child_name_unchanged"));
             }
             await terminal.WaitForKey();
             return;
@@ -4561,7 +4561,7 @@ toResurrect.IsDead = false;
             terminal.SetColor("gray");
             terminal.Write($"({relationship}) ");
             terminal.SetColor("white");
-            terminal.WriteLine(Loc.Get("home.equip_npc_level", npc.Level, npc.Class));
+            terminal.WriteLine(Loc.Get("home.equip_npc_level", npc.Level, GameConfig.GetLocalizedClassName(npc.Class)));
         }
 
         terminal.WriteLine("");
@@ -4608,7 +4608,7 @@ toResurrect.IsDead = false;
 
             // Show target's stats
             terminal.SetColor("white");
-            terminal.WriteLine(Loc.Get("home.equip_stats_level", target.Level, target.Class, target.Race));
+            terminal.WriteLine(Loc.Get("home.equip_stats_level", target.Level, GameConfig.GetLocalizedClassName(target.Class), target.Race));
             terminal.WriteLine(Loc.Get("home.equip_stats_hp", target.HP, target.MaxHP, target.Mana, target.MaxMana));
             terminal.WriteLine(Loc.Get("home.equip_stats_str", target.Strength, target.Dexterity, target.Agility, target.Constitution));
             terminal.WriteLine(Loc.Get("home.equip_stats_int", target.Intelligence, target.Wisdom, target.Charisma, target.Defence));

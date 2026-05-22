@@ -680,6 +680,21 @@ namespace UsurperRemake.Systems
                     CREATE INDEX IF NOT EXISTS idx_npc_decision_log_npc ON npc_decision_log(npc_name, created_at DESC);
                     CREATE INDEX IF NOT EXISTS idx_npc_decision_log_action_outcome ON npc_decision_log(action, outcome);
                     CREATE INDEX IF NOT EXISTS idx_npc_decision_log_created ON npc_decision_log(created_at DESC);
+
+                    -- v0.61.5: Items bequeathed to a player team leader when a team
+                    -- NPC dies of old age. Queue model so the leader can be offline
+                    -- when the death happens; items are delivered on next login.
+                    -- Each row is one item from the NPC's equipped or inventory list,
+                    -- serialized via the standard Item JSON format used in player saves.
+                    CREATE TABLE IF NOT EXISTS pending_inheritance (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        player_username TEXT NOT NULL,
+                        source_npc_name TEXT NOT NULL,
+                        item_json TEXT NOT NULL,
+                        gold_amount INTEGER DEFAULT 0,
+                        created_at TEXT DEFAULT (datetime('now'))
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_pending_inheritance_player ON pending_inheritance(player_username);
                 ";
                 cmd.ExecuteNonQuery();
             }
@@ -4474,6 +4489,122 @@ namespace UsurperRemake.Systems
         {
             DebugLogger.Instance.LogError("SQL", $"Failed to create player team '{teamName}': {ex.Message}");
             return false;
+        }
+    }
+
+    /// <summary>
+    /// v0.61.5: Look up the player who created a team (the team leader). Returns
+    /// the leader's username (lowercase) or null if the team doesn't exist.
+    /// Used by the NPC-old-age-death inheritance flow to find who should receive
+    /// the deceased teammate's belongings.
+    /// </summary>
+    public async Task<string?> GetTeamLeaderUsername(string teamName)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT created_by FROM player_teams WHERE team_name = @name LIMIT 1;";
+            cmd.Parameters.AddWithValue("@name", teamName);
+            var result = await Task.Run(() => cmd.ExecuteScalar());
+            return result?.ToString();
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to look up team leader for '{teamName}': {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// v0.61.5: Queue an item for delivery to a player on their next login.
+    /// Used when a team NPC dies of old age — their belongings go to the team
+    /// leader. Each call queues one item (or a gold amount when itemJson is null).
+    /// </summary>
+    public bool QueueInheritance(string playerUsername, string sourceNpcName, string? itemJson, long goldAmount = 0)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"
+                INSERT INTO pending_inheritance (player_username, source_npc_name, item_json, gold_amount)
+                VALUES (@user, @npc, @json, @gold);";
+            cmd.Parameters.AddWithValue("@user", playerUsername.ToLower());
+            cmd.Parameters.AddWithValue("@npc", sourceNpcName);
+            cmd.Parameters.AddWithValue("@json", itemJson ?? "");
+            cmd.Parameters.AddWithValue("@gold", goldAmount);
+            cmd.ExecuteNonQuery();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to queue inheritance for '{playerUsername}' from '{sourceNpcName}': {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// v0.61.5: Fetch and consume all pending inheritance rows for a player.
+    /// Returns one entry per row (id, sourceNpc, itemJson, gold) so the caller
+    /// can present a summary and append items to the player's inventory.
+    /// The rows are NOT deleted by this call — the caller invokes
+    /// ClearInheritance(ids) once delivery to the in-memory Character succeeds,
+    /// so partial-failure scenarios (process crash mid-delivery) don't lose items.
+    /// </summary>
+    public List<(long Id, string SourceNpc, string ItemJson, long Gold)> GetPendingInheritance(string playerUsername)
+    {
+        var results = new List<(long, string, string, long)>();
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"
+                SELECT id, source_npc_name, item_json, gold_amount
+                FROM pending_inheritance
+                WHERE player_username = @user
+                ORDER BY created_at ASC;";
+            cmd.Parameters.AddWithValue("@user", playerUsername.ToLower());
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                results.Add((
+                    reader.GetInt64(0),
+                    reader.IsDBNull(1) ? "" : reader.GetString(1),
+                    reader.IsDBNull(2) ? "" : reader.GetString(2),
+                    reader.IsDBNull(3) ? 0L : reader.GetInt64(3)
+                ));
+            }
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to fetch pending inheritance for '{playerUsername}': {ex.Message}");
+        }
+        return results;
+    }
+
+    /// <summary>
+    /// v0.61.5: Delete pending_inheritance rows by ID after their items have
+    /// been successfully delivered into the in-memory Character. Atomic at the
+    /// row level — if process crashes mid-delete, the remaining rows fire again
+    /// next login (idempotent because each row is one specific item).
+    /// </summary>
+    public void ClearInheritance(IEnumerable<long> ids)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            foreach (var id in ids)
+            {
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "DELETE FROM pending_inheritance WHERE id = @id;";
+                cmd.Parameters.AddWithValue("@id", id);
+                cmd.ExecuteNonQuery();
+            }
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to clear inheritance: {ex.Message}");
         }
     }
 

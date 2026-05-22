@@ -377,7 +377,7 @@ public class LoveCornerLocation : BaseLocation
             // (no NPC object available, so RelationshipSystem can't be used)
             RomanceTracker.Instance?.AddSpouse(targetName);
 
-            var ceremonyMessages = GameConfig.WeddingCeremonyMessages;
+            var ceremonyMessages = GameConfig.GetWeddingCeremonyMessages();
             string ceremonyMessage = ceremonyMessages[Random.Shared.Next(ceremonyMessages.Length)];
 
             terminal.WriteLine();

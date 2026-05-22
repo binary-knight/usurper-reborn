@@ -201,23 +201,23 @@ namespace UsurperRemake.Systems
                 {
                     case 3:
                         terminal.SetColor("bright_green");
-                        terminal.WriteLine($"  {Get("intimacy.connection_perfect", primaryPartner.Name2)}");
+                        terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.connection_perfect", primaryPartner.Name2))}");
                         terminal.SetColor("bright_yellow");
-                        terminal.WriteLine($"  {Get("intimacy.lovers_bliss")}");
+                        terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.lovers_bliss"))}");
                         player!.LoversBlissCombats = 5;
                         player.LoversBlissBonus = 0.10f;
                         break;
                     case 2:
                         terminal.SetColor("bright_green");
-                        terminal.WriteLine($"  {Get("intimacy.connection_strong", primaryPartner.Name2)}");
+                        terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.connection_strong", primaryPartner.Name2))}");
                         break;
                     case 1:
                         terminal.SetColor("yellow");
-                        terminal.WriteLine($"  {Get("intimacy.connection_pleasant", primaryPartner.Name2)}");
+                        terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.connection_pleasant", primaryPartner.Name2))}");
                         break;
                     default:
                         terminal.SetColor("gray");
-                        terminal.WriteLine($"  {Get("intimacy.connection_awkward", primaryPartner.Name2)}");
+                        terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.connection_awkward", primaryPartner.Name2))}");
                         break;
                 }
                 if (!GameConfig.ScreenReaderMode)
@@ -246,13 +246,13 @@ namespace UsurperRemake.Systems
         /// </summary>
         private async Task PlayFadeToBlackScene(NPC partner, bool isFirstTime)
         {
-            string gender = partner.Sex == CharacterSex.Female ? "she" : "he";
-            string their = partner.Sex == CharacterSex.Female ? "her" : "his";
+            string gender = GameConfig.GetLocalizedSubjectPronoun(partner.Sex).ToLowerInvariant();
+            string their = GameConfig.GetLocalizedPossessivePronoun(partner.Sex);
 
             terminal!.SetColor("dark_magenta");
             terminal.WriteLine("====================================================================");
             terminal.SetColor("bright_magenta");
-            terminal.WriteLine($"                         {Get("intimacy.header_moment")}                            ");
+            terminal.WriteLine($"                         {GameConfig.CleanFormat(Get("intimacy.header_moment"))}                            ");
             terminal.SetColor("dark_magenta");
             terminal.WriteLine("====================================================================");
             terminal.WriteLine("");
@@ -260,13 +260,13 @@ namespace UsurperRemake.Systems
             terminal.SetColor("gray");
             if (isFirstTime)
             {
-                terminal.WriteLine($"  {Get("intimacy.fade_first_time", partner.Name2)}");
-                terminal.WriteLine($"  {Get("intimacy.fade_first_time2", their.Substring(0, 1).ToUpper() + their.Substring(1))}");
+                terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.fade_first_time", partner.Name2))}");
+                terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.fade_first_time2", their.Substring(0, 1).ToUpper() + their.Substring(1)))}");
             }
             else
             {
-                terminal.WriteLine($"  {Get("intimacy.fade_familiar", partner.Name2)}");
-                terminal.WriteLine($"  {Get("intimacy.fade_familiar2")}");
+                terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.fade_familiar", partner.Name2))}");
+                terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.fade_familiar2"))}");
             }
             terminal.WriteLine("");
 
@@ -279,12 +279,12 @@ namespace UsurperRemake.Systems
             await Task.Delay(1000);
 
             terminal.SetColor("white");
-            terminal.WriteLine($"  {Get("intimacy.fade_later")}");
-            terminal.WriteLine($"  {Get("intimacy.fade_later2", partner.Name2, their)}");
+            terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.fade_later"))}");
+            terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.fade_later2", partner.Name2, their))}");
             terminal.WriteLine("");
 
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine($"  {Get("intimacy.fade_bond_stronger")}");
+            terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.fade_bond_stronger"))}");
             terminal.WriteLine("");
 
             await terminal.GetInput($"  {Get("ui.press_enter")}");
@@ -305,7 +305,7 @@ namespace UsurperRemake.Systems
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine("");
-                terminal.WriteLine($"  {Get("intimacy.daily_cap_reached")}");
+                terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.daily_cap_reached"))}");
                 terminal.WriteLine("");
                 await Task.Delay(1500);
             }
@@ -358,43 +358,43 @@ namespace UsurperRemake.Systems
         {
             terminal!.ClearScreen();
 
-            UIHelper.WriteBoxHeader(terminal, Get("intimacy.blessed_news"), "bright_yellow");
+            UIHelper.WriteBoxHeader(terminal, GameConfig.CleanFormat(Get("intimacy.blessed_news")), "bright_yellow");
             terminal.WriteLine("");
 
             await Task.Delay(500);
 
-            string gender = partner.Sex == CharacterSex.Female ? "she" : "he";
-            string their = partner.Sex == CharacterSex.Female ? "her" : "his";
+            string gender = GameConfig.GetLocalizedSubjectPronoun(partner.Sex).ToLowerInvariant();
+            string their = GameConfig.GetLocalizedPossessivePronoun(partner.Sex);
             bool partnerIsPregnant = partner.Sex == CharacterSex.Female;
 
             terminal.SetColor("white");
-            terminal.WriteLine($"  {Get("intimacy.weeks_later")}");
+            terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.weeks_later"))}");
             terminal.WriteLine("");
             await Task.Delay(1000);
 
             if (partnerIsPregnant)
             {
                 terminal.SetColor("bright_magenta");
-                terminal.WriteLine($"  {Get("intimacy.pregnancy_partner_tells", partner.Name2, their)}");
-                terminal.WriteLine($"  \"{Get("intimacy.pregnancy_partner_tells2", player!.Name)}\"");
+                terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.pregnancy_partner_tells", partner.Name2, their))}");
+                terminal.WriteLine($"  \"{GameConfig.CleanFormat(Get("intimacy.pregnancy_partner_tells2", player!.Name))}\"");
                 terminal.WriteLine("");
                 await Task.Delay(1000);
                 terminal.SetColor("white");
-                terminal.WriteLine($"  {Get("intimacy.pregnancy_partner_belly", their)}");
+                terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.pregnancy_partner_belly", their))}");
                 terminal.SetColor("bright_yellow");
-                terminal.WriteLine($"  \"{Get("intimacy.pregnancy_announcement")}\"");
+                terminal.WriteLine($"  \"{GameConfig.CleanFormat(Get("intimacy.pregnancy_announcement"))}\"");
             }
             else
             {
                 terminal.SetColor("bright_magenta");
-                terminal.WriteLine($"  {Get("intimacy.pregnancy_player_feeling")}");
-                terminal.WriteLine($"  {Get("intimacy.pregnancy_player_sickness", partner.Name2, gender)}");
+                terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.pregnancy_player_feeling"))}");
+                terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.pregnancy_player_sickness", partner.Name2, gender))}");
                 terminal.WriteLine("");
                 await Task.Delay(1000);
                 terminal.SetColor("bright_yellow");
-                terminal.WriteLine($"  \"{Get("intimacy.pregnancy_partner_asks")}\"");
+                terminal.WriteLine($"  \"{GameConfig.CleanFormat(Get("intimacy.pregnancy_partner_asks"))}\"");
                 terminal.SetColor("white");
-                terminal.WriteLine($"  {Get("intimacy.pregnancy_player_nods")}");
+                terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.pregnancy_player_nods"))}");
             }
 
             terminal.WriteLine("");
@@ -416,7 +416,7 @@ namespace UsurperRemake.Systems
             // Update spouse's child count in RomanceTracker
             RomanceTracker.Instance.AddChildToSpouse(partner.ID);
 
-            string babyGender = child.Sex == CharacterSex.Male ? Get("intimacy.baby_boy") : Get("intimacy.baby_girl");
+            string babyGender = child.Sex == CharacterSex.Male ? GameConfig.CleanFormat(Get("intimacy.baby_boy")) : GameConfig.CleanFormat(Get("intimacy.baby_girl"));
 
             if (!GameConfig.ScreenReaderMode)
             {
@@ -424,13 +424,13 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("  ════════════════════════════════════════════════════════════════");
             }
             terminal.SetColor("bright_green");
-            terminal.WriteLine($"  {Get("intimacy.baby_born", babyGender)}");
+            terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.baby_born", babyGender))}");
 
             // Let the player name their child
             terminal.WriteLine("");
             terminal.SetColor("bright_yellow");
-            string babyPronoun = child.Sex == CharacterSex.Male ? Get("intimacy.pronoun_him") : Get("intimacy.pronoun_her");
-            terminal.WriteLine($"  {Get("intimacy.name_prompt", babyPronoun, child.Name)}");
+            string babyPronoun = child.Sex == CharacterSex.Male ? GameConfig.CleanFormat(Get("intimacy.pronoun_him")) : GameConfig.CleanFormat(Get("intimacy.pronoun_her"));
+            terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.name_prompt", babyPronoun, child.Name))}");
             terminal.SetColor("white");
             string nameInput = (await terminal.GetInput("  Name: ")).Trim();
             if (!string.IsNullOrEmpty(nameInput) && nameInput.Length <= 20)
@@ -455,7 +455,7 @@ namespace UsurperRemake.Systems
             }
 
             terminal.SetColor("bright_yellow");
-            terminal.WriteLine($"  {Get("intimacy.baby_named", babyPronoun, child.Name)}");
+            terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.baby_named", babyPronoun, child.Name))}");
             if (!GameConfig.ScreenReaderMode)
             {
                 terminal.SetColor("bright_cyan");
@@ -468,7 +468,7 @@ namespace UsurperRemake.Systems
             NewsSystem.Instance?.WriteBirthNews(mother.Name, father.Name, child.Name, motherIsNPC);
 
             terminal.SetColor("white");
-            terminal.WriteLine($"  {Get("intimacy.family_grown")}");
+            terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.family_grown"))}");
             terminal.WriteLine("");
 
             await terminal.GetInput($"  {Get("ui.press_enter")}");
@@ -535,18 +535,18 @@ namespace UsurperRemake.Systems
         /// </summary>
         private void ShowChoiceReaction(NPC partner, bool matched)
         {
-            string their = partner.Sex == CharacterSex.Female ? "she" : "he";
+            string their = GameConfig.GetLocalizedSubjectPronoun(partner.Sex).ToLowerInvariant();
             terminal!.WriteLine("");
 
             if (matched)
             {
                 terminal.SetColor("bright_green");
-                terminal.WriteLine($"  * {Get("intimacy.reaction_matched", partner.Name2, their)}");
+                terminal.WriteLine($"  * {GameConfig.CleanFormat(Get("intimacy.reaction_matched", partner.Name2, their))}");
             }
             else
             {
                 terminal.SetColor("yellow");
-                terminal.WriteLine($"  * {Get("intimacy.reaction_unmatched", partner.Name2)}");
+                terminal.WriteLine($"  * {GameConfig.CleanFormat(Get("intimacy.reaction_unmatched", partner.Name2))}");
             }
 
             terminal.SetColor("white");
@@ -557,20 +557,20 @@ namespace UsurperRemake.Systems
         /// </summary>
         private async Task ShowSceneHeader(NPC partner, IntimacyMood mood)
         {
-            UIHelper.WriteBoxHeader(terminal!, Get("intimacy.header_encounter"), "dark_red");
+            UIHelper.WriteBoxHeader(terminal!, GameConfig.CleanFormat(Get("intimacy.header_encounter")), "dark_red");
             terminal.WriteLine("");
 
             terminal.SetColor("gray");
             string moodDesc = mood switch
             {
-                IntimacyMood.Tender => Get("intimacy.mood_tender"),
-                IntimacyMood.Passionate => Get("intimacy.mood_passionate"),
-                IntimacyMood.Rough => Get("intimacy.mood_rough"),
-                IntimacyMood.Playful => Get("intimacy.mood_playful"),
-                IntimacyMood.Kinky => Get("intimacy.mood_kinky"),
-                IntimacyMood.Romantic => Get("intimacy.mood_romantic"),
-                IntimacyMood.Quick => Get("intimacy.mood_quick"),
-                _ => Get("intimacy.mood_default")
+                IntimacyMood.Tender => GameConfig.CleanFormat(Get("intimacy.mood_tender")),
+                IntimacyMood.Passionate => GameConfig.CleanFormat(Get("intimacy.mood_passionate")),
+                IntimacyMood.Rough => GameConfig.CleanFormat(Get("intimacy.mood_rough")),
+                IntimacyMood.Playful => GameConfig.CleanFormat(Get("intimacy.mood_playful")),
+                IntimacyMood.Kinky => GameConfig.CleanFormat(Get("intimacy.mood_kinky")),
+                IntimacyMood.Romantic => GameConfig.CleanFormat(Get("intimacy.mood_romantic")),
+                IntimacyMood.Quick => GameConfig.CleanFormat(Get("intimacy.mood_quick")),
+                _ => GameConfig.CleanFormat(Get("intimacy.mood_default"))
             };
             terminal.WriteLine($"  {moodDesc}");
             terminal.WriteLine("");
@@ -584,25 +584,25 @@ namespace UsurperRemake.Systems
         private async Task PlayAnticipationPhase(NPC partner, PersonalityProfile? profile, IntimacyMood mood)
         {
             terminal!.SetColor("bright_cyan");
-            terminal.WriteLine($"  --- {Get("intimacy.phase_anticipation")} ---");
+            terminal.WriteLine($"  --- {GameConfig.CleanFormat(Get("intimacy.phase_anticipation"))} ---");
             terminal.WriteLine("");
 
-            string gender = partner.Sex == CharacterSex.Female ? "she" : "he";
-            string genderCap = partner.Sex == CharacterSex.Female ? "She" : "He";
-            string their = partner.Sex == CharacterSex.Female ? "her" : "his";
+            string gender = GameConfig.GetLocalizedSubjectPronoun(partner.Sex).ToLowerInvariant();
+            string genderCap = GameConfig.GetLocalizedSubjectPronoun(partner.Sex);
+            string their = GameConfig.GetLocalizedPossessivePronoun(partner.Sex);
             string them = partner.Sex == CharacterSex.Female ? "her" : "him";
 
             // Setting description
             terminal.SetColor("white");
-            terminal.WriteLine($"  {Get("intimacy.anticipation_alone", partner.Name2)}");
-            terminal.WriteLine($"  {Get("intimacy.anticipation_turns", genderCap)}");
+            terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.anticipation_alone", partner.Name2))}");
+            terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.anticipation_turns", genderCap))}");
             terminal.WriteLine("");
 
             await Task.Delay(1000);
 
             // Player choice for pacing
             terminal.SetColor("cyan");
-            terminal.WriteLine($"  {Get("intimacy.how_begin")}");
+            terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.how_begin"))}");
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
             terminal.Write("  [");
@@ -611,7 +611,7 @@ namespace UsurperRemake.Systems
             terminal.SetColor("darkgray");
             terminal.Write("] ");
             terminal.SetColor("white");
-            terminal.WriteLine(Get("intimacy.choice_slow"));
+            terminal.WriteLine(GameConfig.CleanFormat(Get("intimacy.choice_slow")));
 
             terminal.SetColor("darkgray");
             terminal.Write("  [");
@@ -620,7 +620,7 @@ namespace UsurperRemake.Systems
             terminal.SetColor("darkgray");
             terminal.Write("] ");
             terminal.SetColor("white");
-            terminal.WriteLine(Get("intimacy.choice_pull_close"));
+            terminal.WriteLine(GameConfig.CleanFormat(Get("intimacy.choice_pull_close")));
 
             terminal.SetColor("darkgray");
             terminal.Write("  [");
@@ -629,7 +629,7 @@ namespace UsurperRemake.Systems
             terminal.SetColor("darkgray");
             terminal.Write("] ");
             terminal.SetColor("white");
-            terminal.WriteLine(Get("intimacy.choice_let_lead"));
+            terminal.WriteLine(GameConfig.CleanFormat(Get("intimacy.choice_let_lead")));
             terminal.WriteLine("");
 
             string choice = await terminal.GetInput($"  {Get("ui.your_choice")}");
@@ -645,34 +645,34 @@ namespace UsurperRemake.Systems
             {
                 case "1":
                     terminal.SetColor("white");
-                    terminal.WriteLine($"  {Get("intimacy.anticipation.slow_l1", their)}");
-                    terminal.WriteLine($"  {Get("intimacy.anticipation.slow_l2", genderCap)}");
+                    terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.anticipation.slow_l1", their))}");
+                    terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.anticipation.slow_l2", genderCap))}");
                     terminal.WriteLine("");
-                    terminal.WriteLine($"  {Get("intimacy.anticipation.slow_l3", player!.Name, gender)}");
+                    terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.anticipation.slow_l3", player!.Name, gender))}");
                     terminal.WriteLine("");
-                    terminal.WriteLine($"  {Get("intimacy.anticipation.slow_l4", their)}");
-                    terminal.WriteLine($"  {Get("intimacy.anticipation.slow_l5", their)}");
+                    terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.anticipation.slow_l4", their))}");
+                    terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.anticipation.slow_l5", their))}");
                     break;
 
                 case "2":
                     terminal.SetColor("white");
-                    terminal.WriteLine($"  {Get("intimacy.anticipation.urgent_l1", partner.Name2)}");
-                    terminal.WriteLine($"  {Get("intimacy.anticipation.urgent_l2", their)}");
+                    terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.anticipation.urgent_l1", partner.Name2))}");
+                    terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.anticipation.urgent_l2", their))}");
                     terminal.WriteLine("");
-                    terminal.WriteLine($"  {Get("intimacy.anticipation.urgent_l3", genderCap, their)}");
-                    terminal.WriteLine($"  {Get("intimacy.anticipation.urgent_l4")}");
+                    terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.anticipation.urgent_l3", genderCap, their))}");
+                    terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.anticipation.urgent_l4"))}");
                     terminal.WriteLine("");
-                    terminal.WriteLine($"  {Get("intimacy.anticipation.urgent_l5", gender)}");
+                    terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.anticipation.urgent_l5", gender))}");
                     break;
 
                 case "3":
                 default:
                     terminal.SetColor("white");
-                    terminal.WriteLine($"  {Get("intimacy.anticipation.passive_l1", partner.Name2)}");
-                    terminal.WriteLine($"  {Get("intimacy.anticipation.passive_l2", genderCap)}");
+                    terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.anticipation.passive_l1", partner.Name2))}");
+                    terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.anticipation.passive_l2", genderCap))}");
                     terminal.WriteLine("");
-                    terminal.WriteLine($"  {Get("intimacy.anticipation.passive_l3", theirCap)}");
-                    terminal.WriteLine($"  {Get("intimacy.anticipation.passive_l4", gender)}");
+                    terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.anticipation.passive_l3", theirCap))}");
+                    terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.anticipation.passive_l4", gender))}");
                     break;
             }
 
@@ -689,12 +689,12 @@ namespace UsurperRemake.Systems
             await ShowSceneHeader(partner, mood);
 
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine($"  --- {Get("intimacy.phase_exploration")} ---");
+            terminal.WriteLine($"  --- {GameConfig.CleanFormat(Get("intimacy.phase_exploration"))} ---");
             terminal.WriteLine("");
 
-            string gender = partner.Sex == CharacterSex.Female ? "she" : "he";
-            string genderCap = partner.Sex == CharacterSex.Female ? "She" : "He";
-            string their = partner.Sex == CharacterSex.Female ? "her" : "his";
+            string gender = GameConfig.GetLocalizedSubjectPronoun(partner.Sex).ToLowerInvariant();
+            string genderCap = GameConfig.GetLocalizedSubjectPronoun(partner.Sex);
+            string their = GameConfig.GetLocalizedPossessivePronoun(partner.Sex);
             string them = partner.Sex == CharacterSex.Female ? "her" : "him";
 
             string theirCap = their.Substring(0, 1).ToUpper() + their.Substring(1);
@@ -703,51 +703,51 @@ namespace UsurperRemake.Systems
             terminal.SetColor("white");
             if (isFirstTime)
             {
-                terminal.WriteLine($"  {Get("intimacy.exploration.kiss_first_l1", partner.Name2)}");
-                terminal.WriteLine($"  {Get("intimacy.exploration.kiss_first_l2", genderCap)}");
+                terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.exploration.kiss_first_l1", partner.Name2))}");
+                terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.exploration.kiss_first_l2", genderCap))}");
             }
             else
             {
-                terminal.WriteLine($"  {Get("intimacy.exploration.kiss_familiar_l1")}");
-                terminal.WriteLine($"  {Get("intimacy.exploration.kiss_familiar_l2", partner.Name2)}");
+                terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.exploration.kiss_familiar_l1"))}");
+                terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.exploration.kiss_familiar_l2", partner.Name2))}");
             }
             terminal.WriteLine("");
 
             await Task.Delay(1500);
 
             // Undressing
-            terminal.WriteLine($"  {Get("intimacy.exploration.undress_intro")}");
+            terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.exploration.undress_intro"))}");
 
             float sensuality = profile?.Sensuality ?? 0.6f;
             if (sensuality > 0.7f)
             {
-                terminal.WriteLine($"  {Get("intimacy.exploration.undress_sensual_l1", partner.Name2)}");
-                terminal.WriteLine($"  {Get("intimacy.exploration.undress_sensual_l2")}");
+                terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.exploration.undress_sensual_l1", partner.Name2))}");
+                terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.exploration.undress_sensual_l2"))}");
             }
             else if (sensuality > 0.4f)
             {
-                terminal.WriteLine($"  {Get("intimacy.exploration.undress_eager_l1")}");
-                terminal.WriteLine($"  {Get("intimacy.exploration.undress_eager_l2")}");
+                terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.exploration.undress_eager_l1"))}");
+                terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.exploration.undress_eager_l2"))}");
             }
             else
             {
-                terminal.WriteLine($"  {Get("intimacy.exploration.undress_shy_l1", genderCap, gender)}");
-                terminal.WriteLine($"  {Get("intimacy.exploration.undress_shy_l2")}");
+                terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.exploration.undress_shy_l1", genderCap, gender))}");
+                terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.exploration.undress_shy_l2"))}");
             }
             terminal.WriteLine("");
 
             await Task.Delay(1000);
 
             // Physical description based on NPC
-            terminal.WriteLine($"  {Get("intimacy.exploration.skin_meet")}");
+            terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.exploration.skin_meet"))}");
 
             string physicalDesc = partner.Race switch
             {
-                CharacterRace.Elf => $"  {Get("intimacy.exploration.body_elf", theirCap)}",
-                CharacterRace.Dwarf => $"  {Get("intimacy.exploration.body_dwarf", theirCap)}",
-                CharacterRace.Orc => $"  {Get("intimacy.exploration.body_orc", theirCap)}",
-                CharacterRace.Hobbit => $"  {Get("intimacy.exploration.body_hobbit", theirCap)}",
-                _ => $"  {Get("intimacy.exploration.body_default", theirCap)}"
+                CharacterRace.Elf => $"  {GameConfig.CleanFormat(Get("intimacy.exploration.body_elf", theirCap))}",
+                CharacterRace.Dwarf => $"  {GameConfig.CleanFormat(Get("intimacy.exploration.body_dwarf", theirCap))}",
+                CharacterRace.Orc => $"  {GameConfig.CleanFormat(Get("intimacy.exploration.body_orc", theirCap))}",
+                CharacterRace.Hobbit => $"  {GameConfig.CleanFormat(Get("intimacy.exploration.body_hobbit", theirCap))}",
+                _ => $"  {GameConfig.CleanFormat(Get("intimacy.exploration.body_default", theirCap))}"
             };
             terminal.WriteLine(physicalDesc);
             terminal.WriteLine("");
@@ -764,12 +764,12 @@ namespace UsurperRemake.Systems
             await ShowSceneHeader(partner, mood);
 
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine($"  --- {Get("intimacy.phase_escalation")} ---");
+            terminal.WriteLine($"  --- {GameConfig.CleanFormat(Get("intimacy.phase_escalation"))} ---");
             terminal.WriteLine("");
 
-            string gender = partner.Sex == CharacterSex.Female ? "she" : "he";
-            string genderCap = partner.Sex == CharacterSex.Female ? "She" : "He";
-            string their = partner.Sex == CharacterSex.Female ? "her" : "his";
+            string gender = GameConfig.GetLocalizedSubjectPronoun(partner.Sex).ToLowerInvariant();
+            string genderCap = GameConfig.GetLocalizedSubjectPronoun(partner.Sex);
+            string their = GameConfig.GetLocalizedPossessivePronoun(partner.Sex);
             string them = partner.Sex == CharacterSex.Female ? "her" : "him";
 
             // Foreplay descriptions based on personality
@@ -777,25 +777,25 @@ namespace UsurperRemake.Systems
             float tenderness = profile?.Tenderness ?? 0.5f;
 
             terminal.SetColor("white");
-            terminal.WriteLine($"  {Get("intimacy.escalation.explore_intro", partner.Name2, them)}");
+            terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.escalation.explore_intro", partner.Name2, them))}");
             terminal.WriteLine("");
 
             if (passion > 0.7f)
             {
-                terminal.WriteLine($"  {Get("intimacy.escalation.passion_l1", genderCap)}");
-                terminal.WriteLine($"  {Get("intimacy.escalation.passion_l2")}");
-                terminal.WriteLine($"  {Get("intimacy.escalation.passion_l3", gender)}");
+                terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.escalation.passion_l1", genderCap))}");
+                terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.escalation.passion_l2"))}");
+                terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.escalation.passion_l3", gender))}");
             }
             else if (tenderness > 0.7f)
             {
-                terminal.WriteLine($"  {Get("intimacy.escalation.tender_l1", genderCap)}");
-                terminal.WriteLine($"  {Get("intimacy.escalation.tender_l2", their)}");
-                terminal.WriteLine($"  {Get("intimacy.escalation.tender_l3", gender)}");
+                terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.escalation.tender_l1", genderCap))}");
+                terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.escalation.tender_l2", their))}");
+                terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.escalation.tender_l3", gender))}");
             }
             else
             {
-                terminal.WriteLine($"  {Get("intimacy.escalation.neutral_l1", genderCap)}");
-                terminal.WriteLine($"  {Get("intimacy.escalation.neutral_l2")}");
+                terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.escalation.neutral_l1", genderCap))}");
+                terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.escalation.neutral_l2"))}");
             }
             terminal.WriteLine("");
 
@@ -803,7 +803,7 @@ namespace UsurperRemake.Systems
 
             // Verbal intimacy
             terminal.SetColor("cyan");
-            terminal.WriteLine($"  {Get("intimacy.what_whisper")}");
+            terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.what_whisper"))}");
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
             terminal.Write("  [");
@@ -812,7 +812,7 @@ namespace UsurperRemake.Systems
             terminal.SetColor("darkgray");
             terminal.Write("] ");
             terminal.SetColor("white");
-            terminal.WriteLine(Get("intimacy.whisper_beautiful"));
+            terminal.WriteLine(GameConfig.CleanFormat(Get("intimacy.whisper_beautiful")));
 
             terminal.SetColor("darkgray");
             terminal.Write("  [");
@@ -821,7 +821,7 @@ namespace UsurperRemake.Systems
             terminal.SetColor("darkgray");
             terminal.Write("] ");
             terminal.SetColor("white");
-            terminal.WriteLine(Get("intimacy.whisper_need_you"));
+            terminal.WriteLine(GameConfig.CleanFormat(Get("intimacy.whisper_need_you")));
 
             terminal.SetColor("darkgray");
             terminal.Write("  [");
@@ -830,7 +830,7 @@ namespace UsurperRemake.Systems
             terminal.SetColor("darkgray");
             terminal.Write("] ");
             terminal.SetColor("white");
-            terminal.WriteLine(Get("intimacy.whisper_tell_me"));
+            terminal.WriteLine(GameConfig.CleanFormat(Get("intimacy.whisper_tell_me")));
             terminal.WriteLine("");
 
             string choice = await terminal.GetInput($"  {Get("ui.your_choice")}");
@@ -845,24 +845,24 @@ namespace UsurperRemake.Systems
             {
                 case "1":
                     terminal.SetColor("white");
-                    terminal.WriteLine($"  {Get("intimacy.escalation.whisper_beautiful_l1", their)}");
-                    terminal.WriteLine($"  {Get("intimacy.escalation.whisper_beautiful_l2", partner.Name2)}");
-                    terminal.WriteLine($"  {Get("intimacy.escalation.whisper_beautiful_l3", gender)}");
+                    terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.escalation.whisper_beautiful_l1", their))}");
+                    terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.escalation.whisper_beautiful_l2", partner.Name2))}");
+                    terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.escalation.whisper_beautiful_l3", gender))}");
                     break;
 
                 case "2":
                     terminal.SetColor("white");
-                    terminal.WriteLine($"  {Get("intimacy.escalation.whisper_need_l1")}");
-                    terminal.WriteLine($"  {Get("intimacy.escalation.whisper_need_l2", partner.Name2, genderCap)}");
-                    terminal.WriteLine($"  {Get("intimacy.escalation.whisper_need_l3", gender)}");
+                    terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.escalation.whisper_need_l1"))}");
+                    terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.escalation.whisper_need_l2", partner.Name2, genderCap))}");
+                    terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.escalation.whisper_need_l3", gender))}");
                     break;
 
                 case "3":
                 default:
                     terminal.SetColor("white");
-                    terminal.WriteLine($"  {Get("intimacy.escalation.whisper_tell_l1", their)}");
-                    terminal.WriteLine($"  {Get("intimacy.escalation.whisper_tell_l2", partner.Name2)}");
-                    terminal.WriteLine($"  {Get("intimacy.escalation.whisper_tell_l3", gender)}");
+                    terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.escalation.whisper_tell_l1", their))}");
+                    terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.escalation.whisper_tell_l2", partner.Name2))}");
+                    terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.escalation.whisper_tell_l3", gender))}");
                     break;
             }
 
@@ -879,50 +879,50 @@ namespace UsurperRemake.Systems
             await ShowSceneHeader(partner, mood);
 
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine($"  --- {Get("intimacy.phase_climax")} ---");
+            terminal.WriteLine($"  --- {GameConfig.CleanFormat(Get("intimacy.phase_climax"))} ---");
             terminal.WriteLine("");
 
-            string gender = partner.Sex == CharacterSex.Female ? "she" : "he";
-            string genderCap = partner.Sex == CharacterSex.Female ? "She" : "He";
-            string their = partner.Sex == CharacterSex.Female ? "her" : "his";
+            string gender = GameConfig.GetLocalizedSubjectPronoun(partner.Sex).ToLowerInvariant();
+            string genderCap = GameConfig.GetLocalizedSubjectPronoun(partner.Sex);
+            string their = GameConfig.GetLocalizedPossessivePronoun(partner.Sex);
             string them = partner.Sex == CharacterSex.Female ? "her" : "him";
 
             terminal.SetColor("white");
-            terminal.WriteLine($"  {Get("intimacy.climax.intertwine_l1")}");
-            terminal.WriteLine($"  {Get("intimacy.climax.intertwine_l2", partner.Name2)}");
-            terminal.WriteLine($"  {Get("intimacy.climax.intertwine_l3")}");
+            terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.climax.intertwine_l1"))}");
+            terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.climax.intertwine_l2", partner.Name2))}");
+            terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.climax.intertwine_l3"))}");
             terminal.WriteLine("");
 
             await Task.Delay(1500);
 
-            terminal.WriteLine($"  {Get("intimacy.climax.tension_l1")}");
-            terminal.WriteLine($"  {Get("intimacy.climax.tension_l2")}");
+            terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.climax.tension_l1"))}");
+            terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.climax.tension_l2"))}");
             terminal.WriteLine("");
 
             float passion = profile?.Passion ?? 0.6f;
 
             if (passion > 0.7f)
             {
-                terminal.WriteLine($"  {Get("intimacy.climax.loud_l1", partner.Name2)}");
-                terminal.WriteLine($"  {Get("intimacy.climax.loud_l2", genderCap)}");
+                terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.climax.loud_l1", partner.Name2))}");
+                terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.climax.loud_l2", genderCap))}");
             }
             else
             {
-                terminal.WriteLine($"  {Get("intimacy.climax.soft_l1", partner.Name2)}");
-                terminal.WriteLine($"  {Get("intimacy.climax.soft_l2", genderCap, their)}");
+                terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.climax.soft_l1", partner.Name2))}");
+                terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.climax.soft_l2", genderCap, their))}");
             }
             terminal.WriteLine("");
 
             await Task.Delay(1500);
 
-            terminal.WriteLine($"  {Get("intimacy.climax.crest_l1", partner.Name2)}");
-            terminal.WriteLine($"  {Get("intimacy.climax.crest_l2", them)}");
-            terminal.WriteLine($"  {Get("intimacy.climax.crest_l3")}");
+            terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.climax.crest_l1", partner.Name2))}");
+            terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.climax.crest_l2", them))}");
+            terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.climax.crest_l3"))}");
             terminal.WriteLine("");
 
             terminal.SetColor("bright_magenta");
-            terminal.WriteLine($"  {Get("intimacy.climax.timeless_l1")}");
-            terminal.WriteLine($"  {Get("intimacy.climax.timeless_l2")}");
+            terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.climax.timeless_l1"))}");
+            terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.climax.timeless_l2"))}");
             terminal.WriteLine("");
 
             await terminal.GetInput($"  {Get("ui.press_enter")}");
@@ -937,17 +937,17 @@ namespace UsurperRemake.Systems
             await ShowSceneHeader(partner, mood);
 
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine($"  --- {Get("intimacy.phase_afterglow")} ---");
+            terminal.WriteLine($"  --- {GameConfig.CleanFormat(Get("intimacy.phase_afterglow"))} ---");
             terminal.WriteLine("");
 
-            string gender = partner.Sex == CharacterSex.Female ? "she" : "he";
-            string genderCap = partner.Sex == CharacterSex.Female ? "She" : "He";
-            string their = partner.Sex == CharacterSex.Female ? "her" : "his";
+            string gender = GameConfig.GetLocalizedSubjectPronoun(partner.Sex).ToLowerInvariant();
+            string genderCap = GameConfig.GetLocalizedSubjectPronoun(partner.Sex);
+            string their = GameConfig.GetLocalizedPossessivePronoun(partner.Sex);
             string them = partner.Sex == CharacterSex.Female ? "her" : "him";
 
             terminal.SetColor("white");
-            terminal.WriteLine($"  {Get("intimacy.afterglow.tangled_l1")}");
-            terminal.WriteLine($"  {Get("intimacy.afterglow.tangled_l2", partner.Name2)}");
+            terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.afterglow.tangled_l1"))}");
+            terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.afterglow.tangled_l2", partner.Name2))}");
             terminal.WriteLine("");
 
             await Task.Delay(1000);
@@ -957,19 +957,19 @@ namespace UsurperRemake.Systems
 
             if (romanticism > 0.7f || romanceType == RomanceRelationType.Spouse)
             {
-                terminal.WriteLine($"  {Get("intimacy.afterglow.spouse_l1", gender)}");
-                terminal.WriteLine($"  {Get("intimacy.afterglow.spouse_l2")}");
-                terminal.WriteLine($"  {Get("intimacy.afterglow.spouse_l3")}");
+                terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.afterglow.spouse_l1", gender))}");
+                terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.afterglow.spouse_l2"))}");
+                terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.afterglow.spouse_l3"))}");
             }
             else if (romanceType == RomanceRelationType.Lover)
             {
-                terminal.WriteLine($"  {Get("intimacy.afterglow.lover_l1", gender)}");
-                terminal.WriteLine($"  {Get("intimacy.afterglow.lover_l2")}");
+                terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.afterglow.lover_l1", gender))}");
+                terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.afterglow.lover_l2"))}");
             }
             else
             {
-                terminal.WriteLine($"  {Get("intimacy.afterglow.casual_l1", genderCap, their)}");
-                terminal.WriteLine($"  {Get("intimacy.afterglow.casual_l2", gender)}");
+                terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.afterglow.casual_l1", genderCap, their))}");
+                terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.afterglow.casual_l2", gender))}");
             }
             terminal.WriteLine("");
 
@@ -977,7 +977,7 @@ namespace UsurperRemake.Systems
 
             // Pillow talk options
             terminal.SetColor("cyan");
-            terminal.WriteLine($"  {Get("intimacy.what_say")}");
+            terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.what_say"))}");
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
             terminal.Write("  [");
@@ -986,7 +986,7 @@ namespace UsurperRemake.Systems
             terminal.SetColor("darkgray");
             terminal.Write("] ");
             terminal.SetColor("white");
-            terminal.WriteLine(Get("intimacy.say_stay"));
+            terminal.WriteLine(GameConfig.CleanFormat(Get("intimacy.say_stay")));
 
             terminal.SetColor("darkgray");
             terminal.Write("  [");
@@ -995,7 +995,7 @@ namespace UsurperRemake.Systems
             terminal.SetColor("darkgray");
             terminal.Write("] ");
             terminal.SetColor("white");
-            terminal.WriteLine(Get("intimacy.say_amazing"));
+            terminal.WriteLine(GameConfig.CleanFormat(Get("intimacy.say_amazing")));
 
             terminal.SetColor("darkgray");
             terminal.Write("  [");
@@ -1004,7 +1004,7 @@ namespace UsurperRemake.Systems
             terminal.SetColor("darkgray");
             terminal.Write("] ");
             terminal.SetColor("white");
-            terminal.WriteLine(Get("intimacy.say_hold_close"));
+            terminal.WriteLine(GameConfig.CleanFormat(Get("intimacy.say_hold_close")));
             terminal.WriteLine("");
 
             string choice = await terminal.GetInput($"  {Get("ui.your_choice")}");
@@ -1018,32 +1018,32 @@ namespace UsurperRemake.Systems
             {
                 case "1":
                     terminal.SetColor("white");
-                    terminal.WriteLine($"  {Get("intimacy.afterglow.stay_l1", them)}");
-                    terminal.WriteLine($"  {Get("intimacy.afterglow.stay_l2", partner.Name2)}");
-                    terminal.WriteLine($"  {Get("intimacy.afterglow.stay_l3")}");
+                    terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.afterglow.stay_l1", them))}");
+                    terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.afterglow.stay_l2", partner.Name2))}");
+                    terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.afterglow.stay_l3"))}");
                     terminal.WriteLine("");
-                    terminal.WriteLine($"  {Get("intimacy.afterglow.stay_l4")}");
+                    terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.afterglow.stay_l4"))}");
                     break;
 
                 case "2":
                     terminal.SetColor("white");
-                    terminal.WriteLine($"  {Get("intimacy.afterglow.amazing_l1", their)}");
-                    terminal.WriteLine($"  {Get("intimacy.afterglow.amazing_l2", partner.Name2)}");
-                    terminal.WriteLine($"  {Get("intimacy.afterglow.amazing_l3")}");
+                    terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.afterglow.amazing_l1", their))}");
+                    terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.afterglow.amazing_l2", partner.Name2))}");
+                    terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.afterglow.amazing_l3"))}");
                     break;
 
                 case "3":
                 default:
                     terminal.SetColor("white");
-                    terminal.WriteLine($"  {Get("intimacy.afterglow.silent_l1", partner.Name2)}");
-                    terminal.WriteLine($"  {Get("intimacy.afterglow.silent_l2")}");
-                    terminal.WriteLine($"  {Get("intimacy.afterglow.silent_l3", genderCap)}");
+                    terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.afterglow.silent_l1", partner.Name2))}");
+                    terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.afterglow.silent_l2"))}");
+                    terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.afterglow.silent_l3", genderCap))}");
                     break;
             }
 
             terminal.WriteLine("");
             terminal.SetColor("gray");
-            terminal.WriteLine($"  {Get("intimacy.time_passes")}");
+            terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.time_passes"))}");
             terminal.WriteLine("");
 
             await terminal.GetInput($"  {Get("ui.press_enter")}");

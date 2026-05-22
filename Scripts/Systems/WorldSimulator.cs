@@ -898,6 +898,12 @@ public class WorldSimulator
                         HandleSpouseBereavement(npc);
                     }
 
+                    // v0.61.5: If the deceased was on a player's team, bequeath
+                    // their equipment + inventory + gold to the team leader.
+                    // The leader may be offline; we queue items to the
+                    // pending_inheritance table and deliver on next login.
+                    BequeathItemsToTeamLeader(npc);
+
                     NewsSystem.Instance?.Newsy(
                         $"⚱ {npc.Name2} has passed away peacefully at the age of {currentAge}. The soul moves on...");
 
@@ -995,6 +1001,85 @@ public class WorldSimulator
 
             UsurperRemake.Systems.DebugLogger.Instance.LogInfo("IMMIGRATION",
                 $"Generated immigrant: {immigrant.Name2} ({race} {immigrant.Class} L{immigrant.Level} {sex})");
+        }
+    }
+
+    /// <summary>
+    /// v0.61.5: Bequeath a deceased NPC's belongings to their team leader (player).
+    /// Called when an NPC dies of old age while on a player's team. Items, equipment,
+    /// and gold are queued in the pending_inheritance table; they are delivered to
+    /// the player on their next login. Online-mode only — single-player saves
+    /// don't have the cross-player pending-inheritance infrastructure.
+    /// </summary>
+    private void BequeathItemsToTeamLeader(NPC deceased)
+    {
+        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode) return;
+        if (string.IsNullOrEmpty(deceased.Team)) return;
+
+        try
+        {
+            var backend = UsurperRemake.Systems.SaveSystem.Instance.Backend as UsurperRemake.Systems.SqlSaveBackend;
+            if (backend == null) return;
+
+            // Find the player who created the team. Synchronous-blocking on async
+            // is acceptable here -- this fires once per old-age death (rare event)
+            // and we're inside the world-sim tick which already runs synchronously.
+            var leaderTask = backend.GetTeamLeaderUsername(deceased.Team);
+            leaderTask.Wait();
+            var leaderUsername = leaderTask.Result;
+            if (string.IsNullOrEmpty(leaderUsername)) return;
+
+            int queued = 0;
+            var jsonOpts = new System.Text.Json.JsonSerializerOptions
+            {
+                PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+                IncludeFields = true
+            };
+
+            // Equipped items: walk EquippedItems dict, resolve each ID to an Item,
+            // queue. EquipmentDatabase has the full item registry.
+            foreach (var kvp in deceased.EquippedItems)
+            {
+                if (kvp.Value <= 0) continue;
+                var eq = global::EquipmentDatabase.GetById(kvp.Value);
+                if (eq == null) continue;
+                // Convert Equipment to Item for transfer (Item is the inventory shape).
+                var item = deceased.ConvertEquipmentToLegacyItem(eq);
+                if (item == null) continue;
+                string itemJson = System.Text.Json.JsonSerializer.Serialize(item, jsonOpts);
+                if (backend.QueueInheritance(leaderUsername, deceased.Name2 ?? deceased.Name1 ?? "Unknown", itemJson, 0))
+                    queued++;
+            }
+
+            // Inventory items
+            if (deceased.Inventory != null)
+            {
+                foreach (var item in deceased.Inventory)
+                {
+                    if (item == null) continue;
+                    string itemJson = System.Text.Json.JsonSerializer.Serialize(item, jsonOpts);
+                    if (backend.QueueInheritance(leaderUsername, deceased.Name2 ?? deceased.Name1 ?? "Unknown", itemJson, 0))
+                        queued++;
+                }
+            }
+
+            // Gold (single row with no item, just gold_amount)
+            if (deceased.Gold > 0)
+            {
+                if (backend.QueueInheritance(leaderUsername, deceased.Name2 ?? deceased.Name1 ?? "Unknown", null, deceased.Gold))
+                    queued++;
+            }
+
+            if (queued > 0)
+            {
+                UsurperRemake.Systems.DebugLogger.Instance.LogInfo("LIFECYCLE",
+                    $"Bequeathed {queued} items/gold from {deceased.Name2} (team '{deceased.Team}') to leader '{leaderUsername}'.");
+            }
+        }
+        catch (Exception ex)
+        {
+            UsurperRemake.Systems.DebugLogger.Instance.LogError("LIFECYCLE",
+                $"Failed to bequeath items from {deceased.Name2}: {ex.Message}");
         }
     }
 
@@ -1785,25 +1870,31 @@ public class WorldSimulator
             activities.Add(("shop", shopWeight));
         }
 
-        // Training at gym. Was 0.15; bumped to 0.25. Higher Ambition NPCs
-        // train more (they're trying to climb), Courage doesn't really matter
-        // for gym work.
-        if (npc.Gold > 50)
+        // Training at gym. v0.61.3 bumped 0.15 -> 0.25 to nudge NPCs toward
+        // the gym, but v0.61.5 production telemetry showed train still at
+        // 1.1% of all actions (1,886 events in 174,535). Even the busiest
+        // trainer in the dataset (Hadwin Ravenscroft) trained only 2.6% of
+        // their actions. Doubling base to 0.50 should bring train closer to
+        // its intended ~5% share of NPC time. Lowered gold gate 50 -> 20 so
+        // low-level NPCs with empty pockets can still afford the gym (charge
+        // scales with level; 50g was a real barrier for early-career NPCs).
+        if (npc.Gold > 20)
         {
-            float trainWeight = 0.25f;
+            float trainWeight = 0.50f;
             if (npc.Brain?.Personality != null)
                 trainWeight += npc.Brain.Personality.Ambition * 0.15f;
             activities.Add(("train", trainWeight));
         }
 
-        // Visit level master if eligible. Was 0.30; bumped to 0.80 because if
-        // an NPC has enough XP to level up, they really should do it. Sitting
-        // on unspent XP is the kind of bad-decision pattern the heuristic was
-        // making before this rebalance.
+        // Visit level master if eligible. v0.61.3 bumped 0.30 -> 0.80;
+        // v0.61.5 telemetry showed only 112 levelups across 174k decisions
+        // (0.1%) -- 0.80 was still losing to the sum of all other weights.
+        // When an NPC has the XP, leveling up should be near-automatic, so
+        // raised to 2.0 to dominate the weighted pick when eligible.
         long expForNextLevel = GameConfig.GetExperienceForLevel(npc.Level + 1);
         if (npc.Experience >= expForNextLevel && npc.Level < 100)
         {
-            activities.Add(("levelup", 0.80));
+            activities.Add(("levelup", 2.0));
         }
 
         // Heal if wounded
@@ -2817,8 +2908,26 @@ public class WorldSimulator
         // This block applies the same gates the solo path now uses.
         var leaderPersonality = npc.Brain?.Personality;
 
-        // Gate 1: wounded leader doesn't lead a dungeon run.
-        if (npc.HP < npc.MaxHP * 0.7)
+        // v0.61.5 Gate 0: Lv 1-4 teams are a meat grinder. Production
+        // telemetry across 174k NPC decisions showed Lv 1-4 team_dungeon at
+        // 100% death rate (51 of 51) and Lv 5-9 at 84% (895 of 1069). The
+        // existing gates work fine at 40+ (18% death) but don't help at the
+        // low end because avgLevel - 5 still floors at 1 and low-level
+        // monsters punch hard relative to NPCs without gear. Block the
+        // attempt entirely; let the leader find a safer action next tick.
+        if (npc.Level < 5)
+        {
+            npc.UpdateLocation("Inn");
+            npc.CurrentActivity = "telling the team they aren't ready yet";
+            LogTeamDungeonDecision("aborted_underleveled");
+            return;
+        }
+
+        // Gate 1: wounded leader doesn't lead a dungeon run. v0.61.5 raised
+        // 0.7 -> 0.8 -- at 71% HP the leader was walking into the AoE damage
+        // spread with too little margin and tipping the whole team into a
+        // loss. 80% gives a real buffer.
+        if (npc.HP < npc.MaxHP * 0.8)
         {
             npc.UpdateLocation("Healer");
             npc.CurrentActivity = "tending to wounds before any expedition";
@@ -2860,16 +2969,31 @@ public class WorldSimulator
 
         // Determine dungeon level. First-day telemetry showed the
         // avgLevel - 2 to avgLevel range still produced 45% deaths and 6.5%
-        // completions for teams. New baseline (avgLevel - 5 to avgLevel - 3)
-        // matches the solo path's safer floor choice so teams complete more
-        // runs and feed the progression loop instead of stalling on flees and
-        // deaths. Brave / ambitious leaders still push one floor each.
+        // completions for teams. v0.61.3 baseline (avgLevel - 5 to avgLevel - 3)
+        // worked at high levels (40+ band hit 18% death) but low-level teams
+        // were still catastrophically losing (Lv 10-19 band at 76% death rate
+        // across 3023 attempts).
+        //
+        // v0.61.5: split the floor pick by team avg level. Sub-20 teams pick
+        // avgLevel - 7 to avgLevel - 5 AND skip the Courage/Ambition push-up
+        // (a brave low-level leader is just walking into worse monsters with
+        // the same low-level kit). 20+ teams keep the old pick.
         int avgLevel = (int)teamMembers.Average(m => m.Level);
-        int dungeonLevel = avgLevel - 5 + random.Next(0, 3);
-        if (leaderPersonality != null)
+        int dungeonLevel;
+        if (avgLevel < 20)
         {
-            if (leaderPersonality.Courage > 0.7f) dungeonLevel += random.Next(0, 2);
-            if (leaderPersonality.Ambition > 0.7f) dungeonLevel += random.Next(0, 2);
+            dungeonLevel = avgLevel - 7 + random.Next(0, 3);
+            // Skip Courage/Ambition bonus -- low-level teams shouldn't
+            // overreach. They die when they do.
+        }
+        else
+        {
+            dungeonLevel = avgLevel - 5 + random.Next(0, 3);
+            if (leaderPersonality != null)
+            {
+                if (leaderPersonality.Courage > 0.7f) dungeonLevel += random.Next(0, 2);
+                if (leaderPersonality.Ambition > 0.7f) dungeonLevel += random.Next(0, 2);
+            }
         }
         dungeonLevel = Math.Clamp(dungeonLevel, 1, 100);
 

@@ -102,9 +102,6 @@ public class MusicShopLocation : BaseLocation
         "You enter the Music Shop. Instruments line the walls and the air hums with faint melodies.")
     {
     }
-
-    protected override string GetMudPromptName() => "Music Shop";
-
     protected override void DisplayLocation()
     {
         if (IsScreenReader && currentPlayer != null)

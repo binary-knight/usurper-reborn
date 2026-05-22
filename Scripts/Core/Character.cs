@@ -956,7 +956,7 @@ public class Character
                 {
                     var legacyMainHand = ConvertEquipmentToItem(mainHandItem);
                     Inventory.Add(legacyMainHand);
-                    message = $"Moved {mainHandItem.Name} to inventory. ";
+                    message = Loc.Get("equip.moved_to_inventory", mainHandItem.Name) + " ";
                 }
             }
 
@@ -968,7 +968,7 @@ public class Character
                 {
                     var legacyOffHand = ConvertEquipmentToItem(offHandItem);
                     Inventory.Add(legacyOffHand);
-                    message += $"Moved {offHandItem.Name} to inventory. ";
+                    message += Loc.Get("equip.moved_to_inventory", offHandItem.Name) + " ";
                 }
             }
         }
@@ -987,7 +987,7 @@ public class Character
                 // One-handed weapons can go in either hand
                 if (slot != EquipmentSlot.MainHand && slot != EquipmentSlot.OffHand)
                 {
-                    message = "One-handed weapons can only be equipped in MainHand or OffHand";
+                    message = Loc.Get("equip.one_handed_only_mh_oh");
                     return false;
                 }
             }
@@ -995,7 +995,7 @@ public class Character
             {
                 if (slot != EquipmentSlot.MainHand)
                 {
-                    message = "Two-handed weapons must be equipped in MainHand";
+                    message = Loc.Get("equip.two_handed_must_mh");
                     return false;
                 }
             }
@@ -1003,7 +1003,7 @@ public class Character
             {
                 if (slot != EquipmentSlot.OffHand)
                 {
-                    message = "Shields must be equipped in OffHand";
+                    message = Loc.Get("equip.shields_must_oh");
                     return false;
                 }
             }
@@ -1028,13 +1028,13 @@ public class Character
                 {
                     if (slot != EquipmentSlot.LFinger && slot != EquipmentSlot.RFinger)
                     {
-                        message = $"Rings can only go on a finger slot, not {slot}.";
+                        message = Loc.Get("equip.rings_finger_only", GameConfig.GetLocalizedSlotName(slot));
                         return false;
                     }
                 }
                 else if (slot != item.Slot)
                 {
-                    message = $"This item belongs in the {item.Slot} slot, not {slot}.";
+                    message = Loc.Get("equip.item_belongs_in", GameConfig.GetLocalizedSlotName(item.Slot), GameConfig.GetLocalizedSlotName(slot));
                     return false;
                 }
             }
@@ -1088,7 +1088,7 @@ public class Character
             if (item.Handedness == WeaponHandedness.OneHanded)
             {
                 var twoHandItem = GetEquipment(EquipmentSlot.MainHand);
-                string twoHandName = twoHandItem?.Name ?? "your two-handed weapon";
+                string twoHandName = twoHandItem?.Name ?? Loc.Get("equip.your_2h_weapon");
                 message = Loc.Get("equip.cannot_offhand_with_2h", item.Name, twoHandName);
                 return false;
             }
@@ -1099,7 +1099,7 @@ public class Character
             {
                 var legacyTwoHand = ConvertEquipmentToItem(displacedTwoHand);
                 Inventory.Add(legacyTwoHand);
-                message += $"Moved {displacedTwoHand.Name} to inventory. ";
+                message += Loc.Get("equip.moved_to_inventory", displacedTwoHand.Name) + " ";
             }
         }
 
@@ -1117,12 +1117,12 @@ public class Character
                 // Move main hand to off-hand (don't unequip, just reassign)
                 EquippedItems[EquipmentSlot.OffHand] = currentMainHand.Id;
                 EquippedItems.Remove(EquipmentSlot.MainHand);
-                message += $"Moved {currentMainHand.Name} to off-hand. ";
+                message += Loc.Get("equip.moved_to_offhand", currentMainHand.Name) + " ";
 
                 // Now equip the new item to main hand
                 EquippedItems[slot] = item.Id;
                 item.ApplyToCharacter(this);
-                message += $"Equipped {item.Name} in main hand";
+                message += Loc.Get("equip.equipped_in_slot", item.Name, GameConfig.GetLocalizedSlotName(EquipmentSlot.MainHand));
                 return true;
             }
         }
@@ -1134,7 +1134,7 @@ public class Character
             // Convert Equipment to legacy Item and add to inventory
             var legacyItem = ConvertEquipmentToItem(oldEquipment);
             Inventory.Add(legacyItem);
-            message += $"Moved {oldEquipment.Name} to inventory. ";
+            message += Loc.Get("equip.moved_to_inventory", oldEquipment.Name) + " ";
         }
 
         // Equip the new item — first remove this item's ID from any other slot
@@ -1149,8 +1149,7 @@ public class Character
         // Apply stats
         item.ApplyToCharacter(this);
 
-        string slotName = slot == EquipmentSlot.MainHand ? "main hand" : (slot == EquipmentSlot.OffHand ? "off-hand" : slot.ToString());
-        message += $"Equipped {item.Name} in {slotName}";
+        message += Loc.Get("equip.equipped_in_slot", item.Name, GameConfig.GetLocalizedSlotName(slot));
         return true;
     }
 

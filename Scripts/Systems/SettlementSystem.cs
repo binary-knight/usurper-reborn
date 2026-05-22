@@ -163,7 +163,7 @@ namespace UsurperRemake.Systems
                 OppositionCheck = p => p.Aggression > 0.7f,
                 Precondition = s => s.Buildings.ContainsKey(SettlementBuilding.Shrine) && s.Buildings[SettlementBuilding.Shrine].Tier >= BuildingTier.Foundation },
             new() { Id = "prison", Name = "Prison", Description = "Iron cells to hold bandits and troublemakers",
-                EffectDescription = "-50% trap damage (5 combats)",
+                EffectDescription = "-50% damage from dungeon traps, puzzle and riddle failures (5 events)",
                 TraitScorer = p => (p.Vengefulness + p.Loyalty) / 2f,
                 OppositionCheck = p => p.Impulsiveness > 0.7f,
                 Precondition = s => s.Buildings.ContainsKey(SettlementBuilding.Palisade) && s.Buildings[SettlementBuilding.Palisade].Tier >= BuildingTier.Built },

@@ -108,9 +108,6 @@ public class LoveStreetLocation : BaseLocation
             "Return to Main Street"
         };
     }
-
-    protected override string GetMudPromptName() => "Love Street";
-
     private void DisplayLocationSR()
     {
         terminal.ClearScreen();
@@ -1116,7 +1113,7 @@ public class LoveStreetLocation : BaseLocation
             terminal.SetColor("white");
             terminal.Write($" {npc.Name}");
             terminal.SetColor("gray");
-            terminal.WriteLine($" - {Loc.Get("love_street.level_info", npc.Level, npc.Race, npc.Class, npc.Age)}");
+            terminal.WriteLine($" - {Loc.Get("love_street.level_info", npc.Level, npc.Race, GameConfig.GetLocalizedClassName(npc.Class), npc.Age)}");
 
             terminal.SetColor("white");
             terminal.Write($" {Loc.Get("love_street.relationship")}: ");
@@ -2078,7 +2075,7 @@ public class LoveStreetLocation : BaseLocation
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("love_street.gossip_name", npc.Name));
-        terminal.WriteLine(Loc.Get("love_street.gossip_level_info", npc.Level, npc.Race, npc.Class, npc.Age));
+        terminal.WriteLine(Loc.Get("love_street.gossip_level_info", npc.Level, npc.Race, GameConfig.GetLocalizedClassName(npc.Class), npc.Age));
         terminal.WriteLine("");
 
         var profile = npc.Brain?.Personality;

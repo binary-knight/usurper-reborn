@@ -863,7 +863,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("═══════════════════════════════════════════════════════════════════", "gray");
             terminal.WriteLine("");
 
-            terminal.WriteLine($"  {Loc.Get("ending.final_stats_character", player.Name2, player.Class)}", "white");
+            terminal.WriteLine($"  {Loc.Get("ending.final_stats_character", player.Name2, GameConfig.GetLocalizedClassName(player.Class))}", "white");
             terminal.WriteLine($"  {Loc.Get("ending.final_stats_race", player.Race)}", "white");
             terminal.WriteLine($"  {Loc.Get("ending.final_stats_level", player.Level)}", "cyan");
             terminal.WriteLine("");
@@ -919,7 +919,7 @@ namespace UsurperRemake.Systems
 
             // Character summary
             terminal.WriteLine($"  {Loc.Get("ending.legacy_hero_section")}", "bright_yellow");
-            terminal.WriteLine($"  {Loc.Get("ending.legacy_hero_desc", player.Name2, player.Race, player.Class)}", "white");
+            terminal.WriteLine($"  {Loc.Get("ending.legacy_hero_desc", player.Name2, player.Race, GameConfig.GetLocalizedClassName(player.Class))}", "white");
             terminal.WriteLine($"  {Loc.Get("ending.legacy_hero_stats", player.Level, player.MKills)}", "gray");
             terminal.WriteLine("");
 

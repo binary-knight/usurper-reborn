@@ -355,26 +355,66 @@ function sendJson(res, status, data, extraHeaders) {
 const BUG_REPORT_WEBHOOK_URL = process.env.BUG_REPORT_WEBHOOK_URL || '';
 const BUG_REPORT_MAX_CONTENT_CHARS = 4000;        // Discord msg cap is ~2000; leave headroom
 const BUG_REPORT_WINDOW_MS = 60 * 60 * 1000;      // 1 hour sliding window
-const BUG_REPORT_MAX_PER_WINDOW = 5;              // 5 reports / hour / IP
-const bugReportLimits = new Map();                // ip -> { count, windowStart }
+const BUG_REPORT_MAX_PER_PLAYER = 20;             // 20 reports / hour / player (some reporters are prolific)
+const BUG_REPORT_MAX_GLOBAL = 200;                // 200 reports / hour total (backstop, scaled with per-player cap)
+const bugReportLimits = new Map();                // key -> { count, windowStart }
+let bugReportGlobalCount = 0;
+let bugReportGlobalWindowStart = Date.now();
 
-function bugReportRateLimitOk(ip) {
+// Pre-2026-05-18 design used IP as the rate-limit key, which collapsed every
+// online-mode player to a single bucket (they all originate from the game
+// server's loopback). Five reports server-wide busted the cap and every
+// subsequent player got "Could not send report online" even though the
+// network was fine. Now we bucket by player name (parsed from the report
+// content) with IP fallback for non-online clients (BBS, standalone), plus a
+// separate global counter as a backstop against runaway abuse.
+function bugReportRateLimitOk(key) {
   const now = Date.now();
-  const entry = bugReportLimits.get(ip);
-  if (!entry || now - entry.windowStart > BUG_REPORT_WINDOW_MS) {
-    bugReportLimits.set(ip, { count: 1, windowStart: now });
-    return true;
+
+  // Reset global window if rolled over
+  if (now - bugReportGlobalWindowStart > BUG_REPORT_WINDOW_MS) {
+    bugReportGlobalCount = 0;
+    bugReportGlobalWindowStart = now;
   }
-  if (entry.count >= BUG_REPORT_MAX_PER_WINDOW) return false;
+  if (bugReportGlobalCount >= BUG_REPORT_MAX_GLOBAL) {
+    return { ok: false, reason: 'global' };
+  }
+
+  // Per-player (or per-IP fallback) bucket
+  const entry = bugReportLimits.get(key);
+  if (!entry || now - entry.windowStart > BUG_REPORT_WINDOW_MS) {
+    bugReportLimits.set(key, { count: 1, windowStart: now });
+    bugReportGlobalCount++;
+    return { ok: true };
+  }
+  if (entry.count >= BUG_REPORT_MAX_PER_PLAYER) {
+    return { ok: false, reason: 'player' };
+  }
   entry.count++;
-  return true;
+  bugReportGlobalCount++;
+  return { ok: true };
+}
+
+// Extract the player name from the bug-report content for rate-limit bucketing.
+// The C# game emits a "Player:   {name} - Lv.{N} {race} {class}" line inside
+// the code fence at the top of every online-mode report (BugReportSystem.cs:201).
+// Returns null when the line isn't present (BBS / standalone / malformed input)
+// so the caller can fall back to IP bucketing.
+function parsePlayerName(content) {
+  if (typeof content !== 'string') return null;
+  const match = content.match(/Player:\s+([^\s—-][^—\n\r-]*?)\s+(?:—|--|-)\s*Lv\./);
+  if (!match) return null;
+  const name = match[1].trim();
+  // Belt-and-suspenders: cap the key length so a hostile client can't bloat
+  // the map by sending 100KB "names."
+  return name.length > 0 && name.length <= 64 ? name.toLowerCase() : null;
 }
 
 // Prune stale bug-report buckets every 10 minutes
 setInterval(() => {
   const now = Date.now();
-  for (const [ip, entry] of bugReportLimits) {
-    if (now - entry.windowStart > BUG_REPORT_WINDOW_MS) bugReportLimits.delete(ip);
+  for (const [key, entry] of bugReportLimits) {
+    if (now - entry.windowStart > BUG_REPORT_WINDOW_MS) bugReportLimits.delete(key);
   }
 }, 600000);
 
@@ -387,12 +427,11 @@ async function handleBugReport(req, res) {
     return;
   }
 
-  if (!bugReportRateLimitOk(ip)) {
-    console.warn(`[bug-report] Rate limited ${ip} (5/hr cap hit)`);
-    sendJson(res, 429, { error: 'Too many reports. Try again later.' });
-    return;
-  }
-
+  // Read body BEFORE rate-limiting so we can extract the player name and
+  // bucket per-player instead of per-IP. Every online-mode report originates
+  // from the game server's loopback so IP bucketing collapses to one shared
+  // bucket across all players; player-name bucketing gives each player their
+  // own budget. Fall back to IP if no player name (BBS/standalone clients).
   let body;
   try {
     body = await readBody(req);
@@ -408,6 +447,19 @@ async function handleBugReport(req, res) {
   }
   if (content.length > BUG_REPORT_MAX_CONTENT_CHARS) {
     sendJson(res, 413, { error: 'Content too large' });
+    return;
+  }
+
+  const playerName = parsePlayerName(content);
+  const rateLimitKey = playerName ? `player:${playerName}` : `ip:${ip}`;
+  const rateLimit = bugReportRateLimitOk(rateLimitKey);
+  if (!rateLimit.ok) {
+    if (rateLimit.reason === 'global') {
+      console.warn(`[bug-report] Rate limited (global ${BUG_REPORT_MAX_GLOBAL}/hr cap hit) - ${rateLimitKey} from ${ip}`);
+    } else {
+      console.warn(`[bug-report] Rate limited ${rateLimitKey} (${BUG_REPORT_MAX_PER_PLAYER}/hr cap hit) from ${ip}`);
+    }
+    sendJson(res, 429, { error: 'Too many reports. Try again later.' });
     return;
   }
 
@@ -452,14 +504,14 @@ async function handleBugReport(req, res) {
   try {
     const status = await forward;
     if (status >= 200 && status < 300) {
-      console.log(`[bug-report] Forwarded ${content.length} chars from ${ip} (webhook ${status})`);
+      console.log(`[bug-report] Forwarded ${content.length} chars from ${rateLimitKey} via ${ip} (webhook ${status})`);
       sendJson(res, 204, {});
     } else {
-      console.warn(`[bug-report] Webhook returned ${status} for ${ip}`);
+      console.warn(`[bug-report] Webhook returned ${status} for ${rateLimitKey} via ${ip}`);
       sendJson(res, 502, { error: 'Webhook upstream error' });
     }
   } catch (e) {
-    console.error(`[bug-report] Forward failed for ${ip}: ${e.message}`);
+    console.error(`[bug-report] Forward failed for ${rateLimitKey} via ${ip}: ${e.message}`);
     sendJson(res, 502, { error: 'Webhook forward failed' });
   }
 }
