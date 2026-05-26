@@ -35,6 +35,21 @@ public static class DruidShrineData
         public string AttunementDescription { get; init; } = ""; // Read when the player picks this shrine.
         public string PassiveSummary { get; init; } = "";      // One-line "what this buff does" summary.
         public int ChivalryShift { get; init; }                // Alignment shift per attunement (positive = +Chivalry, negative = +Darkness).
+
+        // Localized accessors. The Name / GodPatron / flavor / attunement / passive strings above are
+        // the hardcoded English source; these resolve `shrine.{id}.name|god|flavor|attune|passive` loc
+        // keys with English fallback so the pilgrimage menu and shrine prose render in the session
+        // language. Player report: shrine names, effects, and altar messages showed in English.
+        private static string LocOrFallback(string key, string fallback)
+        {
+            var v = UsurperRemake.Systems.Loc.Get(key);
+            return v == key ? fallback : v;
+        }
+        public string LocName() => LocOrFallback($"shrine.{Id}.name", Name);
+        public string LocGodPatron() => LocOrFallback($"shrine.{Id}.god", GodPatron);
+        public string LocFlavor() => LocOrFallback($"shrine.{Id}.flavor", FlavorDescription);
+        public string LocAttunement() => LocOrFallback($"shrine.{Id}.attune", AttunementDescription);
+        public string LocPassiveSummary() => LocOrFallback($"shrine.{Id}.passive", PassiveSummary);
     }
 
     public static readonly DruidShrine[] Shrines = new[]

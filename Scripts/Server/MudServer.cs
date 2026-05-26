@@ -1096,6 +1096,28 @@ public class MudServer
         }
     }
 
+    /// <summary>
+    /// Broadcast a message that is rendered per-recipient in each session's own language.
+    /// `buildMessage` receives the recipient's language code and returns the rendered string
+    /// (typically built with Loc.GetIn(lang, ...)). Same delivery filters as BroadcastToAll.
+    /// Used for real-time announcements built outside any session context (e.g. world boss spawn
+    /// fired from the world-sim tick) so each player sees the announcement in their language.
+    /// </summary>
+    public void BroadcastLocalized(Func<string, string> buildMessage, string? excludeUsername = null)
+    {
+        foreach (var kvp in ActiveSessions)
+        {
+            if (excludeUsername != null && kvp.Key == excludeUsername.ToLowerInvariant())
+                continue;
+            if (!kvp.Value.IsInGame) continue;
+            if (kvp.Value.IsSpectating) continue;
+            if (kvp.Value.IsGroupFollower) continue;
+
+            string lang = kvp.Value.Context?.Language ?? "en";
+            kvp.Value.EnqueueMessage(buildMessage(lang));
+        }
+    }
+
     /// <summary>Send a message to a specific player by username.</summary>
     public bool SendToPlayer(string username, string message)
     {

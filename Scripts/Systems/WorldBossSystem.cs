@@ -113,9 +113,14 @@ namespace UsurperRemake.Systems
                     ActiveBossName = bossDef.Name;
                     DebugLogger.Instance.LogInfo("WORLD_BOSS", $"Spawned {bossDef.Name} (Lv{bossLevel}, HP:{scaledHP:N0}) with {onlineCount} players online");
 
-                    // Broadcast spawn to all online players
-                    string spawnMsg = $"\n  *** {Loc.Get("world_boss.spawn_broadcast", bossDef.Name, bossDef.Title)} ***\n  {Loc.Get("world_boss.type_boss_to_join")}";
-                    MudServer.Instance?.BroadcastToAll(spawnMsg);
+                    // Broadcast spawn to all online players, rendered per-recipient in their own
+                    // language. This fires from the world-sim tick (no session context), so a single
+                    // pre-rendered string would fall back to English for everyone -- the bug report.
+                    // BroadcastLocalized renders the announcement in each session's language instead.
+                    // (The boss name/title itself is still English -- boss names are a game-wide
+                    // untranslated layer like monster names, flagged for a separate pass.)
+                    MudServer.Instance?.BroadcastLocalized(lang =>
+                        $"\n  *** {Loc.GetIn(lang, "world_boss.spawn_broadcast", bossDef.Name, bossDef.Title)} ***\n  {Loc.GetIn(lang, "world_boss.type_boss_to_join")}");
 
                     // Post to news feed
                     if (OnlineStateManager.IsActive)
@@ -185,15 +190,16 @@ namespace UsurperRemake.Systems
 
                 // Menu
                 terminal.SetColor("cyan");
-                terminal.WriteLine($"  [A] {Loc.Get("world_boss.attack_boss")}    [Q] {Loc.Get("ui.back")}");
+                terminal.WriteLine($"  [A] {Loc.Get("world_boss.attack_boss")}    [Q] {Loc.Get("engine.back")}");
                 terminal.SetColor("white");
                 terminal.Write($"\n  {Loc.Get("ui.your_choice")}");
                 string input = (await terminal.ReadLineAsync())?.Trim().ToUpper() ?? "";
 
-                // v0.60.8: the menu label renders as `[Q] [B]ack` (Loc.Get("ui.back")
-                // is the BBS-convention string `[B]ack`), so pressing B looked valid
-                // but did nothing. Accept B as an alias to Q so both hotkeys in the
-                // displayed label work as advertised.
+                // v0.61.6: the menu label used to render as `[Q] [B]ack` (Loc.Get("ui.back")
+                // is the BBS-convention string `[B]ack`), which read as a malformed double
+                // hotkey next to the plain `[A] Attack Boss` label. Now uses the plain-word
+                // `engine.back` label so it renders `[Q] Back`. Q is the hotkey; B is still
+                // accepted as a defensive alias for players used to the old `[B]ack` label.
                 if (input == "Q" || input == "B" || input == "") break;
 
                 if (input == "A")
@@ -373,6 +379,17 @@ namespace UsurperRemake.Systems
             var state = new WorldBossCombatState();
             var rng = Random.Shared;
 
+            // Reset transient combat buffs so leftover buffs from a previous fight (dungeon, etc.)
+            // don't carry into the world boss, and so ability/spell buffs applied this fight start clean.
+            player.TempAttackBonus = 0;
+            player.TempAttackBonusDuration = 0;
+            player.TempDefenseBonus = 0;
+            player.TempDefenseBonusDuration = 0;
+            player.TempDamageReductionPercent = 0;
+            player.TempDamageReductionDuration = 0;
+            player.HasStatusImmunity = false;
+            player.StatusImmunityDuration = 0;
+
             terminal.ClearScreen();
             terminal.SetColor(bossDef.ThemeColor);
             terminal.WriteLine($"\n  {Loc.Get("world_boss.engage", bossDef.Name, bossDef.Title)}");
@@ -486,8 +503,11 @@ namespace UsurperRemake.Systems
                             terminal.WriteLine($"  {Loc.Get("world_boss.killing_blow")}");
 
                             // Broadcast — only the killer's session sends this
-                            string killMsg = $"\n  *** {Loc.Get("world_boss.defeat_broadcast", bossDef.Name, player.DisplayName)} ***";
-                            MudServer.Instance?.BroadcastToAll(killMsg, playerKey);
+                            // Per-recipient language (built in the killer's session, but each player
+                            // should read it in their own language, not the killer's).
+                            MudServer.Instance?.BroadcastLocalized(lang =>
+                                $"\n  *** {Loc.GetIn(lang, "world_boss.defeat_broadcast", bossDef.Name, player.DisplayName)} ***",
+                                playerKey);
 
                             // News — also only the killer posts this
                             if (OnlineStateManager.IsActive)
@@ -519,7 +539,7 @@ namespace UsurperRemake.Systems
                 if (player.HP > 0 && !state.Retreated)
                 {
                     await ProcessBossActions(bossDef, bossData, player, terminal, rng,
-                        state.DefendingRounds, state.TempDefenseBonus);
+                        state.DefendingRounds);
                 }
 
                 // ─── Presence aura (unavoidable damage each round) ───
@@ -548,6 +568,17 @@ namespace UsurperRemake.Systems
 
                 // Decrement defend counter
                 if (state.DefendingRounds > 0) state.DefendingRounds--;
+
+                // Tick buff durations (attack/defense/damage-reduction/status-immunity) so ability
+                // and spell buffs expire on schedule, mirroring the main combat engine.
+                if (player.TempAttackBonusDuration > 0 && --player.TempAttackBonusDuration <= 0)
+                    player.TempAttackBonus = 0;
+                if (player.TempDefenseBonusDuration > 0 && --player.TempDefenseBonusDuration <= 0)
+                    player.TempDefenseBonus = 0;
+                if (player.TempDamageReductionDuration > 0 && --player.TempDamageReductionDuration <= 0)
+                    player.TempDamageReductionPercent = 0;
+                if (player.StatusImmunityDuration > 0 && --player.StatusImmunityDuration <= 0)
+                    player.HasStatusImmunity = false;
 
                 // Tick ability cooldowns
                 foreach (var key in state.AbilityCooldowns.Keys.ToList())
@@ -691,7 +722,7 @@ namespace UsurperRemake.Systems
             switch (input)
             {
                 case "A": // Standard attack
-                    damage = CalculatePlayerDamage(player, bossDef, bossData, rng, state.TempAttackBonus);
+                    damage = CalculatePlayerDamage(player, bossDef, bossData, rng);
                     terminal.SetColor("bright_green");
                     terminal.WriteLine($"  {Loc.Get("world_boss.you_strike", bossDef.Name, $"{damage:N0}")}");
                     break;
@@ -711,11 +742,11 @@ namespace UsurperRemake.Systems
                     break;
 
                 case "P": // Power attack (high damage, lower accuracy)
-                    damage = CalculatePowerAttackDamage(player, bossDef, bossData, rng, state.TempAttackBonus, terminal);
+                    damage = CalculatePowerAttackDamage(player, bossDef, bossData, rng, terminal);
                     break;
 
                 case "E": // Precise strike (higher crit chance)
-                    damage = CalculatePreciseStrikeDamage(player, bossDef, bossData, rng, state.TempAttackBonus, terminal);
+                    damage = CalculatePreciseStrikeDamage(player, bossDef, bossData, rng, terminal);
                     break;
 
                 case "L": // Class ability
@@ -735,7 +766,7 @@ namespace UsurperRemake.Systems
                     break;
 
                 default:
-                    damage = CalculatePlayerDamage(player, bossDef, bossData, rng, state.TempAttackBonus);
+                    damage = CalculatePlayerDamage(player, bossDef, bossData, rng);
                     terminal.SetColor("bright_green");
                     terminal.WriteLine($"  {Loc.Get("world_boss.you_strike", bossDef.Name, $"{damage:N0}")}");
                     break;
@@ -745,10 +776,13 @@ namespace UsurperRemake.Systems
         }
 
         private long CalculatePlayerDamage(Character player, WorldBossDefinition bossDef,
-            WorldBossRuntimeData bossData, Random rng, int tempAtkBonus)
+            WorldBossRuntimeData bossData, Random rng)
         {
+            // Active attack buff (Battle Cry / Focus / spell buffs) — only while its duration holds.
+            long atkBonus = player.TempAttackBonusDuration > 0 ? player.TempAttackBonus : 0;
+
             // Standard damage formula: STR + WeapPow + bonuses - boss DEF/2
-            long baseDamage = player.Strength + player.WeapPow + tempAtkBonus;
+            long baseDamage = player.Strength + player.WeapPow + atkBonus;
             long defense = bossData.ScaledDefence / 2;
             long raw = Math.Max(1, baseDamage - defense);
 
@@ -756,12 +790,11 @@ namespace UsurperRemake.Systems
             double variance = 0.7 + rng.NextDouble() * 0.6;
             long damage = (long)(raw * variance);
 
-            // Critical hit check (5-50% chance based on DEX)
-            double critChance = Math.Clamp(5.0 + player.Dexterity * 0.5, 5.0, 50.0);
-            if (rng.NextDouble() * 100 < critChance)
-            {
+            // Real critical-hit chance (DEX + equipment crit bonus), matching the main combat engine
+            // so gear and DEX investment actually pay off here instead of the old flat 5-50% curve.
+            int critChance = StatEffectsSystem.GetCriticalHitChance(player.Dexterity, player.GetEquipmentCritChanceBonus());
+            if (rng.Next(100) < critChance)
                 damage = (long)(damage * 1.5);
-            }
 
             // BossSlayer bonus: +10% damage if any equipped item has BossSlayer effect
             if (HasSpecialEffect(player, LootGenerator.SpecialEffect.BossSlayer))
@@ -771,7 +804,7 @@ namespace UsurperRemake.Systems
         }
 
         private long CalculatePowerAttackDamage(Character player, WorldBossDefinition bossDef,
-            WorldBossRuntimeData bossData, Random rng, int tempAtkBonus, TerminalEmulator terminal)
+            WorldBossRuntimeData bossData, Random rng, TerminalEmulator terminal)
         {
             // 75% hit chance, but 1.5x damage
             if (rng.NextDouble() > 0.75)
@@ -781,21 +814,21 @@ namespace UsurperRemake.Systems
                 return 0;
             }
 
-            long damage = (long)(CalculatePlayerDamage(player, bossDef, bossData, rng, tempAtkBonus) * 1.5);
+            long damage = (long)(CalculatePlayerDamage(player, bossDef, bossData, rng) * 1.5);
             terminal.SetColor("bright_yellow");
             terminal.WriteLine($"  {Loc.Get("world_boss.power_attack_hit", bossDef.Name, $"{damage:N0}")}");
             return damage;
         }
 
         private long CalculatePreciseStrikeDamage(Character player, WorldBossDefinition bossDef,
-            WorldBossRuntimeData bossData, Random rng, int tempAtkBonus, TerminalEmulator terminal)
+            WorldBossRuntimeData bossData, Random rng, TerminalEmulator terminal)
         {
             // Always hits, higher crit chance (double normal), but 80% base damage
-            long baseDamage = (long)(CalculatePlayerDamage(player, bossDef, bossData, rng, tempAtkBonus) * 0.8);
+            long baseDamage = (long)(CalculatePlayerDamage(player, bossDef, bossData, rng) * 0.8);
 
-            // Extra crit check
-            double critChance = Math.Clamp(10.0 + player.Dexterity * 1.0, 10.0, 75.0);
-            if (rng.NextDouble() * 100 < critChance)
+            // Extra crit check — double the real DEX/equipment crit chance, capped at 95%
+            int critChance = Math.Min(95, StatEffectsSystem.GetCriticalHitChance(player.Dexterity, player.GetEquipmentCritChanceBonus()) * 2);
+            if (rng.Next(100) < critChance)
             {
                 baseDamage = (long)(baseDamage * 1.8);
                 terminal.SetColor("bright_yellow");
@@ -883,16 +916,21 @@ namespace UsurperRemake.Systems
                         terminal.WriteLine($"  {Loc.Get("world_boss.healed_for", result.Healing, player.HP, player.MaxHP)}");
                     }
 
-                    // Protection/attack buffs
+                    // Protection/attack buffs — apply to the player's Temp* fields so the
+                    // world-boss damage/defense math actually reads them (the old Shielded/Empowered
+                    // statuses were cosmetic here; nothing in this loop consulted them).
+                    int spellDur = result.Duration > 0 ? result.Duration : 3;
                     if (result.ProtectionBonus > 0)
                     {
-                        player.ApplyStatus(StatusEffect.Shielded, result.Duration > 0 ? result.Duration : 3);
+                        player.TempDefenseBonus = Math.Max(player.TempDefenseBonus, result.ProtectionBonus);
+                        player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, spellDur);
                         terminal.SetColor("cyan");
                         terminal.WriteLine($"  {Loc.Get("world_boss.protection_increased", result.ProtectionBonus)}");
                     }
                     if (result.AttackBonus > 0)
                     {
-                        player.ApplyStatus(StatusEffect.Empowered, result.Duration > 0 ? result.Duration : 3);
+                        player.TempAttackBonus = Math.Max(player.TempAttackBonus, result.AttackBonus);
+                        player.TempAttackBonusDuration = Math.Max(player.TempAttackBonusDuration, spellDur);
                         terminal.SetColor("yellow");
                         terminal.WriteLine($"  {Loc.Get("world_boss.attack_increased", result.AttackBonus)}");
                     }
@@ -922,6 +960,7 @@ namespace UsurperRemake.Systems
                 return;
             }
 
+            bool useMana = false;
             // If player has both types, let them choose
             if (hasHealing && hasMana)
             {
@@ -929,40 +968,99 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine($"    (H) {Loc.Get("world_boss.healing_potion")}  ({player.Healing}/{player.MaxPotions})", "green");
                 terminal.WriteLine($"    (M) {Loc.Get("world_boss.mana_potion")}     ({player.ManaPotions}/{player.MaxManaPotions})", "blue");
                 string choice = await terminal.GetInput("  > ");
-                if (choice.Equals("M", StringComparison.OrdinalIgnoreCase))
-                {
-                    UseManaPotion(player, terminal);
-                    return;
-                }
-                // Default to healing potion
+                if (choice.Equals("M", StringComparison.OrdinalIgnoreCase)) useMana = true;
+                // anything else defaults to healing
             }
-            else if (!hasHealing && hasMana)
+            else if (hasMana)
             {
-                UseManaPotion(player, terminal);
+                useMana = true;
+            }
+
+            if (useMana)
+                await DrinkManaPotions(player, terminal);
+            else
+                await DrinkHealingPotions(player, terminal);
+        }
+
+        /// <summary>
+        /// Prompt for a quantity (number, or F = drink until full) and drink that many healing potions
+        /// in a single action. The old loop drank exactly one per turn and handed the boss a free round
+        /// for every sip — this is the "can only use 1 potion" report.
+        /// </summary>
+        private async Task DrinkHealingPotions(Character player, TerminalEmulator terminal)
+        {
+            int available = (int)Math.Min(player.Healing, int.MaxValue);
+            terminal.SetColor("white");
+            string input = (await terminal.GetInput($"  {Loc.Get("world_boss.potion_qty_heal", available)} "))?.Trim() ?? "";
+            if (input.Equals("Q", StringComparison.OrdinalIgnoreCase) || input == "") return;
+
+            int qty;
+            if (input.Equals("F", StringComparison.OrdinalIgnoreCase))
+                qty = available;
+            else if (!int.TryParse(input, out qty) || qty < 1)
+                qty = 1;
+            qty = Math.Min(qty, available);
+
+            long perPotion = (long)(player.MaxHP * 0.3);
+            long totalHealed = 0;
+            int drank = 0;
+            for (int i = 0; i < qty && player.Healing > 0 && player.HP < player.MaxHP; i++)
+            {
+                long before = player.HP;
+                player.HP = Math.Min(player.MaxHP, player.HP + perPotion);
+                totalHealed += player.HP - before;
+                player.Healing--;
+                drank++;
+            }
+
+            if (drank == 0)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine($"  {Loc.Get("ui.no_healing_potions")}");
                 return;
             }
 
-            // Healing potion
-            long healAmount = (long)(player.MaxHP * 0.3);
-            player.HP = Math.Min(player.MaxHP, player.HP + healAmount);
-            player.Healing--;
-
             terminal.SetColor("bright_green");
-            terminal.WriteLine($"  {Loc.Get("world_boss.drink_potion", healAmount, player.HP, player.MaxHP)}");
+            terminal.WriteLine($"  {Loc.Get("world_boss.drank_heal_multi", drank, totalHealed, player.HP, player.MaxHP)}");
             terminal.SetColor("gray");
             terminal.WriteLine($"  {Loc.Get("world_boss.potions_remaining", player.Healing)}");
         }
 
-        private void UseManaPotion(Character player, TerminalEmulator terminal)
+        private async Task DrinkManaPotions(Character player, TerminalEmulator terminal)
         {
-            long manaRestore = 30 + player.Level * 5;
-            long manaNeeded = player.MaxMana - player.Mana;
-            long actualRestore = Math.Min(manaRestore, manaNeeded);
-            player.Mana += actualRestore;
-            player.ManaPotions--;
+            int available = (int)Math.Min(player.ManaPotions, int.MaxValue);
+            terminal.SetColor("white");
+            string input = (await terminal.GetInput($"  {Loc.Get("world_boss.potion_qty_mana", available)} "))?.Trim() ?? "";
+            if (input.Equals("Q", StringComparison.OrdinalIgnoreCase) || input == "") return;
+
+            int qty;
+            if (input.Equals("F", StringComparison.OrdinalIgnoreCase))
+                qty = available;
+            else if (!int.TryParse(input, out qty) || qty < 1)
+                qty = 1;
+            qty = Math.Min(qty, available);
+
+            long perPotion = 30 + player.Level * 5;
+            long totalRestored = 0;
+            int drank = 0;
+            for (int i = 0; i < qty && player.ManaPotions > 0 && player.Mana < player.MaxMana; i++)
+            {
+                long before = player.Mana;
+                player.Mana = Math.Min(player.MaxMana, player.Mana + perPotion);
+                totalRestored += player.Mana - before;
+                player.ManaPotions--;
+                drank++;
+            }
+
+            if (drank == 0)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine($"  {Loc.Get("world_boss.no_spells")}");
+                return;
+            }
 
             terminal.SetColor("bright_blue");
-            terminal.WriteLine($"  {Loc.Get("world_boss.mana_potion_used", actualRestore)}");
+            terminal.WriteLine($"  {Loc.Get("world_boss.drank_mana_multi", drank, totalRestored, player.Mana, player.MaxMana)}");
             terminal.SetColor("gray");
             terminal.WriteLine($"  {Loc.Get("world_boss.mana_potions_remaining", player.ManaPotions, player.MaxManaPotions)}");
         }
@@ -1029,6 +1127,12 @@ namespace UsurperRemake.Systems
                             terminal.WriteLine($"  {Loc.Get("world_boss.healed_for", result.Healing, player.HP, player.MaxHP)}");
                         }
 
+                        // Apply buff effects to the player's own Temp* fields (the same mechanism the
+                        // main combat engine uses), then the world-boss damage/defense math reads them.
+                        // Without this, Battle Cry / Focus / Shield Wall / Iron Will printed flavor and
+                        // did nothing — they were the "abilities don't work" report.
+                        ApplyAbilityBuffsToPlayer(player, result, terminal);
+
                         return Math.Max(0, result.Damage);
                     }
                     else
@@ -1042,13 +1146,58 @@ namespace UsurperRemake.Systems
             return 0;
         }
 
+        /// <summary>
+        /// Apply a class ability's buff/defensive effects to the player's own Temp* fields, the same
+        /// way CombatEngine does, so the world-boss damage and boss-attack math actually read them.
+        /// Covers AttackBonus / DefenseBonus / Duration generically (Battle Cry, Focus, Shield Wall,
+        /// Iron Will's +50 DEF, etc.) plus the headline SpecialEffect buffs the player can use here.
+        /// </summary>
+        private void ApplyAbilityBuffsToPlayer(Character player, ClassAbilityResult result, TerminalEmulator terminal)
+        {
+            int dur = result.Duration > 0 ? result.Duration : 1;
+
+            if (result.AttackBonus > 0)
+            {
+                player.TempAttackBonus = Math.Max(player.TempAttackBonus, result.AttackBonus);
+                player.TempAttackBonusDuration = Math.Max(player.TempAttackBonusDuration, dur);
+                terminal.SetColor("yellow");
+                terminal.WriteLine($"  {Loc.Get("world_boss.buff_attack_dur", result.AttackBonus, player.TempAttackBonusDuration)}");
+            }
+
+            if (result.DefenseBonus > 0)
+            {
+                player.TempDefenseBonus = Math.Max(player.TempDefenseBonus, result.DefenseBonus);
+                player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, dur);
+                terminal.SetColor("cyan");
+                terminal.WriteLine($"  {Loc.Get("world_boss.buff_defense_dur", result.DefenseBonus, player.TempDefenseBonusDuration)}");
+            }
+
+            switch (result.SpecialEffect)
+            {
+                case "shield_wall_formation": // 30% incoming damage reduction
+                    player.TempDamageReductionPercent = Math.Max(player.TempDamageReductionPercent, 30);
+                    player.TempDamageReductionDuration = Math.Max(player.TempDamageReductionDuration, result.Duration > 0 ? result.Duration : 3);
+                    terminal.SetColor("bright_cyan");
+                    terminal.WriteLine($"  {Loc.Get("world_boss.buff_damage_reduction", 30, player.TempDamageReductionDuration)}");
+                    break;
+
+                case "resist_all":   // Iron Will — immune to debuffs for the duration
+                case "immunity":
+                    player.HasStatusImmunity = true;
+                    player.StatusImmunityDuration = Math.Max(player.StatusImmunityDuration, result.Duration > 0 ? result.Duration : 3);
+                    terminal.SetColor("bright_white");
+                    terminal.WriteLine($"  {Loc.Get("world_boss.buff_status_immunity", player.StatusImmunityDuration)}");
+                    break;
+            }
+        }
+
         // ═══════════════════════════════════════════════════════════════════════════
         // Boss AI — Ability selection and attacks
         // ═══════════════════════════════════════════════════════════════════════════
 
         private async Task ProcessBossActions(WorldBossDefinition bossDef, WorldBossRuntimeData bossData,
             Character player, TerminalEmulator terminal, Random rng,
-            int defendingRounds, int playerDefBonus)
+            int defendingRounds)
         {
             // Boss gets multiple attacks per round
             int attacks = bossData.AttacksPerRound;
@@ -1070,12 +1219,12 @@ namespace UsurperRemake.Systems
                 if (ability != null)
                 {
                     await ProcessBossAbility(ability, bossDef, bossData, player, terminal, rng,
-                        defendingRounds, playerDefBonus);
+                        defendingRounds);
                 }
                 else
                 {
                     // Basic attack
-                    long bossDmg = CalculateBossBasicDamage(bossData, player, rng, defendingRounds, playerDefBonus);
+                    long bossDmg = CalculateBossBasicDamage(bossData, player, rng, defendingRounds);
                     player.HP = Math.Max(0, player.HP - bossDmg);
 
                     terminal.SetColor("bright_red");
@@ -1086,13 +1235,13 @@ namespace UsurperRemake.Systems
 
         private async Task ProcessBossAbility(WorldBossAbility ability, WorldBossDefinition bossDef,
             WorldBossRuntimeData bossData, Character player, TerminalEmulator terminal, Random rng,
-            int defendingRounds, int playerDefBonus)
+            int defendingRounds)
         {
             terminal.SetColor(bossDef.ThemeColor);
             terminal.WriteLine($"  {Loc.Get("world_boss.boss_uses_ability", bossDef.Name, ability.Name)}");
 
             // Calculate ability damage
-            long baseDmg = CalculateBossBasicDamage(bossData, player, rng, defendingRounds, playerDefBonus);
+            long baseDmg = CalculateBossBasicDamage(bossData, player, rng, defendingRounds);
             long abilityDmg = (long)(baseDmg * ability.DamageMultiplier);
 
             // Unavoidable abilities bypass defense
@@ -1112,6 +1261,14 @@ namespace UsurperRemake.Systems
             // Apply status effect
             if (ability.AppliedStatus.HasValue && ability.AppliedStatus.Value != StatusEffect.None)
             {
+                // Iron Will / status-immunity buff fully resists avoidable debuffs.
+                if (player.HasStatusImmunity && player.StatusImmunityDuration > 0 && !ability.IsUnavoidable)
+                {
+                    terminal.SetColor("bright_white");
+                    terminal.WriteLine($"  {Loc.Get("world_boss.resist_effect", ability.AppliedStatus.Value)}");
+                    return;
+                }
+
                 // Status resist check: 30% base resist, +0.5% per player level
                 double resistChance = 30.0 + player.Level * 0.5;
                 if (ability.IsUnavoidable || rng.NextDouble() * 100 >= resistChance)
@@ -1139,10 +1296,13 @@ namespace UsurperRemake.Systems
         }
 
         private long CalculateBossBasicDamage(WorldBossRuntimeData bossData, Character player, Random rng,
-            int defendingRounds, int playerDefBonus)
+            int defendingRounds)
         {
             long bossStr = bossData.ScaledStrength;
-            long playerDef = player.Defence + player.ArmPow + playerDefBonus;
+
+            // Active defense buff (Shield Wall / Iron Will / spell protection) — only while it holds.
+            long defBonus = player.TempDefenseBonusDuration > 0 ? player.TempDefenseBonus : 0;
+            long playerDef = player.Defence + player.ArmPow + defBonus;
 
             // Defending doubles effective defense
             if (defendingRounds > 0)
@@ -1158,8 +1318,13 @@ namespace UsurperRemake.Systems
             long minDamage = Math.Max(1, bossStr / 5);
             raw = Math.Max(raw, minDamage);
             double variance = 0.7 + rng.NextDouble() * 0.6;
+            long final = Math.Max(1, (long)(raw * variance));
 
-            return Math.Max(1, (long)(raw * variance));
+            // Shield Wall Formation flat % damage reduction (applies after the defense curve).
+            if (player.TempDamageReductionDuration > 0 && player.TempDamageReductionPercent > 0)
+                final = Math.Max(1, final - final * player.TempDamageReductionPercent / 100);
+
+            return final;
         }
 
         private List<WorldBossAbility> GetPhaseAbilities(WorldBossDefinition bossDef, int phase)
@@ -1215,8 +1380,8 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("");
 
                 // Broadcast phase change
-                string phaseMsg = $"\n  *** {Loc.Get("world_boss.phase_change_broadcast", bossDef.Name, newPhase, GetPhaseDescription(newPhase))} ***";
-                MudServer.Instance?.BroadcastToAll(phaseMsg);
+                MudServer.Instance?.BroadcastLocalized(lang =>
+                    $"\n  *** {Loc.GetIn(lang, "world_boss.phase_change_broadcast", bossDef.Name, newPhase, GetPhaseDescriptionIn(lang, newPhase))} ***");
             }
         }
 
@@ -1225,6 +1390,14 @@ namespace UsurperRemake.Systems
             2 => Loc.Get("world_boss.phase_2_desc"),
             3 => Loc.Get("world_boss.phase_3_desc"),
             _ => Loc.Get("world_boss.phase_1_desc")
+        };
+
+        // Language-explicit variant for per-recipient broadcasts.
+        private string GetPhaseDescriptionIn(string lang, int phase) => phase switch
+        {
+            2 => Loc.GetIn(lang, "world_boss.phase_2_desc"),
+            3 => Loc.GetIn(lang, "world_boss.phase_3_desc"),
+            _ => Loc.GetIn(lang, "world_boss.phase_1_desc")
         };
 
         // ═══════════════════════════════════════════════════════════════════════════
@@ -1479,8 +1652,6 @@ namespace UsurperRemake.Systems
         public bool Retreated { get; set; }
         public bool Died { get; set; }
         public Dictionary<string, int> AbilityCooldowns { get; } = new();
-        public int TempDefenseBonus { get; set; }
-        public int TempAttackBonus { get; set; }
         public int DefendingRounds { get; set; }
     }
 

@@ -35,109 +35,52 @@ namespace UsurperRemake.Systems
         public const string HINT_COMPANION_LYRIS_TEASER = "companion_lyris_teaser";
         public const string HINT_COMPANION_MIRA_TEASER = "companion_mira_teaser";
 
-        // Hint definitions
+        // Hint definitions. Title and message text are resolved at display time
+        // from loc keys derived from the hint ID (`hint.<id>.title` /
+        // `hint.<id>.msg`), so all hint text is localized -- only the color is
+        // stored here.
         private readonly Dictionary<string, HintDefinition> hints = new()
         {
-            [HINT_MAIN_STREET_NAVIGATION] = new HintDefinition(
-                "Navigation Tip",
-                "Press the highlighted letter key to select an option. For example, press 'I' for the Inn.",
-                "bright_cyan"
-            ),
-            [HINT_FIRST_DUNGEON] = new HintDefinition(
-                "Dungeon Tip",
-                "Explore rooms using N/S/E/W (North/South/East/West). Fight monsters to gain XP and gold.",
-                "bright_cyan"
-            ),
-            [HINT_FIRST_COMBAT] = new HintDefinition(
-                "Combat Tip",
-                "Press [A] to Attack, [R] to Retreat, [H] to use a Healing Potion, or [S] to check your Status.",
-                "bright_cyan"
-            ),
-            [HINT_LOW_HP] = new HintDefinition(
-                "Health Warning",
-                "Your HP is low! Visit the Healer [1] on Main Street, or use healing potions [I] in combat.",
-                "bright_yellow"
-            ),
-            [HINT_FIRST_SHOP] = new HintDefinition(
-                "Shop Tip",
-                "Press 'B' to Buy items or 'S' to Sell. Better equipment means better combat!",
-                "bright_cyan"
-            ),
-            [HINT_FIRST_LEVEL_UP] = new HintDefinition(
-                "Level Up Available!",
-                "You have enough XP to level up! Visit your Master (M) on Main Street to advance.",
-                "bright_green"
-            ),
-            [HINT_FIRST_SPELL] = new HintDefinition(
-                "Magic Tip",
-                "You can cast spells in combat with 'C'. Spells use Mana but can turn the tide of battle!",
-                "bright_cyan"
-            ),
-            [HINT_INVENTORY] = new HintDefinition(
-                "Inventory Tip",
-                "Press '*' on Main Street to view your inventory. You can equip dungeon loot there!",
-                "bright_cyan"
-            ),
-            [HINT_SAVE_GAME] = new HintDefinition(
-                "Save Reminder",
-                "Your progress is saved automatically, but you can also save manually from the game menu.",
-                "bright_cyan"
-            ),
-            [HINT_TEAM_COMBAT] = new HintDefinition(
-                "Team Combat Tip",
-                "Fighting with companions gives you a 15% bonus to XP and gold!",
-                "bright_green"
-            ),
-            [HINT_FIRST_PURCHASE_TAX] = new HintDefinition(
-                "Tax Info",
-                "Purchases include the King's Tax (5%) and City Tax (2%). The City Tax goes to whichever faction controls the town.",
-                "bright_cyan"
-            ),
-            [HINT_LEVEL_MASTER] = new HintDefinition(
-                "Training Available!",
-                "Visit the Level Master [V] on Main Street to spend training points on skill proficiencies and check your progress.",
-                "bright_green"
-            ),
-            [HINT_MANA_SPELLS] = new HintDefinition(
-                "Magic Tip",
-                "Your class has Mana for casting spells! Visit the Magic Shop [M] to learn spells, then cast them in combat with 'C'.",
-                "bright_cyan"
-            ),
-            [HINT_QUEST_SYSTEM] = new HintDefinition(
-                "Quests Available!",
-                "The Quest Hall [2] offers bounties and missions for bonus gold and XP rewards!",
-                "bright_green"
-            ),
-            [HINT_GETTING_STARTED] = new HintDefinition(
-                "Getting Started",
-                "Visit Shops [W/A] to gear up, enter the Dungeons [D] to fight monsters, complete Quests [2] for rewards, and spend training points at the Master [V] when you level up.",
-                "bright_cyan"
-            ),
-            [HINT_FIRST_COMBAT_CLASS] = new HintDefinition(
-                "Class Tip",
-                "", // Placeholder — actual message set dynamically per class
-                "bright_green"
-            )
+            [HINT_MAIN_STREET_NAVIGATION] = new HintDefinition("bright_cyan"),
+            [HINT_FIRST_DUNGEON] = new HintDefinition("bright_cyan"),
+            [HINT_FIRST_COMBAT] = new HintDefinition("bright_cyan"),
+            [HINT_LOW_HP] = new HintDefinition("bright_yellow"),
+            [HINT_FIRST_SHOP] = new HintDefinition("bright_cyan"),
+            [HINT_FIRST_LEVEL_UP] = new HintDefinition("bright_green"),
+            [HINT_FIRST_SPELL] = new HintDefinition("bright_cyan"),
+            [HINT_INVENTORY] = new HintDefinition("bright_cyan"),
+            [HINT_SAVE_GAME] = new HintDefinition("bright_cyan"),
+            [HINT_TEAM_COMBAT] = new HintDefinition("bright_green"),
+            [HINT_FIRST_PURCHASE_TAX] = new HintDefinition("bright_cyan"),
+            [HINT_LEVEL_MASTER] = new HintDefinition("bright_green"),
+            [HINT_MANA_SPELLS] = new HintDefinition("bright_cyan"),
+            [HINT_QUEST_SYSTEM] = new HintDefinition("bright_green"),
+            [HINT_GETTING_STARTED] = new HintDefinition("bright_cyan"),
+            [HINT_FIRST_COMBAT_CLASS] = new HintDefinition("bright_green")
         };
 
         /// <summary>
-        /// Get a class-specific first combat tip for the player.
+        /// Get a class-specific first combat tip for the player, localized.
         /// </summary>
-        public static string GetClassCombatTip(CharacterClass playerClass) => playerClass switch
+        public static string GetClassCombatTip(CharacterClass playerClass)
         {
-            CharacterClass.Magician => "Your power is in your spells! Press [1] to cast Magic Missile for heavy damage.",
-            CharacterClass.Cleric => "You can heal yourself in combat! Press [1] to cast Cure Light, or [A] to Attack.",
-            CharacterClass.Sage => "Press [1] to cast Fog of War for protection, then [A] to Attack!",
-            CharacterClass.Warrior => "Use [1] Power Strike for 1.75x damage, or [A] for a regular Attack.",
-            CharacterClass.Barbarian => "Use [1] Power Strike for 1.75x damage! Your raw strength makes every hit count.",
-            CharacterClass.Paladin => "Use [1] Lay on Hands to heal yourself, or [2] Power Strike for damage.",
-            CharacterClass.Assassin => "Use [1] Backstab for critical damage! Make sure you have a dagger equipped.",
-            CharacterClass.Ranger => "Use [1] Precise Shot — it never misses! Make sure you have a bow equipped.",
-            CharacterClass.Jester => "Use [1] Vicious Mockery for quick damage — low cost, low cooldown!",
-            CharacterClass.Bard => "Use [1] Vicious Mockery for quick damage, or [A] to Attack. Charm is your weapon!",
-            CharacterClass.Alchemist => "Use [1] Throw Bomb for elemental damage! Alchemy is your edge.",
-            _ => "Press [A] to Attack, or use [1]-[9] for your abilities and spells."
-        };
+            string key = playerClass switch
+            {
+                CharacterClass.Magician => "hint.class_combat.magician",
+                CharacterClass.Cleric => "hint.class_combat.cleric",
+                CharacterClass.Sage => "hint.class_combat.sage",
+                CharacterClass.Warrior => "hint.class_combat.warrior",
+                CharacterClass.Barbarian => "hint.class_combat.barbarian",
+                CharacterClass.Paladin => "hint.class_combat.paladin",
+                CharacterClass.Assassin => "hint.class_combat.assassin",
+                CharacterClass.Ranger => "hint.class_combat.ranger",
+                CharacterClass.Jester => "hint.class_combat.jester",
+                CharacterClass.Bard => "hint.class_combat.bard",
+                CharacterClass.Alchemist => "hint.class_combat.alchemist",
+                _ => "hint.class_combat.default"
+            };
+            return Loc.Get(key);
+        }
 
         /// <summary>
         /// Try to show a hint if the player hasn't seen it before.
@@ -158,7 +101,7 @@ namespace UsurperRemake.Systems
             shownHints.Add(hintId);
 
             // Display the hint
-            ShowHintBox(hint, terminal);
+            ShowHintBox(hintId, hint, terminal);
             return true;
         }
 
@@ -173,8 +116,13 @@ namespace UsurperRemake.Systems
         /// <summary>
         /// Display a hint in a nice box format
         /// </summary>
-        private void ShowHintBox(HintDefinition hint, TerminalEmulator terminal)
+        private void ShowHintBox(string hintId, HintDefinition hint, TerminalEmulator terminal)
         {
+            // Resolve localized title/message from keys derived from the hint ID.
+            string title = Loc.Get($"hint.{hintId}.title");
+            string message = Loc.Get($"hint.{hintId}.msg");
+            string tipLabel = Loc.Get("hint.tip_label");
+
             terminal.WriteLine("");
             if (!GameConfig.ScreenReaderMode)
             {
@@ -183,13 +131,13 @@ namespace UsurperRemake.Systems
             }
             terminal.SetColor(hint.Color);
             if (GameConfig.ScreenReaderMode)
-                terminal.WriteLine($"TIP: {hint.Title}");
+                terminal.WriteLine($"{tipLabel}: {title}");
             else
-                terminal.WriteLine($"│ {hint.Title}");
+                terminal.WriteLine($"│ {title}");
             terminal.SetColor("white");
 
             // Word wrap the message to fit in the box
-            var wrappedLines = WordWrap(hint.Message, 75);
+            var wrappedLines = WordWrap(message, 75);
             foreach (var line in wrappedLines)
             {
                 if (GameConfig.ScreenReaderMode)
@@ -242,14 +190,10 @@ namespace UsurperRemake.Systems
         /// </summary>
         private class HintDefinition
         {
-            public string Title { get; }
-            public string Message { get; }
             public string Color { get; }
 
-            public HintDefinition(string title, string message, string color)
+            public HintDefinition(string color)
             {
-                Title = title;
-                Message = message;
                 Color = color;
             }
         }

@@ -135,7 +135,6 @@ public class LevelMasterLocation : BaseLocation
         WriteSRMenuOption("T", $"{Loc.Get("level_master.training")} - {Loc.Get("level_master.training_desc", currentPlayer.TrainingPoints.ToString())}");
         WriteSRMenuOption("C", $"{Loc.Get("level_master.crystal_ball")} - {Loc.Get("level_master.crystal_desc")}");
         WriteSRMenuOption("H", $"{Loc.Get("level_master.help_team")} - {Loc.Get("level_master.help_desc")}");
-        WriteSRMenuOption("S", Loc.Get("level_master.sr_status_desc"));
         terminal.WriteLine("");
         WriteSRMenuOption("R", Loc.Get("shop.return"));
         terminal.WriteLine("");
@@ -253,16 +252,6 @@ public class LevelMasterLocation : BaseLocation
         terminal.Write("]");
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("level_master.menu_help_team", Loc.Get("level_master.help_desc")));
-
-        // Row 6 - Status
-        terminal.SetColor("darkgray");
-        terminal.Write(" [");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("S");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("level_master.menu_status"));
 
         terminal.WriteLine("");
 
@@ -452,7 +441,52 @@ public class LevelMasterLocation : BaseLocation
 
         int totalTrainingPoints = 0;
 
-        while (currentPlayer.Level < GameConfig.MaxLevel &&
+        // Count how many levels the player's banked XP would allow, without
+        // applying anything yet. Leveling is cumulative-XP-threshold based, so
+        // this is just how many thresholds sit below the current XP.
+        int availableLevels = 0;
+        int probeLevel = currentPlayer.Level;
+        while (probeLevel < GameConfig.MaxLevel &&
+               currentPlayer.Experience >= GetExperienceForLevel(probeLevel + 1))
+        {
+            availableLevels++;
+            probeLevel++;
+        }
+
+        if (availableLevels == 0)
+        {
+            long needed = GetExperienceForLevel(currentPlayer.Level + 1) - currentPlayer.Experience;
+            terminal.SetColor("yellow");
+            terminal.WriteLine(Loc.Get("level_master.need_xp_remaining", $"{needed:N0}", currentPlayer.Level + 1));
+            await Task.Delay(2000);
+            return;
+        }
+
+        // Player request: more control over leveling -- a single level-up can
+        // otherwise jump several levels at once, which the player may not want.
+        // When more than one level is available, let them raise just one, raise
+        // all, or cancel. (With auto-level-up off in Preferences, XP banks so this
+        // choice is meaningful; with it on, the player rarely arrives with more
+        // than one level pending.)
+        int levelsToRaise = availableLevels;
+        if (availableLevels > 1)
+        {
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine(Loc.Get("level_master.multi_level_available", availableLevels));
+            terminal.SetColor("white");
+            terminal.WriteLine(Loc.Get("level_master.multi_level_options", availableLevels));
+            terminal.Write(Loc.Get("ui.choice"));
+            string choice = (await terminal.GetInput("")).Trim().ToUpperInvariant();
+
+            if (choice == "C" || choice == "Q")
+                return;
+            if (choice == "1")
+                levelsToRaise = 1;
+            // "A" or anything else falls through to raising all available levels.
+        }
+
+        while (levelsRaised < levelsToRaise &&
+               currentPlayer.Level < GameConfig.MaxLevel &&
                currentPlayer.Experience >= GetExperienceForLevel(currentPlayer.Level + 1))
         {
             // Raise one level
@@ -473,14 +507,8 @@ public class LevelMasterLocation : BaseLocation
             levelsRaised++;
         }
 
-        if (levelsRaised == 0)
-        {
-            long needed = GetExperienceForLevel(currentPlayer.Level + 1) - currentPlayer.Experience;
-            terminal.SetColor("yellow");
-            terminal.WriteLine(Loc.Get("level_master.need_xp_remaining", $"{needed:N0}", currentPlayer.Level + 1));
-            await Task.Delay(2000);
-        }
-        else
+        // levelsRaised is always >= 1 here: the availableLevels == 0 case returned
+        // early, and levelsToRaise is at least 1.
         {
             // Full HP and Mana restore on level up
             currentPlayer.HP = currentPlayer.MaxHP;
@@ -1873,7 +1901,6 @@ public class LevelMasterLocation : BaseLocation
             new() { Key = "T", Label = $"Training ({currentPlayer.TrainingPoints} pts)", Category = "core", Icon = "training" },
             new() { Key = "C", Label = "Crystal Ball", Category = "info", Icon = "crystal-ball" },
             new() { Key = "H", Label = "Help Teammates", Category = "social", Icon = "team" },
-            new() { Key = "S", Label = "Status", Category = "info", Icon = "info" },
             new() { Key = "R", Label = Loc.Get("ui.return"), Category = "navigate", Icon = "back" },
         };
         ElectronBridge.EmitMenu(menu);

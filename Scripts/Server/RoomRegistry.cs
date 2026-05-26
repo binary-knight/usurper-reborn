@@ -151,6 +151,28 @@ public class RoomRegistry
     }
 
     /// <summary>
+    /// Broadcast a message to all players at a location, rendered per-recipient in each session's
+    /// own language. `buildMessage` receives the recipient's language code and returns the rendered
+    /// string (typically built with Loc.GetIn(lang, ...)). For announcements built in one player's
+    /// session (e.g. a boss kill) that other players should read in their own language.
+    /// </summary>
+    public void BroadcastToRoomLocalized(GameLocation location, Func<string, string> buildMessage, string? excludeUsername = null)
+    {
+        if (!_rooms.TryGetValue(location, out var room))
+            return;
+
+        var excludeKey = excludeUsername?.ToLowerInvariant();
+        foreach (var kvp in room)
+        {
+            if (excludeKey != null && (kvp.Key == excludeKey || kvp.Value.ActiveCharacterName.ToLowerInvariant() == excludeKey))
+                continue;
+
+            string lang = kvp.Value.Context?.Language ?? "en";
+            kvp.Value.EnqueueMessage(buildMessage(lang));
+        }
+    }
+
+    /// <summary>
     /// Broadcast a message to ALL connected players regardless of location.
     /// </summary>
     public void BroadcastGlobal(string message, string? excludeUsername = null, string? channelKey = null)
@@ -198,6 +220,24 @@ public class RoomRegistry
         Instance.BroadcastToRoom(
             location.Value,
             $"\u001b[90m  {message}\u001b[0m",
+            excludeUsername: ctx.Username);
+    }
+
+    /// <summary>
+    /// Per-recipient localized variant of BroadcastAction: each player at the broadcasting player's
+    /// location sees the action rendered in their own language. buildMessage receives the
+    /// recipient's language code (use Loc.GetIn(lang, ...)). Same gray action-text wrapping.
+    /// </summary>
+    public static void BroadcastActionLocalized(Func<string, string> buildMessage)
+    {
+        if (!SessionContext.IsActive || Instance == null) return;
+        var ctx = SessionContext.Current;
+        if (ctx == null) return;
+        var location = Instance.GetPlayerLocation(ctx.Username);
+        if (!location.HasValue) return;
+        Instance.BroadcastToRoomLocalized(
+            location.Value,
+            lang => $"[90m  {buildMessage(lang)}[0m",
             excludeUsername: ctx.Username);
     }
 }

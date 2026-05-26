@@ -119,8 +119,7 @@ namespace UsurperRemake.Systems
                 Difficulty = difficulty,
                 Theme = theme,
                 Title = GetLeverPuzzleTitle(theme),
-                Description = $"Before you stand {leverCount} levers, numbered 1 through {leverCount}. " +
-                             "Study the inscriptions to determine the correct sequence.",
+                Description = Loc.Get("puzzle.lever.desc", leverCount),
                 Solution = solution.Select(i => (i + 1).ToString()).ToList(), // Convert to 1-indexed
                 CurrentState = new List<string>(),
                 MaxAttempts = 3 + difficulty,
@@ -134,17 +133,15 @@ namespace UsurperRemake.Systems
         private List<string> GenerateLeverHints(List<int> solution, int leverCount, int difficulty)
         {
             var hints = new List<string>();
-            hints.Add("Ancient mechanisms reveal their secrets:");
+            hints.Add(Loc.Get("puzzle.lever.hint_header"));
             hints.Add("");
 
-            // Generate a hint for each position in the sequence
-            var ordinals = new[] { "First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh", "Eighth" };
             for (int i = 0; i < solution.Count; i++)
             {
                 int leverNum = solution[i] + 1; // Convert to 1-indexed
                 string hint = GetLeverHint(leverNum, i, solution.Count);
-                string ordinal = i < ordinals.Length ? ordinals[i] : $"#{i + 1}";
-                hints.Add($"  Pull {ordinal}: {hint}");
+                string ordinal = i < 8 ? Loc.Get($"puzzle.ordinal.{i + 1}") : $"#{i + 1}";
+                hints.Add(Loc.Get("puzzle.lever.hint_line", ordinal, hint));
             }
 
             return hints;
@@ -152,58 +149,13 @@ namespace UsurperRemake.Systems
 
         private string GetLeverHint(int leverNum, int position, int total)
         {
-            // Create riddles that hint at the number without stating it directly
-            var numberRiddles = new Dictionary<int, string[]>
-            {
-                { 1, new[] {
-                    "The lone wolf leads the pack.",
-                    "First among equals, standing alone.",
-                    "Unity - there is only one."
-                }},
-                { 2, new[] {
-                    "Partners dance as a pair.",
-                    "Eyes come in this number.",
-                    "The swan's neck curves like this numeral."
-                }},
-                { 3, new[] {
-                    "The triangle's corners count thus.",
-                    "Past, present, future - a trinity.",
-                    "Wishes granted come in this many."
-                }},
-                { 4, new[] {
-                    "Seasons cycle in this count.",
-                    "Cardinal directions number this many.",
-                    "Legs of a table, corners of a square."
-                }},
-                { 5, new[] {
-                    "Fingers on one hand.",
-                    "Points of a star, senses of man.",
-                    "The pentagon's sides."
-                }},
-                { 6, new[] {
-                    "The die's highest face.",
-                    "Legs of an insect crawling.",
-                    "Half a dozen, no more, no less."
-                }},
-                { 7, new[] {
-                    "Days complete a week.",
-                    "Deadly sins, heavenly virtues.",
-                    "Colors in the rainbow arc."
-                }},
-                { 8, new[] {
-                    "Spider's legs, octopus arms.",
-                    "The infinite symbol standing upright.",
-                    "Two fours joined as one."
-                }}
-            };
-
-            if (numberRiddles.TryGetValue(leverNum, out var riddles))
-            {
-                return riddles[random.Next(riddles.Length)];
-            }
-
-            // Fallback for larger numbers
-            return $"Count to {leverNum} and pull.";
+            // Number-riddles in loc keys puzzle.num_riddle.{n}.0..2 (n=1..8). Each localized riddle
+            // must still point to the same number. Fallback states the number plainly for n>8.
+            const int variants = 3;
+            string key = $"puzzle.num_riddle.{leverNum}.{random.Next(variants)}";
+            string v = Loc.Get(key);
+            if (v != key) return v;
+            return Loc.Get("puzzle.num_riddle_fallback", leverNum);
         }
 
         private PuzzleInstance GenerateSymbolPuzzle(int difficulty, DungeonTheme theme)
@@ -224,8 +176,7 @@ namespace UsurperRemake.Systems
                 Difficulty = difficulty,
                 Theme = theme,
                 Title = "Symbol Alignment",
-                Description = $"A circular mechanism with {panelCount} rotating panels. " +
-                             "Each panel displays various symbols. Study the inscriptions to find the correct sequence.",
+                Description = Loc.Get("puzzle.symbol.desc", panelCount),
                 Solution = solution,
                 CurrentState = Enumerable.Repeat(symbols[0], panelCount).ToList(),
                 AvailableChoices = symbols.ToList(),
@@ -251,8 +202,7 @@ namespace UsurperRemake.Systems
                 Difficulty = difficulty,
                 Theme = theme,
                 Title = "Pressure Plates",
-                Description = $"The floor is divided into {plateCount} distinct pressure plates, numbered 1 through {plateCount}. " +
-                             "Study the wear patterns to determine the safe path.",
+                Description = Loc.Get("puzzle.pressure.desc", plateCount),
                 Solution = solution.Select(i => (i + 1).ToString()).ToList(), // Convert to 1-indexed
                 CurrentState = new List<string>(),
                 MaxAttempts = 2 + difficulty,
@@ -267,38 +217,22 @@ namespace UsurperRemake.Systems
         private List<string> GeneratePressurePlateHints(List<int> solution, int plateCount)
         {
             var hints = new List<string>();
-            hints.Add("Dust and wear patterns reveal the path of those who passed before:");
+            hints.Add(Loc.Get("puzzle.pressure.hint_header"));
             hints.Add("");
 
-            // Describe wear patterns in terms of position in sequence
-            var wearDescriptions = new[]
-            {
-                "deeply worn, stepped on first by all who passed",
-                "second-most worn, the path continues here",
-                "moderately worn, midway through the journey",
-                "lightly worn, near the end of the path",
-                "barely touched, the final step before safety"
-            };
-
-            // Create hints based on relative wear
             for (int i = 0; i < solution.Count; i++)
             {
                 int plateNum = solution[i] + 1; // Which plate (1-indexed)
                 int stepOrder = i; // When in sequence (0-indexed)
 
-                string wearDesc;
-                if (stepOrder == 0)
-                    wearDesc = "most worn of all - this is where they began";
-                else if (stepOrder == solution.Count - 1)
-                    wearDesc = "least worn - the final step";
-                else if (stepOrder == 1)
-                    wearDesc = "second-most worn - they stepped here next";
-                else if (stepOrder == solution.Count - 2)
-                    wearDesc = "barely touched - nearly at the end";
-                else
-                    wearDesc = "moderately worn - somewhere in the middle";
+                string wearKey;
+                if (stepOrder == 0) wearKey = "puzzle.wear.first";
+                else if (stepOrder == solution.Count - 1) wearKey = "puzzle.wear.last";
+                else if (stepOrder == 1) wearKey = "puzzle.wear.second";
+                else if (stepOrder == solution.Count - 2) wearKey = "puzzle.wear.near_end";
+                else wearKey = "puzzle.wear.middle";
 
-                hints.Add($"  Plate {plateNum}: {wearDesc}");
+                hints.Add(Loc.Get("puzzle.pressure.hint_line", plateNum, Loc.Get(wearKey)));
             }
 
             return hints;
@@ -332,8 +266,7 @@ namespace UsurperRemake.Systems
                 Difficulty = difficulty,
                 Theme = DungeonTheme.AncientRuins,
                 Title = "The Number Grid",
-                Description = $"Ancient numerals are carved into stone tiles. " +
-                             $"Select tiles that sum to exactly {target}.",
+                Description = Loc.Get("puzzle.number.desc", target),
                 Solution = new List<string> { target.ToString() },
                 CurrentState = new List<string>(),
                 AvailableChoices = numbers.Select(n => n.ToString()).ToList(),
@@ -365,8 +298,7 @@ namespace UsurperRemake.Systems
                 Difficulty = difficulty,
                 Theme = theme,
                 Title = "Memory of the Ancients",
-                Description = "Glowing symbols flash before you in sequence. " +
-                             "Remember and repeat the pattern exactly.",
+                Description = Loc.Get("puzzle.memory.desc"),
                 Solution = solution,
                 CurrentState = new List<string>(),
                 AvailableChoices = symbols.ToList(),
@@ -400,8 +332,7 @@ namespace UsurperRemake.Systems
                 Difficulty = difficulty,
                 Theme = theme,
                 Title = "Dance of Light and Shadow",
-                Description = $"{torchCount} ancient torches line the walls, numbered 1 through {torchCount}. " +
-                             "Some must burn, some must stay dark. Read the inscriptions carefully.",
+                Description = Loc.Get("puzzle.light.desc", torchCount),
                 Solution = solution,
                 CurrentState = Enumerable.Repeat("unlit", torchCount).ToList(),
                 AvailableChoices = new List<string> { "toggle" },
@@ -418,51 +349,27 @@ namespace UsurperRemake.Systems
             var hints = new List<string>();
             int litCount = solution.Count(s => s == "lit");
 
-            hints.Add("Faded verses on the wall speak of the torches:");
+            hints.Add(Loc.Get("puzzle.light.hint_header"));
             hints.Add("");
 
-            // Give a clue for each torch
             for (int i = 0; i < solution.Count; i++)
             {
                 bool shouldBeLit = solution[i] == "lit";
                 string hint = GetTorchRiddle(i + 1, shouldBeLit);
-                hints.Add($"  Torch {i + 1}: {hint}");
+                hints.Add(Loc.Get("puzzle.light.hint_line", i + 1, hint));
             }
 
             hints.Add("");
-            hints.Add($"  (When balanced, {litCount} flames shall dance.)");
+            hints.Add(Loc.Get("puzzle.light.balance", litCount));
 
             return hints;
         }
 
         private string GetTorchRiddle(int torchNum, bool shouldBeLit)
         {
-            if (shouldBeLit)
-            {
-                var litRiddles = new[]
-                {
-                    "Let this one blaze against the dark.",
-                    "Fire must kiss this sconce.",
-                    "This bearer craves the flame.",
-                    "Light shall reign here.",
-                    "The spirits demand this one burn.",
-                    "Ignite this vessel of light."
-                };
-                return litRiddles[random.Next(litRiddles.Length)];
-            }
-            else
-            {
-                var unlitRiddles = new[]
-                {
-                    "Darkness must claim this one.",
-                    "No flame shall touch this place.",
-                    "Let shadows embrace this sconce.",
-                    "This one rests in peaceful dark.",
-                    "The void demands this stay cold.",
-                    "Deny fire to this holder."
-                };
-                return unlitRiddles[random.Next(unlitRiddles.Length)];
-            }
+            // 6 lit + 6 unlit flavor variants in loc keys puzzle.torch_lit.0..5 / puzzle.torch_unlit.0..5.
+            string prefix = shouldBeLit ? "puzzle.torch_lit" : "puzzle.torch_unlit";
+            return Loc.Get($"{prefix}.{random.Next(6)}");
         }
 
         private PuzzleInstance GenerateItemPuzzle(int difficulty, DungeonTheme theme)
@@ -476,8 +383,7 @@ namespace UsurperRemake.Systems
                 Difficulty = difficulty,
                 Theme = theme,
                 Title = "The Alchemist's Lock",
-                Description = "A mechanism requires a specific substance to activate. " +
-                             "Combine two items from your surroundings to create it.",
+                Description = Loc.Get("puzzle.alchemy.desc"),
                 Solution = new List<string> { item1, item2 },
                 CurrentState = new List<string>(),
                 AvailableChoices = GenerateItemChoices(item1, item2, difficulty),
@@ -494,48 +400,18 @@ namespace UsurperRemake.Systems
         {
             var hints = new List<string>();
 
-            // Describe what we need to create
-            var resultDescriptions = new Dictionary<string, string>
-            {
-                { "steam", "A hot mist that rises and obscures" },
-                { "awakening_paste", "A substance that stirs the dormant" },
-                { "glowing_crystal", "A gem that holds captured light" },
-                { "flash_powder", "A mixture that explodes with blinding light" },
-                { "blessed_silver", "Metal purified by divine waters" },
-                { "twilight_orb", "A sphere balanced between day and night" },
-                { "eternal_flame", "Fire that never dies" },
-                { "null_essence", "The distilled essence of nothing" }
-            };
+            // Result/item flavor descriptions in loc keys puzzle.alch_result.{key} / puzzle.alch_item.{key}.
+            // Items/results themselves are internal ids; fall back to a readable form if no key exists.
+            string LocOr(string key, string fallback) { var v = Loc.Get(key); return v == key ? fallback : v; }
+            string resultDesc = LocOr($"puzzle.alch_result.{result}", Loc.Get("puzzle.alch_result_fallback", result));
+            string item1Desc = LocOr($"puzzle.alch_item.{item1}", item1.Replace("_", " "));
+            string item2Desc = LocOr($"puzzle.alch_item.{item2}", item2.Replace("_", " "));
 
-            var itemDescriptions = new Dictionary<string, string>
-            {
-                { "water", "The flowing element, giver of life" },
-                { "fire_salt", "Crystals that burn with inner heat" },
-                { "bone_dust", "Powder ground from the remains of the dead" },
-                { "blood", "The crimson river of life" },
-                { "crystal_shard", "A fragment of pure, clear stone" },
-                { "moonlight", "Captured silver radiance of night" },
-                { "sulfur", "Yellow brimite, the devil's element" },
-                { "charcoal", "Wood transformed by flame to black powder" },
-                { "silver_dust", "Precious metal ground fine as flour" },
-                { "holy_water", "Water blessed by the divine" },
-                { "shadow_essence", "Darkness made tangible" },
-                { "light_fragment", "A piece of captured radiance" },
-                { "dragon_scale", "Armor shed from the great serpent" },
-                { "phoenix_ash", "Remains of the firebird's rebirth" },
-                { "void_shard", "A piece of absolute nothing" },
-                { "soul_fragment", "A whisper of departed spirit" }
-            };
-
-            string resultDesc = resultDescriptions.GetValueOrDefault(result, $"the mysterious {result}");
-            string item1Desc = itemDescriptions.GetValueOrDefault(item1, item1.Replace("_", " "));
-            string item2Desc = itemDescriptions.GetValueOrDefault(item2, item2.Replace("_", " "));
-
-            hints.Add("Ancient alchemical texts inscribed nearby reveal:");
+            hints.Add(Loc.Get("puzzle.alchemy.hint_header"));
             hints.Add("");
-            hints.Add($"  \"To create {resultDesc},\"");
-            hints.Add($"  \"one must combine {item1Desc}\"");
-            hints.Add($"  \"with {item2Desc}.\"");
+            hints.Add(Loc.Get("puzzle.alchemy.line1", resultDesc));
+            hints.Add(Loc.Get("puzzle.alchemy.line2", item1Desc));
+            hints.Add(Loc.Get("puzzle.alchemy.line3", item2Desc));
 
             return hints;
         }
@@ -581,8 +457,7 @@ namespace UsurperRemake.Systems
                 Difficulty = difficulty,
                 Theme = theme,
                 Title = "Hall of Mirrors",
-                Description = $"A beam of light enters from the left and must reach a crystal on the right. " +
-                             $"Set each of the {mirrorCount} mirrors to the correct angle (0°, 45°, 90°, or 135°).",
+                Description = Loc.Get("puzzle.mirror.desc", mirrorCount),
                 Solution = solution,
                 CurrentState = Enumerable.Repeat("0", mirrorCount).ToList(),
                 AvailableChoices = angles.ToList(),
@@ -597,39 +472,15 @@ namespace UsurperRemake.Systems
         private List<string> GenerateReflectionHints(List<string> solution, int mirrorCount)
         {
             var hints = new List<string>();
-            hints.Add("Etchings on the mirror frames describe their proper angles:");
+            hints.Add(Loc.Get("puzzle.mirror.hint_header"));
             hints.Add("");
-
-            var angleDescriptions = new Dictionary<string, string[]>
-            {
-                { "0", new[] {
-                    "flat as still water",
-                    "parallel to the horizon",
-                    "level with the earth"
-                }},
-                { "45", new[] {
-                    "tilted as a roof's slope",
-                    "angled like a bird's wing in flight",
-                    "halfway between flat and upright"
-                }},
-                { "90", new[] {
-                    "standing straight as a soldier",
-                    "perpendicular to the ground",
-                    "upright as a tower"
-                }},
-                { "135", new[] {
-                    "leaning back like a resting traveler",
-                    "tilted opposite to the common slope",
-                    "angled as if looking to the sky behind"
-                }}
-            };
 
             for (int i = 0; i < solution.Count; i++)
             {
                 string angle = solution[i];
-                var descriptions = angleDescriptions[angle];
-                string desc = descriptions[random.Next(descriptions.Length)];
-                hints.Add($"  Mirror {i + 1}: Set it {desc} ({angle}°)");
+                // 3 flavor variants per angle in puzzle.angle.{0|45|90|135}.0..2
+                string desc = Loc.Get($"puzzle.angle.{angle}.{random.Next(3)}");
+                hints.Add(Loc.Get("puzzle.mirror.hint_line", i + 1, desc, angle));
             }
 
             return hints;
@@ -1117,29 +968,17 @@ namespace UsurperRemake.Systems
         {
             var clues = new List<string>();
 
-            // Theme-specific flavor text
-            var flavorIntro = theme switch
-            {
-                DungeonTheme.Catacombs => "Ancient funeral rites inscribed on the wall speak in riddles:",
-                DungeonTheme.Sewers => "Scratched warnings in the grime hint at the sequence:",
-                DungeonTheme.Caverns => "Crystalline echoes whisper cryptic truths:",
-                DungeonTheme.AncientRuins => "Faded hieroglyphics pose these mysteries:",
-                DungeonTheme.DemonLair => "Burning runes seared into bone demand answers:",
-                DungeonTheme.FrozenDepths => "Frost patterns form puzzling verses:",
-                DungeonTheme.VolcanicPit => "Molten letters glow with hidden meaning:",
-                DungeonTheme.AbyssalVoid => "Whispers from beyond speak in enigmas:",
-                _ => "Cryptic inscriptions challenge the mind:"
-            };
-
+            string flavorIntro = Loc.Get($"puzzle.sym_intro.{theme}");
+            if (flavorIntro == $"puzzle.sym_intro.{theme}")
+                flavorIntro = Loc.Get("puzzle.sym_intro.default");
             clues.Add(flavorIntro);
             clues.Add("");
 
-            // Generate a riddle for each position
             for (int i = 0; i < solution.Count; i++)
             {
                 string symbol = solution[i];
                 string riddle = GetRiddle(symbol);
-                clues.Add($"  {GetPositionNumeral(i + 1)}: \"{riddle}\"");
+                clues.Add(Loc.Get("puzzle.sym_clue_line", GetPositionNumeral(i + 1), riddle));
             }
 
             return clues;
@@ -1160,291 +999,15 @@ namespace UsurperRemake.Systems
 
         private string GetRiddle(string symbol)
         {
-            // Comprehensive riddles for all symbols - NO ANSWERS GIVEN
-            var riddles = new Dictionary<string, string[]>
-            {
-                // Catacombs
-                { "skull", new[] {
-                    "I once held dreams and schemes, now hollow I remain.",
-                    "The mind's fortress, emptied by time's cruel hand.",
-                    "I grinned at kings and beggars alike when life ended."
-                }},
-                { "bone", new[] {
-                    "I gave the body its frame, now stripped of purpose.",
-                    "White as snow, I outlast the flesh that clothed me.",
-                    "Dogs seek me, scholars study me, the grave reclaims me."
-                }},
-                { "tomb", new[] {
-                    "I am the house that none wish to enter, yet all must.",
-                    "Stone walls embrace eternal sleepers within my keep.",
-                    "Built for one, visited by many, home to silence."
-                }},
-                { "cross", new[] {
-                    "Two paths meet at my heart, one leads up, one across.",
-                    "Salvation's mark, death's companion, hope in geometry.",
-                    "I stand where faith and mortality intersect."
-                }},
-                { "candle", new[] {
-                    "I weep as I illuminate, dying to give light.",
-                    "Born tall, I shrink with purpose, my tears are wax.",
-                    "A wick is my soul, flame my voice, darkness my foe."
-                }},
-                { "ghost", new[] {
-                    "I walk through walls yet cannot hold a cup.",
-                    "Death freed me from flesh but chained me to memory.",
-                    "The living fear what they cannot touch - that is I."
-                }},
-
-                // Sewers
-                { "rat", new[] {
-                    "I thrive where others flee, my kingdom is filth.",
-                    "Whiskers twitch in darkness, my teeth never stop growing.",
-                    "Plague's courier, survivor supreme, I own the underground."
-                }},
-                { "water", new[] {
-                    "I have no shape yet fill every vessel perfectly.",
-                    "I carve mountains given time, yet a child can hold me.",
-                    "Life needs me, yet too much of me brings death."
-                }},
-                { "pipe", new[] {
-                    "Hollow veins of the city, carrying its lifeblood unseen.",
-                    "I connect all yet go unnoticed, metal passage underground.",
-                    "Through me flows what the surface wishes to forget."
-                }},
-                { "grate", new[] {
-                    "I have many mouths but cannot eat, many eyes but cannot see.",
-                    "Iron guardian of the deep, I let liquid pass but halt the rest.",
-                    "Walk upon me without thought, but drop something and weep."
-                }},
-                { "slime", new[] {
-                    "Neither solid nor liquid, I cling where nothing should grow.",
-                    "Green and patient, I consume the forgotten slowly.",
-                    "Touch me and regret it, ignore me and I spread."
-                }},
-                { "drain", new[] {
-                    "The mouth that swallows all the city's tears.",
-                    "I spiral down into darkness, everything flows to me.",
-                    "Final destination before the journey continues below."
-                }},
-
-                // Caverns
-                { "crystal", new[] {
-                    "I grow in darkness yet capture and bend the light.",
-                    "Geometry perfected by patient centuries underground.",
-                    "Clear as thought, hard as resolve, I form in solitude."
-                }},
-                { "stalactite", new[] {
-                    "I grow downward, one drip at a time, for millennia.",
-                    "The ceiling's slow revenge, given centuries I reach the floor.",
-                    "Stone icicles that never melt, we hang in patient rows."
-                }},
-                { "bat", new[] {
-                    "I see with my voice and fly with my hands.",
-                    "Night's child, I sleep inverted and hunt by echo.",
-                    "Leather wings beat where no light reaches."
-                }},
-                { "gem", new[] {
-                    "Pressure and time made me precious, now I tempt the greedy.",
-                    "I sparkle in torchlight, kingdoms have fallen for my kind.",
-                    "Earth's treasure, hidden deep, worth more than my weight."
-                }},
-                { "pool", new[] {
-                    "Still and silent in the depths, I mirror the stone above.",
-                    "No current stirs me, no sun warms me, yet life finds me.",
-                    "Darkness made liquid, I wait in the cave's embrace."
-                }},
-                { "mushroom", new[] {
-                    "I need no sun to grow, darkness is my garden.",
-                    "Neither plant nor animal, I feast on decay.",
-                    "Pale caps in the darkness, we are the cave's strange harvest."
-                }},
-
-                // Ancient Ruins
-                { "sun", new[] {
-                    "I rise and fall yet never move, giver of life and death.",
-                    "Ancient peoples worshipped my face, drew my rays on stone.",
-                    "Blinding to behold, my absence brings cold and fear."
-                }},
-                { "moon", new[] {
-                    "I have no light of my own, yet I guide ships home.",
-                    "My face changes nightly, my pull moves the seas.",
-                    "Silver sentinel of night, I wax and wane eternal."
-                }},
-                { "star", new[] {
-                    "I burn countless leagues away, yet you see me clearly.",
-                    "Sailors trusted me, lovers wished upon me, I am ancient fire.",
-                    "A point of light in the void, I outlive civilizations."
-                }},
-                { "eye", new[] {
-                    "I see but cannot be seen seeing, truth passes through me.",
-                    "Window to the soul, they say, yet I only receive.",
-                    "The watchers painted me on temples to guard secrets."
-                }},
-                { "serpent", new[] {
-                    "I shed my skin to be reborn, wisdom coils within me.",
-                    "Legless I travel, voiceless I threaten, patient I wait.",
-                    "Eden's tempter, medicine's symbol, feared and revered."
-                }},
-                { "crown", new[] {
-                    "Heavy lies the head that wears me, yet all covet me.",
-                    "Circle of gold that grants power and invites daggers.",
-                    "Kings die, kingdoms fall, yet I pass to the next hand."
-                }},
-
-                // Demon Lair
-                { "pentagram", new[] {
-                    "Five points contain what should not be freed.",
-                    "Draw me carefully or what's inside escapes.",
-                    "Geometry of binding, each angle holds dark purpose."
-                }},
-                { "flame", new[] {
-                    "I dance without music, consume without hunger eternal.",
-                    "Feed me and I grow, starve me and I die.",
-                    "Neither solid, liquid, nor gas - I am transformation."
-                }},
-                { "horn", new[] {
-                    "I crown the beast, twisted trophy of dark power.",
-                    "The innocent lamb lacks me, the devil bears two.",
-                    "Curved and sharp, I mark those fallen from grace."
-                }},
-                { "blood", new[] {
-                    "I am the river within, spilled to seal dark pacts.",
-                    "Red is my color, life is my meaning, power my price.",
-                    "Sacrifice demands I flow, demons drink deep of me."
-                }},
-                { "chain", new[] {
-                    "Link by link I bind, freedom's opposite.",
-                    "Iron circles joined in servitude's cold embrace.",
-                    "I am as strong as my weakest part, yet I hold titans."
-                }},
-                { "claw", new[] {
-                    "Curved for rending, sharp for tearing, I end life messily.",
-                    "The beast's final argument, I leave marks that scar.",
-                    "No sword is faster when the predator strikes."
-                }},
-
-                // Frozen Depths
-                { "snowflake", new[] {
-                    "No two of us are alike, yet we all fall the same.",
-                    "Hexagonal perfection, I melt at a touch.",
-                    "Winter's delicate art, unique and fleeting."
-                }},
-                { "icicle", new[] {
-                    "I grow downward in the cold, a dagger of frozen tears.",
-                    "Drip by drip I form, then crash without warning.",
-                    "The cold's slow sword, I hang and wait to fall."
-                }},
-                { "frost", new[] {
-                    "I paint windows with patterns no artist could match.",
-                    "The cold's first messenger, I arrive before snow.",
-                    "Delicate and deadly, I claim the unprepared."
-                }},
-                { "wind", new[] {
-                    "You cannot see me, only what I move.",
-                    "I howl without mouth, push without hands.",
-                    "Born from difference, I seek balance eternally."
-                }},
-                { "glacier", new[] {
-                    "I am a river of ice that moves slower than stone erodes.",
-                    "Mountains bow to my slow advance over ages.",
-                    "Frozen giant, I carved the valleys you now walk."
-                }},
-                { "aurora", new[] {
-                    "I dance in colors where the sky meets the pole.",
-                    "Charged particles paint me across the polar night.",
-                    "The north's mysterious curtain of shifting light."
-                }},
-
-                // Volcanic Pit
-                { "fire", new[] {
-                    "I am never satisfied, feed me and I only want more.",
-                    "Prometheus stole me, humanity was changed forever.",
-                    "Warmth, light, destruction - I am all three."
-                }},
-                { "lava", new[] {
-                    "I am the earth's blood, molten and merciless.",
-                    "Stone flows like water when I am present.",
-                    "Touch me and become ash, flee me or join the earth."
-                }},
-                { "ash", new[] {
-                    "I am what remains when burning has finished its meal.",
-                    "Gray and light, I drift on wind, once I was something more.",
-                    "The aftermath of destruction, fertile yet desolate."
-                }},
-                { "smoke", new[] {
-                    "I rise from destruction, visible breath of burning.",
-                    "I choke and blind, warning of worse to come.",
-                    "Where I billow, hungry flames recently danced."
-                }},
-                { "ember", new[] {
-                    "I am the patient heart of burning, waiting for fuel.",
-                    "Red glow in ash, I am not yet defeated.",
-                    "Stir me and I awaken, neglect me and I sleep forever."
-                }},
-                { "obsidian", new[] {
-                    "I am flowing earth frozen in an instant, dark as void.",
-                    "Volcanic glass, I hold edges sharper than steel.",
-                    "I was molten once, now I am stone's dark mirror."
-                }},
-
-                // Abyssal Void
-                { "void", new[] {
-                    "I am the absence that contains everything.",
-                    "Not darkness, for darkness is something - I am nothing.",
-                    "Look into me and see what existence fears most."
-                }},
-                { "spiral", new[] {
-                    "I turn inward forever, there is no bottom to reach.",
-                    "Follow me and lose yourself in endless descent.",
-                    "Madness takes this shape when geometry fails."
-                }},
-                { "tear", new[] {
-                    "I am a wound in what should be whole.",
-                    "Through me, things that should not meet do.",
-                    "Reality weeps through my ragged opening."
-                }},
-                { "wave", new[] {
-                    "I pulse through emptiness, carrying meaning in nothing.",
-                    "Neither up nor down, I oscillate eternal.",
-                    "All energy moves as I do, peak and trough forever."
-                }},
-                { "infinity", new[] {
-                    "Follow me and never arrive, for I have no end.",
-                    "Count to me - you cannot, I am beyond number.",
-                    "A twisted loop, I represent what cannot be grasped."
-                }},
-
-                // Default geometric
-                { "circle", new[] {
-                    "I have no beginning and no end, perfect and eternal.",
-                    "Every point on me is the same distance from my heart.",
-                    "Roll me and I go on forever, the wheel's ancestor."
-                }},
-                { "square", new[] {
-                    "Four equal sides, four equal angles, order incarnate.",
-                    "I am stability, foundation, the shape of certainty.",
-                    "Rotate me four times and I look the same."
-                }},
-                { "triangle", new[] {
-                    "Three points make me, the simplest strength.",
-                    "I cannot be collapsed, I am geometry's backbone.",
-                    "Point up I aspire, point down I anchor."
-                }},
-                { "diamond", new[] {
-                    "A square turned on its corner, I am balance on edge.",
-                    "Four sides, four points, but I stand differently.",
-                    "Cards bear me in red, I am precious and proud."
-                }}
-            };
-
-            // Get riddle for the symbol
-            if (riddles.TryGetValue(symbol, out var symbolRiddles))
-            {
-                return symbolRiddles[random.Next(symbolRiddles.Length)];
-            }
-
-            // Fallback - give first and last letter as hint
-            return $"I begin with '{symbol[0]}' and end with '{symbol[symbol.Length-1]}'... what am I?";
+            // Riddles live in loc keys puzzle.sym_riddle.{symbol}.0..2 (3 variants per symbol), so they
+            // render in the player's language. The symbol WORDS themselves stay canonical (they double
+            // as the typed answer); each localized riddle must still clearly evoke its symbol concept.
+            const int variants = 3;
+            string key = $"puzzle.sym_riddle.{symbol}.{random.Next(variants)}";
+            string v = Loc.Get(key);
+            if (v != key) return v;
+            // Fallback - first/last letter hint
+            return Loc.Get("puzzle.sym_riddle_fallback", symbol[0], symbol[symbol.Length - 1]);
         }
 
         private string GenerateLightHint(List<string> solution)
@@ -1489,43 +1052,29 @@ namespace UsurperRemake.Systems
 
         private (string desc, List<string> solution, string hint) GetEnvironmentPuzzle(DungeonTheme theme, int difficulty)
         {
+            // Description + multi-line hint localized per theme; the solution tokens (gate/stream/area
+            // names and numbers) stay canonical because the player types them to solve.
             return theme switch
             {
                 DungeonTheme.Caverns => (
-                    "Water flows from multiple channels into a central basin. " +
-                    "Three gates control the flow: LEFT, CENTER, and RIGHT. Open them in the correct order.",
+                    Loc.Get("puzzle.env.caverns.desc"),
                     new List<string> { "left", "center", "right" },
-                    "Ancient carvings instruct:\n" +
-                    "  \"First, open the gate where the sun sets (LEFT).\n" +
-                    "  \"Then, the heart of the room (CENTER).\n" +
-                    "  \"Finally, where the sun rises (RIGHT).\""
+                    Loc.Get("puzzle.env.caverns.hint")
                 ),
                 DungeonTheme.VolcanicPit => (
-                    "Three lava streams block the path, numbered 1, 2, and 3 from left to right. " +
-                    "Cool them in the correct order to create safe passage.",
+                    Loc.Get("puzzle.env.volcanic.desc"),
                     new List<string> { "2", "1", "3" },
-                    "A dying explorer's note reads:\n" +
-                    "  \"The middle stream (2) must cool first - it feeds the others.\n" +
-                    "  \"Then the leftmost (1), lest the center reheat.\n" +
-                    "  \"The rightmost (3) last, or all is lost.\""
+                    Loc.Get("puzzle.env.volcanic.hint")
                 ),
                 DungeonTheme.FrozenDepths => (
-                    "Ice blocks the exit. You can apply heat to three areas: TORCH the ice directly, " +
-                    "heat the WALL behind it, or warm the FLOOR beneath it.",
+                    Loc.Get("puzzle.env.frozen.desc"),
                     new List<string> { "torch", "wall", "floor" },
-                    "Frost runes spell out the method:\n" +
-                    "  \"Direct flame (TORCH) loosens the grip.\n" +
-                    "  \"Warm stone (WALL) weakens the bond.\n" +
-                    "  \"Heated ground (FLOOR) completes the thaw.\""
+                    Loc.Get("puzzle.env.frozen.hint")
                 ),
                 _ => (
-                    "Three ancient switches stand before you, numbered 1, 2, and 3. " +
-                    "Activate them in the correct sequence.",
+                    Loc.Get("puzzle.env.default.desc"),
                     new List<string> { "1", "2", "3" },
-                    "Worn inscriptions reveal the order:\n" +
-                    "  \"Begin with the first (1).\n" +
-                    "  \"Continue to the second (2).\n" +
-                    "  \"End with the third (3).\""
+                    Loc.Get("puzzle.env.default.hint")
                 )
             };
         }

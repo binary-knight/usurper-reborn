@@ -164,6 +164,22 @@ public static class WildernessData
     public static WildernessRegion? GetRegionByKey(string key) =>
         Array.Find(Regions, r => r.DirectionKey.Equals(key, StringComparison.OrdinalIgnoreCase));
 
+    // Localized accessors. The region/discovery data is authored in English; these
+    // resolve `wilderness.region.{id}.*` / `wilderness.direction.{key}` /
+    // `wilderness.discovery.{id}.*` loc keys with English fallback so the wilderness
+    // menu, region screens, and discoveries display in the player's session
+    // language. Player report: region names and directions showed in English.
+    private static string LocOrFallback(string key, string fallback)
+    {
+        var v = UsurperRemake.Systems.Loc.Get(key);
+        return v == key ? fallback : v;
+    }
+    public static string GetRegionName(WildernessRegion r) => LocOrFallback($"wilderness.region.{r.Id}.name", r.Name);
+    public static string GetRegionDirection(WildernessRegion r) => LocOrFallback($"wilderness.direction.{r.DirectionKey}", r.Direction);
+    public static string GetRegionDescription(WildernessRegion r) => LocOrFallback($"wilderness.region.{r.Id}.desc", r.Description);
+    public static string GetDiscoveryName(WildernessDiscovery d) => LocOrFallback($"wilderness.discovery.{d.Id}.name", d.Name);
+    public static string GetDiscoveryDescription(WildernessDiscovery d) => LocOrFallback($"wilderness.discovery.{d.Id}.desc", d.Description);
+
     /// <summary>
     /// v0.61.2 (player report: "Feral Cat takes flight, becoming harder to hit!"):
     /// Wilderness combat called MonsterGenerator.GenerateMonster which picks a

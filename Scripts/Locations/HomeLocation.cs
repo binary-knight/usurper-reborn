@@ -1832,6 +1832,16 @@ public class HomeLocation : BaseLocation
                 terminal.SetColor("gray");
                 terminal.Write(Loc.Get("home.family_child_age", child.Age, child.Age != 1 ? "s" : "", child.Sex == CharacterSex.Male ? Loc.Get("home.family_child_boy") : Loc.Get("home.family_child_girl")));
 
+                // A grown child who left home for higher learning (parked while the
+                // NPC population is at cap). Surface this so the roster count is
+                // explained instead of showing a child the player can't find at home.
+                if (child.Location == GameConfig.ChildLocationAway)
+                {
+                    terminal.SetColor("cyan");
+                    terminal.WriteLine($" {Loc.Get("home.family_child_away")}");
+                    continue;
+                }
+
                 // Show behavior indicator
                 terminal.SetColor(child.Soul > 100 ? "bright_cyan" : (child.Soul < -100 ? "red" : "white"));
                 terminal.WriteLine($" ({child.GetSoulDescription()})");

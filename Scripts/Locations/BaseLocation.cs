@@ -5967,7 +5967,7 @@ public abstract class BaseLocation
                     // v0.61.3: helper returns "12.5h" online or game-day count
                     // single-player so the unit matches each mode's time source.
                     terminal.SetColor("bright_magenta");
-                    terminal.WriteLine($"  - {shrine.Name}: {shrine.PassiveSummary} ({currentPlayer.GetShrineTimeRemainingLabel()} {Loc.Get("shrine.remaining_suffix")})");
+                    terminal.WriteLine($"  - {shrine.LocName()}: {shrine.LocPassiveSummary()} ({currentPlayer.GetShrineTimeRemainingLabel()} {Loc.Get("shrine.remaining_suffix")})");
                 }
             }
             if (currentPlayer.Class == CharacterClass.Alchemist)

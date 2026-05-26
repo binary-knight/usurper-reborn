@@ -122,27 +122,15 @@ public enum EquipmentRarity
 public static class EquipmentSlotExtensions
 {
     /// <summary>
-    /// Get display name for an equipment slot
+    /// Get the localized display name for an equipment slot. Routes through
+    /// GameConfig.GetLocalizedSlotName (reads `equip.slot.{Slot}` loc keys, which
+    /// cover every enum value) so all display sites -- shops, inventory, compare
+    /// window -- show the slot name in the player's session language. Player
+    /// report: armor shop showed "head: <localized empty>" with the slot name
+    /// still in English.
     /// </summary>
-    public static string GetDisplayName(this EquipmentSlot slot) => slot switch
-    {
-        EquipmentSlot.Head => "Head",
-        EquipmentSlot.Body => "Body",
-        EquipmentSlot.Arms => "Arms",
-        EquipmentSlot.Hands => "Hands",
-        EquipmentSlot.Legs => "Legs",
-        EquipmentSlot.Feet => "Feet",
-        EquipmentSlot.Waist => "Waist",
-        EquipmentSlot.Neck => "Neck",
-        EquipmentSlot.Neck2 => "Neck (2)",
-        EquipmentSlot.Face => "Face",
-        EquipmentSlot.Cloak => "Cloak",
-        EquipmentSlot.LFinger => "Left Ring",
-        EquipmentSlot.RFinger => "Right Ring",
-        EquipmentSlot.MainHand => "Main Hand",
-        EquipmentSlot.OffHand => "Off Hand",
-        _ => "Unknown"
-    };
+    public static string GetDisplayName(this EquipmentSlot slot) =>
+        GameConfig.GetLocalizedSlotName(slot);
 
     /// <summary>
     /// Check if slot is an armor slot

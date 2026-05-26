@@ -1273,15 +1273,18 @@ public class AnchorRoadLocation : BaseLocation
     /// beast / drunk gladiator / etc., delivering the "opening acts" feel.</summary>
     private void AnnounceWarmupWave(Monster monster)
     {
-        var flavor = UsurperRemake.Data.GauntletChampionData.WarmupWaveFlavor;
-        string line = flavor[random.Next(flavor.Length)];
+        // Warmup flavor lives in loc keys gauntlet.warmup.0..N so it renders in the session
+        // language (the English array is the source/fallback). Player report: warmup entry
+        // texts ("a dire beast is released", "an unnamed sellsword") showed in English.
+        int flavorCount = UsurperRemake.Data.GauntletChampionData.WarmupWaveFlavor.Length;
+        string line = Loc.Get($"gauntlet.warmup.{random.Next(flavorCount)}");
 
         terminal.SetColor("white");
         terminal.WriteLine(line);
         terminal.WriteLine("");
         terminal.SetColor("bright_cyan");
         terminal.Write(Loc.Get("anchor_road.opponent_label"));
-        terminal.WriteLine($"{monster.Name} (Level {monster.Level})");
+        terminal.WriteLine($"{monster.Name} {Loc.Get("gauntlet.level_suffix", monster.Level)}");
     }
 
     /// <summary>Multi-line champion entrance theater with timing. Reads the herald's
@@ -1291,7 +1294,7 @@ public class AnchorRoadLocation : BaseLocation
         UsurperRemake.Data.GauntletChampionData.GauntletChampion champion, Monster monster)
     {
         terminal.SetColor("bright_yellow");
-        foreach (var line in champion.EntranceAnnouncement)
+        foreach (var line in champion.LocEntrance())
         {
             terminal.WriteLine(line);
             await Task.Delay(600);
@@ -1300,21 +1303,21 @@ public class AnchorRoadLocation : BaseLocation
 
         // Lore line: italicized via dark color, leading two-space indent for emphasis.
         terminal.SetColor("dark_gray");
-        terminal.WriteLine($"  {champion.LoreLine}");
+        terminal.WriteLine($"  {champion.LocLore()}");
         terminal.WriteLine("");
         await Task.Delay(800);
 
         // Crowd reaction (sets the mood for this specific fight).
         terminal.SetColor("white");
-        terminal.WriteLine(champion.CrowdReaction);
+        terminal.WriteLine(champion.LocCrowd());
         terminal.WriteLine("");
         await Task.Delay(600);
 
         // Stat banner: the champion's title, the patron god, the level.
         terminal.SetColor("bright_red");
-        terminal.WriteLine($"  {champion.Name}, {champion.Title} (Level {monster.Level})");
+        terminal.WriteLine($"  {champion.Name}, {champion.Title} {Loc.Get("gauntlet.level_suffix", monster.Level)}");
         terminal.SetColor("dark_gray");
-        terminal.WriteLine($"  Patron: {champion.GodPatron}");
+        terminal.WriteLine($"  {Loc.Get("gauntlet.patron_label")} {champion.GodPatron}");
     }
 
     /// <summary>Build a real Monster from a champion data entry, scaled to the player's
@@ -1325,7 +1328,18 @@ public class AnchorRoadLocation : BaseLocation
         UsurperRemake.Data.GauntletChampionData.GauntletChampion champion, long playerLevel)
     {
         int effLevel = (int)Math.Max(1, Math.Min(100, playerLevel + champion.LevelBonus));
-        var monster = MonsterGenerator.GenerateMonster(effLevel, isBoss: true, isMiniBoss: false, random);
+        // v0.61.6: generate as a NON-boss base. The champion's own HpMultiplier /
+        // AttackMultiplier / DefenseMultiplier ARE the boss-tier scaling (per the
+        // v0.60.11 design: effective level + role-specific multipliers). Generating
+        // with isBoss:true previously stacked the 2.8x boss-tier HP multiplier on
+        // top of the champion's, so Vargash (1.8x) became base * 2.8 * 1.8 = ~5x and
+        // the Nameless Tyrant (4.0x) became ~11.2x -- a 13-round attrition slog that
+        // killed even a Lv.55 Barbarian who takes zero damage from everything else.
+        // We set monster.IsBoss = true AFTER generation so the boss combat behaviors
+        // (phase transitions, last-stand cap, boss AI) still fire without the HP
+        // double-multiply. Player report: Quent, Lv.55 Barbarian, lost to the first
+        // and weakest champion despite one-shotting all regular content.
+        var monster = MonsterGenerator.GenerateMonster(effLevel, isBoss: false, isMiniBoss: false, random);
 
         monster.Name = champion.Name;
         monster.MonsterColor = "bright_yellow";
@@ -1334,6 +1348,11 @@ public class AnchorRoadLocation : BaseLocation
         monster.Strength = (int)(monster.Strength * champion.AttackMultiplier);
         monster.Defence = (int)(monster.Defence * champion.DefenseMultiplier);
         monster.ArmPow = (int)(monster.ArmPow * champion.DefenseMultiplier);
+
+        // Flag as boss so phase transitions, the last-stand cap, and boss-targeted
+        // combat logic still treat the champion as a boss -- just without the
+        // boss-tier stat multipliers that the champion multipliers already supply.
+        monster.IsBoss = true;
 
         // Override the random ability roll with the champion's themed kit.
         if (champion.SpecialAbilities != null && champion.SpecialAbilities.Length > 0)
@@ -1350,10 +1369,10 @@ public class AnchorRoadLocation : BaseLocation
     /// Keeps the arena feeling alive between confrontations.</summary>
     private void PrintGauntletCrowdAmbiance()
     {
-        var lines = UsurperRemake.Data.GauntletChampionData.CrowdAmbiance;
+        int count = UsurperRemake.Data.GauntletChampionData.CrowdAmbiance.Length;
         terminal.SetColor("dark_gray");
         terminal.WriteLine("");
-        terminal.WriteLine($"  {lines[random.Next(lines.Length)]}");
+        terminal.WriteLine($"  {UsurperRemake.Data.GauntletChampionData.GetLocalizedCrowdAmbiance(random.Next(count))}");
         terminal.WriteLine("");
     }
 
@@ -1444,7 +1463,7 @@ public class AnchorRoadLocation : BaseLocation
             Slot = slot,
             Rarity = rarity,
             MinLevel = (int)Math.Max(1, playerLevel - 2),
-            Description = champion.Drop.FlavorDescription
+            Description = champion.LocDropFlavor()
         };
 
         // Stat power matches the rarity label, using the same `basePower * levelScale *

@@ -4482,6 +4482,18 @@ public partial class CombatEngine
             return;
         }
 
+        // v0.61.6 Cyclebreaker Probability Manipulation: passive per-attack evade.
+        // Unlike DodgeNextAttack (consumed by the first attack), this rolls against
+        // EVERY incoming attack, so the class survives group fights long enough to
+        // ramp its buffs instead of being shredded on the rounds before it acts.
+        if (player.Class == CharacterClass.Cyclebreaker
+            && random.Next(100) < GameConfig.CyclebreakerPassiveEvadePercent)
+        {
+            terminal.WriteLine(Loc.Get("combat.cyclebreaker_evade", monster.Name), "bright_cyan");
+            await Task.Delay(GetCombatDelay(500));
+            return;
+        }
+
         // === SMART MONSTER TARGETING ===
         // Monsters intelligently choose targets based on threat, class roles, and positioning
         var aliveTeammates = result.Teammates?.Where(t => t.IsAlive).ToList();
@@ -6276,9 +6288,11 @@ public partial class CombatEngine
             }
         }
 
-        // MUD mode: broadcast boss kills only (regular kills too spammy)
+        // MUD mode: broadcast boss kills only (regular kills too spammy).
+        // Rendered per-recipient so each player in the room reads it in their own language.
         if (isBoss)
-            UsurperRemake.Server.RoomRegistry.BroadcastAction($"{result.Player.DisplayName} has defeated the mighty {result.Monster.Name}!");
+            UsurperRemake.Server.RoomRegistry.BroadcastActionLocalized(lang =>
+                Loc.GetIn(lang, "combat.boss_defeated_broadcast", result.Player.DisplayName, result.Monster.Name));
 
         QuestSystem.OnMonsterKilled(result.Player, result.Monster.Name, isBoss, result.Monster.TierName);
 
@@ -18869,7 +18883,8 @@ public partial class CombatEngine
             if (anyBoss)
             {
                 var monsterNames = string.Join(", ", result.DefeatedMonsters.Select(m => m.Name).Distinct());
-                UsurperRemake.Server.RoomRegistry.BroadcastAction($"{result.Player.DisplayName} has defeated the mighty {monsterNames}!");
+                UsurperRemake.Server.RoomRegistry.BroadcastActionLocalized(lang =>
+                    Loc.GetIn(lang, "combat.boss_defeated_broadcast", result.Player.DisplayName, monsterNames));
             }
 
             // v0.60.3: GMCP Char.Combat.Killed -- one frame per defeated monster so

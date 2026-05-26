@@ -178,6 +178,40 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
+        /// Get a localized string in an explicitly specified language, independent of the current
+        /// session's language. For real-time server broadcasts that are built once but delivered to
+        /// many sessions in different languages (e.g. world boss spawn), so each recipient sees the
+        /// announcement in their own language. Falls back: given language → English → raw key.
+        /// </summary>
+        public static string GetIn(string lang, string key)
+        {
+            if (!_loaded) Initialize();
+
+            if (!string.IsNullOrEmpty(lang) && lang != "en"
+                && _languages.TryGetValue(lang, out var langDict) && langDict.TryGetValue(key, out var localized))
+                return localized;
+
+            if (_languages.TryGetValue("en", out var enDict) && enDict.TryGetValue(key, out var english))
+                return english;
+
+            return key;
+        }
+
+        /// <summary>Get a localized format string in an explicit language and apply arguments.</summary>
+        public static string GetIn(string lang, string key, params object[] args)
+        {
+            var template = GetIn(lang, key);
+            try
+            {
+                return string.Format(template, args);
+            }
+            catch (FormatException)
+            {
+                return template;
+            }
+        }
+
+        /// <summary>
         /// Check if a key exists in the current language (or English fallback).
         /// </summary>
         public static bool Has(string key)

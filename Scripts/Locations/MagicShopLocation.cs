@@ -55,12 +55,12 @@ public partial class MagicShopLocation : BaseLocation
     }
     protected override string[]? GetAmbientMessages() => new[]
     {
-        "A faint arcane hum pulses from somewhere behind the shelves.",
-        "Pages rustle by themselves in an open tome.",
-        "A candle flame bends sideways though there is no wind.",
-        "Glass vials chime softly against one another.",
-        "The air tastes faintly of ozone and old ink.",
-        "A distant incantation trails off and falls silent.",
+        Loc.Get("magic_shop.ambient_hum"),
+        Loc.Get("magic_shop.ambient_pages"),
+        Loc.Get("magic_shop.ambient_candle"),
+        Loc.Get("magic_shop.ambient_vials"),
+        Loc.Get("magic_shop.ambient_ozone"),
+        Loc.Get("magic_shop.ambient_incantation"),
     };
 
     protected override void DisplayLocation()

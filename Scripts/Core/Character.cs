@@ -879,11 +879,28 @@ public class Character
         EquipmentDatabase.GetById(offId)?.Handedness == WeaponHandedness.OneHanded &&
         !HasShieldEquipped; // Shield + weapon is sword-and-board, not dual wielding
 
-    public bool HasShieldEquipped =>
-        EquippedItems.TryGetValue(EquipmentSlot.OffHand, out var offId) && offId > 0 &&
-        (EquipmentDatabase.GetById(offId)?.WeaponType == WeaponType.Shield
-         || EquipmentDatabase.GetById(offId)?.WeaponType == WeaponType.Buckler
-         || EquipmentDatabase.GetById(offId)?.WeaponType == WeaponType.TowerShield);
+    // True when the off-hand holds a shield. Defense-in-depth detection (issue #86 pattern):
+    // a shield is recognized by its WeaponType, OR by carrying shield stats (ShieldBonus /
+    // BlockChance), OR by its name looking like a shield. This guards against a shield/buckler
+    // whose WeaponType got mangled into a one-handed weapon (e.g. a looted buckler routed through
+    // the weapon path, or a pre-fix save), which would otherwise let IsDualWielding fire off-hand
+    // strikes with the shield. Player report: "I have a buckler but I do off-hand strikes."
+    public bool HasShieldEquipped
+    {
+        get
+        {
+            if (!EquippedItems.TryGetValue(EquipmentSlot.OffHand, out var offId) || offId <= 0)
+                return false;
+            var off = EquipmentDatabase.GetById(offId);
+            if (off == null) return false;
+            return off.WeaponType == WeaponType.Shield
+                || off.WeaponType == WeaponType.Buckler
+                || off.WeaponType == WeaponType.TowerShield
+                || off.ShieldBonus > 0
+                || off.BlockChance > 0
+                || ShopItemGenerator.LooksLikeShieldByName(off.Name);
+        }
+    }
 
     public bool IsTwoHanding =>
         EquippedItems.TryGetValue(EquipmentSlot.MainHand, out var mainId) && mainId > 0 &&
@@ -1581,6 +1598,13 @@ public class Character
 
     // Dungeon floor persistence - tracks room state per floor for respawn system
     public Dictionary<int, DungeonFloorState> DungeonFloorStates { get; set; } = new Dictionary<int, DungeonFloorState>();
+
+    // Last dungeon floor the player was actively on when they left. Used so that
+    // re-entering the dungeon resumes where they left off instead of snapping to
+    // the player's character level. 0 = never entered (fall back to char level).
+    // Player report: left at floor 40, came back, dungeon auto-set to char level
+    // 50, got one-shot. Re-entry now resumes the remembered floor.
+    public int LastDungeonFloor { get; set; } = 0;
 
     // Marriage and family
     public bool Married { get; set; }               // is married?

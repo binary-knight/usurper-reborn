@@ -207,7 +207,8 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("════════════════════════════════════════════════════════════");
             }
             terminal.SetColor("bright_yellow");
-            terminal.WriteLine(GameConfig.ScreenReaderMode ? "TOWN NEWS" : "                      TOWN NEWS");
+            string townNews = Loc.Get("news.town_news_header");
+            terminal.WriteLine(GameConfig.ScreenReaderMode ? townNews : townNews.PadLeft(22 + townNews.Length / 2));
             if (!GameConfig.ScreenReaderMode)
             {
                 terminal.SetColor("yellow");
@@ -218,7 +219,7 @@ namespace UsurperRemake.Systems
             if (news.Count == 0)
             {
                 terminal.SetColor("gray");
-                terminal.WriteLine("  No recent news.");
+                terminal.WriteLine("  " + Loc.Get("news.none_recent"));
             }
             else
             {

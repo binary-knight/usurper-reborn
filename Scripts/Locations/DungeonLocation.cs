@@ -150,9 +150,16 @@ public class DungeonLocation : BaseLocation
         // The list will be rebuilt by AddCompanionsToParty() and RestoreNPCTeammates()
         teammates.Clear();
 
-        // Initialize dungeon level based on the actual player entering
+        // Initialize dungeon level. Resume the floor the player was last on
+        // (so leaving to shop / sell / regear and coming back drops you where
+        // you left off, not at your character level). Falls back to character
+        // level for a first-time entry (LastDungeonFloor == 0).
+        // Player report: left at floor 40, regeared, re-entered and got snapped
+        // to char level 50 and one-shot. Remembering the last floor fixes that.
         var playerLevel = player?.Level ?? 1;
-        currentDungeonLevel = Math.Max(1, playerLevel);
+        currentDungeonLevel = player != null && player.LastDungeonFloor > 0
+            ? player.LastDungeonFloor
+            : Math.Max(1, playerLevel);
 
         if (currentDungeonLevel > maxDungeonLevel)
             currentDungeonLevel = maxDungeonLevel;
@@ -161,6 +168,7 @@ public class DungeonLocation : BaseLocation
         // They can't enter floors beyond an uncleared special floor
         currentDungeonLevel = GetMaxAccessibleFloor(player!, currentDungeonLevel);
         player!.CurrentLocation = $"Dungeon Floor {currentDungeonLevel}";
+        player.LastDungeonFloor = currentDungeonLevel;
 
         // Generate or restore floor based on persistence state
         // CRITICAL: Also regenerate if we have a cached floor but no saved state for it
@@ -6381,7 +6389,7 @@ public class DungeonLocation : BaseLocation
         var floorResult = GenerateOrRestoreFloor(player, nextLevel);
         currentFloor = floorResult.Floor;
         currentDungeonLevel = nextLevel;
-        if (player != null) player.CurrentLocation = $"Dungeon Floor {currentDungeonLevel}";
+        if (player != null) { player.CurrentLocation = $"Dungeon Floor {currentDungeonLevel}"; player.LastDungeonFloor = currentDungeonLevel; }
         roomsExploredThisFloor = floorResult.WasRestored ? currentFloor.Rooms.Count(r => r.IsExplored) : 0;
         hasCampedThisFloor = false;
         consecutiveMonsterRooms = 0;
@@ -6702,7 +6710,7 @@ public class DungeonLocation : BaseLocation
             var floorResult = GenerateOrRestoreFloor(player, targetLevel);
             currentFloor = floorResult.Floor;
             currentDungeonLevel = targetLevel;
-            if (player != null) player.CurrentLocation = $"Dungeon Floor {currentDungeonLevel}";
+            if (player != null) { player.CurrentLocation = $"Dungeon Floor {currentDungeonLevel}"; player.LastDungeonFloor = currentDungeonLevel; }
             roomsExploredThisFloor = floorResult.WasRestored ? currentFloor.Rooms.Count(r => r.IsExplored) : 0;
             hasCampedThisFloor = false;
             consecutiveMonsterRooms = 0;
@@ -7384,7 +7392,7 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("dungeon.portal_whisks_deeper"));
                 terminal.WriteLine(Loc.Get("dungeon.portal_emerge_floor", newFloor));
                 currentDungeonLevel = newFloor;
-                if (currentPlayer != null) currentPlayer.CurrentLocation = $"Dungeon Floor {currentDungeonLevel}";
+                if (currentPlayer != null) { currentPlayer.CurrentLocation = $"Dungeon Floor {currentDungeonLevel}"; currentPlayer.LastDungeonFloor = currentDungeonLevel; }
             }
             else if (roll < 75)
             {
@@ -7395,7 +7403,7 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("dungeon.portal_carries_upward"));
                 terminal.WriteLine(Loc.Get("dungeon.portal_emerge_floor", newFloor));
                 currentDungeonLevel = newFloor;
-                if (currentPlayer != null) currentPlayer.CurrentLocation = $"Dungeon Floor {currentDungeonLevel}";
+                if (currentPlayer != null) { currentPlayer.CurrentLocation = $"Dungeon Floor {currentDungeonLevel}"; currentPlayer.LastDungeonFloor = currentDungeonLevel; }
             }
             else if (roll < 90)
             {
@@ -9721,7 +9729,7 @@ public class DungeonLocation : BaseLocation
             var floorResult = GenerateOrRestoreFloor(player, nextLevel);
             currentFloor = floorResult.Floor;
             currentDungeonLevel = nextLevel;
-            if (player != null) player.CurrentLocation = $"Dungeon Floor {currentDungeonLevel}";
+            if (player != null) { player.CurrentLocation = $"Dungeon Floor {currentDungeonLevel}"; player.LastDungeonFloor = currentDungeonLevel; }
             terminal.WriteLine(Loc.Get("dungeon.descend_to", currentDungeonLevel), "yellow");
 
             // Update quest progress for reaching this floor
@@ -14914,7 +14922,7 @@ public class DungeonLocation : BaseLocation
         else
         {
             currentDungeonLevel = targetLevel;
-            if (currentPlayer != null) currentPlayer.CurrentLocation = $"Dungeon Floor {currentDungeonLevel}";
+            if (currentPlayer != null) { currentPlayer.CurrentLocation = $"Dungeon Floor {currentDungeonLevel}"; currentPlayer.LastDungeonFloor = currentDungeonLevel; }
             terminal.WriteLine(Loc.Get("dungeon.steel_nerves", currentDungeonLevel), "magenta");
 
             // Update quest progress for reaching this floor

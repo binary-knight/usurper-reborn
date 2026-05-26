@@ -121,7 +121,7 @@ public class DormitoryLocation : BaseLocation
             terminal.SetColor("darkgray");
             terminal.Write("]");
             terminal.SetColor("white");
-            terminal.WriteLine(Loc.Get("dormitory.return_anchor"));
+            terminal.WriteLine(Loc.Get("dormitory.return_main"));
         }
         else
         {

@@ -976,6 +976,7 @@ namespace UsurperRemake.Systems
 
                 // Dungeon floor persistence
                 DungeonFloorStates = SerializeDungeonFloorStates(player),
+                LastDungeonFloor = player.LastDungeonFloor,
 
                 // Hint system - which hints have been shown
                 HintsShown = player.HintsShown ?? new HashSet<string>(),

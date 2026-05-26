@@ -653,12 +653,16 @@ namespace UsurperRemake.Systems
             var (npcKey, npcData) = available[idx];
             _notifiedNPCs.Add(npcKey);
 
-            string friendlyLocation = npcData.Location switch
-            {
-                "WeaponShop" => Loc.Get("npc_story.location.weapon_shop"),
-                "MainStreet" => Loc.Get("npc_story.location.main_street"),
-                _ => npcData.Location
-            };
+            // Localize the location name. Every memorable NPC's Location string
+            // (Healer, Temple, Inn, WeaponShop, MainStreet, Church) has a matching
+            // `location.name.{string}` key in all languages, so route through that.
+            // Falls back to the raw string if a key is somehow missing. Player
+            // report: the story notification showed the location ("church") in
+            // English because the old switch only localized WeaponShop / MainStreet.
+            string locNameKey = $"location.name.{npcData.Location}";
+            string friendlyLocation = Loc.Get(locNameKey);
+            if (friendlyLocation == locNameKey)
+                friendlyLocation = npcData.Location;
 
             string locId = NPCLocKeyMap.TryGetValue(npcKey, out var id) ? id : "";
             if (!string.IsNullOrEmpty(locId))

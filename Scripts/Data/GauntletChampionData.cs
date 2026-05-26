@@ -145,6 +145,25 @@ public static class GauntletChampionData
         /// <summary>Monster-ability strings the champion has access to. Picked at random
         /// per round by the existing MonsterAbilities pipeline. Empty = basic attacks only.</summary>
         public string[] SpecialAbilities { get; init; } = System.Array.Empty<string>();
+
+        // Localized accessors. The English fields above are the source/fallback; these resolve
+        // gauntlet.champ.{id}.* loc keys so the champion entrance theater renders in the session
+        // language. Champion Name/Title/GodPatron stay canonical (proper-noun layer).
+        private static string LocOr(string key, string fallback)
+        {
+            var v = UsurperRemake.Systems.Loc.Get(key);
+            return v == key ? fallback : v;
+        }
+        public string[] LocEntrance()
+        {
+            var r = new string[EntranceAnnouncement.Length];
+            for (int i = 0; i < r.Length; i++)
+                r[i] = LocOr($"gauntlet.champ.{Id}.entrance.{i}", EntranceAnnouncement[i]);
+            return r;
+        }
+        public string LocLore() => LocOr($"gauntlet.champ.{Id}.lore", LoreLine);
+        public string LocCrowd() => LocOr($"gauntlet.champ.{Id}.crowd", CrowdReaction);
+        public string LocDropFlavor() => LocOr($"gauntlet.champ.{Id}.drop_flavor", Drop.FlavorDescription);
     }
 
     public class ChampionDrop
@@ -403,6 +422,16 @@ public static class GauntletChampionData
         "The arena master watches from his box, unmoving, expressionless.",
         "Old fighters in the cheap seats murmur to each other. Some of them know what's coming."
     };
+
+    /// <summary>Localized crowd-ambiance line by index (gauntlet.crowd_ambiance.{i}), English
+    /// array as source/fallback. Resolved at display time in the player's session language.</summary>
+    public static string GetLocalizedCrowdAmbiance(int index)
+    {
+        if (index < 0 || index >= CrowdAmbiance.Length) return "";
+        string key = $"gauntlet.crowd_ambiance.{index}";
+        var v = UsurperRemake.Systems.Loc.Get(key);
+        return v == key ? CrowdAmbiance[index] : v;
+    }
 
     /// <summary>Warmup wave flavor for the first 3 fights -- generic "opening acts" before
     /// the champion lineup begins. Each wave picks one of these themes at random.</summary>

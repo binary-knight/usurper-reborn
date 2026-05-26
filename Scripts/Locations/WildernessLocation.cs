@@ -46,9 +46,11 @@ public class WildernessLocation : BaseLocation
             terminal.SetColor(canAccess ? region.ThemeColor : "darkgray");
             string levelReq = region.MinLevel > 1 ? Loc.Get("wilderness.level_req", region.MinLevel) : Loc.Get("wilderness.any_level");
             string lockIcon = canAccess ? "" : (IsScreenReader ? Loc.Get("wilderness.locked") : Loc.Get("wilderness.locked_bracket"));
+            string regionName = WildernessData.GetRegionName(region);
+            string regionDir = WildernessData.GetRegionDirection(region);
             terminal.WriteLine(IsScreenReader
-                ? $"  {region.DirectionKey}. {region.Name,-24} - {region.Direction}{levelReq}{lockIcon}"
-                : $"  [{region.DirectionKey}] {region.Name,-24} - {region.Direction}{levelReq}{lockIcon}");
+                ? $"  {region.DirectionKey}. {regionName,-24} - {regionDir}{levelReq}{lockIcon}"
+                : $"  [{region.DirectionKey}] {regionName,-24} - {regionDir}{levelReq}{lockIcon}");
         }
 
         terminal.WriteLine("");
@@ -74,7 +76,7 @@ public class WildernessLocation : BaseLocation
         if (currentPlayer.HasActiveShrineAttunement)
         {
             var shrine = UsurperRemake.Data.DruidShrineData.GetById(currentPlayer.AttunedShrineId);
-            string shrineName = shrine?.Name ?? currentPlayer.AttunedShrineId;
+            string shrineName = shrine?.LocName() ?? currentPlayer.AttunedShrineId;
             // v0.61.3: GetShrineTimeRemainingLabel returns "12.5h" online or
             // "2 days" / "1 day" / "today" in single-player so the same
             // template renders the right unit per game mode.
@@ -110,7 +112,8 @@ public class WildernessLocation : BaseLocation
         {
             bool canAccess = currentPlayer.Level >= region.MinLevel;
             terminal.SetColor(canAccess ? "white" : "darkgray");
-            terminal.WriteLine($"[{region.DirectionKey}] {region.Name} {(canAccess ? "" : "[LOCKED]")}");
+            string lockTag = canAccess ? "" : Loc.Get("wilderness.locked_bracket");
+            terminal.WriteLine($"[{region.DirectionKey}] {WildernessData.GetRegionName(region)} {lockTag}");
         }
 
         if (currentPlayer.WildernessDiscoveries.Count > 0)
@@ -125,7 +128,7 @@ public class WildernessLocation : BaseLocation
         {
             var shrine = UsurperRemake.Data.DruidShrineData.GetById(currentPlayer.AttunedShrineId);
             terminal.WriteLine(Loc.Get("wilderness.bbs_pilgrimage_active",
-                shrine?.Name ?? currentPlayer.AttunedShrineId,
+                shrine?.LocName() ?? currentPlayer.AttunedShrineId,
                 currentPlayer.GetShrineTimeRemainingLabel()));
         }
         else
@@ -181,7 +184,7 @@ public class WildernessLocation : BaseLocation
         if (currentPlayer.Level < region.MinLevel)
         {
             terminal.SetColor("red");
-            terminal.WriteLine(Loc.Get("wilderness.region_too_dangerous", region.Name, region.MinLevel));
+            terminal.WriteLine(Loc.Get("wilderness.region_too_dangerous", WildernessData.GetRegionName(region), region.MinLevel));
             await Task.Delay(2000);
             return;
         }
@@ -208,13 +211,14 @@ public class WildernessLocation : BaseLocation
         // Show travel text
         terminal.ClearScreen();
         terminal.SetColor(region.ThemeColor);
+        string regName = WildernessData.GetRegionName(region);
         if (IsScreenReader)
-            terminal.WriteLine(region.Name);
+            terminal.WriteLine(regName);
         else
-            terminal.WriteLine($"═══ {region.Name} ═══");
+            terminal.WriteLine($"═══ {regName} ═══");
         terminal.WriteLine("");
         terminal.SetColor("white");
-        foreach (var line in region.Description.Split('\n'))
+        foreach (var line in WildernessData.GetRegionDescription(region).Split('\n'))
             terminal.WriteLine(line);
         terminal.WriteLine("");
         await Task.Delay(2000);
@@ -363,7 +367,7 @@ public class WildernessLocation : BaseLocation
         string monsterName = region.MonsterNames[Random.Shared.Next(region.MonsterNames.Length)];
 
         terminal.SetColor("red");
-        terminal.WriteLine(Loc.Get("wilderness.monster_emerges", monsterName, region.Name.ToLower()));
+        terminal.WriteLine(Loc.Get("wilderness.monster_emerges", monsterName, WildernessData.GetRegionName(region).ToLower()));
         terminal.WriteLine("");
         await Task.Delay(1500);
 
@@ -795,9 +799,9 @@ public class WildernessLocation : BaseLocation
         terminal.SetColor("bright_yellow");
         terminal.WriteLine(Loc.Get("wilderness.discovery_star"));
         terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("wilderness.discovery_found", discovery.Name));
+        terminal.WriteLine(Loc.Get("wilderness.discovery_found", WildernessData.GetDiscoveryName(discovery)));
         terminal.SetColor("gray");
-        terminal.WriteLine(discovery.Description);
+        terminal.WriteLine(WildernessData.GetDiscoveryDescription(discovery));
         terminal.SetColor("bright_cyan");
         terminal.WriteLine(Loc.Get("wilderness.discovery_revisit_hint"));
 
@@ -827,10 +831,10 @@ public class WildernessLocation : BaseLocation
             var active = UsurperRemake.Data.DruidShrineData.GetById(currentPlayer.AttunedShrineId);
             terminal.SetColor("bright_cyan");
             terminal.WriteLine(Loc.Get("wilderness.pilgrimage_active",
-                active?.Name ?? currentPlayer.AttunedShrineId,
+                active?.LocName() ?? currentPlayer.AttunedShrineId,
                 currentPlayer.GetShrineTimeRemainingLabel()));
             terminal.SetColor("dark_gray");
-            terminal.WriteLine($"  ({active?.PassiveSummary ?? ""})");
+            terminal.WriteLine($"  ({active?.LocPassiveSummary() ?? ""})");
             terminal.WriteLine("");
         }
 
@@ -844,11 +848,11 @@ public class WildernessLocation : BaseLocation
             terminal.SetColor("gray");
             terminal.Write($"  [{i + 1}] ");
             terminal.SetColor(isActive ? "bright_green" : "white");
-            terminal.Write($"{s.Name,-38}");
+            terminal.Write($"{s.LocName(),-38}");
             terminal.SetColor("dark_gray");
             terminal.WriteLine($"  favor: {favor}");
             terminal.SetColor("cyan");
-            terminal.WriteLine($"        {s.PassiveSummary}");
+            terminal.WriteLine($"        {s.LocPassiveSummary()}");
         }
         terminal.WriteLine("");
         terminal.SetColor("gray");
@@ -864,13 +868,13 @@ public class WildernessLocation : BaseLocation
         // Confirm
         terminal.WriteLine("");
         terminal.SetColor("bright_magenta");
-        terminal.WriteLine($"  {selected.Name}");
+        terminal.WriteLine($"  {selected.LocName()}");
         terminal.SetColor("dark_gray");
-        foreach (var line in selected.FlavorDescription.Split('\n'))
+        foreach (var line in selected.LocFlavor().Split('\n'))
             terminal.WriteLine($"  {line}");
         terminal.WriteLine("");
         terminal.SetColor("cyan");
-        terminal.WriteLine($"  {selected.PassiveSummary}");
+        terminal.WriteLine($"  {selected.LocPassiveSummary()}");
         if (selected.ChivalryShift != 0)
         {
             terminal.SetColor(selected.ChivalryShift > 0 ? "bright_yellow" : "dark_red");
@@ -905,17 +909,17 @@ public class WildernessLocation : BaseLocation
         {
             UsurperRemake.Systems.AlignmentSystem.Instance.ChangeAlignment(
                 currentPlayer, Math.Abs(selected.ChivalryShift), selected.ChivalryShift > 0,
-                $"Pilgrimage to {selected.Name}");
+                $"Pilgrimage to {selected.LocName()}");
         }
 
         terminal.WriteLine("");
         terminal.SetColor("gray");
-        foreach (var line in selected.AttunementDescription.Split('\n'))
+        foreach (var line in selected.LocAttunement().Split('\n'))
             terminal.WriteLine($"  {line}");
         terminal.WriteLine("");
         terminal.SetColor("bright_green");
         terminal.WriteLine(Loc.Get("wilderness.pilgrimage_attuned",
-            selected.Name, UsurperRemake.Data.DruidShrineData.AttunementHours));
+            selected.LocName(), UsurperRemake.Data.DruidShrineData.AttunementHours));
 
         // Milestone check -- crossing 10 visits earns a one-time tangible gift from
         // that god. 25 and 50 visit milestones still print the favor-recognition line
@@ -925,7 +929,7 @@ public class WildernessLocation : BaseLocation
         {
             terminal.SetColor("bright_magenta");
             terminal.WriteLine("");
-            terminal.WriteLine(Loc.Get("wilderness.pilgrimage_milestone", newFavor, selected.GodPatron));
+            terminal.WriteLine(Loc.Get("wilderness.pilgrimage_milestone", newFavor, selected.LocGodPatron()));
             if (newFavor == 10)
                 await ApplyShrineMilestone10Reward(selected);
         }
@@ -1001,9 +1005,9 @@ public class WildernessLocation : BaseLocation
             terminal.SetColor(region.ThemeColor);
             terminal.Write(IsScreenReader ? $"  {i + 1}. " : $"  [{i + 1}] ");
             terminal.SetColor("white");
-            terminal.Write($"{discovery.Name}");
+            terminal.Write(WildernessData.GetDiscoveryName(discovery));
             terminal.SetColor("gray");
-            terminal.WriteLine($" ({region.Name})");
+            terminal.WriteLine($" ({WildernessData.GetRegionName(region)})");
         }
 
         terminal.WriteLine("");

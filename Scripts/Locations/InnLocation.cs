@@ -28,13 +28,13 @@ public class InnLocation : BaseLocation
     
     protected override string[]? GetAmbientMessages() => new[]
     {
-        "The hearth crackles and spits a shower of sparks.",
-        "Distant laughter erupts from a corner table.",
-        "The smell of stale ale and pipe smoke hangs in the air.",
-        "A bard strums somewhere, barely audible over the din.",
-        "The floorboards creak as someone shuffles past.",
-        "A mug is slammed on the bar with a satisfied thud.",
-        "The door swings open and closed, letting in a gust of cold air.",
+        Loc.Get("inn.ambient_hearth"),
+        Loc.Get("inn.ambient_laughter"),
+        Loc.Get("inn.ambient_ale"),
+        Loc.Get("inn.ambient_bard"),
+        Loc.Get("inn.ambient_floorboards"),
+        Loc.Get("inn.ambient_mug"),
+        Loc.Get("inn.ambient_door"),
     };
 
     protected override void SetupLocation()

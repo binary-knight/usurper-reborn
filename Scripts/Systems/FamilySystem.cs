@@ -265,6 +265,24 @@ namespace UsurperRemake.Systems
                     ConvertChildToNPC(child);
                 }
             }
+
+            // Coming-of-age retry / queue drain: any non-deleted child already at or
+            // over ADULT_AGE that hasn't been converted yet. This covers two cases:
+            //   1. Children frozen at 18 by the old bug (conversion was skipped at the
+            //      population cap and never retried, because the loop above only ages
+            //      Age < ADULT_AGE children).
+            //   2. Children currently parked "away at higher learning" (Location =
+            //      ChildLocationAway) waiting for population room.
+            // Each tick we retry ConvertChildToNPC: if the population now has room they
+            // graduate into a real world NPC (marked Deleted); if it is still at cap
+            // they (re)park in the Away state. Orphanage children have their own
+            // coming-of-age path and are left alone.
+            var stuckAdults = _children
+                .Where(c => !c.Deleted && c.Age >= ADULT_AGE
+                    && c.Location != GameConfig.ChildLocationOrphanage)
+                .ToList();
+            foreach (var child in stuckAdults)
+                ConvertChildToNPC(child);
         }
 
         /// <summary>
@@ -275,8 +293,19 @@ namespace UsurperRemake.Systems
             // Idempotency: skip if already converted (prevents duplicate NPCs across save/load)
             if (child.Deleted) return;
 
-            // Don't exceed population cap
-            if ((NPCSpawnSystem.Instance?.ActiveNPCs.Count ?? 0) >= GameConfig.MaxNPCPopulation) return;
+            // Population cap reached: we can't add another world NPC right now, but
+            // the child has still come of age. Rather than freeze them as a phantom
+            // age-18 "child" (the original bug) OR delete them (which would feel like
+            // the game erased the player's kid), park them in an "away" state -- they
+            // have left home for higher learning / service abroad. They stay on the
+            // family roster (shown as away, not as a dependent at home) and the
+            // ProcessDailyAging self-heal pass retries the conversion each tick, so
+            // they graduate into a real world NPC as soon as the population frees up.
+            if ((NPCSpawnSystem.Instance?.ActiveNPCs.Count ?? 0) >= GameConfig.MaxNPCPopulation)
+            {
+                child.Location = GameConfig.ChildLocationAway;
+                return;
+            }
             var existingAdult = NPCSpawnSystem.Instance?.ActiveNPCs
                 ?.FirstOrDefault(n => n.Name2 == child.Name && n.BirthDate == child.BirthDate);
             if (existingAdult != null) { child.Deleted = true; return; }

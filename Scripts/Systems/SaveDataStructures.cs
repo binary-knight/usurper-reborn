@@ -683,6 +683,9 @@ namespace UsurperRemake.Systems
         // Dungeon floor persistence - tracks room state, respawn timers, etc.
         public Dictionary<int, DungeonFloorStateData> DungeonFloorStates { get; set; } = new();
 
+        // Last dungeon floor the player was on (resume-where-you-left-off on re-entry).
+        public int LastDungeonFloor { get; set; } = 0;
+
         // Hint system - tracks which contextual hints have been shown to the player
         public HashSet<string> HintsShown { get; set; } = new();
 

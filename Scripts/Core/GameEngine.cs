@@ -666,6 +666,10 @@ public partial class GameEngine
                     var confirm = await terminal.GetInput(Loc.Get("engine.delete_confirm_prompt"));
                     if (confirm == "DELETE")
                     {
+                        // Disown this character's children before recreating with the
+                        // same name, so the new character doesn't inherit the old life's
+                        // kids (and their daily gold) by name-match.
+                        DisownDeletedCharacterChildren(mainSave.PlayerName);
                         // Delete main character save only (not alt)
                         var saves = SaveSystem.Instance.GetPlayerSaves(accountName);
                         foreach (var save in saves)
@@ -839,6 +843,10 @@ public partial class GameEngine
                     var confirmDel = await terminal.GetInput(Loc.Get("engine.delete_alt_confirm"));
                     if (confirmDel == "DELETE")
                     {
+                        // Disown the alt's children so a future same-named recreate
+                        // doesn't inherit them (and so they don't linger parented to a
+                        // character that no longer exists).
+                        DisownDeletedCharacterChildren(altSave.PlayerName);
                         SaveSystem.Instance.DeleteSave(altKey);
                         // Also clean up sleeping_players entry for the alt
                         if (SaveSystem.Instance.Backend is SqlSaveBackend sqlDel)
@@ -4452,6 +4460,29 @@ public partial class GameEngine
     }
     
     /// <summary>
+    /// Disown a deleted character's children so a same-named recreate does not
+    /// inherit them by name-match (children match parents on display name, and
+    /// the recreated character keeps the same name). Online only -- in
+    /// single-player CreateNewGame resets FamilySystem entirely. Player report:
+    /// deleted a character, recreated it, and a kid from the old life paid the
+    /// daily child gold bonus on the next day. Persist is gated on disowned > 0
+    /// so a stale/empty FamilySystem can never write an empty children set back
+    /// to world_state.
+    /// </summary>
+    private void DisownDeletedCharacterChildren(string? characterName)
+    {
+        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode || string.IsNullOrEmpty(characterName))
+            return;
+        int disowned = UsurperRemake.Systems.FamilySystem.Instance.DisownChildrenOf(characterName);
+        if (disowned > 0)
+        {
+            DebugLogger.Instance.LogInfo("DELETE", $"Disowned {disowned} child(ren) of deleted character '{characterName}'");
+            if (UsurperRemake.Systems.OnlineStateManager.Instance != null)
+                _ = UsurperRemake.Systems.OnlineStateManager.Instance.SaveSharedChildrenNow();
+        }
+    }
+
+    /// <summary>
     /// Create new game
     /// </summary>
     private async Task CreateNewGame(string playerName)
@@ -5730,6 +5761,9 @@ public partial class GameEngine
         {
             player.ClearedSpecialFloors = playerData.ClearedSpecialFloors;
         }
+
+        // Restore last-dungeon-floor so re-entry resumes where the player left off.
+        player.LastDungeonFloor = playerData.LastDungeonFloor;
 
         // Restore dungeon floor states from save data (room exploration, cleared rooms, etc.)
         // The original boss-room-showing-cleared bug has been properly fixed via the BossDefeated flag,

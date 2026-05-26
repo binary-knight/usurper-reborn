@@ -10,7 +10,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.61.5";
+    public const string Version = "0.61.6";
     public const string VersionName = "Beta";
 
     // v0.57.12: Alignment scale cap. Character.Chivalry and Character.Darkness setters clamp to [0, AlignmentCap]
@@ -1203,6 +1203,13 @@ public static partial class GameConfig
     public const float CyclebreakerDebuffResistChance = 0.25f;  // Cyclebreaker: 25% chance to resist incoming debuffs
     public const float CyclebreakerCycleXPBonus = 0.05f;        // Cyclebreaker: +5% XP bonus per NG+ cycle (max +25%)
     public const float CyclebreakerCycleXPBonusCap = 0.25f;     // Cyclebreaker: Maximum XP bonus from Cycle Memory
+    // v0.61.6: Probability Manipulation now also grants a passive per-incoming-attack
+    // evade. Player report (Lv.50 Cyclebreaker): single-target dodge only avoids ONE
+    // attacker per round, so the class that's fine 1v1 gets shredded by groups before
+    // it can ramp its buffs. This evade rolls against EVERY incoming attack (not just
+    // the first), giving the class real group survivability that scales with its
+    // probability-bending identity.
+    public const int CyclebreakerPassiveEvadePercent = 18;      // Cyclebreaker: 18% chance to evade each incoming attack
     // Abysswarden Passives
     public const float AbysswardenAbyssalSiphonPercent = 0.10f;   // Abysswarden: 10% passive lifesteal on all attacks
     public const float AbysswardenPrisonWardResist = 0.10f;       // Abysswarden: Enemies deal 10% less damage
@@ -1708,6 +1715,10 @@ public static partial class GameConfig
     public const int ChildLocationHome = 1;
     public const int ChildLocationOrphanage = 2;
     public const int ChildLocationKidnapped = 3;
+    // A child who came of age while the NPC population was at cap. They have left
+    // home for "higher learning" and wait in this state until the population frees
+    // up, at which point ProcessDailyAging graduates them into a real world NPC.
+    public const int ChildLocationAway = 4;
     
     public const int ChildHealthNormal = 1;
     public const int ChildHealthPoisoned = 2;
