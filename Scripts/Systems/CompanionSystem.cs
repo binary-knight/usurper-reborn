@@ -2441,93 +2441,45 @@ namespace UsurperRemake.Systems
             switch (id)
             {
                 case CompanionId.Aldric:
-                    pool.AddRange(new[]
-                    {
-                        "Aldric checks the walls for structural weaknesses, old habits from Fort Ashwall.",
-                        "Aldric adjusts his shield. \"Tight corridors. Good for defense.\"",
-                        "\"I've held worse positions than this,\" Aldric murmurs, scanning ahead.",
-                        "Aldric runs a hand along the stone. \"Dwarven work. Old, but solid.\"",
-                        "\"Stay close. I don't like these blind corners.\"",
-                        "Aldric pauses to tighten a strap. \"Ready when you are.\"",
-                        "\"Fort Ashwall had tunnels like these. We lost good men in them.\"",
-                        "Aldric nods to you. \"I've got your back. Always.\"",
-                        "\"These walls have seen worse than us,\" Aldric says quietly.",
-                        "Aldric peers into the darkness ahead. \"Something moved. Maybe.\"",
-                    });
-                    if (afterCombat) pool.Add("Aldric cleans his blade. \"Not bad. Could've been cleaner.\"");
-                    if (dungeonLevel >= 40) pool.Add("\"We're deep now. The air feels... wrong.\"");
-                    if (dungeonLevel >= 70) pool.Add("\"I can feel them. The Old Gods. Even the stone is afraid.\"");
-                    if (player.HP < player.MaxHP / 3) pool.Add("\"You're hurt. We should find somewhere safe.\"");
+                    for (int n = 0; n < 10; n++) pool.Add(Loc.Get($"companion.idle.aldric.{n}"));
+                    if (afterCombat) pool.Add(Loc.Get("companion.idle.aldric.combat"));
+                    if (dungeonLevel >= 40) pool.Add(Loc.Get("companion.idle.aldric.deep40"));
+                    if (dungeonLevel >= 70) pool.Add(Loc.Get("companion.idle.aldric.deep70"));
+                    if (player.HP < player.MaxHP / 3) pool.Add(Loc.Get("companion.idle.aldric.hurt"));
                     break;
 
                 case CompanionId.Vex:
-                    pool.AddRange(new[]
-                    {
-                        "Vex is rummaging through a pile of rubble. \"Nope. Junk. More junk.\"",
-                        "\"You know what this dungeon needs? Better loot. I'm just saying.\"",
-                        "Vex coughs quietly, then waves it off. \"Dust. It's the dust.\"",
-                        "\"Did you know that ancient treasure vaults always smell like this? Me neither.\"",
-                        "Vex flips a coin. Catches it. Grins.",
-                        "\"I'm not dying down here. That would be embarrassing.\"",
-                        "Vex picks a lock on a chest that doesn't exist. \"Practice.\"",
-                        "\"My disease doesn't define me. But it does have excellent timing.\"",
-                        "Vex leans against a wall. \"Just... resting my eyes. One second.\"",
-                        "\"Think there's treasure behind this wall? There's always treasure behind walls.\"",
-                    });
-                    if (afterCombat) pool.Add("\"Dibs on anything shiny. I called it first.\"");
-                    if (dungeonLevel >= 50) pool.Add("Vex is unusually quiet. You catch him staring at nothing.");
-                    if (player.Gold > 10000) pool.Add("\"You know, for a hero, you're sitting on a lot of gold. Just observing.\"");
+                    for (int n = 0; n < 10; n++) pool.Add(Loc.Get($"companion.idle.vex.{n}"));
+                    if (afterCombat) pool.Add(Loc.Get("companion.idle.vex.combat"));
+                    if (dungeonLevel >= 50) pool.Add(Loc.Get("companion.idle.vex.quiet50"));
+                    if (player.Gold > 10000) pool.Add(Loc.Get("companion.idle.vex.gold"));
                     break;
 
                 case CompanionId.Lyris:
-                    pool.AddRange(new[]
-                    {
-                        "Lyris tilts her head, listening to something only she can hear.",
-                        "\"The air currents here... they flow deeper than they should.\"",
-                        "Lyris kneels, studying scratch marks on the stone. \"Something nests nearby.\"",
-                        "\"Nature doesn't reach down here. That's what makes it sad.\"",
-                        "Lyris nocks an arrow without looking up. \"Movement. Two corridors ahead.\"",
-                        "\"These tracks are fresh. We're not the only hunters down here.\"",
-                        "Lyris adjusts her bow. \"Something ahead. I can sense it.\"",
-                        "\"The Deepwood used to stretch above these tunnels. I can still smell the roots.\"",
-                        "Lyris tests the air with two fingers. \"Stale. Nothing's moved through here in days.\"",
-                        "\"The deeper we go, the closer to the source of the corruption.\"",
-                    });
-                    if (afterCombat) pool.Add("Lyris retrieves her arrows from the fallen. \"Waste nothing.\"");
-                    if (dungeonLevel >= 60) pool.Add("\"The corruption is stronger here. We're getting close to its heart.\"");
-                    if (dungeonLevel >= 80) pool.Add("Lyris draws her bowstring tight. \"I can feel the Deepwood's pain from here.\"");
+                    for (int n = 0; n < 10; n++) pool.Add(Loc.Get($"companion.idle.lyris.{n}"));
+                    if (afterCombat) pool.Add(Loc.Get("companion.idle.lyris.combat"));
+                    if (dungeonLevel >= 60) pool.Add(Loc.Get("companion.idle.lyris.corrupt60"));
+                    if (dungeonLevel >= 80) pool.Add(Loc.Get("companion.idle.lyris.deep80"));
                     break;
 
                 case CompanionId.Mira:
-                    pool.AddRange(new[]
-                    {
-                        "Mira presses her hand against the wall. \"So much suffering in these stones.\"",
-                        "\"Let me know if anyone needs healing. That's... what I'm here for.\"",
-                        "Mira whispers a prayer. The shadows pull back, just slightly.",
-                        "\"Every room we clear, someone doesn't have to die in it.\"",
-                        "\"I used to wonder if healing was enough. Down here, it has to be.\"",
-                        "Mira checks her bandages. Always prepared. Always worried.",
-                        "\"Faith isn't about certainty. It's about walking into the dark anyway.\"",
-                        "Mira looks at her hands. \"I've healed so many. Why can't I heal myself?\"",
-                        "\"Stay safe. I only have so many miracles left today.\"",
-                        "Mira smiles, barely. \"We're alive. That's today's victory.\"",
-                    });
-                    if (afterCombat) pool.Add("Mira kneels beside a wound. \"Hold still. This will sting.\"");
-                    if (player.HP < player.MaxHP / 2) pool.Add("\"You're hurt — come here, let me look at that.\"");
-                    if (dungeonLevel >= 50) pool.Add("\"The deeper we go, the more I question. Is any god worth this?\"");
-                    // Veloura connection — Mira's tension builds near floor 40
+                    for (int n = 0; n < 10; n++) pool.Add(Loc.Get($"companion.idle.mira.{n}"));
+                    if (afterCombat) pool.Add(Loc.Get("companion.idle.mira.combat"));
+                    if (player.HP < player.MaxHP / 2) pool.Add(Loc.Get("companion.idle.mira.hurt"));
+                    if (dungeonLevel >= 50) pool.Add(Loc.Get("companion.idle.mira.question50"));
+                    // Veloura connection -- Mira's tension builds near floor 40
                     if (dungeonLevel >= 35 && dungeonLevel < 40)
                     {
-                        pool.Add("Mira's hands are trembling. She notices you looking and clasps them together.");
-                        pool.Add("\"I can feel her. Veloura. The closer we get, the more I remember.\"");
-                        pool.Add("\"I used to sing hymns to her every morning. Now I can barely say her name.\"");
+                        pool.Add(Loc.Get("companion.idle.mira.vel_near0"));
+                        pool.Add(Loc.Get("companion.idle.mira.vel_near1"));
+                        pool.Add(Loc.Get("companion.idle.mira.vel_near2"));
                     }
                     if (dungeonLevel == 40)
                     {
                         pool.Clear(); // Only Veloura-specific comments on her floor
-                        pool.Add("Mira has gone pale. \"She's here. I can feel the corruption like a fever.\"");
-                        pool.Add("\"I spent ten years in her temple. Ten years of prayers she never answered.\"");
-                        pool.Add("\"Whatever we find down here... whatever she's become... I need to see it.\"");
+                        pool.Add(Loc.Get("companion.idle.mira.vel_f40_0"));
+                        pool.Add(Loc.Get("companion.idle.mira.vel_f40_1"));
+                        pool.Add(Loc.Get("companion.idle.mira.vel_f40_2"));
                     }
                     var story = StoryProgressionSystem.Instance;
                     if (dungeonLevel > 40 && story.HasStoryFlag("veloura_encountered"))
@@ -2535,30 +2487,18 @@ namespace UsurperRemake.Systems
                         if (story.OldGodStates.TryGetValue(OldGodType.Veloura, out var vState))
                         {
                             if (vState.Status == GodStatus.Saved)
-                                pool.Add("\"She's free now. Veloura is free.\" Mira wipes her eyes. \"Maybe I am too.\"");
+                                pool.Add(Loc.Get("companion.idle.mira.vel_saved"));
                             else if (vState.Status == GodStatus.Defeated)
-                                pool.Add("Mira is quiet. \"I thought killing her would feel like justice. It just feels like grief.\"");
+                                pool.Add(Loc.Get("companion.idle.mira.vel_defeated"));
                         }
                     }
                     break;
 
                 case CompanionId.Melodia:
-                    pool.AddRange(new[]
-                    {
-                        "Melodia hums softly. The acoustics down here are surprisingly good.",
-                        "\"Every dungeon has a rhythm. Listen — can you hear it?\"",
-                        "Melodia taps a wall. \"E flat. This whole corridor is in E flat.\"",
-                        "\"My old party used to sing in places like this. Before...\"",
-                        "Melodia adjusts her instrument. \"Music soothes monsters too. Sometimes.\"",
-                        "\"I'm composing something. In my head. For when we get out.\"",
-                        "Melodia pauses at an echo. \"Beautiful. Terrible. Both.\"",
-                        "\"They say Thorgrim once played a war drum that shook mountains.\"",
-                        "Melodia strums a quiet chord. The darkness seems less heavy.",
-                        "\"A song for the fallen. I keep adding verses.\"",
-                    });
-                    if (afterCombat) pool.Add("Melodia plays a brief requiem. \"For those who fell here before us.\"");
-                    if (dungeonLevel >= 50) pool.Add("\"The Lost Opus... I can almost hear it echoing from deeper down.\"");
-                    if (dungeonLevel >= 70) pool.Add("\"The Old Gods had their own songs. Terrible, beautiful songs.\"");
+                    for (int n = 0; n < 10; n++) pool.Add(Loc.Get($"companion.idle.melodia.{n}"));
+                    if (afterCombat) pool.Add(Loc.Get("companion.idle.melodia.combat"));
+                    if (dungeonLevel >= 50) pool.Add(Loc.Get("companion.idle.melodia.opus50"));
+                    if (dungeonLevel >= 70) pool.Add(Loc.Get("companion.idle.melodia.gods70"));
                     break;
             }
 

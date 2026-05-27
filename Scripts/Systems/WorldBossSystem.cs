@@ -393,8 +393,14 @@ namespace UsurperRemake.Systems
             terminal.ClearScreen();
             terminal.SetColor(bossDef.ThemeColor);
             terminal.WriteLine($"\n  {Loc.Get("world_boss.engage", bossDef.Name, bossDef.Title)}");
+
+            // Dramatic spawn narration (localized) when the player first engages, mirroring the
+            // Old God intro-dialogue beat.
+            foreach (var line in bossDef.LocSpawn())
+                terminal.WriteLine($"  {line}");
+
             terminal.SetColor("gray");
-            terminal.WriteLine($"  {Loc.Get("world_boss.phase_label", bossData.CurrentPhase, 3)} — {Loc.Get("world_boss.prepare_yourself")}\n");
+            terminal.WriteLine($"  {Loc.Get("world_boss.phase_label", bossData.CurrentPhase, 3)} -- {Loc.Get("world_boss.prepare_yourself")}\n");
             await Task.Delay(1000);
 
             while (state.Round < GameConfig.WorldBossMaxRoundsPerSession && player.HP > 0 && !state.Retreated)
@@ -501,6 +507,11 @@ namespace UsurperRemake.Systems
                             terminal.WriteLine($"\n  *** {Loc.Get("world_boss.has_been_defeated", bossDef.Name)} ***");
                             terminal.SetColor("yellow");
                             terminal.WriteLine($"  {Loc.Get("world_boss.killing_blow")}");
+
+                            // Localized defeat narration for the player who landed the kill.
+                            terminal.SetColor(bossDef.ThemeColor);
+                            foreach (var line in bossDef.LocDefeat())
+                                terminal.WriteLine($"  {line}");
 
                             // Broadcast — only the killer's session sends this
                             // Per-recipient language (built in the killer's session, but each player
@@ -1238,7 +1249,7 @@ namespace UsurperRemake.Systems
             int defendingRounds)
         {
             terminal.SetColor(bossDef.ThemeColor);
-            terminal.WriteLine($"  {Loc.Get("world_boss.boss_uses_ability", bossDef.Name, ability.Name)}");
+            terminal.WriteLine($"  {Loc.Get("world_boss.boss_uses_ability", bossDef.Name, bossDef.LocAbilityName(ability))}");
 
             // Calculate ability damage
             long baseDmg = CalculateBossBasicDamage(bossData, player, rng, defendingRounds);
@@ -1255,7 +1266,7 @@ namespace UsurperRemake.Systems
             {
                 player.HP = Math.Max(0, player.HP - abilityDmg);
                 terminal.SetColor("bright_red");
-                terminal.WriteLine($"  {ability.Description} ({abilityDmg:N0} {Loc.Get("world_boss.damage_suffix")})");
+                terminal.WriteLine($"  {bossDef.LocAbilityDesc(ability)} ({abilityDmg:N0} {Loc.Get("world_boss.damage_suffix")})");
             }
 
             // Apply status effect
@@ -1367,7 +1378,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("");
                 terminal.WriteLine($"  *** {Loc.Get("world_boss.phase_label", newPhase, 3)} — {GetPhaseDescription(newPhase)} ***");
 
-                string[]? dialogue = newPhase == 2 ? bossDef.Phase2Dialogue : bossDef.Phase3Dialogue;
+                string[]? dialogue = newPhase == 2 ? bossDef.LocPhase2() : bossDef.LocPhase3();
                 if (dialogue != null)
                 {
                     terminal.SetColor(bossDef.ThemeColor);

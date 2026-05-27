@@ -1444,6 +1444,11 @@ namespace UsurperRemake.Systems
                         Tenderness = data.PersonalityProfile.Tenderness
                     };
 
+                    // Heal legacy orientation/gender mismatch on load: a generator bug labeled
+                    // same-sex females "Gay" (never "Lesbian"), skewing the world's representation.
+                    // Idempotent -- once corrected and re-saved, the data stays fixed.
+                    npc.Personality.SyncOrientationToGender();
+
                     // Migration: fill in Intelligence/Patience/Mysticism/Trustworthiness/Caution
                     // if they were never set (legacy data where these traits defaulted to 0)
                     if (npc.Personality.Intelligence <= 0 && npc.Personality.Patience <= 0 &&

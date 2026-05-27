@@ -291,7 +291,7 @@ public static class MonsterAbilities
             case AbilityType.CrushingBlow:
                 result.DamageMultiplier = 2.0f;
                 result.InflictStatus = StatusEffect.Stunned;
-                result.StatusDuration = 1;
+                result.StatusDuration = 2; // +1 for ProcessStatusEffects off-by-one = 1 effective round of stun
                 result.StatusChance = 25;
                 result.Message = $"{monster.Name} delivers a CRUSHING BLOW!";
                 result.MessageColor = "bright_red";
@@ -794,7 +794,7 @@ public static class MonsterAbilities
             case AbilityType.Boulder:
                 result.DirectDamage = CalculateBreathDamage(monster, 1.5f);
                 result.InflictStatus = StatusEffect.Stunned;
-                result.StatusDuration = 1;
+                result.StatusDuration = 2; // +1 for ProcessStatusEffects off-by-one = 1 effective round of stun
                 result.StatusChance = 30;
                 result.SkipNormalAttack = true;
                 result.Message = $"{monster.Name} hurls a massive boulder!";
@@ -820,7 +820,7 @@ public static class MonsterAbilities
             case AbilityType.Lightning:
                 result.DirectDamage = CalculateBreathDamage(monster, 1.7f);
                 result.InflictStatus = StatusEffect.Stunned;
-                result.StatusDuration = 1;
+                result.StatusDuration = 2; // +1 for ProcessStatusEffects off-by-one = 1 effective round of stun
                 result.StatusChance = 40;
                 result.SkipNormalAttack = true;
                 result.Message = $"{monster.Name} calls down lightning!";
@@ -830,7 +830,7 @@ public static class MonsterAbilities
             case AbilityType.Earthquake:
                 result.DirectDamage = CalculateBreathDamage(monster, 1.4f);
                 result.InflictStatus = StatusEffect.Stunned;
-                result.StatusDuration = 1;
+                result.StatusDuration = 2; // +1 for ProcessStatusEffects off-by-one = 1 effective round of stun
                 result.StatusChance = 50;
                 result.SkipNormalAttack = true;
                 result.Message = $"{monster.Name} causes the earth to shake violently!";
@@ -957,7 +957,7 @@ public static class MonsterAbilities
             case AbilityType.Engulf:
                 result.DamageMultiplier = 1.5f;
                 result.InflictStatus = StatusEffect.Stunned;
-                result.StatusDuration = 1;
+                result.StatusDuration = 2; // +1 for ProcessStatusEffects off-by-one = 1 effective round of stun
                 result.StatusChance = 45;
                 result.Message = $"{monster.Name} engulfs {you} in its mass!";
                 result.MessageColor = "bright_green";
@@ -1202,7 +1202,7 @@ public static class MonsterAbilities
                 result.ExtraAttacks = _rnd.Next(1, 3);
                 result.DamageMultiplier = 0.9f;
                 result.InflictStatus = StatusEffect.Stunned;
-                result.StatusDuration = 1;
+                result.StatusDuration = 2; // +1 for ProcessStatusEffects off-by-one = 1 effective round of stun
                 result.StatusChance = 25;
                 result.Message = $"{monster.Name} lashes out with writhing tentacles!";
                 result.MessageColor = "bright_blue";
@@ -1225,7 +1225,7 @@ public static class MonsterAbilities
             case AbilityType.Whirlpool:
                 result.DirectDamage = CalculateBreathDamage(monster, 1.5f);
                 result.InflictStatus = StatusEffect.Stunned;
-                result.StatusDuration = 1;
+                result.StatusDuration = 2; // +1 for ProcessStatusEffects off-by-one = 1 effective round of stun
                 result.StatusChance = 40;
                 result.SkipNormalAttack = true;
                 result.Message = $"{monster.Name} creates a devastating whirlpool!";

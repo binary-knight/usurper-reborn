@@ -4754,6 +4754,13 @@ public abstract class BaseLocation
                         // Counters were always 0 because nothing ever incremented them.
                         currentPlayer.Statistics?.RecordConversation();
                         currentPlayer.Statistics?.RecordNPCInteraction();
+                        // The full conversation IS the complete "talk to this NPC" session, and it
+                        // has its own [0] Leave. Returning to this per-NPC sub-menu afterward forced
+                        // the player to press 0 a second (or, after a press-enter prompt, third) time
+                        // to actually leave -- confusing in general and worse for screen-reader users,
+                        // who can't tell the nested "0" levels apart. Ending the conversation now drops
+                        // straight back out, so leaving is a single predictable 0.
+                        stayInConversation = false;
                         break;
                     case "6":
                         if (npc.Level > 0 && npc.IsAlive && !npc.IsStoryNPC && !npc.King)
@@ -6110,7 +6117,7 @@ public abstract class BaseLocation
             }
             if (currentPlayer.HasActiveHerbBuff)
             {
-                string herbName = ((HerbType)currentPlayer.HerbBuffType).ToString();
+                string herbName = HerbData.LocName((HerbType)currentPlayer.HerbBuffType);
                 terminal.SetColor("green");
                 terminal.WriteLine($"  - {herbName} ({currentPlayer.HerbBuffCombats} combats)");
             }
@@ -6247,8 +6254,7 @@ public abstract class BaseLocation
                 var spouse = romanceTracker.PrimarySpouse;
                 if (spouse != null)
                 {
-                    var npc = UsurperRemake.Systems.NPCSpawnSystem.Instance?.ActiveNPCs?
-                        .FirstOrDefault(n => n.ID == spouse.NPCId);
+                    var npc = UsurperRemake.Systems.NPCSpawnSystem.Instance?.ResolvePartnerNpc(spouse.NPCId, spouse.NPCName);
                     spouseName = npc?.Name ?? spouse.NPCName;
                 }
             }
@@ -9432,7 +9438,10 @@ public abstract class BaseLocation
     {
         var item = target.GetEquipment(slot);
         terminal.SetColor("gray");
-        terminal.Write($"  {label,-12}: ");
+        // Slot name is derived from the slot (localized) rather than the caller-passed English
+        // `label`, so every equip-management surface (Home/Inn/TeamCorner/Dungeon) shows translated
+        // slot names. The `label` param is kept for call-site compatibility but no longer displayed.
+        terminal.Write($"  {GameConfig.GetLocalizedSlotName(slot),-12}: ");
         if (item != null)
         {
             if (!item.IsIdentified)
@@ -9472,23 +9481,17 @@ public abstract class BaseLocation
     /// </summary>
     protected async Task<EquipmentSlot?> PromptForEquipmentSlot(Character target)
     {
-        var slots = new (EquipmentSlot slot, string label)[]
+        // Labels resolved via GetLocalizedSlotName so the slot picker reads in the player's language.
+        var slotOrder = new[]
         {
-            (EquipmentSlot.MainHand, "Main Hand"),
-            (EquipmentSlot.OffHand, "Off Hand"),
-            (EquipmentSlot.Head, "Head"),
-            (EquipmentSlot.Body, "Body"),
-            (EquipmentSlot.Arms, "Arms"),
-            (EquipmentSlot.Hands, "Hands"),
-            (EquipmentSlot.Legs, "Legs"),
-            (EquipmentSlot.Feet, "Feet"),
-            (EquipmentSlot.Waist, "Waist"),
-            (EquipmentSlot.Face, "Face"),
-            (EquipmentSlot.Cloak, "Cloak"),
-            (EquipmentSlot.Neck, "Neck"),
-            (EquipmentSlot.LFinger, "Left Ring"),
-            (EquipmentSlot.RFinger, "Right Ring"),
+            EquipmentSlot.MainHand, EquipmentSlot.OffHand, EquipmentSlot.Head, EquipmentSlot.Body,
+            EquipmentSlot.Arms, EquipmentSlot.Hands, EquipmentSlot.Legs, EquipmentSlot.Feet,
+            EquipmentSlot.Waist, EquipmentSlot.Face, EquipmentSlot.Cloak, EquipmentSlot.Neck,
+            EquipmentSlot.LFinger, EquipmentSlot.RFinger,
         };
+        var slots = slotOrder
+            .Select(s => (slot: s, label: GameConfig.GetLocalizedSlotName(s)))
+            .ToArray();
 
         terminal.SetColor("bright_yellow");
         terminal.WriteLine($"  {Loc.Get("base.choose_slot")}");

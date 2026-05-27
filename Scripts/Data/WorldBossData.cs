@@ -46,6 +46,47 @@ namespace UsurperRemake.Data
         public string[] Phase2Dialogue { get; set; } = Array.Empty<string>();
         public string[] Phase3Dialogue { get; set; } = Array.Empty<string>();
         public string[] DefeatDialogue { get; set; } = Array.Empty<string>();
+
+        // Localization. The English arrays/strings above are the source/fallback; the Loc*
+        // accessors below resolve translated combat dialogue and ability flavor at display time
+        // (keyed worldboss.{Id}.*) so world boss fights read in the player's language. The boss
+        // Name/Title stay English (boss names are a game-wide untranslated layer, like monster
+        // names). Ability Name/Description are descriptive flavor (not proper nouns) and DO
+        // translate; the player never types them, so there is no input-matching to break.
+        private string[] LocArray(string section, string[] fallback)
+        {
+            if (fallback == null || fallback.Length == 0) return fallback ?? Array.Empty<string>();
+            var r = new string[fallback.Length];
+            for (int i = 0; i < r.Length; i++)
+            {
+                string key = $"worldboss.{Id}.{section}.{i}";
+                var v = UsurperRemake.Systems.Loc.Get(key);
+                r[i] = v == key ? fallback[i] : v;
+            }
+            return r;
+        }
+        public string[] LocSpawn() => LocArray("spawn", SpawnDialogue);
+        public string[] LocPhase2() => LocArray("phase2", Phase2Dialogue);
+        public string[] LocPhase3() => LocArray("phase3", Phase3Dialogue);
+        public string[] LocDefeat() => LocArray("defeat", DefeatDialogue);
+
+        private (int phase, int idx) FindAbility(WorldBossAbility ab)
+        {
+            int i = Phase1Abilities.IndexOf(ab); if (i >= 0) return (1, i);
+            i = Phase2Abilities.IndexOf(ab); if (i >= 0) return (2, i);
+            i = Phase3Abilities.IndexOf(ab); if (i >= 0) return (3, i);
+            return (0, -1);
+        }
+        private string LocAbilityField(WorldBossAbility ab, string field, string fallback)
+        {
+            var (phase, idx) = FindAbility(ab);
+            if (phase == 0) return fallback;
+            string key = $"worldboss.{Id}.ability.p{phase}.{idx}.{field}";
+            var v = UsurperRemake.Systems.Loc.Get(key);
+            return v == key ? fallback : v;
+        }
+        public string LocAbilityName(WorldBossAbility ab) => LocAbilityField(ab, "name", ab.Name);
+        public string LocAbilityDesc(WorldBossAbility ab) => LocAbilityField(ab, "desc", ab.Description);
     }
 
     /// <summary>

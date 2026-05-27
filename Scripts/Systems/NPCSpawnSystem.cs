@@ -65,6 +65,48 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
+        /// Resolve a romantic-partner NPC (spouse/lover/ex) from a stored RomanceTracker record.
+        /// Matches the live NPC's Character.ID against the record's NPCId first; if that fails,
+        /// falls back to a case-insensitive display-name match (preferring a living NPC).
+        ///
+        /// The name fallback fixes spouses/lovers that became permanently unreachable because
+        /// their stored NPCId no longer equals any live NPC's Character.ID:
+        ///  - Love Corner marriages whose target wasn't in ActiveNPCs at the moment of the
+        ///    ceremony stored the raw display NAME into NPCId (LoveCornerLocation fallback).
+        ///  - Legacy saves whose CharacterID was empty restored the NPC as "npc_&lt;name&gt;",
+        ///    diverging from the random immigrant/child id the marriage recorded.
+        /// Both stored values are tried as name candidates (NPCName, then NPCId itself) so a
+        /// raw-name id still resolves. ID match always wins, so this never overrides a correct
+        /// match; it only rescues a record that would otherwise drop the partner entirely.
+        /// </summary>
+        public NPC? ResolvePartnerNpc(string npcId, string npcName)
+            => ResolvePartnerNpc(ActiveNPCs, npcId, npcName);
+
+        public static NPC? ResolvePartnerNpc(IEnumerable<NPC>? pool, string npcId, string npcName)
+        {
+            if (pool == null) return null;
+            var list = pool as IList<NPC> ?? pool.ToList();
+
+            if (!string.IsNullOrEmpty(npcId))
+            {
+                var byId = list.FirstOrDefault(n => n.ID == npcId);
+                if (byId != null) return byId;
+            }
+
+            foreach (var candidate in new[] { npcName, npcId })
+            {
+                if (string.IsNullOrWhiteSpace(candidate)) continue;
+                bool Matches(NPC n) =>
+                    string.Equals(n.Name2, candidate, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(n.Name1, candidate, StringComparison.OrdinalIgnoreCase);
+                var byName = list.FirstOrDefault(n => !n.IsDead && Matches(n))
+                          ?? list.FirstOrDefault(Matches);
+                if (byName != null) return byName;
+            }
+            return null;
+        }
+
+        /// <summary>
         /// Initialize all classic Usurper NPCs and spawn them into the world
         /// </summary>
         public async Task InitializeClassicNPCs()
@@ -516,6 +558,7 @@ namespace UsurperRemake.Systems
             // Apply romance traits from template
             profile.Gender = template.Gender;
             profile.Orientation = template.Orientation;
+            profile.SyncOrientationToGender(); // reconcile Gay/Lesbian with the just-applied gender
             profile.IntimateStyle = template.IntimateStyle;
             profile.RelationshipPref = template.RelationshipPref;
 
@@ -772,14 +815,23 @@ namespace UsurperRemake.Systems
         /// among living NPCs so the romance system always has viable candidates
         /// regardless of how the initial orientation roll fell.
         /// </summary>
+        // Diversity floor target: scales with the living population so representation is
+        // maintained as the world grows, with an absolute minimum for small/early worlds.
+        // ~4% per category (gay-male / lesbian / bisexual) of living NPCs, never below 3.
+        private const float OrientationFloorPercent = 0.04f;
+        private const int OrientationFloorAbsoluteMin = 3;
+        private static int DiversityTarget(int livingCount) =>
+            Math.Max(OrientationFloorAbsoluteMin, (int)Math.Ceiling(livingCount * OrientationFloorPercent));
+
         private void EnsureOrientationDiversity()
         {
-            const int minGayMale = 2;
-            const int minLesbianFemale = 2;
-            const int minBisexual = 2;
-
             // Only count living NPCs. Dead NPCs shouldn't satisfy diversity requirements.
             var livingNPCs = spawnedNPCs.Where(n => !n.IsDead).ToList();
+
+            int target = DiversityTarget(livingNPCs.Count);
+            int minGayMale = target;
+            int minLesbianFemale = target;
+            int minBisexual = target;
 
             int gayMaleCount = livingNPCs.Count(n => n.Brain?.Personality?.Orientation == SexualOrientation.Gay);
             int lesbianCount = livingNPCs.Count(n => n.Brain?.Personality?.Orientation == SexualOrientation.Lesbian);
@@ -840,12 +892,13 @@ namespace UsurperRemake.Systems
             // produced a non-straight orientation, leave it.
             if (npc.Brain.Personality.Orientation != SexualOrientation.Straight) return;
 
-            const int minGayMale = 2;
-            const int minLesbianFemale = 2;
-            const int minBisexual = 2;
-            const int nudgeChance = 60; // percent chance to fill a gap when one exists
+            const int nudgeChance = 80; // percent chance to fill a gap when one exists
 
             var living = spawnedNPCs.Where(n => !n.IsDead).ToList();
+            int target = DiversityTarget(living.Count);
+            int minGayMale = target;
+            int minLesbianFemale = target;
+            int minBisexual = target;
             int gayMaleCount = living.Count(n => n.Brain?.Personality?.Orientation == SexualOrientation.Gay
                                               && n.Brain.Personality.Gender == GenderIdentity.Male);
             int lesbianCount = living.Count(n => n.Brain?.Personality?.Orientation == SexualOrientation.Lesbian
@@ -1315,6 +1368,10 @@ namespace UsurperRemake.Systems
                 // Create personality profile
                 var personality = PersonalityProfile.GenerateForArchetype("commoner");
                 personality.Gender = sex == CharacterSex.Female ? GenderIdentity.Female : GenderIdentity.Male;
+                // The archetype roll happened with the default (Male) gender, so a female who
+                // rolled the same-sex band is currently mislabeled Gay -- fix it to Lesbian before
+                // the nudge (which only acts on straights).
+                personality.SyncOrientationToGender();
                 npc.Personality = personality;
                 npc.Brain = new NPCBrain(npc, personality);
 

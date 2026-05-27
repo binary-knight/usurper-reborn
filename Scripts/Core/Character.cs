@@ -1491,6 +1491,34 @@ public class Character
     // builds heal at most ~60% of damage from equipment alone; the total
     // per-attack cap in ApplyPostHitEnchantments enforces the across-sources limit.
     public int GetEquipmentLifeSteal() => Math.Min(GameConfig.MaxEquipmentLifeStealPercent, SumEquipmentProperty(e => e.LifeSteal));
+
+    // v0.61.7 (player report: Lifedrinker no longer procced despite a high gear-wide enchant total).
+    // The Lifedrinker (LifeSteal) and Siphon (ManaSteal) enchants are applicable to EVERY
+    // equipment slot -- weapon, shield, all armor, and accessories -- and were always designed
+    // to stack across gear. The v0.60.10 cross-hand-leak pass lumped them in with the
+    // intrinsically-weapon-bound elemental enchants and made combat read only the SWINGING
+    // weapon's value, which silently zeroed every Lifedrinker/Siphon on armor/rings/shield.
+    // These helpers restore the gear-wide sum while keeping the one legitimate per-hand rule:
+    // when dual-wielding, the OTHER hand's weapon is excluded so its leech procs on its own
+    // swing (not this one). A shield or empty off-hand is passive gear and always counts.
+    private static EquipmentSlot LeechOpposingWeaponSlot(EquipmentSlot weaponSlot) =>
+        weaponSlot == EquipmentSlot.OffHand ? EquipmentSlot.MainHand : EquipmentSlot.OffHand;
+
+    public int GetEffectiveLifeStealPercent(EquipmentSlot weaponSlot)
+    {
+        int total = SumEquipmentProperty(e => e.LifeSteal);
+        if (IsDualWielding)
+            total -= GetEquipment(LeechOpposingWeaponSlot(weaponSlot))?.LifeSteal ?? 0;
+        return Math.Clamp(total, 0, GameConfig.MaxEquipmentLifeStealPercent);
+    }
+
+    public int GetEffectiveManaStealPercent(EquipmentSlot weaponSlot)
+    {
+        int total = SumEquipmentProperty(e => e.ManaSteal);
+        if (IsDualWielding)
+            total -= GetEquipment(LeechOpposingWeaponSlot(weaponSlot))?.ManaSteal ?? 0;
+        return Math.Max(0, total);
+    }
     public int GetEquipmentMagicResistance() => SumEquipmentProperty(e => e.MagicResistance);
     public int GetEquipmentManaSteal() => SumEquipmentProperty(e => e.ManaSteal);
     public int GetEquipmentArmorPiercing() => SumEquipmentProperty(e => e.ArmorPiercing);
@@ -2656,6 +2684,17 @@ public enum HerbType
 
 public static class HerbData
 {
+    // Localization key stem per herb type (e.g. "healing_herb" -> herb.healing_herb.name/.desc).
+    private static string GetLocKey(HerbType type) => type switch
+    {
+        HerbType.HealingHerb => "healing_herb",
+        HerbType.IronbarkRoot => "ironbark_root",
+        HerbType.FirebloomPetal => "firebloom_petal",
+        HerbType.Swiftthistle => "swiftthistle",
+        HerbType.StarbloomEssence => "starbloom_essence",
+        _ => "unknown"
+    };
+
     public static string GetName(HerbType type) => type switch
     {
         HerbType.HealingHerb => "Healing Herb",
@@ -2666,6 +2705,10 @@ public static class HerbData
         _ => "Unknown"
     };
 
+    /// <summary>Localized herb name. Falls back to the English GetName value via the loc system.</summary>
+    public static string LocName(HerbType type) =>
+        UsurperRemake.Systems.Loc.Get($"herb.{GetLocKey(type)}.name");
+
     public static string GetDescription(HerbType type) => type switch
     {
         HerbType.HealingHerb => $"Heals {(int)(GameConfig.HerbHealPercent * 100)}% of max HP",
@@ -2675,6 +2718,22 @@ public static class HerbData
         HerbType.StarbloomEssence => $"Restores {(int)(GameConfig.HerbManaRestorePercent * 100)}% mana, +{(int)(GameConfig.HerbSpellBonus * 100)}% spell damage for {GameConfig.HerbBuffDuration} combats",
         _ => ""
     };
+
+    /// <summary>Localized herb effect description. Numeric bonuses are passed as format args so the
+    /// surrounding prose can be reordered per language. Falls back to English via the loc system.</summary>
+    public static string LocDescription(HerbType type)
+    {
+        string key = $"herb.{GetLocKey(type)}.desc";
+        return type switch
+        {
+            HerbType.HealingHerb => UsurperRemake.Systems.Loc.Get(key, (int)(GameConfig.HerbHealPercent * 100)),
+            HerbType.IronbarkRoot => UsurperRemake.Systems.Loc.Get(key, (int)(GameConfig.HerbDefenseBonus * 100), GameConfig.HerbBuffDuration),
+            HerbType.FirebloomPetal => UsurperRemake.Systems.Loc.Get(key, (int)(GameConfig.HerbDamageBonus * 100), GameConfig.HerbBuffDuration),
+            HerbType.Swiftthistle => UsurperRemake.Systems.Loc.Get(key, GameConfig.HerbExtraAttackCount, GameConfig.HerbSwiftDuration),
+            HerbType.StarbloomEssence => UsurperRemake.Systems.Loc.Get(key, (int)(GameConfig.HerbManaRestorePercent * 100), (int)(GameConfig.HerbSpellBonus * 100), GameConfig.HerbBuffDuration),
+            _ => ""
+        };
+    }
 
     public static string GetColor(HerbType type) => type switch
     {

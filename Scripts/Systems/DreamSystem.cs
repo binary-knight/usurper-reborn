@@ -1208,19 +1208,14 @@ namespace UsurperRemake.Systems
             var pick = candidates[rng.Next(candidates.Count)];
             if (rng.NextDouble() > pick.triggerChance) return null;
 
-            // Replace {VICTIM} placeholder with a real name from the kill log
+            // Replace {VICTIM} placeholder with a real name from the kill log. WithVictimSubstituted
+            // does the replacement on the LOCALIZED title/content/hint and stores it as overrides, so
+            // the display accessors return the substituted, localized text.
             var dream = pick.dream;
             if (player.PermakillLog.Count > 0)
             {
                 string victim = player.PermakillLog[rng.Next(player.PermakillLog.Count)];
-                dream = new NarrativeDreamData
-                {
-                    Id = dream.Id,
-                    Title = dream.Title,
-                    Content = dream.Content.Select(line => line.Replace("{VICTIM}", victim)).ToArray(),
-                    AwakeningGain = dream.AwakeningGain,
-                    PhilosophicalHint = dream.PhilosophicalHint.Replace("{VICTIM}", victim),
-                };
+                dream = dream.WithVictimSubstituted(victim);
             }
 
             return dream;
@@ -1393,6 +1388,52 @@ namespace UsurperRemake.Systems
         public bool RequiresAllSeals { get; set; } = false;
         public bool RequiresAnyCompanionQuestDone { get; set; } = false;
         public string PhilosophicalHint { get; set; } = "";
+
+        // Localization. The English fields above are the source/fallback; the Loc* accessors below
+        // resolve translated dream text at display time (keyed dream.{Id}.title|content.{i}|hint) so
+        // rest dreams read in the player's language. Modded dreams (custom Id, no loc key) fall back
+        // to their own fields. Nightmares carry a {VICTIM} runtime token: GetNightmare builds a
+        // localized+substituted clone via WithVictimSubstituted, stored in the _resolved* overrides
+        // below so the accessors return the already-substituted localized text instead of re-looking
+        // up the key (which would lose the substitution). _resolved* are private -> not serialized.
+        private string[]? _resolvedContent;
+        private string? _resolvedTitle;
+        private string? _resolvedHint;
+        private string[] LocArrDream(string section, string[] fb)
+        {
+            if (fb == null || fb.Length == 0) return fb ?? Array.Empty<string>();
+            var r = new string[fb.Length];
+            for (int i = 0; i < r.Length; i++)
+            {
+                string key = $"dream.{Id}.{section}.{i}";
+                var v = Loc.Get(key);
+                r[i] = v == key ? fb[i] : v;
+            }
+            return r;
+        }
+        private string LocScalarDream(string section, string fb)
+        {
+            if (string.IsNullOrEmpty(Id)) return fb;
+            string key = $"dream.{Id}.{section}";
+            var v = Loc.Get(key);
+            return v == key ? fb : v;
+        }
+        public string LocTitle() => _resolvedTitle ?? LocScalarDream("title", Title);
+        public string[] LocContentLines() => _resolvedContent ?? LocArrDream("content", Content);
+        public string LocHintText() => _resolvedHint ?? (string.IsNullOrEmpty(PhilosophicalHint) ? PhilosophicalHint : LocScalarDream("hint", PhilosophicalHint));
+
+        /// <summary>
+        /// Build a clone with the {VICTIM} token replaced inside the localized title/content/hint
+        /// (used by the Blood Price nightmare path so the substitution survives localization).
+        /// </summary>
+        public NarrativeDreamData WithVictimSubstituted(string victim)
+        {
+            var clone = (NarrativeDreamData)MemberwiseClone();
+            clone._resolvedTitle = LocTitle().Replace("{VICTIM}", victim);
+            clone._resolvedContent = LocContentLines().Select(l => l.Replace("{VICTIM}", victim)).ToArray();
+            clone._resolvedHint = LocHintText().Replace("{VICTIM}", victim);
+            return clone;
+        }
     }
 
     public class DungeonVision
@@ -1405,6 +1446,27 @@ namespace UsurperRemake.Systems
         public string[] Content { get; set; } = Array.Empty<string>();
         public int AwakeningGain { get; set; } = 0;
         public WaveFragment? WaveFragment { get; set; }
+
+        // Localization: English fields are source/fallback; accessors resolve vision.{Id}.desc /
+        // vision.{Id}.content.{i} at display time.
+        public string LocDescription()
+        {
+            if (string.IsNullOrEmpty(Id)) return Description;
+            var v = Loc.Get($"vision.{Id}.desc");
+            return v == $"vision.{Id}.desc" ? Description : v;
+        }
+        public string[] LocContentLines()
+        {
+            if (Content == null || Content.Length == 0) return Content ?? Array.Empty<string>();
+            var r = new string[Content.Length];
+            for (int i = 0; i < r.Length; i++)
+            {
+                string key = $"vision.{Id}.content.{i}";
+                var v = Loc.Get(key);
+                r[i] = v == key ? Content[i] : v;
+            }
+            return r;
+        }
     }
 
     public class DreamSaveData

@@ -4720,11 +4720,11 @@ public class DungeonLocation : BaseLocation
     {
         terminal.WriteLine("");
         terminal.SetColor("dark_magenta");
-        terminal.WriteLine($"=== {vision.Description} ===");
+        terminal.WriteLine($"=== {vision.LocDescription()} ===");
         terminal.WriteLine("");
 
         terminal.SetColor("magenta");
-        foreach (var line in vision.Content)
+        foreach (var line in vision.LocContentLines())
         {
             terminal.WriteLine($"  {line}");
             await Task.Delay(1200);
@@ -6569,11 +6569,11 @@ public class DungeonLocation : BaseLocation
             await Task.Delay(1500);
 
             terminal.SetColor("bright_magenta");
-            terminal.WriteLine($"=== {dream.Title} ===");
+            terminal.WriteLine($"=== {dream.LocTitle()} ===");
             terminal.WriteLine("");
 
             terminal.SetColor("magenta");
-            foreach (var line in dream.Content)
+            foreach (var line in dream.LocContentLines())
             {
                 terminal.WriteLine($"  {line}");
                 await Task.Delay(1200);
@@ -6583,7 +6583,7 @@ public class DungeonLocation : BaseLocation
             {
                 terminal.WriteLine("");
                 terminal.SetColor("dark_cyan");
-                terminal.WriteLine($"  ({dream.PhilosophicalHint})");
+                terminal.WriteLine($"  ({dream.LocHintText()})");
             }
 
             terminal.WriteLine("");
@@ -9849,10 +9849,11 @@ public class DungeonLocation : BaseLocation
             var spouse = romance.PrimarySpouse;
             if (spouse != null)
             {
-                spouseNpc = UsurperRemake.Systems.NPCSpawnSystem.Instance?.ActiveNPCs?
-                    .FirstOrDefault(n => n.ID == spouse.NPCId && n.IsAlive && !n.IsDead && n.DaysInPrison == 0 && !teammates.Contains(n) && !npcTeammates.Contains(n));
-                if (spouseNpc != null)
+                var resolvedSpouse = UsurperRemake.Systems.NPCSpawnSystem.Instance?.ResolvePartnerNpc(spouse.NPCId, spouse.NPCName);
+                if (resolvedSpouse != null && resolvedSpouse.IsAlive && !resolvedSpouse.IsDead && resolvedSpouse.DaysInPrison == 0
+                    && !teammates.Contains(resolvedSpouse) && !npcTeammates.Contains(resolvedSpouse))
                 {
+                    spouseNpc = resolvedSpouse;
                     npcTeammates.Insert(0, spouseNpc); // Spouse first in list
                 }
             }
@@ -9864,9 +9865,9 @@ public class DungeonLocation : BaseLocation
         {
             foreach (var lover in romance.CurrentLovers)
             {
-                var loverNpc = UsurperRemake.Systems.NPCSpawnSystem.Instance?.ActiveNPCs?
-                    .FirstOrDefault(n => n.ID == lover.NPCId && n.IsAlive && !n.IsDead && n.DaysInPrison == 0 && !teammates.Contains(n) && !npcTeammates.Contains(n));
-                if (loverNpc != null)
+                var loverNpc = UsurperRemake.Systems.NPCSpawnSystem.Instance?.ResolvePartnerNpc(lover.NPCId, lover.NPCName);
+                if (loverNpc != null && loverNpc.IsAlive && !loverNpc.IsDead && loverNpc.DaysInPrison == 0
+                    && !teammates.Contains(loverNpc) && !npcTeammates.Contains(loverNpc))
                 {
                     npcTeammates.Add(loverNpc);
                 }
@@ -10702,7 +10703,7 @@ public class DungeonLocation : BaseLocation
 
             // Slot 0 — Player
             terminal.SetColor("bright_white");
-            string youLabel = $"  [0] You ({player.ClassName} Lv.{player.Level})";
+            string youLabel = "  " + Loc.Get("dungeon.xp_label_you", player.ClassName, player.Level);
             terminal.Write(youLabel.PadRight(40));
             terminal.SetColor("bright_green");
             terminal.WriteLine($": {player.TeamXPPercent[0],3}%");
@@ -10717,8 +10718,8 @@ public class DungeonLocation : BaseLocation
                 {
                     var tm = xpTeammates[i];
                     string tmLabel = tm.IsCompanion
-                        ? $"  [{slotIndex}] {tm.DisplayName} (Companion Lv.{tm.Level})"
-                        : $"  [{slotIndex}] {tm.DisplayName} (Lv.{tm.Level} {tm.ClassName})";
+                        ? "  " + Loc.Get("dungeon.xp_label_companion", slotIndex, tm.DisplayName, tm.Level)
+                        : "  " + Loc.Get("dungeon.xp_label_npc", slotIndex, tm.DisplayName, tm.Level, tm.ClassName);
                     terminal.SetColor("cyan");
                     terminal.Write(tmLabel.PadRight(40));
                     terminal.SetColor("bright_green");
@@ -10727,7 +10728,7 @@ public class DungeonLocation : BaseLocation
                 else
                 {
                     terminal.SetColor("gray");
-                    string emptyLabel = $"  [{slotIndex}] (empty)";
+                    string emptyLabel = "  " + Loc.Get("dungeon.xp_label_empty", slotIndex);
                     terminal.Write(emptyLabel.PadRight(40));
                     terminal.WriteLine($": {pct,3}%");
                 }
@@ -10740,7 +10741,7 @@ public class DungeonLocation : BaseLocation
             terminal.Write("".PadRight(40));
             string totalColor = total > 100 ? "red" : total == 100 ? "bright_green" : "yellow";
             terminal.SetColor(totalColor);
-            terminal.WriteLine($"  Total: {total}%");
+            terminal.WriteLine($"  {Loc.Get("dungeon.xp_total", total)}");
 
             if (total < 100)
             {
@@ -10751,7 +10752,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine("");
             terminal.SetColor("gray");
             string autoRedistStatus = currentPlayer.AutoRedistributeXP ? Loc.Get("ui.on") : Loc.Get("ui.off");
-            terminal.WriteLine($"  [R] Auto-redistribute on death: {autoRedistStatus}");
+            terminal.WriteLine($"  {Loc.Get("dungeon.xp_auto_redist", autoRedistStatus)}");
             terminal.WriteLine("");
             terminal.SetColor("white");
             terminal.WriteLine(Loc.Get("dungeon.xp_adjust_prompt"));
@@ -10768,7 +10769,7 @@ public class DungeonLocation : BaseLocation
                 currentPlayer.AutoRedistributeXP = !currentPlayer.AutoRedistributeXP;
                 string newStatus = currentPlayer.AutoRedistributeXP ? Loc.Get("ui.on") : Loc.Get("ui.off");
                 terminal.SetColor("green");
-                terminal.WriteLine($"  Auto-redistribute XP on teammate death: {newStatus}");
+                terminal.WriteLine($"  {Loc.Get("dungeon.xp_auto_redist_toggled", newStatus)}");
                 await GameEngine.Instance.SaveCurrentGame();
                 await Task.Delay(1000);
             }
@@ -10801,7 +10802,7 @@ public class DungeonLocation : BaseLocation
                     continue;
                 }
 
-                string slotName = slot == 0 ? "You" : (slot <= xpTeammates.Count ? xpTeammates[slot - 1].DisplayName : "(empty)");
+                string slotName = slot == 0 ? Loc.Get("dungeon.xp_you") : (slot <= xpTeammates.Count ? xpTeammates[slot - 1].DisplayName : Loc.Get("dungeon.xp_empty_name"));
 
                 // Calculate how much room is left (excluding this slot's current value)
                 int currentSlotPct = player.TeamXPPercent[slot];
@@ -12730,59 +12731,22 @@ public class DungeonLocation : BaseLocation
         }
         if (suggestDir == null) return; // all exits cleared/explored, nothing to suggest
 
-        string dir = suggestDir.Value.ToString().ToLower();
+        string dir = Loc.Get($"companion.dir.{suggestDir.Value.ToString().ToLower()}");
 
         // Pick a companion to speak
         var speaker = teammates[_companionCommentRng.Next(teammates.Count)];
-        string name = speaker.DisplayName ?? speaker.Name2 ?? "Companion";
+        string name = speaker.DisplayName ?? speaker.Name2 ?? Loc.Get("companion.generic_name");
 
-        // Personality-based lines
-        string[] lines;
-        var companionId = speaker.CompanionId;
-        if (companionId == CompanionId.Vex)
+        // Personality-based lines (localized; {0} = localized direction)
+        var (navPrefix, navCount) = speaker.CompanionId switch
         {
-            lines = new[] {
-                $"Obviously we should go {dir} from here.",
-                $"So are we going {dir} or are we just standing around?",
-                $"I vote {dir}. Not that anyone asked.",
-                $"Last one to go {dir} is buying drinks at the Inn.",
-            };
-        }
-        else if (companionId == CompanionId.Lyris)
-        {
-            lines = new[] {
-                $"I sense something to the {dir}...",
-                $"The path {dir} calls to us.",
-                $"To the {dir}, I think. The stars agree.",
-            };
-        }
-        else if (companionId == CompanionId.Aldric)
-        {
-            lines = new[] {
-                $"We should push {dir}. Stay sharp.",
-                $"Form up. We move {dir}.",
-                $"There's more to the {dir}. Let's keep moving.",
-            };
-        }
-        else if (companionId == CompanionId.Mira)
-        {
-            lines = new[] {
-                $"There may be more who need help to the {dir}.",
-                $"I think we should try going {dir}.",
-                $"The {dir} passage... I have a feeling about it.",
-            };
-        }
-        else
-        {
-            // Generic NPC teammates
-            lines = new[] {
-                $"Let's try going {dir}.",
-                $"I say we head {dir} from here.",
-                $"Looks like there's more to the {dir}.",
-            };
-        }
-
-        string line = lines[_companionCommentRng.Next(lines.Length)];
+            CompanionId.Vex => ("companion.nav.vex", 4),
+            CompanionId.Lyris => ("companion.nav.lyris", 3),
+            CompanionId.Aldric => ("companion.nav.aldric", 3),
+            CompanionId.Mira => ("companion.nav.mira", 3),
+            _ => ("companion.nav.generic", 3),
+        };
+        string line = Loc.Get($"{navPrefix}.{_companionCommentRng.Next(navCount)}", dir);
         terminal.SetColor("cyan");
         terminal.WriteLine($"{name}: \"{line}\"");
         await Task.Delay(800);
@@ -12798,53 +12762,17 @@ public class DungeonLocation : BaseLocation
         if (_companionCommentRng.Next(100) >= 30) return; // 30% chance
 
         var speaker = teammates[_companionCommentRng.Next(teammates.Count)];
-        string name = speaker.DisplayName ?? speaker.Name2 ?? "Companion";
+        string name = speaker.DisplayName ?? speaker.Name2 ?? Loc.Get("companion.generic_name");
 
-        string[] lines;
-        var companionId = speaker.CompanionId;
-        if (companionId == CompanionId.Vex)
+        var (btPrefix, btCount) = speaker.CompanionId switch
         {
-            lines = new[] {
-                "Are you lost or something? There's nothing left this way.",
-                "We already cleared this area. Did you forget already?",
-                "I know I'm dying, but I'd rather not waste what time I have backtracking.",
-                "Oh good, my favorite activity. Walking through empty rooms.",
-            };
-        }
-        else if (companionId == CompanionId.Lyris)
-        {
-            lines = new[] {
-                "We've been this way before. The path ahead lies elsewhere.",
-                "This area is quiet now. We should seek what remains unseen.",
-                "The echoes here are fading. Our purpose lies in another direction.",
-            };
-        }
-        else if (companionId == CompanionId.Aldric)
-        {
-            lines = new[] {
-                "We've secured this area already. Nothing left to fight here.",
-                "This ground is cleared. We should press forward, not backward.",
-                "I cleared this corridor myself. Trust me, it's empty.",
-            };
-        }
-        else if (companionId == CompanionId.Mira)
-        {
-            lines = new[] {
-                "I don't think there's anything left for us here...",
-                "This area feels... peaceful now. We should look elsewhere.",
-                "We've already helped everyone we could here.",
-            };
-        }
-        else
-        {
-            lines = new[] {
-                "We've already been through here. It's all cleared.",
-                "Nothing left this way. Maybe we should turn around.",
-                "This area's been cleaned out already.",
-            };
-        }
-
-        string line = lines[_companionCommentRng.Next(lines.Length)];
+            CompanionId.Vex => ("companion.backtrack.vex", 4),
+            CompanionId.Lyris => ("companion.backtrack.lyris", 3),
+            CompanionId.Aldric => ("companion.backtrack.aldric", 3),
+            CompanionId.Mira => ("companion.backtrack.mira", 3),
+            _ => ("companion.backtrack.generic", 3),
+        };
+        string line = Loc.Get($"{btPrefix}.{_companionCommentRng.Next(btCount)}");
         terminal.SetColor("cyan");
         terminal.WriteLine($"{name}: \"{line}\"");
         await Task.Delay(1000);

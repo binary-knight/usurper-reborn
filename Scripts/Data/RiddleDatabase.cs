@@ -73,7 +73,7 @@ namespace UsurperRemake.Data
             terminal.WriteLine("");
 
             // Display the riddle
-            foreach (var line in riddle.Text)
+            foreach (var line in riddle.LocText())
             {
                 terminal.WriteLine($"  \"{line}\"", "bright_cyan");
                 await Task.Delay(100);
@@ -123,7 +123,7 @@ namespace UsurperRemake.Data
                         if (attempts == riddle.MaxAttempts - 1 && !string.IsNullOrEmpty(riddle.Hint))
                         {
                             terminal.WriteLine("");
-                            terminal.WriteLine($"A whisper: \"{riddle.Hint}\"", "dark_magenta");
+                            terminal.WriteLine(Loc.Get("riddle.whisper_hint", riddle.LocHint()), "dark_magenta");
                         }
                     }
                 }
@@ -166,12 +166,17 @@ namespace UsurperRemake.Data
 
         private bool CheckAnswer(Riddle riddle, string input)
         {
-            // Check primary answer
+            // Accept the original English answer set...
             if (riddle.Answer.Equals(input, StringComparison.OrdinalIgnoreCase))
                 return true;
+            if (riddle.AlternateAnswers.Any(alt => alt.Equals(input, StringComparison.OrdinalIgnoreCase)))
+                return true;
 
-            // Check alternate answers
-            return riddle.AlternateAnswers.Any(alt =>
+            // ...and the localized answer set for the current session language, so a player reading
+            // a translated riddle can type the translated answer (English still works as a fallback).
+            if (riddle.LocAnswer().Equals(input, StringComparison.OrdinalIgnoreCase))
+                return true;
+            return riddle.LocAlternates().Any(alt =>
                 alt.Equals(input, StringComparison.OrdinalIgnoreCase));
         }
 
@@ -225,7 +230,7 @@ namespace UsurperRemake.Data
             }
 
             terminal.WriteLine("");
-            terminal.WriteLine(Loc.Get("riddle.answer_was", riddle.Answer), "gray");
+            terminal.WriteLine(Loc.Get("riddle.answer_was", riddle.LocAnswer()), "gray");
 
             await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
         }
@@ -950,6 +955,30 @@ namespace UsurperRemake.Data
         public GuardianType GuardianType { get; set; } = GuardianType.Spirit;
         public bool IsOceanPhilosophy { get; set; } = false;
         public bool FleeAllowed { get; set; } = true;
+
+        // Localized accessors. The English fields above are the source/fallback; these resolve
+        // riddle.{id}.* loc keys so the riddle text, hint, and accepted answers render/match in the
+        // session language. Riddles are solvability-critical, so CheckAnswer accepts BOTH the English
+        // and the localized answer set (a player can type either; guards against translation drift).
+        private static string LocOr(string key, string fallback)
+        {
+            var v = Loc.Get(key);
+            return v == key ? fallback : v;
+        }
+        public string[] LocText()
+        {
+            var r = new string[Text.Length];
+            for (int i = 0; i < r.Length; i++) r[i] = LocOr($"riddle.{Id}.text.{i}", Text[i]);
+            return r;
+        }
+        public string LocAnswer() => LocOr($"riddle.{Id}.answer", Answer);
+        public string[] LocAlternates()
+        {
+            var r = new string[AlternateAnswers.Length];
+            for (int i = 0; i < r.Length; i++) r[i] = LocOr($"riddle.{Id}.alt.{i}", AlternateAnswers[i]);
+            return r;
+        }
+        public string LocHint() => LocOr($"riddle.{Id}.hint", Hint);
     }
 
     public class RiddleResult

@@ -180,6 +180,19 @@ public static class WildernessData
     public static string GetDiscoveryName(WildernessDiscovery d) => LocOrFallback($"wilderness.discovery.{d.Id}.name", d.Name);
     public static string GetDiscoveryDescription(WildernessDiscovery d) => LocOrFallback($"wilderness.discovery.{d.Id}.desc", d.Description);
 
+    // Foraging / ruins / traveler prose, keyed per region + positional index (the arrays are
+    // positional, no per-entry id). English text on the definition is the source/fallback.
+    // Foraging effect tokens and the foraging item name are internal (not displayed); only the
+    // foraging line text, the ruins line, and the traveler line + role label are player-facing.
+    public static string GetForagingText(WildernessRegion r, int i) =>
+        (i >= 0 && i < r.ForagingResults.Length) ? LocOrFallback($"wilderness.forage.{r.Id}.{i}", r.ForagingResults[i].text) : "";
+    public static string GetRuinsEncounter(WildernessRegion r, int i) =>
+        (i >= 0 && i < r.RuinsEncounters.Length) ? LocOrFallback($"wilderness.ruins.{r.Id}.{i}", r.RuinsEncounters[i]) : "";
+    public static string GetTravelerText(WildernessRegion r, int i) =>
+        (i >= 0 && i < r.TravelerEncounters.Length) ? LocOrFallback($"wilderness.traveler.{r.Id}.{i}.text", r.TravelerEncounters[i].text) : "";
+    public static string GetTravelerName(WildernessRegion r, int i) =>
+        (i >= 0 && i < r.TravelerEncounters.Length) ? LocOrFallback($"wilderness.traveler.{r.Id}.{i}.name", r.TravelerEncounters[i].name) : "";
+
     /// <summary>
     /// v0.61.2 (player report: "Feral Cat takes flight, becoming harder to hit!"):
     /// Wilderness combat called MonsterGenerator.GenerateMonster which picks a

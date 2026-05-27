@@ -1136,7 +1136,7 @@ public class SettlementLocation : BaseLocation
         if (currentCount >= maxCarry)
         {
             terminal.SetColor("yellow");
-            terminal.WriteLine(Loc.Get("settlement.herbalist_max_carry", HerbData.GetName(herb)));
+            terminal.WriteLine(Loc.Get("settlement.herbalist_max_carry", HerbData.LocName(herb)));
             await terminal.PressAnyKey();
             return;
         }
@@ -1149,9 +1149,9 @@ public class SettlementLocation : BaseLocation
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("settlement.herbalist_desc"));
         terminal.SetColor("bright_yellow");
-        terminal.WriteLine(Loc.Get("settlement.herbalist_received", HerbData.GetName(herb)));
+        terminal.WriteLine(Loc.Get("settlement.herbalist_received", HerbData.LocName(herb)));
         terminal.SetColor("gray");
-        terminal.WriteLine($"  ({HerbData.GetDescription(herb)})");
+        terminal.WriteLine($"  ({HerbData.LocDescription(herb)})");
 
         await terminal.PressAnyKey();
     }

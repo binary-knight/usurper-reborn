@@ -2608,12 +2608,15 @@ public partial class GameEngine
                     if (change > 0)
                     {
                         terminal.SetColor("bright_green");
-                        terminal.WriteLine($"  You moved up {change} rank{(change != 1 ? "s" : "")}! Now #{currentPlayer.WeeklyRank}");
+                        string upKey = change == 1 ? "engine.rank_moved_up_one" : "engine.rank_moved_up_many";
+                        terminal.WriteLine($"  {Loc.Get(upKey, change, currentPlayer.WeeklyRank)}");
                     }
                     else
                     {
                         terminal.SetColor("yellow");
-                        terminal.WriteLine($"  You dropped {Math.Abs(change)} rank{(Math.Abs(change) != 1 ? "s" : "")}. Now #{currentPlayer.WeeklyRank}");
+                        int dropped = Math.Abs(change);
+                        string downKey = dropped == 1 ? "engine.rank_dropped_one" : "engine.rank_dropped_many";
+                        terminal.WriteLine($"  {Loc.Get(downKey, dropped, currentPlayer.WeeklyRank)}");
                     }
 
                     // v0.57.10 (player report — "Every single time I have logged
@@ -2634,7 +2637,7 @@ public partial class GameEngine
                 if (!string.IsNullOrEmpty(currentPlayer.RivalName))
                 {
                     terminal.SetColor("cyan");
-                    terminal.WriteLine($"  Your rival {currentPlayer.RivalName} is Level {currentPlayer.RivalLevel}.");
+                    terminal.WriteLine($"  {Loc.Get("engine.rival_level", currentPlayer.RivalName, currentPlayer.RivalLevel)}");
                 }
                 terminal.WriteLine("");
             }
@@ -6269,6 +6272,9 @@ public partial class GameEngine
                     Passion = data.PersonalityProfile.Passion,
                     Tenderness = data.PersonalityProfile.Tenderness
                 };
+                // Heal legacy orientation/gender mismatch on load (a generator bug labeled same-sex
+                // females "Gay" and never "Lesbian"). Idempotent; persists once re-saved.
+                npc.Personality.SyncOrientationToGender();
                 npc.Archetype = data.Archetype ?? "citizen";
             }
             else

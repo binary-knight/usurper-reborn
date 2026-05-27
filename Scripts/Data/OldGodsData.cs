@@ -782,6 +782,7 @@ namespace UsurperRemake.Data
             return new OldGodBossData
             {
                 Type = OldGodType.Noctura,
+                LocKey = "noctura_betrayal", // distinct from the regular Noctura fight
                 Name = "Noctura, The Shadow Ascendant",
                 Title = "Goddess of Shadows, Betrayer",
                 Level = 100,
@@ -931,6 +932,32 @@ namespace UsurperRemake.Data
         public string[] Phase3Dialogue { get; set; } = Array.Empty<string>();
         public string[] DefeatDialogue { get; set; } = Array.Empty<string>();
         public string[] LossDialogue { get; set; } = Array.Empty<string>();
+
+        // Localization key for this boss's dialogue (oldgod.{LocKey}.*). Defaults to the
+        // lowercased OldGodType; the Noctura betrayal variant sets it to "noctura_betrayal"
+        // so it doesn't collide with the regular Noctura fight. The English arrays above are
+        // the source/fallback; the Loc* accessors below resolve translated dialogue at display
+        // time so boss fights read in the player's language. Boss Name/Title stay English.
+        public string LocKey { get; set; } = "";
+        private string DialogueKey => string.IsNullOrEmpty(LocKey) ? Type.ToString().ToLowerInvariant() : LocKey;
+        private string[] LocArray(string section, string[] fallback)
+        {
+            if (fallback == null || fallback.Length == 0) return fallback ?? Array.Empty<string>();
+            var r = new string[fallback.Length];
+            for (int i = 0; i < r.Length; i++)
+            {
+                string key = $"oldgod.{DialogueKey}.{section}.{i}";
+                var v = UsurperRemake.Systems.Loc.Get(key);
+                r[i] = v == key ? fallback[i] : v;
+            }
+            return r;
+        }
+        public string[] LocIntro() => LocArray("intro", IntroDialogue);
+        public string[] LocPhase2() => LocArray("phase2", Phase2Dialogue);
+        public string[] LocPhase3() => LocArray("phase3", Phase3Dialogue);
+        public string[] LocDefeat() => LocArray("defeat", DefeatDialogue);
+        public string[] LocLoss() => LocArray("loss", LossDialogue);
+        public string[] LocSave() => SaveDialogue == null ? Array.Empty<string>() : LocArray("save", SaveDialogue);
 
         // Phase thresholds (percentage of HP)
         public float Phase1Threshold { get; set; }

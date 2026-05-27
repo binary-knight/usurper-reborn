@@ -2363,11 +2363,11 @@ public class InnLocation : BaseLocation
             await Task.Delay(1500);
 
             terminal.SetColor("bright_magenta");
-            terminal.WriteLine($"=== {dream.Title} ===");
+            terminal.WriteLine($"=== {dream.LocTitle()} ===");
             terminal.WriteLine("");
 
             terminal.SetColor("magenta");
-            foreach (var line in dream.Content)
+            foreach (var line in dream.LocContentLines())
             {
                 terminal.WriteLine($"  {line}");
                 await Task.Delay(1200);
@@ -2377,7 +2377,7 @@ public class InnLocation : BaseLocation
             {
                 terminal.WriteLine("");
                 terminal.SetColor("dark_cyan");
-                terminal.WriteLine($"  ({dream.PhilosophicalHint})");
+                terminal.WriteLine($"  ({dream.LocHintText()})");
             }
 
             terminal.WriteLine("");
@@ -2464,11 +2464,11 @@ public class InnLocation : BaseLocation
             await Task.Delay(1500);
 
             terminal.SetColor("bright_magenta");
-            terminal.WriteLine($"=== {dream.Title} ===");
+            terminal.WriteLine($"=== {dream.LocTitle()} ===");
             terminal.WriteLine("");
 
             terminal.SetColor("magenta");
-            foreach (var line in dream.Content)
+            foreach (var line in dream.LocContentLines())
             {
                 terminal.WriteLine($"  {line}");
                 await Task.Delay(1200);
@@ -2478,7 +2478,7 @@ public class InnLocation : BaseLocation
             {
                 terminal.WriteLine("");
                 terminal.SetColor("dark_cyan");
-                terminal.WriteLine($"  ({dream.PhilosophicalHint})");
+                terminal.WriteLine($"  ({dream.LocHintText()})");
             }
 
             terminal.WriteLine("");

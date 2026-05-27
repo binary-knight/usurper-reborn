@@ -392,15 +392,21 @@ public class PersonalityProfile
                 break;
         }
 
-        // Randomly assign orientation — ~95% straight, ~2% gay/lesbian, ~3% bisexual
-        // EnsureOrientationDiversity() guarantees minimums after spawning
+        // Randomly assign orientation. ~85% straight, ~8% gay/lesbian, ~6% bisexual, ~1% pansexual
+        // for a more representative population (bumped from the old ~95/2/3). NOTE: profile.Gender is
+        // still the default (Male) at roll time -- callers set Gender afterward -- so the gay/lesbian
+        // branch always lands on Gay here; SyncOrientationToGender() (called once Gender is known)
+        // flips it to Lesbian for females. That is also why the OLD code never produced lesbians.
+        // EnsureOrientationDiversity() / NudgeLateJoinerOrientation() still enforce a floor on top.
         float orientationRoll = (float)Random.Shared.NextDouble();
-        if (orientationRoll < 0.95f)
+        if (orientationRoll < 0.85f)
             profile.Orientation = SexualOrientation.Straight;
-        else if (orientationRoll < 0.97f)
+        else if (orientationRoll < 0.93f)
             profile.Orientation = profile.Gender == GenderIdentity.Female ? SexualOrientation.Lesbian : SexualOrientation.Gay;
-        else
+        else if (orientationRoll < 0.99f)
             profile.Orientation = SexualOrientation.Bisexual;
+        else
+            profile.Orientation = SexualOrientation.Pansexual;
 
         // Randomly assign relationship preference if not already set by archetype
         if (profile.RelationshipPref == RelationshipPreference.Undecided)
@@ -503,6 +509,23 @@ public class PersonalityProfile
         compatibility += GetCompatibility(other) * 0.1f;
 
         return ClampFloat(compatibility, 0f, 1f);
+    }
+
+    /// <summary>
+    /// Reconcile a Gay/Lesbian orientation with this profile's Gender. The orientation roll in
+    /// the personality generators runs before callers set Gender (which defaults to Male), so
+    /// females that rolled the same-sex band came out "Gay" and "Lesbian" was never produced
+    /// organically -- leaving the world with mislabeled gay females and almost no lesbians.
+    /// Call this AFTER Gender is finalized. It is bidirectional and idempotent, so it also heals
+    /// legacy/persisted data on load. Only flips Gay<->Lesbian; other orientations are untouched,
+    /// and non-binary genders are left as-is (Gay/Lesbian only flip on a clear Male/Female gender).
+    /// </summary>
+    public void SyncOrientationToGender()
+    {
+        if (Orientation == SexualOrientation.Gay && Gender == GenderIdentity.Female)
+            Orientation = SexualOrientation.Lesbian;
+        else if (Orientation == SexualOrientation.Lesbian && Gender == GenderIdentity.Male)
+            Orientation = SexualOrientation.Gay;
     }
 
     /// <summary>

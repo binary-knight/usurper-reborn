@@ -367,6 +367,9 @@ namespace UsurperRemake.Systems
             // Create personality based on child's soul - use GenerateForArchetype to get romance traits
             var personality = PersonalityProfile.GenerateForArchetype("commoner");
             personality.Gender = child.Sex == CharacterSex.Female ? GenderIdentity.Female : GenderIdentity.Male;
+            // The archetype roll used the default (Male) gender, so a female who rolled the
+            // same-sex band is mislabeled Gay -- reconcile to Lesbian before the diversity nudge.
+            personality.SyncOrientationToGender();
             if (child.Soul > 100)
             {
                 personality.Aggression = 0.2f;

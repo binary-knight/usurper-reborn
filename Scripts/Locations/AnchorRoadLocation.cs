@@ -1880,15 +1880,17 @@ public class AnchorRoadLocation : BaseLocation
             className: player.ClassName, raceName: player.Race.ToString(),
             playerName: player.DisplayName);
 
+        // Labels reuse the existing localized SR/visual menu keys so the Electron client renders
+        // in the player's language (was hardcoded English).
         var menu = new List<ElectronBridge.MenuItemData>
         {
-            new() { Key = "B", Label = "Bounty Hunting", Category = "combat", Icon = "bounty" },
-            new() { Key = "G", Label = "Gang War", Category = "combat", Icon = "gang" },
-            new() { Key = "T", Label = "The Gauntlet", Category = "combat", Icon = "gauntlet" },
-            new() { Key = "C", Label = "Claim Town Control", Category = "team", Icon = "control" },
-            new() { Key = "F", Label = "Flee Town Control", Category = "team", Icon = "flee" },
-            new() { Key = "S", Label = "Challenge Status", Category = "info", Icon = "info" },
-            new() { Key = "P", Label = "Prison Grounds", Category = "navigate", Icon = "prison" },
+            new() { Key = "B", Label = Loc.Get("anchor_road.bounty"), Category = "combat", Icon = "bounty" },
+            new() { Key = "G", Label = Loc.Get("anchor_road.gang_war"), Category = "combat", Icon = "gang" },
+            new() { Key = "T", Label = Loc.Get("anchor_road.gauntlet"), Category = "combat", Icon = "gauntlet" },
+            new() { Key = "C", Label = Loc.Get("anchor_road.claim_town"), Category = "team", Icon = "control" },
+            new() { Key = "F", Label = Loc.Get("anchor_road.flee_control"), Category = "team", Icon = "flee" },
+            new() { Key = "S", Label = Loc.Get("anchor_road.status"), Category = "info", Icon = "info" },
+            new() { Key = "P", Label = Loc.Get("anchor_road.prison"), Category = "navigate", Icon = "prison" },
             new() { Key = "R", Label = Loc.Get("ui.return"), Category = "navigate", Icon = "back" },
         };
         ElectronBridge.EmitMenu(menu);

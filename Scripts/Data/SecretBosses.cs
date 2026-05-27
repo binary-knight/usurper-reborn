@@ -34,6 +34,7 @@ namespace UsurperRemake.Data
             bosses[SecretBossType.TheFirstWave] = new SecretBossData
             {
                 Type = SecretBossType.TheFirstWave,
+                LocKey = "first_wave",
                 Name = "The First Wave",
                 Title = "Primordial Separation",
                 FloorLevel = 25,
@@ -111,6 +112,7 @@ namespace UsurperRemake.Data
             bosses[SecretBossType.TheForgottenEighth] = new SecretBossData
             {
                 Type = SecretBossType.TheForgottenEighth,
+                LocKey = "forgotten_eighth",
                 Name = "The Forgotten Eighth",
                 Title = "Erased from Existence",
                 FloorLevel = 50,
@@ -199,6 +201,7 @@ namespace UsurperRemake.Data
             bosses[SecretBossType.EchoOfSelf] = new SecretBossData
             {
                 Type = SecretBossType.EchoOfSelf,
+                LocKey = "echo_of_self",
                 Name = "Echo of Self",
                 Title = "The Life Before",
                 FloorLevel = 75,
@@ -295,6 +298,7 @@ namespace UsurperRemake.Data
             bosses[SecretBossType.TheOceanSpeaks] = new SecretBossData
             {
                 Type = SecretBossType.TheOceanSpeaks,
+                LocKey = "ocean_speaks",
                 Name = "The Ocean Speaks",
                 Title = "The Source of All",
                 FloorLevel = 99,
@@ -426,7 +430,7 @@ namespace UsurperRemake.Data
             await DisplayIntro(boss, terminal);
 
             // Pre-fight dialogue
-            await DisplayDialogue(boss.DialogueBeforeFight, boss.Name, terminal);
+            await DisplayDialogue(boss.LocPreDialogue(), boss.Name, terminal);
 
             // Handle choice if required
             if (boss.RequiresChoice)
@@ -441,9 +445,9 @@ namespace UsurperRemake.Data
 
             // Battle cry
             terminal.WriteLine("");
-            terminal.WriteLine($"\"{boss.BattleCry}\"", "bright_red");
+            terminal.WriteLine($"\"{boss.LocBattleCry()}\"", "bright_red");
             terminal.WriteLine("");
-            await terminal.GetInputAsync("Press Enter to begin the battle...");
+            await terminal.GetInputAsync(Loc.Get("secretboss.press_begin"));
 
             // The actual combat would integrate with CombatEngine
             // For now, simulate the encounter
@@ -479,7 +483,7 @@ namespace UsurperRemake.Data
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════╝", "bright_yellow");
             terminal.WriteLine("");
 
-            foreach (var line in boss.VictoryText)
+            foreach (var line in boss.LocVictory())
             {
                 if (string.IsNullOrEmpty(line))
                 {
@@ -502,9 +506,9 @@ namespace UsurperRemake.Data
 
             terminal.WriteLine("");
             if (boss.RewardXP > 0)
-                terminal.WriteLine($"(+{boss.RewardXP} Experience)", "cyan");
+                terminal.WriteLine(Loc.Get("secretboss.reward_xp", boss.RewardXP), "cyan");
             if (boss.RewardGold > 0)
-                terminal.WriteLine($"(+{boss.RewardGold} Gold)", "yellow");
+                terminal.WriteLine(Loc.Get("secretboss.reward_gold", boss.RewardGold), "yellow");
 
             // Grant wave fragment
             if (boss.GrantsFragment.HasValue)
@@ -536,7 +540,7 @@ namespace UsurperRemake.Data
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════╝", "bright_magenta");
             terminal.WriteLine("");
 
-            foreach (var line in boss.IntroText)
+            foreach (var line in boss.LocIntro())
             {
                 if (string.IsNullOrEmpty(line))
                 {
@@ -560,7 +564,7 @@ namespace UsurperRemake.Data
         private async Task DisplayDialogue(string[] dialogue, string name, TerminalEmulator terminal)
         {
             terminal.Clear();
-            terminal.WriteLine($"[{name} speaks...]", "bright_yellow");
+            terminal.WriteLine(Loc.Get("secretboss.speaks_label", name), "bright_yellow");
             terminal.WriteLine("");
 
             foreach (var line in dialogue)
@@ -586,9 +590,10 @@ namespace UsurperRemake.Data
             terminal.WriteLine(Loc.Get("riddle.entity_question"), "bright_yellow");
             terminal.WriteLine("");
 
-            for (int i = 0; i < boss.ChoiceOptions.Length; i++)
+            var choiceOptions = boss.LocChoiceOptions();
+            for (int i = 0; i < choiceOptions.Length; i++)
             {
-                terminal.WriteLine($"  [{i + 1}] {boss.ChoiceOptions[i]}", "cyan");
+                terminal.WriteLine($"  [{i + 1}] {choiceOptions[i]}", "cyan");
             }
 
             terminal.WriteLine("");
@@ -627,7 +632,7 @@ namespace UsurperRemake.Data
                 Gold = boss.RewardGold,
                 Experience = boss.RewardXP,
                 IsBoss = true,
-                Phrase = $"\"{boss.BattleCry}\""
+                Phrase = $"\"{boss.LocBattleCry()}\""
             };
         }
     }
@@ -646,6 +651,39 @@ namespace UsurperRemake.Data
         public string BattleCry { get; set; } = "";
         public string[] DialogueBeforeFight { get; set; } = Array.Empty<string>();
         public string[] VictoryText { get; set; } = Array.Empty<string>();
+
+        // Localization. The English arrays/strings above are the source/fallback; the Loc*
+        // accessors below resolve translated encounter text at display time (keyed
+        // secretboss.{LocKey}.*) so secret boss fights read in the player's language. The boss
+        // Name/Title stay English (boss-name layer, like monster names). ChoiceOptions translate
+        // safely -- the choice is selected by NUMBER and graded by index (CorrectChoice), not by
+        // matching the text. The Abilities array is internal data (never displayed), so it is
+        // left as-is.
+        public string LocKey { get; set; } = "";
+        private string[] LocArr(string section, string[] fallback)
+        {
+            if (fallback == null || fallback.Length == 0) return fallback ?? Array.Empty<string>();
+            var r = new string[fallback.Length];
+            for (int i = 0; i < r.Length; i++)
+            {
+                string key = $"secretboss.{LocKey}.{section}.{i}";
+                var v = UsurperRemake.Systems.Loc.Get(key);
+                r[i] = v == key ? fallback[i] : v;
+            }
+            return r;
+        }
+        private string LocScalar(string section, string fallback)
+        {
+            if (string.IsNullOrEmpty(LocKey)) return fallback;
+            string key = $"secretboss.{LocKey}.{section}";
+            var v = UsurperRemake.Systems.Loc.Get(key);
+            return v == key ? fallback : v;
+        }
+        public string[] LocIntro() => LocArr("intro", IntroText);
+        public string LocBattleCry() => LocScalar("battlecry", BattleCry);
+        public string[] LocPreDialogue() => LocArr("predialogue", DialogueBeforeFight);
+        public string[] LocVictory() => LocArr("victory", VictoryText);
+        public string[] LocChoiceOptions() => LocArr("choice", ChoiceOptions);
 
         public SecretBossStats Stats { get; set; } = new();
         public string[] Abilities { get; set; } = Array.Empty<string>();

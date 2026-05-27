@@ -1368,14 +1368,14 @@ public class LoveStreetLocation : BaseLocation
 
         foreach (var spouse in romance.Spouses)
         {
-            var npc = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == spouse.NPCId);
+            var npc = NPCSpawnSystem.Instance?.ResolvePartnerNpc(spouse.NPCId, spouse.NPCName);
             var name = npc?.Name ?? (!string.IsNullOrEmpty(spouse.NPCName) ? spouse.NPCName : spouse.NPCId);
             potentialDates.Add((spouse.NPCId, name, "Spouse"));
         }
 
         foreach (var lover in romance.CurrentLovers)
         {
-            var npc = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == lover.NPCId);
+            var npc = NPCSpawnSystem.Instance?.ResolvePartnerNpc(lover.NPCId, lover.NPCName);
             var name = npc?.Name ?? (!string.IsNullOrEmpty(lover.NPCName) ? lover.NPCName : lover.NPCId);
             potentialDates.Add((lover.NPCId, name, "Lover"));
         }
@@ -1865,7 +1865,7 @@ public class LoveStreetLocation : BaseLocation
             terminal.SetColor("white");
             foreach (var spouse in playerRomance.Spouses)
             {
-                var npc = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == spouse.NPCId);
+                var npc = NPCSpawnSystem.Instance?.ResolvePartnerNpc(spouse.NPCId, spouse.NPCName);
                 var name = npc?.Name ?? (!string.IsNullOrEmpty(spouse.NPCName) ? spouse.NPCName : spouse.NPCId);
                 var days = spouse.MarriedGameDay > 0
                     ? Math.Max(0, DailySystemManager.Instance.CurrentDay - spouse.MarriedGameDay)
@@ -2365,7 +2365,7 @@ public class LoveStreetLocation : BaseLocation
             terminal.SetColor("white");
             foreach (var spouse in romance.Spouses)
             {
-                var npc = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == spouse.NPCId);
+                var npc = NPCSpawnSystem.Instance?.ResolvePartnerNpc(spouse.NPCId, spouse.NPCName);
                 var name = npc?.Name ?? (!string.IsNullOrEmpty(spouse.NPCName) ? spouse.NPCName : spouse.NPCId);
                 var days = spouse.MarriedGameDay > 0
                     ? Math.Max(0, DailySystemManager.Instance.CurrentDay - spouse.MarriedGameDay)
@@ -2383,7 +2383,7 @@ public class LoveStreetLocation : BaseLocation
             terminal.SetColor("white");
             foreach (var lover in romance.CurrentLovers)
             {
-                var npc = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == lover.NPCId);
+                var npc = NPCSpawnSystem.Instance?.ResolvePartnerNpc(lover.NPCId, lover.NPCName);
                 var name = npc?.Name ?? (!string.IsNullOrEmpty(lover.NPCName) ? lover.NPCName : lover.NPCId);
                 var days = (DateTime.Now - lover.RelationshipStart).Days;
                 terminal.WriteLine(Loc.Get("love_street.summary_lover_line", name, days));

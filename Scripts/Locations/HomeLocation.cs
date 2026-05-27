@@ -200,7 +200,7 @@ public class HomeLocation : BaseLocation
 
         foreach (var spouse in romance.Spouses)
         {
-            var npc = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == spouse.NPCId);
+            var npc = NPCSpawnSystem.Instance?.ResolvePartnerNpc(spouse.NPCId, spouse.NPCName);
             var name = npc?.Name ?? spouse.NPCName;
             if (npc != null && npc.IsAlive == true && (npc.CurrentLocation == "Home" || npc.CurrentLocation == "Your Home"))
             {
@@ -214,7 +214,7 @@ public class HomeLocation : BaseLocation
 
         foreach (var lover in romance.CurrentLovers)
         {
-            var npc = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == lover.NPCId);
+            var npc = NPCSpawnSystem.Instance?.ResolvePartnerNpc(lover.NPCId, lover.NPCName);
             var name = npc?.Name ?? lover.NPCName;
             if (npc != null && npc.IsAlive == true && (npc.CurrentLocation == "Home" || npc.CurrentLocation == "Your Home"))
             {
@@ -458,13 +458,13 @@ public class HomeLocation : BaseLocation
         var partnersAtHome = new List<string>();
         foreach (var spouse in romance.Spouses)
         {
-            var npc = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == spouse.NPCId);
+            var npc = NPCSpawnSystem.Instance?.ResolvePartnerNpc(spouse.NPCId, spouse.NPCName);
             if (npc != null && npc.IsAlive == true && (npc.CurrentLocation == "Home" || npc.CurrentLocation == "Your Home"))
                 partnersAtHome.Add(npc.Name ?? spouse.NPCName);
         }
         foreach (var lover in romance.CurrentLovers)
         {
-            var npc = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == lover.NPCId);
+            var npc = NPCSpawnSystem.Instance?.ResolvePartnerNpc(lover.NPCId, lover.NPCName);
             if (npc != null && npc.IsAlive == true && (npc.CurrentLocation == "Home" || npc.CurrentLocation == "Your Home"))
                 partnersAtHome.Add(npc.Name ?? lover.NPCName);
         }
@@ -743,11 +743,11 @@ public class HomeLocation : BaseLocation
             await Task.Delay(1500);
 
             terminal.SetColor("bright_magenta");
-            terminal.WriteLine($"=== {dream.Title} ===");
+            terminal.WriteLine($"=== {dream.LocTitle()} ===");
             terminal.WriteLine("");
 
             terminal.SetColor("magenta");
-            foreach (var line in dream.Content)
+            foreach (var line in dream.LocContentLines())
             {
                 terminal.WriteLine($"  {line}");
                 await Task.Delay(1200);
@@ -757,7 +757,7 @@ public class HomeLocation : BaseLocation
             {
                 terminal.WriteLine("");
                 terminal.SetColor("dark_cyan");
-                terminal.WriteLine($"  ({dream.PhilosophicalHint})");
+                terminal.WriteLine($"  ({dream.LocHintText()})");
             }
 
             terminal.WriteLine("");
@@ -880,11 +880,11 @@ public class HomeLocation : BaseLocation
             await Task.Delay(1500);
 
             terminal.SetColor("bright_magenta");
-            terminal.WriteLine($"=== {dream.Title} ===");
+            terminal.WriteLine($"=== {dream.LocTitle()} ===");
             terminal.WriteLine("");
 
             terminal.SetColor("magenta");
-            foreach (var line in dream.Content)
+            foreach (var line in dream.LocContentLines())
             {
                 terminal.WriteLine($"  {line}");
                 await Task.Delay(1200);
@@ -894,7 +894,7 @@ public class HomeLocation : BaseLocation
             {
                 terminal.WriteLine("");
                 terminal.SetColor("dark_cyan");
-                terminal.WriteLine($"  ({dream.PhilosophicalHint})");
+                terminal.WriteLine($"  ({dream.LocHintText()})");
             }
 
             terminal.WriteLine("");
@@ -961,9 +961,9 @@ public class HomeLocation : BaseLocation
                 string color = full ? "darkgray" : HerbData.GetColor(type);
                 string fullTag = full ? " [FULL]" : "";
                 terminal.SetColor(color);
-                terminal.WriteLine($"  [{i}] {HerbData.GetName(type)} ({count}/{max}){fullTag}");
+                terminal.WriteLine($"  [{i}] {HerbData.LocName(type)} ({count}/{max}){fullTag}");
                 terminal.SetColor("gray");
-                terminal.WriteLine($"      {HerbData.GetDescription(type)}");
+                terminal.WriteLine($"      {HerbData.LocDescription(type)}");
                 if (!full) available.Add(type);
             }
 
@@ -983,7 +983,7 @@ public class HomeLocation : BaseLocation
                 int max = GameConfig.HerbMaxCarry[choice];
                 if (count >= max)
                 {
-                    terminal.WriteLine(Loc.Get("home.herb_pouch_full", HerbData.GetName(herbType), count, max), "yellow");
+                    terminal.WriteLine(Loc.Get("home.herb_pouch_full", HerbData.LocName(herbType), count, max), "yellow");
                     await terminal.WaitForKey();
                     continue;
                 }
@@ -993,7 +993,7 @@ public class HomeLocation : BaseLocation
                 herbsLeft--;
 
                 terminal.SetColor(HerbData.GetColor(herbType));
-                terminal.WriteLine(Loc.Get("home.herb_gathered", HerbData.GetName(herbType), currentPlayer.GetHerbCount(herbType), max));
+                terminal.WriteLine(Loc.Get("home.herb_gathered", HerbData.LocName(herbType), currentPlayer.GetHerbCount(herbType), max));
                 await Task.Delay(500);
             }
         }
@@ -1029,7 +1029,7 @@ public class HomeLocation : BaseLocation
 
         if (player.HasActiveHerbBuff)
         {
-            var buffName = HerbData.GetName((HerbType)player.HerbBuffType);
+            var buffName = HerbData.LocName((HerbType)player.HerbBuffType);
             terminal.SetColor("cyan");
             terminal.WriteLine(Loc.Get("home.herb_active_buff", buffName, player.HerbBuffCombats));
             terminal.WriteLine("");
@@ -1050,10 +1050,10 @@ public class HomeLocation : BaseLocation
             options.Add(type);
             terminal.SetColor(HerbData.GetColor(type));
             terminal.Write(GameConfig.ScreenReaderMode
-                ? $"  {idx}. {HerbData.GetName(type)} x{count}"
-                : $"  [{idx}] {HerbData.GetName(type)} x{count}");
+                ? $"  {idx}. {HerbData.LocName(type)} x{count}"
+                : $"  [{idx}] {HerbData.LocName(type)} x{count}");
             terminal.SetColor("gray");
-            terminal.WriteLine($" — {HerbData.GetDescription(type)}");
+            terminal.WriteLine($" -- {HerbData.LocDescription(type)}");
             idx++;
         }
 
@@ -1085,7 +1085,7 @@ public class HomeLocation : BaseLocation
     {
         if (!player.ConsumeHerb(type)) return;
 
-        string herbName = HerbData.GetName(type);
+        string herbName = HerbData.LocName(type);
         terminal.SetColor(HerbData.GetColor(type));
 
         switch (type)
@@ -1734,7 +1734,7 @@ public class HomeLocation : BaseLocation
 
             foreach (var spouse in romance.Spouses)
             {
-                var npc = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == spouse.NPCId);
+                var npc = NPCSpawnSystem.Instance?.ResolvePartnerNpc(spouse.NPCId, spouse.NPCName);
                 var name = npc?.Name ?? spouse.NPCId;
                 // Use real wall-clock time for marriage duration (game day counters desync in online mode)
                 var marriedDays = spouse.MarriedDate > DateTime.MinValue
@@ -1774,7 +1774,7 @@ public class HomeLocation : BaseLocation
 
             foreach (var lover in romance.CurrentLovers)
             {
-                var npc = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == lover.NPCId);
+                var npc = NPCSpawnSystem.Instance?.ResolvePartnerNpc(lover.NPCId, lover.NPCName);
                 var name = npc?.Name ?? lover.NPCId;
                 var daysTogether = (int)(DateTime.Now - lover.RelationshipStart).TotalDays;
 
@@ -2139,14 +2139,14 @@ public class HomeLocation : BaseLocation
 
         foreach (var spouse in romance.Spouses)
         {
-            var npc = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == spouse.NPCId);
+            var npc = NPCSpawnSystem.Instance?.ResolvePartnerNpc(spouse.NPCId, spouse.NPCName);
             if (npc == null || npc.IsDead) continue;
             options.Add((spouse.NPCId, npc.Name ?? spouse.NPCId, "spouse"));
         }
 
         foreach (var lover in romance.CurrentLovers)
         {
-            var npc = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == lover.NPCId);
+            var npc = NPCSpawnSystem.Instance?.ResolvePartnerNpc(lover.NPCId, lover.NPCName);
             if (npc == null || npc.IsDead) continue;
             options.Add((lover.NPCId, npc.Name ?? lover.NPCId, "lover"));
         }
@@ -3806,7 +3806,7 @@ public class HomeLocation : BaseLocation
 
         foreach (var spouse in romance.Spouses)
         {
-            var npc = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == spouse.NPCId);
+            var npc = NPCSpawnSystem.Instance?.ResolvePartnerNpc(spouse.NPCId, spouse.NPCName);
             if (npc != null && !npc.IsDead && (npc.CurrentLocation == "Home" || npc.CurrentLocation == "Your Home"))
             {
                 availablePartners.Add(npc);
@@ -3815,7 +3815,7 @@ public class HomeLocation : BaseLocation
 
         foreach (var lover in romance.CurrentLovers)
         {
-            var npc = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == lover.NPCId);
+            var npc = NPCSpawnSystem.Instance?.ResolvePartnerNpc(lover.NPCId, lover.NPCName);
             if (npc != null && !npc.IsDead && (npc.CurrentLocation == "Home" || npc.CurrentLocation == "Your Home"))
             {
                 availablePartners.Add(npc);
@@ -4061,7 +4061,7 @@ public class HomeLocation : BaseLocation
                         {
                             var newHerb = (HerbType)lvl;
                             terminal.SetColor(HerbData.GetColor(newHerb));
-                            terminal.WriteLine(Loc.Get("home.upgrade_new_herb", HerbData.GetName(newHerb), HerbData.GetDescription(newHerb)));
+                            terminal.WriteLine(Loc.Get("home.upgrade_new_herb", HerbData.LocName(newHerb), HerbData.LocDescription(newHerb)));
                         }
                     });
                 break;
@@ -4331,7 +4331,7 @@ public class HomeLocation : BaseLocation
                 terminal.Write($"  Lv{pet.Level,-2} {roleLabel,-9}");
             }
             terminal.SetColor("cyan");
-            terminal.WriteLine($"  {def?.PassiveDescription ?? ""}");
+            terminal.WriteLine($"  {def?.LocPassiveDescription() ?? ""}");
         }
         terminal.WriteLine("");
         terminal.SetColor("gray");
@@ -4389,7 +4389,7 @@ public class HomeLocation : BaseLocation
         {
             foreach (var spouse in romance.Spouses)
             {
-                var npc = allWorldNPCs.FirstOrDefault(n => n.ID == spouse.NPCId);
+                var npc = NPCSpawnSystem.ResolvePartnerNpc(allWorldNPCs, spouse.NPCId, spouse.NPCName);
 
                 // Check IsDead (permanent death) OR !IsAlive (currently at 0 HP)
                 if (npc != null && (npc.IsDead || !npc.IsAlive) && !npc.IsAgedDeath && !npc.IsPermaDead)
@@ -4400,7 +4400,7 @@ public class HomeLocation : BaseLocation
 
             foreach (var lover in romance.CurrentLovers)
             {
-                var npc = allWorldNPCs.FirstOrDefault(n => n.ID == lover.NPCId);
+                var npc = NPCSpawnSystem.ResolvePartnerNpc(allWorldNPCs, lover.NPCId, lover.NPCName);
 
                 // Check IsDead (permanent death) OR !IsAlive (currently at 0 HP)
                 // Skip aged death and permadead NPCs (matching spouse path guards)
@@ -4490,7 +4490,7 @@ toResurrect.IsDead = false;
         {
             foreach (var spouse in romance.Spouses)
             {
-                var npc = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == spouse.NPCId);
+                var npc = NPCSpawnSystem.Instance?.ResolvePartnerNpc(spouse.NPCId, spouse.NPCName);
                 if (npc != null && npc.IsAlive && !party.Contains(npc)) party.Add(npc);
             }
         }
@@ -4500,7 +4500,7 @@ toResurrect.IsDead = false;
         {
             foreach (var lover in romance.CurrentLovers)
             {
-                var npc = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == lover.NPCId);
+                var npc = NPCSpawnSystem.Instance?.ResolvePartnerNpc(lover.NPCId, lover.NPCName);
                 if (npc != null && npc.IsAlive && !party.Contains(npc)) party.Add(npc);
             }
         }
@@ -4525,7 +4525,7 @@ toResurrect.IsDead = false;
         // Get all spouses
         foreach (var spouse in romance.Spouses)
         {
-            var npc = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == spouse.NPCId);
+            var npc = NPCSpawnSystem.Instance?.ResolvePartnerNpc(spouse.NPCId, spouse.NPCName);
             if (npc != null && npc.IsAlive)
             {
                 partners.Add((npc, "Spouse"));
@@ -4535,7 +4535,7 @@ toResurrect.IsDead = false;
         // Get all lovers
         foreach (var lover in romance.CurrentLovers)
         {
-            var npc = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == lover.NPCId);
+            var npc = NPCSpawnSystem.Instance?.ResolvePartnerNpc(lover.NPCId, lover.NPCName);
             if (npc != null && npc.IsAlive)
             {
                 partners.Add((npc, "Lover"));
@@ -4745,7 +4745,7 @@ toResurrect.IsDead = false;
         {
             terminal.WriteLine("");
             terminal.SetColor("yellow");
-            terminal.WriteLine("  No items available for this slot.");
+            terminal.WriteLine($"  {Loc.Get("home.no_items_slot")}");
             await Task.Delay(2000);
             return;
         }
@@ -4754,11 +4754,11 @@ toResurrect.IsDead = false;
         terminal.WriteLine("");
         var currentItem = target.GetEquipment(selectedSlot.Value);
         terminal.SetColor("white");
-        terminal.Write($"  Current: ");
+        terminal.Write($"  {Loc.Get("home.equip_current")} ");
         if (currentItem != null)
         {
             terminal.SetColor(currentItem.IsIdentified ? currentItem.GetRarityColor() : "magenta");
-            terminal.Write(currentItem.IsIdentified ? currentItem.Name : "Unidentified");
+            terminal.Write(currentItem.IsIdentified ? currentItem.Name : Loc.Get("ui.unidentified"));
             if (currentItem.IsIdentified) WriteEquipmentStatSummary(currentItem);
             terminal.WriteLine("");
         }
@@ -4795,7 +4795,7 @@ toResurrect.IsDead = false;
         if (!selectedItem.IsIdentified)
         {
             terminal.SetColor("yellow");
-            terminal.WriteLine("  Must identify the item first.");
+            terminal.WriteLine($"  {Loc.Get("home.must_identify")}");
             await Task.Delay(2000);
             return;
         }
@@ -4925,7 +4925,7 @@ toResurrect.IsDead = false;
             if (item.IsCursed)
             {
                 terminal.SetColor("red");
-                terminal.Write(" (CURSED)");
+                terminal.Write(Loc.Get("home.item_cursed"));
             }
             terminal.WriteLine("");
         }

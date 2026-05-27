@@ -911,7 +911,7 @@ namespace UsurperRemake.Systems
                 IsBoss = true,
                 IsActive = true,
                 CanSpeak = true,
-                Phrase = boss.IntroDialogue.Length > 0 ? boss.IntroDialogue[0] : "",
+                Phrase = boss.LocIntro().Length > 0 ? boss.LocIntro()[0] : "",
                 Experience = boss.Level * 2000,
                 Gold = boss.Level * 500,
             };
@@ -1050,7 +1050,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  {Loc.Get("old_god.saved_seeing_world")}", "white");
             terminal.WriteLine("");
 
-            foreach (var line in boss.SaveDialogue)
+            foreach (var line in boss.LocSave())
             {
                 PrintDialogueLine(terminal, line,"bright_cyan");
                 await Task.Delay(300);
@@ -1129,7 +1129,7 @@ namespace UsurperRemake.Systems
 
             await Task.Delay(1500);
 
-            foreach (var line in boss.DefeatDialogue)
+            foreach (var line in boss.LocDefeat())
             {
                 PrintDialogueLine(terminal, line,boss.ThemeColor);
                 await Task.Delay(1500); // Give players time to read each line
@@ -1267,7 +1267,7 @@ namespace UsurperRemake.Systems
             // Show betrayal intro
             terminal.Clear();
             terminal.WriteLine("");
-            foreach (var line in betrayalData.IntroDialogue)
+            foreach (var line in betrayalData.LocIntro())
             {
                 if (string.IsNullOrEmpty(line)) { terminal.WriteLine(""); continue; }
                 terminal.SetColor(line.StartsWith("NOCTURA:") ? "dark_magenta" : "gray");
@@ -1322,7 +1322,7 @@ namespace UsurperRemake.Systems
                 IsBoss = true,
                 IsActive = true,
                 CanSpeak = true,
-                Phrase = betrayalData.IntroDialogue.Length > 0 ? betrayalData.IntroDialogue[0] : "",
+                Phrase = betrayalData.LocIntro().Length > 0 ? betrayalData.LocIntro()[0] : "",
                 Experience = betrayalData.Level * 2000,
                 Gold = betrayalData.Level * 500,
             };
@@ -1362,7 +1362,7 @@ namespace UsurperRemake.Systems
                 UIHelper.WriteBoxHeader(terminal, "THE SHADOW FALLS", "bright_magenta", 63);
                 terminal.WriteLine("");
 
-                foreach (var line in betrayalData.DefeatDialogue)
+                foreach (var line in betrayalData.LocDefeat())
                 {
                     if (string.IsNullOrEmpty(line)) { terminal.WriteLine(""); continue; }
                     terminal.SetColor(line.StartsWith("NOCTURA:") ? "dark_magenta" : "white");
@@ -1392,7 +1392,7 @@ namespace UsurperRemake.Systems
                 terminal.Clear();
                 terminal.WriteLine("");
 
-                foreach (var line in betrayalData.LossDialogue)
+                foreach (var line in betrayalData.LocLoss())
                 {
                     if (string.IsNullOrEmpty(line)) { terminal.WriteLine(""); continue; }
                     terminal.SetColor(line.StartsWith("NOCTURA:") ? "dark_magenta" : "gray");

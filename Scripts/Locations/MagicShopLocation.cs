@@ -451,15 +451,17 @@ public partial class MagicShopLocation : BaseLocation
     
     private string GetRaceGreeting(CharacterRace race)
     {
-        return race switch
+        // Localized address word injected into the greeting templates ("Welcome, {0}").
+        string key = race switch
         {
-            CharacterRace.Human => "human",
-            CharacterRace.Elf => "elf",
-            CharacterRace.Dwarf => "dwarf", 
-            CharacterRace.Hobbit => "hobbit",
-            CharacterRace.Gnome => "fellow gnome",
-            _ => "traveler"
+            CharacterRace.Human => "magic_shop.race_greeting.human",
+            CharacterRace.Elf => "magic_shop.race_greeting.elf",
+            CharacterRace.Dwarf => "magic_shop.race_greeting.dwarf",
+            CharacterRace.Hobbit => "magic_shop.race_greeting.hobbit",
+            CharacterRace.Gnome => "magic_shop.race_greeting.gnome",
+            _ => "magic_shop.race_greeting.other"
         };
+        return Loc.Get(key);
     }
     
     // Legacy curio listing/buying methods removed in v0.26.0 - replaced by modern Accessory Shop [A]
@@ -3942,42 +3944,42 @@ public partial class MagicShopLocation : BaseLocation
 
         int awakeningLevel = OceanPhilosophySystem.Instance?.AwakeningLevel ?? 0;
         bool hasCorruptionFragment = OceanPhilosophySystem.Instance?.CollectedFragments?.Contains(WaveFragment.TheCorruption) ?? false;
-        string playerAddress = hasCorruptionFragment ? "Dreamer" : GetRaceGreeting(player.Race);
+        string playerAddress = hasCorruptionFragment ? Loc.Get("magic_shop.address_dreamer") : GetRaceGreeting(player.Race);
         long totalSpent = player.Statistics?.TotalMagicShopGoldSpent ?? 0;
         long deathSpells = player.Statistics?.TotalDeathSpellsCast ?? 0;
 
         // Context-aware greeting
         if (deathSpells > 0)
         {
-            DisplayMessage($"The shadows on you grow heavier each time, {playerAddress}.", "gray");
-            DisplayMessage($"{_ownerName} studies you with knowing, troubled eyes.", "gray");
+            DisplayMessage(Loc.Get("magic_shop.talk_greet_dark", playerAddress), "gray");
+            DisplayMessage(Loc.Get("magic_shop.talk_greet_dark_2", _ownerName), "gray");
         }
         else if (totalSpent >= 50000)
         {
-            DisplayMessage($"Ah, my most valued patron! Welcome back, {playerAddress}.", "cyan");
+            DisplayMessage(Loc.Get("magic_shop.talk_greet_valued", playerAddress), "cyan");
         }
         else
         {
-            DisplayMessage($"'Welcome, {playerAddress},' {_ownerName} says, looking up from an ancient tome.", "cyan");
+            DisplayMessage(Loc.Get("magic_shop.talk_greet_normal", playerAddress, _ownerName), "cyan");
         }
         DisplayMessage("");
 
         // Class-specific commentary
-        string classComment = player.Class switch
+        string classKey = player.Class switch
         {
-            CharacterClass.Magician => "'A fellow practitioner of the arcane. We understand each other.'",
-            CharacterClass.Sage => "'The wisdom you carry... it resonates with the items here.'",
-            CharacterClass.Cleric => "'The divine and the arcane are closer than most believe.'",
-            CharacterClass.Paladin => "'A holy warrior in a shop of mysteries. How delightfully contradictory.'",
-            CharacterClass.Jester => "'I've warded everything against theft. Just so you know.'",
-            CharacterClass.Assassin => "'Your kind appreciates the... specialized services I offer.'",
-            CharacterClass.Ranger => "'The wild magic in you makes these items sing differently.'",
-            CharacterClass.Barbarian => "'Most of your kind dismiss magic. Yet here you stand.'",
-            CharacterClass.Warrior => "'Steel and sorcery make a powerful combination.'",
-            CharacterClass.Bard => "'Music and magic share the same root. Let me show you.'",
-            _ => "'Every soul has magical potential, if they know where to look.'"
+            CharacterClass.Magician => "magic_shop.talk_class_magician",
+            CharacterClass.Sage => "magic_shop.talk_class_sage",
+            CharacterClass.Cleric => "magic_shop.talk_class_cleric",
+            CharacterClass.Paladin => "magic_shop.talk_class_paladin",
+            CharacterClass.Jester => "magic_shop.talk_class_jester",
+            CharacterClass.Assassin => "magic_shop.talk_class_assassin",
+            CharacterClass.Ranger => "magic_shop.talk_class_ranger",
+            CharacterClass.Barbarian => "magic_shop.talk_class_barbarian",
+            CharacterClass.Warrior => "magic_shop.talk_class_warrior",
+            CharacterClass.Bard => "magic_shop.talk_class_bard",
+            _ => "magic_shop.talk_class_other"
         };
-        DisplayMessage(classComment, "cyan");
+        DisplayMessage(Loc.Get(classKey), "cyan");
         DisplayMessage("");
 
         // Story-aware comments
@@ -3986,19 +3988,19 @@ public partial class MagicShopLocation : BaseLocation
         {
             int godsDefeated = story.OldGodStates?.Count(kvp => kvp.Value?.Status == GodStatus.Defeated) ?? 0;
             if (godsDefeated >= 3)
-                DisplayMessage("'You've faced the Old Gods and lived. That changes a person.'", "magenta");
+                DisplayMessage(Loc.Get("magic_shop.talk_gods_3"), "magenta");
             else if (godsDefeated >= 1)
-                DisplayMessage("'I hear whispers of your deeds in the deep places.'", "gray");
+                DisplayMessage(Loc.Get("magic_shop.talk_gods_1"), "gray");
         }
 
         if (player.King)
-            DisplayMessage("'Your Majesty graces my humble shop. How may I serve the crown?'", "yellow");
+            DisplayMessage(Loc.Get("magic_shop.talk_king"), "yellow");
 
         // Alignment commentary
         if (player.Darkness > 80)
-            DisplayMessage("'The darkness in you... it makes certain items resonate. Be careful.'", "darkred");
+            DisplayMessage(Loc.Get("magic_shop.talk_dark_align"), "darkred");
         else if (player.Chivalry > 80)
-            DisplayMessage("'Your noble spirit brightens this dusty shop.'", "blue");
+            DisplayMessage(Loc.Get("magic_shop.talk_noble_align"), "blue");
 
         // Awakening wisdom
         if (awakeningLevel >= 5)
@@ -4007,7 +4009,7 @@ public partial class MagicShopLocation : BaseLocation
             if (!string.IsNullOrEmpty(wisdom))
             {
                 DisplayMessage("");
-                DisplayMessage($"'...{wisdom}'", "magenta");
+                DisplayMessage(Loc.Get("magic_shop.talk_wisdom", wisdom), "magenta");
             }
         }
 
@@ -4020,9 +4022,9 @@ public partial class MagicShopLocation : BaseLocation
         if (fragmentAvailable)
         {
             DisplayMessage("");
-            DisplayMessage("Something troubles you... a darkness since you used the death magic.", "magenta");
+            DisplayMessage(Loc.Get("magic_shop.talk_fragment_troubled"), "magenta");
             DisplayMessage("");
-            DisplayMessage("(F) Ask about the darkness you've felt", "bright_magenta");
+            DisplayMessage(Loc.Get("magic_shop.talk_fragment_option"), "bright_magenta");
         }
 
         // Loyalty discount info
@@ -4030,7 +4032,7 @@ public partial class MagicShopLocation : BaseLocation
         {
             long nextThreshold = totalSpent < 50000 ? 50000 : 200000;
             DisplayMessage("");
-            DisplayMessage($"'You've spent {totalSpent:N0} gold here. At {nextThreshold:N0}, your loyalty discount increases.'", "gray");
+            DisplayMessage(Loc.Get("magic_shop.talk_loyalty_info", $"{totalSpent:N0}", $"{nextThreshold:N0}"), "gray");
         }
 
         DisplayMessage("");
@@ -4047,32 +4049,32 @@ public partial class MagicShopLocation : BaseLocation
     {
         terminal.ClearScreen();
         DisplayMessage("");
-        DisplayMessage($"{_ownerName}'s expression becomes grave.", "gray");
+        DisplayMessage(Loc.Get("magic_shop.corrupt_grave", _ownerName), "gray");
         await Task.Delay(1000);
         DisplayMessage("");
-        DisplayMessage("'Every death spell fragments something inside the caster.'", "cyan");
-        DisplayMessage("'I've seen it before. Many times. Over more years than you'd believe.'", "cyan");
+        DisplayMessage(Loc.Get("magic_shop.corrupt_1"), "cyan");
+        DisplayMessage(Loc.Get("magic_shop.corrupt_2"), "cyan");
         await Task.Delay(1500);
         DisplayMessage("");
-        DisplayMessage("He reaches beneath the counter and produces a dark crystal.", "gray");
-        DisplayMessage("It pulses with a sickly light, like a bruise on reality.", "magenta");
+        DisplayMessage(Loc.Get("magic_shop.corrupt_3"), "gray");
+        DisplayMessage(Loc.Get("magic_shop.corrupt_4"), "magenta");
         await Task.Delay(1500);
         DisplayMessage("");
-        DisplayMessage("'The Ocean dreamed of separation, and separation became corruption.'", "magenta");
-        DisplayMessage("'Power that takes life is the Ocean forgetting what it is.'", "magenta");
+        DisplayMessage(Loc.Get("magic_shop.corrupt_5"), "magenta");
+        DisplayMessage(Loc.Get("magic_shop.corrupt_6"), "magenta");
         await Task.Delay(1500);
         DisplayMessage("");
-        DisplayMessage("'This formed from the residue of every death spell cast in this shop.'", "cyan");
-        DisplayMessage("'Centuries of dark magic, crystallized into understanding.'", "cyan");
-        DisplayMessage("'Take it. Understand what corruption truly means.'", "cyan");
+        DisplayMessage(Loc.Get("magic_shop.corrupt_7"), "cyan");
+        DisplayMessage(Loc.Get("magic_shop.corrupt_8"), "cyan");
+        DisplayMessage(Loc.Get("magic_shop.corrupt_9"), "cyan");
         await Task.Delay(1000);
         DisplayMessage("");
 
         // Award the fragment
         OceanPhilosophySystem.Instance?.CollectFragment(WaveFragment.TheCorruption);
 
-        DisplayMessage("You received: Wave Fragment - The Corruption", "bright_magenta");
-        DisplayMessage("'The corruption is not evil. It is forgetting. Remember that.'", "magenta");
+        DisplayMessage(Loc.Get("magic_shop.corrupt_received"), "bright_magenta");
+        DisplayMessage(Loc.Get("magic_shop.corrupt_final"), "magenta");
         DisplayMessage("");
 
         AchievementSystem.TryUnlock(player, "corruption_fragment");

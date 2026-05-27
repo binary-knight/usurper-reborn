@@ -3807,9 +3807,9 @@ public partial class CombatEngine
             if (count <= 0) continue;
             options.Add(type);
             terminal.SetColor(HerbData.GetColor(type));
-            terminal.Write($"  [{idx}] {HerbData.GetName(type)} x{count}");
+            terminal.Write($"  [{idx}] {HerbData.LocName(type)} x{count}");
             terminal.SetColor("gray");
-            terminal.WriteLine($" — {HerbData.GetDescription(type)}");
+            terminal.WriteLine($" -- {HerbData.LocDescription(type)}");
             idx++;
         }
         terminal.WriteLine("");
@@ -7375,15 +7375,18 @@ public partial class CombatEngine
                     terminal.WriteLine(Loc.Get("combat.storm_eagle_stun", target.Name), "bright_yellow");
             }
         }
-        // v0.60.10 (druidah Lv.9 Cleric report): weapon-source enchants (Lifedrinker,
-        // Siphoning, elemental procs) used to read SUM-of-slots via SumEquipmentProperty
-        // or hardcode MainHand. So a Siphoning dagger in OffHand made every main-hand
-        // swing siphon mana too, and conversely an off-hand fire enchant never proc'd.
-        // Now route each post-hit enchant check through the SOURCE WEAPON's own
-        // properties via weaponSlot, so each strike only proc's the enchants on the
-        // weapon that swung. Armor-side passives (Thorns, regen, magic resist) keep
-        // summing slots; those are not per-strike.
-        var sourceWeapon = attacker.GetEquipment(weaponSlot);
+        // Post-hit enchant sourcing -- two different rules apply:
+        //  * Elemental enchants (fire/frost/etc.) are intrinsically weapon-bound (a flaming
+        //    off-hand must not proc on a main-hand swing), so CheckElementalEnchantProcs reads
+        //    the SOURCE WEAPON for those -- the v0.60.10 cross-hand-leak fix (druidah report).
+        //  * Lifedrinker (LifeSteal) and Siphon (ManaSteal) are enchantable on EVERY slot
+        //    (armor, accessories, shield, weapons) and were always designed to stack, so they
+        //    sum across all gear via the GetEffective* helpers. Those helpers still honor the
+        //    per-hand rule -- when dual-wielding, the other hand's weapon is excluded so its
+        //    leech procs on its own swing. v0.61.7 (player report): the v0.60.10 pass
+        //    over-corrected and read only the swinging weapon, silently zeroing every
+        //    Lifedrinker/Siphon on armor and accessories.
+        // Armor-side passives (Thorns, regen, magic resist) keep summing slots as before.
 
         // v0.60.0 lifedrinker cap. Five lifesteal sources can fire on a single
         // attack: divine blessing, equipment Lifedrinker, divine boon, Abysswarden
@@ -7425,16 +7428,14 @@ public partial class CombatEngine
             }
         }
 
-        // Equipment lifesteal (Lifedrinker enchant), weapon-based, skip for spells.
+        // Equipment lifesteal (Lifedrinker enchant), gear-wide, skip for spells.
         // v0.60.0, issue #91: demons have no mortal life force; Lifedrinker can't
-        // pull anything from them.
-        // v0.60.10: read LifeSteal from the SOURCE WEAPON only (not summed across
-        // all slots) so an off-hand Lifedrinker only fires on off-hand strikes.
-        // Per-weapon cap at MaxEquipmentLifeStealPercent matches the previous
-        // sum-cap intent: "no single weapon can lifedrink more than X% per hit."
-        if (!isSpellDamage && !IsDemonMonster(target) && sourceWeapon != null)
+        // pull anything from them. GetEffectiveLifeStealPercent sums Lifedrinker across
+        // every slot (capped at MaxEquipmentLifeStealPercent) and excludes the opposite
+        // hand's weapon when dual-wielding.
+        if (!isSpellDamage && !IsDemonMonster(target))
         {
-            int equipLifeSteal = Math.Min(GameConfig.MaxEquipmentLifeStealPercent, sourceWeapon.LifeSteal);
+            int equipLifeSteal = attacker.GetEffectiveLifeStealPercent(weaponSlot);
             if (equipLifeSteal > 0)
             {
                 long requested = Math.Max(1, damage * equipLifeSteal / 100);
@@ -7794,14 +7795,14 @@ public partial class CombatEngine
             attacker.Statistics?.RecordDamageDealt(wispDamage, false);
         }
 
-        // Mana steal proc
-        // v0.60.10 (druidah Lv.9 Cleric report): "If you wield a staff and a siphoning
-        // dagger, both the main hand and the off hand attacks siphon mana." Was reading
-        // SUM of all-slots ManaSteal via GetEquipmentManaSteal() so an off-hand
-        // Siphoning enchant procced on every hit. Now reads only the source weapon's
-        // ManaSteal so each hand procs its own enchants. `weapon` is guaranteed non-null
-        // here -- the early-return at the top of this method bails when it's null.
-        int manaStealPct = weapon.ManaSteal;
+        // Mana steal proc (Siphon enchant). Like Lifedrinker, Siphon is enchantable on
+        // every slot and stacks across gear, so it sums via GetEffectiveManaStealPercent.
+        // v0.60.10 (druidah report) made this read only the source weapon to stop an
+        // off-hand Siphoning dagger proccing on main-hand swings; that also zeroed every
+        // armor/accessory Siphon. v0.61.7 (player report, same fix as Lifedrinker): sum
+        // gear-wide but still exclude the opposite hand's weapon when dual-wielding, so
+        // the off-hand-leak fix is preserved without killing gear-based Siphon.
+        int manaStealPct = attacker.GetEffectiveManaStealPercent(weaponSlot);
         if (manaStealPct > 0 && damage > 0)
         {
             // v0.60.0, issue #91: angels carry no mana to siphon. The proc fizzles
@@ -7813,7 +7814,7 @@ public partial class CombatEngine
                 terminal.SetColor("blue");
                 terminal.WriteLine(isPlayer
                     ? Loc.Get("combat.enchant_siphon", manaRestored)
-                    : $"{name}'s weapon siphons {manaRestored} mana! (Siphon)");
+                    : Loc.Get("combat.tm_enchant_siphon", name, manaRestored));
             }
         }
     }
@@ -26802,12 +26803,12 @@ public partial class CombatEngine
         // than crashing the combat loop.
         var dialogue = newPhase switch
         {
-            2 => ctx.BossData?.Phase2Dialogue ?? Array.Empty<string>(),
-            3 => ctx.BossData?.Phase3Dialogue ?? Array.Empty<string>(),
+            2 => ctx.BossData?.LocPhase2() ?? Array.Empty<string>(),
+            3 => ctx.BossData?.LocPhase3() ?? Array.Empty<string>(),
             _ => Array.Empty<string>()
         };
-        string flavor = newPhase == 2 ? $"{boss.Name} grows more powerful!"
-            : newPhase == 3 ? $"{boss.Name} unleashes their true form!"
+        string flavor = newPhase == 2 ? Loc.Get("combat.boss_phase2_flavor", boss.Name)
+            : newPhase == 3 ? Loc.Get("combat.boss_phase3_flavor", boss.Name)
             : "";
 
         // Phase 7: emit graphical phase-transition banner. Non-blocking — the

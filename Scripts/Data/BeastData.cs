@@ -45,7 +45,19 @@ public static class BeastData
         public int CombatBaseHP { get; init; }
         public int CombatBaseAttack { get; init; }
         public int CombatBaseDefence { get; init; }
-        public string CombatPassive { get; init; } = "";       // Short flavor of what the combat pet does.
+        public string CombatPassive { get; init; } = "";       // Short flavor of what the combat pet does (internal, not displayed).
+
+        // Localized accessors. The English fields above are the source/fallback; these resolve
+        // beast.{id}.* loc keys so the encounter/tame prose and passive summary render in the
+        // session language. Name/Species stay canonical creature types (monster-name layer).
+        private static string LocOr(string key, string fallback)
+        {
+            var v = UsurperRemake.Systems.Loc.Get(key);
+            return v == key ? fallback : v;
+        }
+        public string LocEncounterFlavor() => LocOr($"beast.{Id}.encounter", EncounterFlavor);
+        public string LocTameSuccessFlavor() => LocOr($"beast.{Id}.tame", TameSuccessFlavor);
+        public string LocPassiveDescription() => LocOr($"beast.{Id}.passive", PassiveDescription);
     }
 
     public static readonly BeastDefinition[] Beasts = new[]

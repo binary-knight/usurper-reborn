@@ -278,11 +278,11 @@ public class WildernessLocation : BaseLocation
         terminal.SetColor("bright_yellow");
         terminal.WriteLine(Loc.Get("wilderness.beast_encounter_header", beast.Name, beast.Species));
         terminal.SetColor("white");
-        foreach (var line in beast.EncounterFlavor.Split('\n'))
+        foreach (var line in beast.LocEncounterFlavor().Split('\n'))
             terminal.WriteLine($"  {line}");
         terminal.WriteLine("");
         terminal.SetColor("dark_gray");
-        terminal.WriteLine($"  {beast.PassiveDescription}");
+        terminal.WriteLine($"  {beast.LocPassiveDescription()}");
         terminal.WriteLine("");
 
         terminal.SetColor("cyan");
@@ -336,7 +336,7 @@ public class WildernessLocation : BaseLocation
 
                 terminal.WriteLine("");
                 terminal.SetColor("bright_green");
-                foreach (var line in beast.TameSuccessFlavor.Split('\n'))
+                foreach (var line in beast.LocTameSuccessFlavor().Split('\n'))
                     terminal.WriteLine($"  {line}");
                 terminal.WriteLine("");
                 terminal.SetColor("bright_cyan");
@@ -443,7 +443,8 @@ public class WildernessLocation : BaseLocation
 
     private async Task ForagingEncounter(WildernessRegion region)
     {
-        var result = region.ForagingResults[Random.Shared.Next(region.ForagingResults.Length)];
+        int fi = Random.Shared.Next(region.ForagingResults.Length);
+        var result = region.ForagingResults[fi];
 
         terminal.SetColor("green");
         terminal.WriteLine(Loc.Get("wilderness.search_area"));
@@ -451,7 +452,7 @@ public class WildernessLocation : BaseLocation
         await Task.Delay(1500);
 
         terminal.SetColor("white");
-        terminal.WriteLine(result.text);
+        terminal.WriteLine(WildernessData.GetForagingText(region, fi));
         terminal.WriteLine("");
 
         ApplyForagingResult(result.effect, region);
@@ -580,7 +581,7 @@ public class WildernessLocation : BaseLocation
 
     private async Task RuinsEncounter(WildernessRegion region)
     {
-        string ruins = region.RuinsEncounters[Random.Shared.Next(region.RuinsEncounters.Length)];
+        int ri = Random.Shared.Next(region.RuinsEncounters.Length);
 
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("wilderness.discover_ruins"));
@@ -588,7 +589,7 @@ public class WildernessLocation : BaseLocation
         await Task.Delay(1500);
 
         terminal.SetColor("white");
-        terminal.WriteLine(ruins);
+        terminal.WriteLine(WildernessData.GetRuinsEncounter(region, ri));
         terminal.WriteLine("");
 
         terminal.SetColor("bright_yellow");
@@ -640,10 +641,11 @@ public class WildernessLocation : BaseLocation
 
     private async Task TravelerEncounter(WildernessRegion region)
     {
-        var traveler = region.TravelerEncounters[Random.Shared.Next(region.TravelerEncounters.Length)];
+        int ti = Random.Shared.Next(region.TravelerEncounters.Length);
+        string travelerName = WildernessData.GetTravelerName(region, ti);
 
         terminal.SetColor("cyan");
-        terminal.WriteLine(traveler.text);
+        terminal.WriteLine(WildernessData.GetTravelerText(region, ti));
         terminal.WriteLine("");
 
         terminal.SetColor("bright_yellow");
@@ -661,7 +663,7 @@ public class WildernessLocation : BaseLocation
                 // Trade offer
                 long cost = 20 + Random.Shared.Next(30);
                 terminal.SetColor("white");
-                terminal.WriteLine(Loc.Get("wilderness.traveler_sell_potion", traveler.name, cost));
+                terminal.WriteLine(Loc.Get("wilderness.traveler_sell_potion", travelerName, cost));
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine(Loc.Get("wilderness.traveler_buy_or_decline"));
                 var buy = await GetChoice();
@@ -682,7 +684,7 @@ public class WildernessLocation : BaseLocation
             {
                 // Lore / hint
                 terminal.SetColor("white");
-                terminal.WriteLine(Loc.Get("wilderness.traveler_shares_wisdom", traveler.name));
+                terminal.WriteLine(Loc.Get("wilderness.traveler_shares_wisdom", travelerName));
                 terminal.SetColor("cyan");
                 terminal.WriteLine(Loc.Get("wilderness.traveler_lore_line1"));
                 terminal.WriteLine(Loc.Get("wilderness.traveler_lore_line2"));
@@ -693,7 +695,7 @@ public class WildernessLocation : BaseLocation
                 long heal = currentPlayer.MaxHP / 8;
                 currentPlayer.HP = Math.Min(currentPlayer.MaxHP, currentPlayer.HP + heal);
                 terminal.SetColor("green");
-                terminal.WriteLine(Loc.Get("wilderness.traveler_shares_food", traveler.name, heal));
+                terminal.WriteLine(Loc.Get("wilderness.traveler_shares_food", travelerName, heal));
             }
         }
         else
@@ -855,6 +857,22 @@ public class WildernessLocation : BaseLocation
             terminal.WriteLine($"        {s.LocPassiveSummary()}");
         }
         terminal.WriteLine("");
+
+        // v0.61.7 (player report): one pilgrimage per attunement period. The menu displayed
+        // the active-attunement status but never blocked re-attuning, so the attune flow ran
+        // unconditionally -- a player could spam pilgrimages, re-applying the buff and, worse,
+        // incrementing ShrineFavor on every press, fast-farming the 10/25/50 favor milestones
+        // (milestone 10 is a permanent stat reward). Block the attune flow while an attunement
+        // is active; the shrine list above still shows for favor reference.
+        if (currentPlayer.HasActiveShrineAttunement)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine(Loc.Get("wilderness.pilgrimage_cooldown", currentPlayer.GetShrineTimeRemainingLabel()));
+            terminal.WriteLine("");
+            await terminal.PressAnyKey();
+            return;
+        }
+
         terminal.SetColor("gray");
         terminal.WriteLine(IsScreenReader ? "  0. Cancel" : "  [0] Cancel");
         terminal.WriteLine("");
