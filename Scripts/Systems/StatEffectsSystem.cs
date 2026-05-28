@@ -454,6 +454,13 @@ public static class StatEffectsSystem
         if (attacker.HasActivePet("cave_spider"))
             critChance = Math.Clamp(critChance + 5, 5, GetCriticalHitChanceCapped(attacker.Dexterity));
 
+        // Alignment passive — Shadow Strike (Dark/Evil) / Righteous Fury (Good/Holy):
+        // flat crit bonus for committing to a path. Same DEX-scaled cap so it can't
+        // push past the ceiling. (NPC allies with strong alignment benefit too -- intended.)
+        int alignCrit = UsurperRemake.Systems.AlignmentSystem.Instance.GetAlignmentCritBonus(attacker);
+        if (alignCrit > 0)
+            critChance = Math.Clamp(critChance + alignCrit, 5, GetCriticalHitChanceCapped(attacker.Dexterity));
+
         return _random.Next(100) < critChance;
     }
 

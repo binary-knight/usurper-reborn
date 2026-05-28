@@ -157,6 +157,23 @@ public class CharacterCreationSystem
                 return null;
             }
 
+            // Auto-look preference (online/MUD only — single-player already redraws every turn).
+            // Default off so MUD purists are unaffected; new online players opt in here.
+            if (DoorMode.IsMudServerMode)
+            {
+                terminal.WriteLine("");
+                terminal.WriteLine(Loc.Get("creation.autolook_prompt"), "bright_cyan");
+                terminal.WriteLine(Loc.Get("creation.autolook_desc"), "gray");
+                var autoLookAns = (await terminal.GetInputAsync(Loc.Get("creation.autolook_ask")) ?? "").Trim().ToUpperInvariant();
+                // Accept localized affirmatives: Yes / Igen (hu) / Si (es,it) / Oui (fr)
+                character.AutoLook = autoLookAns.StartsWith("Y") || autoLookAns.StartsWith("I")
+                    || autoLookAns.StartsWith("S") || autoLookAns.StartsWith("O");
+                GameConfig.AutoLook = character.AutoLook;
+                terminal.WriteLine(character.AutoLook
+                    ? Loc.Get("creation.autolook_on")
+                    : Loc.Get("creation.autolook_off"), "green");
+            }
+
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("creation.created"), "green");
             terminal.WriteLine(Loc.Get("creation.entering"), "cyan");

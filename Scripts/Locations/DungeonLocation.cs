@@ -2520,13 +2520,13 @@ public class DungeonLocation : BaseLocation
         }
 
         // Features (1 line)
-        var uninteractedFeatures = room.Features.Where(f => !f.IsInteracted).ToList();
+        var uninteractedFeatures = ExaminableFeatures(room);
         if (uninteractedFeatures.Any())
         {
             terminal.SetColor("cyan");
             terminal.Write(Loc.Get("dungeon.bbs_notice"));
             terminal.SetColor("white");
-            terminal.WriteLine(string.Join(", ", uninteractedFeatures.Select(f => f.Name)));
+            terminal.WriteLine(string.Join(", ", uninteractedFeatures.Select(f => ResolveFeatureName(f))));
         }
 
         // Exits (1 line)
@@ -2865,16 +2865,16 @@ public class DungeonLocation : BaseLocation
         }
 
         // Features to examine
-        if (room.Features.Any(f => !f.IsInteracted))
+        if (HasExaminableFeatures(room))
         {
             terminal.SetColor("cyan");
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("dungeon.you_notice"));
-            foreach (var feature in room.Features.Where(f => !f.IsInteracted))
+            foreach (var feature in ExaminableFeatures(room))
             {
                 terminal.Write("  - ");
                 terminal.SetColor("white");
-                terminal.WriteLine(feature.Name);
+                terminal.WriteLine(ResolveFeatureName(feature));
                 terminal.SetColor("cyan");
             }
             hasAnything = true;
@@ -2979,7 +2979,7 @@ public class DungeonLocation : BaseLocation
                 WriteSRMenuOption("T", Loc.Get("dungeon.collect_treasure"));
             if (room.HasEvent && !room.EventCompleted)
                 WriteSRMenuOption("V", Loc.Get("dungeon.investigate"));
-            if (room.Features.Any(f => !f.IsInteracted))
+            if (HasExaminableFeatures(room))
                 WriteSRMenuOption("X", Loc.Get("dungeon.examine"));
             if (room.HasStairsDown && (room.IsCleared || !room.HasMonsters))
                 WriteSRMenuOption("D", Loc.Get("dungeon.descend_stairs"));
@@ -3039,7 +3039,7 @@ public class DungeonLocation : BaseLocation
         }
 
         // Examine features
-        if (room.Features.Any(f => !f.IsInteracted))
+        if (HasExaminableFeatures(room))
         {
             terminal.SetColor("darkgray");
             terminal.Write("  [");
@@ -4374,7 +4374,7 @@ public class DungeonLocation : BaseLocation
                 return false;
 
             case "X":
-                if (room.Features.Any(f => !f.IsInteracted))
+                if (HasExaminableFeatures(room))
                 {
                     await ExamineFeatures(room);
                     RequestRedisplay();
@@ -5626,9 +5626,49 @@ public class DungeonLocation : BaseLocation
     /// <summary>
     /// Examine room features
     /// </summary>
+    // v0.62.0 Discovery helpers.
+    private bool IsFoundOneTimeDiscovery(RoomFeature f, Character player)
+    {
+        if (player == null || string.IsNullOrEmpty(f.DiscoveryId)) return false;
+        var def = DiscoveryCatalog.ById(f.DiscoveryId);
+        return def != null && def.OneTime && player.DiscoveredFeatureIds.Contains(def.Id);
+    }
+
+    private string ResolveFeatureName(RoomFeature f)
+    {
+        if (string.IsNullOrEmpty(f.DiscoveryId)) return f.Name;
+        string key = $"discovery.{f.DiscoveryId}.name";
+        string v = Loc.Get(key);
+        return (string.IsNullOrEmpty(v) || v == key) ? f.Name : v;
+    }
+
+    private string ResolveFeatureDesc(RoomFeature f)
+    {
+        if (string.IsNullOrEmpty(f.DiscoveryId)) return f.Description;
+        string key = $"discovery.{f.DiscoveryId}.desc";
+        string v = Loc.Get(key);
+        return (string.IsNullOrEmpty(v) || v == key) ? f.Description : v;
+    }
+
+    // v0.62.0: the single source of truth for "what can the player actually examine here." Must
+    // match ExamineFeatures' filter exactly -- a feature is hidden if already interacted with, OR
+    // if it is a one-time discovery this character already found. The room-menu gates and the
+    // "you notice" line all use this so the [X] Examine action never shows when pressing it would
+    // do nothing (player report: [X] appeared on a room whose only feature was an already-found
+    // one-time discovery, and nothing happened).
+    private List<RoomFeature> ExaminableFeatures(DungeonRoom room)
+    {
+        if (room?.Features == null) return new List<RoomFeature>();
+        var p = GetCurrentPlayer();
+        return room.Features.Where(f => !f.IsInteracted && !IsFoundOneTimeDiscovery(f, p)).ToList();
+    }
+
+    private bool HasExaminableFeatures(DungeonRoom room) => ExaminableFeatures(room).Count > 0;
+
     private async Task ExamineFeatures(DungeonRoom room)
     {
-        var unexamined = room.Features.Where(f => !f.IsInteracted).ToList();
+        // v0.62.0: hide one-time Discoveries this character has already found (they don't re-trigger).
+        var unexamined = ExaminableFeatures(room);
         if (unexamined.Count == 0) return;
 
         terminal.ClearScreen();
@@ -5641,9 +5681,15 @@ public class DungeonLocation : BaseLocation
             terminal.SetColor("white");
             terminal.Write($"[{i + 1}] ");
             terminal.SetColor("yellow");
-            terminal.Write(unexamined[i].Name);
+            terminal.Write(ResolveFeatureName(unexamined[i]));
             terminal.SetColor("gray");
             terminal.WriteLine($" ({unexamined[i].Interaction})");
+            // Discoveries carry a one-line teaser to entice; show it in dark gray under the entry.
+            if (!string.IsNullOrEmpty(unexamined[i].DiscoveryId))
+            {
+                terminal.SetColor("darkgray");
+                terminal.WriteLine($"    {ResolveFeatureDesc(unexamined[i])}");
+            }
         }
 
         terminal.WriteLine("");
@@ -5684,18 +5730,30 @@ public class DungeonLocation : BaseLocation
             _ => DungeonTheme.Catacombs
         };
 
-        // Use the new comprehensive feature interaction system. teammates is passed
-        // through so class-specific bonuses can apply party-wide effects (e.g. the
-        // Cleric / Paladin "divine presence" heal radiates to every alive teammate
-        // instead of only the user, per Lv.20 player feedback).
-        var outcome = await FeatureInteractionSystem.Instance.InteractWithFeature(
-            feature,
-            player!,
-            currentDungeonLevel,
-            theme,
-            terminal,
-            teammates
-        );
+        // v0.62.0: a catalog Discovery runs its own bespoke scripted beat (DiscoverySystem).
+        // Everything else falls back to the legacy generic-outcome FeatureInteractionSystem.
+        FeatureOutcome outcome;
+        var def = string.IsNullOrEmpty(feature.DiscoveryId) ? null : DiscoveryCatalog.ById(feature.DiscoveryId);
+        if (def != null)
+        {
+            outcome = await DiscoverySystem.Instance.RunDiscovery(def, player!, currentDungeonLevel, terminal, teammates);
+            // One-time set-pieces are recorded so they never re-trigger for this character.
+            if (def.OneTime && player != null)
+                player.DiscoveredFeatureIds.Add(def.Id);
+        }
+        else
+        {
+            // Legacy generic feature interaction. teammates is passed through so class-specific
+            // bonuses can apply party-wide effects (e.g. Cleric/Paladin "divine presence" heal).
+            outcome = await FeatureInteractionSystem.Instance.InteractWithFeature(
+                feature,
+                player!,
+                currentDungeonLevel,
+                theme,
+                terminal,
+                teammates
+            );
+        }
 
         // Post-hoc reward split: FeatureInteractionSystem already awarded full amount to leader.
         // Reduce leader to their share and distribute to grouped players.
@@ -9811,14 +9869,14 @@ public class DungeonLocation : BaseLocation
         // Show current dungeon party
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("dungeon.current_dungeon_party"));
-        terminal.WriteLine($"  1. {player.DisplayName} (You) - Level {player.Level} {player.ClassName}");
+        terminal.WriteLine(Loc.Get("dungeon.party_line_you", player.DisplayName, player.Level, player.ClassName));
         for (int i = 0; i < teammates.Count; i++)
         {
             var tm = teammates[i];
             string status = tm.IsAlive ? $"{Loc.Get("combat.bar_hp")}: {tm.HP}/{tm.MaxHP}" : Loc.Get("combat.injured");
-            string tag = tm.IsGroupedPlayer ? " [Player]" : "";
+            string tag = tm.IsGroupedPlayer ? " " + Loc.Get("dungeon.party_tag_player") : "";
             if (tm.IsGroupedPlayer) terminal.SetColor("bright_green");
-            terminal.WriteLine($"  {i + 2}. {tm.DisplayName}{tag} - Level {tm.Level} {tm.ClassName} - {status}");
+            terminal.WriteLine(Loc.Get("dungeon.party_line_member", i + 2, tm.DisplayName, tag, tm.Level, tm.ClassName, status));
             if (tm.IsGroupedPlayer) terminal.SetColor("cyan");
         }
         terminal.WriteLine("");
@@ -10617,8 +10675,8 @@ public class DungeonLocation : BaseLocation
         for (int i = 0; i < teammates.Count; i++)
         {
             var tm = teammates[i];
-            string tag = tm.IsGroupedPlayer ? " [Player]" : "";
-            terminal.WriteLine($"  {i + 2}. {tm.DisplayName}{tag} - Level {tm.Level} {tm.ClassName}");
+            string tag = tm.IsGroupedPlayer ? " " + Loc.Get("dungeon.party_tag_player") : "";
+            terminal.WriteLine(Loc.Get("dungeon.party_line_member_short", i + 2, tm.DisplayName, tag, tm.Level, tm.ClassName));
         }
         terminal.SetColor("white");
         var input = await terminal.GetInput(Loc.Get("dungeon.enter_party_remove", teammates.Count + 1));
@@ -10888,8 +10946,8 @@ public class DungeonLocation : BaseLocation
             for (int i = 0; i < teammates.Count; i++)
             {
                 var tm = teammates[i];
-                string type = tm.IsCompanion ? "[Companion]" : "[Ally]";
-                terminal.WriteLine($"  {i + 1}. {tm.DisplayName} - Level {tm.Level} {type}");
+                string type = tm.IsCompanion ? Loc.Get("dungeon.party_type_companion") : Loc.Get("dungeon.party_type_ally");
+                terminal.WriteLine(Loc.Get("dungeon.party_line_typed", i + 1, tm.DisplayName, tm.Level, type));
             }
             terminal.WriteLine("");
 

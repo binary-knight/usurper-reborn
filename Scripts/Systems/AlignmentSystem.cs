@@ -231,6 +231,54 @@ namespace UsurperRemake.Systems
             };
         }
 
+        // ──────────────────────────────────────────────────────────────────────
+        // Alignment combat passives (the "named abilities" made real). Scale with how
+        // committed the path is (Dark < Evil, Good < Holy). Dark = leech/fear/crit glass
+        // cannon; Light = regen/smite/crit bruiser. Magnitudes are playtest starting points.
+        // ──────────────────────────────────────────────────────────────────────
+
+        /// <summary>Shadow Strike (dark) / Righteous Fury (light): flat crit-chance bonus.</summary>
+        public int GetAlignmentCritBonus(Character c) => GetAlignment(c) switch
+        {
+            AlignmentType.Dark => 3,
+            AlignmentType.Evil => 5,
+            AlignmentType.Good => 3,
+            AlignmentType.Holy => 5,
+            _ => 0
+        };
+
+        /// <summary>Soul Drain (Evil/Dark): heal this fraction of melee damage dealt.</summary>
+        public float GetSoulDrainPercent(Character c) => GetAlignment(c) switch
+        {
+            AlignmentType.Dark => 0.03f,
+            AlignmentType.Evil => 0.06f,
+            _ => 0f
+        };
+
+        /// <summary>Terror Incarnate (Evil) / Fear Aura (Dark): % chance to Fear on hit.</summary>
+        public int GetFearOnHitChance(Character c) => GetAlignment(c) switch
+        {
+            AlignmentType.Dark => 5,
+            AlignmentType.Evil => 10,
+            _ => 0
+        };
+
+        /// <summary>Blessed Aura (Holy/Good): regen this fraction of MaxHP per combat round.</summary>
+        public float GetBlessedRegenPercent(Character c) => GetAlignment(c) switch
+        {
+            AlignmentType.Good => 0.02f,
+            AlignmentType.Holy => 0.04f,
+            _ => 0f
+        };
+
+        /// <summary>Holy Smite (Holy/Good): bonus melee damage vs undead/demonic foes.</summary>
+        public float GetHolySmiteBonus(Character c) => GetAlignment(c) switch
+        {
+            AlignmentType.Good => 0.05f,
+            AlignmentType.Holy => 0.10f,
+            _ => 0f
+        };
+
         /// <summary>
         /// Apply alignment change with news generation
         /// </summary>

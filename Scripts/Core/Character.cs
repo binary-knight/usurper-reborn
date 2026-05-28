@@ -138,6 +138,7 @@ public class Character
     public bool SkipIntimateScenes { get; set; }    // skip detailed intimate scenes (fade to black)
     public bool ScreenReaderMode { get; set; }      // simplified text output for screen readers (accessibility)
     public bool CompactMode { get; set; }             // compact menus for mobile/small screen SSH
+    public bool AutoLook { get; set; }                // online: auto-redraw the location screen after each action (single-player feel)
     public bool DisableCharacterMonsterArt { get; set; } // skip race/class portraits, NPC portraits, monster + Old God art (without going full SR mode)
     public string Language { get; set; } = "en";       // player language preference for localization
     public ColorThemeType ColorTheme { get; set; } = ColorThemeType.Default;  // player-selected color theme
@@ -524,12 +525,12 @@ public class Character
     public (string label, string color) GetFatigueTier()
     {
         if (Fatigue < GameConfig.FatigueFreshThreshold)
-            return ("Well-Rested", "bright_green");
+            return (Loc.Get("status.fatigue_rested"), "bright_green");
         if (Fatigue < GameConfig.FatigueTiredThreshold)
             return ("", ""); // Normal — no display
         if (Fatigue < GameConfig.FatigueExhaustedThreshold)
-            return ("Tired", "yellow");
-        return ("Exhausted", "bright_red");
+            return (Loc.Get("status.fatigue_tired"), "yellow");
+        return (Loc.Get("status.fatigue_exhausted"), "bright_red");
     }
 
     // Session XP pacing (v0.54.0) — transient, resets on login, NOT serialized
@@ -772,6 +773,11 @@ public class Character
     // <= AttunedShrineExpiresGameDay`. Default 0 means no expiration set.
     public int AttunedShrineExpiresGameDay { get; set; } = 0;
     public Dictionary<string, int> ShrineFavor { get; set; } = new();
+
+    // v0.62.0 Dungeon Discoveries: ids of one-time discoveries this character has already found,
+    // so a memorable set-piece (a vault, a vision, a permanent boon) does not re-trigger. Minor
+    // (repeatable) discoveries are not tracked here. Round-tripped via PlayerData.
+    public HashSet<string> DiscoveredFeatureIds { get; set; } = new();
     public bool HasActiveShrineAttunement
     {
         get

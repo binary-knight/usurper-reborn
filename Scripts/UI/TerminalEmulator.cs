@@ -858,10 +858,15 @@ public partial class TerminalEmulator
         // MUD streaming mode: never wipe the scroll buffer — output flows continuously
         // downward like a real MUD. Location banners print once on entry, then actions
         // and chat accumulate naturally in the terminal history.
+        // Exception: when the player opts into auto-look, emit a real ANSI clear for capable
+        // (non-plain-text) clients so the location redraw matches single-player. Plain-text /
+        // raw-MUD / screen-reader sessions keep their scroll buffer (SR already returned above).
         if (UsurperRemake.BBS.DoorMode.IsMudServerMode)
         {
             _bbsLineCount = 0;
-            return;
+            if (!GameConfig.AutoLook || IsPlainText)
+                return;
+            // else fall through to the ANSI clear in the _streamWriter block below
         }
 
         if (_streamWriter != null)

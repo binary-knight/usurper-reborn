@@ -2159,7 +2159,7 @@ public class HomeLocation : BaseLocation
             terminal.SetColor(opt.type == "spouse" ? "bright_red" : "bright_magenta");
             terminal.Write($"<3 {opt.name}");
             terminal.SetColor("gray");
-            terminal.WriteLine($" ({opt.type})");
+            terminal.WriteLine($" ({Loc.Get(opt.type == "spouse" ? "home.partner_type_spouse" : "home.partner_type_lover")})");
         }
         terminal.SetColor("bright_yellow");
         terminal.Write("  [0]");
@@ -3927,43 +3927,43 @@ public class HomeLocation : BaseLocation
         int hlCur = Math.Clamp(currentPlayer.HomeLevel, 0, 5);
         int hlNext = Math.Clamp(currentPlayer.HomeLevel + 1, 0, 5);
         ShowTieredOption(opt++, Loc.Get("home.upgrade_type.quarters"), LivingQuartersKeys, currentPlayer.HomeLevel, 5, GetLivingQuartersCost(currentPlayer.HomeLevel),
-            $"{(int)(GameConfig.HomeRecoveryPercent[hlCur] * 100)}% rest, {GameConfig.HomeRestsPerDay[hlCur]}x/day",
-            $"{(int)(GameConfig.HomeRecoveryPercent[hlNext] * 100)}% rest, {GameConfig.HomeRestsPerDay[hlNext]}x/day");
+            Loc.Get("home.bonus_quarters", (int)(GameConfig.HomeRecoveryPercent[hlCur] * 100), GameConfig.HomeRestsPerDay[hlCur]),
+            Loc.Get("home.bonus_quarters", (int)(GameConfig.HomeRecoveryPercent[hlNext] * 100), GameConfig.HomeRestsPerDay[hlNext]));
 
         // Bed
         int blCur = Math.Clamp(currentPlayer.BedLevel, 0, 5);
         int blNext = Math.Clamp(currentPlayer.BedLevel + 1, 0, 5);
-        string bedCurStr = blCur == 0 ? "-50% fertility" : (GameConfig.BedFertilityModifier[blCur] == 0f ? "No modifier" : $"+{(int)(GameConfig.BedFertilityModifier[blCur] * 100)}% fertility");
-        string bedNextStr = GameConfig.BedFertilityModifier[blNext] == 0f ? "No penalty" : $"+{(int)(GameConfig.BedFertilityModifier[blNext] * 100)}% fertility";
+        string bedCurStr = blCur == 0 ? Loc.Get("home.bonus_bed_base") : (GameConfig.BedFertilityModifier[blCur] == 0f ? Loc.Get("home.bonus_bed_none") : Loc.Get("home.bonus_bed_plus", (int)(GameConfig.BedFertilityModifier[blCur] * 100)));
+        string bedNextStr = GameConfig.BedFertilityModifier[blNext] == 0f ? Loc.Get("home.bonus_bed_no_penalty") : Loc.Get("home.bonus_bed_plus", (int)(GameConfig.BedFertilityModifier[blNext] * 100));
         ShowTieredOption(opt++, Loc.Get("home.upgrade_type.bed"), BedKeys, currentPlayer.BedLevel, 5, GetBedCost(currentPlayer.BedLevel), bedCurStr, bedNextStr);
 
         // Storage Chest
         int clCur = Math.Clamp(currentPlayer.ChestLevel, 0, 5);
         int clNext = Math.Clamp(currentPlayer.ChestLevel + 1, 0, 5);
         ShowTieredOption(opt++, Loc.Get("home.upgrade_type.chest"), ChestKeys, currentPlayer.ChestLevel, 5, GetChestUpgradeCost(currentPlayer.ChestLevel),
-            $"{GameConfig.ChestCapacity[clCur]} items",
-            $"{GameConfig.ChestCapacity[clNext]} items");
+            Loc.Get("home.bonus_chest", GameConfig.ChestCapacity[clCur]),
+            Loc.Get("home.bonus_chest", GameConfig.ChestCapacity[clNext]));
 
         // Hearth
         int heCur = Math.Clamp(currentPlayer.HearthLevel, 0, 5);
         int heNext = Math.Clamp(currentPlayer.HearthLevel + 1, 0, 5);
-        string hearthCurStr = heCur == 0 ? "No buff" : $"+{(int)(GameConfig.HearthDamageBonus[heCur] * 100)}% dmg/def, {GameConfig.HearthCombatDuration[heCur]} combats";
-        string hearthNextStr = $"+{(int)(GameConfig.HearthDamageBonus[heNext] * 100)}% dmg/def, {GameConfig.HearthCombatDuration[heNext]} combats";
+        string hearthCurStr = heCur == 0 ? Loc.Get("home.bonus_hearth_none") : Loc.Get("home.bonus_hearth", (int)(GameConfig.HearthDamageBonus[heCur] * 100), GameConfig.HearthCombatDuration[heCur]);
+        string hearthNextStr = Loc.Get("home.bonus_hearth", (int)(GameConfig.HearthDamageBonus[heNext] * 100), GameConfig.HearthCombatDuration[heNext]);
         ShowTieredOption(opt++, Loc.Get("home.upgrade_type.hearth"), HearthKeys, currentPlayer.HearthLevel, 5, GetHearthCost(currentPlayer.HearthLevel), hearthCurStr, hearthNextStr);
 
         // Herb Garden
         int glCur = Math.Clamp(currentPlayer.GardenLevel, 0, 5);
         int glNext = Math.Clamp(currentPlayer.GardenLevel + 1, 0, 5);
         ShowTieredOption(opt++, Loc.Get("home.upgrade_type.garden"), GardenKeys, currentPlayer.GardenLevel, 5, GetGardenCost(currentPlayer.GardenLevel),
-            $"{GameConfig.HerbsPerDay[glCur]} herbs/day",
-            $"{GameConfig.HerbsPerDay[glNext]} herbs/day");
+            Loc.Get("home.bonus_garden", GameConfig.HerbsPerDay[glCur]),
+            Loc.Get("home.bonus_garden", GameConfig.HerbsPerDay[glNext]));
 
         // Training Room
         int trCur = currentPlayer.TrainingRoomLevel;
         int trNext = Math.Min(trCur + 1, 10);
-        ShowTieredOption(opt++, "Training Room", null, trCur, 10, GetTrainingRoomCost(trCur),
-            $"+{trCur} all stats",
-            $"+{trNext} all stats");
+        ShowTieredOption(opt++, Loc.Get("home.upgrade_type.training_room"), null, trCur, 10, GetTrainingRoomCost(trCur),
+            Loc.Get("home.bonus_training", trCur),
+            Loc.Get("home.bonus_training", trNext));
 
         terminal.WriteLine();
         terminal.SetColor("bright_cyan");
@@ -3971,22 +3971,22 @@ public class HomeLocation : BaseLocation
 
         // Trophy Room
         long trophyRoomCost = 500_000;
-        ShowOneTimePurchase(opt++, "Trophy Room", currentPlayer.HasTrophyRoom, trophyRoomCost, "Display achievements & bosses");
+        ShowOneTimePurchase(opt++, Loc.Get("home.special_trophy"), currentPlayer.HasTrophyRoom, trophyRoomCost, Loc.Get("home.special_trophy_desc"));
         // Study / Library
         long studyCost = 750_000;
-        ShowOneTimePurchase(opt++, "Study / Library", currentPlayer.HasStudy, studyCost, "+5% XP from combat");
+        ShowOneTimePurchase(opt++, Loc.Get("home.special_study"), currentPlayer.HasStudy, studyCost, Loc.Get("home.special_study_desc"));
         // Servants' Quarters
         long servantsCost = 500_000;
-        ShowOneTimePurchase(opt++, "Servants' Quarters", currentPlayer.HasServants, servantsCost, $"Daily gold income ({GameConfig.ServantsDailyGoldBase}+lvl*{GameConfig.ServantsDailyGoldPerLevel})");
+        ShowOneTimePurchase(opt++, Loc.Get("home.special_servants"), currentPlayer.HasServants, servantsCost, Loc.Get("home.special_servants_desc", GameConfig.ServantsDailyGoldBase, GameConfig.ServantsDailyGoldPerLevel));
         // Reinforced Door
         long reinforcedDoorCost = GameConfig.ReinforcedDoorCost;
-        ShowOneTimePurchase(opt++, "Reinforced Door", currentPlayer.HasReinforcedDoor, reinforcedDoorCost, "Sleep safely at home in online mode");
+        ShowOneTimePurchase(opt++, Loc.Get("home.special_door"), currentPlayer.HasReinforcedDoor, reinforcedDoorCost, Loc.Get("home.special_door_desc"));
         // Legendary Armory
         long armoryCost = 2_500_000;
-        ShowOneTimePurchase(opt++, "Legendary Armory", currentPlayer.HasLegendaryArmory, armoryCost, "+5% damage & defense permanently");
+        ShowOneTimePurchase(opt++, Loc.Get("home.special_armory"), currentPlayer.HasLegendaryArmory, armoryCost, Loc.Get("home.special_armory_desc"));
         // Fountain of Vitality
         long fountainCost = 5_000_000;
-        ShowOneTimePurchase(opt++, "Fountain of Vitality", currentPlayer.HasVitalityFountain, fountainCost, "+10% max HP permanently");
+        ShowOneTimePurchase(opt++, Loc.Get("home.special_fountain"), currentPlayer.HasVitalityFountain, fountainCost, Loc.Get("home.special_fountain_desc"));
 
         terminal.WriteLine();
         if (IsScreenReader)
@@ -4066,15 +4066,15 @@ public class HomeLocation : BaseLocation
                     });
                 break;
             case 6:
-                await PurchaseUpgrade("Training Room", GetTrainingRoomCost(currentPlayer.TrainingRoomLevel),
+                await PurchaseUpgrade(Loc.Get("home.upgrade_type.training_room"), GetTrainingRoomCost(currentPlayer.TrainingRoomLevel),
                     currentPlayer.TrainingRoomLevel < 10, () => { currentPlayer.TrainingRoomLevel++; ApplyTrainingBonus(); });
                 break;
             case 7:
-                await PurchaseUpgrade("Trophy Room", trophyRoomCost,
+                await PurchaseUpgrade(Loc.Get("home.special_trophy"), trophyRoomCost,
                     !currentPlayer.HasTrophyRoom, () => { currentPlayer.HasTrophyRoom = true; });
                 break;
             case 8:
-                await PurchaseUpgrade("Study / Library", studyCost,
+                await PurchaseUpgrade(Loc.Get("home.special_study"), studyCost,
                     !currentPlayer.HasStudy, () => {
                         currentPlayer.HasStudy = true;
                         terminal.SetColor("cyan");
@@ -4083,7 +4083,7 @@ public class HomeLocation : BaseLocation
                     });
                 break;
             case 9:
-                await PurchaseUpgrade("Servants' Quarters", servantsCost,
+                await PurchaseUpgrade(Loc.Get("home.special_servants"), servantsCost,
                     !currentPlayer.HasServants, () => {
                         currentPlayer.HasServants = true;
                         terminal.SetColor("cyan");
@@ -4092,7 +4092,7 @@ public class HomeLocation : BaseLocation
                     });
                 break;
             case 10:
-                await PurchaseUpgrade("Reinforced Door", reinforcedDoorCost,
+                await PurchaseUpgrade(Loc.Get("home.special_door"), reinforcedDoorCost,
                     !currentPlayer.HasReinforcedDoor, () => {
                         currentPlayer.HasReinforcedDoor = true;
                         terminal.SetColor("cyan");
@@ -4101,11 +4101,11 @@ public class HomeLocation : BaseLocation
                     });
                 break;
             case 11:
-                await PurchaseUpgrade("Legendary Armory", armoryCost,
+                await PurchaseUpgrade(Loc.Get("home.special_armory"), armoryCost,
                     !currentPlayer.HasLegendaryArmory, () => { currentPlayer.HasLegendaryArmory = true; ApplyArmoryBonus(); });
                 break;
             case 12:
-                await PurchaseUpgrade("Fountain of Vitality", fountainCost,
+                await PurchaseUpgrade(Loc.Get("home.special_fountain"), fountainCost,
                     !currentPlayer.HasVitalityFountain, () => { currentPlayer.HasVitalityFountain = true; ApplyFountainBonus(); });
                 break;
         }

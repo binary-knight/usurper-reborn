@@ -8,6 +8,7 @@ COPY Scripts/ Scripts/
 COPY Console/ Console/
 COPY Data/ Data/
 COPY Assets/ Assets/
+COPY Localization/ Localization/
 COPY app.ico ./
 RUN dotnet publish usurper-reloaded.csproj -c Release -r linux-x64 --self-contained -o /app
 

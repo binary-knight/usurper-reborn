@@ -5101,6 +5101,7 @@ public partial class GameEngine
             SkipIntimateScenes = playerData.SkipIntimateScenes,
             ScreenReaderMode = playerData.ScreenReaderMode,
             CompactMode = playerData.CompactMode,
+            AutoLook = playerData.AutoLook,
             DisableCharacterMonsterArt = playerData.DisableCharacterMonsterArt,
             Language = playerData.Language ?? "en",
             ColorTheme = playerData.ColorTheme,
@@ -5704,6 +5705,9 @@ public partial class GameEngine
         player.ShrineFavor = playerData.ShrineFavor != null
             ? new Dictionary<string, int>(playerData.ShrineFavor)
             : new Dictionary<string, int>();
+        player.DiscoveredFeatureIds = playerData.DiscoveredFeatureIds != null
+            ? new HashSet<string>(playerData.DiscoveredFeatureIds)
+            : new HashSet<string>();
         player.PetRoster = playerData.PetRoster?.Select(p => new UsurperRemake.Data.Pet
         {
             Id = p.Id,
@@ -5867,6 +5871,7 @@ public partial class GameEngine
 
         // Sync compact mode and language from player save to global
         GameConfig.CompactMode = player.CompactMode;
+        GameConfig.AutoLook = player.AutoLook;
         GameConfig.DisableCharacterMonsterArt = player.DisableCharacterMonsterArt;
         // If the player actively chose a language on the main menu this session, keep it
         // and update their character to match. Otherwise restore from save.

@@ -2224,31 +2224,31 @@ public class MainStreetLocation : BaseLocation
         if (currentPlayer.Level < 10)
         {
             int nextFloor = Math.Min((currentPlayer.Statistics?.DeepestDungeonLevel ?? 1) + 2, 100);
-            forecasts.Add($"The dungeon depths call to you... Floor {nextFloor} holds new challenges.");
+            forecasts.Add(Loc.Get("forecast.ctx_dungeon", nextFloor));
         }
 
         if (currentPlayer.HerbsGatheredToday > 0)
-            forecasts.Add("Your herb garden will have fresh herbs ready to gather.");
+            forecasts.Add(Loc.Get("forecast.ctx_herbs"));
 
         if (currentPlayer.Healing < 3)
-            forecasts.Add("Stock up on potions at the Healer before your next dungeon run.");
+            forecasts.Add(Loc.Get("forecast.ctx_potions"));
 
         if (currentPlayer.Gold > 0 && currentPlayer.BankGold == 0 && currentPlayer.Gold >= 500)
-            forecasts.Add("Consider depositing your gold at the Bank for safekeeping.");
+            forecasts.Add(Loc.Get("forecast.ctx_bank"));
 
         if (currentPlayer.Level >= 3 && currentPlayer.MKills > 0 && currentPlayer.MKills < 20)
-            forecasts.Add("The Quest Hall may have new bounties worth your time.");
+            forecasts.Add(Loc.Get("forecast.ctx_quests"));
 
         // Generic forecasts (always available)
         var genericForecasts = new List<string>
         {
-            "Merchants are expecting a fresh shipment of goods.",
-            "Rumors of treasure on the dungeon's deeper floors spread through town.",
-            "The arena champion awaits a worthy challenger.",
-            "Strange sounds echo from the dungeon at night...",
-            "The townsfolk whisper about events unfolding in the realm.",
-            "New bounties may appear at the Quest Hall.",
-            "The wilderness holds secrets yet to be discovered.",
+            Loc.Get("forecast.generic.0"),
+            Loc.Get("forecast.generic.1"),
+            Loc.Get("forecast.generic.2"),
+            Loc.Get("forecast.generic.3"),
+            Loc.Get("forecast.generic.4"),
+            Loc.Get("forecast.generic.5"),
+            Loc.Get("forecast.generic.6"),
         };
 
         var random = Random.Shared;
@@ -2259,7 +2259,7 @@ public class MainStreetLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("cyan");
-        terminal.WriteLine("  Tomorrow's Forecast:");
+        terminal.WriteLine($"  {Loc.Get("forecast.header")}");
         terminal.SetColor("gray");
         foreach (var forecast in toShow)
         {

@@ -410,6 +410,7 @@ namespace UsurperRemake.Systems
         public bool SkipIntimateScenes { get; set; }  // Skip detailed intimate scenes (fade to black)
         public bool ScreenReaderMode { get; set; }  // Simplified text for screen readers (accessibility)
         public bool CompactMode { get; set; }  // Compact menus for mobile/small screen SSH
+        public bool AutoLook { get; set; }  // Online/MUD: auto-redraw location screen after each action
         public bool DisableCharacterMonsterArt { get; set; }  // Skip portrait + monster + Old God art (without going full SR)
         public string Language { get; set; } = "en";  // Player language preference
         public ColorThemeType ColorTheme { get; set; } = ColorThemeType.Default;  // Player-selected color theme
@@ -648,6 +649,8 @@ namespace UsurperRemake.Systems
         // v0.61.3: single-player game-day expiration. See Character.AttunedShrineExpiresGameDay.
         public int AttunedShrineExpiresGameDay { get; set; } = 0;
         public Dictionary<string, int> ShrineFavor { get; set; } = new();
+        // v0.62.0 Dungeon Discoveries: ids of one-time discoveries already found.
+        public List<string> DiscoveredFeatureIds { get; set; } = new();
         // v0.61.0 Beast Taming
         public List<PetSaveData> PetRoster { get; set; } = new();
         public string ActivePetId { get; set; } = "";

@@ -77,6 +77,17 @@ namespace UsurperRemake.Systems
         public Func<PersonalityProfile, float> TraitScorer { get; set; }
         public Func<PersonalityProfile, bool> OppositionCheck { get; set; }
         public Func<SettlementState, bool> Precondition { get; set; }
+
+        // Localized accessors: resolve settlement.pbuilding.{id}.* with the
+        // hardcoded English fields as fallback (so modded ids without keys still render).
+        public string LocName => ResolveOr($"settlement.pbuilding.{Id}.name", Name);
+        public string LocDescription => ResolveOr($"settlement.pbuilding.{Id}.desc", Description);
+        public string LocEffectDescription => ResolveOr($"settlement.pbuilding.{Id}.effect", EffectDescription);
+        private static string ResolveOr(string key, string fallback)
+        {
+            var v = Loc.Get(key);
+            return v == key ? fallback : v;
+        }
     }
 
     public class SettlementState
@@ -270,7 +281,7 @@ namespace UsurperRemake.Systems
                 // Announce new settler (not every one, just sometimes)
                 if (random.NextDouble() < 0.3)
                 {
-                    NewsSystem.Instance?.Newsy(true, $"{npc.Name} has joined the Outskirts settlement.");
+                    NewsSystem.Instance?.Newsy(true, Loc.Get("settlement.news_settler_joined", npc.Name));
                 }
 
                 DebugLogger.Instance?.LogDebug("SETTLEMENT", $"{npc.Name} migrated to settlement ({State.SettlerNames.Count} settlers)");
@@ -410,16 +421,16 @@ namespace UsurperRemake.Systems
             buildingState.ResourcePool -= cost;
             buildingState.Tier = (BuildingTier)nextTier;
 
-            string tierName = buildingState.Tier switch
+            string newsKey = buildingState.Tier switch
             {
-                BuildingTier.Foundation => "foundation has been laid",
-                BuildingTier.Built => "has been completed",
-                BuildingTier.Upgraded => "has been upgraded",
-                _ => "has been built"
+                BuildingTier.Foundation => "settlement.news_foundation",
+                BuildingTier.Built => "settlement.news_built",
+                BuildingTier.Upgraded => "settlement.news_upgraded",
+                _ => "settlement.news_default"
             };
 
             string buildingName = GetBuildingDisplayName(State.ActiveBuilding.Value);
-            NewsSystem.Instance?.Newsy(true, $"The settlement's {buildingName} {tierName}!");
+            NewsSystem.Instance?.Newsy(true, Loc.Get(newsKey, buildingName));
 
             DebugLogger.Instance?.LogDebug("SETTLEMENT", $"{buildingName} advanced to {buildingState.Tier}");
 
@@ -517,7 +528,7 @@ namespace UsurperRemake.Systems
                     TicksRemaining = GameConfig.SettlementProposalDeliberationTicks
                 };
 
-                NewsSystem.Instance?.Newsy(true, $"{bestProposer} proposes building a {template.Name} in the settlement!");
+                NewsSystem.Instance?.Newsy(true, Loc.Get("settlement.news_proposes", bestProposer, template.LocName));
                 DebugLogger.Instance?.LogDebug("SETTLEMENT", $"Proposal: {template.Name} by {bestProposer} (score: {bestScore:F1})");
             }
         }
@@ -571,7 +582,7 @@ namespace UsurperRemake.Systems
                     State.ProposedBuildings[proposal.BuildingId] = new ProposedBuildingState { Id = proposal.BuildingId };
 
                 State.ActiveProposedBuildingId = proposal.BuildingId;
-                NewsSystem.Instance?.Newsy(true, $"The settlers vote to build a {template.Name}! Construction begins.");
+                NewsSystem.Instance?.Newsy(true, Loc.Get("settlement.news_vote_build", template.LocName));
                 DebugLogger.Instance?.LogDebug("SETTLEMENT", $"Proposal passed: {template.Name} ({totalSupport} for, {totalOppose} against)");
 
                 // Memorial special effect: boost contributions
@@ -582,7 +593,7 @@ namespace UsurperRemake.Systems
             {
                 // Proposal fails
                 State.ProposalCooldowns[proposal.BuildingId] = GameConfig.SettlementProposalCooldownTicks;
-                NewsSystem.Instance?.Newsy(true, $"The settlers reject the proposal to build a {template.Name}.");
+                NewsSystem.Instance?.Newsy(true, Loc.Get("settlement.news_reject", template.LocName));
                 DebugLogger.Instance?.LogDebug("SETTLEMENT", $"Proposal rejected: {template.Name} ({totalSupport} for, {totalOppose} against)");
             }
 
@@ -682,35 +693,35 @@ namespace UsurperRemake.Systems
 
         public static string GetBuildingDisplayName(SettlementBuilding building) => building switch
         {
-            SettlementBuilding.Palisade => "Palisade",
-            SettlementBuilding.Tavern => "Tavern",
-            SettlementBuilding.MarketStall => "Market Stall",
-            SettlementBuilding.Shrine => "Shrine",
-            SettlementBuilding.Workshop => "Workshop",
-            SettlementBuilding.Watchtower => "Watchtower",
-            SettlementBuilding.CouncilHall => "Council Hall",
+            SettlementBuilding.Palisade => Loc.Get("settlement.building.Palisade.name"),
+            SettlementBuilding.Tavern => Loc.Get("settlement.building.Tavern.name"),
+            SettlementBuilding.MarketStall => Loc.Get("settlement.building.MarketStall.name"),
+            SettlementBuilding.Shrine => Loc.Get("settlement.building.Shrine.name"),
+            SettlementBuilding.Workshop => Loc.Get("settlement.building.Workshop.name"),
+            SettlementBuilding.Watchtower => Loc.Get("settlement.building.Watchtower.name"),
+            SettlementBuilding.CouncilHall => Loc.Get("settlement.building.CouncilHall.name"),
             _ => building.ToString()
         };
 
         public static string GetBuildingDescription(SettlementBuilding building) => building switch
         {
-            SettlementBuilding.Palisade => "Wooden walls to defend the settlement",
-            SettlementBuilding.Tavern => "A gathering place that attracts new settlers",
-            SettlementBuilding.MarketStall => "A place to trade goods with settlers",
-            SettlementBuilding.Shrine => "A place of healing and contemplation",
-            SettlementBuilding.Workshop => "Craftsmen repair and identify equipment",
-            SettlementBuilding.Watchtower => "Scouts report on dungeon dangers",
-            SettlementBuilding.CouncilHall => "Settlers govern and generate income",
+            SettlementBuilding.Palisade => Loc.Get("settlement.building.Palisade.desc"),
+            SettlementBuilding.Tavern => Loc.Get("settlement.building.Tavern.desc"),
+            SettlementBuilding.MarketStall => Loc.Get("settlement.building.MarketStall.desc"),
+            SettlementBuilding.Shrine => Loc.Get("settlement.building.Shrine.desc"),
+            SettlementBuilding.Workshop => Loc.Get("settlement.building.Workshop.desc"),
+            SettlementBuilding.Watchtower => Loc.Get("settlement.building.Watchtower.desc"),
+            SettlementBuilding.CouncilHall => Loc.Get("settlement.building.CouncilHall.desc"),
             _ => ""
         };
 
         public static string GetTierDisplayName(BuildingTier tier) => tier switch
         {
-            BuildingTier.None => "Not Started",
-            BuildingTier.Foundation => "Foundation",
-            BuildingTier.Built => "Built",
-            BuildingTier.Upgraded => "Upgraded",
-            _ => "Unknown"
+            BuildingTier.None => Loc.Get("settlement.tier.None"),
+            BuildingTier.Foundation => Loc.Get("settlement.tier.Foundation"),
+            BuildingTier.Built => Loc.Get("settlement.tier.Built"),
+            BuildingTier.Upgraded => Loc.Get("settlement.tier.Upgraded"),
+            _ => Loc.Get("settlement.tier.Unknown")
         };
 
         /// <summary>
@@ -721,19 +732,19 @@ namespace UsurperRemake.Systems
             var services = new List<(string, string, SettlementBuilding)>();
 
             if (HasBuilding(SettlementBuilding.Tavern, BuildingTier.Built))
-                services.Add(("1", "Tavern — Rest & XP Buff", SettlementBuilding.Tavern));
+                services.Add(("1", Loc.Get("settlement.svc.tavern"), SettlementBuilding.Tavern));
             if (HasBuilding(SettlementBuilding.Shrine, BuildingTier.Upgraded))
-                services.Add(("2", "Shrine — Free Healing", SettlementBuilding.Shrine));
+                services.Add(("2", Loc.Get("settlement.svc.shrine"), SettlementBuilding.Shrine));
             if (HasBuilding(SettlementBuilding.MarketStall, BuildingTier.Built))
-                services.Add(("3", "Market — Trade with Settlers", SettlementBuilding.MarketStall));
+                services.Add(("3", Loc.Get("settlement.svc.market"), SettlementBuilding.MarketStall));
             if (HasBuilding(SettlementBuilding.Palisade, BuildingTier.Upgraded))
-                services.Add(("4", "Palisade — Defense Buff", SettlementBuilding.Palisade));
+                services.Add(("4", Loc.Get("settlement.svc.palisade"), SettlementBuilding.Palisade));
             if (HasBuilding(SettlementBuilding.Workshop, BuildingTier.Upgraded))
-                services.Add(("5", "Workshop — Sharpen Weapon (+20% ATK)", SettlementBuilding.Workshop));
+                services.Add(("5", Loc.Get("settlement.svc.workshop"), SettlementBuilding.Workshop));
             if (HasBuilding(SettlementBuilding.Watchtower, BuildingTier.Upgraded))
-                services.Add(("6", "Watchtower — Reveal Dungeon Floor", SettlementBuilding.Watchtower));
+                services.Add(("6", Loc.Get("settlement.svc.watchtower"), SettlementBuilding.Watchtower));
             if (HasBuilding(SettlementBuilding.CouncilHall, BuildingTier.Built))
-                services.Add(("7", "Council Hall — Claim Gold Share", SettlementBuilding.CouncilHall));
+                services.Add(("7", Loc.Get("settlement.svc.council"), SettlementBuilding.CouncilHall));
 
             return services;
         }
@@ -747,23 +758,23 @@ namespace UsurperRemake.Systems
             int keyNum = 8; // Continue numbering after core services
 
             if (HasProposedBuilding("arena", BuildingTier.Upgraded))
-                services.Add((keyNum++.ToString(), "Arena — Damage Buff", "arena"));
+                services.Add((keyNum++.ToString(), Loc.Get("settlement.psvc.arena"), "arena"));
             if (HasProposedBuilding("thieves_den", BuildingTier.Upgraded))
-                services.Add((keyNum++.ToString(), "Thieves' Den — Gold Find Buff", "thieves_den"));
+                services.Add((keyNum++.ToString(), Loc.Get("settlement.psvc.thieves_den"), "thieves_den"));
             if (HasProposedBuilding("mystic_circle", BuildingTier.Upgraded))
-                services.Add((keyNum++.ToString(), "Mystic Circle — Restore Mana", "mystic_circle"));
+                services.Add((keyNum++.ToString(), Loc.Get("settlement.psvc.mystic_circle"), "mystic_circle"));
             if (HasProposedBuilding("prison", BuildingTier.Upgraded))
-                services.Add((keyNum++.ToString(), "Prison — Trap Resistance", "prison"));
+                services.Add((keyNum++.ToString(), Loc.Get("settlement.psvc.prison"), "prison"));
             if (HasProposedBuilding("scouts_lodge", BuildingTier.Upgraded))
-                services.Add((keyNum++.ToString(), "Scouts' Lodge — Scout 3 Floors", "scouts_lodge"));
+                services.Add((keyNum++.ToString(), Loc.Get("settlement.psvc.scouts_lodge"), "scouts_lodge"));
             if (HasProposedBuilding("library", BuildingTier.Upgraded))
-                services.Add((keyNum++.ToString(), "Library — Knowledge Buff", "library"));
+                services.Add((keyNum++.ToString(), Loc.Get("settlement.psvc.library"), "library"));
             if (HasProposedBuilding("herbalist_hut", BuildingTier.Built))
-                services.Add((keyNum++.ToString(), "Herbalist Hut — Free Herb", "herbalist_hut"));
+                services.Add((keyNum++.ToString(), Loc.Get("settlement.psvc.herbalist_hut"), "herbalist_hut"));
             if (HasProposedBuilding("gambling_hall", BuildingTier.Built))
-                services.Add((keyNum++.ToString(), "Gambling Hall — Test Your Luck", "gambling_hall"));
+                services.Add((keyNum++.ToString(), Loc.Get("settlement.psvc.gambling_hall"), "gambling_hall"));
             if (HasProposedBuilding("oracles_sanctum", BuildingTier.Upgraded))
-                services.Add((keyNum++.ToString(), "Oracle's Sanctum — Glimpse the Future", "oracles_sanctum"));
+                services.Add((keyNum++.ToString(), Loc.Get("settlement.psvc.oracles_sanctum"), "oracles_sanctum"));
 
             return services;
         }

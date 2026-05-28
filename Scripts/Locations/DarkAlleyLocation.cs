@@ -1075,16 +1075,45 @@ namespace UsurperRemake.Locations
             // Check if already in a faction
             if (factionSystem.PlayerFaction != null)
             {
+                var currentFaction = factionSystem.PlayerFaction.Value;
+                string facName = currentFaction switch
+                {
+                    Faction.TheCrown => Loc.Get("faction.name_crown"),
+                    Faction.TheShadows => Loc.Get("faction.name_shadows"),
+                    Faction.TheFaith => Loc.Get("faction.name_faith"),
+                    _ => FactionSystem.Factions[currentFaction].Name
+                };
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("dark_alley.shadows_study"));
                 terminal.WriteLine("");
                 terminal.SetColor("bright_magenta");
-                terminal.WriteLine(Loc.Get("dark_alley.shadows_carry_mark", FactionSystem.Factions[factionSystem.PlayerFaction.Value].Name));
+                terminal.WriteLine(Loc.Get("dark_alley.shadows_carry_mark", facName));
                 terminal.WriteLine(Loc.Get("dark_alley.shadows_no_share"));
-                terminal.WriteLine(Loc.Get("dark_alley.shadows_find_us"));
                 terminal.WriteLine("");
-                terminal.SetColor("gray");
-                terminal.WriteLine(Loc.Get("dark_alley.shadows_dissolves"));
+
+                // Offer to renounce the current allegiance. Player feedback: "I can't seem to
+                // leave the Evil group either." FactionSystem.LeaveFaction() existed but was
+                // never exposed in any menu; this wires it up with its real consequence.
+                terminal.SetColor("yellow");
+                terminal.WriteLine(Loc.Get("dark_alley.faction_leave_warn", facName));
+                terminal.WriteLine("");
+                var leaveChoice = (await terminal.GetInputAsync(Loc.Get("dark_alley.faction_leave_prompt", facName)) ?? "").Trim().ToUpperInvariant();
+                // Accept localized affirmatives: Yes / Igen (hu) / Si (es,it) / Oui (fr)
+                bool confirmLeave = leaveChoice.StartsWith("Y") || leaveChoice.StartsWith("I")
+                    || leaveChoice.StartsWith("S") || leaveChoice.StartsWith("O");
+                if (confirmLeave)
+                {
+                    factionSystem.LeaveFaction();
+                    if (GameEngine.Instance != null) await GameEngine.Instance.SaveCurrentGame();
+                    terminal.WriteLine("");
+                    terminal.SetColor("bright_red");
+                    terminal.WriteLine(Loc.Get("dark_alley.faction_left", facName));
+                }
+                else
+                {
+                    terminal.SetColor("gray");
+                    terminal.WriteLine(Loc.Get("dark_alley.shadows_find_us"));
+                }
                 await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
                 return;
             }

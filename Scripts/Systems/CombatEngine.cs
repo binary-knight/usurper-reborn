@@ -1132,6 +1132,20 @@ public partial class CombatEngine
                 }
             }
 
+            // Alignment passive — Blessed Aura (Good/Holy): regen a fraction of MaxHP each
+            // round. The light sustains you the way the dark sustains the wicked through Soul Drain.
+            float blessedPct = AlignmentSystem.Instance.GetBlessedRegenPercent(player);
+            if (blessedPct > 0f && player.HP < player.MaxHP && player.IsAlive)
+            {
+                long blessedRegen = Math.Min((long)(player.MaxHP * blessedPct), player.MaxHP - player.HP);
+                if (blessedRegen > 0)
+                {
+                    player.HP += blessedRegen;
+                    terminal.SetColor("bright_green");
+                    terminal.WriteLine(Loc.Get("combat.blessed_aura", blessedRegen));
+                }
+            }
+
             // Drug HPDrain: some drugs cost HP each round (e.g., Haste: -5 HP/round)
             {
                 var drugEffects = DrugSystem.GetDrugEffects(player);
@@ -7493,6 +7507,44 @@ public partial class CombatEngine
                     terminal.WriteLine(Loc.Get("combat.dark_energy_siphon", applied), "dark_red");
                 else
                     terminal.WriteLine(Loc.Get("combat.tm_dark_energy_siphon", attackerName, applied), "dark_red");
+            }
+        }
+
+        // Alignment passives (player only) — the "named abilities" made real.
+        if (isPlayer && !isSpellDamage)
+        {
+            // Soul Drain (Dark/Evil): heal a fraction of melee damage dealt. Draws from the
+            // shared lifesteal budget above so it can't stack abusively with Lifedrinker.
+            float soulDrainPct = AlignmentSystem.Instance.GetSoulDrainPercent(attacker);
+            if (soulDrainPct > 0f)
+            {
+                long applied = ApplyLifestealSlice(Math.Max(1, (long)(damage * soulDrainPct)));
+                if (applied > 0)
+                {
+                    attacker.HP = Math.Min(attacker.MaxHP, attacker.HP + applied);
+                    terminal.WriteLine(Loc.Get("combat.soul_drain", applied), "dark_red");
+                }
+            }
+
+            // Terror Incarnate (Evil) / Fear Aura (Dark): chance to Fear on hit. Bosses resist.
+            int fearChance = AlignmentSystem.Instance.GetFearOnHitChance(attacker);
+            if (fearChance > 0 && target.IsAlive && !target.IsBoss && !target.IsMiniBoss && !target.IsFeared
+                && random.Next(100) < fearChance)
+            {
+                target.IsFeared = true;
+                target.FearDuration = 2;
+                terminal.WriteLine(Loc.Get("combat.terror_incarnate", target.Name), "bright_magenta");
+            }
+
+            // Holy Smite (Good/Holy): bonus damage vs undead/demonic foes. Applied as extra
+            // HP loss on top of the swing (same pattern as Storm Eagle's lightning chip).
+            float smiteBonus = AlignmentSystem.Instance.GetHolySmiteBonus(attacker);
+            if (smiteBonus > 0f && target.IsAlive
+                && (target.MonsterClass == MonsterClass.Undead || target.MonsterClass == MonsterClass.Demon))
+            {
+                long smite = Math.Max(1, (long)(damage * smiteBonus));
+                target.HP = Math.Max(0, target.HP - smite);
+                terminal.WriteLine(Loc.Get("combat.holy_smite_passive", target.Name, smite), "bright_yellow");
             }
         }
 

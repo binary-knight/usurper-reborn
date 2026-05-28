@@ -900,7 +900,7 @@ public class FeatureInteractionSystem
         {
             player.Gold += option.GoldReward;
             terminal.SetColor(option.GoldReward > 0 ? "yellow" : "red");
-            terminal.WriteLine(option.GoldReward > 0 ? $"+{option.GoldReward} gold" : $"{option.GoldReward} gold");
+            terminal.WriteLine(option.GoldReward > 0 ? Loc.Get("feature.reward_gold_plus", option.GoldReward) : Loc.Get("feature.reward_gold_minus", option.GoldReward));
             outcome.GoldGained = option.GoldReward;
         }
 
@@ -909,7 +909,7 @@ public class FeatureInteractionSystem
             long scaledXP = CalculateScaledReward(level, (int)option.ExperienceReward, (int)(option.ExperienceReward * 2));
             player.Experience += scaledXP;
             terminal.SetColor("yellow");
-            terminal.WriteLine($"+{scaledXP} experience");
+            terminal.WriteLine(Loc.Get("feature.reward_xp", scaledXP));
             outcome.ExperienceGained = scaledXP;
         }
 
@@ -918,7 +918,7 @@ public class FeatureInteractionSystem
             player.HP += option.HealthChange;
             player.HP = Math.Clamp(player.HP, 1, player.MaxHP);
             terminal.SetColor(option.HealthChange > 0 ? "green" : "red");
-            terminal.WriteLine(option.HealthChange > 0 ? $"+{option.HealthChange} HP" : $"{option.HealthChange} HP");
+            terminal.WriteLine(option.HealthChange > 0 ? Loc.Get("feature.reward_hp_plus", option.HealthChange) : Loc.Get("feature.reward_hp_minus", option.HealthChange));
         }
 
         outcome.Success = true;

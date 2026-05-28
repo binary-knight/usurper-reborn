@@ -191,8 +191,10 @@ public abstract class BaseLocation
             throw new LocationExitException(GameLocation.MainStreet);
         }
 
-        // MUD mode: show other players at this location
-        if (UsurperRemake.Server.SessionContext.IsActive && UsurperRemake.Server.RoomRegistry.Instance != null)
+        // MUD mode: show other players at this location. Skipped in the Dungeons: each
+        // player explores their own floors/instance, so "Also here" there is misleading.
+        if (UsurperRemake.Server.SessionContext.IsActive && UsurperRemake.Server.RoomRegistry.Instance != null
+            && LocationId != GameLocation.Dungeons)
         {
             var otherPlayers = UsurperRemake.Server.RoomRegistry.Instance.GetPlayerNamesAt(LocationId, player.DisplayName);
             if (otherPlayers.Count > 0)
@@ -653,13 +655,18 @@ public abstract class BaseLocation
             // In MUD streaming mode: show the full location display only on the first iteration
             // (or after `look`/`l` resets the flag). Subsequent iterations just flow output
             // continuously without wiping the scroll buffer — real MUD behaviour.
+            // Exception: when the player opts into auto-look, redraw every iteration like
+            // single-player (ClearScreen emits a real ANSI clear for capable clients).
             bool showDisplay = !_skipNextRedraw &&
-                (!UsurperRemake.BBS.DoorMode.IsMudServerMode || !_locationEntryDisplayed);
+                (!UsurperRemake.BBS.DoorMode.IsMudServerMode || GameConfig.AutoLook || !_locationEntryDisplayed);
             _skipNextRedraw = false;
 
-            // Refresh co-presence player cache every 15s (MUD mode only)
+            // Refresh co-presence player cache every 15s (MUD mode only).
+            // Skipped in the Dungeons: each player explores their own floors/instance,
+            // so co-presence there is misleading.
             if (UsurperRemake.BBS.DoorMode.IsMudServerMode &&
                 UsurperRemake.Systems.OnlineStateManager.IsActive &&
+                LocationId != GameLocation.Dungeons &&
                 (DateTime.Now - _coPresenceCacheTime).TotalSeconds >= 15)
             {
                 var allPlayers = await UsurperRemake.Systems.OnlineStateManager.Instance!.GetOnlinePlayers();
@@ -685,8 +692,10 @@ public abstract class BaseLocation
                 // Immersion text — overheard NPC dialogue and world-state flavor
                 ShowImmersionText();
 
-                // Co-presence: show other online players at this location (MUD mode only)
-                if (UsurperRemake.BBS.DoorMode.IsMudServerMode && _coPresenceCache.Count > 0)
+                // Co-presence: show other online players at this location (MUD mode only).
+                // Skipped in the Dungeons (instanced per player).
+                if (UsurperRemake.BBS.DoorMode.IsMudServerMode && _coPresenceCache.Count > 0
+                    && LocationId != GameLocation.Dungeons)
                 {
                     terminal.SetColor("cyan");
                     terminal.Write(Loc.Get("base.also_here") + ": ");
@@ -917,9 +926,9 @@ public abstract class BaseLocation
         terminal.WriteLine("");
 
         terminal.SetColor("white");
-        terminal.WriteLine($"  {encounter.DisguiseData.Name}");
+        terminal.WriteLine($"  {Loc.Get($"stranger.disguise.{encounter.Disguise}.name")}");
         terminal.SetColor("gray");
-        terminal.WriteLine($"  {encounter.DisguiseData.Description}");
+        terminal.WriteLine($"  {Loc.Get($"stranger.disguise.{encounter.Disguise}.desc")}");
         terminal.WriteLine("");
 
         await Task.Delay(1500);
@@ -1412,7 +1421,9 @@ public abstract class BaseLocation
         {
             var timePeriod = DailySystemManager.GetTimePeriodString(currentPlayer);
             var timeColor = DailySystemManager.GetTimePeriodColor(currentPlayer);
-            terminal.Write(Name);
+            // Localized display name (the raw Name field is a hardcoded English literal per location)
+            string locDisplayName = GetLocationName(LocationId);
+            terminal.Write(locDisplayName);
             terminal.SetColor("gray");
             terminal.Write(" — ");
             terminal.SetColor(timeColor);
@@ -1420,7 +1431,7 @@ public abstract class BaseLocation
 
             // Append fatigue tier label when Tired or Exhausted
             var (fatigueLabel, fatigueColor) = currentPlayer.GetFatigueTier();
-            int headerLen = Name.Length + 3 + timePeriod.Length;
+            int headerLen = locDisplayName.Length + 3 + timePeriod.Length;
             if (!string.IsNullOrEmpty(fatigueLabel) && currentPlayer.Fatigue >= GameConfig.FatigueTiredThreshold)
             {
                 terminal.SetColor("gray");
@@ -1461,11 +1472,14 @@ public abstract class BaseLocation
             }
             else
             {
-                terminal.WriteLine(Name);
+                // Localize the header name for non-dungeon locations (online + single-player);
+                // the Dungeons header keeps its raw Name because it carries the floor number.
+                string hdrName = LocationId == GameLocation.Dungeons ? Name : GetLocationName(LocationId);
+                terminal.WriteLine(hdrName);
                 if (!IsScreenReader)
                 {
                     terminal.SetColor("yellow");
-                    terminal.WriteLine(new string('═', Name.Length));
+                    terminal.WriteLine(new string('═', hdrName.Length));
                 }
             }
         }
@@ -2053,7 +2067,7 @@ public abstract class BaseLocation
             case GameLocation.Prison:
                 return Loc.Get("base.bc_prison");
             default:
-                return Name ?? Loc.Get("base.bc_unknown");
+                return GetLocationName(LocationId);
         }
     }
 
@@ -2757,6 +2771,21 @@ public abstract class BaseLocation
                 await Task.Delay(1000);
                 return (true, false);
 
+            case "autolook":
+            case "autodraw":
+                // Online/MUD only — single-player already redraws every turn
+                if (UsurperRemake.BBS.DoorMode.IsMudServerMode)
+                {
+                    currentPlayer.AutoLook = !currentPlayer.AutoLook;
+                    GameConfig.AutoLook = currentPlayer.AutoLook;
+                    terminal.WriteLine(currentPlayer.AutoLook
+                        ? $"  {Loc.Get("base.autolook_enabled")}"
+                        : $"  {Loc.Get("base.autolook_disabled")}", "green");
+                    await GameEngine.Instance.SaveCurrentGame();
+                    await Task.Delay(1000);
+                }
+                return (true, false);
+
             case "town":
             case "townhall":
                 await ShowTownHall();
@@ -2876,6 +2905,8 @@ public abstract class BaseLocation
         WriteCmd("/boss", Loc.Get("base.help_boss"));
         WriteCmd("/town", Loc.Get("base.help_town"));
         WriteCmd("/compact", Loc.Get("base.help_compact"));
+        if (UsurperRemake.BBS.DoorMode.IsMudServerMode)
+            WriteCmd("/autolook", Loc.Get("base.help_autolook"));
         WriteCmd("/bug", Loc.Get("base.help_bug"));
 
         WriteBoxLine(() => { }, 0);
@@ -2982,6 +3013,8 @@ public abstract class BaseLocation
         terminal.WriteLine($"/boss {Loc.Get("base.help_boss")}");
         terminal.WriteLine($"/town {Loc.Get("base.help_town")}");
         terminal.WriteLine($"/compact {Loc.Get("base.help_compact")}");
+        if (UsurperRemake.BBS.DoorMode.IsMudServerMode)
+            terminal.WriteLine($"/autolook {Loc.Get("base.help_autolook")}");
         terminal.WriteLine($"/bug {Loc.Get("base.help_bug")}");
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("base.help_quick_keys"));
@@ -3762,6 +3795,8 @@ public abstract class BaseLocation
                 terminal.WriteLine($"  {Loc.Get("prefs.auto_level")}: {(currentPlayer.AutoLevelUp ? Loc.Get("prefs.enabled") : Loc.Get("prefs.disabled"))}");
                 terminal.WriteLine($"  {Loc.Get("prefs.compact_mode")}: {(currentPlayer.CompactMode ? Loc.Get("prefs.enabled") : Loc.Get("prefs.disabled"))}");
                 terminal.WriteLine($"  {Loc.Get("prefs.disable_char_monster_art")}: {(currentPlayer.DisableCharacterMonsterArt ? Loc.Get("prefs.enabled") : Loc.Get("prefs.disabled"))}");
+                if (UsurperRemake.BBS.DoorMode.IsMudServerMode)
+                    terminal.WriteLine($"  {Loc.Get("prefs.auto_look")}: {(currentPlayer.AutoLook ? Loc.Get("prefs.enabled") : Loc.Get("prefs.disabled"))}");
                 terminal.WriteLine($"  {Loc.Get("prefs.auto_equip")}: {(currentPlayer.AutoEquipDisabled ? Loc.Get("prefs.disabled") : Loc.Get("prefs.enabled"))}");
                 terminal.WriteLine("");
 
@@ -3777,6 +3812,8 @@ public abstract class BaseLocation
                 terminal.WriteLine($"  6. {Loc.Get("prefs.color_theme")}");
                 terminal.WriteLine($"  9. {Loc.Get("prefs.toggle", Loc.Get("prefs.compact_mode"))}");
                 terminal.WriteLine($"  P. {Loc.Get("prefs.toggle", Loc.Get("prefs.disable_char_monster_art"))}");
+                if (UsurperRemake.BBS.DoorMode.IsMudServerMode)
+                    terminal.WriteLine($"  L. {Loc.Get("prefs.toggle", Loc.Get("prefs.auto_look"))}");
                 terminal.WriteLine($"  D. {Loc.Get("base.prefs_date_format")} ({srDateFormat})");
                 if (IsRunningInWezTerm())
                     terminal.WriteLine($"  7. {Loc.Get("prefs.terminal_font")}");
@@ -3837,6 +3874,8 @@ public abstract class BaseLocation
                 WriteMenuOption("6", $"{Loc.Get("prefs.color_theme")}: {ColorTheme.GetThemeName(currentPlayer.ColorTheme)}");
                 WriteMenuOption("9", $"{Loc.Get("prefs.compact_mode")}: {onOff(currentPlayer.CompactMode)}");
                 WriteMenuOption("P", $"{Loc.Get("prefs.disable_char_monster_art")}: {onOff(currentPlayer.DisableCharacterMonsterArt)}");
+                if (UsurperRemake.BBS.DoorMode.IsMudServerMode)
+                    WriteMenuOption("L", $"{Loc.Get("prefs.auto_look")}: {onOff(currentPlayer.AutoLook)}");
                 WriteMenuOption("D", $"{Loc.Get("base.prefs_date_format")}: {dateFormatName}");
                 if (IsRunningInWezTerm())
                     WriteMenuOption("7", $"{Loc.Get("prefs.terminal_font")}: {ReadCurrentFont()}");
@@ -4017,6 +4056,27 @@ public abstract class BaseLocation
                     }
                     await GameEngine.Instance.SaveCurrentGame();
                     await Task.Delay(1000);
+                    break;
+
+                case "L":
+                    // Auto-look toggle (online/MUD only — single-player already redraws every turn)
+                    if (UsurperRemake.BBS.DoorMode.IsMudServerMode)
+                    {
+                        currentPlayer.AutoLook = !currentPlayer.AutoLook;
+                        GameConfig.AutoLook = currentPlayer.AutoLook;
+                        if (currentPlayer.AutoLook)
+                        {
+                            terminal.WriteLine(Loc.Get("base.pref_autolook_enabled"), "green");
+                            terminal.WriteLine(Loc.Get("base.pref_autolook_enabled_desc"), "white");
+                        }
+                        else
+                        {
+                            terminal.WriteLine(Loc.Get("base.pref_autolook_disabled"), "green");
+                            terminal.WriteLine(Loc.Get("base.pref_autolook_disabled_desc"), "white");
+                        }
+                        await GameEngine.Instance.SaveCurrentGame();
+                        await Task.Delay(1000);
+                    }
                     break;
 
                 case "D":
@@ -5788,6 +5848,23 @@ public abstract class BaseLocation
         terminal.Write($"  |  {Loc.Get("ui.stat_constitution")}: ");
         terminal.SetColor("cyan");
         terminal.WriteLine($"{currentPlayer.Constitution}");
+
+        // Fatigue (single-player only — fatigue is not used in online mode)
+        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
+        {
+            var (fatigueLabel, fatigueColor) = currentPlayer.GetFatigueTier();
+            if (string.IsNullOrEmpty(fatigueLabel))
+            {
+                fatigueLabel = Loc.Get("status.fatigue_normal");
+                fatigueColor = "gray";
+            }
+            terminal.SetColor("white");
+            terminal.Write($"{Loc.Get("status.fatigue")}: ");
+            terminal.SetColor(fatigueColor);
+            terminal.Write(fatigueLabel);
+            terminal.SetColor("gray");
+            terminal.WriteLine($" ({currentPlayer.Fatigue}/100)");
+        }
         terminal.WriteLine("");
 
         // Pagination - Page 1 break
@@ -6376,6 +6453,61 @@ public abstract class BaseLocation
                 terminal.WriteLine($"    - {ability}");
             }
         }
+
+        // "What this means" — surface the otherwise-invisible mechanical effects of alignment
+        // (combat / economy / social / access / faction) so committing to a Dark or Light path
+        // visibly pays off. Player feedback: "being evil shows no benefits."
+        {
+            var alignType = AlignmentSystem.Instance.GetAlignment(currentPlayer);
+            var (atkMod, defMod) = AlignmentSystem.Instance.GetCombatModifiers(currentPlayer);
+            float shadyMod = AlignmentSystem.Instance.GetPriceModifier(currentPlayer, true);
+            float honestMod = AlignmentSystem.Instance.GetPriceModifier(currentPlayer, false);
+
+            string FmtMod(float mod)
+            {
+                int pct = (int)Math.Round((mod - 1f) * 100);
+                if (pct == 0) return Loc.Get("reputation.normal");
+                return pct > 0 ? Loc.Get("reputation.markup_val", pct) : Loc.Get("reputation.discount_val", -pct);
+            }
+
+            terminal.SetColor("cyan");
+            terminal.WriteLine(Loc.Get("reputation.effects_header"));
+            terminal.SetColor("white");
+            terminal.WriteLine($"    {Loc.Get("reputation.combat_line", FmtMod(atkMod), FmtMod(defMod))}");
+            terminal.WriteLine($"    {Loc.Get("reputation.prices_line", FmtMod(shadyMod), FmtMod(honestMod))}");
+
+            string reactKey = alignType switch
+            {
+                AlignmentSystem.AlignmentType.Holy or AlignmentSystem.AlignmentType.Good => "reputation.react_good",
+                AlignmentSystem.AlignmentType.Dark or AlignmentSystem.AlignmentType.Evil => "reputation.react_evil",
+                AlignmentSystem.AlignmentType.Balanced => "reputation.react_balanced",
+                _ => "reputation.react_neutral"
+            };
+            terminal.WriteLine($"    {Loc.Get(reactKey)}");
+
+            if (currentPlayer.Darkness > 100)
+                terminal.WriteLine($"    {Loc.Get("reputation.wanted")}");
+            var (templeOk, _) = AlignmentSystem.Instance.CanAccessLocation(currentPlayer, GameLocation.Temple);
+            if (!templeOk)
+                terminal.WriteLine($"    {Loc.Get("reputation.holy_barred")}");
+
+            var faction = FactionSystem.Instance;
+            if (faction.PlayerFaction != null)
+            {
+                string facName = faction.PlayerFaction switch
+                {
+                    Faction.TheCrown => Loc.Get("faction.name_crown"),
+                    Faction.TheShadows => Loc.Get("faction.name_shadows"),
+                    Faction.TheFaith => Loc.Get("faction.name_faith"),
+                    _ => faction.PlayerFaction.ToString()
+                };
+                terminal.WriteLine($"    {Loc.Get("reputation.faction_member", facName, faction.GetCurrentRankTitle(), faction.FactionReputation)}");
+            }
+            else
+            {
+                terminal.WriteLine($"    {Loc.Get("reputation.faction_none")}");
+            }
+        }
         terminal.WriteLine("");
 
         terminal.SetColor("white");
@@ -6729,6 +6861,36 @@ public abstract class BaseLocation
                 terminal.WriteLine(Loc.Get("base.affliction_haunted", currentPlayer.Haunt));
             }
             terminal.WriteLine("");
+        }
+
+        // v0.62.0: lingering combat afflictions -- transient statuses (from a dungeon discovery
+        // trap, or an unfinished fight) that bite when you next enter combat. These live in the
+        // per-combat ActiveStatuses dict and were previously invisible out of combat, so a player
+        // hit by a discovery affliction couldn't tell it had taken hold. Surface them here.
+        if (currentPlayer.ActiveStatuses != null && currentPlayer.ActiveStatuses.Count > 0)
+        {
+            var afflictKinds = new System.Collections.Generic.HashSet<StatusEffect>
+            {
+                StatusEffect.Poisoned, StatusEffect.Bleeding, StatusEffect.Burning, StatusEffect.Diseased,
+                StatusEffect.Cursed, StatusEffect.Weakened, StatusEffect.Blinded, StatusEffect.Frozen,
+                StatusEffect.Stunned, StatusEffect.Slow, StatusEffect.Paralyzed, StatusEffect.Sleeping,
+                StatusEffect.Silenced
+            };
+            var lingering = currentPlayer.ActiveStatuses
+                .Where(kv => kv.Value > 0 && afflictKinds.Contains(kv.Key)).ToList();
+            if (lingering.Count > 0)
+            {
+                WriteSectionHeader(Loc.Get("base.lingering_afflictions"), "bright_red");
+                foreach (var kv in lingering)
+                {
+                    string sk = $"status.{kv.Key.ToString().ToLowerInvariant()}";
+                    string sname = Loc.Get(sk);
+                    if (sname == sk) sname = kv.Key.ToString();
+                    terminal.SetColor("red");
+                    terminal.WriteLine("  - " + Loc.Get("base.lingering_affliction_line", sname, kv.Value));
+                }
+                terminal.WriteLine("");
+            }
         }
 
         // Footer

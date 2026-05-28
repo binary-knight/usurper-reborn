@@ -250,7 +250,7 @@ namespace UsurperRemake.Systems
                         .TryGetValue(sessionKey.ToLowerInvariant(), out var s) == true ? s : null;
                     if (session != null)
                     {
-                        _ = session.DisconnectAsync("You have been permadied.");
+                        _ = session.DisconnectAsync(Loc.Get("permadeath.disconnect_msg"));
                     }
                 }
             }

@@ -136,7 +136,7 @@ public class SettlementLocation : BaseLocation
             foreach (var kvp in proposedBuilt.OrderByDescending(b => (int)b.Value.Tier))
             {
                 var template = SettlementSystem.Instance.GetProposalTemplate(kvp.Key);
-                string name = template?.Name ?? kvp.Key;
+                string name = template?.LocName ?? kvp.Key;
                 string tier = SettlementSystem.GetTierDisplayName(kvp.Value.Tier);
                 string color = kvp.Value.Tier switch
                 {
@@ -178,7 +178,7 @@ public class SettlementLocation : BaseLocation
             if (propTemplate != null)
             {
                 terminal.SetColor("bright_cyan");
-                terminal.WriteLine(Loc.Get("settlement.proposal_active", state.CurrentProposal.ProposerName, propTemplate.Name));
+                terminal.WriteLine(Loc.Get("settlement.proposal_active", state.CurrentProposal.ProposerName, propTemplate.LocName));
                 terminal.SetColor("gray");
                 int dispFor = state.CurrentProposal.SupportVotes + Math.Max(0, state.CurrentProposal.PlayerVoteWeight);
                 int dispAgainst = state.CurrentProposal.OpposeVotes + Math.Max(0, -state.CurrentProposal.PlayerVoteWeight);
@@ -253,7 +253,7 @@ public class SettlementLocation : BaseLocation
         foreach (var kvp in state.ProposedBuildings.Where(b => b.Value.Tier > BuildingTier.None))
         {
             var tmpl = SettlementSystem.Instance.GetProposalTemplate(kvp.Key);
-            string nm = tmpl?.Name ?? kvp.Key;
+            string nm = tmpl?.LocName ?? kvp.Key;
             string tr = SettlementSystem.GetTierDisplayName(kvp.Value.Tier);
             string act = state.ActiveProposedBuildingId == kvp.Key ? "*" : "";
             terminal.WriteLine($"  {nm}: {tr}{act}");
@@ -267,7 +267,7 @@ public class SettlementLocation : BaseLocation
                 terminal.SetColor("cyan");
                 int bFor = state.CurrentProposal.SupportVotes + Math.Max(0, state.CurrentProposal.PlayerVoteWeight);
                 int bAgainst = state.CurrentProposal.OpposeVotes + Math.Max(0, -state.CurrentProposal.PlayerVoteWeight);
-                terminal.WriteLine(Loc.Get("settlement.bbs_proposal", pt.Name, bFor, bAgainst));
+                terminal.WriteLine(Loc.Get("settlement.bbs_proposal", pt.LocName, bFor, bAgainst));
             }
         }
 
@@ -791,13 +791,13 @@ public class SettlementLocation : BaseLocation
             if (template != null)
             {
                 terminal.SetColor("bright_yellow");
-                terminal.WriteLine(Loc.Get("settlement.active_proposal", template.Name));
+                terminal.WriteLine(Loc.Get("settlement.active_proposal", template.LocName));
                 terminal.SetColor("white");
                 terminal.WriteLine(Loc.Get("settlement.proposed_by", proposal.ProposerName));
                 terminal.SetColor("gray");
-                terminal.WriteLine($"  \"{template.Description}\"");
+                terminal.WriteLine($"  \"{template.LocDescription}\"");
                 terminal.SetColor("white");
-                terminal.WriteLine(Loc.Get("settlement.proposal_effect", template.EffectDescription));
+                terminal.WriteLine(Loc.Get("settlement.proposal_effect", template.LocEffectDescription));
                 terminal.WriteLine("");
                 terminal.SetColor("cyan");
 
@@ -832,14 +832,14 @@ public class SettlementLocation : BaseLocation
             foreach (var kvp in proposed.OrderByDescending(b => (int)b.Value.Tier))
             {
                 var tmpl = SettlementSystem.Instance.GetProposalTemplate(kvp.Key);
-                string name = tmpl?.Name ?? kvp.Key;
+                string name = tmpl?.LocName ?? kvp.Key;
                 string tier = SettlementSystem.GetTierDisplayName(kvp.Value.Tier);
                 terminal.SetColor(kvp.Value.Tier >= BuildingTier.Built ? "bright_green" : "yellow");
                 terminal.WriteLine($"    {name,-20} {tier}");
                 if (tmpl != null)
                 {
                     terminal.SetColor("gray");
-                    terminal.WriteLine($"      {tmpl.EffectDescription}");
+                    terminal.WriteLine($"      {tmpl.LocEffectDescription}");
                 }
             }
         }

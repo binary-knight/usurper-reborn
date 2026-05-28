@@ -712,6 +712,7 @@ namespace UsurperRemake.Systems
                 SkipIntimateScenes = player.SkipIntimateScenes,
                 ScreenReaderMode = player.ScreenReaderMode,
                 CompactMode = player.CompactMode,
+                AutoLook = player.AutoLook,
                 DisableCharacterMonsterArt = player.DisableCharacterMonsterArt,
                 Language = player.Language ?? "en",
                 ColorTheme = player.ColorTheme,
@@ -936,6 +937,7 @@ namespace UsurperRemake.Systems
                 AttunedShrineExpiresUtc = player.AttunedShrineExpiresUtc,
                 AttunedShrineExpiresGameDay = player.AttunedShrineExpiresGameDay,
                 ShrineFavor = player.ShrineFavor != null ? new Dictionary<string, int>(player.ShrineFavor) : new Dictionary<string, int>(),
+                DiscoveredFeatureIds = player.DiscoveredFeatureIds != null ? new List<string>(player.DiscoveredFeatureIds) : new List<string>(),
                 PetRoster = player.PetRoster?.Select(p => new PetSaveData
                 {
                     Id = p.Id,

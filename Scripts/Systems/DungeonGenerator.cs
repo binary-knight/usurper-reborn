@@ -251,7 +251,7 @@ namespace UsurperRemake.Systems
             room.HasTrap = random.NextDouble() < 0.15; // 15% chance of trap
 
             // Generate features to examine
-            room.Features = GenerateRoomFeatures(theme, type);
+            room.Features = GenerateRoomFeatures(theme, type, level);
 
             return room;
         }
@@ -422,21 +422,51 @@ namespace UsurperRemake.Systems
 
         #endregion
 
-        private static List<RoomFeature> GenerateRoomFeatures(DungeonTheme theme, RoomType type)
+        private static List<RoomFeature> GenerateRoomFeatures(DungeonTheme theme, RoomType type, int level)
         {
             var features = new List<RoomFeature>();
             int featureCount = random.Next(1, 4);
 
-            var possibleFeatures = GetThemeFeatures(theme);
+            // v0.62.0: prefer bespoke catalog Discoveries (theme + floor gated, weighted). Fall back
+            // to the legacy generic theme features as filler when no discovery fits or the slot
+            // rolls filler. Discoveries are unique within a room; one-time-already-found filtering
+            // happens at examine time (player-aware), not here (generation is player-agnostic/seeded).
+            var discoveries = DiscoveryCatalog.ForFloor(theme, level);
+            var oldPool = GetThemeFeatures(theme);
+            var usedDiscoveryIds = new HashSet<string>();
 
-            for (int i = 0; i < featureCount && possibleFeatures.Count > 0; i++)
+            for (int i = 0; i < featureCount; i++)
             {
-                var idx = random.Next(possibleFeatures.Count);
-                features.Add(possibleFeatures[idx]);
-                possibleFeatures.RemoveAt(idx);
+                bool useDiscovery = discoveries.Count > 0 && (oldPool.Count == 0 || random.Next(100) < 70);
+                if (useDiscovery)
+                {
+                    var def = WeightedPickDiscovery(discoveries, usedDiscoveryIds);
+                    if (def != null)
+                    {
+                        usedDiscoveryIds.Add(def.Id);
+                        features.Add(new RoomFeature(def.Name, def.Desc, def.Verb) { DiscoveryId = def.Id });
+                        continue;
+                    }
+                }
+                if (oldPool.Count > 0)
+                {
+                    var idx = random.Next(oldPool.Count);
+                    features.Add(oldPool[idx]);
+                    oldPool.RemoveAt(idx);
+                }
             }
 
             return features;
+        }
+
+        private static DiscoveryDefinition WeightedPickDiscovery(List<DiscoveryDefinition> pool, HashSet<string> exclude)
+        {
+            var avail = pool.Where(d => !exclude.Contains(d.Id)).ToList();
+            if (avail.Count == 0) return null;
+            int total = avail.Sum(d => Math.Max(1, d.Weight));
+            int r = random.Next(total);
+            foreach (var d in avail) { r -= Math.Max(1, d.Weight); if (r < 0) return d; }
+            return avail[0];
         }
 
         private static List<RoomFeature> GetThemeFeatures(DungeonTheme theme)
@@ -1177,6 +1207,10 @@ namespace UsurperRemake.Systems
         public string Description { get; set; }
         public FeatureInteraction Interaction { get; set; }
         public bool IsInteracted { get; set; } = false;
+        // v0.62.0: when set, this feature is a catalog Discovery (DiscoveryCatalog) and the examine
+        // path runs DiscoverySystem instead of the legacy generic-outcome FeatureInteractionSystem.
+        // Name/Description hold the English source; display resolves discovery.{id}.name/.desc.
+        public string DiscoveryId { get; set; } = "";
 
         public RoomFeature(string name, string desc, FeatureInteraction interaction)
         {

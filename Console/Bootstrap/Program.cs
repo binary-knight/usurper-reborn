@@ -103,6 +103,25 @@ namespace UsurperConsole
                 return;
             }
 
+            // Handle --export-discoveries flag: emit the dungeon Discovery loc source keys (English)
+            // for translation, then exit. Optional second arg = output path.
+            if (args.Contains("--export-discoveries"))
+            {
+                var map = UsurperRemake.Systems.DiscoverySystem.ExportLocKeys();
+                var idx = Array.IndexOf(args, "--export-discoveries");
+                string path = (idx >= 0 && idx + 1 < args.Length && !args[idx + 1].StartsWith("--"))
+                    ? args[idx + 1]
+                    : System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "discovery_en.json");
+                var jsonOpts = new System.Text.Json.JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                    Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+                };
+                System.IO.File.WriteAllText(path, System.Text.Json.JsonSerializer.Serialize(map, jsonOpts));
+                Console.WriteLine($"Exported {map.Count} discovery keys to: {path}");
+                return;
+            }
+
             // --editor launches the standalone USEDIT-analog editor. Analogous to the
             // DOS-era companion tool that shipped alongside the original Usurper.
             // Edits GameData/*.json + save files; does NOT start any game systems

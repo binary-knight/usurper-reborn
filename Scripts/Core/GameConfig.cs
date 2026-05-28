@@ -10,8 +10,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.61.7";
-    public const string VersionName = "Beta";
+    public const string Version = "0.62.0";
+    public const string VersionName = "Light and Dark";
 
     // v0.57.12: Alignment scale cap. Character.Chivalry and Character.Darkness setters clamp to [0, AlignmentCap]
     // as defense in depth against direct-mutation bypass sites that don't route through AlignmentSystem.ChangeAlignment.
@@ -256,6 +256,31 @@ public static partial class GameConfig
                 ctx.CompactMode = value;
             else
                 _compactModeGlobal = value;
+        }
+    }
+
+    private static bool _autoLookGlobal = false;
+
+    /// <summary>
+    /// Online/MUD opt-in: when true, the location screen auto-redraws after every action
+    /// (the single-player feel) instead of waiting for the player to type `look`. Per-session
+    /// (SessionContext-backed) so concurrent MUD players can differ; single-player ignores it
+    /// (it already redraws every loop).
+    /// </summary>
+    public static bool AutoLook
+    {
+        get
+        {
+            var ctx = UsurperRemake.Server.SessionContext.Current;
+            return ctx != null ? ctx.AutoLook : _autoLookGlobal;
+        }
+        set
+        {
+            var ctx = UsurperRemake.Server.SessionContext.Current;
+            if (ctx != null)
+                ctx.AutoLook = value;
+            else
+                _autoLookGlobal = value;
         }
     }
 

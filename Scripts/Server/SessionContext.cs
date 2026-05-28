@@ -157,6 +157,7 @@ public class SessionContext : IDisposable
     /// </summary>
     public string Language { get; set; } = "en";
     public bool CompactMode { get; set; } = false;
+    public bool AutoLook { get; set; } = false;
     public bool DisableCharacterMonsterArt { get; set; } = false;
     public int DateFormat { get; set; } = 0;
     public ColorThemeType ColorTheme { get; set; } = ColorThemeType.Default;
