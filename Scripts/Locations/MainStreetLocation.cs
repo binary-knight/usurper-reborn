@@ -421,6 +421,9 @@ public class MainStreetLocation : BaseLocation
             terminal.SetColor("darkgray");
             terminal.Write(" ["); terminal.SetColor("bright_yellow"); terminal.Write("Y"); terminal.SetColor("darkgray"); terminal.Write("]");
             terminal.SetColor("gray"); terminal.Write(Loc.Get("main_street.menu_dark_alley"));
+            // v0.62.x Phase 6: The Sanctum -- yin/yang Light mirror of Dark Alley. Iconic [+] symbol.
+            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("+"); terminal.SetColor("darkgray"); terminal.Write("]");
+            terminal.SetColor("bright_yellow"); terminal.Write(Loc.Get("main_street.menu_sanctum"));
             terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("X"); terminal.SetColor("darkgray"); terminal.Write("]");
             terminal.SetColor("magenta"); terminal.Write(Loc.Get("main_street.menu_love_st"));
             terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("O"); terminal.SetColor("darkgray"); terminal.Write("]");
@@ -843,6 +846,7 @@ public class MainStreetLocation : BaseLocation
         if (tier >= 3)
         {
             MI("Y", Loc.Get("menu.action.dark_alley"), "gray", C);
+            MI("+", Loc.Get("menu.action.sanctum"), "bright_yellow", C);
             MI("X", Loc.Get("menu.action.love_street"), "magenta", C);
             MI("Q", Loc.Get("menu.action.quit_game"), "gray", C);
             ML("~", Loc.Get("menu.action.settings"), "gray");
@@ -1018,6 +1022,7 @@ public class MainStreetLocation : BaseLocation
         if (tier >= 3)
         {
             terminal.WriteLine($"  Y - {Loc.Get("menu.action.dark_alley")}");
+            terminal.WriteLine($"  + - {Loc.Get("menu.action.sanctum")}");
             terminal.WriteLine($"  X - {Loc.Get("menu.action.love_street")}");
         }
         terminal.WriteLine($"  Q - {Loc.Get("menu.action.quit")}");
@@ -1226,6 +1231,13 @@ public class MainStreetLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("main_street.nav_dark_alley"), "gray");
                 await Task.Delay(1500);
                 throw new LocationExitException(GameLocation.DarkAlley);
+
+            case "+":
+                // v0.62.x Phase 6: The Sanctum -- Light activity hub (yin/yang mirror of Dark Alley).
+                // Evil players are wards-barred at the door inside AlignmentSystem.CanAccessLocation.
+                terminal.WriteLine(Loc.Get("main_street.nav_sanctum"), "bright_yellow");
+                await Task.Delay(1500);
+                throw new LocationExitException(GameLocation.Sanctum);
 
             case ">":
                 if (UsurperRemake.Systems.SettlementSystem.Instance?.State.IsEstablished == true)

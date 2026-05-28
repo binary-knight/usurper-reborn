@@ -643,6 +643,21 @@ namespace UsurperRemake.Systems
         public int IntimateEncountersToday { get; set; }
         public int GauntletRunsToday { get; set; }
         public bool MarshToadAntidoteClaimedToday { get; set; }
+        public int TributeDemandsToday { get; set; }            // v0.62.x Phase 3 (Dread reward loop)
+        public bool FreeBlessingClaimedToday { get; set; }      // v0.62.x Phase 3 (Renown reward loop)
+        // v0.62.x Phase 4 (Mercenary board)
+        public int MercContractsCompleted { get; set; }
+        public int MercContractsClaimedToday { get; set; }
+        public DateTime LastMercBoardRefreshUtc { get; set; }
+        public Dictionary<int, int> DailyMercStandingGain { get; set; } = new();
+        // v0.62.x Phase 5 (Black Market rotation)
+        public int BlackMarketStockSeed { get; set; }
+        public DateTime LastBlackMarketRefreshUtc { get; set; }
+        // v0.62.x Phase 6 (Sanctum -- Light activity hub)
+        public int AlmsGivenToday { get; set; }
+        public int OrphanageGiftsToday { get; set; }
+        public int HospiceTithesToday { get; set; }
+        public long LifetimeCharityGoldDonated { get; set; }
         // v0.61.0 Druid's Shrines
         public string AttunedShrineId { get; set; } = "";
         public DateTime AttunedShrineExpiresUtc { get; set; } = DateTime.MinValue;
@@ -1137,6 +1152,11 @@ namespace UsurperRemake.Systems
         public string TargetNPCName { get; set; } = "";
         public List<QuestObjectiveData> Objectives { get; set; } = new();
         public List<QuestMonsterData> Monsters { get; set; } = new();
+        // v0.62.x Phase 4 (Mercenary board): faction-issued freelance contract fields.
+        // Serialized as int (-1 = none) matching FactionSaveData.PlayerFaction pattern.
+        public bool IsMercContract { get; set; }
+        public int IssuingFaction { get; set; } = -1;
+        public int MercContractTier { get; set; } = 1;
     }
 
     /// <summary>

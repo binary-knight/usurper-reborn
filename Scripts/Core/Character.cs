@@ -708,6 +708,34 @@ public class Character
     public int IntimateEncountersToday { get; set; } = 0;       // v0.61.x: bedroom / spouse / lover intimate-scene daily counter (cap: GameConfig.MaxIntimateEncountersPerDay). LoveStreet has its own separate counter.
     public int GauntletRunsToday { get; set; } = 0;             // v0.60.11 hotfix: Anchor Road Gauntlet daily counter (cap: GameConfig.MaxGauntletRunsPerDay).
     public bool MarshToadAntidoteClaimedToday { get; set; } = false; // v0.61.1 Beast Taming: Marsh Toad daily free antidote claimed.
+    public int TributeDemandsToday { get; set; } = 0;            // v0.62.x "Light and Dark" Phase 3 (Dread reward loop): Demand Tribute daily counter (cap: GameConfig.MaxTributeDemandsPerDay).
+    public bool FreeBlessingClaimedToday { get; set; } = false;  // v0.62.x "Light and Dark" Phase 3 (Renown reward loop): one free Temple blessing per day at Paragon+ Renown.
+    // v0.62.x "Light and Dark" Phase 4 (Mercenary/Sellsword job board): the four fields below
+    // implement the freelance-merc career track. MercContractsCompleted is the LIFETIME counter
+    // that drives the rank ladder (never decays, survives NG+); the others are daily-cap state.
+    public int MercContractsCompleted { get; set; } = 0;         // Lifetime contracts completed across all factions. Never decays. Drives merc rank tier.
+    public int MercContractsClaimedToday { get; set; } = 0;      // Daily cap counter (cap: GameConfig.MaxMercContractsPerDay).
+    public DateTime LastMercBoardRefreshUtc { get; set; } = DateTime.MinValue; // Per-player board refresh timestamp; default forces a refresh on first visit.
+    public Dictionary<int, int> DailyMercStandingGain { get; set; } = new();   // Key = (int)Faction, value = standing gained today via merc contracts. Reset daily. Caps per-faction climb via merc work.
+    // v0.62.x "Light and Dark" Phase 5 (Dark Alley depth -- rotating Black Market stock).
+    // Stock list is computed live from BlackMarketStockSeed each visit (deterministic per seed), so we
+    // only need to persist the seed and the last-refresh timestamp. Default seed 0 + Min timestamp force
+    // a refresh on first visit. Mirrors the LastMercBoardRefreshUtc daily-refresh pattern from Phase 4.
+    public int BlackMarketStockSeed { get; set; } = 0;
+    public DateTime LastBlackMarketRefreshUtc { get; set; } = DateTime.MinValue;
+    // Transient per-session stock cache for the rotating gear slots. NOT copied into PlayerData
+    // (the save system uses an explicit-copy DTO pattern, so anything not enumerated in SaveSystem
+    // doesn't persist). This is regenerated on first visit each session OR on day-change refresh.
+    // Storing it on Character (not as a static) keeps it per-player in online mode.
+    public List<Item>? CachedBlackMarketStock { get; set; } = null;
+    // v0.62.x "Light and Dark" Phase 6 (Light activity hub -- "The Sanctum").
+    // Three charity verbs daily-capped. Each verb has its own counter so capping one doesn't
+    // block the others. LifetimeCharityGoldDonated is a cosmetic milestone counter (parallel to
+    // ChurchDonations) for future achievement hooks; not consulted by gameplay in Tier 1.
+    public int AlmsGivenToday { get; set; } = 0;             // 0..GameConfig.MaxAlmsPerDay
+    public int OrphanageGiftsToday { get; set; } = 0;        // 0..GameConfig.MaxOrphanageGiftsPerDay
+    public int HospiceTithesToday { get; set; } = 0;         // 0..GameConfig.MaxHospiceTithesPerDay
+    public long LifetimeCharityGoldDonated { get; set; } = 0; // running total across all 3 verbs; pure cosmetic / achievement hook
 
     // v0.61.2 Last-Stand cap: prevents monster / boss / environmental damage from
     // one-shotting a player who started the round above 50% MaxHP. Transient

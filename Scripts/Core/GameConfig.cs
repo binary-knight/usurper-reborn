@@ -18,6 +18,12 @@ public static partial class GameConfig
     // Pre-v0.57.12 saves could exceed this cap (one player reached 15,000 chivalry through accumulated unchecked +=);
     // AlignmentSystem.HealOverflow retroactively applies paired-movement and clamps on load.
     public const long AlignmentCap = 1000;
+
+    // v0.62.x "Light and Dark" Phase 2 (Dread/Renown notoriety ladders): a Dark/Evil player at
+    // Terror+ Dread standing makes weaker ordinary NPCs flee on sight. The fleeing NPC must be at
+    // least this many levels below the player (so quest targets and peers still interact).
+    public const int DreadFleeLevelGap = 5;
+
     public const string DiscordInvite = "discord.gg/EZhwgDT6Ta";
 
     // Electron graphical client mode — emits JSON events via OSC sequences
@@ -733,6 +739,75 @@ public static partial class GameConfig
     public const float MurderGoldTheftPercent = 0.50f;       // Steal 50% of NPC's gold on murder
     public const int MurderDarknessGain = 250;                // 50 -> 250 (paired with -125 chivalry).
     public const int MaxMurdersPerDay = 3;                    // v0.57.6: cap non-bounty NPC murders to prevent a dark-aligned player from wiping the town in a single play session.
+
+    // v0.62.x "Light and Dark" Phase 3 (Dread/Renown reward-loop content).
+    // DREAD: Demand Tribute is the Dark/Evil "active income" verb. Capped to prevent infinite
+    // gold extraction; success scales to NPC level (NOT player gold or wealth, so it can't
+    // snowball); failure burns a charge AND turns the NPC hostile.
+    public const int MaxTributeDemandsPerDay = 3;
+    public const int TributeGoldPerNpcLevel = 50;             // base gold per NPC level on a successful demand (+random 20..100 jitter).
+    public const int TributeBaseSuccessPercent = 30;          // baseline success chance at Cutthroat tier; each tier above adds 15.
+    public const int TributeSuccessPerTier = 15;
+    public const int TributeDarknessGain = 5;                 // paired alignment via ChangeAlignment (also -2 chivalry).
+    // DREAD: escalating bounty hunters worth killing. Replaces the throwaway-thug feel: hunter
+    // is named, scaled, drops a guaranteed gold purse + a real loot roll. Gated to Dark/Evil band
+    // at Marauder+ Dread. Spawn chance is checked in addition to the existing danger multiplier
+    // (which already biases random encounters toward evil players via StreetEncounterSystem:89-92).
+    public const int DreadBountyHunterSpawnPercent = 18;      // per-encounter roll at Marauder+; rises with tier.
+    public const int DreadBountyHunterGoldPerTier = 350;      // gold purse base = tier * this + level*random.
+    // RENOWN: free temple blessing once per day at Paragon+ (Chivalry >= 450). Mirror of the
+    // Dread shop-discount: the temple recognizes a celebrated hero and offers one blessing free.
+    public const int FreeBlessingMinRenownChivalry = 450;     // = Paragon tier threshold (kept literal here to avoid AlignmentSystem coupling at config layer).
+
+    // v0.62.x "Light and Dark" Phase 4 (Mercenary/Sellsword job board, [[project_alignment_rework]]).
+    // A freelance contract surface offering work from all 3 factions with no oath required. Closes
+    // the loop on the original player feedback "live as a Merc doing whatever jobs I want." Lifetime
+    // contract counter (MercContractsCompleted) drives a 5-tier rank ladder (Recruit -> Legend);
+    // contract gold scales on PLAYER LEVEL (NOT player wealth) so it can't compound. Daily-capped at
+    // MaxMercContractsPerDay to bound spam; per-faction-standing daily gain capped via the
+    // DailyMercStandingGain dict to slow the "merc the cascade into Crown membership in three days"
+    // exploit. Refresh policy mirrors RefreshBountyBoard at QuestSystem.cs:508 -- daily reset clears
+    // unclaimed older than MercContractStaleDays, repopulates to the rank-tier slot count.
+    public const int MaxMercContractsPerDay = 3;              // Daily cap on contracts CLAIMED. Separate from RoyQuestsToday so merc work is a parallel track to dungeon questing.
+    public const int MaxDailyMercStandingGain = 30;           // Per-faction standing gain from merc contracts capped per day. Cascade still fires.
+    public const int MercContractBaseGoldTier1 = 150;         // Tier-1 contract base; scaled by playerLevel * this. Sub-linear curve up to tier 5 (see GetMercContractGoldTierMultiplier).
+    public const int MercContractStaleDays = 3;               // Unclaimed contracts older than this are dropped on the next daily refresh.
+    public static readonly int[] MercRankContractsRequired = { 0, 1, 10, 30, 75, 150 }; // None / Recruit / Sellsword / Veteran / Ironbound / Legend
+    public static readonly int[] MercRankSlotsPerFaction = { 1, 1, 1, 2, 2, 3 };          // visible contracts per faction column by rank index
+    public static readonly float[] MercRankPayMultiplier = { 1.00f, 1.00f, 1.00f, 1.05f, 1.10f, 1.15f }; // payout multiplier by rank index
+
+    // v0.62.x "Light and Dark" Phase 5 (Dark Alley depth -- rotating Black Market keyed on Dread tier).
+    // The 3-item utility floor (forged papers / poison vials / smoke bombs) stays as-is; rotating
+    // GEAR slots scale with Dread tier so the deeper your Dread standing, the more (and better)
+    // merchandise the fences show you. Gear pool feeds from LootGenerator.GenerateDungeonLoot with
+    // a minimum rarity clamped upward by tier. Per-player daily rotation seeded by
+    // Character.BlackMarketStockSeed, refreshed on day-change via LastBlackMarketRefreshUtc.
+    public static readonly int[] BlackMarketGearSlotsByDreadTier = { 0, 2, 3, 4, 5 }; // None / Cutthroat / Marauder / Terror / Nightmare
+    public const float BlackMarketGearMarkup = 1.5f;                  // base price = item.Value * this. Premium for unsanctioned access.
+    public const float BlackMarketFreelanceSurcharge = 1.10f;         // freelance evil (non-Shadows) pays this extra at Marauder+ Dread.
+    public const int BlackMarketLegendarySlotCap = 1;                 // Nightmare-only; max Legendaries in rotation per refresh.
+
+    // v0.62.x "Light and Dark" Phase 6 (Light activity hub -- "The Sanctum").
+    // Structural yin/yang mirror of the Dark Alley as a Good/Holy player's home. Gated at the
+    // door to Holy/Good/Balanced/Neutral/Dark; Evil is wards-barred (mirrors Temple). Three
+    // charity verbs in the first slice (Alms / Orphanage / Hospice) each daily-capped to prevent
+    // farming. Costs scale with player level (NOT player wealth -- can't compound). Each charity
+    // act routes through AlignmentSystem.ChangeAlignment so paired-movement + DR curve apply.
+    // Faith faction members get a 10% discount on charity costs (Sanctum's mirror of Black
+    // Market's rank discount). All Chivalry climbs come from ChangeAlignment, not direct +=.
+    public const int MaxAlmsPerDay = 3;                              // give to beggar pool (small / fast)
+    public const int MaxOrphanageGiftsPerDay = 1;                    // big-gesture fund (large / slow)
+    public const int MaxHospiceTithesPerDay = 1;                     // moderate (mid)
+    public const int AlmsGoldPerLevel = 50;                          // playerLevel * this = alms cost
+    public const int OrphanageGoldPerLevel = 200;                    // playerLevel * this = orphanage cost
+    public const int HospiceGoldPerLevel = 150;                      // playerLevel * this = hospice cost
+    public const int AlmsChivalryReward = 5;                         // pre-DR; passes through AlignmentSystem.ChangeAlignment so the DR curve scales it down at high chivalry
+    public const int OrphanageChivalryReward = 10;
+    public const int HospiceChivalryReward = 8;
+    public const int AlmsFaithStandingReward = 3;                    // FactionStanding[TheFaith] via the cascade (cross-fires Crown/Shadows per FactionSystem.ApplyReputationCascade)
+    public const int OrphanageFaithStandingReward = 5;
+    public const int HospiceFaithStandingReward = 4;
+    public const float SanctumFaithMemberDiscount = 0.10f;           // 10% off charity costs for Faith faction members. Mirrors Slice 5's Black Market Shadows-rank discount.
 
     // Team Wars (v0.57.17 — anti-exploit caps)
     // Player report: at Lv.100 the wager is 20k and the win pays 40k (wager * 2 from
@@ -2835,6 +2910,10 @@ public enum GameLocation
 
     // NPC Settlement (autonomous town-building)
     Settlement = 505,    // The Outskirts — NPC-built settlement
+
+    // v0.62.x Phase 6 (Light activity hub). Structural yin/yang mirror of DarkAlley as a
+    // Good/Holy player's home. Evil players are wards-barred (mirrors Temple gating).
+    Sanctum = 506,       // The Sanctum -- charity, Hall of Heroes (Tournament of Honor + Crown commissions in slice 6b)
 
     Closed = 30000       // onloc_closed (for fake players)
 }

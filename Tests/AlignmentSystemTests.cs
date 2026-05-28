@@ -147,9 +147,12 @@ public class AlignmentSystemTests
 
     #region Price Modifier Tests - Legitimate Shops
 
+    // v0.62.x Renown ladder: Good/Holy characters get a deeper honest-shop discount scaled by their
+    // Renown tier (the test Good char is Chiv 600 = Paragon x0.90 -> 0.9*0.90=0.81; the Holy char is
+    // Chiv 850 = Legend x0.80 -> 0.8*0.80=0.64). Dark/Evil/Neutral/Balanced honest prices are unchanged.
     [Theory]
-    [InlineData(AlignmentSystem.AlignmentType.Holy, 0.8f)]
-    [InlineData(AlignmentSystem.AlignmentType.Good, 0.9f)]
+    [InlineData(AlignmentSystem.AlignmentType.Holy, 0.64f)]
+    [InlineData(AlignmentSystem.AlignmentType.Good, 0.81f)]
     [InlineData(AlignmentSystem.AlignmentType.Neutral, 1.0f)]
     [InlineData(AlignmentSystem.AlignmentType.Balanced, 0.95f)]
     [InlineData(AlignmentSystem.AlignmentType.Dark, 1.15f)]
@@ -162,7 +165,7 @@ public class AlignmentSystemTests
 
         var modifier = _alignmentSystem.GetPriceModifier(character, isShadyShop: false);
 
-        modifier.Should().Be(expectedModifier);
+        modifier.Should().BeApproximately(expectedModifier, 0.001f);
     }
 
     [Fact]
@@ -181,13 +184,16 @@ public class AlignmentSystemTests
 
     #region Price Modifier Tests - Shady Shops
 
+    // v0.62.x Dread ladder: Dark/Evil characters get a deeper shady-shop discount scaled by their
+    // Dread tier (the test Dark char is Dark 600 = Marauder x0.90 -> 0.9*0.90=0.81; the Evil char is
+    // Dark 850 = Nightmare x0.80 -> 0.75*0.80=0.60). Holy/Good/Neutral/Balanced shady prices unchanged.
     [Theory]
     [InlineData(AlignmentSystem.AlignmentType.Holy, 1.5f)]
     [InlineData(AlignmentSystem.AlignmentType.Good, 1.25f)]
     [InlineData(AlignmentSystem.AlignmentType.Neutral, 1.0f)]
     [InlineData(AlignmentSystem.AlignmentType.Balanced, 0.95f)]
-    [InlineData(AlignmentSystem.AlignmentType.Dark, 0.9f)]
-    [InlineData(AlignmentSystem.AlignmentType.Evil, 0.75f)]
+    [InlineData(AlignmentSystem.AlignmentType.Dark, 0.81f)]
+    [InlineData(AlignmentSystem.AlignmentType.Evil, 0.6f)]
     public void GetPriceModifier_ShadyShop_ReturnsCorrectValue(
         AlignmentSystem.AlignmentType alignment,
         float expectedModifier)
@@ -196,7 +202,7 @@ public class AlignmentSystemTests
 
         var modifier = _alignmentSystem.GetPriceModifier(character, isShadyShop: true);
 
-        modifier.Should().Be(expectedModifier);
+        modifier.Should().BeApproximately(expectedModifier, 0.001f);
     }
 
     [Fact]
@@ -209,6 +215,100 @@ public class AlignmentSystemTests
         var evilPrice = _alignmentSystem.GetPriceModifier(evilChar, isShadyShop: true);
 
         evilPrice.Should().BeLessThan(holyPrice);
+    }
+
+    #endregion
+
+    #region Dread / Renown Notoriety Ladders (v0.62.x "Light and Dark" Phase 2)
+
+    [Theory]
+    [InlineData(0, AlignmentSystem.DreadTier.None)]
+    [InlineData(249, AlignmentSystem.DreadTier.None)]
+    [InlineData(250, AlignmentSystem.DreadTier.Cutthroat)]
+    [InlineData(449, AlignmentSystem.DreadTier.Cutthroat)]
+    [InlineData(450, AlignmentSystem.DreadTier.Marauder)]
+    [InlineData(649, AlignmentSystem.DreadTier.Marauder)]
+    [InlineData(650, AlignmentSystem.DreadTier.Terror)]
+    [InlineData(799, AlignmentSystem.DreadTier.Terror)]
+    [InlineData(800, AlignmentSystem.DreadTier.Nightmare)]
+    [InlineData(1000, AlignmentSystem.DreadTier.Nightmare)]
+    public void GetDreadTier_BreakpointsAreCorrect(long darkness, AlignmentSystem.DreadTier expected)
+    {
+        var character = new Character { Darkness = darkness, Chivalry = 0 };
+        _alignmentSystem.GetDreadTier(character).Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData(0, AlignmentSystem.RenownTier.None)]
+    [InlineData(249, AlignmentSystem.RenownTier.None)]
+    [InlineData(250, AlignmentSystem.RenownTier.Defender)]
+    [InlineData(449, AlignmentSystem.RenownTier.Defender)]
+    [InlineData(450, AlignmentSystem.RenownTier.Paragon)]
+    [InlineData(649, AlignmentSystem.RenownTier.Paragon)]
+    [InlineData(650, AlignmentSystem.RenownTier.Hero)]
+    [InlineData(799, AlignmentSystem.RenownTier.Hero)]
+    [InlineData(800, AlignmentSystem.RenownTier.Legend)]
+    [InlineData(1000, AlignmentSystem.RenownTier.Legend)]
+    public void GetRenownTier_BreakpointsAreCorrect(long chivalry, AlignmentSystem.RenownTier expected)
+    {
+        var character = new Character { Chivalry = chivalry, Darkness = 0 };
+        _alignmentSystem.GetRenownTier(character).Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData(0, 1.0f)]      // None
+    [InlineData(250, 0.95f)]   // Cutthroat
+    [InlineData(450, 0.90f)]   // Marauder
+    [InlineData(650, 0.85f)]   // Terror
+    [InlineData(800, 0.80f)]   // Nightmare
+    public void GetDreadPriceMultiplier_ScalesWithTier(long darkness, float expected)
+    {
+        var character = new Character { Darkness = darkness, Chivalry = 0 };
+        _alignmentSystem.GetDreadPriceMultiplier(character).Should().BeApproximately(expected, 0.001f);
+    }
+
+    [Theory]
+    [InlineData(0, 1.0f)]      // None
+    [InlineData(250, 0.95f)]   // Defender
+    [InlineData(450, 0.90f)]   // Paragon
+    [InlineData(650, 0.85f)]   // Hero
+    [InlineData(800, 0.80f)]   // Legend
+    public void GetRenownPriceMultiplier_ScalesWithTier(long chivalry, float expected)
+    {
+        var character = new Character { Chivalry = chivalry, Darkness = 0 };
+        _alignmentSystem.GetRenownPriceMultiplier(character).Should().BeApproximately(expected, 0.001f);
+    }
+
+    [Fact]
+    public void GetNotorietyStandingLine_EvilPlayer_ShowsDreadStanding()
+    {
+        var character = new Character { Darkness = 850, Chivalry = 50 }; // Evil band, Nightmare
+        _alignmentSystem.GetNotorietyStandingLine(character).Should().NotBeNullOrEmpty();
+    }
+
+    [Fact]
+    public void GetNotorietyStandingLine_HolyPlayer_ShowsRenownStanding()
+    {
+        var character = new Character { Chivalry = 850, Darkness = 50 }; // Holy band, Legend
+        _alignmentSystem.GetNotorietyStandingLine(character).Should().NotBeNullOrEmpty();
+    }
+
+    [Fact]
+    public void GetNotorietyStandingLine_BalancedLineWalker_HasNoStanding()
+    {
+        // High Darkness AND high Chivalry within 100 of each other = Balanced band. The line-walker
+        // must NOT collect a Dread standing even though raw Darkness would map to Nightmare -- the
+        // pole gating in GetNotorietyStandingLine keys off the alignment band, not the raw scale.
+        var character = new Character { Darkness = 850, Chivalry = 800 };
+        _alignmentSystem.GetAlignment(character).Should().Be(AlignmentSystem.AlignmentType.Balanced);
+        _alignmentSystem.GetNotorietyStandingLine(character).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void GetNotorietyStandingLine_NeutralPlayer_HasNoStanding()
+    {
+        var character = new Character { Darkness = 50, Chivalry = 50 }; // Neutral band
+        _alignmentSystem.GetNotorietyStandingLine(character).Should().BeEmpty();
     }
 
     #endregion

@@ -1650,7 +1650,11 @@ namespace UsurperRemake.Systems
                     OfferedTo = quest.OfferedTo,
                     Forced = quest.Forced,
                     Objectives = new List<QuestObjectiveData>(),
-                    Monsters = new List<QuestMonsterData>()
+                    Monsters = new List<QuestMonsterData>(),
+                    // v0.62.x Phase 4 (Mercenary board): faction-issued freelance contract fields.
+                    IsMercContract = quest.IsMercContract,
+                    IssuingFaction = quest.IssuingFaction.HasValue ? (int)quest.IssuingFaction.Value : -1,
+                    MercContractTier = quest.MercContractTier
                 };
 
                 foreach (var objective in quest.Objectives)

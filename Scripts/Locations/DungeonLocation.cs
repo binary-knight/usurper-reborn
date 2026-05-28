@@ -4518,6 +4518,9 @@ public class DungeonLocation : BaseLocation
             // v0.60.0 alpha audit: track rooms explored. Counter was always 0
             // because nothing ever incremented it.
             currentPlayer?.Statistics?.RecordRoomExplored();
+            // v0.62.x Phase 4 (Mercenary board): tick ExploreRooms-objective merc contracts
+            // (e.g. crown_guard_relief). Per-new-room counter; doesn't double-count revisits.
+            if (currentPlayer != null) QuestSystem.OnRoomExplored(currentPlayer);
 
             // Advance game time for room exploration (single-player)
             if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)

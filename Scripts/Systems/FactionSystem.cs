@@ -536,12 +536,43 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Check if player has black market access (Shadows faction)
+        /// Check if player has black market access. Shadows membership is the primary path
+        /// (full discounts + reliable rotation), but as of v0.62.x Phase 5, a freelance evil
+        /// player at Marauder+ Dread is also admitted on the strength of their name -- with a
+        /// 10% surcharge applied at the till (see GameConfig.BlackMarketFreelanceSurcharge).
+        /// The freelance path closes the gap left when Phase 4 made the Mercenary board an
+        /// alignment-agnostic centerline.
         /// </summary>
         public bool HasBlackMarketAccess()
         {
-            if (PlayerFaction != Faction.TheShadows) return false;
-            return GetCurrentBonuses()?.BlackMarketAccess ?? false;
+            if (PlayerFaction == Faction.TheShadows)
+                return GetCurrentBonuses()?.BlackMarketAccess ?? false;
+            // Freelance evil at Marauder+ Dread: feared enough to be admitted, but pays a surcharge.
+            // Pole-gated to Dark/Evil so a Balanced line-walker with high raw Darkness doesn't trigger.
+            var ctx = UsurperRemake.Server.SessionContext.Current;
+            var player = ctx?.Player;
+            if (player == null) return false;
+            var alignSys = AlignmentSystem.Instance;
+            var band = alignSys.GetAlignment(player);
+            bool isDarkBand = band == AlignmentSystem.AlignmentType.Dark || band == AlignmentSystem.AlignmentType.Evil;
+            if (!isDarkBand) return false;
+            return alignSys.GetDreadTier(player) >= AlignmentSystem.DreadTier.Marauder;
+        }
+
+        /// <summary>
+        /// v0.62.x Phase 5: true when the player is a freelance evil (Marauder+ Dread but NOT
+        /// in the Shadows faction) being admitted to the Black Market on their reputation alone.
+        /// Used by the Black Market UI to surface the 10% surcharge in the price display.
+        /// </summary>
+        public bool IsBlackMarketFreelance(Character player)
+        {
+            if (PlayerFaction == Faction.TheShadows) return false;
+            if (player == null) return false;
+            var alignSys = AlignmentSystem.Instance;
+            var band = alignSys.GetAlignment(player);
+            bool isDarkBand = band == AlignmentSystem.AlignmentType.Dark || band == AlignmentSystem.AlignmentType.Evil;
+            if (!isDarkBand) return false;
+            return alignSys.GetDreadTier(player) >= AlignmentSystem.DreadTier.Marauder;
         }
 
         /// <summary>

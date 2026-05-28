@@ -530,7 +530,238 @@ public partial class QuestSystem
 
         // GD.Print($"[QuestSystem] Bounty board refreshed with {existingCount} quests");
     }
-    
+
+    // ────────────────────────────────────────────────────────────────────────
+    // v0.62.x "Light and Dark" Phase 4 (Mercenary/Sellsword job board).
+    // Faction-issued freelance contracts visible at Anchor Road's Sellsword Hall menu.
+    // Composes with the existing Quest/QuestObjective pipeline -- contracts ARE Quests with
+    // `IsMercContract = true` and an `IssuingFaction` discriminator. RefreshMercBoard mirrors
+    // RefreshBountyBoard's "drop unclaimed > N days old, refill to slot count" rhythm.
+    // ────────────────────────────────────────────────────────────────────────
+
+    // Issuer sentinel strings for `Quest.Initiator` (English fallback; localized via InitiatorKey).
+    public const string MERC_INITIATOR_CROWN = "Crown Steward";
+    public const string MERC_INITIATOR_SHADOWS = "Shadow Broker";
+    public const string MERC_INITIATOR_FAITH = "Faith Almoner";
+
+    private struct MercTemplate
+    {
+        public string Id;                    // e.g. "crown_bandit_purge"; drives loc key namespaces
+        public UsurperRemake.Systems.Faction Faction;
+        public QuestObjectiveType ObjectiveType;
+        public string TargetId;              // monster type, location name, or empty for generic
+        public int BaseProgress;             // baseline RequiredProgress, scaled by playerLevel at create time
+        public float PayoutMultiplier;       // contract-kind multiplier on base gold (0.85 = easy job pays less, 1.25 = harder pays more)
+        public int Tier;                     // 1-5; slice 1 ships only tier 1
+    }
+
+    // Slice 1: 2 contracts per faction at tier 1. Tier 2+ deferred to slice 4b.
+    private static readonly MercTemplate[] MercTemplatesSlice1 = new[]
+    {
+        new MercTemplate { Id = "crown_bandit_purge",    Faction = UsurperRemake.Systems.Faction.TheCrown,   ObjectiveType = QuestObjectiveType.KillSpecificMonster, TargetId = "Bandit",     BaseProgress = 3, PayoutMultiplier = 1.00f, Tier = 1 },
+        new MercTemplate { Id = "crown_guard_relief",    Faction = UsurperRemake.Systems.Faction.TheCrown,   ObjectiveType = QuestObjectiveType.ExploreRooms,        TargetId = "",           BaseProgress = 10, PayoutMultiplier = 0.85f, Tier = 1 },
+        new MercTemplate { Id = "shadows_fence_run",     Faction = UsurperRemake.Systems.Faction.TheShadows, ObjectiveType = QuestObjectiveType.VisitLocation,       TargetId = "DarkAlley",  BaseProgress = 1, PayoutMultiplier = 0.90f, Tier = 1 },
+        new MercTemplate { Id = "shadows_jailbreak",     Faction = UsurperRemake.Systems.Faction.TheShadows, ObjectiveType = QuestObjectiveType.VisitLocation,       TargetId = "Prison",     BaseProgress = 1, PayoutMultiplier = 0.90f, Tier = 1 },
+        new MercTemplate { Id = "faith_purge_undead",    Faction = UsurperRemake.Systems.Faction.TheFaith,   ObjectiveType = QuestObjectiveType.KillSpecificMonster, TargetId = "Zombie",     BaseProgress = 3, PayoutMultiplier = 1.00f, Tier = 1 },
+        new MercTemplate { Id = "faith_escort_pilgrim",  Faction = UsurperRemake.Systems.Faction.TheFaith,   ObjectiveType = QuestObjectiveType.KillMonsters,        TargetId = "",           BaseProgress = 5, PayoutMultiplier = 0.95f, Tier = 1 },
+    };
+
+    /// <summary>
+    /// Refresh the Sellsword Hall board: drop unclaimed stale contracts, refill per-faction
+    /// slot count based on the player's merc rank. Called on entry to the Hall and on daily reset.
+    /// </summary>
+    public static void RefreshMercBoard(Character player)
+    {
+        if (player == null) return;
+        int playerLevel = Math.Max(1, player.Level);
+
+        // Slot count per faction column scales with rank (Recruit=1, Veteran=2, Legend=3). Capped at template-pool size.
+        int rankIdx = (int)UsurperRemake.Systems.AlignmentSystem.Instance.GetMercRank(player);
+        int slotsPerFaction = rankIdx >= 0 && rankIdx < GameConfig.MercRankSlotsPerFaction.Length
+            ? GameConfig.MercRankSlotsPerFaction[rankIdx]
+            : 1;
+
+        // Drop unclaimed stale contracts (mirrors RefreshBountyBoard:511).
+        var staleCutoff = DateTime.Now.AddDays(-GameConfig.MercContractStaleDays);
+        questDatabase.RemoveAll(q => q.IsMercContract
+            && !q.Deleted
+            && string.IsNullOrEmpty(q.Occupier)
+            && q.Date < staleCutoff);
+
+        // Per-faction refill.
+        foreach (var faction in new[] { UsurperRemake.Systems.Faction.TheCrown,
+                                        UsurperRemake.Systems.Faction.TheShadows,
+                                        UsurperRemake.Systems.Faction.TheFaith })
+        {
+            int existing = questDatabase.Count(q => q.IsMercContract
+                && !q.Deleted
+                && string.IsNullOrEmpty(q.Occupier)
+                && q.IssuingFaction.HasValue
+                && q.IssuingFaction.Value == faction);
+            int needed = slotsPerFaction - existing;
+            if (needed <= 0) continue;
+
+            // Tier-gate visibility by rank: Recruit (rankIdx 1) sees tier-1 only; future tiers gate
+            // by Tier <= max(1, rankIdx). Slice 1 templates are all Tier=1 so this is a no-op now.
+            int visibleTier = Math.Max(1, rankIdx);
+            var pool = MercTemplatesSlice1.Where(t => t.Faction == faction && t.Tier <= visibleTier).ToList();
+            if (pool.Count == 0) continue;
+
+            for (int i = 0; i < needed; i++)
+            {
+                var tpl = pool[random.Next(pool.Count)];
+                CreateMercContract(tpl, playerLevel);
+            }
+        }
+
+        player.LastMercBoardRefreshUtc = DateTime.UtcNow;
+    }
+
+    private static Quest CreateMercContract(MercTemplate tpl, int playerLevel)
+    {
+        // Required progress scales with player level so the contract isn't trivially easy at endgame.
+        int required = tpl.BaseProgress + (playerLevel / 5);
+
+        // Gold scales on PLAYER LEVEL only (NOT player wealth -- can't compound into a printer).
+        long goldReward = (long)(playerLevel * GameConfig.MercContractBaseGoldTier1 * tpl.PayoutMultiplier);
+
+        string issuerName = tpl.Faction switch
+        {
+            UsurperRemake.Systems.Faction.TheCrown => MERC_INITIATOR_CROWN,
+            UsurperRemake.Systems.Faction.TheShadows => MERC_INITIATOR_SHADOWS,
+            UsurperRemake.Systems.Faction.TheFaith => MERC_INITIATOR_FAITH,
+            _ => "Sellsword Hall"
+        };
+        string initiatorKey = tpl.Faction switch
+        {
+            UsurperRemake.Systems.Faction.TheCrown => "merc.issuer.crown",
+            UsurperRemake.Systems.Faction.TheShadows => "merc.issuer.shadows",
+            UsurperRemake.Systems.Faction.TheFaith => "merc.issuer.faith",
+            _ => ""
+        };
+
+        var quest = new Quest
+        {
+            Id = $"merc_{tpl.Id}_{Guid.NewGuid().ToString("N").Substring(0, 8)}",
+            Initiator = issuerName,
+            InitiatorKey = initiatorKey,
+            Title = $"Sellsword Contract: {tpl.Id}",  // English fallback; localized via TitleKey
+            TitleKey = $"merc.contract.{tpl.Id}.title",
+            TitleArgs = new List<string> { required.ToString() },
+            Comment = $"Sellsword Hall posting: {tpl.Id}",
+            CommentKey = $"merc.contract.{tpl.Id}.comment",
+            CommentArgs = new List<string> { required.ToString() },
+            Date = DateTime.Now,
+            QuestType = QuestType.SingleQuest,
+            QuestTarget = QuestTarget.Monster, // closest legacy target; objectives are the real tracking
+            Difficulty = (byte)Math.Max(1, tpl.Tier),
+            DaysToComplete = 7,
+            MinLevel = Math.Max(1, playerLevel - 5),
+            MaxLevel = playerLevel + 15,
+            Reward = GameConfig.QuestRewardMedium,
+            BountyGold = goldReward,                   // honest gold payout via BountyGold (bypasses byte Reward cap)
+            RewardType = QuestRewardType.Money,
+            Penalty = 2,
+            PenaltyType = QuestRewardType.Money,
+            IsMercContract = true,
+            IssuingFaction = tpl.Faction,
+            MercContractTier = tpl.Tier
+        };
+
+        var obj = new QuestObjective
+        {
+            Id = $"merc_obj_{tpl.Id}",
+            ObjectiveType = tpl.ObjectiveType,
+            TargetId = tpl.TargetId,
+            TargetName = tpl.TargetId,
+            RequiredProgress = required,
+            DescriptionKey = $"merc.contract.{tpl.Id}.objective",
+            DescriptionArgs = new List<string> { required.ToString(), tpl.TargetId ?? "" }
+        };
+        quest.Objectives.Add(obj);
+
+        questDatabase.Add(quest);
+        return quest;
+    }
+
+    /// <summary>
+    /// Filter the questDatabase for merc contracts visible to this player. Pass faction = null
+    /// to get all 3 columns; pass a specific faction for a single column.
+    /// </summary>
+    public static List<Quest> GetAvailableMercContracts(Character player, UsurperRemake.Systems.Faction? faction = null)
+    {
+        if (player == null) return new List<Quest>();
+        return questDatabase.Where(q =>
+            q.IsMercContract
+            && !q.Deleted
+            && string.IsNullOrEmpty(q.Occupier)
+            && (faction == null || (q.IssuingFaction.HasValue && q.IssuingFaction.Value == faction.Value))
+            && player.Level >= q.MinLevel
+            && player.Level <= q.MaxLevel
+        ).ToList();
+    }
+
+    /// <summary>
+    /// Get the merc contracts the player has currently CLAIMED (Occupier = player.Name2). Used by
+    /// the Hall to show what's in-progress and offer turn-in.
+    /// </summary>
+    public static List<Quest> GetClaimedMercContracts(Character player)
+    {
+        if (player == null) return new List<Quest>();
+        return questDatabase.Where(q =>
+            q.IsMercContract
+            && !q.Deleted
+            && q.Occupier == player.Name2
+        ).ToList();
+    }
+
+    /// <summary>
+    /// Turn in a completed merc contract: pay gold + Reputation cascade + alignment shift (Faith/Shadows
+    /// only; Crown is alignment-neutral by default). Caps faction standing gain via DailyMercStandingGain
+    /// to prevent "merc 30 Crown contracts in a row, jump into Crown membership instantly" exploits.
+    /// </summary>
+    public static (bool ok, long goldAwarded, int standingAwarded, string reason) CompleteMercContract(Character player, Quest quest)
+    {
+        if (player == null || quest == null) return (false, 0, 0, "null");
+        if (!quest.IsMercContract || !quest.IssuingFaction.HasValue) return (false, 0, 0, "not_merc");
+        if (quest.Occupier != player.Name2) return (false, 0, 0, "not_yours");
+        if (!ValidateQuestCompletion(player, quest)) return (false, 0, 0, "incomplete");
+
+        // Rank-based pay multiplier (Recruit 1.00x -> Legend 1.15x).
+        int rankIdx = (int)UsurperRemake.Systems.AlignmentSystem.Instance.GetMercRank(player);
+        float rankMul = rankIdx >= 0 && rankIdx < GameConfig.MercRankPayMultiplier.Length
+            ? GameConfig.MercRankPayMultiplier[rankIdx]
+            : 1.0f;
+        long gold = (long)(quest.BountyGold * rankMul);
+        player.Gold += gold;
+
+        // Faction standing award, capped per-faction-per-day. Cascade fires inside ModifyReputation.
+        var faction = quest.IssuingFaction.Value;
+        int factionKey = (int)faction;
+        int gainedToday = player.DailyMercStandingGain != null && player.DailyMercStandingGain.TryGetValue(factionKey, out int g) ? g : 0;
+        int baseAward = 10 + quest.MercContractTier * 5; // tier-1 = 15; tier-5 = 35
+        int allowedAward = Math.Max(0, Math.Min(baseAward, GameConfig.MaxDailyMercStandingGain - gainedToday));
+        if (allowedAward > 0)
+        {
+            UsurperRemake.Systems.FactionSystem.Instance.ModifyReputation(faction, allowedAward);
+            if (player.DailyMercStandingGain == null) player.DailyMercStandingGain = new Dictionary<int, int>();
+            player.DailyMercStandingGain[factionKey] = gainedToday + allowedAward;
+        }
+
+        // Per-faction alignment shift (Faith = chivalry, Shadows = darkness, Crown = neutral by default).
+        // Modest amounts so a long career drifts alignment naturally without forcing it on first contract.
+        if (faction == UsurperRemake.Systems.Faction.TheFaith)
+            UsurperRemake.Systems.AlignmentSystem.Instance.ChangeAlignment(player, 3, isGood: true, "Faith merc contract");
+        else if (faction == UsurperRemake.Systems.Faction.TheShadows)
+            UsurperRemake.Systems.AlignmentSystem.Instance.ChangeAlignment(player, 3, isGood: false, "Shadows merc contract");
+
+        // Bookkeeping: career counter + mark the quest complete (matches existing Bounty Board pattern).
+        player.MercContractsCompleted++;
+        quest.Deleted = true;
+
+        return (true, gold, allowedAward, "ok");
+    }
+
     /// <summary>
     /// Set default rewards based on difficulty
     /// Pascal: Default reward assignment
@@ -875,7 +1106,14 @@ public partial class QuestSystem
                 Forced = questData.Forced,
                 TargetNPCName = questData.TargetNPCName ?? "",
                 Deleted = questData.Status == QuestStatus.Completed || questData.Status == QuestStatus.Failed || questData.Status == QuestStatus.Abandoned,
-                IsAbandoned = questData.Status == QuestStatus.Abandoned
+                IsAbandoned = questData.Status == QuestStatus.Abandoned,
+                // v0.62.x Phase 4 (Mercenary board): restore faction-issued freelance contract fields.
+                // -1 sentinel in QuestData.IssuingFaction maps back to null Faction?.
+                IsMercContract = questData.IsMercContract,
+                IssuingFaction = questData.IssuingFaction >= 0
+                    ? (UsurperRemake.Systems.Faction?)questData.IssuingFaction
+                    : null,
+                MercContractTier = questData.MercContractTier > 0 ? questData.MercContractTier : 1
             };
 
             // Restore objectives
@@ -959,7 +1197,14 @@ public partial class QuestSystem
                 Forced = questData.Forced,
                 TargetNPCName = questData.TargetNPCName ?? "",
                 Deleted = questData.Status == QuestStatus.Completed || questData.Status == QuestStatus.Failed || questData.Status == QuestStatus.Abandoned,
-                IsAbandoned = questData.Status == QuestStatus.Abandoned
+                IsAbandoned = questData.Status == QuestStatus.Abandoned,
+                // v0.62.x Phase 4 (Mercenary board): restore faction-issued freelance contract fields.
+                // -1 sentinel in QuestData.IssuingFaction maps back to null Faction?.
+                IsMercContract = questData.IsMercContract,
+                IssuingFaction = questData.IssuingFaction >= 0
+                    ? (UsurperRemake.Systems.Faction?)questData.IssuingFaction
+                    : null,
+                MercContractTier = questData.MercContractTier > 0 ? questData.MercContractTier : 1
             };
 
             foreach (var objData in questData.Objectives)
@@ -1043,7 +1288,14 @@ public partial class QuestSystem
                 Forced = questData.Forced,
                 TargetNPCName = questData.TargetNPCName ?? "",
                 Deleted = questData.Status == QuestStatus.Completed || questData.Status == QuestStatus.Failed || questData.Status == QuestStatus.Abandoned,
-                IsAbandoned = questData.Status == QuestStatus.Abandoned
+                IsAbandoned = questData.Status == QuestStatus.Abandoned,
+                // v0.62.x Phase 4 (Mercenary board): restore faction-issued freelance contract fields.
+                // -1 sentinel in QuestData.IssuingFaction maps back to null Faction?.
+                IsMercContract = questData.IsMercContract,
+                IssuingFaction = questData.IssuingFaction >= 0
+                    ? (UsurperRemake.Systems.Faction?)questData.IssuingFaction
+                    : null,
+                MercContractTier = questData.MercContractTier > 0 ? questData.MercContractTier : 1
             };
 
             foreach (var objData in questData.Objectives)
@@ -1094,6 +1346,44 @@ public partial class QuestSystem
     /// Update quest progress when a monster is killed
     /// Call this from CombatEngine after monster defeat
     /// </summary>
+    /// <summary>
+    /// v0.62.x Phase 4 (Mercenary board): increment ExploreRooms objectives by 1 when the player
+    /// enters a NEW dungeon room. Called once per first-time room entry from `DungeonLocation.MoveToRoom`
+    /// (the `targetRoom.IsExplored = true` branch). Auto-completes shadows_fence_run / faith etc. once
+    /// the running total of new rooms hits the contract's required count -- so the contract's `RequiredProgress`
+    /// is a NEW-rooms-count, not a current-floor-rooms-count. Cheap: bounded by playerQuests count.
+    /// </summary>
+    public static void OnRoomExplored(Character player)
+    {
+        if (player == null) return;
+        var playerQuests = GetPlayerQuests(player.Name2);
+        foreach (var quest in playerQuests)
+        {
+            quest.UpdateObjectiveProgress(QuestObjectiveType.ExploreRooms, 1);
+        }
+    }
+
+    /// <summary>
+    /// v0.62.x Phase 4 (Mercenary board): increment VisitLocation objectives that match this location
+    /// when the player enters it. Called once per location entry from `BaseLocation.EnterLocation`.
+    /// Matches case-insensitively against the location's enum name (e.g. "DarkAlley", "Prison") that
+    /// merc contracts set as `objective.TargetId`. Auto-completes shadows_fence_run / shadows_jailbreak
+    /// on first visit after claiming. Cheap: bounded by playerQuests count.
+    /// </summary>
+    public static void OnLocationVisited(Character player, GameLocation location)
+    {
+        if (player == null) return;
+        string locId = location.ToString();
+        var playerQuests = GetPlayerQuests(player.Name2);
+        foreach (var quest in playerQuests)
+        {
+            // UpdateObjectiveProgress matches TargetId case-insensitively; merc contracts use the
+            // bare enum string (e.g. "DarkAlley"). Use a targetId-specific increment so a contract
+            // requiring "Prison" doesn't tick when the player visits "DarkAlley".
+            quest.UpdateObjectiveProgress(QuestObjectiveType.VisitLocation, 1, locId);
+        }
+    }
+
     public static void OnMonsterKilled(Character player, string monsterName, bool isBoss = false, string tierName = "")
     {
         var playerQuests = GetPlayerQuests(player.Name2);

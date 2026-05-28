@@ -1347,6 +1347,19 @@ namespace UsurperRemake.Locations
                 return;
             }
 
+            // v0.62.x Phase 5 (Dark Alley depth): rebuild the rotating gear stock when the day has
+            // changed since the last refresh, OR when the per-session cache is null (post-login first
+            // visit). LastBlackMarketRefreshUtc.Date < UtcNow.Date mirrors the LastMercBoardRefreshUtc
+            // pattern from Phase 4. The cache is transient on Character (not in PlayerData), so it
+            // doesn't persist across sessions -- daily rotation across days, fresh roll on relog same
+            // day. Acceptable trade-off: simpler than persistence with per-session stable display.
+            bool dayChanged = currentPlayer.LastBlackMarketRefreshUtc.Date < DateTime.UtcNow.Date;
+            if (dayChanged || currentPlayer.CachedBlackMarketStock == null)
+            {
+                RebuildBlackMarketStock();
+                currentPlayer.LastBlackMarketRefreshUtc = DateTime.UtcNow;
+            }
+
             terminal.ClearScreen();
             WriteBoxHeader(Loc.Get("dark_alley.black_market_header"), "bright_magenta", 66);
             terminal.WriteLine("");
@@ -1357,15 +1370,52 @@ namespace UsurperRemake.Locations
             terminal.WriteLine("");
 
             float rankDiscount = FactionSystem.Instance?.GetBlackMarketDiscount() ?? 0f;
+            bool isFreelance = FactionSystem.Instance?.IsBlackMarketFreelance(currentPlayer) ?? false;
             int level = currentPlayer.Level;
 
+            // Utility floor: faction-rank discount only (matches the long-standing behavior; alignment
+            // multipliers don't compose on utility consumables since they're keyed off level not Value).
             long forgedPapersPrice = (long)((1000 + level * 100) * (1.0f - rankDiscount));
             long poisonVialPrice = (long)((300 + level * 20) * (1.0f - rankDiscount));
             long smokeBombPrice = (long)((500 + level * 30) * (1.0f - rankDiscount));
 
+            terminal.SetColor("cyan");
+            terminal.WriteLine(Loc.Get("dark_alley.bm_section_utility"));
+            terminal.SetColor("white");
             WriteSRMenuOption("1", Loc.Get("dark_alley.bm_forged_papers", forgedPapersPrice));
             WriteSRMenuOption("2", Loc.Get("dark_alley.bm_poison_vials", poisonVialPrice));
             WriteSRMenuOption("3", Loc.Get("dark_alley.bm_smoke_bomb", smokeBombPrice));
+            terminal.WriteLine("");
+
+            // Rotating gear: only shown when Dread tier unlocks at least 1 slot (Cutthroat+). The
+            // stock is the cached list from RebuildBlackMarketStock; prices are computed live so the
+            // player always sees the current alignment + faction + freelance modifiers.
+            var stock = currentPlayer.CachedBlackMarketStock ?? new List<Item>();
+            if (stock.Count > 0)
+            {
+                terminal.SetColor("cyan");
+                terminal.WriteLine(Loc.Get("dark_alley.bm_section_gear"));
+                terminal.SetColor("white");
+                for (int i = 0; i < stock.Count; i++)
+                {
+                    long price = ComputeBlackMarketGearPrice(stock[i], rankDiscount, isFreelance);
+                    // LootGenerator encodes rarity in the item NAME PREFIX (Epic / Legendary etc.),
+                    // not in item.Rarity directly (slice 5b will populate item.Rarity properly).
+                    // Use a flat color for now; the name carries the rarity signal.
+                    terminal.SetColor("darkgray");
+                    terminal.Write("  [");
+                    terminal.SetColor("bright_yellow");
+                    terminal.Write((4 + i).ToString());
+                    terminal.SetColor("darkgray");
+                    terminal.Write("] ");
+                    terminal.SetColor("bright_magenta");
+                    terminal.Write(stock[i].Name);
+                    terminal.SetColor("gray");
+                    terminal.WriteLine($"  -- {price} {GameConfig.MoneyType}");
+                }
+                terminal.WriteLine("");
+            }
+
             WriteSRMenuOption("0", Loc.Get("ui.leave"));
             terminal.WriteLine("");
 
@@ -1373,83 +1423,193 @@ namespace UsurperRemake.Locations
             {
                 terminal.SetColor("bright_magenta");
                 terminal.WriteLine(Loc.Get("dark_alley.bm_rank_discount", rankDiscount * 100));
-                terminal.WriteLine("");
             }
+            if (isFreelance)
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine(Loc.Get("dark_alley.bm_freelance_surcharge", (GameConfig.BlackMarketFreelanceSurcharge - 1.0f) * 100));
+            }
+
+            terminal.SetColor("gray");
+            terminal.WriteLine(Loc.Get("dark_alley.bm_refresh_hint"));
+            terminal.WriteLine("");
 
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("dark_alley.bm_gold", currentPlayer.Gold));
             terminal.WriteLine("");
 
-            var input = await terminal.GetInput(Loc.Get("dark_alley.bm_purchase_prompt"));
-            switch (input.Trim())
+            var input = (await terminal.GetInput(Loc.Get("dark_alley.bm_purchase_prompt"))).Trim();
+            switch (input)
             {
                 case "1": // Forged Papers
-                    if (currentPlayer.Gold < forgedPapersPrice)
-                    {
-                        terminal.SetColor("red");
-                        terminal.WriteLine(Loc.Get("dark_alley.bm_no_gold"));
-                    }
-                    else
-                    {
-                        currentPlayer.Gold -= forgedPapersPrice;
-                        long reduction = Math.Min(100, currentPlayer.Darkness);
-                        currentPlayer.Darkness -= (int)reduction;
-                        terminal.SetColor("bright_green");
-                        terminal.WriteLine(Loc.Get("dark_alley.bm_forged_result", reduction));
-                        currentPlayer.Statistics?.RecordGoldSpent(forgedPapersPrice);
-                    }
+                    await BuyForgedPapers(forgedPapersPrice);
                     break;
-
                 case "2": // Poison Vials
-                    if (currentPlayer.PoisonVials >= GameConfig.MaxPoisonVials)
-                    {
-                        terminal.SetColor("gray");
-                        terminal.WriteLine(Loc.Get("dark_alley.bm_poison_vial_limit", currentPlayer.PoisonVials, GameConfig.MaxPoisonVials));
-                    }
-                    else if (currentPlayer.Gold < poisonVialPrice)
-                    {
-                        terminal.SetColor("red");
-                        terminal.WriteLine(Loc.Get("dark_alley.bm_no_gold"));
-                    }
-                    else
-                    {
-                        currentPlayer.Gold -= poisonVialPrice;
-                        int vialsToAdd = 3;
-                        currentPlayer.PoisonVials = Math.Min(GameConfig.MaxPoisonVials, currentPlayer.PoisonVials + vialsToAdd);
-                        terminal.SetColor("bright_green");
-                        terminal.WriteLine(Loc.Get("dark_alley.bm_poison_result", vialsToAdd, currentPlayer.PoisonVials));
-                        terminal.SetColor("cyan");
-                        terminal.WriteLine(Loc.Get("dark_alley.bm_poison_use"));
-                        currentPlayer.Statistics?.RecordGoldSpent(poisonVialPrice);
-                    }
+                    await BuyPoisonVials(poisonVialPrice);
                     break;
-
                 case "3": // Smoke Bomb
-                    if (currentPlayer.SmokeBombs >= 3)
-                    {
-                        terminal.SetColor("gray");
-                        terminal.WriteLine(Loc.Get("dark_alley.bm_smoke_limit"));
-                    }
-                    else if (currentPlayer.Gold < smokeBombPrice)
-                    {
-                        terminal.SetColor("red");
-                        terminal.WriteLine(Loc.Get("dark_alley.bm_no_gold"));
-                    }
-                    else
-                    {
-                        currentPlayer.Gold -= smokeBombPrice;
-                        currentPlayer.SmokeBombs++;
-                        terminal.SetColor("bright_green");
-                        terminal.WriteLine(Loc.Get("dark_alley.bm_smoke_result", currentPlayer.SmokeBombs));
-                        currentPlayer.Statistics?.RecordGoldSpent(smokeBombPrice);
-                    }
+                    await BuySmokeBomb(smokeBombPrice);
                     break;
-
                 default:
+                    // Gear slot purchases use numbers 4..(3+stock.Count). Parse and dispatch.
+                    if (int.TryParse(input, out int slotNum) && slotNum >= 4 && slotNum <= 3 + stock.Count)
+                    {
+                        int gearIdx = slotNum - 4;
+                        long price = ComputeBlackMarketGearPrice(stock[gearIdx], rankDiscount, isFreelance);
+                        await BuyBlackMarketGear(stock[gearIdx], gearIdx, price);
+                    }
                     break;
             }
 
             await Task.Delay(2000);
+        }
+
+        /// <summary>
+        /// v0.62.x Phase 5: rebuild the rotating gear slots based on the player's Dread tier. Slot
+        /// count by tier comes from GameConfig.BlackMarketGearSlotsByDreadTier[] (None=0 / Cutthroat=2
+        /// / Marauder=3 / Terror=4 / Nightmare=5). Items roll via LootGenerator's natural rarity curve
+        /// at the player's level. Rarity-floor biasing was deferred to slice 5b (see LootGenerator
+        /// note). Called from VisitBlackMarket when the day has changed since LastBlackMarketRefreshUtc
+        /// or the per-session cache is null.
+        /// </summary>
+        private void RebuildBlackMarketStock()
+        {
+            var stock = new List<Item>();
+            int dreadTier = (int)AlignmentSystem.Instance.GetDreadTier(currentPlayer);
+            int slotCount = dreadTier >= 0 && dreadTier < GameConfig.BlackMarketGearSlotsByDreadTier.Length
+                ? GameConfig.BlackMarketGearSlotsByDreadTier[dreadTier]
+                : 0;
+            if (slotCount <= 0)
+            {
+                currentPlayer.CachedBlackMarketStock = stock; // empty list, not null -- skip re-roll mid-day
+                return;
+            }
+
+            for (int i = 0; i < slotCount; i++)
+            {
+                var loot = LootGenerator.GenerateDungeonLoot(currentPlayer.Level, currentPlayer.Class);
+                if (loot != null) stock.Add(loot);
+            }
+
+            currentPlayer.CachedBlackMarketStock = stock;
+        }
+
+        /// <summary>
+        /// Composes the final Black Market price for a gear item across all the discount layers.
+        /// base = item.Value * BlackMarketGearMarkup (premium for unsanctioned access)
+        ///   then x alignment shady-shop modifier (includes Dread-tier discount from Phase 2)
+        ///   then x (1 - rank discount) for Shadows membership
+        ///   then x BlackMarketFreelanceSurcharge if not a Shadows member (freelance pays extra)
+        /// </summary>
+        private long ComputeBlackMarketGearPrice(Item item, float rankDiscount, bool isFreelance)
+        {
+            float price = item.Value * GameConfig.BlackMarketGearMarkup;
+            price *= AlignmentSystem.Instance.GetPriceModifier(currentPlayer, isShadyShop: true);
+            price *= (1.0f - rankDiscount);
+            if (isFreelance) price *= GameConfig.BlackMarketFreelanceSurcharge;
+            return Math.Max(1, (long)price);
+        }
+
+        private async Task BuyForgedPapers(long forgedPapersPrice)
+        {
+            if (currentPlayer.Gold < forgedPapersPrice)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine(Loc.Get("dark_alley.bm_no_gold"));
+            }
+            else
+            {
+                currentPlayer.Gold -= forgedPapersPrice;
+                long reduction = Math.Min(100, currentPlayer.Darkness);
+                currentPlayer.Darkness -= (int)reduction;
+                terminal.SetColor("bright_green");
+                terminal.WriteLine(Loc.Get("dark_alley.bm_forged_result", reduction));
+                currentPlayer.Statistics?.RecordGoldSpent(forgedPapersPrice);
+            }
+            await Task.CompletedTask;
+        }
+
+        private async Task BuyPoisonVials(long poisonVialPrice)
+        {
+            if (currentPlayer.PoisonVials >= GameConfig.MaxPoisonVials)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine(Loc.Get("dark_alley.bm_poison_vial_limit", currentPlayer.PoisonVials, GameConfig.MaxPoisonVials));
+            }
+            else if (currentPlayer.Gold < poisonVialPrice)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine(Loc.Get("dark_alley.bm_no_gold"));
+            }
+            else
+            {
+                currentPlayer.Gold -= poisonVialPrice;
+                int vialsToAdd = 3;
+                currentPlayer.PoisonVials = Math.Min(GameConfig.MaxPoisonVials, currentPlayer.PoisonVials + vialsToAdd);
+                terminal.SetColor("bright_green");
+                terminal.WriteLine(Loc.Get("dark_alley.bm_poison_result", vialsToAdd, currentPlayer.PoisonVials));
+                terminal.SetColor("cyan");
+                terminal.WriteLine(Loc.Get("dark_alley.bm_poison_use"));
+                currentPlayer.Statistics?.RecordGoldSpent(poisonVialPrice);
+            }
+            await Task.CompletedTask;
+        }
+
+        private async Task BuySmokeBomb(long smokeBombPrice)
+        {
+            if (currentPlayer.SmokeBombs >= 3)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine(Loc.Get("dark_alley.bm_smoke_limit"));
+            }
+            else if (currentPlayer.Gold < smokeBombPrice)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine(Loc.Get("dark_alley.bm_no_gold"));
+            }
+            else
+            {
+                currentPlayer.Gold -= smokeBombPrice;
+                currentPlayer.SmokeBombs++;
+                terminal.SetColor("bright_green");
+                terminal.WriteLine(Loc.Get("dark_alley.bm_smoke_result", currentPlayer.SmokeBombs));
+                currentPlayer.Statistics?.RecordGoldSpent(smokeBombPrice);
+            }
+            await Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// v0.62.x Phase 5: buy a rotating-gear-slot Black Market item. Honors inventory cap
+        /// (matches the combat-loot pattern at CombatEngine.cs:8394 -- at-cap players see a "your
+        /// pack is full" message instead of a silent over-cap Add) and removes the item from the
+        /// session-cached stock so it can't be double-bought.
+        /// </summary>
+        private async Task BuyBlackMarketGear(Item item, int gearIdx, long price)
+        {
+            if (currentPlayer.Gold < price)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine(Loc.Get("dark_alley.bm_no_gold"));
+                await Task.CompletedTask;
+                return;
+            }
+
+            if (currentPlayer.IsInventoryFull)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine(Loc.Get("dark_alley.bm_gear_inventory_full"));
+                await Task.CompletedTask;
+                return;
+            }
+
+            currentPlayer.Gold -= price;
+            currentPlayer.Inventory.Add(item);
+            currentPlayer.CachedBlackMarketStock?.RemoveAt(gearIdx);
+            currentPlayer.Statistics?.RecordGoldSpent(price);
+
+            terminal.SetColor("bright_green");
+            terminal.WriteLine(Loc.Get("dark_alley.bm_gear_purchased", item.Name, price));
+            await Task.CompletedTask;
         }
 
         private async Task VisitInformant()
@@ -1696,62 +1856,131 @@ namespace UsurperRemake.Locations
             await Task.Delay(2000);
         }
 
+        /// <summary>
+        /// v0.62.x Phase 5 (Dark Alley depth -- gambling decisions): "Spot the Mark" replaces the
+        /// old back-fit Loaded Dice coin-flip. The dice ARE loaded (each round biased toward a hidden
+        /// high/low direction); the player's REAL decision is how many rounds to watch before committing
+        /// to a call. Earlier calls pay more (riskier -- less information); later calls pay less but
+        /// face an easier DC. WIS-keyed skill check (d20 + WIS/15 vs scaling DC). Failure costs the
+        /// bet AND +5 Darkness (you got publicly hustled and stewed in it).
+        /// </summary>
         private async Task<(bool won, long winnings)> PlayLoadedDice(long bet)
         {
-            bool won = false;
-            long winnings = 0;
+            // Dealer secretly biases this run toward HIGH (8-12) or LOW (2-6). 70% chance per round
+            // the bias matches the loaded side. The player has to read the pattern across rounds.
+            bool dealerLoadsHigh = Random.Shared.Next(2) == 0;
+            const float BIAS_STRENGTH = 0.70f;
 
             terminal.SetColor("white");
             terminal.WriteLine("");
-            terminal.WriteLine(Loc.Get("dark_alley.dice_rattles"));
+            terminal.WriteLine(Loc.Get("dark_alley.spot_intro"));
             terminal.WriteLine("");
-            WriteSRMenuOption("1", Loc.Get("dark_alley.dice_over"));
-            WriteSRMenuOption("2", Loc.Get("dark_alley.dice_under"));
-            var guess = await terminal.GetInput("> ");
-            bool guessOver = guess != "2"; // Default to over
+            await Task.Delay(800);
 
-            await Task.Delay(1000);
-            int die1 = Random.Shared.Next(1, 7);
-            int die2 = Random.Shared.Next(1, 7);
-            int total = die1 + die2;
-
-            terminal.SetColor("bright_cyan");
-            terminal.WriteLine(Loc.Get("dark_alley.dice_result", die1, die2, total));
-            await Task.Delay(500);
-
-            // ~45% base win + CHA/200 bonus
-            float chaBonus = currentPlayer.Charisma / 200f;
-            float baseChance = 0.45f + chaBonus;
-
-            // Determine actual outcome based on chance (not the dice -- the dice are loaded!)
-            float roll = (float)Random.Shared.NextDouble();
-            if (roll < baseChance)
+            // Per-round payout and DC. Earlier rounds: bigger payout, harder DC. Later rounds:
+            // smaller payout, easier DC. Round 3 is forced-call (no Wait option).
+            (int payoutMul10, int dc)[] roundTuning =
             {
-                // Player wins - adjust displayed result to match their guess
-                if ((guessOver && total <= 7) || (!guessOver && total >= 7))
-                {
-                    total = guessOver ? Random.Shared.Next(8, 13) : Random.Shared.Next(2, 7);
-                    terminal.SetColor("bright_cyan");
-                    terminal.WriteLine(Loc.Get("dark_alley.dice_actually", total));
-                }
-                won = true;
-                winnings = (long)(bet * 1.8);
-                terminal.SetColor("bright_green");
-                terminal.WriteLine(Loc.Get("dark_alley.dice_favor"));
-            }
-            else
+                (30, 14), // round 1: 3.0x payout, DC 14
+                (20, 12), // round 2: 2.0x payout, DC 12
+                (14, 10)  // round 3: 1.4x payout, DC 10 (forced call)
+            };
+
+            for (int roundIdx = 0; roundIdx < 3; roundIdx++)
             {
-                if ((guessOver && total > 7) || (!guessOver && total < 7))
+                // Roll dice with bias toward the dealer's loaded side.
+                int die1, die2, total;
+                if (Random.Shared.NextDouble() < BIAS_STRENGTH)
                 {
-                    total = guessOver ? Random.Shared.Next(2, 8) : Random.Shared.Next(7, 13);
-                    terminal.SetColor("bright_cyan");
-                    terminal.WriteLine(Loc.Get("dark_alley.dice_actually", total));
+                    // Loaded toward the secret direction.
+                    if (dealerLoadsHigh)
+                    {
+                        die1 = Random.Shared.Next(4, 7); // 4-6
+                        die2 = Random.Shared.Next(4, 7);
+                    }
+                    else
+                    {
+                        die1 = Random.Shared.Next(1, 4); // 1-3
+                        die2 = Random.Shared.Next(1, 4);
+                    }
                 }
-                terminal.SetColor("red");
-                terminal.WriteLine(Loc.Get("dark_alley.dice_betray"));
+                else
+                {
+                    // Honest roll this round (the 30% honest-noise makes the read non-trivial).
+                    die1 = Random.Shared.Next(1, 7);
+                    die2 = Random.Shared.Next(1, 7);
+                }
+                total = die1 + die2;
+
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine(Loc.Get("dark_alley.spot_round_result", roundIdx + 1, die1, die2, total));
+                await Task.Delay(600);
+
+                // Last round: forced call (no Wait option). Otherwise let the player decide.
+                bool isFinalRound = roundIdx == 2;
+                if (!isFinalRound)
+                {
+                    terminal.SetColor("white");
+                    terminal.WriteLine("");
+                    WriteSRMenuOption("1", Loc.Get("dark_alley.spot_call_now", roundTuning[roundIdx].payoutMul10 / 10f, roundTuning[roundIdx].dc));
+                    WriteSRMenuOption("2", Loc.Get("dark_alley.spot_wait"));
+                    var input = (await terminal.GetInput("> ")).Trim();
+                    if (input == "2")
+                    {
+                        continue; // wait for next round
+                    }
+                }
+
+                // Commit: which way does the player think the dice are loaded? Two choices, simple.
+                terminal.SetColor("white");
+                terminal.WriteLine("");
+                terminal.WriteLine(Loc.Get("dark_alley.spot_which_way"));
+                WriteSRMenuOption("1", Loc.Get("dark_alley.spot_loaded_high"));
+                WriteSRMenuOption("2", Loc.Get("dark_alley.spot_loaded_low"));
+                var callInput = (await terminal.GetInput("> ")).Trim();
+                bool playerCallsHigh = callInput != "2";
+
+                // Skill check: d20 + WIS/15 vs DC. Read-the-pattern check, scaled per-round.
+                int wisBonus = (int)(currentPlayer.Wisdom / 15);
+                int d20 = Random.Shared.Next(1, 21);
+                int totalRoll = d20 + wisBonus;
+                int dc = roundTuning[roundIdx].dc;
+                bool readPassed = totalRoll >= dc;
+                bool calledCorrectDirection = playerCallsHigh == dealerLoadsHigh;
+                bool won = readPassed && calledCorrectDirection;
+
+                terminal.SetColor("gray");
+                terminal.WriteLine(Loc.Get("dark_alley.spot_check_line", d20, wisBonus, totalRoll, dc));
+                await Task.Delay(800);
+
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine(Loc.Get(dealerLoadsHigh ? "dark_alley.spot_reveal_high" : "dark_alley.spot_reveal_low"));
+                await Task.Delay(500);
+
+                if (won)
+                {
+                    long winnings = bet * roundTuning[roundIdx].payoutMul10 / 10;
+                    terminal.SetColor("bright_green");
+                    terminal.WriteLine(Loc.Get("dark_alley.spot_won", winnings));
+                    return (true, winnings);
+                }
+                else
+                {
+                    terminal.SetColor("red");
+                    string reasonKey = !calledCorrectDirection
+                        ? "dark_alley.spot_lost_wrong_way"
+                        : "dark_alley.spot_lost_failed_read";
+                    terminal.WriteLine(Loc.Get(reasonKey));
+                    // Failure flavor: +5 Darkness via paired alignment movement (the public humiliation
+                    // and the rage that follows). Uses ChangeAlignment so the cascade fires correctly
+                    // and high-chivalry players still see the appropriate paired-movement cleanse cost.
+                    AlignmentSystem.Instance.ChangeAlignment(currentPlayer, 5, isGood: false, "publicly hustled at the dice table");
+                    return (false, 0);
+                }
             }
 
-            return (won, winnings);
+            // Defensive fallthrough (shouldn't reach -- the round 3 path always returns).
+            return (false, 0);
         }
 
         private async Task<(bool won, long winnings)> PlayThreeCardMonte(long bet)

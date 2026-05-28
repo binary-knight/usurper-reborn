@@ -100,7 +100,7 @@ namespace UsurperRemake.Systems
             if (isShadyShop)
             {
                 // Shady shops favor dark characters (Balanced gets neutral — they walk in without trouble)
-                return alignment switch
+                float baseMod = alignment switch
                 {
                     AlignmentType.Holy => 1.5f,      // 50% markup for holy characters
                     AlignmentType.Good => 1.25f,    // 25% markup for good characters
@@ -110,11 +110,17 @@ namespace UsurperRemake.Systems
                     AlignmentType.Evil => 0.75f,    // 25% discount for evil
                     _ => 1.0f
                 };
+                // v0.62.x Dread ladder: a feared Dark/Evil player intimidates shady merchants into
+                // deeper discounts as their standing climbs (Cutthroat 0.95x .. Nightmare 0.80x).
+                // Only on the Dark/Evil band so a Balanced line-walker keeps the flat 0.95 rate.
+                if (alignment == AlignmentType.Dark || alignment == AlignmentType.Evil)
+                    baseMod *= GetDreadPriceMultiplier(character);
+                return baseMod;
             }
             else
             {
                 // Legitimate shops favor good characters (Balanced accepted — not a pariah like evil)
-                return alignment switch
+                float baseMod = alignment switch
                 {
                     AlignmentType.Holy => 0.8f,     // 20% discount for holy
                     AlignmentType.Good => 0.9f,    // 10% discount for good
@@ -124,6 +130,11 @@ namespace UsurperRemake.Systems
                     AlignmentType.Evil => 1.4f,    // 40% markup for evil
                     _ => 1.0f
                 };
+                // v0.62.x Renown ladder: a celebrated Good/Holy player earns deeper goodwill at honest
+                // shops as their standing climbs (Defender 0.95x .. Legend 0.80x). Mirror of Dread.
+                if (alignment == AlignmentType.Holy || alignment == AlignmentType.Good)
+                    baseMod *= GetRenownPriceMultiplier(character);
+                return baseMod;
             }
         }
 
@@ -142,6 +153,15 @@ namespace UsurperRemake.Systems
                         return (false, Loc.Get("alignment.wards_repel"));
                     if (alignment == AlignmentType.Dark && character.Darkness > 600)
                         return (false, Loc.Get("alignment.priests_bar_door"));
+                    break;
+
+                // v0.62.x Phase 6: The Sanctum (Light activity hub) -- mirrors the Church/Temple
+                // ward against Evil players. Dark Tier players are admitted but coldly received
+                // (handled per-action inside SanctumLocation rather than blocking at the door,
+                // since Dark may still want to give alms to wash darkness via paired movement).
+                case GameLocation.Sanctum:
+                    if (alignment == AlignmentType.Evil)
+                        return (false, Loc.Get("alignment.wards_repel"));
                     break;
 
                 case GameLocation.DarkAlley:
@@ -278,6 +298,98 @@ namespace UsurperRemake.Systems
             AlignmentType.Holy => 0.10f,
             _ => 0f
         };
+
+        // ──────────────────────────────────────────────────────────────────────
+        // Dread / Renown notoriety ladders (v0.62.x "Light and Dark" Phase 2).
+        // Two mirrored standing tracks derived live from Darkness / Chivalry (no new
+        // save fields). They ESCALATE effects that already key off alignment (shop
+        // prices here; more "the world reacts to your name" content in a later slice)
+        // so committing deep into a pole feels different from dabbling. Only the pole
+        // matching the player's alignment BAND is treated as active at call sites, so a
+        // Balanced line-walker never collects both ladders' escalation.
+        // ──────────────────────────────────────────────────────────────────────
+
+        public enum DreadTier { None, Cutthroat, Marauder, Terror, Nightmare }
+        public enum RenownTier { None, Defender, Paragon, Hero, Legend }
+
+        /// <summary>Dread standing from raw Darkness. Pure; gate "active" on the Dark/Evil band at call sites.</summary>
+        public DreadTier GetDreadTier(Character c)
+        {
+            if (c == null) return DreadTier.None;
+            return c.Darkness switch
+            {
+                >= 800 => DreadTier.Nightmare,
+                >= 650 => DreadTier.Terror,
+                >= 450 => DreadTier.Marauder,
+                >= 250 => DreadTier.Cutthroat,
+                _ => DreadTier.None
+            };
+        }
+
+        /// <summary>Renown standing from raw Chivalry. Pure; gate "active" on the Good/Holy band at call sites.</summary>
+        public RenownTier GetRenownTier(Character c)
+        {
+            if (c == null) return RenownTier.None;
+            return c.Chivalry switch
+            {
+                >= 800 => RenownTier.Legend,
+                >= 650 => RenownTier.Hero,
+                >= 450 => RenownTier.Paragon,
+                >= 250 => RenownTier.Defender,
+                _ => RenownTier.None
+            };
+        }
+
+        /// <summary>Tiered shady-shop discount multiplier for a feared player. 1.0 = no effect.</summary>
+        public float GetDreadPriceMultiplier(Character c) => GetDreadTier(c) switch
+        {
+            DreadTier.Nightmare => 0.80f,
+            DreadTier.Terror => 0.85f,
+            DreadTier.Marauder => 0.90f,
+            DreadTier.Cutthroat => 0.95f,
+            _ => 1.0f
+        };
+
+        /// <summary>Tiered honest-shop discount multiplier for a renowned player. 1.0 = no effect.</summary>
+        public float GetRenownPriceMultiplier(Character c) => GetRenownTier(c) switch
+        {
+            RenownTier.Legend => 0.80f,
+            RenownTier.Hero => 0.85f,
+            RenownTier.Paragon => 0.90f,
+            RenownTier.Defender => 0.95f,
+            _ => 1.0f
+        };
+
+        /// <summary>
+        /// Full "Notoriety/Renown: {tier} ({what it does})" line for the [%] status readout, or "" if the
+        /// player has no active standing. Picks the Dread track for Dark/Evil and the Renown track for
+        /// Good/Holy; Neutral/Balanced return "" (a line-walker has no single name the world fears or sings).
+        /// </summary>
+        public string GetNotorietyStandingLine(Character c)
+        {
+            var band = GetAlignment(c);
+            if (band == AlignmentType.Dark || band == AlignmentType.Evil)
+            {
+                var t = GetDreadTier(c);
+                if (t == DreadTier.None) return "";
+                string name = Loc.Get($"dread.tier_{t.ToString().ToLowerInvariant()}");
+                string effect = t >= DreadTier.Terror
+                    ? Loc.Get("dread.standing_effect_high")
+                    : Loc.Get("dread.standing_effect_low");
+                return Loc.Get("reputation.dread_standing", name, effect);
+            }
+            if (band == AlignmentType.Holy || band == AlignmentType.Good)
+            {
+                var t = GetRenownTier(c);
+                if (t == RenownTier.None) return "";
+                string name = Loc.Get($"renown.tier_{t.ToString().ToLowerInvariant()}");
+                string effect = t >= RenownTier.Paragon
+                    ? Loc.Get("renown.standing_effect_high")
+                    : Loc.Get("renown.standing_effect_low");
+                return Loc.Get("reputation.renown_standing", name, effect);
+            }
+            return "";
+        }
 
         /// <summary>
         /// Apply alignment change with news generation
@@ -479,6 +591,10 @@ namespace UsurperRemake.Systems
                     terminal.WriteLine(Loc.Get("alignment.event_gods_smile"));
                     player.HP = Math.Min(player.MaxHP, player.HP + player.MaxHP / 10);
                     terminal.WriteLine(Loc.Get("alignment.event_hp_restored", player.MaxHP / 10));
+                    // v0.62.x Phase 3 (Renown reward loop): at Hero+ Renown, an admirer presses
+                    // a gift item into the player's hand on top of the HP restoration. Mirror of
+                    // the Dread bounty-hunter loot-roll on the Light side.
+                    TryGrantRenownGift(player, terminal);
                     await Task.Delay(2000);
                     return true;
 
@@ -491,6 +607,9 @@ namespace UsurperRemake.Systems
                         int gold = _random.Next(20, 100);
                         terminal.WriteLine(Loc.Get("alignment.event_merchant_thanks", gold));
                         player.Gold += gold;
+                        // v0.62.x Phase 3: at Hero+ Renown the merchant's "thanks" is materially
+                        // bigger -- they include a gift item with the gold.
+                        TryGrantRenownGift(player, terminal);
                         await Task.Delay(2000);
                         return true;
                     }
@@ -578,6 +697,66 @@ namespace UsurperRemake.Systems
             }
 
             return false;
+        }
+
+        // ──────────────────────────────────────────────────────────────────────
+        // Mercenary / Sellsword rank (v0.62.x "Light and Dark" Phase 4 reward-loop content).
+        // Career counter ladder: separate from Dread/Renown alignment standing, NOT pole-gated
+        // (the merc path is alignment-agnostic by design -- it's the freelance lane that runs
+        // alongside the Light/Dark poles). Derived live from Character.MercContractsCompleted.
+        // Tier-up thresholds live in GameConfig.MercRankContractsRequired and never decay.
+        // ──────────────────────────────────────────────────────────────────────
+
+        public enum MercRank { None, Recruit, Sellsword, Veteran, Ironbound, Legend }
+
+        /// <summary>Pure function of Character.MercContractsCompleted; never decays. Used for
+        /// tier-up gating, slot count, payout multiplier, and the [%] standing readout.</summary>
+        public MercRank GetMercRank(Character c)
+        {
+            if (c == null) return MercRank.None;
+            int completed = c.MercContractsCompleted;
+            var thresholds = GameConfig.MercRankContractsRequired;
+            // Walk from highest to lowest so the highest reached tier wins.
+            for (int t = thresholds.Length - 1; t >= 1; t--)
+            {
+                if (completed >= thresholds[t]) return (MercRank)t;
+            }
+            return MercRank.None;
+        }
+
+        /// <summary>Localized "Sellsword Hall: {rank}" line for the [%] status readout when the
+        /// player has at least one merc contract completed. Empty otherwise (unranked freelancers
+        /// don't show a standing -- you have to do at least one job to have a name on the board).</summary>
+        public string GetMercStandingLine(Character c)
+        {
+            if (c == null) return "";
+            var rank = GetMercRank(c);
+            if (rank == MercRank.None) return "";
+            string rankName = Loc.Get($"merc.rank_{rank.ToString().ToLowerInvariant()}");
+            return Loc.Get("reputation.merc_standing", rankName, c.MercContractsCompleted);
+        }
+
+        /// <summary>
+        /// v0.62.x Phase 3 (Renown reward loop): at Hero+ Renown, an admirer or grateful
+        /// citizen presses a class-appropriate loot item into the player's hand as part of
+        /// the existing Good/Holy alignment-event flow. Pole-gated so a Balanced line-walker
+        /// doesn't trigger it. Silent no-op below Hero (renown gold/HP still grants normally).
+        /// </summary>
+        private void TryGrantRenownGift(Character player, TerminalEmulator terminal)
+        {
+            var band = GetAlignment(player);
+            if (band != AlignmentType.Good && band != AlignmentType.Holy) return;
+            if (GetRenownTier(player) < RenownTier.Hero) return;
+
+            try
+            {
+                var gift = LootGenerator.GenerateDungeonLoot(player.Level, player.Class);
+                if (gift == null || player.Inventory == null) return;
+                player.Inventory.Add(gift);
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine(Loc.Get("alignment.event_renown_gift", gift.Name));
+            }
+            catch { /* defensive: a loot-generator hiccup must not break the alignment event */ }
         }
 
         /// <summary>

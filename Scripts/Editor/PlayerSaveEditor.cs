@@ -1324,6 +1324,14 @@ internal static class PlayerSaveEditor
         p.LoveStreetVisitsToday = 0;
         p.IntimateEncountersToday = 0;
         p.GauntletRunsToday = 0;
+        p.TributeDemandsToday = 0;        // v0.62.x Phase 3
+        p.FreeBlessingClaimedToday = false; // v0.62.x Phase 3
+        p.MercContractsClaimedToday = 0;    // v0.62.x Phase 4
+        p.DailyMercStandingGain?.Clear();   // v0.62.x Phase 4
+        p.AlmsGivenToday = 0;               // v0.62.x Phase 6 (Sanctum)
+        p.OrphanageGiftsToday = 0;          // v0.62.x Phase 6 (Sanctum)
+        p.HospiceTithesToday = 0;           // v0.62.x Phase 6 (Sanctum)
+        // LifetimeCharityGoldDonated deliberately NOT reset (cosmetic lifetime tracker)
         EditorIO.Success("Daily counters reset. Play as if a new day began.");
         EditorIO.Pause();
     }

@@ -149,6 +149,130 @@ public class SaveRoundTripTests
     }
 
     [Fact]
+    public void PlayerData_RoundTrip_PreservesPhase3DailyCounters()
+    {
+        // v0.62.x "Light and Dark" Phase 3: TributeDemandsToday (Dread reward-loop daily cap)
+        // and FreeBlessingClaimedToday (Renown reward-loop once-per-day flag) MUST survive
+        // save/load -- if they reset on relog, players bypass the daily caps every session.
+        var original = new PlayerData
+        {
+            TributeDemandsToday = 2,
+            FreeBlessingClaimedToday = true
+        };
+
+        var json = JsonSerializer.Serialize(original, _jsonOptions);
+        var restored = JsonSerializer.Deserialize<PlayerData>(json, _jsonOptions);
+
+        restored.Should().NotBeNull();
+        restored!.TributeDemandsToday.Should().Be(2, "TributeDemandsToday must survive save/load (Dread reward-loop daily cap)");
+        restored.FreeBlessingClaimedToday.Should().BeTrue("FreeBlessingClaimedToday must survive save/load (Renown free-blessing one-per-day flag)");
+    }
+
+    [Fact]
+    public void PlayerData_RoundTrip_PreservesPhase4MercFields()
+    {
+        // v0.62.x "Light and Dark" Phase 4 (Sellsword Hall / Mercenary board): the 4 new
+        // player-state fields MUST survive save/load. MercContractsCompleted is the lifetime
+        // career counter that drives the rank ladder (never decays). The other three are daily-cap
+        // state. If any of them resets on relog, the player either silently loses rank progress or
+        // the daily caps stop working.
+        var stamp = new DateTime(2026, 5, 28, 10, 0, 0, DateTimeKind.Utc);
+        var original = new PlayerData
+        {
+            MercContractsCompleted = 47,
+            MercContractsClaimedToday = 2,
+            LastMercBoardRefreshUtc = stamp,
+            DailyMercStandingGain = new Dictionary<int, int> { { 1, 15 }, { 2, 5 } }
+        };
+
+        var json = JsonSerializer.Serialize(original, _jsonOptions);
+        var restored = JsonSerializer.Deserialize<PlayerData>(json, _jsonOptions);
+
+        restored.Should().NotBeNull();
+        restored!.MercContractsCompleted.Should().Be(47, "MercContractsCompleted must survive save/load (lifetime rank counter)");
+        restored.MercContractsClaimedToday.Should().Be(2, "MercContractsClaimedToday must survive save/load (daily cap)");
+        restored.LastMercBoardRefreshUtc.Should().Be(stamp, "LastMercBoardRefreshUtc must survive save/load (board refresh tracking)");
+        restored.DailyMercStandingGain.Should().NotBeNull();
+        restored.DailyMercStandingGain.Should().ContainKey(1).And.ContainKey(2);
+        restored.DailyMercStandingGain[1].Should().Be(15, "per-faction standing-gain caps must survive save/load");
+        restored.DailyMercStandingGain[2].Should().Be(5, "per-faction standing-gain caps must survive save/load");
+    }
+
+    [Fact]
+    public void QuestData_RoundTrip_PreservesMercContractFields()
+    {
+        // v0.62.x Phase 4: a merc contract is a Quest with three additive fields
+        // (IsMercContract, IssuingFaction as int sentinel, MercContractTier). These must round-trip
+        // so claimed contracts survive logout. The IssuingFaction enum serializes as int with
+        // -1 = no faction (matches FactionSaveData.PlayerFaction's pattern).
+        var original = new QuestData
+        {
+            Id = "merc_test_contract",
+            IsMercContract = true,
+            IssuingFaction = 1, // arbitrary Faction enum value
+            MercContractTier = 3
+        };
+
+        var json = JsonSerializer.Serialize(original, _jsonOptions);
+        var restored = JsonSerializer.Deserialize<QuestData>(json, _jsonOptions);
+
+        restored.Should().NotBeNull();
+        restored!.IsMercContract.Should().BeTrue("IsMercContract flag must survive save/load");
+        restored.IssuingFaction.Should().Be(1, "IssuingFaction enum value (as int) must survive save/load");
+        restored.MercContractTier.Should().Be(3, "MercContractTier must survive save/load");
+    }
+
+    [Fact]
+    public void PlayerData_RoundTrip_PreservesPhase5BlackMarketFields()
+    {
+        // v0.62.x "Light and Dark" Phase 5 (Dark Alley depth -- rotating Black Market). Two new
+        // Character fields drive the daily rotation: a seed (currently unused but reserved for a
+        // future deterministic-rotation upgrade) and the last-refresh timestamp. If
+        // LastBlackMarketRefreshUtc resets on relog, the player gets a fresh stock list every login
+        // instead of once per day -- defeating the daily-rotation contract.
+        var stamp = new DateTime(2026, 6, 1, 18, 30, 0, DateTimeKind.Utc);
+        var original = new PlayerData
+        {
+            BlackMarketStockSeed = 42,
+            LastBlackMarketRefreshUtc = stamp
+        };
+
+        var json = JsonSerializer.Serialize(original, _jsonOptions);
+        var restored = JsonSerializer.Deserialize<PlayerData>(json, _jsonOptions);
+
+        restored.Should().NotBeNull();
+        restored!.BlackMarketStockSeed.Should().Be(42, "BlackMarketStockSeed must survive save/load (reserved for slice 5b deterministic-rotation)");
+        restored.LastBlackMarketRefreshUtc.Should().Be(stamp, "LastBlackMarketRefreshUtc must survive save/load -- otherwise daily rotation resets on every login");
+    }
+
+    [Fact]
+    public void PlayerData_RoundTrip_PreservesPhase6SanctumFields()
+    {
+        // v0.62.x "Light and Dark" Phase 6 (Sanctum / Light activity hub). Four new persisted
+        // fields: three per-verb daily counters (Alms / Orphanage / Hospice) and one lifetime
+        // gold-donated counter (for future achievement hooks). The per-verb counters reset daily
+        // via DailySystemManager.ApplyDailyReset; the lifetime tracker never resets. All four
+        // must survive save/load -- otherwise daily caps reset on relog or the lifetime milestone
+        // is permanently 0.
+        var original = new PlayerData
+        {
+            AlmsGivenToday = 2,
+            OrphanageGiftsToday = 1,
+            HospiceTithesToday = 1,
+            LifetimeCharityGoldDonated = 123456L
+        };
+
+        var json = JsonSerializer.Serialize(original, _jsonOptions);
+        var restored = JsonSerializer.Deserialize<PlayerData>(json, _jsonOptions);
+
+        restored.Should().NotBeNull();
+        restored!.AlmsGivenToday.Should().Be(2, "AlmsGivenToday must survive save/load (Sanctum alms daily cap)");
+        restored.OrphanageGiftsToday.Should().Be(1, "OrphanageGiftsToday must survive save/load (Sanctum orphanage daily cap)");
+        restored.HospiceTithesToday.Should().Be(1, "HospiceTithesToday must survive save/load (Sanctum hospice daily cap)");
+        restored.LifetimeCharityGoldDonated.Should().Be(123456L, "LifetimeCharityGoldDonated must survive save/load (lifetime milestone tracker)");
+    }
+
+    [Fact]
     public void PlayerData_RoundTrip_PreservesLastPartnerBondingUtc()
     {
         // v0.57.7: Rage reported infinite-XP exploit via "romantic dinner" at

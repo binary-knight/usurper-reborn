@@ -58,6 +58,16 @@ public partial class Quest
     public List<string> CommentArgs { get; set; } = new();
     public string InitiatorKey { get; set; } = "";
 
+    // v0.62.x "Light and Dark" Phase 4 (Mercenary/Sellsword board): three additive fields that
+    // let the existing Quest type express a faction-issued freelance contract. Composes with the
+    // existing Quest pipeline (objectives / save / display / claim / turn-in) instead of
+    // introducing a parallel type. `IsMercContract` is the filter discriminator; `IssuingFaction`
+    // routes the standing cascade on completion; `MercContractTier` controls payout scaling +
+    // visibility (a Recruit-tier player only sees tier-1 contracts; higher ranks unlock higher tiers).
+    public bool IsMercContract { get; set; } = false;
+    public UsurperRemake.Systems.Faction? IssuingFaction { get; set; } = null;
+    public int MercContractTier { get; set; } = 1;
+
     /// <summary>
     /// Resolves any arg with the `loc:` prefix to its localized form at display
     /// time. The release notes for v0.61.2 quest localization called out a

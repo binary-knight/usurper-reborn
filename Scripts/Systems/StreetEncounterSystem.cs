@@ -65,7 +65,8 @@ public class StreetEncounterSystem
         GrudgeConfrontation,  // Defeated NPC seeking revenge
         SpouseConfrontation,  // Suspicious spouse confronting player
         ThroneChallenge,      // Ambitious NPC challenges player king
-        CityControlContest    // Rival team contests player's city control
+        CityControlContest,   // Rival team contests player's city control
+        BountyHunter          // v0.62.x Phase 3 (Dread reward loop): escalating named hunter chasing a feared Dark/Evil player.
     }
 
     /// <summary>
@@ -119,6 +120,25 @@ public class StreetEncounterSystem
     /// </summary>
     private EncounterType DetermineEncounterType(Character player, GameLocation location)
     {
+        // v0.62.x Phase 3 (Dread reward loop): a feared Dark/Evil player at Marauder+ Dread
+        // sometimes draws a named bounty hunter instead of the normal random encounter. The
+        // hunter is scaled higher than ordinary street thugs but drops a guaranteed gold purse
+        // + a loot roll on defeat -- the keystone of "the hunters are worth killing." Pole-gated
+        // to Dark/Evil so a Balanced line-walker doesn't trigger it.
+        try
+        {
+            var alignSys = AlignmentSystem.Instance;
+            var band = alignSys.GetAlignment(player);
+            bool isDarkBand = band == AlignmentSystem.AlignmentType.Dark || band == AlignmentSystem.AlignmentType.Evil;
+            if (isDarkBand
+                && alignSys.GetDreadTier(player) >= AlignmentSystem.DreadTier.Marauder
+                && _random.Next(100) < GameConfig.DreadBountyHunterSpawnPercent)
+            {
+                return EncounterType.BountyHunter;
+            }
+        }
+        catch { /* defensive: alignment lookup must never block normal encounters */ }
+
         int roll = _random.Next(100);
 
         return location switch
@@ -242,6 +262,10 @@ public class StreetEncounterSystem
 
             case EncounterType.Ambush:
                 await ProcessAmbushEncounter(player, location, result, terminal);
+                break;
+
+            case EncounterType.BountyHunter:
+                await ProcessBountyHunterEncounter(player, location, result, terminal);
                 break;
         }
     }
@@ -1301,6 +1325,131 @@ public class StreetEncounterSystem
         }
 
         await Task.Delay(2000);
+    }
+
+    /// <summary>
+    /// v0.62.x "Light and Dark" Phase 3 (Dread reward loop): a named bounty hunter chases a
+    /// feared Dark/Evil player at Marauder+ Dread. The hunter is champion-tier scaled above
+    /// the player (player.Level + dreadTier) so the fight is real, but on victory the player
+    /// earns a guaranteed gold purse + a real loot roll on top of whatever the combat engine
+    /// already awarded -- the keystone "the hunters are worth killing" reward loop. Bounty
+    /// hunters are CreateBountyHunter-spawned (not in NPCSpawnSystem) so the murder cap
+    /// clawback in FightNPC doesn't penalize self-defense.
+    /// </summary>
+    private async Task ProcessBountyHunterEncounter(Character player, GameLocation location,
+        EncounterResult result, TerminalEmulator terminal)
+    {
+        terminal.ClearScreen();
+        UIHelper.WriteBoxHeader(terminal, Loc.Get("street_encounter.bounty_hunter.title"), "bright_red");
+        terminal.WriteLine("");
+
+        int dreadTier = (int)AlignmentSystem.Instance.GetDreadTier(player);
+        NPC hunter = CreateBountyHunter(player.Level, dreadTier);
+
+        terminal.SetColor("bright_red");
+        terminal.WriteLine(Loc.Get("street_encounter.bounty_hunter.intro", hunter.Name2));
+        terminal.SetColor("yellow");
+        terminal.WriteLine($"  \"{Loc.Get("street_encounter.bounty_hunter.threat", player.Name2)}\"");
+        terminal.WriteLine("");
+        terminal.SetColor("white");
+        terminal.WriteLine(Loc.Get("street_encounter.bounty_hunter.stats", hunter.Name2, hunter.Level, hunter.HP, hunter.MaxHP));
+        terminal.WriteLine("");
+        await Task.Delay(1500);
+
+        // No pre-fight choice -- the hunter announces and engages. The CombatEngine's own
+        // [R]un option is still available mid-fight, mirroring ProcessAmbushEncounter.
+        await FightNPC(player, hunter, result, terminal);
+
+        if (result.Victory)
+        {
+            // Bonus purse layered on top of FightNPC's existing combat reward. Scales to dread
+            // tier so deeper standing earns deeper pockets ("hunters are worth killing").
+            long bonusPurse = dreadTier * GameConfig.DreadBountyHunterGoldPerTier + player.Level * _random.Next(20, 50);
+            player.Gold += bonusPurse;
+            result.GoldGained += bonusPurse;
+
+            terminal.WriteLine("");
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine(Loc.Get("street_encounter.bounty_hunter.victory_purse", bonusPurse));
+
+            // Real loot roll via the same generator dungeon kills use, scaled by player.Level + dreadTier
+            // so endgame Nightmare-tier hunters drop level-104-equivalent loot. Class-appropriate.
+            // Inventory-cap honored: mirrors the combat-loot pattern at CombatEngine.cs:8394 — at-cap
+            // players see a "left where they fell" line instead of a silent over-cap Add.
+            try
+            {
+                var loot = LootGenerator.GenerateDungeonLoot(player.Level + dreadTier, player.Class);
+                if (loot != null && player.Inventory != null)
+                {
+                    if (!player.IsInventoryFull)
+                    {
+                        player.Inventory.Add(loot);
+                        terminal.SetColor("cyan");
+                        terminal.WriteLine(Loc.Get("street_encounter.bounty_hunter.victory_loot", loot.Name));
+                    }
+                    else
+                    {
+                        terminal.SetColor("gray");
+                        terminal.WriteLine(Loc.Get("street_encounter.bounty_hunter.victory_loot_dropped", loot.Name));
+                    }
+                }
+            }
+            catch { /* defensive: a loot-generator hiccup must not break the encounter */ }
+
+            await Task.Delay(2000);
+        }
+    }
+
+    /// <summary>
+    /// Spawn a named bounty hunter scaled above the player by Dread tier. Champion-tier stats
+    /// (HP/atk/def x1.2-1.4 vs CreateRandomHostileNPC) so the fight is meaningful. NOT registered
+    /// with NPCSpawnSystem -- this is a one-shot hostile spawn, like Hired Assassin in Ambush.
+    /// </summary>
+    private NPC CreateBountyHunter(int playerLevel, int dreadTier)
+    {
+        int level = Math.Max(1, playerLevel + dreadTier);
+
+        // Evocative named pool. These are NOT proper-noun titles (no Sir/Dame/king collision);
+        // they're flavor character names that read as hardened freelance hunters.
+        string[] names = {
+            "Hex the Hound", "Greymark", "Black Iris", "Vance the Stalker",
+            "Iron Lyra", "Cold Mercy", "Sable Roan", "The Silent Maw",
+            "Vendrik the Patient", "Ash Wren"
+        };
+        string selectedName = names[_random.Next(names.Length)];
+
+        var hunter = new NPC
+        {
+            Name1 = selectedName,
+            Name2 = selectedName,
+            Level = level,
+            Class = _random.Next(3) switch
+            {
+                0 => CharacterClass.Assassin,
+                1 => CharacterClass.Ranger,
+                _ => CharacterClass.Warrior
+            },
+            Race = (CharacterRace)_random.Next(1, 8),
+            Sex = _random.Next(2) == 0 ? CharacterSex.Male : CharacterSex.Female,
+            Darkness = 200 + _random.Next(150), // morally grey: works for coin, not for ideology.
+        };
+
+        int levelSq = level * level;
+        // Champion-tier multipliers: HP x1.4, atk/def x1.2. Comparable to a dungeon champion
+        // but spawned in town, so the player can't just retreat to safer floors.
+        hunter.MaxHP = (int)((70 + level * 30 + levelSq / 2 + _random.Next(level * 10)) * 1.4f);
+        hunter.HP = hunter.MaxHP;
+        hunter.Strength = 14 + level * 3 + levelSq / 18 + _random.Next(5);
+        hunter.Dexterity = 14 + level * 3 + _random.Next(5);
+        hunter.Constitution = 12 + level * 2 + _random.Next(5);
+        hunter.Intelligence = 10 + level + _random.Next(5);
+        hunter.Wisdom = 10 + level + _random.Next(5);
+        hunter.Charisma = 8 + _random.Next(5);
+        hunter.Defence = (int)((10 + level * 3 + levelSq / 14) * 1.2f);
+        hunter.WeapPow = (int)((10 + level * 4 + levelSq / 18) * 1.2f);
+        hunter.ArmPow = (int)((7 + level * 3 + levelSq / 18) * 1.2f);
+
+        return hunter;
     }
 
     // ======================== HELPER METHODS ========================

@@ -484,9 +484,35 @@ namespace UsurperRemake.Locations
         {
             terminal.WriteLine("");
             terminal.WriteLine("");
-            
+
+            // v0.62.x "Light and Dark" Phase 3 (Renown reward loop): a pure-of-soul player with no
+            // darkness to purify used to hit a dead end here ("your soul is already pure"). At
+            // Paragon+ Renown (Chivalry >= GameConfig.FreeBlessingMinRenownChivalry), the Bishop now
+            // recognizes their devotion and grants one free DivineBlessing buff per day instead.
+            // Daily flag is the standard FreeBlessingClaimedToday counter (reset by DailySystemManager).
+            // Mirror of the Dread escalating shop discount on the Light side: a tangible reward for
+            // committed Good/Holy play that doesn't depend on having darkness to cleanse.
             if (currentPlayer.Darkness < 1)
             {
+                if (currentPlayer.Chivalry >= GameConfig.FreeBlessingMinRenownChivalry
+                    && !currentPlayer.FreeBlessingClaimedToday)
+                {
+                    currentPlayer.FreeBlessingClaimedToday = true;
+                    currentPlayer.BlessingsReceived += 1;
+                    // 7 days of DivineBlessing -- same magnitude as a paid blessing, no gold cost.
+                    currentPlayer.DivineBlessing = Math.Max(currentPlayer.DivineBlessing, 7);
+
+                    terminal.SetColor("bright_yellow");
+                    terminal.WriteLine(Loc.Get("renown.free_blessing_offered", bishopName));
+                    terminal.WriteLine("");
+                    terminal.SetColor("white");
+                    terminal.WriteLine(Loc.Get("renown.free_blessing_granted"));
+                    await Task.Delay(2500);
+                    return;
+                }
+
+                // Either not eligible, or already claimed today. Original "your soul is pure"
+                // dead-end stays so a player can't loop the blessing by pressing it twice.
                 terminal.WriteLine(Loc.Get("church.blessing_pure"), "bright_green");
                 await Task.Delay(2000);
                 return;

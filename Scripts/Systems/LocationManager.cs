@@ -114,6 +114,10 @@ public class LocationManager
         // NPC Settlement (autonomous town-building)
         locations[GameLocation.Settlement] = new SettlementLocation();
 
+        // v0.62.x Phase 6: The Sanctum -- Light-aligned activity hub (charity + Hall of Heroes;
+        // Tournament of Honor + Crown commissions in slice 6b). Structural yin/yang mirror of Dark Alley.
+        locations[GameLocation.Sanctum] = new SanctumLocation();
+
         // Note: Gym removed - stat training doesn't fit single-player endless format
 
         // GD.Print($"[LocationManager] Initialized {locations.Count} locations");
@@ -196,7 +200,8 @@ public class LocationManager
             GameLocation.MusicShop,    // loc18 – music shop
             GameLocation.TeamCorner,   // loc19 – team corner
             GameLocation.Wilderness,   // loc20 – wilderness exploration
-            GameLocation.Settlement    // loc21 – NPC settlement
+            GameLocation.Settlement,   // loc21 – NPC settlement
+            GameLocation.Sanctum       // loc22 – v0.62.x Phase 6: Light activity hub
         };
         
         navigationTable[GameLocation.TheInn] = new List<GameLocation>
@@ -212,6 +217,12 @@ public class LocationManager
         navigationTable[GameLocation.Church] = new List<GameLocation>
         {
             GameLocation.MainStreet   // loc1
+        };
+
+        // v0.62.x Phase 6: The Sanctum (Light activity hub) returns to Main Street.
+        navigationTable[GameLocation.Sanctum] = new List<GameLocation>
+        {
+            GameLocation.MainStreet
         };
         
         navigationTable[GameLocation.Dungeons] = new List<GameLocation>

@@ -82,6 +82,8 @@ public class AnchorRoadLocation : BaseLocation
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("anchor_road.menu_challenges"));
         WriteMenuRow("B", Loc.Get("anchor_road.menu_bounty_board"), "G", Loc.Get("anchor_road.menu_gang_war_label"), "T", Loc.Get("anchor_road.menu_gauntlet_label"));
+        // v0.62.x Phase 4: Sellsword Hall (faction-issued freelance contracts; no oath required)
+        WriteMenuRow("M", Loc.Get("merc.menu_sellsword_hall"), "", "", "", "");
         terminal.WriteLine("");
 
         // Menu - Town Control
@@ -116,6 +118,8 @@ public class AnchorRoadLocation : BaseLocation
         WriteSRMenuOption("B", Loc.Get("anchor_road.bounty"));
         WriteSRMenuOption("G", Loc.Get("anchor_road.gang_war"));
         WriteSRMenuOption("T", Loc.Get("anchor_road.gauntlet"));
+        // v0.62.x Phase 4: Sellsword Hall
+        WriteSRMenuOption("M", Loc.Get("merc.menu_sellsword_hall"));
         terminal.WriteLine("");
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("anchor_road.menu_town_control"));
@@ -304,6 +308,8 @@ public class AnchorRoadLocation : BaseLocation
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("anchor_road.bbs_challenges"));
         ShowBBSMenuRow(("B", "bright_yellow", Loc.Get("anchor_road.bbs_bounty")), ("G", "bright_yellow", Loc.Get("anchor_road.bbs_gang_war")), ("T", "bright_yellow", Loc.Get("anchor_road.bbs_gauntlet")));
+        // v0.62.x Phase 4: Sellsword Hall
+        ShowBBSMenuRow(("M", "bright_yellow", Loc.Get("merc.menu_sellsword_hall")), ("", "", ""), ("", "", ""));
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("anchor_road.bbs_town_control"));
         ShowBBSMenuRow(("C", "bright_yellow", Loc.Get("anchor_road.bbs_claim_town")), ("F", "bright_yellow", Loc.Get("anchor_road.bbs_flee_town")), ("P", "bright_yellow", Loc.Get("anchor_road.bbs_prison")), ("R", "bright_yellow", Loc.Get("anchor_road.bbs_return")));
@@ -334,6 +340,10 @@ public class AnchorRoadLocation : BaseLocation
 
             case 'T':
                 await StartGauntlet();
+                return false;
+
+            case 'M':
+                await ShowSellswordHall();
                 return false;
 
             case 'C':
@@ -1833,6 +1843,293 @@ public class AnchorRoadLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
+        terminal.WriteLine(Loc.Get("ui.press_enter"));
+        await terminal.ReadKeyAsync();
+    }
+
+    /// <summary>
+    /// v0.62.x "Light and Dark" Phase 4 (Mercenary/Sellsword job board). The freelance contract
+    /// surface: factions post jobs, the player claims and completes them without swearing an
+    /// oath. Faction standing climbs naturally through the existing cascade so a long-time
+    /// freelancer eventually becomes eligible for full membership if they want it. No alignment
+    /// gate -- this is the explicit yin/yang centerline for the alignment rework.
+    /// </summary>
+    private async Task ShowSellswordHall()
+    {
+        // Per-player on-demand board refresh: if we haven't refreshed today, do it now. Mirrors
+        // the LastMercBoardRefreshUtc check pattern; default DateTime.MinValue forces a refresh
+        // on first-ever visit so a v0.62.x save loaded for the first time gets a populated board.
+        if (currentPlayer.LastMercBoardRefreshUtc.Date < DateTime.UtcNow.Date)
+        {
+            QuestSystem.RefreshMercBoard(currentPlayer);
+        }
+
+        bool stayInHall = true;
+        while (stayInHall)
+        {
+            terminal.ClearScreen();
+            WriteBoxHeader(Loc.Get("merc.hall_header"), "bright_magenta");
+            terminal.WriteLine("");
+            terminal.SetColor("white");
+            terminal.WriteLine(Loc.Get("merc.hall_desc_1"));
+            terminal.WriteLine(Loc.Get("merc.hall_desc_2"));
+            terminal.WriteLine("");
+
+            // Show player's current merc rank + counts.
+            var rank = UsurperRemake.Systems.AlignmentSystem.Instance.GetMercRank(currentPlayer);
+            string rankName = rank == UsurperRemake.Systems.AlignmentSystem.MercRank.None
+                ? Loc.Get("merc.rank_none")
+                : Loc.Get($"merc.rank_{rank.ToString().ToLowerInvariant()}");
+            terminal.SetColor("cyan");
+            terminal.WriteLine(Loc.Get("merc.hall_your_rank", rankName, currentPlayer.MercContractsCompleted));
+            int remainingToday = Math.Max(0, GameConfig.MaxMercContractsPerDay - currentPlayer.MercContractsClaimedToday);
+            terminal.SetColor("gray");
+            terminal.WriteLine(Loc.Get("merc.hall_daily_remaining", remainingToday, GameConfig.MaxMercContractsPerDay));
+            terminal.WriteLine("");
+
+            // Build the available list (numbered across all factions).
+            var available = QuestSystem.GetAvailableMercContracts(currentPlayer, null);
+
+            // Available contracts list.
+            terminal.SetColor("cyan");
+            terminal.WriteLine(Loc.Get("merc.board_available_header"));
+            terminal.SetColor("white");
+            if (available.Count == 0)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine($"  {Loc.Get("merc.board_empty")}");
+            }
+            else
+            {
+                for (int i = 0; i < available.Count; i++)
+                {
+                    var q = available[i];
+                    string factionTag = FormatMercFactionTag(q.IssuingFaction);
+                    string title = q.GetDisplayTitle();
+                    terminal.SetColor("darkgray");
+                    terminal.Write("  [");
+                    terminal.SetColor("bright_yellow");
+                    terminal.Write((i + 1).ToString());
+                    terminal.SetColor("darkgray");
+                    terminal.Write("] ");
+                    terminal.SetColor("bright_white");
+                    terminal.Write(factionTag);
+                    terminal.SetColor("white");
+                    terminal.WriteLine(" " + title);
+                }
+            }
+            terminal.WriteLine("");
+
+            // Claimed (in-progress) contracts.
+            var claimed = QuestSystem.GetClaimedMercContracts(currentPlayer);
+            if (claimed.Count > 0)
+            {
+                terminal.SetColor("cyan");
+                terminal.WriteLine(Loc.Get("merc.board_claimed_header"));
+                terminal.SetColor("white");
+                foreach (var q in claimed)
+                {
+                    string factionTag = FormatMercFactionTag(q.IssuingFaction);
+                    string title = q.GetDisplayTitle();
+                    // Progress summary from the first objective (slice 1 contracts are single-objective).
+                    string progress = "";
+                    if (q.Objectives != null && q.Objectives.Count > 0)
+                    {
+                        var o = q.Objectives[0];
+                        bool done = o.CurrentProgress >= o.RequiredProgress;
+                        progress = done
+                            ? Loc.Get("merc.board_claimed_ready")
+                            : Loc.Get("merc.board_claimed_progress", o.CurrentProgress, o.RequiredProgress);
+                    }
+                    terminal.SetColor("gray");
+                    terminal.WriteLine($"    {factionTag} {title}  {progress}");
+                }
+                terminal.WriteLine("");
+            }
+
+            // Action prompt.
+            terminal.SetColor("white");
+            terminal.WriteLine(Loc.Get("merc.hall_prompt_options"));
+            string input = (await terminal.GetInput(Loc.Get("ui.your_choice"))).Trim().ToUpperInvariant();
+
+            if (input == "Q" || input == "")
+            {
+                stayInHall = false;
+                continue;
+            }
+
+            if (input == "T")
+            {
+                await TurnInReadyMercContracts(claimed);
+                continue;
+            }
+
+            if (int.TryParse(input, out int contractNum) && contractNum >= 1 && contractNum <= available.Count)
+            {
+                await ShowMercContractDetails(available[contractNum - 1]);
+                continue;
+            }
+
+            terminal.SetColor("red");
+            terminal.WriteLine(Loc.Get("merc.hall_invalid_choice"));
+            await Task.Delay(900);
+        }
+    }
+
+    private string FormatMercFactionTag(UsurperRemake.Systems.Faction? faction)
+    {
+        if (!faction.HasValue) return "";
+        string key = faction.Value switch
+        {
+            UsurperRemake.Systems.Faction.TheCrown => "merc.tag_crown",
+            UsurperRemake.Systems.Faction.TheShadows => "merc.tag_shadows",
+            UsurperRemake.Systems.Faction.TheFaith => "merc.tag_faith",
+            _ => "merc.tag_unknown"
+        };
+        return Loc.Get(key);
+    }
+
+    private async Task ShowMercContractDetails(Quest quest)
+    {
+        terminal.ClearScreen();
+        WriteBoxHeader(Loc.Get("merc.contract_details_header"), "bright_magenta");
+        terminal.WriteLine("");
+
+        terminal.SetColor("bright_white");
+        terminal.WriteLine($"  {FormatMercFactionTag(quest.IssuingFaction)} {quest.GetDisplayTitle()}");
+        terminal.WriteLine("");
+        terminal.SetColor("gray");
+        terminal.WriteLine($"  {Loc.Get("merc.contract_issued_by", quest.GetDisplayInitiator())}");
+        terminal.WriteLine("");
+        terminal.SetColor("white");
+        terminal.WriteLine($"  {quest.GetDisplayComment()}");
+        terminal.WriteLine("");
+
+        if (quest.Objectives != null && quest.Objectives.Count > 0)
+        {
+            terminal.SetColor("cyan");
+            terminal.WriteLine(Loc.Get("merc.contract_objective_header"));
+            terminal.SetColor("white");
+            foreach (var o in quest.Objectives)
+            {
+                terminal.WriteLine($"    - {o.GetDisplayDescription()}");
+            }
+            terminal.WriteLine("");
+        }
+
+        // Payout preview (rank-adjusted).
+        int rankIdx = (int)UsurperRemake.Systems.AlignmentSystem.Instance.GetMercRank(currentPlayer);
+        float rankMul = rankIdx >= 0 && rankIdx < GameConfig.MercRankPayMultiplier.Length
+            ? GameConfig.MercRankPayMultiplier[rankIdx]
+            : 1.0f;
+        long previewGold = (long)(quest.BountyGold * rankMul);
+        terminal.SetColor("yellow");
+        terminal.WriteLine(Loc.Get("merc.contract_reward_line", previewGold));
+        terminal.SetColor("gray");
+        terminal.WriteLine(Loc.Get("merc.contract_penalty_line", quest.Penalty));
+        terminal.WriteLine("");
+
+        // Daily-cap check.
+        if (currentPlayer.MercContractsClaimedToday >= GameConfig.MaxMercContractsPerDay)
+        {
+            terminal.SetColor("bright_red");
+            terminal.WriteLine($"  {Loc.Get("merc.contract_cap_reached", GameConfig.MaxMercContractsPerDay)}");
+            terminal.WriteLine("");
+            terminal.SetColor("gray");
+            terminal.WriteLine(Loc.Get("ui.press_enter"));
+            await terminal.ReadKeyAsync();
+            return;
+        }
+
+        terminal.SetColor("white");
+        string choice = (await terminal.GetInput(Loc.Get("merc.contract_claim_prompt"))).Trim().ToUpperInvariant();
+        if (choice == "Y" || choice == "S" || choice == "O" || choice == "I")
+        {
+            quest.Occupier = currentPlayer.Name2;
+            quest.OccupierRace = currentPlayer.Race;
+            quest.OccupierSex = (byte)currentPlayer.Sex;
+            quest.OccupiedDays = 0;
+            currentPlayer.MercContractsClaimedToday++;
+
+            terminal.SetColor("bright_green");
+            terminal.WriteLine($"  {Loc.Get("merc.contract_claimed_msg")}");
+            await Task.Delay(1500);
+        }
+    }
+
+    private async Task TurnInReadyMercContracts(List<Quest> claimedContracts)
+    {
+        // Filter to contracts that meet objective completion.
+        var ready = claimedContracts.Where(q => q.Objectives != null
+            && q.Objectives.Count > 0
+            && q.Objectives.All(o => o.IsOptional || o.CurrentProgress >= o.RequiredProgress)).ToList();
+
+        if (ready.Count == 0)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"  {Loc.Get("merc.turnin_nothing_ready")}");
+            await Task.Delay(1500);
+            return;
+        }
+
+        // Pick one: numbered list if more than 1, otherwise auto.
+        Quest pick = ready[0];
+        if (ready.Count > 1)
+        {
+            terminal.ClearScreen();
+            WriteBoxHeader(Loc.Get("merc.turnin_header"), "bright_magenta");
+            terminal.WriteLine("");
+            terminal.SetColor("white");
+            terminal.WriteLine(Loc.Get("merc.turnin_choose"));
+            terminal.WriteLine("");
+            for (int i = 0; i < ready.Count; i++)
+            {
+                terminal.WriteLine($"  [{i + 1}] {FormatMercFactionTag(ready[i].IssuingFaction)} {ready[i].GetDisplayTitle()}");
+            }
+            terminal.WriteLine("");
+            string input = (await terminal.GetInput(Loc.Get("ui.your_choice"))).Trim();
+            if (!int.TryParse(input, out int idx) || idx < 1 || idx > ready.Count)
+            {
+                return;
+            }
+            pick = ready[idx - 1];
+        }
+
+        var (ok, gold, standing, reason) = QuestSystem.CompleteMercContract(currentPlayer, pick);
+        if (!ok)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine($"  {Loc.Get("merc.turnin_failed", reason)}");
+            await Task.Delay(1800);
+            return;
+        }
+
+        terminal.ClearScreen();
+        WriteBoxHeader(Loc.Get("merc.turnin_complete_header"), "bright_green");
+        terminal.WriteLine("");
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine($"  {Loc.Get("merc.turnin_gold_awarded", gold)}");
+        if (standing > 0)
+        {
+            terminal.SetColor("cyan");
+            terminal.WriteLine($"  {Loc.Get("merc.turnin_standing_awarded", standing, FormatMercFactionTag(pick.IssuingFaction))}");
+        }
+        terminal.SetColor("gray");
+        terminal.WriteLine($"  {Loc.Get("merc.turnin_contracts_completed", currentPlayer.MercContractsCompleted)}");
+
+        // Rank-up flavor on threshold crossings.
+        int newRank = (int)UsurperRemake.Systems.AlignmentSystem.Instance.GetMercRank(currentPlayer);
+        var thresholds = GameConfig.MercRankContractsRequired;
+        if (newRank > 0 && currentPlayer.MercContractsCompleted == thresholds[newRank])
+        {
+            string newRankName = Loc.Get($"merc.rank_{((UsurperRemake.Systems.AlignmentSystem.MercRank)newRank).ToString().ToLowerInvariant()}");
+            terminal.WriteLine("");
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine($"  {Loc.Get("merc.rank_up", newRankName)}");
+        }
+
+        terminal.WriteLine("");
+        terminal.SetColor("gray");
         terminal.WriteLine(Loc.Get("ui.press_enter"));
         await terminal.ReadKeyAsync();
     }

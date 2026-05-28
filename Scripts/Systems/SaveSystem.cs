@@ -933,6 +933,22 @@ namespace UsurperRemake.Systems
                 IntimateEncountersToday = player.IntimateEncountersToday,
                 GauntletRunsToday = player.GauntletRunsToday,
                 MarshToadAntidoteClaimedToday = player.MarshToadAntidoteClaimedToday,
+                TributeDemandsToday = player.TributeDemandsToday,           // v0.62.x Phase 3
+                FreeBlessingClaimedToday = player.FreeBlessingClaimedToday, // v0.62.x Phase 3
+                MercContractsCompleted = player.MercContractsCompleted,     // v0.62.x Phase 4 (Mercenary board)
+                MercContractsClaimedToday = player.MercContractsClaimedToday,
+                LastMercBoardRefreshUtc = player.LastMercBoardRefreshUtc,
+                DailyMercStandingGain = player.DailyMercStandingGain != null
+                    ? new Dictionary<int, int>(player.DailyMercStandingGain)
+                    : new Dictionary<int, int>(),
+                // v0.62.x Phase 5 (Black Market rotation)
+                BlackMarketStockSeed = player.BlackMarketStockSeed,
+                LastBlackMarketRefreshUtc = player.LastBlackMarketRefreshUtc,
+                // v0.62.x Phase 6 (Sanctum)
+                AlmsGivenToday = player.AlmsGivenToday,
+                OrphanageGiftsToday = player.OrphanageGiftsToday,
+                HospiceTithesToday = player.HospiceTithesToday,
+                LifetimeCharityGoldDonated = player.LifetimeCharityGoldDonated,
                 AttunedShrineId = player.AttunedShrineId ?? "",
                 AttunedShrineExpiresUtc = player.AttunedShrineExpiresUtc,
                 AttunedShrineExpiresGameDay = player.AttunedShrineExpiresGameDay,
@@ -1557,7 +1573,11 @@ namespace UsurperRemake.Systems
                     Forced = quest.Forced,
                     TargetNPCName = quest.TargetNPCName ?? "",
                     Objectives = new List<QuestObjectiveData>(),
-                    Monsters = new List<QuestMonsterData>()
+                    Monsters = new List<QuestMonsterData>(),
+                    // v0.62.x Phase 4 (Mercenary board): faction-issued freelance contract fields.
+                    IsMercContract = quest.IsMercContract,
+                    IssuingFaction = quest.IssuingFaction.HasValue ? (int)quest.IssuingFaction.Value : -1,
+                    MercContractTier = quest.MercContractTier
                 };
 
                 // Serialize objectives

@@ -342,6 +342,14 @@ public class DailySystemManager
         player.IntimateEncountersToday = 0; // v0.61.x: bedroom / spouse / lover intimate-scene daily cap
         player.GauntletRunsToday = 0;     // v0.60.11 hotfix: Anchor Road Gauntlet daily cap
         player.MarshToadAntidoteClaimedToday = false; // v0.61.1 Beast Taming: Marsh Toad daily antidote refreshes
+        player.TributeDemandsToday = 0;   // v0.62.x Phase 3: Dread Demand Tribute daily cap
+        player.FreeBlessingClaimedToday = false; // v0.62.x Phase 3: Renown free Temple blessing refreshes
+        player.MercContractsClaimedToday = 0;    // v0.62.x Phase 4: Sellsword Hall daily cap
+        player.DailyMercStandingGain?.Clear();   // v0.62.x Phase 4: per-faction merc-contract standing-gain caps refresh
+        player.AlmsGivenToday = 0;               // v0.62.x Phase 6: Sanctum alms daily cap
+        player.OrphanageGiftsToday = 0;          // v0.62.x Phase 6: Sanctum orphanage daily cap
+        player.HospiceTithesToday = 0;           // v0.62.x Phase 6: Sanctum hospice daily cap
+        // LifetimeCharityGoldDonated NOT reset (cosmetic lifetime tracker)
 
         // Reset session XP tracking (prevents bypass by logging out/in to clear diminishing returns)
         player.SessionXPEarned = 0;

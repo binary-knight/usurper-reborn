@@ -162,6 +162,11 @@ public abstract class BaseLocation
         // Track location visit statistics
         player.Statistics?.RecordLocationVisit(Name);
 
+        // v0.62.x Phase 4 (Mercenary board): tick VisitLocation-objective merc contracts that
+        // target this location (e.g. shadows_fence_run -> "DarkAlley", shadows_jailbreak -> "Prison").
+        // Match is case-insensitive on the GameLocation enum string; safe to call on every entry.
+        QuestSystem.OnLocationVisited(player, LocationId);
+
         // Sync player King/CTurf state with world state (catches background sim changes)
         SyncPlayerWorldState(player);
 
@@ -4662,6 +4667,34 @@ public abstract class BaseLocation
         npc.IsInConversation = true; // Protect from world sim during interaction
         try
         {
+            // v0.62.x "Light and Dark" Phase 2 (Dread ladder): a Dark/Evil player at Terror+ Dread
+            // standing makes much weaker ordinary NPCs flee before a word is spoken. Gated to the
+            // Dark/Evil band (a Balanced line-walker with high Darkness doesn't qualify) and to
+            // non-story, non-king NPCs more than GameConfig.DreadFleeLevelGap levels below the player,
+            // so quest targets, the king, and near-peers still interact normally. The finally below
+            // resets IsInConversation, so the early return is safe.
+            var alignSys = AlignmentSystem.Instance;
+            var alignBand = alignSys.GetAlignment(currentPlayer);
+            bool isDarkBand = alignBand == AlignmentSystem.AlignmentType.Dark || alignBand == AlignmentSystem.AlignmentType.Evil;
+            bool isLightBand = alignBand == AlignmentSystem.AlignmentType.Holy || alignBand == AlignmentSystem.AlignmentType.Good;
+
+            if (isDarkBand
+                && alignSys.GetDreadTier(currentPlayer) >= AlignmentSystem.DreadTier.Terror
+                && npc.Level > 0 && npc.IsAlive && !npc.IsStoryNPC && !npc.King
+                && npc.Level < currentPlayer.Level - GameConfig.DreadFleeLevelGap)
+            {
+                terminal.ClearScreen();
+                WriteBoxHeader(Loc.Get("base.talking_to", npc.Name2), "bright_cyan");
+                terminal.WriteLine("");
+                terminal.SetColor("bright_red");
+                terminal.WriteLine($"  {Loc.Get("dread.npc_flees", npc.Name2)}");
+                terminal.WriteLine("");
+                terminal.SetColor("gray");
+                terminal.WriteLine($"  {Loc.Get("dread.npc_flees_sub")}");
+                await Task.Delay(1500);
+                return;
+            }
+
             bool stayInConversation = true;
             bool isFirstGreeting = true;
 
@@ -4689,6 +4722,21 @@ public abstract class BaseLocation
                 // Get NPC's greeting (only on first interaction)
                 if (isFirstGreeting)
                 {
+                    // v0.62.x Renown ladder (mirror of Dread flee-on-sight): a celebrated Good/Holy hero
+                    // at Paragon+ standing is recognized by ordinary townsfolk. Pure flavor, no mechanical
+                    // weight; Legend tier earns a bow, lower tiers a cheer. Skipped for story NPCs (they
+                    // have their own scripted greetings) and shown only ~half the time so it doesn't grate.
+                    if (isLightBand && !npc.IsStoryNPC
+                        && alignSys.GetRenownTier(currentPlayer) >= AlignmentSystem.RenownTier.Paragon
+                        && Random.Shared.Next(2) == 0)
+                    {
+                        bool isLegend = alignSys.GetRenownTier(currentPlayer) >= AlignmentSystem.RenownTier.Legend;
+                        terminal.SetColor("bright_yellow");
+                        terminal.WriteLine($"  {Loc.Get(isLegend ? "renown.npc_bows" : "renown.npc_cheers", npc.Name2)}");
+                        terminal.WriteLine("");
+                        terminal.SetColor("white");
+                    }
+
                     // Update talk-to-NPC quest objectives
                     QuestSystem.OnNPCTalkedTo(currentPlayer, npc.Name);
                     QuestSystem.OnNPCTalkedTo(currentPlayer, npc.Name2);
@@ -4770,6 +4818,25 @@ public abstract class BaseLocation
                     terminal.WriteLine($" {Loc.Get("base.attack_npc")}");
                 }
 
+                // v0.62.x Phase 3 (Dread reward loop): Demand Tribute. A feared Dark/Evil player
+                // at Cutthroat+ Dread can shake down ordinary non-story townsfolk for gold. Daily
+                // cap (anti-exploit) + paired alignment cost (it's an evil deed).
+                bool canDemandTribute =
+                    isDarkBand
+                    && alignSys.GetDreadTier(currentPlayer) >= AlignmentSystem.DreadTier.Cutthroat
+                    && npc.Level > 0 && npc.IsAlive && !npc.IsStoryNPC && !npc.King;
+                if (canDemandTribute)
+                {
+                    terminal.SetColor("darkgray");
+                    terminal.Write("  [");
+                    terminal.SetColor("bright_yellow");
+                    terminal.Write("7");
+                    terminal.SetColor("darkgray");
+                    terminal.Write("]");
+                    terminal.SetColor("dark_red");
+                    terminal.WriteLine($" {Loc.Get("dread.tribute_menu_option")}");
+                }
+
                 terminal.WriteLine("");
                 terminal.SetColor("white");
                 terminal.Write("  [");
@@ -4826,6 +4893,13 @@ public abstract class BaseLocation
                         if (npc.Level > 0 && npc.IsAlive && !npc.IsStoryNPC && !npc.King)
                         {
                             await AttackNPC(npc);
+                            stayInConversation = false;
+                        }
+                        break;
+                    case "7":
+                        if (canDemandTribute)
+                        {
+                            await DemandTribute(npc);
                             stayInConversation = false;
                         }
                         break;
@@ -5211,6 +5285,74 @@ public abstract class BaseLocation
             terminal.SetColor("red");
             terminal.WriteLine("\n  " + Loc.Get("base.duel_defeat", npc.Name2));
             currentPlayer.PDefeats++;
+        }
+
+        await Task.Delay(2000);
+    }
+
+    /// <summary>
+    /// v0.62.x "Light and Dark" Phase 3 (Dread reward loop). A feared Dark/Evil player at
+    /// Cutthroat+ Dread can shake down an ordinary non-story NPC for gold without combat.
+    /// Success scales to NPC level (NOT player wealth, so it can't snowball into a printing
+    /// press). Failure burns the charge with a refusal -- the resource constraint (3/day)
+    /// + the paired alignment cost are the friction, not combat. The 3/day cap mirrors
+    /// MurdersToday's anti-spam shape.
+    /// </summary>
+    private async Task DemandTribute(NPC npc)
+    {
+        terminal.WriteLine("");
+
+        if (currentPlayer.TributeDemandsToday >= GameConfig.MaxTributeDemandsPerDay)
+        {
+            terminal.SetColor("bright_red");
+            terminal.WriteLine($"  {Loc.Get("dread.tribute_cap_reached", GameConfig.MaxTributeDemandsPerDay)}");
+            await Task.Delay(1800);
+            return;
+        }
+
+        // Approach line first (the player threatens).
+        terminal.SetColor("dark_red");
+        terminal.WriteLine($"  {Loc.Get("dread.tribute_demand", npc.Name2)}");
+        await Task.Delay(800);
+
+        // Success chance scales with Dread tier. At Cutthroat (T1): 45%; Marauder (T2): 60%;
+        // Terror (T3): 75%; Nightmare (T4): 90%. The deeper your standing, the harder it is
+        // for the townsfolk to refuse.
+        int dreadTier = (int)AlignmentSystem.Instance.GetDreadTier(currentPlayer);
+        int successChance = GameConfig.TributeBaseSuccessPercent + dreadTier * GameConfig.TributeSuccessPerTier;
+        bool success = Random.Shared.Next(100) < successChance;
+
+        // Charge spent regardless of outcome so the daily cap is meaningful even with high success.
+        currentPlayer.TributeDemandsToday++;
+
+        if (success)
+        {
+            // Gold scales to NPC LEVEL (capped to what they actually have if tracked), not player
+            // wealth -- can't loop tribute into infinite gold no matter how rich the player gets.
+            long gold = npc.Level * GameConfig.TributeGoldPerNpcLevel + Random.Shared.Next(20, 100);
+            if (npc.Gold > 0 && gold > npc.Gold) gold = npc.Gold;
+
+            currentPlayer.Gold += gold;
+            if (npc.Gold > 0) npc.Gold = Math.Max(0, npc.Gold - gold);
+
+            // Paired alignment movement: an evil deed. ChangeAlignment handles the -chivalry / +darkness
+            // cross-application and the DR curve (so committed Evil players still gain darkness but slower).
+            AlignmentSystem.Instance.ChangeAlignment(currentPlayer, GameConfig.TributeDarknessGain, isGood: false, "demanded tribute");
+
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine($"  {Loc.Get("dread.tribute_success", npc.Name2, gold)}");
+            terminal.SetColor("gray");
+            terminal.WriteLine($"  {Loc.Get("dread.tribute_remaining", currentPlayer.TributeDemandsToday, GameConfig.MaxTributeDemandsPerDay)}");
+        }
+        else
+        {
+            // Refusal: charge spent, no gold, no alignment shift. The NPC walks away angry but does
+            // not initiate combat -- triggering NPC-aggressor combat from this surface would require
+            // a separate refactor (AttackNPC is player-initiated with a murder-confirm flow).
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"  {Loc.Get("dread.tribute_failure", npc.Name2)}");
+            terminal.SetColor("gray");
+            terminal.WriteLine($"  {Loc.Get("dread.tribute_remaining", currentPlayer.TributeDemandsToday, GameConfig.MaxTributeDemandsPerDay)}");
         }
 
         await Task.Delay(2000);
@@ -6473,6 +6615,30 @@ public abstract class BaseLocation
             terminal.SetColor("cyan");
             terminal.WriteLine(Loc.Get("reputation.effects_header"));
             terminal.SetColor("white");
+
+            // v0.62.x Dread/Renown notoriety standing — the escalating "your name precedes you" tier.
+            // Empty for Neutral/Balanced (a line-walker has no single name the world fears or sings).
+            string standingLine = AlignmentSystem.Instance.GetNotorietyStandingLine(currentPlayer);
+            if (!string.IsNullOrEmpty(standingLine))
+            {
+                var standingBand = AlignmentSystem.Instance.GetAlignment(currentPlayer);
+                terminal.SetColor(standingBand == AlignmentSystem.AlignmentType.Dark || standingBand == AlignmentSystem.AlignmentType.Evil
+                    ? "bright_red" : "bright_yellow");
+                terminal.WriteLine($"    {standingLine}");
+                terminal.SetColor("white");
+            }
+
+            // v0.62.x Phase 4 Sellsword Hall standing -- alignment-agnostic merc career counter.
+            // Shows whenever MercContractsCompleted >= 1; empty for never-mercs (the freelance lane
+            // is opt-in by design, so unranked players don't see a line until they've taken a contract).
+            string mercLine = AlignmentSystem.Instance.GetMercStandingLine(currentPlayer);
+            if (!string.IsNullOrEmpty(mercLine))
+            {
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine($"    {mercLine}");
+                terminal.SetColor("white");
+            }
+
             terminal.WriteLine($"    {Loc.Get("reputation.combat_line", FmtMod(atkMod), FmtMod(defMod))}");
             terminal.WriteLine($"    {Loc.Get("reputation.prices_line", FmtMod(shadyMod), FmtMod(honestMod))}");
 

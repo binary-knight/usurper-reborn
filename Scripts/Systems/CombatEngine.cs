@@ -7538,8 +7538,13 @@ public partial class CombatEngine
 
             // Holy Smite (Good/Holy): bonus damage vs undead/demonic foes. Applied as extra
             // HP loss on top of the swing (same pattern as Storm Eagle's lightning chip).
+            // v0.62.0 fix: do NOT gate the flavor line on target.IsAlive — when the base hit
+            // one-shots an Undead/Demon at endgame, the IsAlive check would suppress the
+            // proc message and the Light-pole passive becomes invisible on kill-shots.
+            // Same bug-class as Shadow Harvest / Wave Echo / Hungering Strike. The smite
+            // damage on a corpse is a no-op (Math.Max(0, ...)), so removing the gate is safe.
             float smiteBonus = AlignmentSystem.Instance.GetHolySmiteBonus(attacker);
-            if (smiteBonus > 0f && target.IsAlive
+            if (smiteBonus > 0f
                 && (target.MonsterClass == MonsterClass.Undead || target.MonsterClass == MonsterClass.Demon))
             {
                 long smite = Math.Max(1, (long)(damage * smiteBonus));

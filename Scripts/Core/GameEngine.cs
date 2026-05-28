@@ -4548,6 +4548,19 @@ public partial class GameEngine
         // walks into Home and sees their previous-cycle kids waiting at the table.
         string? previousLifeName = isNgPlus ? currentPlayer?.Name : null;
 
+        // v0.62.0 NG+ lifetime carryover (Phases 4 + 6). Two Character fields are
+        // documented (inline comments + release notes) as "survives NG+ / never decays":
+        //   - MercContractsCompleted  (drives the freelance Sellsword rank ladder)
+        //   - LifetimeCharityGoldDonated  (cosmetic milestone for future achievement hook)
+        // CreateNewPlayer below builds a fresh Character with default 0/0, and the
+        // existing ApplyCycleBonusesToNewCharacter only touches stats/level/EXP/Gold.
+        // Without an explicit copy here, a player on NG+ cycle 2 lost all merc rank
+        // progress and the lifetime charity counter, contradicting the design intent.
+        // Snapshot the two values from the previous-life Character so we can restore them
+        // onto the fresh Character after creation.
+        int previousMercContractsCompleted = isNgPlus ? (currentPlayer?.MercContractsCompleted ?? 0) : 0;
+        long previousLifetimeCharityGold = isNgPlus ? (currentPlayer?.LifetimeCharityGoldDonated ?? 0L) : 0L;
+
         UsurperRemake.Systems.RomanceTracker.Instance.Reset();
         UsurperRemake.Systems.CompanionSystem.Instance?.ResetAllCompanions();
         if (isNgPlus)
@@ -4659,6 +4672,13 @@ public partial class GameEngine
                 : EndingType.Defiant; // fallback
             CycleSystem.Instance.ApplyCycleBonusesToNewCharacter(currentPlayer, story.CurrentCycle, lastEnding);
             currentPlayer.RecalculateStats();
+
+            // v0.62.0 NG+ lifetime carryover: restore the two "survives NG+" Character
+            // fields snapshotted from the previous life. ApplyCycleBonusesToNewCharacter
+            // does not touch these; without restoring them here, merc rank and the
+            // lifetime charity total reset to 0 on every cycle (contradicting the design).
+            currentPlayer.MercContractsCompleted = previousMercContractsCompleted;
+            currentPlayer.LifetimeCharityGoldDonated = previousLifetimeCharityGold;
         }
 
         // Save the new game using the character's actual name (Name1)
@@ -5699,6 +5719,22 @@ public partial class GameEngine
         player.IntimateEncountersToday = playerData.IntimateEncountersToday;
         player.GauntletRunsToday = playerData.GauntletRunsToday;
         player.MarshToadAntidoteClaimedToday = playerData.MarshToadAntidoteClaimedToday;
+        player.TributeDemandsToday = playerData.TributeDemandsToday;           // v0.62.x Phase 3
+        player.FreeBlessingClaimedToday = playerData.FreeBlessingClaimedToday; // v0.62.x Phase 3
+        player.MercContractsCompleted = playerData.MercContractsCompleted;     // v0.62.x Phase 4 (Mercenary board)
+        player.MercContractsClaimedToday = playerData.MercContractsClaimedToday;
+        player.LastMercBoardRefreshUtc = playerData.LastMercBoardRefreshUtc;
+        player.DailyMercStandingGain = playerData.DailyMercStandingGain != null
+            ? new Dictionary<int, int>(playerData.DailyMercStandingGain)
+            : new Dictionary<int, int>();
+        // v0.62.x Phase 5 (Black Market rotation)
+        player.BlackMarketStockSeed = playerData.BlackMarketStockSeed;
+        player.LastBlackMarketRefreshUtc = playerData.LastBlackMarketRefreshUtc;
+        // v0.62.x Phase 6 (Sanctum)
+        player.AlmsGivenToday = playerData.AlmsGivenToday;
+        player.OrphanageGiftsToday = playerData.OrphanageGiftsToday;
+        player.HospiceTithesToday = playerData.HospiceTithesToday;
+        player.LifetimeCharityGoldDonated = playerData.LifetimeCharityGoldDonated;
         player.AttunedShrineId = playerData.AttunedShrineId ?? "";
         player.AttunedShrineExpiresUtc = playerData.AttunedShrineExpiresUtc;
         player.AttunedShrineExpiresGameDay = playerData.AttunedShrineExpiresGameDay;
