@@ -209,8 +209,13 @@ namespace UsurperRemake.Systems
         /// <summary>
         /// v0.61.0 Druid's Shrines + Beast Taming: applies social-modifier deltas from
         /// active long-term effects. Veloura attunement = +15% reactions (warmer);
-        /// Cave Spider active pet = -10% reactions (creepy). Both stack multiplicatively
+        /// Cave Spider active pet = -10% reactions (creepy). All stack multiplicatively
         /// on top of alignment-compatibility math.
+        /// v0.63.1: Dynasty standing also folds in here. Founder / Patriarch /
+        /// Matriarch / Bloodline / Dynasty tiers grant +5 / +10 / +15 / +20%
+        /// reactions, derived live from the player's adult-children set. Closes
+        /// the "Dynasty tier shows on the status sheet but does nothing
+        /// mechanical" gap the v0.63.0 release notes implicitly promised.
         /// </summary>
         private static float ApplyVeloraReactionBonus(Character player, float baseModifier)
         {
@@ -221,6 +226,12 @@ namespace UsurperRemake.Systems
                     modifier *= (1f + GameConfig.ShrineVeloraReactionBonus);
                 if (player.HasActivePet("cave_spider"))
                     modifier *= 0.90f; // -10% reactions (creepy companion)
+
+                // v0.63.1: Dynasty standing reaction bonus.
+                int dynastyBonus = UsurperRemake.Systems.FamilySystem.Instance
+                    ?.GetDynastyReactionBonus(player) ?? 0;
+                if (dynastyBonus > 0)
+                    modifier *= (1f + dynastyBonus / 100f);
             }
             return modifier;
         }

@@ -4701,6 +4701,26 @@ public abstract class BaseLocation
                 _ = GameEngine.Instance.SaveCurrentGame();
             }
 
+            // v0.63.1 family-grudge consumer: an NPC whose parent / sibling /
+            // child the player killed refuses to talk to them. Skipped for the
+            // player's own adult children -- the recognition path already ran
+            // above, and the parent-grade relationship overrides the grudge by
+            // design. Story NPCs / kings exempt so quest flow never soft-locks.
+            if (!isAdultChild && !npc.IsStoryNPC && !npc.King
+                && UsurperRemake.Systems.FamilySystem.HasGrudgeAgainst(npc, currentPlayer))
+            {
+                terminal.ClearScreen();
+                WriteBoxHeader(Loc.Get("base.talking_to", headerName), "bright_cyan");
+                terminal.WriteLine("");
+                terminal.SetColor("bright_red");
+                terminal.WriteLine($"  {Loc.Get("family.grudge_refuse_talk", npc.Name2)}");
+                terminal.WriteLine("");
+                terminal.SetColor("gray");
+                terminal.WriteLine($"  {Loc.Get("family.grudge_refuse_talk_sub")}");
+                await Task.Delay(1500);
+                return;
+            }
+
             if (!isAdultChild
                 && isDarkBand
                 && alignSys.GetDreadTier(currentPlayer) >= AlignmentSystem.DreadTier.Terror

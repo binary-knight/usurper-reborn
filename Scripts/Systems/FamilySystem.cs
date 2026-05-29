@@ -472,6 +472,43 @@ namespace UsurperRemake.Systems
             };
         }
 
+        /// <summary>
+        /// v0.63.1: did `killer` permanently kill one of `viewer`'s family
+        /// members? Drives the family-grudge consumers: refuses to talk,
+        /// refuses to join your team, attacks on sight if dark-aligned.
+        /// Reads from the NPC's memory store rather than the Enemies list so
+        /// it works regardless of whether the killer was stored by display
+        /// name or by NPC ID. Killer matching is by display name (NPC.Name2
+        /// / Character.Name); the death cascade records the same string into
+        /// MemoryEvent.InvolvedCharacter, so a string compare resolves.
+        /// </summary>
+        public static bool HasGrudgeAgainst(NPC viewer, Character killer)
+        {
+            if (viewer == null || killer == null || viewer.Brain?.Memory == null) return false;
+
+            string killerName = killer.Name2 ?? killer.Name ?? "";
+            string killerName1 = killer.Name1 ?? "";
+            if (string.IsNullOrEmpty(killerName) && string.IsNullOrEmpty(killerName1))
+                return false;
+
+            // Scan the family-tie memory types. Both KilledMyParent and
+            // KilledMyFamily are written with the killer's display name in
+            // InvolvedCharacter (WorldSimulator.RecordFamilyDeath sites).
+            foreach (var mem in viewer.Brain.Memory.AllMemories)
+            {
+                if (mem.Type != global::MemoryType.KilledMyParent
+                    && mem.Type != global::MemoryType.KilledMyFamily) continue;
+
+                string involved = mem.InvolvedCharacter ?? "";
+                if (string.IsNullOrEmpty(involved)) continue;
+
+                if ((killerName.Length > 0 && involved == killerName)
+                    || (killerName1.Length > 0 && involved == killerName1))
+                    return true;
+            }
+            return false;
+        }
+
         // ---- Internal helpers ----
 
         private static bool IsParentMatchOnChild(Child child, Character parent)

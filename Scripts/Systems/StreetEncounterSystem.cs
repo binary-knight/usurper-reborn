@@ -290,7 +290,7 @@ public class StreetEncounterSystem
         terminal.SetColor("red");
         terminal.WriteLine(Loc.Get("street_encounter.hostile.blocks_path", attacker.Name));
         terminal.SetColor("yellow");
-        terminal.WriteLine($"  \"{GetHostilePhrase(attacker)}\"");
+        terminal.WriteLine($"  \"{GetHostilePhrase(attacker, player)}\"");
         terminal.WriteLine("");
 
         terminal.SetColor("white");
@@ -1818,6 +1818,29 @@ public class StreetEncounterSystem
         // player's team members, and player's spouse)
         string playerTeam = (player as Player)?.Team ?? "";
         string playerSpouse = (player as Player)?.SpouseName ?? "";
+
+        // v0.63.1 family-grudge revenge: a dark-aligned NPC whose parent /
+        // sibling / child the player killed will seek the player out for a
+        // hostile encounter, taking priority over the generic random-evil
+        // hostile selection. Level gate widened to +/- 10 so a grown adult
+        // child can still confront a higher-level player. Same protected-IDs
+        // / team / spouse exclusions apply (a grieving spouse shouldn't
+        // ambush the player from the marriage bed).
+        var grudgeRevenge = npcs
+            .Where(n => n.IsAlive && !n.IsStoryNPC && !n.King)
+            .Where(n => n.Level >= player.Level - 10 && n.Level <= player.Level + 10)
+            .Where(n => !protectedIds.Contains(n.ID))
+            .Where(n => string.IsNullOrEmpty(playerTeam) || !playerTeam.Equals(n.Team, StringComparison.OrdinalIgnoreCase))
+            .Where(n => string.IsNullOrEmpty(playerSpouse) || !(n.Name2 ?? n.Name).Equals(playerSpouse, StringComparison.OrdinalIgnoreCase))
+            .Where(n => n.Darkness > n.Chivalry)
+            .Where(n => UsurperRemake.Systems.FamilySystem.HasGrudgeAgainst(n, player))
+            .ToList();
+
+        if (grudgeRevenge.Count > 0)
+        {
+            return grudgeRevenge[_random.Next(grudgeRevenge.Count)];
+        }
+
         var potentialEnemies = npcs
             .Where(n => n.IsAlive && n.Level >= player.Level - 5 && n.Level <= player.Level + 5)
             .Where(n => !protectedIds.Contains(n.ID)) // Never attack romantic partners
@@ -1926,6 +1949,22 @@ public class StreetEncounterSystem
 
     private string GetHostilePhrase(NPC npc)
     {
+        return GetHostilePhrase(npc, null);
+    }
+
+    /// <summary>
+    /// v0.63.1: overload that returns a family-revenge phrase when the
+    /// attacker has a grudge against the player (the player permadied
+    /// their parent / sibling / child). Falls through to the generic
+    /// hostile pool otherwise.
+    /// </summary>
+    private string GetHostilePhrase(NPC npc, Character player)
+    {
+        if (player != null && UsurperRemake.Systems.FamilySystem.HasGrudgeAgainst(npc, player))
+        {
+            return Loc.Get($"family.revenge_phrase_{_random.Next(5)}");
+        }
+
         string[] phrases = {
             "Your gold or your life!",
             "This is your last day!",

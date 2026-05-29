@@ -904,6 +904,16 @@ public partial class TeamSystem
             return (RecruitmentBand.Family, GameConfig.AdultChildRecruitmentDiscount);
         }
 
+        // v0.63.1 family-grudge filter: an NPC whose parent / sibling / child
+        // the player killed refuses to join their team regardless of friendship
+        // score. Runs AFTER the adult-child gate (own kid would never carry a
+        // grudge against parent in this scope -- own-kid case is handled by
+        // Family band above and InteractWithNPC's recognition path).
+        if (FamilySystem.HasGrudgeAgainst(npc, player))
+        {
+            return (RecruitmentBand.Refused, 1.0);
+        }
+
         // Score-based bands. Lower score = better relationship. See
         // GameConfig.Relation* constants for the numeric thresholds.
         int score = RelationshipSystem.GetRelationshipStatus(player, npc);

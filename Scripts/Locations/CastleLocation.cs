@@ -365,6 +365,16 @@ public class CastleLocation : BaseLocation
             terminal.SetColor("white");
             terminal.WriteLine(Loc.Get("castle.menu_d3_sponsor"));
 
+            // v0.63.0 Bloodlines of the Realm (read-only family-tree records).
+            terminal.SetColor("darkgray");
+            terminal.Write(" [");
+            terminal.SetColor("bright_magenta");
+            terminal.Write("Z");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("white");
+            terminal.WriteLine(Loc.Get("castle.menu_e3_bloodlines"));
+
             terminal.WriteLine("");
 
             // Navigation
@@ -617,6 +627,16 @@ public class CastleLocation : BaseLocation
             terminal.SetColor("white");
             terminal.WriteLine(" Courtyard Statues");
 
+            // v0.63.0 Bloodlines of the Realm (read-only family-tree records).
+            terminal.SetColor("darkgray");
+            terminal.Write(" [");
+            terminal.SetColor("bright_magenta");
+            terminal.Write("Z");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("white");
+            terminal.WriteLine(Loc.Get("castle.menu_e3_bloodlines"));
+
             // Navigation
             terminal.SetColor("darkgray");
             terminal.Write(" [");
@@ -659,6 +679,8 @@ public class CastleLocation : BaseLocation
         ShowBBSMenuRow(("C", "bright_yellow", "Security"), ("H", "bright_yellow", "History"), ("A", "bright_yellow", "Abdicate"), ("M", "bright_yellow", "Magic"));
         ShowBBSMenuRow(("F", "bright_yellow", "Fiscal"), ("Q", "bright_yellow", "Quests"), ("T", "bright_yellow", "Orphanage"), ("W", "bright_yellow", "Wedding"));
         ShowBBSMenuRow(("U", "bright_yellow", "Court"), ("E", "bright_yellow", "Succession"), ("B", "bright_yellow", "Bodyguards"));
+        // v0.63.0 Sponsor Heir to Court (D3) + Bloodlines of the Realm (E3).
+        ShowBBSMenuRow(("Y", "bright_magenta", "Sponsor Heir"), ("Z", "bright_magenta", "Bloodlines"), ("V", "bright_yellow", "Statues"));
         ShowBBSMenuRow(("R", "bright_yellow", "Return"));
         ShowBBSFooter();
     }
@@ -712,6 +734,8 @@ public class CastleLocation : BaseLocation
             ShowBBSMenuRow(("J", "bright_yellow", "Join Crown"));
         if (FactionSystem.Instance?.HasCastleAccess() == true)
             ShowBBSMenuRow(("L", "bright_yellow", "Royal Armory"));
+        // v0.63.0 Bloodlines of the Realm (read-only family-tree records).
+        ShowBBSMenuRow(("V", "bright_yellow", "Courtyard Statues"), ("Z", "bright_magenta", "Bloodlines"));
         ShowBBSMenuRow(("R", "bright_yellow", "Return"));
         ShowBBSFooter();
     }
@@ -926,8 +950,10 @@ public class CastleLocation : BaseLocation
                     UsurperRemake.Data.FounderStatueData.StatueLocationTag.Castle, terminal);
                 return false;
 
-            // v0.63.0 slice E3: family tree records.
-            case "F":
+            // v0.63.0 family tree records. Z matches the king-flow hotkey so
+            // the bloodlines page is reachable via the same key whether or not
+            // the player is on the throne.
+            case "Z":
                 await ShowFamilyTreeRecords();
                 return false;
 
