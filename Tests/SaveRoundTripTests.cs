@@ -1060,6 +1060,62 @@ public class SaveRoundTripTests
         restored.WildernessDiscoveries.Should().Contain("swamp_lost_shrine");
     }
 
+    [Fact]
+    public void PlayerData_RoundTrip_PreservesSlice23RelationshipFields()
+    {
+        // v0.63.0 slice 2/3: RecognizedChildren (HashSet of NPC IDs whose
+        // recognition cinematic has already fired) + PermadeathInheritanceClaimed
+        // (lock once the inheritance distribution has run). Locks both contracts.
+        var original = new PlayerData
+        {
+            RecognizedChildren = new List<string>
+            {
+                "npc_aldric_jr_abc12345",
+                "npc_mira_jr_def67890"
+            },
+            PermadeathInheritanceClaimed = true,
+        };
+
+        var json = JsonSerializer.Serialize(original, _jsonOptions);
+        var restored = JsonSerializer.Deserialize<PlayerData>(json, _jsonOptions);
+
+        restored.Should().NotBeNull();
+        restored!.RecognizedChildren.Should().HaveCount(2);
+        restored.RecognizedChildren.Should().Contain("npc_aldric_jr_abc12345");
+        restored.RecognizedChildren.Should().Contain("npc_mira_jr_def67890");
+        restored.PermadeathInheritanceClaimed.Should().BeTrue();
+    }
+
+    [Fact]
+    public void PlayerData_RoundTrip_PreservesSlice3bFamilyArcFields()
+    {
+        // v0.63.0 slice 3b D5: CompletedFamilyArcs (lifetime counter, survives
+        // NG+) + CompletedArcChildNames (idempotency set tracking which adult
+        // children have already counted toward the lifetime tally). Each
+        // completed arc grants +5 starting Charisma at next character creation,
+        // capped at +25 (5 arcs). Lock the save-format contract.
+        var original = new PlayerData
+        {
+            CompletedFamilyArcs = 3,
+            CompletedArcChildNames = new List<string>
+            {
+                "Aldric Junior",
+                "Mira the Younger",
+                "Vex Junior",
+            },
+        };
+
+        var json = JsonSerializer.Serialize(original, _jsonOptions);
+        var restored = JsonSerializer.Deserialize<PlayerData>(json, _jsonOptions);
+
+        restored.Should().NotBeNull();
+        restored!.CompletedFamilyArcs.Should().Be(3);
+        restored.CompletedArcChildNames.Should().HaveCount(3);
+        restored.CompletedArcChildNames.Should().Contain("Aldric Junior");
+        restored.CompletedArcChildNames.Should().Contain("Mira the Younger");
+        restored.CompletedArcChildNames.Should().Contain("Vex Junior");
+    }
+
     #endregion
 
     #region Comprehensive Single-Test All Daily Properties
@@ -1510,6 +1566,44 @@ public class SaveRoundTripTests
         restored.Should().NotBeNull();
         restored!.Inventory.Should().NotBeNull("Missing inventory field must default to empty list, not null");
         restored.Inventory.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void NPCData_RoundTrip_PreservesLineage()
+    {
+        // v0.63.0 (relationship completion slice 1): NPC class gained
+        // MotherName / FatherName / MotherID / FatherID / OriginalMotherName /
+        // OriginalFatherName / SoulAtGraduation / WasRaisedByPlayer so the
+        // incest gate has data to check against and adult children can
+        // recognize the player as their parent. Test locks the NPCData
+        // round-trip so the field-add doesn't silently regress.
+        var original = new NPCData
+        {
+            Id = "npc_aldric_jr",
+            Name = "Aldric Junior",
+            Level = 18,
+            MotherName = "Mira",
+            FatherName = "Aldric",
+            MotherID = "npc_mira_abc12345",
+            FatherID = "rage",  // player ID
+            OriginalMotherName = "Mira",
+            OriginalFatherName = "Aldric",
+            SoulAtGraduation = 87,
+            WasRaisedByPlayer = true,
+        };
+
+        var json = JsonSerializer.Serialize(original, _jsonOptions);
+        var restored = JsonSerializer.Deserialize<NPCData>(json, _jsonOptions);
+
+        restored.Should().NotBeNull();
+        restored!.MotherName.Should().Be("Mira");
+        restored.FatherName.Should().Be("Aldric");
+        restored.MotherID.Should().Be("npc_mira_abc12345");
+        restored.FatherID.Should().Be("rage");
+        restored.OriginalMotherName.Should().Be("Mira");
+        restored.OriginalFatherName.Should().Be("Aldric");
+        restored.SoulAtGraduation.Should().Be(87);
+        restored.WasRaisedByPlayer.Should().BeTrue();
     }
 
     [Fact]

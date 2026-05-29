@@ -4678,13 +4678,37 @@ public abstract class BaseLocation
             bool isDarkBand = alignBand == AlignmentSystem.AlignmentType.Dark || alignBand == AlignmentSystem.AlignmentType.Evil;
             bool isLightBand = alignBand == AlignmentSystem.AlignmentType.Holy || alignBand == AlignmentSystem.AlignmentType.Good;
 
-            if (isDarkBand
+            // v0.63.0 slice 1: if this NPC is the player's adult child, prepend
+            // "(your daughter / son / child)" to the header so the player can
+            // tell at a glance. Computed once; reused at both the flee branch
+            // and the conversation loop.
+            var family = UsurperRemake.Systems.FamilySystem.Instance;
+            bool isAdultChild = family?.IsAdultChildOf(npc, currentPlayer) ?? false;
+            string familyTag = isAdultChild ? family!.GetChildTagFor(npc, currentPlayer) : "";
+            string headerName = string.IsNullOrEmpty(familyTag) ? npc.Name2 : $"{npc.Name2} {familyTag}";
+
+            // v0.63.0 slice 2 C1: family overrides Dread. Even at Nightmare-tier
+            // Dread, your own kid doesn't flee on sight -- they recognize you
+            // and the recognition moment takes precedence over the standing-driven
+            // flee. Run BEFORE the Dread flee check. Idempotent via RecognizedChildren.
+            if (isAdultChild && !string.IsNullOrEmpty(npc.ID)
+                && !currentPlayer.RecognizedChildren.Contains(npc.ID))
+            {
+                await PlayAdultChildRecognitionMoment(npc);
+                currentPlayer.RecognizedChildren.Add(npc.ID);
+                // Persist on the next save tick so the recognition can't fire twice
+                // across a disconnect mid-conversation.
+                _ = GameEngine.Instance.SaveCurrentGame();
+            }
+
+            if (!isAdultChild
+                && isDarkBand
                 && alignSys.GetDreadTier(currentPlayer) >= AlignmentSystem.DreadTier.Terror
                 && npc.Level > 0 && npc.IsAlive && !npc.IsStoryNPC && !npc.King
                 && npc.Level < currentPlayer.Level - GameConfig.DreadFleeLevelGap)
             {
                 terminal.ClearScreen();
-                WriteBoxHeader(Loc.Get("base.talking_to", npc.Name2), "bright_cyan");
+                WriteBoxHeader(Loc.Get("base.talking_to", headerName), "bright_cyan");
                 terminal.WriteLine("");
                 terminal.SetColor("bright_red");
                 terminal.WriteLine($"  {Loc.Get("dread.npc_flees", npc.Name2)}");
@@ -4701,7 +4725,7 @@ public abstract class BaseLocation
             while (stayInConversation)
             {
                 terminal.ClearScreen();
-                WriteBoxHeader(Loc.Get("base.talking_to", npc.Name2), "bright_cyan");
+                WriteBoxHeader(Loc.Get("base.talking_to", headerName), "bright_cyan");
                 terminal.WriteLine("");
 
                 // Show NPC portrait (skip for screen readers and art-disabled)
@@ -4844,15 +4868,13 @@ public abstract class BaseLocation
                 terminal.Write("0");
                 terminal.SetColor("white");
                 terminal.WriteLine($"] {Loc.Get("base.walk_away")}");
-
-                // Debug option
-                terminal.SetColor("dark_gray");
-                terminal.Write("  [");
-                terminal.SetColor("bright_yellow");
-                terminal.Write("9");
-                terminal.SetColor("dark_gray");
-                terminal.WriteLine($"] {Loc.Get("base.debug_personality")}");
                 terminal.WriteLine("");
+                // v0.62.1: the "[9] (DEBUG) View personality traits" entry that
+                // used to render here -- a dev tool that exposed raw trait floats,
+                // jealousy thresholds, polyamory assessment, etc. -- is removed.
+                // Players who want to read an NPC's nature can scry them through
+                // the Level Master's Crystal Ball, which surfaces the same kinds
+                // of information in player-facing, in-fiction language.
 
                 string action = await GetChoice();
 
@@ -4903,9 +4925,10 @@ public abstract class BaseLocation
                             stayInConversation = false;
                         }
                         break;
-                    case "9":
-                        await ShowNPCDebugTraits(npc);
-                        break;
+                    // v0.62.1: case "9" (DEBUG personality traits) removed --
+                    // see the comment above the menu render. Not aliased as a
+                    // hidden hotkey because the debug screen exposed raw float
+                    // values that have no place in player-facing UI.
                     case "0":
                     default:
                         // Show NPC's farewell using dynamic dialogue system
@@ -4924,6 +4947,75 @@ public abstract class BaseLocation
             }
         }
         finally { npc.IsInConversation = false; }
+    }
+
+    /// <summary>
+    /// v0.63.0 slice 2 C1: one-time recognition cinematic when the player first
+    /// meets one of their grown-up children as an adult. Fires before the normal
+    /// conversation loop, plays a short flavor scene keyed to the child's Soul
+    /// at graduation (saved into SoulAtGraduation at FamilySystem.ConvertChildToNPC),
+    /// then seeds the relationship at a high-baseline friendly band so the next
+    /// time they meet the dialogue tier is parent-grade rather than stranger.
+    /// Tracked via Character.RecognizedChildren so it never repeats.
+    /// </summary>
+    private async Task PlayAdultChildRecognitionMoment(NPC adultChild)
+    {
+        terminal.ClearScreen();
+        WriteBoxHeader(Loc.Get("family.recognition_header"), "bright_magenta");
+        terminal.WriteLine("");
+
+        // Tone by Soul-at-graduation (the snapshot taken at coming-of-age,
+        // immune to later alignment drift the adult NPC might undergo).
+        // > 100 = virtuous: warm reunion. < -100 = evil: wary/cold. else: neutral.
+        int soul = adultChild.SoulAtGraduation;
+        string toneSlot;
+        string toneColor;
+        if (soul > 100) { toneSlot = "virtuous"; toneColor = "bright_cyan"; }
+        else if (soul < -100) { toneSlot = "evil"; toneColor = "dark_red"; }
+        else { toneSlot = "neutral"; toneColor = "white"; }
+
+        // Sex word for the narration ("daughter"/"son"/"child").
+        string sexWord = adultChild.Sex switch
+        {
+            CharacterSex.Female => Loc.Get("family.recognition_sex_daughter"),
+            CharacterSex.Male => Loc.Get("family.recognition_sex_son"),
+            _ => Loc.Get("family.recognition_sex_child"),
+        };
+
+        // Narrative paragraph.
+        terminal.SetColor("gray");
+        terminal.WriteLine($"  {Loc.Get($"family.recognition_narrative_{toneSlot}", adultChild.Name2, sexWord)}");
+        terminal.WriteLine("");
+        await Task.Delay(1500);
+
+        // The adult child's spoken line.
+        terminal.SetColor(toneColor);
+        terminal.WriteLine($"  {Loc.Get($"family.recognition_line_{toneSlot}", currentPlayer.Name)}");
+        terminal.WriteLine("");
+        await Task.Delay(1500);
+
+        // Seed the relationship at a high-baseline parental band. The integer
+        // scale runs lower-is-better (Love ~20, Friendship ~40, Neutral ~70).
+        // Snap to a "Beloved Family" band slightly better than Friendship via
+        // multiple UpdateRelationship steps, overrideMaxFeeling so the daily
+        // cap doesn't block the parental seed. Idempotent because this whole
+        // method only runs once per child (gated on RecognizedChildren).
+        try
+        {
+            // Snap to ~25 (between Love and Passion) regardless of starting band.
+            RelationshipSystem.UpdateRelationship(currentPlayer, adultChild, +1, 30, false, true);
+            RelationshipSystem.UpdateRelationship(adultChild, currentPlayer, +1, 30, false, true);
+        }
+        catch (Exception ex)
+        {
+            UsurperRemake.Systems.DebugLogger.Instance?.LogWarning(
+                "FAMILY", $"PlayAdultChildRecognitionMoment relationship seed failed: {ex.Message}");
+        }
+
+        terminal.SetColor("dark_gray");
+        terminal.WriteLine($"  {Loc.Get("family.recognition_close")}");
+        terminal.WriteLine("");
+        await terminal.PressAnyKey();
     }
 
     /// <summary>
@@ -5097,128 +5189,14 @@ public abstract class BaseLocation
         await terminal.PressAnyKey();
     }
 
-    /// <summary>
-    /// DEBUG: Show NPC personality and relationship traits
-    /// </summary>
-    private async Task ShowNPCDebugTraits(NPC npc)
-    {
-        terminal.ClearScreen();
-        WriteBoxHeader($"DEBUG: {npc.Name2}", "bright_magenta");
-        terminal.WriteLine("");
-
-        var profile = npc.Personality;
-        if (profile == null)
-        {
-            terminal.SetColor("red");
-            terminal.WriteLine($"  {Loc.Get("base.no_personality")}");
-            await terminal.PressAnyKey();
-            return;
-        }
-
-        // Basic identity
-        terminal.SetColor("bright_cyan");
-        terminal.WriteLine($"  === {Loc.Get("base.debug_identity")} ===");
-        terminal.SetColor("white");
-        terminal.WriteLine($"  {Loc.Get("base.debug_gender")}    {profile.Gender}");
-        terminal.WriteLine($"  {Loc.Get("base.debug_orientation")} {profile.Orientation}");
-        terminal.WriteLine("");
-
-        // Faction affiliation
-        terminal.SetColor("bright_yellow");
-        terminal.WriteLine($"  === {Loc.Get("base.debug_faction")} ===");
-        terminal.SetColor("white");
-        terminal.Write($"  {Loc.Get("base.debug_faction_label")}            ");
-        if (npc.NPCFaction.HasValue)
-        {
-            var factionColor = npc.NPCFaction.Value switch
-            {
-                UsurperRemake.Systems.Faction.TheCrown => "bright_yellow",
-                UsurperRemake.Systems.Faction.TheFaith => "bright_cyan",
-                UsurperRemake.Systems.Faction.TheShadows => "bright_magenta",
-                _ => "white"
-            };
-            terminal.SetColor(factionColor);
-            terminal.WriteLine(npc.NPCFaction.Value.ToString());
-        }
-        else
-        {
-            terminal.SetColor("gray");
-            terminal.WriteLine(Loc.Get("base.none_independent"));
-        }
-        terminal.WriteLine("");
-
-        // Relationship preferences
-        terminal.SetColor("bright_yellow");
-        terminal.WriteLine($"  === {Loc.Get("base.debug_rel_style")} ===");
-        terminal.SetColor("white");
-        terminal.WriteLine($"  {Loc.Get("base.debug_rel_pref")}  {profile.RelationshipPref}");
-        terminal.WriteLine($"  {Loc.Get("base.debug_intimate")}     {profile.IntimateStyle}");
-        terminal.WriteLine("");
-
-        // Romance traits
-        terminal.SetColor("bright_green");
-        terminal.WriteLine($"  === {Loc.Get("base.debug_romance_traits")} ===");
-        terminal.SetColor("white");
-
-        // Color code based on value - using inline method
-        PrintTraitLine("Romanticism:", profile.Romanticism, "(romantic vs practical)");
-        PrintTraitLine("Sensuality:", profile.Sensuality, "(physical desire)");
-        PrintTraitLine("Passion:", profile.Passion, "(intensity)");
-        PrintTraitLine("Flirtatiousness:", profile.Flirtatiousness, "(likely to flirt)");
-        PrintTraitLine("Commitment:", profile.Commitment, "(marriage-minded)");
-        PrintTraitLine("Tenderness:", profile.Tenderness, "(gentle vs rough)");
-        PrintTraitLine("Jealousy:", profile.Jealousy, "(possessiveness)");
-        terminal.WriteLine("");
-
-        // Polyamory assessment
-        terminal.SetColor("bright_magenta");
-        terminal.WriteLine($"  === {Loc.Get("base.debug_polyamory")} ===");
-
-        bool openToPolyamory = profile.RelationshipPref == RelationshipPreference.OpenRelationship ||
-                               profile.RelationshipPref == RelationshipPreference.Polyamorous;
-        bool lowJealousy = profile.Jealousy < 0.4f;
-        bool lowCommitment = profile.Commitment < 0.5f;
-
-        terminal.SetColor("white");
-        terminal.Write($"  {Loc.Get("base.debug_open_poly")} ");
-        if (openToPolyamory && lowJealousy)
-        {
-            terminal.SetColor("bright_green");
-            terminal.WriteLine(Loc.Get("base.poly_very_likely"));
-        }
-        else if (openToPolyamory || (lowJealousy && lowCommitment))
-        {
-            terminal.SetColor("yellow");
-            terminal.WriteLine(Loc.Get("base.poly_possible"));
-        }
-        else
-        {
-            terminal.SetColor("red");
-            terminal.WriteLine(Loc.Get("base.poly_unlikely"));
-        }
-
-        terminal.WriteLine("");
-        terminal.SetColor("dark_gray");
-        terminal.WriteLine($"  {Loc.Get("base.debug_poly_factors")}");
-        terminal.WriteLine("");
-
-        await terminal.PressAnyKey();
-        await InteractWithNPC(npc); // Return to interaction menu
-    }
-
-    /// <summary>
-    /// Helper to print a trait line with color coding based on value
-    /// </summary>
-    private void PrintTraitLine(string name, float value, string description)
-    {
-        string color = value >= 0.7f ? "bright_green" : value >= 0.4f ? "yellow" : "gray";
-        terminal.SetColor(color);
-        terminal.Write($"  {name,-18} ");
-        terminal.SetColor("white");
-        terminal.Write($"{value:F2}");
-        terminal.SetColor("dark_gray");
-        terminal.WriteLine($"  {description}");
-    }
+    // v0.62.1: ShowNPCDebugTraits and the PrintTraitLine helper that supported it
+    // are removed. They were a dev tool that shipped to players. The player-facing
+    // counterpart lives in LevelMasterLocation.DisplayScryingResult (Crystal Ball),
+    // where the same kinds of information are surfaced in in-fiction language with
+    // abstracted, banded values instead of raw 0.00-1.00 trait floats. The loc keys
+    // that used to back the debug screen (base.debug_*, base.poly_*, base.no_personality)
+    // are now orphaned in en.json but kept in case a future internal-only dev view
+    // wants to reuse them.
     /// <summary>
     /// Challenge NPC to a duel
     /// </summary>
@@ -6639,6 +6617,23 @@ public abstract class BaseLocation
                 terminal.SetColor("white");
             }
 
+            // v0.63.0 slice 3 D1: Patriarch / Matriarch standing line. Shown
+            // whenever the player has at least one living adult child (derived
+            // live from FamilySystem). Players who haven't raised kids see no
+            // line at all -- the family arc is opt-in, like the merc lane.
+            var dynastyTier = UsurperRemake.Systems.FamilySystem.Instance?.GetDynastyTier(currentPlayer)
+                ?? UsurperRemake.Systems.FamilySystem.DynastyTier.None;
+            if (dynastyTier != UsurperRemake.Systems.FamilySystem.DynastyTier.None)
+            {
+                string tierName = UsurperRemake.Systems.FamilySystem.Instance!
+                    .GetDynastyTierName(dynastyTier, currentPlayer.Sex);
+                int adultKids = UsurperRemake.Systems.FamilySystem.Instance
+                    .GetAdultChildrenOf(currentPlayer).Count;
+                terminal.SetColor("bright_magenta");
+                terminal.WriteLine($"    {Loc.Get("dynasty.standing_line", tierName, adultKids)}");
+                terminal.SetColor("white");
+            }
+
             terminal.WriteLine($"    {Loc.Get("reputation.combat_line", FmtMod(atkMod), FmtMod(defMod))}");
             terminal.WriteLine($"    {Loc.Get("reputation.prices_line", FmtMod(shadyMod), FmtMod(honestMod))}");
 
@@ -7259,6 +7254,9 @@ public abstract class BaseLocation
             if (item.MaxManaBonus != 0) combatStats.Add($"{Loc.Get("ui.stat_mp")}:{item.MaxManaBonus:+#;-#;0}");
             if (item.StaminaBonus != 0) combatStats.Add($"{Loc.Get("ui.stat_sta")}:{item.StaminaBonus:+#;-#;0}");
 
+            // v0.62.1 stat-order consistency: sort the whole list. WP/AC/Block sort
+            // naturally to one end and bonuses cluster alphabetically alongside Def.
+            combatStats.Sort(System.StringComparer.Ordinal);
             if (combatStats.Count > 0)
             {
                 terminal.SetColor("gray");
@@ -9733,24 +9731,38 @@ public abstract class BaseLocation
     /// </summary>
     protected void WriteEquipmentStatSummary(Equipment item)
     {
-        var stats = new List<string>();
-        if (item.WeaponPower > 0) stats.Add($"{Loc.Get("ui.stat_wp")}:{item.WeaponPower}");
-        if (item.ArmorClass > 0) stats.Add($"{Loc.Get("ui.stat_ac")}:{item.ArmorClass}");
-        if (item.ShieldBonus > 0) stats.Add($"{Loc.Get("ui.stat_block")}:{item.ShieldBonus}");
-        if (item.DefenceBonus != 0) stats.Add($"{Loc.Get("ui.stat_def")}:{item.DefenceBonus:+#;-#}");
-        if (item.StrengthBonus != 0) stats.Add($"{Loc.Get("ui.stat_str")}:{item.StrengthBonus:+#;-#}");
-        if (item.DexterityBonus != 0) stats.Add($"{Loc.Get("ui.stat_dex")}:{item.DexterityBonus:+#;-#}");
-        if (item.AgilityBonus != 0) stats.Add($"{Loc.Get("ui.stat_agi")}:{item.AgilityBonus:+#;-#}");
-        if (item.ConstitutionBonus != 0) stats.Add($"{Loc.Get("ui.stat_con")}:{item.ConstitutionBonus:+#;-#}");
-        if (item.IntelligenceBonus != 0) stats.Add($"{Loc.Get("ui.stat_int")}:{item.IntelligenceBonus:+#;-#}");
-        if (item.WisdomBonus != 0) stats.Add($"{Loc.Get("ui.stat_wis")}:{item.WisdomBonus:+#;-#}");
-        if (item.CharismaBonus != 0) stats.Add($"{Loc.Get("ui.stat_cha")}:{item.CharismaBonus:+#;-#}");
-        if (item.MaxHPBonus != 0) stats.Add($"{Loc.Get("ui.stat_hp")}:{item.MaxHPBonus:+#;-#}");
-        if (item.MaxManaBonus != 0) stats.Add($"{Loc.Get("ui.stat_mp")}:{item.MaxManaBonus:+#;-#}");
-        if (item.CriticalChanceBonus > 0) stats.Add($"{Loc.Get("ui.stat_crit")}:{item.CriticalChanceBonus}%");
-        if (item.LifeSteal > 0) stats.Add($"{Loc.Get("ui.stat_leech")}:{item.LifeSteal}%");
-        if (item.MagicResistance > 0) stats.Add($"{Loc.Get("ui.stat_mr")}:{item.MagicResistance}%");
-        if (item.PoisonDamage > 0) stats.Add($"{Loc.Get("ui.stat_psn")}:{item.PoisonDamage}");
+        // v0.62.1 (player report): bonuses sorted alphabetically so the same set of
+        // stat bonuses shows in the same order across every equip surface (Home, Inn,
+        // Team Corner, dungeon party manager, shops, combat loot comparison). Primary
+        // stats (WP / AC / Block) lead because they're the headline weapon/armor/shield
+        // values and the player expects those first; the bonus modifiers underneath
+        // sort alphabetically so a stat list with Int / Def / Wis never appears next
+        // to one with Def / Int / Wis.
+        var primary = new List<string>();
+        if (item.WeaponPower > 0) primary.Add($"{Loc.Get("ui.stat_wp")}:{item.WeaponPower}");
+        if (item.ArmorClass > 0) primary.Add($"{Loc.Get("ui.stat_ac")}:{item.ArmorClass}");
+        if (item.ShieldBonus > 0) primary.Add($"{Loc.Get("ui.stat_block")}:{item.ShieldBonus}");
+
+        var bonuses = new List<string>();
+        if (item.DefenceBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_def")}:{item.DefenceBonus:+#;-#}");
+        if (item.StrengthBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_str")}:{item.StrengthBonus:+#;-#}");
+        if (item.DexterityBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_dex")}:{item.DexterityBonus:+#;-#}");
+        if (item.AgilityBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_agi")}:{item.AgilityBonus:+#;-#}");
+        if (item.ConstitutionBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_con")}:{item.ConstitutionBonus:+#;-#}");
+        if (item.IntelligenceBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_int")}:{item.IntelligenceBonus:+#;-#}");
+        if (item.WisdomBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_wis")}:{item.WisdomBonus:+#;-#}");
+        if (item.CharismaBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_cha")}:{item.CharismaBonus:+#;-#}");
+        if (item.MaxHPBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_hp")}:{item.MaxHPBonus:+#;-#}");
+        if (item.MaxManaBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_mp")}:{item.MaxManaBonus:+#;-#}");
+        if (item.CriticalChanceBonus > 0) bonuses.Add($"{Loc.Get("ui.stat_crit")}:{item.CriticalChanceBonus}%");
+        if (item.LifeSteal > 0) bonuses.Add($"{Loc.Get("ui.stat_leech")}:{item.LifeSteal}%");
+        if (item.MagicResistance > 0) bonuses.Add($"{Loc.Get("ui.stat_mr")}:{item.MagicResistance}%");
+        if (item.PoisonDamage > 0) bonuses.Add($"{Loc.Get("ui.stat_psn")}:{item.PoisonDamage}");
+        bonuses.Sort(System.StringComparer.Ordinal);
+
+        var stats = new List<string>(primary.Count + bonuses.Count);
+        stats.AddRange(primary);
+        stats.AddRange(bonuses);
 
         if (stats.Count > 0)
         {

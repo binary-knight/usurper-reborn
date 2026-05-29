@@ -561,15 +561,32 @@ public class WorldSimulator
 
             // DebugLogger.Instance.LogInfo("PERMADEATH", $"{npc.Name} permanently killed by {killerName} (chance was {basePermadeathChance:P0})");
 
-            // Only trigger bereavement for truly permanent deaths (aged death or permadeath).
-            // Temporary deaths (NPC will respawn) should not destroy marriages.
-            if ((npc.IsAgedDeath || npc.IsPermaDead) && (npc.Married || npc.IsMarried))
+            // v0.63.0 slice 4 (audit npc-C7): pre-fix the gate read
+            // (npc.IsAgedDeath || npc.IsPermaDead) but `npc.IsPermaDead = true`
+            // is commented out at line 550 (permadeath disabled in v0.53.11),
+            // so the bereavement was unreachable from any combat-permadeath
+            // roll. Since we're inside `if (permadeath)`, the death IS
+            // permanent for bookkeeping purposes; drop the flag check so
+            // HandleSpouseBereavement fires regardless of whether the flag
+            // happens to be live. Aging-death path at line 896 still gates
+            // on its own IsAgedDeath check independently.
+            if (npc.Married || npc.IsMarried)
             {
                 HandleSpouseBereavement(npc);
             }
 
             // Check if this NPC's children are now orphaned (both parents dead)
             CheckForOrphanedChildren(npc);
+
+            // v0.63.0 multi-gen NPC family rivalries. Every living relative of
+            // the deceased (children, parents, siblings) records a memory of
+            // the loss. If there was a killer, the killer is added to each
+            // relative's Enemies list. Children get a parent-specific memory
+            // type (KilledMyParent / LostFamilyMember -> parent); other
+            // relatives get the generic family types. Surfaces later as: that
+            // relative refusing to talk to the killer, refusing to join the
+            // killer's team, attacking on sight if Dark.
+            RecordFamilyDeath(npc, killerName);
         }
         else
         {
@@ -881,6 +898,27 @@ public class WorldSimulator
             {
                 if (currentAge >= maxAge)
                 {
+                    // v0.63.0 slice 4 (audit npc-N7): race-extinction guard.
+                    // Pre-fix, aging-death could push a race below the
+                    // GameConfig.PermadeathRaceFloor population floor since
+                    // the natural-attrition path didn't consult the floor
+                    // (only combat-permadeath did via RollPermadeath). When
+                    // a race has only the floor count alive, defer this
+                    // NPC's aging death by extending their birth date
+                    // slightly so the floor holds. Immigration system will
+                    // refill the race over time; this just buys us a tick.
+                    int raceAliveCount = npcs.Count(n =>
+                        n != null && n.IsAlive && !n.IsDead && !n.IsAgedDeath
+                        && !n.IsPermaDead && n.Race == npc.Race);
+                    if (raceAliveCount <= GameConfig.PermadeathRaceFloor)
+                    {
+                        // Buy one game-week of life by pushing BirthDate forward.
+                        // Immigration tick should add a same-race NPC before
+                        // this NPC ages again.
+                        npc.BirthDate = npc.BirthDate.AddDays(7);
+                        continue; // Don't process death this tick; next NPC.
+                    }
+
                     // Natural death - permanent, no respawn
                     npc.IsDead = true;
                     npc.IsAgedDeath = true;
@@ -996,8 +1034,10 @@ public class WorldSimulator
         {
             NPCSpawnSystem.Instance?.AddRestoredNPC(immigrant);
 
+            // v0.62.1 (article fix): race may be vowel-initial (Elf, Orc) so emit
+            // "An Elf traveler" / "A Dwarf traveler" via GetIndefiniteArticle.
             NewsSystem.Instance?.Newsy(
-                $"A {race} traveler named {immigrant.Name2} has arrived in town.");
+                $"{GameConfig.GetIndefiniteArticle(race.ToString())} {race} traveler named {immigrant.Name2} has arrived in town.");
 
             UsurperRemake.Systems.DebugLogger.Instance.LogInfo("IMMIGRATION",
                 $"Generated immigrant: {immigrant.Name2} ({race} {immigrant.Class} L{immigrant.Level} {sex})");
@@ -1346,7 +1386,7 @@ public class WorldSimulator
     /// <summary>
     /// Determine orphan's race from their parents (looks up dead parents in NPC list).
     /// </summary>
-    private CharacterRace DetermineOrphanRace(Child child)
+    public CharacterRace DetermineOrphanRace(Child child)
     {
         var mother = npcs.FirstOrDefault(n =>
             (!string.IsNullOrEmpty(child.MotherID) && n.ID == child.MotherID) ||
@@ -1450,39 +1490,92 @@ public class WorldSimulator
     }
 
     /// <summary>
-    /// Orphan graduates to become a citizen NPC (similar to FamilySystem.ConvertChildToNPC).
+    /// Orphan graduates to become a citizen NPC (parallel of FamilySystem.ConvertChildToNPC).
+    ///
+    /// v0.63.0 rewrite -- mirrors the slice-1 fixes that ConvertChildToNPC got:
+    /// lineage carryover from RoyalOrphan (its MotherName/FatherName/MotherID/
+    /// FatherID slots were always populated, just never carried forward to the
+    /// graduated NPC), Base* stats set so RecalculateStats doesn't zero them,
+    /// missing CON/WIS/DEX/MaxMana added, name-clash disambiguation, orientation
+    /// sync, late-joiner diversity nudge, and faction assignment. Pre-fix
+    /// orphan-graduates were 0-stat husks that never reconciled their female-Gay
+    /// orientation roll to Lesbian and never got a faction.
     /// </summary>
     public void OrphanBecomesNPC(RoyalOrphan orphan)
     {
         // Don't exceed population cap
         if (npcs.Count >= GameConfig.MaxNPCPopulation) return;
 
+        string displayName = NPCSpawnSystem.Instance?.DisambiguateNPCName(orphan.Name) ?? orphan.Name;
+
+        int level = 1;
+        int strength = 12 + random.Next(5);
+        int defence = 12 + random.Next(5);
+        int stamina = 10 + random.Next(5);
+        int agility = 10 + random.Next(5);
+        int dexterity = 10 + random.Next(5);
+        int constitution = 10 + random.Next(5);
+        int intelligence = 10 + random.Next(5);
+        int wisdom = 10 + random.Next(5);
+        int charisma = 12 + random.Next(5); // Orphanage gives social skills
+        int maxHP = 100;
+        var orphanClass = DetermineOrphanClass(orphan.Soul);
+        int maxMana = IsCasterClass(orphanClass) ? 50 + intelligence * 2 : 0;
+
         var npc = new NPC
         {
-            ID = $"npc_{orphan.Name.ToLower().Replace(" ", "_")}_{Guid.NewGuid().ToString("N").Substring(0, 8)}",
-            Name1 = orphan.Name,
-            Name2 = orphan.Name,
+            ID = $"npc_{displayName.ToLower().Replace(" ", "_")}_{Guid.NewGuid().ToString("N").Substring(0, 8)}",
+            Name1 = displayName,
+            Name2 = displayName,
             Sex = orphan.Sex,
             Age = 18,
             Race = orphan.Race,
-            Class = DetermineOrphanClass(orphan.Soul),
-            Level = 1,
-            HP = 100,
-            MaxHP = 100,
-            Strength = 12 + random.Next(5),
-            Defence = 12 + random.Next(5),
-            Stamina = 10 + random.Next(5),
-            Agility = 10 + random.Next(5),
-            Intelligence = 10 + random.Next(5),
-            Charisma = 12 + random.Next(5), // Orphanage gives social skills
+            Class = orphanClass,
+            Level = level,
+            Experience = GameConfig.GetExperienceForLevel(level),
+            HP = maxHP,
+            MaxHP = maxHP,
+            BaseMaxHP = maxHP,
+            MaxMana = maxMana,
+            BaseMaxMana = maxMana,
+            Strength = strength,
+            BaseStrength = strength,
+            Defence = defence,
+            BaseDefence = defence,
+            Stamina = stamina,
+            BaseStamina = stamina,
+            Agility = agility,
+            BaseAgility = agility,
+            Dexterity = dexterity,
+            BaseDexterity = dexterity,
+            Constitution = constitution,
+            BaseConstitution = constitution,
+            Intelligence = intelligence,
+            BaseIntelligence = intelligence,
+            Wisdom = wisdom,
+            BaseWisdom = wisdom,
+            Charisma = charisma,
+            BaseCharisma = charisma,
             Gold = 200,
-            Experience = 0,
             CurrentLocation = "Main Street",
             AI = CharacterAI.Computer,
-            BirthDate = orphan.BirthDate
+            BirthDate = orphan.BirthDate,
+            // Lineage carryover from the RoyalOrphan record (v0.63.0 slice 1)
+            MotherName = orphan.MotherName ?? "",
+            FatherName = orphan.FatherName ?? "",
+            MotherID = orphan.MotherID ?? "",
+            FatherID = orphan.FatherID ?? "",
+            // Orphan history: the recorded names ARE the biological parents
+            // (the orphan record is the durable parent reference after the
+            // child enters the orphanage).
+            OriginalMotherName = orphan.MotherName ?? "",
+            OriginalFatherName = orphan.FatherName ?? "",
+            SoulAtGraduation = orphan.Soul,
+            // True if either recorded parent ID looks like a player slot.
+            WasRaisedByPlayer =
+                (!string.IsNullOrEmpty(orphan.MotherID) && !orphan.MotherID.StartsWith("npc_", StringComparison.OrdinalIgnoreCase))
+                || (!string.IsNullOrEmpty(orphan.FatherID) && !orphan.FatherID.StartsWith("npc_", StringComparison.OrdinalIgnoreCase))
         };
-
-        npc.HP = npc.MaxHP;
 
         // Soul-based alignment
         if (orphan.Soul > 200) { npc.Chivalry = 50 + random.Next(50); npc.Darkness = 0; }
@@ -1494,17 +1587,190 @@ public class WorldSimulator
         if (npc.Personality != null)
         {
             npc.Personality.Gender = orphan.Sex == CharacterSex.Female ? GenderIdentity.Female : GenderIdentity.Male;
+            // Reconcile the orientation roll against the now-set gender so the
+            // population doesn't drift straight (the v0.61.7 fix that the
+            // npc-system-reviewer audit flagged as missing from this path).
+            npc.Personality.SyncOrientationToGender();
             if (orphan.Soul > 100) { npc.Personality.Aggression = 0.2f; npc.Personality.Tenderness = 0.8f; }
             else if (orphan.Soul < -100) { npc.Personality.Aggression = 0.7f; npc.Personality.Tenderness = 0.2f; }
         }
 
+        // Late-joiner diversity nudge and faction assignment (parity with
+        // FamilySystem.ConvertChildToNPC -- orphan-graduates used to skip both).
+        NPCSpawnSystem.Instance?.NudgeLateJoinerOrientation(npc);
+        npc.NPCFaction = NPCSpawnSystem.Instance?.DetermineFactionForNPC(npc);
+
         NPCSpawnSystem.Instance?.AddRestoredNPC(npc);
 
         NewsSystem.Instance?.Newsy(
-            $"🎓 {orphan.Name}, raised in the Royal Orphanage, has come of age and joined the realm!");
+            $"🎓 {displayName}, raised in the Royal Orphanage, has come of age and joined the realm!");
 
         DebugLogger.Instance.LogInfo("ORPHANAGE",
-            $"{orphan.Name} came of age and became a citizen NPC ({npc.Class})");
+            $"{displayName} came of age and became a citizen NPC ({npc.Class})");
+    }
+
+    /// <summary>
+    /// v0.63.0: record an NPC death in the memory of every living relative
+    /// (children, parents, siblings). Each relative records a LostFamilyMember
+    /// memory; children additionally record a parent-specific KilledMyParent
+    /// memory (preserves the original slice-E2 contract); other relatives get
+    /// the generic KilledMyFamily type. If there was a killer, the killer is
+    /// added to each relative's Enemies list. Surfaces downstream as the
+    /// relative refusing to talk to / join the killer's team, attacking on
+    /// sight when alignment is dark. Sparse + idempotent.
+    /// </summary>
+    private void RecordFamilyDeath(NPC deceased, string killerName)
+    {
+        try
+        {
+            if (deceased == null) return;
+
+            // Walk all NPCs once and classify by relation to the deceased.
+            string deceasedName = deceased.Name2 ?? deceased.Name1 ?? deceased.Name;
+            string deceasedId = deceased.ID ?? "";
+            if (string.IsNullOrEmpty(deceasedName)) return;
+
+            // Build the deceased's parent name set up-front so we can detect
+            // siblings (any NPC sharing at least one parent name with deceased).
+            var deceasedParentNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (!string.IsNullOrEmpty(deceased.MotherName)) deceasedParentNames.Add(deceased.MotherName);
+            if (!string.IsNullOrEmpty(deceased.FatherName)) deceasedParentNames.Add(deceased.FatherName);
+
+            foreach (var relative in npcs)
+            {
+                if (relative == null || relative.IsDead || relative == deceased) continue;
+
+                // Child of deceased? (deceased was their parent)
+                bool isChild =
+                    (relative.MotherName == deceasedName || relative.FatherName == deceasedName)
+                    || (!string.IsNullOrEmpty(deceasedId) && (relative.MotherID == deceasedId || relative.FatherID == deceasedId));
+
+                // Parent of deceased? (deceased was their child)
+                bool isParent =
+                    (!string.IsNullOrEmpty(deceased.MotherName) && relative.Name2 == deceased.MotherName)
+                    || (!string.IsNullOrEmpty(deceased.FatherName) && relative.Name2 == deceased.FatherName);
+
+                // Sibling? (shared at least one parent name with deceased)
+                bool isSibling = !isChild && !isParent && deceasedParentNames.Count > 0
+                    && ((!string.IsNullOrEmpty(relative.MotherName) && deceasedParentNames.Contains(relative.MotherName))
+                        || (!string.IsNullOrEmpty(relative.FatherName) && deceasedParentNames.Contains(relative.FatherName)));
+
+                if (!isChild && !isParent && !isSibling) continue;
+
+                string relationLabel = isChild ? "parent" : isParent ? "child" : "sibling";
+                bool hasKiller = !string.IsNullOrEmpty(killerName);
+
+                // Parent-specific memory for children (preserves slice-E2 contract).
+                if (isChild && hasKiller)
+                {
+                    relative.Brain?.Memory?.RecordEvent(new MemoryEvent
+                    {
+                        Type = MemoryType.KilledMyParent,
+                        Description = $"{killerName} killed my parent {deceasedName}.",
+                        Importance = 0.95f,
+                        EmotionalImpact = -0.9f,
+                        Timestamp = DateTime.Now,
+                        InvolvedCharacter = killerName,
+                    });
+                }
+                else if (hasKiller)
+                {
+                    // Generic family-kill memory for parents / siblings.
+                    relative.Brain?.Memory?.RecordEvent(new MemoryEvent
+                    {
+                        Type = MemoryType.KilledMyFamily,
+                        Description = $"{killerName} killed my {relationLabel} {deceasedName}.",
+                        Importance = 0.9f,
+                        EmotionalImpact = -0.85f,
+                        Timestamp = DateTime.Now,
+                        InvolvedCharacter = killerName,
+                    });
+                }
+
+                // Loss memory for every relative regardless of killer.
+                relative.Brain?.Memory?.RecordEvent(new MemoryEvent
+                {
+                    Type = MemoryType.LostFamilyMember,
+                    Description = $"My {relationLabel} {deceasedName} died.",
+                    Importance = isChild ? 0.9f : 0.85f,
+                    EmotionalImpact = isChild ? -0.85f : -0.8f,
+                    Timestamp = DateTime.Now,
+                    InvolvedCharacter = deceasedName,
+                });
+
+                // Killer enters the relative's Enemies list.
+                if (hasKiller && !relative.Enemies.Contains(killerName))
+                {
+                    relative.Enemies.Add(killerName);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            UsurperRemake.Systems.DebugLogger.Instance?.LogWarning("FAMILY",
+                $"RecordFamilyDeath failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// v0.63.0: record a new-child event in the memory of every living relative
+    /// (parents, siblings, grandparents). Positive valence memory, no behavior
+    /// hooks attached. Counterpart to RecordFamilyDeath.
+    /// </summary>
+    public void RecordFamilyBirth(string childName, string motherName, string fatherName)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(childName)) return;
+
+            var parentNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (!string.IsNullOrEmpty(motherName)) parentNames.Add(motherName);
+            if (!string.IsNullOrEmpty(fatherName)) parentNames.Add(fatherName);
+            if (parentNames.Count == 0) return;
+
+            foreach (var relative in npcs)
+            {
+                if (relative == null || relative.IsDead) continue;
+
+                bool isParent = parentNames.Contains(relative.Name2 ?? "");
+                bool isSibling = !isParent
+                    && ((!string.IsNullOrEmpty(relative.MotherName) && parentNames.Contains(relative.MotherName))
+                        || (!string.IsNullOrEmpty(relative.FatherName) && parentNames.Contains(relative.FatherName)));
+
+                if (!isParent && !isSibling) continue;
+
+                string relationLabel = isParent ? "child" : "sibling";
+
+                relative.Brain?.Memory?.RecordEvent(new MemoryEvent
+                {
+                    Type = MemoryType.FamilyMemberBorn,
+                    Description = $"My {relationLabel} {childName} was born.",
+                    Importance = isParent ? 0.85f : 0.6f,
+                    EmotionalImpact = isParent ? 0.85f : 0.55f,
+                    Timestamp = DateTime.Now,
+                    InvolvedCharacter = childName,
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            UsurperRemake.Systems.DebugLogger.Instance?.LogWarning("FAMILY",
+                $"RecordFamilyBirth failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// True if the class needs a mana pool. Local duplicate of FamilySystem's
+    /// helper (kept private to avoid widening the system surface area).
+    /// </summary>
+    private static bool IsCasterClass(CharacterClass cls)
+    {
+        return cls == CharacterClass.Magician
+            || cls == CharacterClass.Cleric
+            || cls == CharacterClass.Sage
+            || cls == CharacterClass.Paladin
+            || cls == CharacterClass.Bard
+            || cls == CharacterClass.MysticShaman;
     }
 
     /// <summary>
@@ -1538,9 +1804,18 @@ public class WorldSimulator
                         !king.Orphans.Any(o => o.Name == c.Name && o.IsRealOrphan))
             .ToList();
 
+        // v0.63.0 slice 4 (audit npc-N4): per-instance NPC list is in scope here
+        // and DetermineOrphanRace already exists. Use it instead of hardcoding
+        // Human, so late-pickup orphans inherit their actual parental race.
+        var inst = WorldSimulator.Instance;
+
         foreach (var child in orphanedChildren)
         {
             if (king.Orphans.Count >= GameConfig.MaxRoyalOrphans) break;
+
+            var inheritedRace = inst != null
+                ? inst.DetermineOrphanRace(child)
+                : CharacterRace.Human;
 
             king.Orphans.Add(new RoyalOrphan
             {
@@ -1555,7 +1830,7 @@ public class WorldSimulator
                 FatherName = child.Father,
                 MotherID = child.MotherID,
                 FatherID = child.FatherID,
-                Race = CharacterRace.Human, // Can't easily look up parents without NPC list reference
+                Race = inheritedRace,
                 Soul = child.Soul,
                 IsRealOrphan = true
             });
@@ -1715,6 +1990,11 @@ public class WorldSimulator
         var profile = npc.Brain?.Personality;
         if (profile == null) return null;
 
+        // v0.63.0 slice 1: NPC-NPC incest gate for the affair path. Same shape
+        // as the marriage filter -- silent, just narrows the candidate pool so
+        // a sibling / parent / grandchild never registers as a partner.
+        var family = UsurperRemake.Systems.FamilySystem.Instance;
+
         var candidates = npcs.Where(c =>
             c.ID != npc.ID &&
             c.IsAlive && !c.IsDead &&
@@ -1723,7 +2003,10 @@ public class WorldSimulator
             c.Age >= 18 &&
             c.Brain?.Personality != null &&
             profile.IsAttractedTo(c.Brain.Personality.Gender) &&
-            c.Brain.Personality.IsAttractedTo(profile.Gender)
+            c.Brain.Personality.IsAttractedTo(profile.Gender) &&
+            (family == null
+                || !UsurperRemake.Systems.FamilySystem.IsBlockingRelation(
+                       family.GetFamilyRelation(npc, c)))
         ).ToList();
 
         if (candidates.Count == 0) return null;
@@ -3734,6 +4017,66 @@ public class WorldSimulator
 
             // This is always newsworthy!
             NewsSystem.Instance?.WriteNPCLevelUpNews(npc.Name, npc.Level, npc.Class.ToString(), npc.Race.ToString());
+
+            // v0.63.0 slice 3b D2: family reflection. If this NPC was raised by a
+            // player AND has just crossed a public-milestone level (10 / 20 / 30 /
+            // 50), spawn a separate news entry that ties their accomplishment back
+            // to the player as parent. Same shape as a regular news post but with
+            // alignment-keyed flavor so a virtuous grown child earns the player
+            // reputation while an evil one earns the player notoriety. Gated to
+            // WasRaisedByPlayer (lineage flag set at graduation) so non-player
+            // NPCs don't spam the feed.
+            if (npc.WasRaisedByPlayer && IsReflectionMilestone(npc.Level))
+            {
+                EmitFamilyReflectionNews(npc);
+            }
+        }
+    }
+
+    /// <summary>
+    /// v0.63.0 slice 3b D2: which NPC levels trigger a "reflects on the parent"
+    /// news entry. Sparse so the feed doesn't get spammed by every adult-child
+    /// level-up. Lv 10 (no longer a novice), 20 (slice 3 D5 arc-completion level),
+    /// 30 (designer-doc example), 50 (career mark), 75 (legend tier).
+    /// </summary>
+    private static bool IsReflectionMilestone(int level)
+    {
+        return level == 10 || level == 20 || level == 30 || level == 50 || level == 75;
+    }
+
+    /// <summary>
+    /// v0.63.0 slice 3b D2: localized news entry tying an adult NPC's milestone
+    /// level-up to their parent name. Tone splits on SoulAtGraduation (the
+    /// snapshot taken at coming-of-age, immune to later drift) so a virtuous
+    /// child earns "rumors of their kindness reach the parent" flavor and an
+    /// evil child earns "rumors of their cruelty" flavor.
+    /// </summary>
+    private void EmitFamilyReflectionNews(NPC adultChild)
+    {
+        try
+        {
+            string parentName = !string.IsNullOrEmpty(adultChild.MotherName)
+                ? adultChild.MotherName!
+                : (adultChild.FatherName ?? "");
+            if (string.IsNullOrEmpty(parentName)) return;
+
+            string toneSlot;
+            int soul = adultChild.SoulAtGraduation;
+            if (soul > 100) toneSlot = "virtuous";
+            else if (soul < -100) toneSlot = "evil";
+            else toneSlot = "neutral";
+
+            string headline = UsurperRemake.Systems.Loc.Get(
+                $"family.reflection_news_{toneSlot}",
+                adultChild.Name2 ?? adultChild.Name1 ?? "their child",
+                parentName,
+                adultChild.Level);
+            NewsSystem.Instance?.Newsy(true, headline);
+        }
+        catch (Exception ex)
+        {
+            UsurperRemake.Systems.DebugLogger.Instance?.LogWarning("FAMILY",
+                $"EmitFamilyReflectionNews failed: {ex.Message}");
         }
     }
 
@@ -5116,8 +5459,11 @@ public class WorldSimulator
                 }
             }
 
+            // v0.62.1 (article fix): plot types include "Assassination" / "Espionage"
+            // which need "An" not "A". Lowercased so the helper still finds the vowel.
+            string plotTypeLc = plot.PlotType.ToLower();
             NewsSystem.Instance?.Newsy(true,
-                $"A {plot.PlotType.ToLower()} plot against {king.GetTitle()} {king.Name} was discovered!");
+                $"{GameConfig.GetIndefiniteArticle(plotTypeLc)} {plotTypeLc} plot against {king.GetTitle()} {king.Name} was discovered!");
 
             king.ActivePlots.Remove(plot);
             return;

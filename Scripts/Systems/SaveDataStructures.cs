@@ -666,6 +666,18 @@ namespace UsurperRemake.Systems
         public Dictionary<string, int> ShrineFavor { get; set; } = new();
         // v0.62.0 Dungeon Discoveries: ids of one-time discoveries already found.
         public List<string> DiscoveredFeatureIds { get; set; } = new();
+        // v0.63.0 slice 2 (relationship completion): adult-child NPCs whose recognition
+        // moment has already fired. Persists across logins so the cinematic plays once
+        // per child per cycle. NG+ resets via CreateNewGame's relationship reset path.
+        public List<string> RecognizedChildren { get; set; } = new();
+        // v0.63.0 slice 3: locked once the inheritance cinematic has fired (prevents
+        // double-distribution on a malformed save). Resets on NG+.
+        public bool PermadeathInheritanceClaimed { get; set; } = false;
+        // v0.63.0 slice 3 D5: lifetime family arcs counter. Survives NG+ via explicit
+        // carryover in CreateNewGame (mirrors MercContractsCompleted pattern). Each
+        // completed arc grants +5 starting CHA at next character creation (cap +25).
+        public int CompletedFamilyArcs { get; set; } = 0;
+        public List<string> CompletedArcChildNames { get; set; } = new();
         // v0.61.0 Beast Taming
         public List<PetSaveData> PetRoster { get; set; } = new();
         public string ActivePetId { get; set; } = "";
@@ -903,6 +915,21 @@ namespace UsurperRemake.Systems
 
         // Class specialization
         public ClassSpecialization Specialization { get; set; }
+
+        // Lineage (v0.63.0 -- relationship completion slice 1). Populated when
+        // a Child graduates via FamilySystem.ConvertChildToNPC or a RoyalOrphan
+        // graduates via WorldSimulator.OrphanBecomesNPC. Pre-v0.63.0 saves
+        // restore as empty strings / 0 / false -- a save migration pass on load
+        // (GameEngine.RestoreNPCs) backfills these by walking the Child registry
+        // for any Deleted child whose Name + BirthDate match a living NPC.
+        public string MotherName { get; set; } = "";
+        public string FatherName { get; set; } = "";
+        public string MotherID { get; set; } = "";
+        public string FatherID { get; set; } = "";
+        public string OriginalMotherName { get; set; } = "";
+        public string OriginalFatherName { get; set; } = "";
+        public int SoulAtGraduation { get; set; } = 0;
+        public bool WasRaisedByPlayer { get; set; } = false;
     }
 
     /// <summary>

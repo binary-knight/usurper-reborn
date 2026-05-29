@@ -2829,6 +2829,36 @@ public partial class GameEngine
                 await LoadSharedChildrenAndMarriages();
             }
 
+            // v0.63.0 slice 1: backfill lineage on living NPCs whose lineage
+            // fields are empty (pre-v0.63.0 graduated children / orphans).
+            // Walks the Child registry for any Deleted child whose Name +
+            // BirthDate match a living NPC, copies Mother / Father / etc.
+            // onto the NPC. Cheap, idempotent, runs every load until the
+            // first save persists the backfilled fields.
+            BackfillNPCLineageFromChildRegistry();
+
+            // v0.63.0 slice 3 D5: lazy credit pass for completed family arcs.
+            // Walks the player's adult children; for each one at Lv.20+ that
+            // isn't already in CompletedArcChildNames, credits the lifetime
+            // arc counter. Idempotent via the name set.
+            CreditCompletedFamilyArcs();
+
+            // v0.63.0 slice 4 (audit m10 + N8): explicit dead-spouse cleanup.
+            // Pre-fix, GetSpouseName silently mutated relation records during a
+            // "read" to clear stale marriage state when it noticed the spouse
+            // was dead. That side-effect is now in RelationshipSystem.SyncDeadSpouseState,
+            // called here once per login. Also clears the dangling Married=true
+            // flag on the widow when no live spouse can be found (audit N8).
+            if (currentPlayer != null)
+            {
+                int cleared = RelationshipSystem.SyncDeadSpouseState(currentPlayer);
+                if (cleared > 0)
+                {
+                    UsurperRemake.Systems.DebugLogger.Instance?.LogInfo("ROMANCE",
+                        $"SyncDeadSpouseState: cleared {cleared} stale dead-spouse marriage record(s) for {currentPlayer.Name}");
+                }
+            }
+
             terminal.WriteLine(Loc.Get("engine.save_loaded"), "bright_green");
             await Task.Delay(1000);
 
@@ -2971,6 +3001,11 @@ public partial class GameEngine
                 {
                     DebugLogger.Instance.LogWarning("MARRIAGE", $"Spouse '{currentPlayer.SpouseName}' not found or dead — clearing marriage for {currentPlayer.Name2}");
                     currentPlayer.IsMarried = false;
+                    // v0.63.0 slice 4 (audit npc-N8): also clear the legacy
+                    // Pascal Married flag. Pre-fix it stayed at true after
+                    // widow cleanup, leaving the player in a half-married state
+                    // that some quest/dialogue paths consult independently.
+                    currentPlayer.Married = false;
                     currentPlayer.SpouseName = "";
                 }
             }
@@ -4442,6 +4477,14 @@ public partial class GameEngine
             await LoadSharedChildrenAndMarriages();
         }
 
+        // v0.63.0 slice 1: backfill lineage on living NPCs whose lineage fields
+        // are empty (pre-v0.63.0 graduated children / orphans). Mirror of the
+        // LoadExistingGame load path above.
+        BackfillNPCLineageFromChildRegistry();
+
+        // v0.63.0 slice 3 D5: family-arc completion credit (mirror).
+        CreditCompletedFamilyArcs();
+
         // Online mode: sync player King and CTurf flags with authoritative world state.
         if (UsurperRemake.BBS.DoorMode.IsOnlineMode && currentPlayer != null)
         {
@@ -4560,6 +4603,14 @@ public partial class GameEngine
         // onto the fresh Character after creation.
         int previousMercContractsCompleted = isNgPlus ? (currentPlayer?.MercContractsCompleted ?? 0) : 0;
         long previousLifetimeCharityGold = isNgPlus ? (currentPlayer?.LifetimeCharityGoldDonated ?? 0L) : 0L;
+        // v0.63.0 slice 3 D5: lifetime family arcs counter, NG+ carryover. Same shape
+        // as the merc / charity carryover above. CompletedArcChildNames tracks which
+        // adult children we've already credited so the counter stays idempotent across
+        // saves/restores (a child re-hitting Lv.20 after reload doesn't double-count).
+        int previousCompletedFamilyArcs = isNgPlus ? (currentPlayer?.CompletedFamilyArcs ?? 0) : 0;
+        HashSet<string> previousArcNames = (isNgPlus && currentPlayer?.CompletedArcChildNames != null)
+            ? new HashSet<string>(currentPlayer.CompletedArcChildNames)
+            : new HashSet<string>();
 
         UsurperRemake.Systems.RomanceTracker.Instance.Reset();
         UsurperRemake.Systems.CompanionSystem.Instance?.ResetAllCompanions();
@@ -4627,6 +4678,17 @@ public partial class GameEngine
                 if (disowned > 0)
                 {
                     DebugLogger.Instance.LogInfo("NG+", $"Online NG+ disowned {disowned} children of {previousLifeName}");
+                    // v0.63.0 slice 4 (audit npc-N5): persist the disown immediately
+                    // so a concurrent WorldSimService tick doesn't capture and re-write
+                    // the stale in-memory FamilySystem singleton (with the
+                    // disowned children re-attached) into world_state. Mirrors
+                    // the v0.57.2 pattern used by IntimacySystem birth + HomeLocation
+                    // rename to durably push family changes to shared state.
+                    if (UsurperRemake.BBS.DoorMode.IsOnlineMode
+                        && UsurperRemake.Systems.OnlineStateManager.Instance != null)
+                    {
+                        _ = UsurperRemake.Systems.OnlineStateManager.Instance.SaveSharedChildrenNow();
+                    }
                 }
             }
         }
@@ -4679,6 +4741,22 @@ public partial class GameEngine
             // lifetime charity total reset to 0 on every cycle (contradicting the design).
             currentPlayer.MercContractsCompleted = previousMercContractsCompleted;
             currentPlayer.LifetimeCharityGoldDonated = previousLifetimeCharityGold;
+            // v0.63.0 slice 3 D5: NG+ family-arc carryover. Also applies the
+            // starting CHA bonus at character creation time -- each completed
+            // arc grants +GameConfig.FamilyArcStartingCharismaBonus to Base
+            // and live Charisma, capped at GameConfig.MaxFamilyArcStartingCharismaBonus.
+            currentPlayer.CompletedFamilyArcs = previousCompletedFamilyArcs;
+            currentPlayer.CompletedArcChildNames = previousArcNames;
+            if (previousCompletedFamilyArcs > 0)
+            {
+                int charismaBonus = Math.Min(
+                    previousCompletedFamilyArcs * GameConfig.FamilyArcStartingCharismaBonus,
+                    GameConfig.MaxFamilyArcStartingCharismaBonus);
+                currentPlayer.BaseCharisma += charismaBonus;
+                currentPlayer.Charisma += charismaBonus;
+                DebugLogger.Instance.LogInfo("NG+",
+                    $"Applied family-arc CHA bonus: +{charismaBonus} from {previousCompletedFamilyArcs} completed arc(s)");
+            }
         }
 
         // Save the new game using the character's actual name (Name1)
@@ -5744,6 +5822,15 @@ public partial class GameEngine
         player.DiscoveredFeatureIds = playerData.DiscoveredFeatureIds != null
             ? new HashSet<string>(playerData.DiscoveredFeatureIds)
             : new HashSet<string>();
+        // v0.63.0 slice 2/3
+        player.RecognizedChildren = playerData.RecognizedChildren != null
+            ? new HashSet<string>(playerData.RecognizedChildren)
+            : new HashSet<string>();
+        player.PermadeathInheritanceClaimed = playerData.PermadeathInheritanceClaimed;
+        player.CompletedFamilyArcs = playerData.CompletedFamilyArcs;
+        player.CompletedArcChildNames = playerData.CompletedArcChildNames != null
+            ? new HashSet<string>(playerData.CompletedArcChildNames)
+            : new HashSet<string>();
         player.PetRoster = playerData.PetRoster?.Select(p => new UsurperRemake.Data.Pet
         {
             Id = p.Id,
@@ -6166,6 +6253,21 @@ public partial class GameEngine
                 IsPermaDead = data.IsPermaDead,
                 PregnancyDueDate = data.PregnancyDueDate,
                 PregnancyFatherName = data.PregnancyFatherName,
+
+                // Lineage (v0.63.0 -- relationship completion slice 1).
+                // Pre-v0.63.0 saves restore as empty strings / 0 / false;
+                // GameEngine.BackfillNPCLineageFromChildRegistry runs after
+                // all NPCs are restored and walks the Child registry to
+                // retro-set MotherName/FatherName/etc. for any Deleted
+                // child whose Name + BirthDate match a living NPC.
+                MotherName = data.MotherName ?? "",
+                FatherName = data.FatherName ?? "",
+                MotherID = data.MotherID ?? "",
+                FatherID = data.FatherID ?? "",
+                OriginalMotherName = data.OriginalMotherName ?? "",
+                OriginalFatherName = data.OriginalFatherName ?? "",
+                SoulAtGraduation = data.SoulAtGraduation,
+                WasRaisedByPlayer = data.WasRaisedByPlayer,
 
                 // Marriage status
                 IsMarried = data.IsMarried,
@@ -6657,6 +6759,129 @@ public partial class GameEngine
         }
 
         await Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// v0.63.0 slice 1 save migration. Walks the Child registry; for every
+    /// Deleted child (i.e., a child who graduated to NPC), if a living NPC
+    /// matches by Name + BirthDate, backfill its lineage fields from the
+    /// Child record. Idempotent: skips NPCs whose lineage fields are already
+    /// populated (post-v0.63.0 graduations or already-healed entries).
+    ///
+    /// Runs after both single-player and online family-data load paths, so
+    /// FamilySystem._children is populated by the time this fires. Cheap --
+    /// iterates only Deleted children (the kept-alive Child records are
+    /// minors and never have a corresponding NPC).
+    ///
+    /// Pattern mirrors the v0.61.4 echo cleanup + v0.62 spouse id-drift fixes:
+    /// detect the gap, repair in place, persist on next save. Pre-v0.63.0
+    /// saves heal on first load; no save format break.
+    /// </summary>
+    private void BackfillNPCLineageFromChildRegistry()
+    {
+        try
+        {
+            var family = UsurperRemake.Systems.FamilySystem.Instance;
+            var spawn = NPCSpawnSystem.Instance;
+            if (family == null || spawn == null) return;
+
+            var deletedChildren = family.AllChildren?.Where(c => c.Deleted).ToList();
+            if (deletedChildren == null || deletedChildren.Count == 0) return;
+
+            int healed = 0;
+            foreach (var child in deletedChildren)
+            {
+                if (string.IsNullOrEmpty(child.Name)) continue;
+
+                // Find the living NPC that came from this child. Match by Name + BirthDate
+                // (BirthDate is carried over at ConvertChildToNPC time so this should be
+                // unique). For legacy saves where BirthDate is DateTime.MinValue on either
+                // side, fall back to Name match.
+                var npc = spawn.ActiveNPCs?.FirstOrDefault(n =>
+                    n != null && n.Name2 == child.Name &&
+                    (n.BirthDate == child.BirthDate
+                        || n.BirthDate == DateTime.MinValue
+                        || child.BirthDate == DateTime.MinValue));
+                if (npc == null) continue;
+
+                // Skip if already backfilled (idempotent).
+                bool hasLineage = !string.IsNullOrEmpty(npc.MotherName)
+                    || !string.IsNullOrEmpty(npc.FatherName)
+                    || !string.IsNullOrEmpty(npc.MotherID)
+                    || !string.IsNullOrEmpty(npc.FatherID);
+                if (hasLineage) continue;
+
+                npc.MotherName = child.Mother ?? "";
+                npc.FatherName = child.Father ?? "";
+                npc.MotherID = child.MotherID ?? "";
+                npc.FatherID = child.FatherID ?? "";
+                npc.OriginalMotherName = child.OriginalMother ?? "";
+                npc.OriginalFatherName = child.OriginalFather ?? "";
+                npc.SoulAtGraduation = child.Soul;
+                npc.WasRaisedByPlayer =
+                    (!string.IsNullOrEmpty(child.MotherID) && !child.MotherID.StartsWith("npc_", StringComparison.OrdinalIgnoreCase))
+                    || (!string.IsNullOrEmpty(child.FatherID) && !child.FatherID.StartsWith("npc_", StringComparison.OrdinalIgnoreCase));
+                healed++;
+            }
+
+            if (healed > 0)
+            {
+                UsurperRemake.Systems.DebugLogger.Instance?.LogInfo("FAMILY",
+                    $"BackfillNPCLineageFromChildRegistry: backfilled lineage on {healed} graduated-child NPC(s)");
+            }
+        }
+        catch (Exception ex)
+        {
+            UsurperRemake.Systems.DebugLogger.Instance?.LogWarning("FAMILY",
+                $"BackfillNPCLineageFromChildRegistry failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// v0.63.0 slice 3 D5: lazy credit pass for completed family arcs. Called on
+    /// player login after BackfillNPCLineageFromChildRegistry so the world sim's
+    /// per-tick NPC leveling has had a chance to push adult children past the
+    /// FamilyArcCompletionLevel threshold. Idempotent via CompletedArcChildNames.
+    /// Walks the player's adult children once; for each one at threshold that
+    /// isn't already credited, adds the lifetime counter and records the name.
+    /// </summary>
+    private void CreditCompletedFamilyArcs()
+    {
+        try
+        {
+            if (currentPlayer == null) return;
+            var family = UsurperRemake.Systems.FamilySystem.Instance;
+            if (family == null) return;
+
+            var adults = family.GetAdultChildrenOf(currentPlayer);
+            if (adults == null || adults.Count == 0) return;
+
+            int credited = 0;
+            foreach (var adult in adults)
+            {
+                if (adult.Level < GameConfig.FamilyArcCompletionLevel) continue;
+                // Match by display name (the field that's stable across save round-trips
+                // and immune to the id-drift class of bug that hits ID-keyed lookups).
+                string key = adult.Name2 ?? adult.Name1 ?? "";
+                if (string.IsNullOrEmpty(key)) continue;
+                if (currentPlayer.CompletedArcChildNames.Contains(key)) continue;
+
+                currentPlayer.CompletedArcChildNames.Add(key);
+                currentPlayer.CompletedFamilyArcs++;
+                credited++;
+            }
+
+            if (credited > 0)
+            {
+                UsurperRemake.Systems.DebugLogger.Instance?.LogInfo("FAMILY",
+                    $"Credited {credited} completed family arc(s); lifetime now {currentPlayer.CompletedFamilyArcs}");
+            }
+        }
+        catch (Exception ex)
+        {
+            UsurperRemake.Systems.DebugLogger.Instance?.LogWarning("FAMILY",
+                $"CreditCompletedFamilyArcs failed: {ex.Message}");
+        }
     }
 
     /// <summary>

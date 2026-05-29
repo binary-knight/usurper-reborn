@@ -246,29 +246,41 @@ public class Child
         string[] maleNames = { "Alexander", "Benjamin", "Christopher", "Daniel", "Edward", "Frederick", "Gabriel", "Henry", "Isaac", "James" };
         string[] femaleNames = { "Alice", "Beatrice", "Catherine", "Diana", "Elizabeth", "Florence", "Grace", "Helena", "Isabella", "Jane" };
 
-        if (Sex == CharacterSex.Male)
+        string given = Sex == CharacterSex.Male
+            ? maleNames[Random.Shared.Next(maleNames.Length)]
+            : femaleNames[Random.Shared.Next(femaleNames.Length)];
+
+        // v0.63.0 slice 4 (audit npc-N2): give newborns their father's surname
+        // at naming time so they don't sit nameless-of-surname until the
+        // deserialize-time MigrateChildSurnames pass catches them. Father
+        // surname is extracted as the last whitespace-delimited token of the
+        // Father field. Fallback to mother's surname, then to none.
+        string surname = "";
+        if (!string.IsNullOrWhiteSpace(Father))
         {
-            Name = maleNames[Random.Shared.Next(maleNames.Length)];
+            int sp = Father.LastIndexOf(' ');
+            if (sp > 0 && sp < Father.Length - 1)
+                surname = Father.Substring(sp + 1);
         }
-        else
+        if (string.IsNullOrEmpty(surname) && !string.IsNullOrWhiteSpace(Mother))
         {
-            Name = femaleNames[Random.Shared.Next(femaleNames.Length)];
+            int sp = Mother.LastIndexOf(' ');
+            if (sp > 0 && sp < Mother.Length - 1)
+                surname = Mother.Substring(sp + 1);
         }
-        
+
+        Name = string.IsNullOrEmpty(surname) ? given : $"{given} {surname}";
         Named = true;
         return Name;
     }
     
     /// <summary>
-    /// Check if character is parent of this child
-    /// Pascal equivalent: My_Child function
+    /// v0.63.0 slice 4 (audit npc-M7): IsParent helper was unreachable dead
+    /// code -- no caller in the codebase. Use FamilySystem.IsParentMatchOnChild
+    /// (internal) or the broader FamilySystem.GetChildrenOf for "is X the
+    /// parent of child Y" queries. Removed.
     /// </summary>
-    public bool IsParent(Character character)
-    {
-        return (FatherID == character.ID && Father == character.Name) ||
-               (MotherID == character.ID && Mother == character.Name);
-    }
-    
+
     /// <summary>
     /// Improve child's soul/behavior
     /// Pascal equivalent: Better_Child_Soul procedure

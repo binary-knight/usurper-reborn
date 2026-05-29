@@ -5084,7 +5084,10 @@ public class DungeonLocation : BaseLocation
         {
             var monster = monsters[0];
             terminal.SetColor(monster.MonsterColor);
-            terminal.WriteLine(Loc.Get("dungeon.monster_attacks", monster.Name));
+            // v0.62.1 article fix: route the monster name through ArticulateForLanguage
+            // so English emits "An Ooze attacks!" / "A Wolf attacks!" instead of "A Ooze".
+            // Non-English templates carry their own locale-appropriate article unchanged.
+            terminal.WriteLine(Loc.Get("dungeon.monster_attacks", GameConfig.ArticulateForLanguage(monster.Name)));
         }
         else
         {
@@ -6870,14 +6873,25 @@ public class DungeonLocation : BaseLocation
             if (monster.IsBoss)
             {
                 terminal.SetColor("bright_red");
+                // v0.62.1 article fix. GetIndefiniteArticle reads past the color-markup
+                // wrapper to the actual first letter of the name. "A powerful Ancient
+                // Dragon" stays as-is via the helper's silent-h/yu-sound exception list;
+                // "An Archfiend" comes out correctly.
+                string bossNameWithArticle = GameConfig.Language == "en"
+                    ? $"{GameConfig.GetIndefiniteArticle(monster.Name)} powerful [{monster.MonsterColor}]{monster.Name}[/]"
+                    : $"[{monster.MonsterColor}]{monster.Name}[/]";
                 terminal.WriteLine(GameConfig.ScreenReaderMode
-                    ? Loc.Get("dungeon.boss_blocks_path_sr", $"[{monster.MonsterColor}]{monster.Name}[/]")
-                    : Loc.Get("dungeon.boss_blocks_path_visual", $"[{monster.MonsterColor}]{monster.Name}[/]"));
+                    ? Loc.Get("dungeon.boss_blocks_path_sr", bossNameWithArticle)
+                    : Loc.Get("dungeon.boss_blocks_path_visual", bossNameWithArticle));
             }
             else
             {
                 terminal.SetColor(monster.MonsterColor);
-                terminal.WriteLine(Loc.Get("dungeon.monster_appears", $"[{monster.MonsterColor}]{monster.Name}[/]"));
+                // v0.62.1 article fix: see dungeon.monster_attacks comment above.
+                string monsterNameWithArticle = GameConfig.Language == "en"
+                    ? $"{GameConfig.GetIndefiniteArticle(monster.Name)} [{monster.MonsterColor}]{monster.Name}[/]"
+                    : $"[{monster.MonsterColor}]{monster.Name}[/]";
+                terminal.WriteLine(Loc.Get("dungeon.monster_appears", monsterNameWithArticle));
             }
         }
         else

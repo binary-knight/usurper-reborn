@@ -2558,7 +2558,6 @@ public class CharacterCreationSystem
         character.Kids = 0;
         character.IntimacyActs = 5;
         character.Pregnancy = 0;
-        character.FatherID = "";
         character.TaxRelief = false;
         character.MarriedTimes = 0;
         character.BardSongsLeft = 5;

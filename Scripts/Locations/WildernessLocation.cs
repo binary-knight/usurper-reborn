@@ -367,7 +367,8 @@ public class WildernessLocation : BaseLocation
         string monsterName = region.MonsterNames[Random.Shared.Next(region.MonsterNames.Length)];
 
         terminal.SetColor("red");
-        terminal.WriteLine(Loc.Get("wilderness.monster_emerges", monsterName, WildernessData.GetRegionName(region).ToLower()));
+        // v0.62.1 article fix: "An Owl-Bear" / "An Elemental" instead of "A".
+        terminal.WriteLine(Loc.Get("wilderness.monster_emerges", GameConfig.ArticulateForLanguage(monsterName), WildernessData.GetRegionName(region).ToLower()));
         terminal.WriteLine("");
         await Task.Delay(1500);
 

@@ -107,6 +107,12 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine($"  {player.Name2 ?? player.Name1 ?? "Mortal"}, you have exhausted your lives.");
                 await Task.Delay(2500);
 
+                // v0.63.0 slice 3 D4: Inheritance. Before the Veil closes, if
+                // the player has at least one living adult child, half the gold
+                // passes to the eldest, with a brief news entry tying the legacy
+                // back to them. Idempotent via PermadeathInheritanceClaimed.
+                await TryDistributeInheritance(player, terminal);
+
                 terminal.WriteLine("");
                 terminal.SetColor("gray");
                 terminal.WriteLine("  The Veil closes for the last time.");
@@ -258,6 +264,113 @@ namespace UsurperRemake.Systems
             {
                 DebugLogger.Instance.LogWarning("DEATH_CAP",
                     $"Force-disconnect after permadeath failed: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// v0.63.0 slice 3 D4: Inheritance on permadeath. When the player
+        /// permadies with at least one living adult child, half the gold
+        /// passes to the eldest (by Age, ties broken by ID order), the heir
+        /// gets a one-time grief XP buff, and a news entry ties the legacy
+        /// to them. Idempotent via PermadeathInheritanceClaimed so the
+        /// distribution can't double-fire on a malformed save / restart.
+        /// </summary>
+        private static async Task TryDistributeInheritance(
+            global::Character player, TerminalEmulator terminal)
+        {
+            try
+            {
+                if (player == null) return;
+                if (player.PermadeathInheritanceClaimed) return;
+
+                var family = UsurperRemake.Systems.FamilySystem.Instance;
+                if (family == null) return;
+
+                var adultChildren = family.GetAdultChildrenOf(player);
+                if (adultChildren == null || adultChildren.Count == 0) return;
+
+                // Pick the eldest adult child (highest Age). Tiebreak by Name2
+                // ordinal so the result is deterministic across saves.
+                var heir = adultChildren
+                    .OrderByDescending(n => n.Age)
+                    .ThenBy(n => n.Name2 ?? "", StringComparer.Ordinal)
+                    .FirstOrDefault();
+                if (heir == null) return;
+
+                // Inheritance: 50% of current gold, +500 XP determination buff.
+                long passed = Math.Max(0, player.Gold / 2);
+                heir.Gold += passed;
+                heir.Experience += 500;
+
+                terminal.WriteLine("");
+                terminal.SetColor("bright_magenta");
+                string heirName = heir.DisplayName ?? heir.Name2 ?? heir.Name1 ?? "your child";
+                terminal.WriteLine(
+                    $"  {UsurperRemake.Systems.Loc.Get("permadeath.inheritance_estate", heirName, passed)}");
+                await Task.Delay(2500);
+                terminal.SetColor("gray");
+                terminal.WriteLine(
+                    $"  {UsurperRemake.Systems.Loc.Get("permadeath.inheritance_legacy", heirName)}");
+                await Task.Delay(2500);
+
+                // News entry so anyone else online (or returning later) sees
+                // the legacy as a real world event.
+                try
+                {
+                    global::NewsSystem.Instance?.Newsy(
+                        UsurperRemake.Systems.Loc.Get("permadeath.inheritance_news",
+                            player.Name2 ?? player.Name1 ?? "An adventurer", heirName, passed));
+                }
+                catch (Exception nx)
+                {
+                    DebugLogger.Instance.LogWarning("DEATH_CAP",
+                        $"Inheritance news post failed: {nx.Message}");
+                }
+
+                // Persist the heir's new gold + XP via the shared NPC state
+                // save so a session reload after the cinematic doesn't undo it.
+                try
+                {
+                    if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                    {
+                        await UsurperRemake.Systems.OnlineStateManager.Instance!.SaveAllSharedState();
+                    }
+                }
+                catch (Exception sx)
+                {
+                    DebugLogger.Instance.LogWarning("DEATH_CAP",
+                        $"Post-inheritance SaveAllSharedState failed: {sx.Message}");
+                }
+
+                // Mark the inheritance claimed AND persist before the player's
+                // save row gets deleted. Save-state-reviewer F1 audit (v0.63.0
+                // slice 3): without an explicit save here, the flag lives only
+                // on the in-memory Character and is gone the moment DeleteGameData
+                // fires. A subsequent admin `/restore` would bring back the
+                // pre-distribution state and let a second permadeath double-grant
+                // the heir. The save here gets archived by DeleteGameData's
+                // archive step so the restored row reflects the post-distribution
+                // state, and the idempotency guard at the top of this method
+                // does its job for real.
+                player.PermadeathInheritanceClaimed = true;
+                try
+                {
+                    var ge = GameEngine.Instance;
+                    if (ge != null)
+                    {
+                        await ge.SaveCurrentGame();
+                    }
+                }
+                catch (Exception psx)
+                {
+                    DebugLogger.Instance.LogWarning("DEATH_CAP",
+                        $"Post-inheritance player save failed: {psx.Message}");
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogWarning("DEATH_CAP",
+                    $"TryDistributeInheritance failed: {ex.Message}");
             }
         }
     }

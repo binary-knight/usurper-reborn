@@ -1303,6 +1303,12 @@ namespace UsurperRemake.Systems
                 if (equipment.MaxManaBonus != 0) newBonuses.Add($"Mana {equipment.MaxManaBonus:+#;-#;0}");
                 if (equipment.DefenceBonus != 0) newBonuses.Add($"Def {equipment.DefenceBonus:+#;-#;0}");
 
+                // v0.62.1 stat-order consistency: sort alphabetically so the inventory
+                // equip-compare prompt uses the same predictable order as combat-loot
+                // and shop displays. Each entry starts with the 3-letter stat label.
+                currentBonuses.Sort(System.StringComparer.Ordinal);
+                newBonuses.Sort(System.StringComparer.Ordinal);
+
                 if (currentBonuses.Count > 0 || newBonuses.Count > 0)
                 {
                     terminal.SetColor("gray");
@@ -1701,6 +1707,8 @@ namespace UsurperRemake.Systems
             if (item.CriticalDamageBonus != 0) stats.Add($"{Loc.Get("ui.crit_damage")}: {item.CriticalDamageBonus}%");
             if (item.LifeSteal != 0) stats.Add($"{Loc.Get("ui.life_steal")}: {item.LifeSteal}%");
 
+            // v0.62.1 stat-order consistency.
+            stats.Sort(System.StringComparer.Ordinal);
             if (stats.Count > 0)
             {
                 terminal.SetColor("green");

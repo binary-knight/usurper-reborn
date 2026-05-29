@@ -246,56 +246,16 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  {physicalDesc}");
             terminal.WriteLine("");
 
-            // DEBUG: Show relationship stats
-            await ShowDebugRelationshipInfo(npc, relationLevel, romanceType);
-
+            // v0.62.1 (player report Lv.6 Sage on Main Street): the orange
+            // "[DEBUG] Relationship Stats" block that used to render here --
+            // exposing Relation Level integers, Flirt Receptiveness percentages,
+            // Has Confessed booleans, etc. -- was a dev tool that shipped to
+            // players. Removed entirely. The information players genuinely
+            // want (orientation, relationship band, romance status, abstracted
+            // personality, abstracted flirt receptiveness) is now surfaced
+            // through the Level Master's Crystal Ball scry instead, gated
+            // behind a small in-game cost so it feels earned.
             await Task.Delay(100);
-        }
-
-        /// <summary>
-        /// Show debug information about relationship status
-        /// </summary>
-        private async Task ShowDebugRelationshipInfo(NPC npc, int relationLevel, RomanceRelationType romanceType)
-        {
-            var profile = npc.Brain?.Personality;
-            var state = npcConversationStates.GetValueOrDefault(npc.ID) ?? new ConversationState();
-
-            // Check attraction
-            var playerGender = player!.Sex == CharacterSex.Female ? GenderIdentity.Female : GenderIdentity.Male;
-            bool isAttracted = profile?.IsAttractedTo(playerGender) ?? true;
-
-            // Get flirt receptiveness
-            float flirtReceptiveness = profile?.GetFlirtReceptiveness(relationLevel, isAttracted) ?? 0.5f;
-            flirtReceptiveness += GetCharismaModifier();
-            flirtReceptiveness = Math.Clamp(flirtReceptiveness, 0.05f, 0.95f);
-
-            // Calculate flirts needed for confession
-            int flirtsNeeded = player.Charisma >= CHARISMA_EXCEPTIONAL ? 0 :
-                               player.Charisma >= CHARISMA_HIGH ? 1 : 2;
-
-            if (!GameConfig.ScreenReaderMode)
-            {
-                terminal.SetColor("dark_gray");
-                terminal.WriteLine("  ─────────────────────────────────────────────────────────────────────────────");
-            }
-            terminal.SetColor("yellow");
-            terminal.WriteLine("  [DEBUG] Relationship Stats:");
-            terminal.SetColor("white");
-            terminal.WriteLine($"    Relation Level: {relationLevel} (0=Soulmate, 50=Neutral, 100=Hated)");
-            terminal.WriteLine($"    Romance Type: {romanceType}");
-            terminal.SetColor(isAttracted ? "bright_green" : "bright_red");
-            terminal.WriteLine($"    Attracted to you: {(isAttracted ? "YES" : "NO")} (orientation: {profile?.Orientation})");
-            terminal.SetColor("white");
-            terminal.WriteLine($"    Your Charisma: {player.Charisma} (modifier: {GetCharismaModifier():+0.00;-0.00})");
-            terminal.WriteLine($"    Flirt Success Count: {state.FlirtSuccessCount} (need {flirtsNeeded} for confession)");
-            terminal.WriteLine($"    Flirt Receptiveness: {flirtReceptiveness:P0}");
-            terminal.WriteLine($"    Has Confessed: {state.HasConfessed}, Accepted: {state.ConfessionAccepted}");
-            if (!GameConfig.ScreenReaderMode)
-            {
-                terminal.SetColor("dark_gray");
-                terminal.WriteLine("  ─────────────────────────────────────────────────────────────────────────────");
-            }
-            terminal.WriteLine("");
         }
 
         /// <summary>
@@ -591,17 +551,36 @@ namespace UsurperRemake.Systems
             var state = npcConversationStates.GetValueOrDefault(npc.ID) ?? new ConversationState();
             bool isAttracted = profile?.IsAttractedTo(player!.Sex == CharacterSex.Female ? GenderIdentity.Female : GenderIdentity.Male) ?? true;
 
-            // Get a dynamic chat topic
-            var chatTopic = GetNextChatTopic(npc, state);
-            if (chatTopic != null)
+            // v0.63.0 slice 2 C2: family awareness. When the NPC is the player's
+            // own adult child, the menu hides Flirt / Intimate / Proposition /
+            // Propose entirely (defense in depth + don't even tempt the player)
+            // and surfaces a family-specific chat topic in the [Chat] slot.
+            // Compliment / Personal / Ask-about questions / Chat about the world
+            // still work -- you can still talk to your kid, just not date them.
+            var family = UsurperRemake.Systems.FamilySystem.Instance;
+            bool isAdultChild = family?.IsAdultChildOf(npc, player!) ?? false;
+
+            // Get a dynamic chat topic. For adult children, swap in a parent-focused
+            // topic if available so the player can ask "how have you been?" / "what
+            // do you do now?" etc. instead of the random world-topic small talk.
+            ConversationOption? familyChatOption = isAdultChild ? BuildAdultChildChatTopic(npc, state) : null;
+            if (familyChatOption != null)
             {
-                options.Add(new ConversationOption
+                options.Add(familyChatOption);
+            }
+            else
+            {
+                var chatTopic = GetNextChatTopic(npc, state);
+                if (chatTopic != null)
                 {
-                    Type = ConversationType.Chat,
-                    Text = chatTopic.PlayerLine,
-                    Color = "white",
-                    TopicId = chatTopic.TopicId
-                });
+                    options.Add(new ConversationOption
+                    {
+                        Type = ConversationType.Chat,
+                        Text = chatTopic.PlayerLine,
+                        Color = "white",
+                        TopicId = chatTopic.TopicId
+                    });
+                }
             }
 
             // Ask about themselves - varies based on what we've learned
@@ -615,8 +594,9 @@ namespace UsurperRemake.Systems
 
             // Flirtation - with cooldown and escalation
             // Allow more attempts if player hasn't reached 2 successful flirts yet (needed for confession)
+            // v0.63.0 slice 2 C2: hidden entirely for the player's adult child.
             int maxFlirtsThisSession = state.FlirtSuccessCount < 2 ? 5 : 3;
-            if (relationLevel <= 80 && isAttracted && flirtCountThisSession < maxFlirtsThisSession)
+            if (!isAdultChild && relationLevel <= 80 && isAttracted && flirtCountThisSession < maxFlirtsThisSession)
             {
                 string flirtText = GetFlirtLine(npc, state, relationLevel, flirtCountThisSession);
                 if (flirtText != null)
@@ -629,7 +609,7 @@ namespace UsurperRemake.Systems
                     });
                 }
             }
-            else if (flirtCountThisSession >= maxFlirtsThisSession && relationLevel > 30)
+            else if (!isAdultChild && flirtCountThisSession >= maxFlirtsThisSession && relationLevel > 30)
             {
                 // Too much flirting - they notice
                 options.Add(new ConversationOption
@@ -653,10 +633,15 @@ namespace UsurperRemake.Systems
                 });
             }
 
-            // Romantic options (if in relationship or friendly)
+            // Romantic options (if in relationship or friendly).
+            // v0.63.0 slice 2 C2: hidden entirely for the player's adult child.
+            // (Note: legacy saves could have a Spouse / Lover romance type recorded
+            // against an NPC who's now resolved as a biological child via the
+            // backfill -- the gate hides the menu items, the incest check at
+            // PerformMarriage / CheckForPregnancy / etc. blocks the actions.)
             // Note: relationLevel scale is 0=Soulmate, 50=Neutral, 100=Hated
             // So <= 50 means neutral or better
-            if (romanceType != RomanceRelationType.None || relationLevel <= 50)
+            if (!isAdultChild && (romanceType != RomanceRelationType.None || relationLevel <= 50))
             {
                 if (romanceType == RomanceRelationType.Spouse || romanceType == RomanceRelationType.Lover)
                 {
@@ -687,9 +672,11 @@ namespace UsurperRemake.Systems
             }
 
             // Physical intimacy (if in romantic relationship)
-            if (romanceType == RomanceRelationType.Spouse ||
-                romanceType == RomanceRelationType.Lover ||
-                romanceType == RomanceRelationType.FWB)
+            // v0.63.0 slice 2 C2: hidden for adult children.
+            if (!isAdultChild
+                && (romanceType == RomanceRelationType.Spouse
+                    || romanceType == RomanceRelationType.Lover
+                    || romanceType == RomanceRelationType.FWB))
             {
                 options.Add(new ConversationOption
                 {
@@ -700,7 +687,8 @@ namespace UsurperRemake.Systems
             }
 
             // Marriage proposal (if lover and not already married to them)
-            if (romanceType == RomanceRelationType.Lover && relationLevel <= 20)
+            // v0.63.0 slice 2 C2: hidden for adult children.
+            if (!isAdultChild && romanceType == RomanceRelationType.Lover && relationLevel <= 20)
             {
                 options.Add(new ConversationOption
                 {
@@ -737,6 +725,44 @@ namespace UsurperRemake.Systems
             }
 
             return options;
+        }
+
+        /// <summary>
+        /// v0.63.0 slice 2 C2: when talking to the player's adult child, cycle
+        /// through a small set of parent-flavored chat topics (remember when,
+        /// how is your mother, what's your trade now, are you well, do you
+        /// need anything) instead of the generic small-talk pool. Topic id is
+        /// recorded in `topicsDiscussedThisSession` so cycling doesn't repeat.
+        /// Returns null when all five topics have already been raised this
+        /// session, in which case the caller falls back to a generic chat
+        /// topic so the [Chat] slot doesn't disappear.
+        /// </summary>
+        private ConversationOption? BuildAdultChildChatTopic(NPC adultChild, ConversationState state)
+        {
+            // The five slots. Each "topic" carries its own id so the dialogue
+            // engine can pull the right response variant when the player picks
+            // it. Per-session dedup via topicsDiscussedThisSession.
+            string[] slotIds = new[]
+            {
+                "family_child_remember_when",
+                "family_child_other_parent",
+                "family_child_trade_now",
+                "family_child_are_you_well",
+                "family_child_do_you_need",
+            };
+
+            foreach (var id in slotIds)
+            {
+                if (topicsDiscussedThisSession.Contains(id)) continue;
+                return new ConversationOption
+                {
+                    Type = ConversationType.Chat,
+                    Text = Loc.Get($"dialogue.opt_{id}"),
+                    Color = "bright_cyan",
+                    TopicId = id,
+                };
+            }
+            return null;
         }
 
         /// <summary>
@@ -1148,9 +1174,36 @@ namespace UsurperRemake.Systems
                 case "family":
                     return Loc.Get(isOpen ? "dialogue.vn.topic.family_open" : "dialogue.vn.topic.family_closed");
 
+                // v0.63.0 slice 2 C2: adult-child-specific topics. Tone shifts on
+                // SoulAtGraduation (the snapshot at coming-of-age, immune to later
+                // alignment drift): virtuous (> 100), evil (< -100), neutral.
+                case "family_child_remember_when":
+                case "family_child_other_parent":
+                case "family_child_trade_now":
+                case "family_child_are_you_well":
+                case "family_child_do_you_need":
+                    return GetAdultChildTopicResponse(npc, topicId);
+
                 default:
                     return Loc.Get($"dialogue.vn.topic.generic_{random.Next(3) + 1}");
             }
+        }
+
+        /// <summary>
+        /// v0.63.0 slice 2 C2: tone-keyed response for a family-flavored chat
+        /// topic. Soul band determines the slot: virtuous adult children are
+        /// warm, neutrals are casual, evils are guarded. Three variants per
+        /// topic per tone (1/2/3) so the conversation doesn't read identical
+        /// on repeat playthroughs.
+        /// </summary>
+        private string GetAdultChildTopicResponse(NPC adultChild, string topicId)
+        {
+            int soul = adultChild.SoulAtGraduation;
+            string tone = soul > 100 ? "virtuous" : (soul < -100 ? "evil" : "neutral");
+            // 2 variants per tone per topic (keeps loc volume to 30 response keys
+            // instead of 45). Re-encounter dedup is handled by
+            // topicsDiscussedThisSession at the calling site so 2 is plenty.
+            return Loc.Get($"dialogue.vn.topic.{topicId}_{tone}_{random.Next(2) + 1}");
         }
 
         private async Task HandlePersonalOption(NPC npc, int relationLevel)
@@ -1214,16 +1267,28 @@ namespace UsurperRemake.Systems
 
         private async Task HandleFlirtOption(NPC npc, int relationLevel)
         {
+            // v0.63.0 slice 4 (audit m5): dead-NPC guard. The dialogue layer
+            // can be re-entered against a permadied NPC if the menu render
+            // raced a permadeath cascade -- refuse to operate.
+            if (npc.IsDead) return;
+
             var profile = npc.Brain?.Personality;
             var state = npcConversationStates.GetValueOrDefault(npc.ID) ?? new ConversationState();
             bool isAttracted = profile?.IsAttractedTo(player!.Sex == CharacterSex.Female ? GenderIdentity.Female : GenderIdentity.Male) ?? true;
+            // v0.63.0 slice 4 (audit m1): single flip-once guard. Pre-fix
+            // FlirtSuccessCount was incremented in the spouse/lover branch
+            // AND in the regular-flirt success branch lower down, allowing
+            // one call to double-bump when the conversation re-entered the
+            // success branch. Caller-side flirtCountThisSession is unrelated
+            // and stays as-is.
+            bool flirtSuccessRecorded = false;
 
             // If NPC is already the player's Spouse or Lover, flirting always succeeds warmly
             var romanceType = RomanceTracker.Instance.GetRelationType(npc.ID);
             if (romanceType == RomanceRelationType.Spouse || romanceType == RomanceRelationType.Lover)
             {
                 state.LastFlirtWasPositive = true;
-                state.FlirtSuccessCount++;
+                if (!flirtSuccessRecorded) { state.FlirtSuccessCount++; flirtSuccessRecorded = true; }
                 // Note: flirtCountThisSession is incremented by the caller (ProcessConversationChoice)
 
                 terminal!.SetColor("bright_magenta");
@@ -1365,7 +1430,7 @@ namespace UsurperRemake.Systems
                 if (affairResult.Success)
                 {
                     state.LastFlirtWasPositive = true;
-                    state.FlirtSuccessCount++;
+                    if (!flirtSuccessRecorded) { state.FlirtSuccessCount++; flirtSuccessRecorded = true; }
                     flirtCountThisSession++;
 
                     // Show milestone-specific dialogue
@@ -1440,9 +1505,17 @@ namespace UsurperRemake.Systems
                             }
                             else
                             {
-                                terminal.SetColor("red");
-                                terminal.WriteLine(GameConfig.ScreenReaderMode ? $"  {Loc.Get("dialogue.affair_now_lover", npc.Name2)}" : $"  ♥ {Loc.Get("dialogue.affair_now_lover", npc.Name2)} ♥");
-                                RomanceTracker.Instance.AddLover(npc.ID, 50, false);
+                                bool loverAdded = RomanceTracker.Instance.AddLover(npc.ID, 50, false);
+                                if (loverAdded)
+                                {
+                                    terminal.SetColor("red");
+                                    terminal.WriteLine(GameConfig.ScreenReaderMode ? $"  {Loc.Get("dialogue.affair_now_lover", npc.Name2)}" : $"  ♥ {Loc.Get("dialogue.affair_now_lover", npc.Name2)} ♥");
+                                }
+                                else
+                                {
+                                    terminal.SetColor("gray");
+                                    terminal.WriteLine($"  {Loc.Get("dialogue.lover_cap_reached", npc.Name2)}");
+                                }
                             }
                         }
                         else
@@ -1490,7 +1563,7 @@ namespace UsurperRemake.Systems
             {
                 // Positive response
                 state.LastFlirtWasPositive = true;
-                state.FlirtSuccessCount++;
+                if (!flirtSuccessRecorded) { state.FlirtSuccessCount++; flirtSuccessRecorded = true; }
 
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  {Loc.Get("dialogue.narr_responds_warmly", npc.Name2)}");
@@ -1601,8 +1674,12 @@ namespace UsurperRemake.Systems
 
         private async Task HandleConfessionOption(NPC npc, int relationLevel)
         {
+            // v0.63.0 slice 4 (audit m5): dead-NPC guard.
+            if (npc.IsDead) return;
+
             var profile = npc.Brain?.Personality;
             bool isAttracted = profile?.IsAttractedTo(player!.Sex == CharacterSex.Female ? GenderIdentity.Female : GenderIdentity.Male) ?? true;
+            bool confessionAccepted = false; // v0.63.0 slice 4 (audit m11): success tracker
 
             terminal!.SetColor("bright_magenta");
             terminal.WriteLine($"  {Loc.Get("dialogue.narr_confess")}");
@@ -1638,16 +1715,24 @@ namespace UsurperRemake.Systems
 
                 // Becoming lovers is a major relationship boost - use override to break friendship cap
                 RelationshipSystem.UpdateRelationship(player!, npc, 1, 8, false, true);
-                RomanceTracker.Instance.AddLover(npc.ID, 30);
+                bool loverAdded = RomanceTracker.Instance.AddLover(npc.ID, 30);
 
-                // Mark confession state
-                var confState = npcConversationStates.GetValueOrDefault(npc.ID) ?? new ConversationState();
-                confState.HasConfessed = true;
-                confState.ConfessionAccepted = true;
-                npcConversationStates[npc.ID] = confState;
+                // v0.63.0 slice 4 (audit m11): track success so the bottom
+                // postState write doesn't blow the ConfessionAccepted flag.
+                // Confession is accepted in feeling either way; the lover cap
+                // only blocks the romance formalization, not the emotional beat.
+                confessionAccepted = true;
 
-                terminal.SetColor("bright_cyan");
-                terminal.WriteLine($"  {Loc.Get("dialogue.new_romance")}");
+                if (loverAdded)
+                {
+                    terminal.SetColor("bright_cyan");
+                    terminal.WriteLine($"  {Loc.Get("dialogue.new_romance")}");
+                }
+                else
+                {
+                    terminal.SetColor("gray");
+                    terminal.WriteLine($"  {Loc.Get("dialogue.lover_cap_reached", npc.Name2)}");
+                }
             }
             else if (roll < successChance + 0.3f)
             {
@@ -1670,9 +1755,15 @@ namespace UsurperRemake.Systems
 
             terminal.WriteLine("");
 
-            // Mark that confession happened (even on rejection) so it doesn't repeat
+            // v0.63.0 slice 4 (audit m11): single canonical state write that
+            // preserves ConfessionAccepted if it was set in the success branch.
+            // Pre-fix the success-branch write happened FIRST, then the bottom
+            // post-state write overwrote ConfessionAccepted to false implicitly
+            // (the dict re-read fetched the now-saved success state, but the
+            // pattern was fragile to refactor).
             var postState = npcConversationStates.GetValueOrDefault(npc.ID) ?? new ConversationState();
             postState.HasConfessed = true;
+            if (confessionAccepted) postState.ConfessionAccepted = true;
             npcConversationStates[npc.ID] = postState;
 
             await terminal.GetInput($"  {Loc.Get("ui.press_enter")}");
@@ -1916,10 +2007,20 @@ namespace UsurperRemake.Systems
                     }
                     else
                     {
-                        terminal.SetColor("red");
-                        terminal.WriteLine($"  {Loc.Get("dialogue.affair_now_lover", npc.Name2)}");
-                        RomanceTracker.Instance.AddLover(npc.ID, 50, false);
-                        NewsSystem.Instance?.Newsy(true, $"{npc.Name2} has left {exSpouseName} in a scandal involving {player.Name}!");
+                        bool loverAdded = RomanceTracker.Instance.AddLover(npc.ID, 50, false);
+                        if (loverAdded)
+                        {
+                            terminal.SetColor("red");
+                            terminal.WriteLine($"  {Loc.Get("dialogue.affair_now_lover", npc.Name2)}");
+                            NewsSystem.Instance?.Newsy(true, $"{npc.Name2} has left {exSpouseName} in a scandal involving {player.Name}!");
+                        }
+                        else
+                        {
+                            terminal.SetColor("gray");
+                            terminal.WriteLine($"  {Loc.Get("dialogue.lover_cap_reached", npc.Name2)}");
+                            // Affair-divorce already fired; NPC is now single, not the player's lover.
+                            NewsSystem.Instance?.Newsy(true, $"{npc.Name2} has left {exSpouseName} after a scandal, but did not stay with {player.Name}.");
+                        }
                     }
                 }
                 else
@@ -1969,6 +2070,22 @@ namespace UsurperRemake.Systems
 
             UIHelper.WriteBoxHeader(terminal, Loc.Get("dialogue.marriage_proposal"), "bright_red");
             terminal.WriteLine("");
+
+            // v0.63.0 slice 1: blood-tie refusal at the top of the proposal flow.
+            // Player shouldn't even reach the speech / acceptance roll for a
+            // family member; refuse with flavor and bail.
+            var fam = UsurperRemake.Systems.FamilySystem.Instance;
+            if (fam != null && player != null)
+            {
+                var rel = fam.GetFamilyRelation(player, npc);
+                if (UsurperRemake.Systems.FamilySystem.IsBlockingRelation(rel))
+                {
+                    terminal.SetColor("red");
+                    terminal.WriteLine($"  {GetVNIncestRefusal(rel, npc.DisplayName ?? npc.Name2 ?? npc.Name)}");
+                    await terminal.GetInput($"  {Loc.Get("ui.press_enter")}");
+                    return;
+                }
+            }
 
             // Check player age
             if (player!.Age < GameConfig.MinimumAgeToMarry)
@@ -2272,6 +2389,39 @@ namespace UsurperRemake.Systems
                 <= 70 => "gray",            // Normal
                 <= 90 => "yellow",          // Suspicious/Anger
                 _ => "red"                  // Enemy/Hate
+            };
+        }
+
+        /// <summary>
+        /// v0.63.0 slice 1: localized refusal for an incest proposal in VN.
+        /// Shares the family.incest_refuse_* loc namespace with the
+        /// Church / Castle / RelationshipSystem refusal sites.
+        /// </summary>
+        private static string GetVNIncestRefusal(UsurperRemake.Systems.FamilySystem.FamilyRelation rel, string targetName)
+        {
+            return rel switch
+            {
+                UsurperRemake.Systems.FamilySystem.FamilyRelation.Self =>
+                    Loc.Get("family.incest_refuse_self"),
+                UsurperRemake.Systems.FamilySystem.FamilyRelation.Parent =>
+                    Loc.Get("family.incest_refuse_parent", targetName),
+                UsurperRemake.Systems.FamilySystem.FamilyRelation.Child =>
+                    Loc.Get("family.incest_refuse_child", targetName),
+                UsurperRemake.Systems.FamilySystem.FamilyRelation.Sibling =>
+                    Loc.Get("family.incest_refuse_sibling", targetName),
+                UsurperRemake.Systems.FamilySystem.FamilyRelation.HalfSibling =>
+                    Loc.Get("family.incest_refuse_half_sibling", targetName),
+                UsurperRemake.Systems.FamilySystem.FamilyRelation.Grandparent =>
+                    Loc.Get("family.incest_refuse_grandparent", targetName),
+                UsurperRemake.Systems.FamilySystem.FamilyRelation.Grandchild =>
+                    Loc.Get("family.incest_refuse_grandchild", targetName),
+                UsurperRemake.Systems.FamilySystem.FamilyRelation.AdoptiveParent =>
+                    Loc.Get("family.incest_refuse_adoptive_parent", targetName),
+                UsurperRemake.Systems.FamilySystem.FamilyRelation.AdoptiveChild =>
+                    Loc.Get("family.incest_refuse_adoptive_child", targetName),
+                UsurperRemake.Systems.FamilySystem.FamilyRelation.AdoptiveSibling =>
+                    Loc.Get("family.incest_refuse_adoptive_sibling", targetName),
+                _ => Loc.Get("family.incest_refuse_generic", targetName),
             };
         }
     }

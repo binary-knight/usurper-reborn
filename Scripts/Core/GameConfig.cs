@@ -10,8 +10,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.62.0";
-    public const string VersionName = "Light and Dark";
+    public const string Version = "0.63.0";
+    public const string VersionName = "Bloodlines";
 
     // v0.57.12: Alignment scale cap. Character.Chivalry and Character.Darkness setters clamp to [0, AlignmentCap]
     // as defense in depth against direct-mutation bypass sites that don't route through AlignmentSystem.ChangeAlignment.
@@ -809,6 +809,24 @@ public static partial class GameConfig
     public const int HospiceFaithStandingReward = 4;
     public const float SanctumFaithMemberDiscount = 0.10f;           // 10% off charity costs for Faith faction members. Mirrors Slice 5's Black Market Shadows-rank discount.
 
+    // v0.63.0 slice 3 D5 -- Family arc NG+ starting bonuses.
+    //   FamilyArcCompletionLevel: NPC level at which an adult child counts as a "completed arc"
+    //   FamilyArcStartingCharismaBonus: per-arc Base CHA bonus at next character creation
+    //   MaxFamilyArcStartingCharismaBonus: hard cap on the total CHA bonus
+    //   AdultChildRecruitmentDiscount: multiplier on the team-recruit cost when recruiting an adult child
+    //     (mirrors RecruitmentBand multipliers; deeper than Friend's 0.75 because blood ties harder than friendship)
+    public const int FamilyArcCompletionLevel = 20;
+    public const int FamilyArcStartingCharismaBonus = 5;
+    public const int MaxFamilyArcStartingCharismaBonus = 25;
+    public const float AdultChildRecruitmentDiscount = 0.5f;
+
+    // v0.63.0 slice 5 D3: cost to sponsor an adult child into a court / faction
+    // role at Castle. Player must be king AND have at least one adult child at
+    // FamilyArcCompletionLevel. Track is decided by the child's alignment band:
+    // virtuous (Chivalry > 200) -> Faith ordination; evil (Darkness > 200) ->
+    // Shadows enforcer; otherwise -> Crown court advisor.
+    public const int D3SponsorshipFameCost = 50;
+
     // Team Wars (v0.57.17 — anti-exploit caps)
     // Player report: at Lv.100 the wager is 20k and the win pays 40k (wager * 2 from
     // thin air). With no daily cap and no opponent cooldown, the moment a challenger
@@ -1245,6 +1263,14 @@ public static partial class GameConfig
     // 3 intimate scenes per day, and combined with the 5-children cap the
     // long-running spam vector is closed.
     public const int MaxIntimateEncountersPerDay = 3;
+
+    // v0.63.0 slice 4 (audit M10): hard cap on concurrent lovers. Unbounded
+    // before this, flirt-confess loops could pad CurrentLovers indefinitely,
+    // producing Home/Family display bloat and the same save-bloat surface
+    // the v0.57.18 audit flagged for other unbounded romance collections.
+    // Spouses don't count toward this cap; this is concurrent NON-MARRIED
+    // romantic partners only.
+    public const int MaxConcurrentLovers = 5;
 
     // Chest: capacity per level (0 = no chest)
     public static readonly int[] ChestCapacity = { 0, 10, 25, 50, 75, 100 };
@@ -2169,6 +2195,89 @@ public static partial class GameConfig
         if (System.Enum.TryParse<CharacterClass>(enumName, ignoreCase: true, out var cls))
             return GetLocalizedClassName(cls);
         return enumName!;
+    }
+
+    // v0.62.1 (player report Lv.15 Dwarf Barbarian): the game was emitting hardcoded
+    // "A {name}" in encounter messages regardless of whether the noun started with a
+    // vowel ("A Ooze", "A Imp", "A Ossuary Priest"). Old MUDs handled this with a
+    // 1-line consonant/vowel switch; we now do the same plus the standard English
+    // exceptions (silent-h vs aspirated-h, yu-sound consonant-initial like "user").
+    //
+    // English-only. Spanish / French / Italian / Hungarian have their own article
+    // rules (gender-keyed un/una/un/uno, vowel-keyed a/az) so the localized
+    // templates carry whatever article is correct for that language; this helper
+    // returns just the noun untouched for non-English sessions and lets the template
+    // do its job. See ArticulateForLanguage below for the locale-aware caller.
+
+    private static readonly System.Collections.Generic.HashSet<char> EnglishVowels =
+        new() { 'a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U' };
+
+    /// <summary>
+    /// Returns the English indefinite article ("a" / "an" or "A" / "An") for the
+    /// given noun. Handles the standard English exceptions: silent-h words
+    /// ("honest", "hour", "honor", "heir", "herb") get "an"; yu-sound initials
+    /// ("user", "uniform", "universe", "European", "one") get "a"; bare consonant
+    /// abbreviations starting with a vowel-sound letter ("F", "H", "L", "M", "N",
+    /// "R", "S", "X") are not currently special-cased because monster / class
+    /// names don't include them. Returns empty string for null / empty input.
+    /// </summary>
+    public static string GetIndefiniteArticle(string? noun, bool capitalize = true)
+    {
+        if (string.IsNullOrWhiteSpace(noun)) return "";
+
+        // Strip leading whitespace and markup before reading the first letter.
+        // Color codes like "[red]Ooze[/]" start with '[' so we want the 'O' that
+        // follows. ToLowerInvariant() makes vowel/exception checks cheap.
+        string trimmed = noun.TrimStart();
+        // Skip past leading "[...]" markup wrapper if present.
+        if (trimmed.Length > 0 && trimmed[0] == '[')
+        {
+            int closeIdx = trimmed.IndexOf(']');
+            if (closeIdx >= 0 && closeIdx < trimmed.Length - 1)
+                trimmed = trimmed.Substring(closeIdx + 1);
+        }
+        if (trimmed.Length == 0) return capitalize ? "A" : "a";
+
+        string lower = trimmed.ToLowerInvariant();
+        char first = lower[0];
+
+        // Silent-h exceptions: "an honest mistake", "an hour", "an honor", "an heir",
+        // "an herb" (US English). Keep the list small and exact — words that START
+        // with these prefixes only.
+        string[] silentH = { "honest", "hour", "honor", "honour", "heir", "herb" };
+        foreach (var sh in silentH)
+        {
+            if (lower.StartsWith(sh)) return capitalize ? "An" : "an";
+        }
+
+        // Yu-sound exceptions: "a user", "a uniform", "a unicorn", "a universe",
+        // "a European", "a one-eyed bandit", "a ouija" (rare). Vowel-initial but
+        // the sound is consonant-y.
+        string[] yuConsonant = { "user", "uniform", "uni", "europ", "one", "ouija", "use", "ewe" };
+        foreach (var yc in yuConsonant)
+        {
+            if (lower.StartsWith(yc)) return capitalize ? "A" : "a";
+        }
+
+        // Default: vowel letter -> "an", consonant letter -> "a".
+        if (EnglishVowels.Contains(first))
+            return capitalize ? "An" : "an";
+        return capitalize ? "A" : "a";
+    }
+
+    /// <summary>
+    /// Locale-aware noun + article composition. In English, returns
+    /// "{article} {noun}" with the correct a / an / A / An. In other languages,
+    /// returns the noun unchanged so the localized template's own article
+    /// (un / una / az / a / etc.) stays in charge. Use at the C# call site
+    /// instead of baking "A " into the loc template.
+    /// </summary>
+    public static string ArticulateForLanguage(string? noun, bool capitalize = true)
+    {
+        if (string.IsNullOrEmpty(noun)) return "";
+        if (Language == "en" || string.IsNullOrEmpty(Language))
+            return $"{GetIndefiniteArticle(noun, capitalize)} {noun}";
+        return noun!;
     }
 
     // Race Descriptions for Character Creation

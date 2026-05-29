@@ -857,6 +857,8 @@ public partial class TeamSystem
     {
         /// <summary>Hidden from recruitment entirely (lover/spouse/FWB/ex).</summary>
         Hidden,
+        /// <summary>v0.63.0 slice 3b C3: adult biological child of the player. Deepest discount, dedicated tag, blood-ties-thicker-than-friendship band.</summary>
+        Family,
         /// <summary>Discounted price (≤ Friendship / Trust / Respect).</summary>
         Friend,
         /// <summary>Baseline price (= Normal).</summary>
@@ -889,6 +891,17 @@ public partial class TeamSystem
          || romanceType == RomanceRelationType.Ex)
         {
             return (RecruitmentBand.Hidden, 1.0);
+        }
+
+        // v0.63.0 slice 3b C3: adult-child filter. If the candidate is one of
+        // the player's grown biological children, they go into the Family
+        // band with the deepest discount (GameConfig.AdultChildRecruitmentDiscount).
+        // Blood ties beat friendship ties. Family band takes precedence over the
+        // numeric relationship score, since an adult child you're temporarily
+        // estranged from (low score) should still get the family discount.
+        if (FamilySystem.Instance?.IsAdultChildOf(npc, player) ?? false)
+        {
+            return (RecruitmentBand.Family, GameConfig.AdultChildRecruitmentDiscount);
         }
 
         // Score-based bands. Lower score = better relationship. See

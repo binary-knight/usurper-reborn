@@ -1553,17 +1553,180 @@ public class LevelMasterLocation : BaseLocation
         terminal.WriteLine($"    {Loc.Get("ui.team")}: {(string.IsNullOrEmpty(target.Team) ? Loc.Get("ui.none") : target.Team)}");
         terminal.WriteLine($"    {Loc.Get("ui.alignment")}: {(target.Chivalry > target.Darkness ? Loc.Get("ui.good") : target.Darkness > target.Chivalry ? Loc.Get("ui.evil") : Loc.Get("ui.neutral"))}");
 
-        if (target.Brain != null)
+        // v0.62.1: the old code here dumped `target.Brain.Personality` via its
+        // .ToString() -- that was a debug-y readable-by-developers dump. Replaced
+        // with a curated, in-fiction "Their Nature" + "Their Connection to You"
+        // section that surfaces the same kinds of information the removed
+        // debug screens used to show -- orientation, abstracted personality
+        // traits, current relationship band, romance status, abstracted flirt
+        // receptiveness -- but in player-facing language. This is the
+        // pay-off the player report ("players should be able to get some of
+        // this information if they use the Crystal Ball ability at the level
+        // master") asked for.
+        var profile = target.Brain?.Personality;
+        if (profile != null)
         {
             terminal.WriteLine("");
-            terminal.SetColor("cyan");
-            terminal.WriteLine(Loc.Get("level_master.crystal_personality", target.Brain.Personality));
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine(Loc.Get("level_master.crystal_nature_header"));
+            terminal.SetColor("white");
+
+            // Orientation. Reuse the existing base.orientation_* keys so the
+            // labels match the ones the player saw at character creation.
+            string orientationLabel = profile.Orientation switch
+            {
+                SexualOrientation.Straight => Loc.Get("base.orientation_straight"),
+                SexualOrientation.Gay => Loc.Get("base.orientation_gay"),
+                SexualOrientation.Bisexual => Loc.Get("base.orientation_bisexual"),
+                SexualOrientation.Asexual => Loc.Get("base.orientation_asexual"),
+                _ => Loc.Get("base.orientation_straight")
+            };
+            terminal.WriteLine(Loc.Get("level_master.crystal_orientation", orientationLabel));
+
+            // Two abstracted personality lines: one drawn from the behavior-axis
+            // trait pool (greed/trust/compassion/courage/caution/ambition), one
+            // from the romance-axis pool (romantic/sensual/passionate/flirty/
+            // committed/tender/jealous). Each is the most-deviated salient trait;
+            // we skip an axis entirely if no trait deviates enough (avoids
+            // emitting a lukewarm "they are... average" line). Compassion is
+            // derived from the inverse of Aggression+Vengefulness (matches the
+            // DialogueEnhancer.GetPersonalityFlavor pattern from v0.61.x).
+            string? behaviorLine = ScryBehaviorTraitLine(profile);
+            string? romanceLine = ScryRomanceTraitLine(profile);
+            if (behaviorLine != null) terminal.WriteLine(behaviorLine);
+            if (romanceLine != null) terminal.WriteLine(romanceLine);
+
+            terminal.WriteLine("");
+        }
+
+        // Relationship-with-player section. Always shown (even if profile is
+        // null) because the relationship score lives on the player save, not
+        // the NPC, and the player wants to know how they stand.
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine(Loc.Get("level_master.crystal_connection_header"));
+        terminal.SetColor("white");
+
+        int relScore = RelationshipSystem.GetRelationshipStatus(currentPlayer, target);
+        terminal.WriteLine(ScryRelationshipBandLine(relScore));
+
+        // Romance status: spouse / lover / FWB / ex / dating, if any. Shown
+        // as its own line so it's instantly readable.
+        string? romanceLineText = ScryRomanceStatusLine(target);
+        if (romanceLineText != null) terminal.WriteLine(romanceLineText);
+
+        // Flirt receptiveness banded to one of: open / warm / guarded / closed
+        // / no-attraction. Replaces the debug "Flirt Receptiveness: 27 %" line
+        // the player explicitly complained about.
+        if (profile != null && currentPlayer is Player)
+        {
+            terminal.WriteLine(ScryFlirtReceptivenessLine(profile, relScore));
         }
 
         terminal.WriteLine("");
         terminal.SetColor("gray");
         terminal.WriteLine(Loc.Get("level_master.crystal_fade"));
         await terminal.PressAnyKey();
+    }
+
+    // ---- v0.62.1 Crystal Ball player-facing readout helpers ----
+
+    /// <summary>
+    /// Pick the most-deviated behavior-axis trait and return a single in-fiction
+    /// line for it, or null if no trait is salient enough to be worth mentioning.
+    /// Mirrors the DialogueEnhancer.GetPersonalityFlavor pattern.
+    /// </summary>
+    private string? ScryBehaviorTraitLine(PersonalityProfile p)
+    {
+        // Compassion: inverse of (Aggression + Vengefulness)/2, baseline 0.5.
+        float compassionStrength = System.MathF.Max(0f,
+            ((1f - p.Aggression) + (1f - p.Vengefulness)) / 2f - 0.5f);
+
+        var candidates = new (string locKey, float strength)[]
+        {
+            ("level_master.crystal_trait_greedy",      System.MathF.Max(0f, p.Greed - 0.5f)),
+            ("level_master.crystal_trait_honorable",   System.MathF.Max(0f, p.Trustworthiness - 0.5f)),
+            ("level_master.crystal_trait_compassionate", compassionStrength),
+            ("level_master.crystal_trait_brave",       System.MathF.Max(0f, p.Courage - 0.5f)),
+            ("level_master.crystal_trait_cautious",    System.MathF.Max(0f, p.Caution - 0.5f)),
+            ("level_master.crystal_trait_ambitious",   System.MathF.Max(0f, p.Ambition - 0.5f)),
+        };
+        var top = candidates.OrderByDescending(c => c.strength).First();
+        if (top.strength < 0.15f) return null; // not salient
+        return Loc.Get(top.locKey);
+    }
+
+    /// <summary>
+    /// Pick the most-deviated romance-axis trait and return a single in-fiction
+    /// line for it, or null if no trait is salient enough.
+    /// </summary>
+    private string? ScryRomanceTraitLine(PersonalityProfile p)
+    {
+        var candidates = new (string locKey, float strength)[]
+        {
+            ("level_master.crystal_trait_romantic",  System.MathF.Max(0f, p.Romanticism - 0.5f)),
+            ("level_master.crystal_trait_sensual",   System.MathF.Max(0f, p.Sensuality - 0.5f)),
+            ("level_master.crystal_trait_passionate",System.MathF.Max(0f, p.Passion - 0.5f)),
+            ("level_master.crystal_trait_flirty",    System.MathF.Max(0f, p.Flirtatiousness - 0.5f)),
+            ("level_master.crystal_trait_committed", System.MathF.Max(0f, p.Commitment - 0.5f)),
+            ("level_master.crystal_trait_tender",    System.MathF.Max(0f, p.Tenderness - 0.5f)),
+            ("level_master.crystal_trait_jealous",   System.MathF.Max(0f, p.Jealousy - 0.5f)),
+        };
+        var top = candidates.OrderByDescending(c => c.strength).First();
+        if (top.strength < 0.15f) return null;
+        return Loc.Get(top.locKey);
+    }
+
+    /// <summary>
+    /// Map the integer relationship score to one of five in-fiction band
+    /// descriptions. Lower = better (matches Pascal-era engine convention).
+    /// </summary>
+    private string ScryRelationshipBandLine(int relScore)
+    {
+        // Bands: Love/Passion (<=30), Friendship/Trust (<=50), Normal (~70),
+        // Suspicious/Anger (80-90), Enemy/Hate (>=100).
+        if (relScore <= GameConfig.RelationPassion) return Loc.Get("level_master.crystal_rel_beloved");
+        if (relScore <= GameConfig.RelationTrust) return Loc.Get("level_master.crystal_rel_friend");
+        if (relScore < GameConfig.RelationSuspicious) return Loc.Get("level_master.crystal_rel_neutral");
+        if (relScore < GameConfig.RelationEnemy) return Loc.Get("level_master.crystal_rel_wary");
+        return Loc.Get("level_master.crystal_rel_hostile");
+    }
+
+    /// <summary>
+    /// If the player has a recorded romance type with this NPC, surface it as a
+    /// one-line status. Returns null when there's nothing to say (relationship
+    /// is purely social, not romantic).
+    /// </summary>
+    private string? ScryRomanceStatusLine(NPC target)
+    {
+        var romanceType = RomanceTracker.Instance.GetRelationType(target.ID);
+        return romanceType switch
+        {
+            RomanceRelationType.Spouse => Loc.Get("level_master.crystal_romance_spouse"),
+            RomanceRelationType.Lover => Loc.Get("level_master.crystal_romance_lover"),
+            RomanceRelationType.FWB => Loc.Get("level_master.crystal_romance_fwb"),
+            RomanceRelationType.Ex => Loc.Get("level_master.crystal_romance_ex"),
+            _ => null,
+        };
+    }
+
+    /// <summary>
+    /// Replace the old "Flirt Receptiveness: 27 %" debug line with a banded
+    /// player-facing description. The orientation-mismatch path gets its own
+    /// dedicated line so the player isn't left guessing why every flirt fails.
+    /// </summary>
+    private string ScryFlirtReceptivenessLine(PersonalityProfile p, int relScore)
+    {
+        var playerGender = currentPlayer.Sex == CharacterSex.Female
+            ? GenderIdentity.Female
+            : GenderIdentity.Male;
+        bool isAttracted = p.IsAttractedTo(playerGender);
+        if (!isAttracted) return Loc.Get("level_master.crystal_flirt_no_attraction");
+
+        float r = p.GetFlirtReceptiveness(relScore, isAttracted);
+        if (r >= 0.55f) return Loc.Get("level_master.crystal_flirt_open");
+        if (r >= 0.30f) return Loc.Get("level_master.crystal_flirt_warm");
+        if (r >= 0.10f) return Loc.Get("level_master.crystal_flirt_guarded");
+        return Loc.Get("level_master.crystal_flirt_closed");
     }
 
     /// <summary>

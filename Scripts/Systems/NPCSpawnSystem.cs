@@ -1261,18 +1261,7 @@ namespace UsurperRemake.Systems
                 string fullName = $"{firstName} {surname}";
 
                 // Check for duplicate name — append Roman numeral if needed
-                if (spawnedNPCs.Any(n => n.Name2.Equals(fullName, StringComparison.OrdinalIgnoreCase)))
-                {
-                    for (int suffix = 2; suffix <= 10; suffix++)
-                    {
-                        string suffixed = $"{fullName} {ToRomanNumeral(suffix)}";
-                        if (!spawnedNPCs.Any(n => n.Name2.Equals(suffixed, StringComparison.OrdinalIgnoreCase)))
-                        {
-                            fullName = suffixed;
-                            break;
-                        }
-                    }
-                }
+                fullName = DisambiguateNPCName(fullName);
 
                 // Class selection weighted by current population — underrepresented classes
                 // get higher spawn chance to maintain diversity (especially healers)
@@ -1472,7 +1461,7 @@ namespace UsurperRemake.Systems
             return (CharacterClass)random.Next(baseClassCount);
         }
 
-        private static string ToRomanNumeral(int number)
+        public static string ToRomanNumeral(int number)
         {
             return number switch
             {
@@ -1480,6 +1469,28 @@ namespace UsurperRemake.Systems
                 6 => "VI", 7 => "VII", 8 => "VIII", 9 => "IX", 10 => "X",
                 _ => number.ToString()
             };
+        }
+
+        /// <summary>
+        /// Pick a display name that doesn't collide with any living NPC. If
+        /// the candidate already exists, append a Roman-numeral suffix (II
+        /// through X). Used by both immigrant generation and child / orphan
+        /// graduation (v0.63.0 -- previously only immigrants did this,
+        /// graduating children could silently shadow living NPCs by name).
+        /// </summary>
+        public string DisambiguateNPCName(string candidate)
+        {
+            if (string.IsNullOrEmpty(candidate)) return candidate;
+            if (!spawnedNPCs.Any(n => n.Name2.Equals(candidate, StringComparison.OrdinalIgnoreCase)))
+                return candidate;
+            for (int suffix = 2; suffix <= 10; suffix++)
+            {
+                string suffixed = $"{candidate} {ToRomanNumeral(suffix)}";
+                if (!spawnedNPCs.Any(n => n.Name2.Equals(suffixed, StringComparison.OrdinalIgnoreCase)))
+                    return suffixed;
+            }
+            // Bail at X+1; appending a guid fragment is uglier but unique.
+            return $"{candidate} {Guid.NewGuid().ToString("N").Substring(0, 4)}";
         }
     }
 }

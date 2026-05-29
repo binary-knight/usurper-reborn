@@ -231,7 +231,9 @@ public class Item
         if (Dexterity != 0) stats.Add($"{Loc.Get("ui.stat_dexterity")}: {Dexterity:+#;-#;0}");
         if (Charisma != 0) stats.Add($"{Loc.Get("ui.stat_charisma")}: {Charisma:+#;-#;0}");
         if (Wisdom != 0) stats.Add($"{Loc.Get("ui.stat_wisdom")}: {Wisdom:+#;-#;0}");
-        
+
+        // v0.62.1 stat-order consistency.
+        stats.Sort(System.StringComparer.Ordinal);
         if (stats.Count > 0)
         {
             desc += string.Join(", ", stats) + "\n";
@@ -1103,6 +1105,8 @@ public class Equipment
         if (DefenceBonus != 0) stats.Add($"{Loc.Get("ui.stat_def")}: {DefenceBonus:+#;-#;0}");
         if (StaminaBonus != 0) stats.Add($"{Loc.Get("ui.stat_sta")}: {StaminaBonus:+#;-#;0}");
 
+        // v0.62.1 stat-order consistency.
+        stats.Sort(System.StringComparer.Ordinal);
         return stats.Count > 0 ? string.Join(", ", stats) : Loc.Get("ui.no_bonuses");
     }
 

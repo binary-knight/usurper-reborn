@@ -566,6 +566,9 @@ public class WeaponShopLocation : BaseLocation
         if (item.LifeSteal != 0) bonuses.Add($"{Loc.Get("ui.stat_leech")}{item.LifeSteal}%");
         if (item.PoisonDamage != 0) bonuses.Add($"{Loc.Get("ui.stat_psn")}+{item.PoisonDamage}");
 
+        // v0.62.1 (player report): sort alphabetically so the WeaponShop, ArmorShop,
+        // and combat-loot comparison all show stat bonuses in the same predictable order.
+        bonuses.Sort(System.StringComparer.Ordinal);
         return string.Join(" ", bonuses);
     }
 

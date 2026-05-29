@@ -226,45 +226,86 @@ public partial class RelationshipSystem
     /// </summary>
     public static string GetSpouseName(Character character)
     {
+        // v0.63.0 slice 4 (audit m10): pure read. Pre-fix this method mutated
+        // relation records during a "read" (cleared marriage state when it
+        // noticed the spouse was dead) which fired side-effects from every
+        // call site -- BBS status lines, /who, dialogue render hooks. Reads
+        // should be reads. Dead-spouse cleanup is now a separate
+        // SyncDeadSpouseState(character) callable from a login healing path.
         foreach (var relationGroup in _relationships.Values)
         {
             foreach (var relation in relationGroup.Values)
             {
                 if (relation.Deleted) continue;
+                if (relation.Relation1 != GameConfig.RelationMarried ||
+                    relation.Relation2 != GameConfig.RelationMarried)
+                    continue;
 
-                if (relation.Name1 == character.Name &&
-                    relation.Relation1 == GameConfig.RelationMarried &&
-                    relation.Relation2 == GameConfig.RelationMarried)
+                if (relation.Name1 == character.Name)
                 {
-                    // Check if spouse is dead — clear stale marriage record
                     var spouse = NPCSpawnSystem.Instance?.GetNPCByName(relation.Name2);
-                    if (spouse != null && spouse.IsDead)
-                    {
-                        relation.Relation1 = GameConfig.RelationNormal;
-                        relation.Relation2 = GameConfig.RelationNormal;
-                        continue;
-                    }
+                    if (spouse != null && spouse.IsDead) continue; // skip dead, don't mutate
                     return relation.Name2;
                 }
-
-                if (relation.Name2 == character.Name &&
-                    relation.Relation1 == GameConfig.RelationMarried &&
-                    relation.Relation2 == GameConfig.RelationMarried)
+                if (relation.Name2 == character.Name)
                 {
-                    // Check if spouse is dead — clear stale marriage record
                     var spouse = NPCSpawnSystem.Instance?.GetNPCByName(relation.Name1);
-                    if (spouse != null && spouse.IsDead)
-                    {
-                        relation.Relation1 = GameConfig.RelationNormal;
-                        relation.Relation2 = GameConfig.RelationNormal;
-                        continue;
-                    }
+                    if (spouse != null && spouse.IsDead) continue;
                     return relation.Name1;
                 }
             }
         }
 
         return "";
+    }
+
+    /// <summary>
+    /// v0.63.0 slice 4 (audit m10): explicit cleanup of dead-spouse marriage
+    /// records. Pre-fix this work was done as a side-effect of GetSpouseName
+    /// reads. Callable from login healing or daily-reset paths so the cleanup
+    /// fires once per session in a controlled spot rather than at every read.
+    /// Returns the number of stale records cleared.
+    /// </summary>
+    public static int SyncDeadSpouseState(Character character)
+    {
+        if (character == null) return 0;
+        int cleared = 0;
+        foreach (var relationGroup in _relationships.Values)
+        {
+            foreach (var relation in relationGroup.Values)
+            {
+                if (relation.Deleted) continue;
+                if (relation.Relation1 != GameConfig.RelationMarried ||
+                    relation.Relation2 != GameConfig.RelationMarried)
+                    continue;
+
+                bool involves =
+                    relation.Name1 == character.Name || relation.Name2 == character.Name;
+                if (!involves) continue;
+
+                string otherName = relation.Name1 == character.Name ? relation.Name2 : relation.Name1;
+                var spouse = NPCSpawnSystem.Instance?.GetNPCByName(otherName);
+                if (spouse != null && spouse.IsDead)
+                {
+                    relation.Relation1 = GameConfig.RelationNormal;
+                    relation.Relation2 = GameConfig.RelationNormal;
+                    SaveRelationship(relation);
+                    cleared++;
+                }
+            }
+        }
+
+        // Also clear player-side flags that reference a dead spouse name.
+        if (cleared > 0 && (character.IsMarried || character.Married))
+        {
+            if (string.IsNullOrEmpty(GetSpouseName(character)))
+            {
+                character.IsMarried = false;
+                character.Married = false;
+                character.SpouseName = "";
+            }
+        }
+        return cleared;
     }
     
     /// <summary>
@@ -293,6 +334,24 @@ public partial class RelationshipSystem
         {
             message = $"{character2.Name} has passed away and cannot marry.";
             return false;
+        }
+
+        // v0.63.0 slice 1: blood-tie / adoption gate. Single canonical chokepoint
+        // for incest enforcement -- every player-facing marriage path (Church,
+        // LoveCorner, Castle royal, VN proposal) routes through PerformMarriage.
+        // Adoption is treated as blood here (game already treats adoption as
+        // moral parenthood elsewhere). Sibling / half-sibling / grandparent /
+        // grandchild are hard-blocked at slice 1; a softer "Targaryen mode"
+        // can be added later if Dark playthroughs ask for it.
+        var fam = UsurperRemake.Systems.FamilySystem.Instance;
+        if (fam != null)
+        {
+            var rel = fam.GetFamilyRelation(character1, character2);
+            if (UsurperRemake.Systems.FamilySystem.IsBlockingRelation(rel))
+            {
+                message = GetIncestRefusalMessage(rel, character2);
+                return false;
+            }
         }
 
         // Check marriage prerequisites
@@ -375,17 +434,32 @@ public partial class RelationshipSystem
         
         SaveRelationship(relation);
 
-        // Register in NPCMarriageRegistry (authoritative source for gossip/flirt checks)
-        if (character2 is NPC npcSpouse)
+        // v0.63.0 slice 4 (audit M5): one-shot registration. Pre-fix this
+        // block ran AddSpouse + RegisterMarriage TWICE on the player-NPC
+        // path (once here for character2-as-NPC, once at the bottom). The
+        // second registration was a no-op for the registries themselves
+        // (idempotent) but caused metadata churn (MarriedDate reset,
+        // RomanceTracker.AddSpouse re-cached name). Collapsed to a single
+        // dispatch for each path -- player-NPC, NPC-player, NPC-NPC.
+        if (character1 is NPC npc1Final && character2 is NPC npc2Final)
         {
+            // NPC-NPC marriage path
+            NPCMarriageRegistry.Instance?.RegisterMarriage(
+                npc1Final.ID, npc2Final.ID, npc1Final.Name2, npc2Final.Name2);
+        }
+        else if (character2 is NPC npcSpouse)
+        {
+            // Player (character1) - NPC (character2) marriage path
             NPCMarriageRegistry.Instance?.RegisterMarriage(
                 character1.ID ?? "", npcSpouse.ID, character1.Name, npcSpouse.Name2);
+            RomanceTracker.Instance?.AddSpouse(npcSpouse.ID);
         }
-
-        // Register in RomanceTracker (tracks player romantic history)
-        if (character2 is NPC romanceNpc)
+        else if (character1 is NPC npcSpouse2)
         {
-            RomanceTracker.Instance?.AddSpouse(romanceNpc.ID);
+            // NPC (character1) - Player (character2) marriage path
+            NPCMarriageRegistry.Instance?.RegisterMarriage(
+                character2.ID ?? "", npcSpouse2.ID, character2.Name, npcSpouse2.Name2);
+            RomanceTracker.Instance?.AddSpouse(npcSpouse2.ID);
         }
 
         // Online news: marriage
@@ -397,11 +471,11 @@ public partial class RelationshipSystem
 
         // Generate wedding announcement
         var weddingMsgs = GameConfig.GetWeddingCeremonyMessages(); var ceremonyMessage = weddingMsgs[_random.Next(weddingMsgs.Length)];
-        
+
         message = $"Wedding Ceremony Complete!\n" +
                  $"{character1.Name} and {character2.Name} are now married!\n" +
                  $"{ceremonyMessage}";
-        
+
         // Handle different-sex vs same-sex marriages
         if (character1.Sex != character2.Sex)
         {
@@ -414,22 +488,6 @@ public partial class RelationshipSystem
 
         // Generate marriage news for the realm
         NewsSystem.Instance?.WriteMarriageNews(character1.Name, character2.Name, "Church");
-
-        // Sync with RomanceTracker for NPC spouses
-        if (character2 is NPC npc)
-        {
-            RomanceTracker.Instance?.AddSpouse(npc.ID);
-        }
-        else if (character1 is NPC npc1)
-        {
-            RomanceTracker.Instance?.AddSpouse(npc1.ID);
-        }
-
-        // Sync with NPCMarriageRegistry for NPC-NPC marriages
-        if (character1 is NPC npc1Marriage && character2 is NPC npc2Marriage)
-        {
-            NPCMarriageRegistry.Instance.RegisterMarriage(npc1Marriage.ID, npc2Marriage.ID, npc1Marriage.Name2, npc2Marriage.Name2);
-        }
 
         // Log the marriage event
         DebugLogger.Instance.LogMarriage(character1.Name, character2.Name);
@@ -788,20 +846,30 @@ public partial class RelationshipSystem
     
     private static void HandleChildCustodyAfterDivorce(Character parent1, Character parent2)
     {
-        // Parent1 keeps custody of children, parent2 loses access
-        // This follows the original Pascal behavior
-        int totalChildren = parent1.Kids + parent2.Kids;
+        // v0.63.0 slice 4 (audit npc-M2): route custody through FamilySystem
+        // so the canonical Child registry is updated (MotherAccess /
+        // FatherAccess flags). Pre-fix, this method mutated only the
+        // Character.Kids integer counters, leaving FamilySystem.GetChildrenOf
+        // out of sync -- parent2's counter said 0 but the registry still
+        // returned every shared child. Recompute Character.Kids from the
+        // registry afterward so the two stay in sync.
+        UsurperRemake.Systems.FamilySystem.Instance?.HandleDivorceCustody(parent1, parent2, parent1);
 
+        // v0.63.0 slice 4 follow-up (reviewer Finding 2 / audit npc-M2): use
+        // GetCustodialChildrenOf so Character.Kids reflects current custody
+        // (post-HandleDivorceCustody access flags) not lineage. Pre-this-edit
+        // both parents over-reported the count because GetChildrenOf returns
+        // all biological kids regardless of access.
+        int parent1Kids = UsurperRemake.Systems.FamilySystem.Instance?.GetCustodialChildrenOf(parent1).Count ?? 0;
+        int parent2Kids = UsurperRemake.Systems.FamilySystem.Instance?.GetCustodialChildrenOf(parent2).Count ?? 0;
+        parent1.Kids = parent1Kids;
+        parent2.Kids = parent2Kids;
+
+        int totalChildren = parent1Kids + parent2Kids;
         if (totalChildren > 0)
         {
-            // Parent1 (initiator of divorce) keeps the children
-            parent1.Kids = totalChildren;
-            parent2.Kids = 0;
-
-            // Generate news about the custody arrangement
-            NewsSystem.Instance?.Newsy(true, $"{parent1.Name} was awarded custody of {totalChildren} child{(totalChildren > 1 ? "ren" : "")} in the divorce from {parent2.Name}.");
+            NewsSystem.Instance?.Newsy(true, $"{parent1.Name} was awarded custody of {parent1Kids} child{(parent1Kids != 1 ? "ren" : "")} in the divorce from {parent2.Name}.");
         }
-
     }
     
     private static void ProcessAutomaticDivorce(RelationshipRecord relation)
@@ -1015,4 +1083,40 @@ public partial class RelationshipSystem
     }
 
     #endregion
+
+    /// <summary>
+    /// v0.63.0 slice 1: localized flavor refusal for the incest gate. Mapped
+    /// per FamilyRelation. Loc keys live under family.incest_refuse_*.
+    /// Adopted relations get a softer "no blood, but not done" line (still
+    /// hard-blocks at the gate -- the message just acknowledges the player's
+    /// "we're not actually blood" angle).
+    /// </summary>
+    private static string GetIncestRefusalMessage(UsurperRemake.Systems.FamilySystem.FamilyRelation rel, Character target)
+    {
+        var name = target?.DisplayName ?? target?.Name ?? "";
+        return rel switch
+        {
+            UsurperRemake.Systems.FamilySystem.FamilyRelation.Self =>
+                Loc.Get("family.incest_refuse_self"),
+            UsurperRemake.Systems.FamilySystem.FamilyRelation.Parent =>
+                Loc.Get("family.incest_refuse_parent", name),
+            UsurperRemake.Systems.FamilySystem.FamilyRelation.Child =>
+                Loc.Get("family.incest_refuse_child", name),
+            UsurperRemake.Systems.FamilySystem.FamilyRelation.Sibling =>
+                Loc.Get("family.incest_refuse_sibling", name),
+            UsurperRemake.Systems.FamilySystem.FamilyRelation.HalfSibling =>
+                Loc.Get("family.incest_refuse_half_sibling", name),
+            UsurperRemake.Systems.FamilySystem.FamilyRelation.Grandparent =>
+                Loc.Get("family.incest_refuse_grandparent", name),
+            UsurperRemake.Systems.FamilySystem.FamilyRelation.Grandchild =>
+                Loc.Get("family.incest_refuse_grandchild", name),
+            UsurperRemake.Systems.FamilySystem.FamilyRelation.AdoptiveParent =>
+                Loc.Get("family.incest_refuse_adoptive_parent", name),
+            UsurperRemake.Systems.FamilySystem.FamilyRelation.AdoptiveChild =>
+                Loc.Get("family.incest_refuse_adoptive_child", name),
+            UsurperRemake.Systems.FamilySystem.FamilyRelation.AdoptiveSibling =>
+                Loc.Get("family.incest_refuse_adoptive_sibling", name),
+            _ => Loc.Get("family.incest_refuse_generic", name),
+        };
+    }
 }

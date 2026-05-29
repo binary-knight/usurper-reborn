@@ -353,6 +353,12 @@ public enum MemoryType
     MadeFriend,
     Murdered,
     SocialInteraction,
+
+    // Family events (v0.63.0 multi-generational NPC family rivalries)
+    KilledMyParent,       // Adult NPC saw / learned that this character killed their parent
+    LostFamilyMember,     // A relative died (parent, sibling, child); description names the relative
+    KilledMyFamily,       // The character killed a sibling, child, or grandchild (generic family death)
+    FamilyMemberBorn,     // A new sibling, child, or grandchild entered the family
     
     // Economic events
     BoughtItem,

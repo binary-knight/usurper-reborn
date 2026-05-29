@@ -78,39 +78,77 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine("");
         }
 
-        // Menu options
+        // v0.62.1 menu cleanup (player report Lv.6 Human Sage on MainStreet):
+        // "The option to apply to join a team... does not go away after already
+        // joining a team. It's clutter that could probably be removed."
+        // Two changes: (1) [A] Apply removed from every menu surface -- it routed
+        // to JoinTeam with the comment "Apply is same as join for now", so it was
+        // a hidden duplicate of [J] Join. The input handler keeps "A" as an alias
+        // for muscle-memory backward compat; only the display is gone. (2) Apply
+        // the same "don't show options that don't work" principle to the rest of
+        // the menu: gate Create/Join on !inTeam and team-management options on
+        // inTeam. Universal options (Rankings/Info/Return/Status) always show.
+        bool inTeam = !string.IsNullOrEmpty(currentPlayer.Team);
+
+        // v0.62.1 single-player suppression (player report same Sage session):
+        // "I'm not sure there's any purpose to a password for teams in the
+        // singleplayer version of the game? Nor a few other features like
+        // messaging teammates." Password locks the team against cross-session
+        // join attempts -- meaningless when there's no other session, so gate
+        // it on online-mode. Send Message has the same shape (it's a stub
+        // even in online mode; in single-player it's pure noise with no NPC
+        // recipient). Mirrors the existing W/B/H online-only pattern.
+        bool showPassword = inTeam && DoorMode.IsOnlineMode;
+        bool showMessage = inTeam && DoorMode.IsOnlineMode;
+
+        // INFO section -- Rankings and Info always show; Password (online + in-team),
+        // Examine and Your Status (in-team).
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("team.section_info"));
         terminal.SetColor("white");
-        WriteMenuOption("T", Loc.Get("team.menu_rankings"), "P", Loc.Get("team.menu_password"));
-        WriteMenuOption("I", Loc.Get("team.menu_info"), "E", Loc.Get("team.menu_examine"));
-        WriteMenuOption("Y", Loc.Get("team.menu_your_status"), "", "");
+        WriteMenuOption("T", Loc.Get("team.menu_rankings"), showPassword ? "P" : "", showPassword ? Loc.Get("team.menu_password") : "");
+        WriteMenuOption("I", Loc.Get("team.menu_info"), inTeam ? "E" : "", inTeam ? Loc.Get("team.menu_examine") : "");
+        if (inTeam) WriteMenuOption("Y", Loc.Get("team.menu_your_status"), "", "");
         terminal.WriteLine("");
 
+        // ACTIONS section — Create / Join when not in a team; team-management
+        // when in a team. Apply removed entirely.
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("team.section_actions"));
         terminal.SetColor("white");
-        WriteMenuOption("C", Loc.Get("team.menu_create"), "J", Loc.Get("team.menu_join"));
-        WriteMenuOption("Q", Loc.Get("team.menu_quit"), "A", Loc.Get("team.menu_apply"));
-        WriteMenuOption("N", Loc.Get("team.menu_recruit_npc"), "2", Loc.Get("team.menu_sack"));
-        WriteMenuOption("G", Loc.Get("team.menu_equip"), "X", Loc.Get("team.menu_specialize"));
-        WriteMenuOption("V", Loc.Get("team.menu_view_inventories"), "", "");
-        terminal.WriteLine("");
-
-        terminal.SetColor("cyan");
-        terminal.WriteLine(Loc.Get("team.section_comm"));
-        terminal.SetColor("white");
-        WriteMenuOption("M", Loc.Get("team.menu_message"), "U", Loc.Get("team.menu_resurrect"));
-        if (DoorMode.IsOnlineMode)
+        if (!inTeam)
         {
-            WriteMenuOption("W", Loc.Get("team.menu_recruit_player"), "", "");
-            terminal.WriteLine("");
-            terminal.SetColor("cyan");
-            terminal.WriteLine(Loc.Get("team.section_online"));
-            terminal.SetColor("white");
-            WriteMenuOption("B", Loc.Get("team.menu_battle"), "H", Loc.Get("team.menu_hq"));
+            WriteMenuOption("C", Loc.Get("team.menu_create"), "J", Loc.Get("team.menu_join"));
+        }
+        else
+        {
+            WriteMenuOption("Q", Loc.Get("team.menu_quit"), "N", Loc.Get("team.menu_recruit_npc"));
+            WriteMenuOption("2", Loc.Get("team.menu_sack"), "G", Loc.Get("team.menu_equip"));
+            WriteMenuOption("X", Loc.Get("team.menu_specialize"), "V", Loc.Get("team.menu_view_inventories"));
         }
         terminal.WriteLine("");
+
+        // COMM section -- in-team only. Send Message gated on online-mode (see
+        // showMessage comment above). Resurrect Teammate stays available in
+        // single-player because NPC teammates can die and players want to
+        // revive them. Skip the entire section header when not in a team.
+        if (inTeam)
+        {
+            terminal.SetColor("cyan");
+            terminal.WriteLine(Loc.Get("team.section_comm"));
+            terminal.SetColor("white");
+            WriteMenuOption(showMessage ? "M" : "U", showMessage ? Loc.Get("team.menu_message") : Loc.Get("team.menu_resurrect"), showMessage ? "U" : "", showMessage ? Loc.Get("team.menu_resurrect") : "");
+            if (DoorMode.IsOnlineMode)
+            {
+                WriteMenuOption("W", Loc.Get("team.menu_recruit_player"), "", "");
+                terminal.WriteLine("");
+                terminal.SetColor("cyan");
+                terminal.WriteLine(Loc.Get("team.section_online"));
+                terminal.SetColor("white");
+                WriteMenuOption("B", Loc.Get("team.menu_battle"), "H", Loc.Get("team.menu_hq"));
+            }
+            terminal.WriteLine("");
+        }
 
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("team.section_nav"));
@@ -140,40 +178,58 @@ public class TeamCornerLocation : BaseLocation
         }
         terminal.WriteLine("");
 
+        // v0.62.1 menu cleanup -- see DisplayLocation() for the rationale on
+        // Apply / Create / Join / team-management gating, AND the additional
+        // single-player suppression of Password and Send Message.
+        bool inTeamSr = !string.IsNullOrEmpty(currentPlayer.Team);
+        bool showPasswordSr = inTeamSr && DoorMode.IsOnlineMode;
+        bool showMessageSr = inTeamSr && DoorMode.IsOnlineMode;
+
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("team.sr_info_section"));
         WriteSRMenuOption("T", Loc.Get("team_corner.rankings"));
         WriteSRMenuOption("I", Loc.Get("team_corner.info"));
-        WriteSRMenuOption("Y", Loc.Get("team_corner.your_status"));
-        WriteSRMenuOption("P", Loc.Get("team_corner.password"));
-        WriteSRMenuOption("E", Loc.Get("team_corner.examine"));
+        if (inTeamSr)
+        {
+            WriteSRMenuOption("Y", Loc.Get("team_corner.your_status"));
+            if (showPasswordSr) WriteSRMenuOption("P", Loc.Get("team_corner.password"));
+            WriteSRMenuOption("E", Loc.Get("team_corner.examine"));
+        }
         terminal.WriteLine("");
 
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("team.sr_actions_section"));
-        WriteSRMenuOption("C", Loc.Get("team_corner.create"));
-        WriteSRMenuOption("J", Loc.Get("team_corner.join"));
-        WriteSRMenuOption("Q", Loc.Get("team_corner.quit"));
-        WriteSRMenuOption("A", Loc.Get("team_corner.apply"));
-        WriteSRMenuOption("N", Loc.Get("team_corner.recruit_npc"));
-        WriteSRMenuOption("2", Loc.Get("team_corner.sack"));
-        WriteSRMenuOption("G", Loc.Get("team_corner.equip"));
-        WriteSRMenuOption("X", Loc.Get("team_corner.specialize"));
-        terminal.WriteLine("");
-
-        terminal.SetColor("cyan");
-        terminal.WriteLine(Loc.Get("team.sr_comm_section"));
-        WriteSRMenuOption("M", Loc.Get("team_corner.message"));
-        WriteSRMenuOption("U", Loc.Get("team_corner.resurrect"));
-        if (DoorMode.IsOnlineMode)
+        if (!inTeamSr)
         {
-            WriteSRMenuOption("W", Loc.Get("team_corner.recruit_player"));
-            terminal.SetColor("cyan");
-            terminal.WriteLine(Loc.Get("team.sr_online_section"));
-            WriteSRMenuOption("B", Loc.Get("team_corner.battle"));
-            WriteSRMenuOption("H", Loc.Get("team_corner.headquarters"));
+            WriteSRMenuOption("C", Loc.Get("team_corner.create"));
+            WriteSRMenuOption("J", Loc.Get("team_corner.join"));
+        }
+        else
+        {
+            WriteSRMenuOption("Q", Loc.Get("team_corner.quit"));
+            WriteSRMenuOption("N", Loc.Get("team_corner.recruit_npc"));
+            WriteSRMenuOption("2", Loc.Get("team_corner.sack"));
+            WriteSRMenuOption("G", Loc.Get("team_corner.equip"));
+            WriteSRMenuOption("X", Loc.Get("team_corner.specialize"));
         }
         terminal.WriteLine("");
+
+        if (inTeamSr)
+        {
+            terminal.SetColor("cyan");
+            terminal.WriteLine(Loc.Get("team.sr_comm_section"));
+            if (showMessageSr) WriteSRMenuOption("M", Loc.Get("team_corner.message"));
+            WriteSRMenuOption("U", Loc.Get("team_corner.resurrect"));
+            if (DoorMode.IsOnlineMode)
+            {
+                WriteSRMenuOption("W", Loc.Get("team_corner.recruit_player"));
+                terminal.SetColor("cyan");
+                terminal.WriteLine(Loc.Get("team.sr_online_section"));
+                WriteSRMenuOption("B", Loc.Get("team_corner.battle"));
+                WriteSRMenuOption("H", Loc.Get("team_corner.headquarters"));
+            }
+            terminal.WriteLine("");
+        }
 
         WriteSRMenuOption("R", Loc.Get("team_corner.return"));
         WriteSRMenuOption("S", Loc.Get("marketplace.status"));
@@ -235,17 +291,60 @@ public class TeamCornerLocation : BaseLocation
         }
         terminal.WriteLine("");
 
-        // Menu rows (3 rows for all options)
+        // v0.62.1 menu cleanup -- see DisplayLocation() for the rationale on
+        // Apply / Create / Join / team-management gating AND on the single-player
+        // suppression of Password and Send Message.
+        bool inTeamBbs = !string.IsNullOrEmpty(currentPlayer.Team);
+        bool showPasswordBbs = inTeamBbs && DoorMode.IsOnlineMode;
+        bool showMessageBbs = inTeamBbs && DoorMode.IsOnlineMode;
+
+        // INFO row -- always Rankings + Info; in-team gets Examine and Your Team;
+        // Password only when in-team AND online (no purpose in single-player).
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("team.bbs_info"));
-        ShowBBSMenuRow(("T", "bright_yellow", Loc.Get("team.bbs_rankings")), ("P", "bright_yellow", Loc.Get("team.bbs_password")), ("I", "bright_yellow", Loc.Get("team.bbs_info")), ("E", "bright_yellow", Loc.Get("team.bbs_examine")), ("Y", "bright_yellow", Loc.Get("team.bbs_your_team")));
+        if (inTeamBbs)
+        {
+            // Build the info row with Password as an optional cell so single-player
+            // sessions get a Rankings / Info / Examine / Your Team row without the
+            // dead Password slot.
+            var infoCells = new System.Collections.Generic.List<(string, string, string)>
+            {
+                ("T", "bright_yellow", Loc.Get("team.bbs_rankings"))
+            };
+            if (showPasswordBbs) infoCells.Add(("P", "bright_yellow", Loc.Get("team.bbs_password")));
+            infoCells.Add(("I", "bright_yellow", Loc.Get("team.bbs_info")));
+            infoCells.Add(("E", "bright_yellow", Loc.Get("team.bbs_examine")));
+            infoCells.Add(("Y", "bright_yellow", Loc.Get("team.bbs_your_team")));
+            ShowBBSMenuRow(infoCells.ToArray());
+        }
+        else
+        {
+            ShowBBSMenuRow(("T", "bright_yellow", Loc.Get("team.bbs_rankings")), ("I", "bright_yellow", Loc.Get("team.bbs_info")));
+        }
+
+        // ACTIONS rows -- Create/Join when not in a team; team-management when in.
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("team.bbs_actions"));
-        ShowBBSMenuRow(("C", "bright_yellow", Loc.Get("team.bbs_create")), ("J", "bright_yellow", Loc.Get("team.bbs_join")), ("Q", "bright_yellow", Loc.Get("team.bbs_quit_team")), ("A", "bright_yellow", Loc.Get("team.bbs_apply")), ("N", "bright_yellow", Loc.Get("team.bbs_recruit_npc")));
-        ShowBBSMenuRow(("2", "bright_yellow", Loc.Get("team.bbs_sack_member")), ("G", "bright_yellow", Loc.Get("team.bbs_equip_mbr")), ("X", "bright_yellow", Loc.Get("team.bbs_specialize")), ("M", "bright_yellow", Loc.Get("team.bbs_message")), ("U", "bright_yellow", Loc.Get("team.bbs_resurrect")));
-        if (DoorMode.IsOnlineMode)
+        if (!inTeamBbs)
         {
-            ShowBBSMenuRow(("W", "bright_yellow", Loc.Get("team.bbs_recruit_ally")), ("B", "bright_yellow", Loc.Get("team.bbs_team_battle")), ("H", "bright_yellow", Loc.Get("team.bbs_hq")));
+            ShowBBSMenuRow(("C", "bright_yellow", Loc.Get("team.bbs_create")), ("J", "bright_yellow", Loc.Get("team.bbs_join")));
+        }
+        else
+        {
+            ShowBBSMenuRow(("Q", "bright_yellow", Loc.Get("team.bbs_quit_team")), ("N", "bright_yellow", Loc.Get("team.bbs_recruit_npc")), ("2", "bright_yellow", Loc.Get("team.bbs_sack_member")), ("G", "bright_yellow", Loc.Get("team.bbs_equip_mbr")), ("X", "bright_yellow", Loc.Get("team.bbs_specialize")));
+            // Message gated on online-mode; Resurrect always shown when in-team.
+            if (showMessageBbs)
+            {
+                ShowBBSMenuRow(("M", "bright_yellow", Loc.Get("team.bbs_message")), ("U", "bright_yellow", Loc.Get("team.bbs_resurrect")));
+            }
+            else
+            {
+                ShowBBSMenuRow(("U", "bright_yellow", Loc.Get("team.bbs_resurrect")));
+            }
+            if (DoorMode.IsOnlineMode)
+            {
+                ShowBBSMenuRow(("W", "bright_yellow", Loc.Get("team.bbs_recruit_ally")), ("B", "bright_yellow", Loc.Get("team.bbs_team_battle")), ("H", "bright_yellow", Loc.Get("team.bbs_hq")));
+            }
         }
         ShowBBSMenuRow(("R", "bright_yellow", Loc.Get("team.bbs_main_street")));
 
@@ -293,7 +392,13 @@ public class TeamCornerLocation : BaseLocation
                 return false;
 
             case "A":
-                await JoinTeam(); // Apply is same as join for now
+                // v0.62.1: [A] Apply is removed from the displayed menu (was
+                // redundant with [J] Join -- the code comment that used to live
+                // here said "Apply is same as join for now" since at least
+                // v0.49). The case is kept as a hidden alias so existing muscle
+                // memory and old hotkey docs still route to JoinTeam. JoinTeam
+                // itself early-exits cleanly if the player is already in a team.
+                await JoinTeam();
                 return false;
 
             case "Q":
@@ -309,11 +414,22 @@ public class TeamCornerLocation : BaseLocation
                 return false;
 
             case "P":
-                await ChangeTeamPassword();
+                // v0.62.1: Password is meaningless in single-player (no cross-session
+                // join attempts to lock out). Gated to online mode to match the
+                // existing W/B/H online-only pattern; the hidden hotkey silently
+                // no-ops in single-player so old muscle memory doesn't get an
+                // unexpected "not in team" beat for a feature that shouldn't exist.
+                if (DoorMode.IsOnlineMode)
+                    await ChangeTeamPassword();
                 return false;
 
             case "M":
-                await SendTeamMessage();
+                // v0.62.1: Send Message has no NPC recipient in single-player and
+                // the handler itself is a stub (prints "message sent!" then drops
+                // the text on the floor with a "// Could integrate with mail system
+                // here" comment). Gated the same way as Password.
+                if (DoorMode.IsOnlineMode)
+                    await SendTeamMessage();
                 return false;
 
             case "2":
@@ -1245,9 +1361,12 @@ public class TeamCornerLocation : BaseLocation
             });
         }
 
-        // Sort: Friend (1) → Neutral (2) → Rival (3) → Refused (4), then level desc.
+        // Sort: Family (0, top) → Friend (1) → Neutral (2) → Rival (3) → Refused (4), then level desc.
+        // v0.63.0 slice 3b C3: adult children sort to the top because the player
+        // overwhelmingly wants to find their kids fast in the recruit list.
         int BandOrder(TeamSystem.RecruitmentBand b) => b switch
         {
+            TeamSystem.RecruitmentBand.Family   => 0,
             TeamSystem.RecruitmentBand.Friend   => 1,
             TeamSystem.RecruitmentBand.Neutral  => 2,
             TeamSystem.RecruitmentBand.Rival    => 3,
@@ -1284,6 +1403,7 @@ public class TeamCornerLocation : BaseLocation
     {
         string color = row.Band switch
         {
+            TeamSystem.RecruitmentBand.Family  => "bright_magenta",  // v0.63.0 slice 3b: family pop
             TeamSystem.RecruitmentBand.Friend  => "bright_green",
             TeamSystem.RecruitmentBand.Neutral => "white",
             TeamSystem.RecruitmentBand.Rival   => "yellow",
@@ -1308,6 +1428,7 @@ public class TeamCornerLocation : BaseLocation
 
     private static string GetBandTag(TeamSystem.RecruitmentBand band) => band switch
     {
+        TeamSystem.RecruitmentBand.Family   => Loc.Get("team.recruit_rel_family"),
         TeamSystem.RecruitmentBand.Friend   => Loc.Get("team.recruit_rel_friend"),
         TeamSystem.RecruitmentBand.Neutral  => Loc.Get("team.recruit_rel_neutral"),
         TeamSystem.RecruitmentBand.Rival    => Loc.Get("team.recruit_rel_rival"),
@@ -1695,8 +1816,14 @@ public class TeamCornerLocation : BaseLocation
         // personality traits (top 3 deviated from neutral), social context
         // (marriage, faction, worship), and combat stats. Player report:
         // "Need a way to view stats about each of their team mates."
+        // v0.63.0 slice 1: prepend "(your daughter / son / child)" if this
+        // team member is the player's adult child.
         terminal.ClearScreen();
-        WriteSectionHeader(member.DisplayName.ToUpper(), "bright_cyan");
+        string familyTag = UsurperRemake.Systems.FamilySystem.Instance?.GetChildTagFor(member, currentPlayer) ?? "";
+        string examineHeader = string.IsNullOrEmpty(familyTag)
+            ? member.DisplayName.ToUpper()
+            : $"{member.DisplayName.ToUpper()} {familyTag}";
+        WriteSectionHeader(examineHeader, "bright_cyan");
         terminal.WriteLine("");
 
         // --- Identity ---
@@ -1747,6 +1874,30 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine($"  {Loc.Get("team.examine_worships")}: {member.WorshippedGod}");
         }
         terminal.WriteLine("");
+
+        // --- Family / Lineage block (v0.63.0 slice E1) ---
+        bool hasParents = !string.IsNullOrEmpty(member.MotherName)
+            || !string.IsNullOrEmpty(member.FatherName);
+        bool hasSpouse = !string.IsNullOrEmpty(member.SpouseName);
+        // Children of this NPC: walk Child registry + GetAdultChildrenOf
+        var family = UsurperRemake.Systems.FamilySystem.Instance;
+        int npcChildCount = family != null ? family.GetChildrenOf(member).Count
+            + family.GetAdultChildrenOf(member).Count : 0;
+        if (hasParents || hasSpouse || npcChildCount > 0)
+        {
+            terminal.SetColor("bright_white");
+            terminal.WriteLine(Loc.Get("team.examine_section_family"));
+            terminal.SetColor("white");
+            if (!string.IsNullOrEmpty(member.MotherName))
+                terminal.WriteLine($"  {Loc.Get("team.examine_mother")}: {member.MotherName}");
+            if (!string.IsNullOrEmpty(member.FatherName))
+                terminal.WriteLine($"  {Loc.Get("team.examine_father")}: {member.FatherName}");
+            if (hasSpouse)
+                terminal.WriteLine($"  {Loc.Get("team.examine_spouse")}: {member.SpouseName}");
+            if (npcChildCount > 0)
+                terminal.WriteLine($"  {Loc.Get("team.examine_children", npcChildCount)}");
+            terminal.WriteLine("");
+        }
 
         // --- Attitude (toward player + dominant emotion) ---
         terminal.SetColor("bright_white");

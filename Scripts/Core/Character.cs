@@ -806,6 +806,34 @@ public class Character
     // so a memorable set-piece (a vault, a vision, a permanent boon) does not re-trigger. Minor
     // (repeatable) discoveries are not tracked here. Round-tripped via PlayerData.
     public HashSet<string> DiscoveredFeatureIds { get; set; } = new();
+
+    // v0.63.0 slice 2 (relationship completion): NPC IDs of adult children who have
+    // already had their "first encounter" recognition moment fired. The recognition
+    // cinematic at BaseLocation.InteractWithNPC opens once per adult child per cycle
+    // and never replays. NG+ wipes (mirrors how DiscoveredFeatureIds reset). Round-trip
+    // via PlayerData. Bounded by GameConfig.MaxPlayerChildren (~5 entries).
+    public HashSet<string> RecognizedChildren { get; set; } = new();
+
+    // v0.63.0 slice 3: Lifetime gold the player has donated to charity at the Sanctum.
+    // Slice 3 Inheritance flag carried separately -- see PermadeathInheritanceClaimed.
+    // When the player permadies and has at least one living adult child, the eldest
+    // adult child receives 50% of the player's current gold + a token of the player's
+    // legacy. To prevent a permadied character from "double-inheriting" if the death
+    // cinematic re-fires on a malformed save, the flag locks once set.
+    public bool PermadeathInheritanceClaimed { get; set; } = false;
+
+    // v0.63.0 slice 3 D5: lifetime counter of "completed family arcs". An arc
+    // completes when one of the player's adult children reaches Lv.20 (a
+    // milestone implying they survived long enough in the world sim to become
+    // a real established person). Lifetime counter -- survives NG+ like
+    // MercContractsCompleted and LifetimeCharityGoldDonated. Each arc grants
+    // a small starting-CHA bonus on the player's NEXT character creation,
+    // capped at +5 arcs = +25 starting Charisma. The previous-life adult-child
+    // names that already counted are stored in CompletedArcChildNames so the
+    // counter is idempotent: spotting the same adult child at Lv.20 twice
+    // (eg via reload) doesn't double-count them.
+    public int CompletedFamilyArcs { get; set; } = 0;
+    public HashSet<string> CompletedArcChildNames { get; set; } = new();
     public bool HasActiveShrineAttunement
     {
         get
@@ -1673,7 +1701,14 @@ public class Character
     public int Kids { get; set; }                   // number of children
     public int IntimacyActs { get; set; }           // intimacy acts left today
     public byte Pregnancy { get; set; }             // pregnancy days (0=not pregnant)
-    public string FatherID { get; set; } = "";      // father's unique ID
+    // NOTE: FatherID was historically declared here but never read. As of
+    // v0.63.0 (relationship completion slice 1), lineage lives on NPC where
+    // it actually matters -- NPC.MotherName/FatherName/MotherID/FatherID
+    // /OriginalMotherName/OriginalFatherName get populated by
+    // FamilySystem.ConvertChildToNPC and WorldSimulator.OrphanBecomesNPC.
+    // Players don't need a parent record on Character because the Child
+    // registry (FamilySystem._children) is the canonical store for any
+    // adult-NPC -> player-parent lookup.
     public string ID { get; set; } = "";            // unique player ID
     public bool TaxRelief { get; set; }             // free from tax
     

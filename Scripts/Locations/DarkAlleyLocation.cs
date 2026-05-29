@@ -2293,7 +2293,8 @@ namespace UsurperRemake.Locations
 
             terminal.SetColor("bright_red");
             terminal.WriteLine("");
-            terminal.WriteLine(Loc.Get("dark_alley.pit_released", monster.Name));
+            // v0.62.1 article fix.
+            terminal.WriteLine(Loc.Get("dark_alley.pit_released", GameConfig.ArticulateForLanguage(monster.Name)));
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("dark_alley.pit_monster_stats", monster.Level, monster.HP));
             terminal.WriteLine("");

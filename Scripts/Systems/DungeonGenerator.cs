@@ -297,7 +297,9 @@ namespace UsurperRemake.Systems
                     RoomType.TrapGauntlet => GetDangerousCorridorFlavor(theme),
                     _ => (
                         $"{type} ({theme})",
-                        Loc.Get("dg.default.d", type.ToString().ToLower(), theme.ToString().ToLower()),
+                        // v0.62.1 article fix. Room types include vowel-initials
+                        // ("antechamber") so route through ArticulateForLanguage.
+                        Loc.Get("dg.default.d", GameConfig.ArticulateForLanguage(type.ToString().ToLower(), capitalize: true), theme.ToString().ToLower()),
                         Loc.Get("dg.default.a")
                     )
                 };

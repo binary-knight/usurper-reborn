@@ -232,8 +232,12 @@ namespace UsurperRemake.Systems
                     ["royal"] = c.Royal,
                     ["kidnapped"] = c.Kidnapped,
                     ["birthDate"] = c.BirthDate.ToString("o"),
+                    // v0.63.0 slice 4 (audit npc-M9): cover all four ChildLocation values.
+                    // Pre-fix Kidnapped (=3) and Away (=4) both rendered as "Unknown".
                     ["location"] = c.Location == GameConfig.ChildLocationHome ? "Home" :
-                                   c.Location == GameConfig.ChildLocationOrphanage ? "Orphanage" : "Unknown"
+                                   c.Location == GameConfig.ChildLocationOrphanage ? "Orphanage" :
+                                   c.Location == GameConfig.ChildLocationKidnapped ? "Kidnapped" :
+                                   c.Location == GameConfig.ChildLocationAway ? "Away" : "Unknown"
                 }).ToList();
 
                 var childrenRaw = familySystem.SerializeChildren();
@@ -1398,6 +1402,16 @@ namespace UsurperRemake.Systems
                     IsPermaDead = npc.IsPermaDead,
                     PregnancyDueDate = npc.PregnancyDueDate,
                     PregnancyFatherName = npc.PregnancyFatherName,
+
+                    // Lineage (v0.63.0 -- relationship completion slice 1).
+                    MotherName = npc.MotherName ?? "",
+                    FatherName = npc.FatherName ?? "",
+                    MotherID = npc.MotherID ?? "",
+                    FatherID = npc.FatherID ?? "",
+                    OriginalMotherName = npc.OriginalMotherName ?? "",
+                    OriginalFatherName = npc.OriginalFatherName ?? "",
+                    SoulAtGraduation = npc.SoulAtGraduation,
+                    WasRaisedByPlayer = npc.WasRaisedByPlayer,
 
                     // Hostility, social graph, and gang affiliation
                     IsHostile = npc.IsHostile,

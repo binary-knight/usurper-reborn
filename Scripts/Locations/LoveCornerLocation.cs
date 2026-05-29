@@ -214,9 +214,12 @@ public class LoveCornerLocation : BaseLocation
                 case "M":
                     await HandleMarry(player, targetName);
                     return true;
-                case "C":
-                    await HandleChangeFeelings(player, targetName);
-                    return true;
+                // v0.63.0 slice 4 (audit C3): Change Feelings was a dev tool
+                // that escaped to production. It lied -- printed "feelings set"
+                // and did nothing. Removed entirely. Players who want to
+                // change a relationship band use the existing dialogue /
+                // flirt / gift / compliment / provoke paths the engine was
+                // built around.
                 case "R":
                     return true; // Return to main menu
                 default:
@@ -316,6 +319,17 @@ public class LoveCornerLocation : BaseLocation
         terminal.WriteLine("==================");
         terminal.WriteLine();
 
+        // v0.63.0 slice 4 (audit m8): already-married guard up front. Pre-fix,
+        // a married player could pay the wedding cost and reach PerformMarriage
+        // which would refund -- but only if the target NPC resolved. Resolve
+        // here so we never charge gold on a doomed second marriage.
+        if (player.IsMarried || player.Married)
+        {
+            terminal.WriteLine(Loc.Get("love_corner.already_married"), TerminalEmulator.ColorRed);
+            await terminal.PressAnyKey();
+            return;
+        }
+
         // Try to find the target character (NPC)
         var targetNPC = NPCSpawnSystem.Instance?.ActiveNPCs?.Find(n =>
             n.Name2.Equals(targetName, StringComparison.OrdinalIgnoreCase) ||
@@ -342,101 +356,44 @@ public class LoveCornerLocation : BaseLocation
             return;
         }
 
-        // Pay wedding cost regardless of outcome
+        // v0.63.0 slice 1: removed the phantom-marriage fallback (audit C7).
+        // Pre-fix, if `targetNPC == null` (typed name didn't resolve), the
+        // code would set `player.SpouseName = targetName` with no NPC reference,
+        // no incest check, no age check, no IntimacyActs consumed -- a real
+        // marriage record to a ghost. Now we refund and refuse.
+        if (targetNPC == null)
+        {
+            terminal.WriteLine();
+            terminal.WriteLine(Loc.Get("love_corner.target_not_found", targetName), TerminalEmulator.ColorRed);
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        // Pay wedding cost; refund on failure
         player.Gold -= weddingCost;
 
-        // Use RelationshipSystem.PerformMarriage for proper tracking if we have the target
-        if (targetNPC != null)
+        // PerformMarriage runs the canonical guard chain (incest gate, age,
+        // dead-NPC, mutual-love, ban, intimacy, duration, acceptance roll).
+        if (RelationshipSystem.PerformMarriage(player, targetNPC, out string message))
         {
-            if (RelationshipSystem.PerformMarriage(player, targetNPC, out string message))
-            {
-                terminal.WriteLine();
-                terminal.WriteLine(Loc.Get("love_corner.wedding_ceremony"), TerminalEmulator.ColorYellow);
-                terminal.WriteLine();
-                terminal.WriteLine(message, TerminalEmulator.ColorGreen);
-            }
-            else
-            {
-                terminal.WriteLine();
-                terminal.WriteLine(message, TerminalEmulator.ColorRed);
-                // Refund on failure
-                player.Gold += weddingCost;
-            }
-        }
-        else
-        {
-            // Fallback for when target NPC not found (e.g., offline player or unknown name)
-            // Manually set marriage flags for compatibility
-            player.IsMarried = true;
-            player.Married = true;
-            player.SpouseName = targetName;
-            player.MarriedTimes++;
-            player.IntimacyActs--;
-
-            // Try to register with RomanceTracker using the target name as ID
-            // (no NPC object available, so RelationshipSystem can't be used)
-            RomanceTracker.Instance?.AddSpouse(targetName);
-
-            var ceremonyMessages = GameConfig.GetWeddingCeremonyMessages();
-            string ceremonyMessage = ceremonyMessages[Random.Shared.Next(ceremonyMessages.Length)];
-
             terminal.WriteLine();
             terminal.WriteLine(Loc.Get("love_corner.wedding_ceremony"), TerminalEmulator.ColorYellow);
             terminal.WriteLine();
-            terminal.WriteLine(Loc.Get("love_corner.now_married", player.Name, targetName), TerminalEmulator.ColorGreen);
-            terminal.WriteLine(ceremonyMessage);
+            terminal.WriteLine(message, TerminalEmulator.ColorGreen);
+        }
+        else
+        {
             terminal.WriteLine();
-            terminal.WriteLine(Loc.Get("love_corner.congratulations"), TerminalEmulator.ColorCyan);
+            terminal.WriteLine(message, TerminalEmulator.ColorRed);
+            // Refund on failure
+            player.Gold += weddingCost;
         }
 
         await terminal.PressAnyKey();
     }
 
-    private async Task HandleChangeFeelings(Character player, string targetName)
-    {
-        terminal.WriteLine();
-        terminal.WriteLine(Loc.Get("love_corner.change_feelings"), TerminalEmulator.ColorCyan);
-        terminal.WriteLine("====================");
-        terminal.WriteLine();
-        terminal.WriteLine(Loc.Get("love_corner.feelings_menu1"));
-        terminal.WriteLine(Loc.Get("love_corner.feelings_menu2"));
-        terminal.WriteLine(Loc.Get("love_corner.feelings_menu3"));
-        terminal.WriteLine(Loc.Get("love_corner.feelings_menu4"));
-        terminal.WriteLine(Loc.Get("love_corner.feelings_menu5"));
-        terminal.WriteLine();
-
-        string feeling = await terminal.GetInput(Loc.Get("love_corner.how_feel"));
-
-        int newRelation = feeling?.ToUpper() switch
-        {
-            "L" => GameConfig.RelationLove,
-            "P" => GameConfig.RelationPassion,
-            "F" => GameConfig.RelationFriendship,
-            "T" => GameConfig.RelationTrust,
-            "R" => GameConfig.RelationRespect,
-            "N" => GameConfig.RelationNormal,
-            "S" => GameConfig.RelationSuspicious,
-            "A" => GameConfig.RelationAnger,
-            "E" => GameConfig.RelationEnemy,
-            "H" => GameConfig.RelationHate,
-            _ => GameConfig.RelationNormal
-        };
-
-        terminal.WriteLine();
-        terminal.WriteLine(Loc.Get("love_corner.feelings_set", targetName, GetRelationshipName(newRelation)));
-
-        // Display appropriate reaction
-        if (newRelation == GameConfig.RelationLove)
-        {
-            terminal.WriteLine(Loc.Get("love_corner.love_reaction"), TerminalEmulator.ColorMagenta);
-        }
-        else if (newRelation == GameConfig.RelationHate)
-        {
-            terminal.WriteLine(Loc.Get("love_corner.hate_reaction"), TerminalEmulator.ColorRed);
-        }
-
-        await terminal.PressAnyKey();
-    }
+    // v0.63.0 slice 4 (audit C3): HandleChangeFeelings removed -- was a
+    // production dev tool that printed "feelings set" without writing.
 
     private async Task<bool> HandleDivorce(Character player)
     {
@@ -489,10 +446,15 @@ public class LoveCornerLocation : BaseLocation
         player.Gold -= GameConfig.DivorceCostBase;
         string exSpouse = player.SpouseName;
 
-        // Sync divorce across all tracking systems
-        var exSpouseNPC = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n =>
-            (n.Name2 ?? n.Name1)?.Equals(exSpouse, StringComparison.OrdinalIgnoreCase) == true ||
-            n.Name1?.Equals(exSpouse, StringComparison.OrdinalIgnoreCase) == true);
+        // v0.63.0 slice 4 (audit m7): use ID-first resolution via
+        // ResolvePartnerNpc so an id-drift between RomanceTracker's stored
+        // spouse and the live ActiveNPCs roster doesn't leave us with the
+        // NPC handle null. RomanceTracker carries the canonical NPCId for
+        // the spouse record so we can divorce-by-ID even when the live name
+        // doesn't match (online world-state reload class of issue).
+        var primarySpouse = RomanceTracker.Instance?.PrimarySpouse;
+        var exSpouseNPC = NPCSpawnSystem.Instance?.ResolvePartnerNpc(
+            primarySpouse?.NPCId ?? "", exSpouse);
 
         if (exSpouseNPC != null)
         {
@@ -503,6 +465,18 @@ public class LoveCornerLocation : BaseLocation
             exSpouseNPC.Married = false;
             exSpouseNPC.IsMarried = false;
             exSpouseNPC.SpouseName = "";
+        }
+        else if (!string.IsNullOrEmpty(primarySpouse?.NPCId))
+        {
+            // v0.63.0 slice 4 (audit m7): NPC handle didn't resolve but we have
+            // the canonical spouse ID in RomanceTracker. Move the romance state
+            // unconditionally so the player isn't left in a half-divorced state.
+            // v0.63.0 slice 4 follow-up (reviewer Finding 3): also clear the
+            // marriage registry entry symmetric to the Castle M8 path -- the
+            // happy path's ProcessDivorce internally clears it, but this
+            // fallback bypassed that.
+            RomanceTracker.Instance?.Divorce(primarySpouse!.NPCId, "Love Corner divorce (NPC handle missing)", playerInitiated: true);
+            NPCMarriageRegistry.Instance?.EndMarriage(player.ID ?? "");
         }
 
         player.IsMarried = false;

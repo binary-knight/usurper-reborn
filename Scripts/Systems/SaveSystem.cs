@@ -954,6 +954,11 @@ namespace UsurperRemake.Systems
                 AttunedShrineExpiresGameDay = player.AttunedShrineExpiresGameDay,
                 ShrineFavor = player.ShrineFavor != null ? new Dictionary<string, int>(player.ShrineFavor) : new Dictionary<string, int>(),
                 DiscoveredFeatureIds = player.DiscoveredFeatureIds != null ? new List<string>(player.DiscoveredFeatureIds) : new List<string>(),
+                // v0.63.0 slice 2/3
+                RecognizedChildren = player.RecognizedChildren != null ? new List<string>(player.RecognizedChildren) : new List<string>(),
+                PermadeathInheritanceClaimed = player.PermadeathInheritanceClaimed,
+                CompletedFamilyArcs = player.CompletedFamilyArcs,
+                CompletedArcChildNames = player.CompletedArcChildNames != null ? new List<string>(player.CompletedArcChildNames) : new List<string>(),
                 PetRoster = player.PetRoster?.Select(p => new PetSaveData
                 {
                     Id = p.Id,
@@ -1241,6 +1246,20 @@ namespace UsurperRemake.Systems
                     IsPermaDead = npc.IsPermaDead,
                     PregnancyDueDate = npc.PregnancyDueDate,
                     PregnancyFatherName = npc.PregnancyFatherName,
+
+                    // Lineage (v0.63.0 -- relationship completion slice 1).
+                    // Set at FamilySystem.ConvertChildToNPC / WorldSimulator.OrphanBecomesNPC;
+                    // empty / 0 / false for NPCs spawned via the immigration / starting-roster
+                    // path (their parents predate simulation). See FamilySystem
+                    // .GetFamilyRelation for the consumer.
+                    MotherName = npc.MotherName ?? "",
+                    FatherName = npc.FatherName ?? "",
+                    MotherID = npc.MotherID ?? "",
+                    FatherID = npc.FatherID ?? "",
+                    OriginalMotherName = npc.OriginalMotherName ?? "",
+                    OriginalFatherName = npc.OriginalFatherName ?? "",
+                    SoulAtGraduation = npc.SoulAtGraduation,
+                    WasRaisedByPlayer = npc.WasRaisedByPlayer,
 
                     // Dialogue tracking. v0.57.18: cap at serialization time. The
                     // database tracks every dialogue line ever delivered to this NPC

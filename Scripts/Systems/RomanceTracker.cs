@@ -65,14 +65,28 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Add a new lover to the tracker
+        /// Add a new lover to the tracker.
+        /// v0.63.0 slice 4 (M10): caller-visible bool return so the UI can
+        /// surface "you already have too many lovers" instead of silently
+        /// dropping the addition. Cap is GameConfig.MaxConcurrentLovers.
         /// </summary>
-        public void AddLover(string npcId, int initialLoveLevel = 30, bool isExclusive = false)
+        public bool AddLover(string npcId, int initialLoveLevel = 30, bool isExclusive = false)
         {
             if (CurrentLovers.Any(l => l.NPCId == npcId))
             {
                 // GD.Print($"[Romance] {npcId} is already a lover");
-                return;
+                return true; // Treat as success (already in list)
+            }
+
+            // v0.63.0 slice 4 (M10): cap concurrent lovers. Unbounded before this
+            // meant flirt-success loops could pad CurrentLovers indefinitely,
+            // causing Home/Family display bloat and the save-bloat surface the
+            // v0.57.18 audit flagged. Spouses don't count toward this cap.
+            if (CurrentLovers.Count >= GameConfig.MaxConcurrentLovers)
+            {
+                DebugLogger.Instance.LogInfo("ROMANCE",
+                    $"AddLover refused (cap {GameConfig.MaxConcurrentLovers} reached): {npcId}");
+                return false;
             }
 
             var lover = new Lover
@@ -86,13 +100,13 @@ namespace UsurperRemake.Systems
             };
 
             CurrentLovers.Add(lover);
-            // GD.Print($"[Romance] New lover added: {npcId}");
 
             // Track archetype - Lover
             ArchetypeTracker.Instance.RecordRomanceEncounter(wasIntimate: false);
 
             // Check jealousy of other lovers
             CheckJealousyTriggers(npcId);
+            return true;
         }
 
         /// <summary>
@@ -302,7 +316,54 @@ namespace UsurperRemake.Systems
                 // Remove from current spouses
                 Spouses.Remove(spouse);
 
-                // GD.Print($"[Romance] Spouse {spouse.NPCName ?? npcId} has died. Player is now a widow/widower.");
+                // v0.63.0 slice 4 (m4): clear the dead spouse's jealousy entry
+                // so ProcessJealousyConsequences doesn't keep ticking against
+                // a dead NPC -- pre-fix the ghost jealousy could trip a
+                // divorce-news entry against the corpse.
+                JealousyLevels.Remove(npcId);
+            }
+        }
+
+        /// <summary>
+        /// v0.63.0 slice 4 (C4 + C5): single cleanup hook for a permadied NPC.
+        /// Combat death handlers, world-sim death handlers, and the permadeath
+        /// cascade should all call this against any player whose romance state
+        /// might reference the deceased. Removes the NPC from every romance
+        /// register: spouse moves to ExSpouses via HandleSpouseDeath, lover /
+        /// FWB is dropped to Exes via EndRelationship, jealousy entry cleared,
+        /// affair registrations elsewhere are handled by NPCMarriageRegistry's
+        /// own OnNPCPermadied symmetry helper.
+        ///
+        /// Pre-fix (audit C4): combat death only called HandleSpouseDeath; a
+        /// permadied lover sat in CurrentLovers forever. Pre-fix (audit C5):
+        /// JealousyLevels[deadId] kept ticking with no live NPC to read.
+        /// </summary>
+        public void OnNPCPermadied(string npcId)
+        {
+            if (string.IsNullOrEmpty(npcId)) return;
+            try
+            {
+                bool wasSpouse = Spouses.Any(s => s.NPCId == npcId);
+                bool wasLover = CurrentLovers.Any(l => l.NPCId == npcId);
+                bool wasFWB = FriendsWithBenefits.Contains(npcId);
+
+                if (wasSpouse) HandleSpouseDeath(npcId);
+                if (wasLover || wasFWB) EndRelationship(npcId, "passed away");
+
+                // Defense in depth: HandleSpouseDeath already clears JealousyLevels
+                // for the spouse case; EndRelationship doesn't, so do it here.
+                JealousyLevels.Remove(npcId);
+
+                if (wasSpouse || wasLover || wasFWB)
+                {
+                    DebugLogger.Instance.LogInfo("ROMANCE",
+                        $"OnNPCPermadied: {npcId} cleared from romance state (was spouse={wasSpouse}, lover={wasLover}, fwb={wasFWB})");
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogWarning("ROMANCE",
+                    $"OnNPCPermadied failed for {npcId}: {ex.Message}");
             }
         }
 
@@ -378,7 +439,18 @@ namespace UsurperRemake.Systems
 
                 // Find the NPC
                 var npc = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == npcId);
-                string npcName = npc?.Name ?? npcId;
+
+                // v0.63.0 slice 4 follow-up (reviewer M7 still-open): defense
+                // in depth. If the NPC is null OR dead, clear the jealousy
+                // entry and skip processing -- pre-fix the jealousy could
+                // hit 90 and trigger a divorce-news entry against a corpse.
+                if (npc == null || npc.IsDead)
+                {
+                    JealousyLevels.Remove(npcId);
+                    continue;
+                }
+
+                string npcName = npc.Name;
 
                 // Check if they're a spouse or lover
                 var spouse = Spouses.FirstOrDefault(s => s.NPCId == npcId);

@@ -355,6 +355,16 @@ public class CastleLocation : BaseLocation
             terminal.SetColor("white");
             terminal.WriteLine(" Courtyard Statues");
 
+            // v0.63.0 slice 5 D3: Sponsor adult child to court (king-only)
+            terminal.SetColor("darkgray");
+            terminal.Write(" [");
+            terminal.SetColor("bright_magenta");
+            terminal.Write("Y");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("white");
+            terminal.WriteLine(Loc.Get("castle.menu_d3_sponsor"));
+
             terminal.WriteLine("");
 
             // Navigation
@@ -802,6 +812,16 @@ public class CastleLocation : BaseLocation
                     UsurperRemake.Data.FounderStatueData.StatueLocationTag.Castle, terminal);
                 return false;
 
+            // v0.63.0 slice 5 D3: sponsor an adult child to a court / faction role.
+            case "Y":
+                await SponsorAdultChildToRole();
+                return false;
+
+            // v0.63.0 slice E3: family tree records (read-only).
+            case "Z":
+                await ShowFamilyTreeRecords();
+                return false;
+
             case "R":
                 await NavigateToLocation(GameLocation.MainStreet);
                 return true;
@@ -904,6 +924,11 @@ public class CastleLocation : BaseLocation
             case "V":
                 await UsurperRemake.Systems.FounderStatueSystem.ShowStatuesAt(
                     UsurperRemake.Data.FounderStatueData.StatueLocationTag.Castle, terminal);
+                return false;
+
+            // v0.63.0 slice E3: family tree records.
+            case "F":
+                await ShowFamilyTreeRecords();
                 return false;
 
             case "R":
@@ -2531,7 +2556,8 @@ public class CastleLocation : BaseLocation
             if (currentKing.AddMonsterGuard(name, level, cost))
             {
                 terminal.SetColor("bright_green");
-                terminal.WriteLine(Loc.Get("castle.monster_added", name));
+                // v0.62.1 article fix.
+                terminal.WriteLine(Loc.Get("castle.monster_added", GameConfig.ArticulateForLanguage(name)));
                 terminal.WriteLine(Loc.Get("castle.beast_lurks"));
                 NewsSystem.Instance.Newsy(true, $"{currentKing.GetTitle()} {currentKing.Name} acquired a fearsome {name} to guard the castle!");
                 PersistRoyalCourtToWorldState();
@@ -4067,16 +4093,28 @@ public class CastleLocation : BaseLocation
         terminal.WriteLine(Loc.Get("castle.marriage_desc_2"));
         terminal.WriteLine("");
 
-        // Find eligible NPCs for marriage
+        // Find eligible NPCs for marriage.
+        // v0.63.0 slice 1: also filter blood relatives (incest gate) and add
+        // the age check the audit M3 flagged as missing.
+        // v0.63.0 follow-up: allow the player's own teammate to be a royal
+        // marriage candidate (Church and LoveCorner already allowed this; the
+        // Castle filter incorrectly excluded them). Rival-team-loyal NPCs are
+        // still filtered out -- the political-marriage framing only refuses
+        // candidates already sworn to a different banner.
+        var family = UsurperRemake.Systems.FamilySystem.Instance;
         var eligibleNPCs = NPCSpawnSystem.Instance?.ActiveNPCs?
             .Where(n => n.IsAlive &&
                    !n.IsDead &&
                    !n.IsMarried &&
                    !n.Married &&
+                   n.Age >= GameConfig.MinimumAgeToMarry &&
                    n.Level >= 10 &&
                    !n.King &&
                    !n.IsStoryNPC &&
-                   string.IsNullOrEmpty(n.Team))  // Can't marry team members
+                   (string.IsNullOrEmpty(n.Team) || n.Team == currentPlayer.Team) &&
+                   (family == null
+                       || !UsurperRemake.Systems.FamilySystem.IsBlockingRelation(
+                              family.GetFamilyRelation(currentPlayer, n))))
             .OrderByDescending(n => n.Level)
             .Take(5)
             .ToList();
@@ -4142,6 +4180,46 @@ public class CastleLocation : BaseLocation
     private async Task ProposeMarriage(NPC candidate)
     {
         terminal.WriteLine("");
+
+        // v0.63.0 slice 1: royal marriage was bypassing every PerformMarriage
+        // guard (incest, age, already-married). Royal marriages stay outside
+        // PerformMarriage proper because the political-arrangement design
+        // doesn't require love-baseline / IntimacyActs / MinDaysBeforeMarriage,
+        // but the four hard refusals get added inline.
+        if (candidate.IsDead)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine(Loc.Get("family.incest_refuse_generic", candidate.Name));
+            await terminal.PressAnyKey();
+            return;
+        }
+        if (candidate.Age < GameConfig.MinimumAgeToMarry)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine(Loc.Get("castle.candidate_too_young", candidate.Name));
+            await terminal.PressAnyKey();
+            return;
+        }
+        if (currentPlayer.IsMarried || currentPlayer.Married)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine(Loc.Get("castle.already_married_royal"));
+            await terminal.PressAnyKey();
+            return;
+        }
+        var famGate = UsurperRemake.Systems.FamilySystem.Instance;
+        if (famGate != null)
+        {
+            var rel = famGate.GetFamilyRelation(currentPlayer, candidate);
+            if (UsurperRemake.Systems.FamilySystem.IsBlockingRelation(rel))
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine(GetIncestRefusalForRoyal(rel, candidate.DisplayName ?? candidate.Name));
+                await terminal.PressAnyKey();
+                return;
+            }
+        }
+
         terminal.SetColor("bright_magenta");
         terminal.WriteLine(Loc.Get("castle.send_proposal", candidate.Name));
         await Task.Delay(1500);
@@ -4279,8 +4357,17 @@ public class CastleLocation : BaseLocation
             currentPlayer.IsMarried = false;
             currentPlayer.SpouseName = "";
 
-            // Clear marriage state on the NPC spouse
-            var spouseNPC = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.Name == spouseName);
+            // v0.63.0 slice 4 (audit M8): ID-first resolution + unconditional
+            // RomanceTracker.Divorce. Pre-fix this used name-only matching and
+            // when the NPC lookup failed (id drift / world-state reload between
+            // marriage and divorce), the RomanceTracker spouse record was left
+            // stale -- player.IsMarried = false but RomanceTracker.Spouses
+            // still listed them. The four owners (RelationshipSystem score,
+            // RomanceTracker spouse-to-ex, NPCMarriageRegistry marriage entry,
+            // Character.SpouseName flags) must move together.
+            var primarySpouse = RomanceTracker.Instance?.PrimarySpouse;
+            var spouseNPC = NPCSpawnSystem.Instance?.ResolvePartnerNpc(
+                primarySpouse?.NPCId ?? "", spouseName);
             if (spouseNPC != null)
             {
                 spouseNPC.Married = false;
@@ -4294,6 +4381,12 @@ public class CastleLocation : BaseLocation
             {
                 RelationshipSystem.ProcessDivorce(currentPlayer, spouseNPC, out _);
                 RomanceTracker.Instance?.Divorce(spouseNPC.ID, "Royal divorce", playerInitiated: true);
+            }
+            else if (!string.IsNullOrEmpty(primarySpouse?.NPCId))
+            {
+                // NPC handle didn't resolve; still move the RomanceTracker side
+                // using the canonical ID so the player isn't left half-divorced.
+                RomanceTracker.Instance?.Divorce(primarySpouse!.NPCId, "Royal divorce (NPC handle missing)", playerInitiated: true);
             }
 
             terminal.SetColor("red");
@@ -4974,6 +5067,226 @@ public class CastleLocation : BaseLocation
         }
 
         return merc;
+    }
+
+    /// <summary>
+    /// v0.63.0 slice 5 D3: sponsor an adult child to a court / faction role.
+    /// Player as KING can elevate one of their grown-up children into:
+    ///   - Castle Court (any alignment) -- standard CourtMember slot
+    ///   - Faith ordination (virtuous adult child, Chivalry > 200) -- joins Faith faction
+    ///   - Shadows enforcer (evil adult child, Darkness > 200) -- joins Shadows faction
+    /// Costs Fame and a daily-cap so the player can't pad the court with kids.
+    /// Only fires for player-king with at least one eligible adult child.
+    /// </summary>
+    private async Task SponsorAdultChildToRole()
+    {
+        terminal.ClearScreen();
+        WriteSectionHeader(Loc.Get("castle.d3_sponsor_header"), "bright_magenta");
+        terminal.WriteLine("");
+
+        if (!currentPlayer.King)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine(Loc.Get("castle.d3_not_king"));
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        var family = UsurperRemake.Systems.FamilySystem.Instance;
+        if (family == null)
+        {
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        var adultChildren = family.GetAdultChildrenOf(currentPlayer);
+        // Filter: must be at least FamilyArcCompletionLevel, not already in court,
+        // not already in another faction.
+        var eligible = adultChildren
+            .Where(c => c.Level >= GameConfig.FamilyArcCompletionLevel)
+            .Where(c => !currentKing.CourtMembers.Any(m => m.Name == c.Name2))
+            .Where(c => c.NPCFaction == null)
+            .ToList();
+
+        if (eligible.Count == 0)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine(Loc.Get("castle.d3_no_eligible"));
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        // Fame cost
+        if (currentPlayer.Fame < GameConfig.D3SponsorshipFameCost)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine(Loc.Get("castle.d3_not_enough_fame",
+                GameConfig.D3SponsorshipFameCost, currentPlayer.Fame));
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        terminal.SetColor("cyan");
+        terminal.WriteLine(Loc.Get("castle.d3_pick_child"));
+        terminal.WriteLine("");
+        terminal.SetColor("white");
+        for (int i = 0; i < eligible.Count; i++)
+        {
+            var c = eligible[i];
+            string track = c.Chivalry > 200 ? Loc.Get("castle.d3_track_faith")
+                : c.Darkness > 200 ? Loc.Get("castle.d3_track_shadows")
+                : Loc.Get("castle.d3_track_court");
+            terminal.WriteLine($"  [{i + 1}] {c.Name2} (Lv.{c.Level} {c.ClassName}) -- {track}");
+        }
+        terminal.WriteLine("");
+        terminal.WriteLine(Loc.Get("castle.d3_cost_summary", GameConfig.D3SponsorshipFameCost));
+        terminal.SetColor("yellow");
+
+        string input = await terminal.GetInput(Loc.Get("castle.d3_pick_prompt"));
+        if (!int.TryParse(input, out int pick) || pick < 1 || pick > eligible.Count)
+        {
+            terminal.WriteLine(Loc.Get("castle.d3_cancelled"));
+            await terminal.PressAnyKey();
+            return;
+        }
+        var chosen = eligible[pick - 1];
+
+        // Determine track and assign faction + court entry.
+        UsurperRemake.Systems.Faction? faction = null;
+        global::CourtFaction courtFaction = global::CourtFaction.Loyalists;
+        string roleName = Loc.Get("castle.d3_role_advisor");
+        if (chosen.Chivalry > 200)
+        {
+            faction = UsurperRemake.Systems.Faction.TheFaith;
+            courtFaction = global::CourtFaction.Faithful;
+            roleName = Loc.Get("castle.d3_role_chaplain");
+        }
+        else if (chosen.Darkness > 200)
+        {
+            faction = UsurperRemake.Systems.Faction.TheShadows;
+            courtFaction = global::CourtFaction.Militarists;
+            roleName = Loc.Get("castle.d3_role_spymaster");
+        }
+        else
+        {
+            faction = UsurperRemake.Systems.Faction.TheCrown;
+            courtFaction = global::CourtFaction.Loyalists;
+            roleName = Loc.Get("castle.d3_role_advisor");
+        }
+
+        chosen.NPCFaction = faction;
+        currentKing.CourtMembers.Add(new CourtMember
+        {
+            Name = chosen.Name2,
+            Faction = courtFaction,
+            Role = roleName,
+            Influence = 40 + Random.Shared.Next(20),
+            LoyaltyToKing = 80, // family loyalty is high
+            JoinedCourt = DateTime.Now,
+        });
+
+        // Pay the Fame cost.
+        currentPlayer.Fame -= GameConfig.D3SponsorshipFameCost;
+
+        // News + flavor.
+        terminal.SetColor("bright_magenta");
+        terminal.WriteLine("");
+        terminal.WriteLine(Loc.Get("castle.d3_appointed", chosen.Name2, roleName));
+        try
+        {
+            global::NewsSystem.Instance?.Newsy(
+                UsurperRemake.Systems.Loc.Get("castle.d3_news",
+                    currentPlayer.Name2 ?? currentPlayer.Name, chosen.Name2, roleName));
+        }
+        catch { }
+
+        await terminal.PressAnyKey();
+    }
+
+    /// <summary>
+    /// v0.63.0 slice E3: Family Tree records at Castle. Read-only catalog of
+    /// the realm's bloodlines -- the top "founding" NPCs (oldest known root
+    /// per name) with their descendant count, sorted by descendant count desc.
+    /// Mirrors the Hall of Heroes / Pantheon read-only display pattern.
+    /// </summary>
+    private async Task ShowFamilyTreeRecords()
+    {
+        terminal.ClearScreen();
+        WriteSectionHeader(Loc.Get("castle.e3_family_tree_header"), "bright_magenta");
+        terminal.WriteLine("");
+
+        var spawn = NPCSpawnSystem.Instance;
+        if (spawn == null || spawn.ActiveNPCs.Count == 0)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine(Loc.Get("castle.e3_no_families"));
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        // Aggregate: for every parent name referenced by a child or NPC, count
+        // descendants. The top N parents by descendant count are the "founding"
+        // bloodlines.
+        var parentDescendantCount = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+        void Bump(string parent)
+        {
+            if (string.IsNullOrEmpty(parent)) return;
+            parentDescendantCount[parent] = parentDescendantCount.GetValueOrDefault(parent) + 1;
+        }
+
+        var family = UsurperRemake.Systems.FamilySystem.Instance;
+        if (family != null)
+        {
+            foreach (var c in family.AllChildren)
+            {
+                if (c.Deleted) continue;
+                Bump(c.Mother);
+                Bump(c.Father);
+            }
+        }
+        foreach (var n in spawn.ActiveNPCs)
+        {
+            if (n == null || n.IsDead) continue;
+            Bump(n.MotherName);
+            Bump(n.FatherName);
+            Bump(n.OriginalMotherName);
+            Bump(n.OriginalFatherName);
+        }
+
+        var topBloodlines = parentDescendantCount
+            .Where(kvp => kvp.Value >= 2) // require at least 2 descendants to count as a bloodline
+            .OrderByDescending(kvp => kvp.Value)
+            .Take(10)
+            .ToList();
+
+        if (topBloodlines.Count == 0)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine(Loc.Get("castle.e3_no_families"));
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        terminal.SetColor("cyan");
+        terminal.WriteLine(Loc.Get("castle.e3_bloodlines_intro"));
+        terminal.WriteLine("");
+        terminal.SetColor("white");
+
+        int rank = 1;
+        foreach (var kvp in topBloodlines)
+        {
+            terminal.SetColor("bright_yellow");
+            terminal.Write($"  {rank}. ");
+            terminal.SetColor("bright_white");
+            terminal.Write(kvp.Key);
+            terminal.SetColor("gray");
+            terminal.WriteLine($"  ({Loc.Get("castle.e3_descendants", kvp.Value)})");
+            rank++;
+        }
+        terminal.WriteLine("");
+
+        await terminal.PressAnyKey();
     }
 
     private async Task ManageRoyalBodyguards()
@@ -8699,6 +9012,39 @@ public class CastleLocation : BaseLocation
         ElectronBridge.EmitMenu(menu);
 
         EmitNPCsInLocationToElectron();
+    }
+
+    /// <summary>
+    /// v0.63.0 slice 1: localized incest refusal for the royal-marriage flow.
+    /// Shares the family.incest_refuse_* loc namespace with the Church / VN
+    /// flow so translators only maintain one set of refusal lines.
+    /// </summary>
+    private static string GetIncestRefusalForRoyal(UsurperRemake.Systems.FamilySystem.FamilyRelation rel, string targetName)
+    {
+        return rel switch
+        {
+            UsurperRemake.Systems.FamilySystem.FamilyRelation.Self =>
+                Loc.Get("family.incest_refuse_self"),
+            UsurperRemake.Systems.FamilySystem.FamilyRelation.Parent =>
+                Loc.Get("family.incest_refuse_parent", targetName),
+            UsurperRemake.Systems.FamilySystem.FamilyRelation.Child =>
+                Loc.Get("family.incest_refuse_child", targetName),
+            UsurperRemake.Systems.FamilySystem.FamilyRelation.Sibling =>
+                Loc.Get("family.incest_refuse_sibling", targetName),
+            UsurperRemake.Systems.FamilySystem.FamilyRelation.HalfSibling =>
+                Loc.Get("family.incest_refuse_half_sibling", targetName),
+            UsurperRemake.Systems.FamilySystem.FamilyRelation.Grandparent =>
+                Loc.Get("family.incest_refuse_grandparent", targetName),
+            UsurperRemake.Systems.FamilySystem.FamilyRelation.Grandchild =>
+                Loc.Get("family.incest_refuse_grandchild", targetName),
+            UsurperRemake.Systems.FamilySystem.FamilyRelation.AdoptiveParent =>
+                Loc.Get("family.incest_refuse_adoptive_parent", targetName),
+            UsurperRemake.Systems.FamilySystem.FamilyRelation.AdoptiveChild =>
+                Loc.Get("family.incest_refuse_adoptive_child", targetName),
+            UsurperRemake.Systems.FamilySystem.FamilyRelation.AdoptiveSibling =>
+                Loc.Get("family.incest_refuse_adoptive_sibling", targetName),
+            _ => Loc.Get("family.incest_refuse_generic", targetName),
+        };
     }
 }
 

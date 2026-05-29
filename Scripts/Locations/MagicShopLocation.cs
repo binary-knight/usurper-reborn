@@ -1747,6 +1747,8 @@ public partial class MagicShopLocation : BaseLocation
             if (equip.MaxHPBonus != 0) stats.Add($"{Loc.Get("ui.stat_hp")}{(equip.MaxHPBonus > 0 ? "+" : "")}{equip.MaxHPBonus}");
             if (equip.MaxManaBonus != 0) stats.Add($"{Loc.Get("ui.stat_mana")}{(equip.MaxManaBonus > 0 ? "+" : "")}{equip.MaxManaBonus}");
             if (equip.StaminaBonus != 0) stats.Add($"{Loc.Get("ui.stat_sta")}{(equip.StaminaBonus > 0 ? "+" : "")}{equip.StaminaBonus}");
+            // v0.62.1 stat-order consistency.
+            stats.Sort(System.StringComparer.Ordinal);
             terminal.SetColor("green");
             terminal.Write(string.Join(" ", stats));
 
@@ -3028,6 +3030,8 @@ public partial class MagicShopLocation : BaseLocation
         if (item.CriticalChanceBonus != 0) bonuses.Add($"Crit+{item.CriticalChanceBonus}%");
         if (item.CriticalDamageBonus != 0) bonuses.Add($"CritDmg+{item.CriticalDamageBonus}%");
         if (item.LifeSteal != 0) bonuses.Add($"Lifesteal+{item.LifeSteal}%");
+        // v0.62.1 stat-order consistency.
+        bonuses.Sort(System.StringComparer.Ordinal);
         return string.Join("  ", bonuses);
     }
 

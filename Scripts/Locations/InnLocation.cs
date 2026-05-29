@@ -3899,6 +3899,8 @@ public class InnLocation : BaseLocation
                 if (item.MagicResistance > 0) stats.Add($"{Loc.Get("ui.stat_mr")}:{item.MagicResistance}%");
                 if (item.PoisonDamage > 0) stats.Add($"{Loc.Get("ui.stat_psn")}:{item.PoisonDamage}");
 
+                // v0.62.1 stat-order consistency.
+                stats.Sort(System.StringComparer.Ordinal);
                 if (stats.Count > 0)
                 {
                     terminal.SetColor("darkgray");
@@ -5972,7 +5974,8 @@ public class InnLocation : BaseLocation
         {
             var (gType, gName, gHp, gMaxHp) = guards[gi];
             terminal.SetColor("yellow");
-            terminal.WriteLine(Loc.Get("inn.atk_guard_blocks", gName));
+            // v0.62.1 article fix.
+            terminal.WriteLine(Loc.Get("inn.atk_guard_blocks", GameConfig.ArticulateForLanguage(gName)));
             await Task.Delay(1000);
 
             var guardChar = HeadlessCombatResolver.CreateGuardCharacter(gType, gHp, victimLevel, rng);

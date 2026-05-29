@@ -503,6 +503,9 @@ public class ArmorShopLocation : BaseLocation
         if (item.CriticalChanceBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_crit")}+{item.CriticalChanceBonus}%");
         if (item.MagicResistance != 0) bonuses.Add($"{Loc.Get("ui.stat_mr")}+{item.MagicResistance}%");
 
+        // v0.62.1 (player report): sort alphabetically so the WeaponShop, ArmorShop,
+        // and combat-loot comparison all show stat bonuses in the same predictable order.
+        bonuses.Sort(System.StringComparer.Ordinal);
         return string.Join(" ", bonuses);
     }
 

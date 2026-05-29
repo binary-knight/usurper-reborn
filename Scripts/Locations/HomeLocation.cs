@@ -1864,6 +1864,44 @@ public class HomeLocation : BaseLocation
             terminal.WriteLine();
         }
 
+        // v0.63.0 slice 1: Adult children at large. Previously, every child
+        // graduating at 18 vanished from this view forever (Child.Deleted=true
+        // hid them from GetChildrenOf above; the resulting NPC carried no
+        // back-pointer to the player). Now FamilySystem.GetAdultChildrenOf
+        // returns the living adult NPCs via the new lineage fields, so the
+        // long-cycle player who's raised 4-5 kids actually gets to SEE that
+        // they have grown children walking around in the world.
+        var adultChildren = FamilySystem.Instance.GetAdultChildrenOf(currentPlayer);
+        if (adultChildren.Count > 0)
+        {
+            hasFamily = true;
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine(Loc.Get("home.family_adult_children_label", adultChildren.Count));
+            terminal.SetColor("white");
+
+            foreach (var grown in adultChildren)
+            {
+                terminal.Write("    ");
+                terminal.SetColor("yellow");
+                terminal.Write("* ");
+                terminal.SetColor("bright_white");
+                terminal.Write(grown.DisplayName ?? grown.Name2 ?? grown.Name1 ?? "");
+                terminal.SetColor("gray");
+                // Class + level + age + sex shorthand
+                string sexWord = grown.Sex == CharacterSex.Female
+                    ? Loc.Get("home.family_child_girl")
+                    : Loc.Get("home.family_child_boy");
+                terminal.WriteLine(Loc.Get("home.family_adult_child_line",
+                    grown.Level, grown.ClassName, grown.Age, sexWord));
+                if (!string.IsNullOrEmpty(grown.CurrentLocation) && grown.CurrentLocation != "Main Street")
+                {
+                    terminal.SetColor("dark_gray");
+                    terminal.WriteLine($"      {Loc.Get("home.family_adult_child_location", grown.CurrentLocation)}");
+                }
+            }
+            terminal.WriteLine();
+        }
+
         // Show ex-spouses (detailed records)
         if (romance.ExSpouses.Count > 0)
         {

@@ -326,6 +326,17 @@ namespace UsurperRemake.Systems
             if (romanceType != RomanceRelationType.Spouse && romanceType != RomanceRelationType.Lover)
                 return;
 
+            // v0.63.0 slice 1: defense-in-depth incest gate. The dialogue-side
+            // flirt / confess / intimate flows already hide for blood relatives
+            // once the gate is wired in, but the romance type (Spouse / Lover)
+            // could have been established BEFORE the lineage data existed
+            // (legacy saves with adult-child NPCs accidentally married pre-fix).
+            // Refuse pregnancy here so the legacy state can't produce a child.
+            var family = FamilySystem.Instance;
+            if (family != null
+                && FamilySystem.IsBlockingRelation(family.GetFamilyRelation(player!, partner)))
+                return;
+
             // v0.61.x: hard cap on living biological children. Once the player
             // has MaxPlayerChildren non-deleted entries in the family registry,
             // pregnancy rolls quietly stop firing. Slot reopens when a child
@@ -415,6 +426,28 @@ namespace UsurperRemake.Systems
 
             // Update spouse's child count in RomanceTracker
             RomanceTracker.Instance.AddChildToSpouse(partner.ID);
+
+            // v0.63.0 slice 4 (audit M6): populate the NPC partner's
+            // PregnancyFatherName + PregnancyDueDate when the partner is
+            // female. The v0.54.0 affair-pregnancy preservation hinges on
+            // PregnancyFatherName being non-empty -- without it,
+            // WorldSimulator's divorce-and-spouse-cleanup pass at
+            // RemoveMarriagesWithDeadOrMissingSpouse clears the pregnancy
+            // entirely. Affair child (player is not the spouse) flagged
+            // with the player's name; legitimate child also gets the
+            // attribution so display sites can tell who the father was.
+            if (partnerIsPregnant && partner is NPC npcPartner)
+            {
+                npcPartner.PregnancyFatherName = player!.Name2 ?? player.Name1 ?? player.Name;
+                if (!npcPartner.PregnancyDueDate.HasValue)
+                {
+                    // Approximate gestation = NpcLifecycleHoursPerYear * 0.75
+                    // (3/4 of a year in game time). Real birth fires from the
+                    // world sim daily aging tick when the due date passes.
+                    npcPartner.PregnancyDueDate = DateTime.UtcNow.AddHours(
+                        GameConfig.NpcLifecycleHoursPerYear * 0.75);
+                }
+            }
 
             string babyGender = child.Sex == CharacterSex.Male ? GameConfig.CleanFormat(Get("intimacy.baby_boy")) : GameConfig.CleanFormat(Get("intimacy.baby_girl"));
 

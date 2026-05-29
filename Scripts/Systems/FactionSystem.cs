@@ -477,7 +477,9 @@ namespace UsurperRemake.Systems
             // Hostile faction
             return npcFaction switch
             {
-                Faction.TheCrown => $"A {Factions[PlayerFaction.Value].Name} sympathizer. Watch yourself.",
+                // v0.62.1: faction names already carry "The " (e.g. "The Crown"),
+                // so the original "A The Crown sympathizer" was double-determiner-broken.
+                Faction.TheCrown => $"{Factions[PlayerFaction.Value].Name} sympathizer. Watch yourself.",
                 Faction.TheShadows => $"One of the {Factions[PlayerFaction.Value].Name}? Interesting...",
                 Faction.TheFaith => $"Even those who follow {Factions[PlayerFaction.Value].Name} may find redemption.",
                 _ => "I know who you serve."

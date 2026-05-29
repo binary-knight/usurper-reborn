@@ -8993,6 +8993,8 @@ public partial class CombatEngine
             if (lootItem.Mana != 0) bonuses.Add($"Mana {lootItem.Mana:+#;-#;0}");
             if (lootItem.Stamina != 0) bonuses.Add($"Sta {lootItem.Stamina:+#;-#;0}");
 
+            // v0.62.1 stat-order consistency.
+            bonuses.Sort(System.StringComparer.Ordinal);
             if (bonuses.Count > 0)
             {
                 terminal.SetColor("cyan");
@@ -9947,6 +9949,8 @@ public partial class CombatEngine
         if (item.LifeSteal > 0) stats.Add($"{Loc.Get("ui.stat_leech")}:{item.LifeSteal}%");
         if (item.ManaSteal > 0) stats.Add($"Siphon:{item.ManaSteal}%");
         if (item.MagicResistance > 0) stats.Add($"{Loc.Get("ui.stat_mr")}:{item.MagicResistance}%");
+        // v0.62.1 stat-order consistency.
+        stats.Sort(System.StringComparer.Ordinal);
         return stats.Count > 0 ? $"[{string.Join(" ", stats)}]" : "";
     }
 
@@ -10630,6 +10634,19 @@ public partial class CombatEngine
             if (lootIntBonus != 0) newBonuses.Add($"Int {lootIntBonus:+#;-#;0}");
             if (lootItem.HP != 0) newBonuses.Add($"HP {lootItem.HP:+#;-#;0}");
             if (lootItem.Mana != 0) newBonuses.Add($"Mana {lootItem.Mana:+#;-#;0}");
+
+            // v0.62.1 (player report Lv.6 Human Sage): the two bonus lists above are
+            // populated in different orders -- current item walks Str/Dex/Agi/Con/Int/Wis/Cha/HP/Mana/Def
+            // while the new item walks Str/Dex/Agi/Wis/Cha/Def then appends Con/Int/HP/Mana
+            // (Con and Int come from LootEffects, a different code path). That asymmetry made
+            // "current: Int, Def, Wis" line up against "new: Def, Int, Wis" and the player
+            // had to scan to find each stat. Sorting both alphabetically by leading stat
+            // label is the obvious, defensive fix and survives future additions to either
+            // list without re-introducing the asymmetry. Each entry starts with the 3-letter
+            // stat name (Str / Dex / Agi / Con / Int / Wis / Cha / Def / HP / Mana) so a
+            // plain Ordinal sort gives the right order: Agi, Cha, Con, Def, Dex, HP, Int, Mana, Str, Wis.
+            currentBonuses.Sort(System.StringComparer.Ordinal);
+            newBonuses.Sort(System.StringComparer.Ordinal);
 
             if (currentBonuses.Count > 0 || newBonuses.Count > 0)
             {
@@ -18854,7 +18871,13 @@ public partial class CombatEngine
             await Task.Delay(1500);
         }
 
-        // Check relationship type and handle accordingly
+        // Check relationship type and handle accordingly.
+        // v0.63.0 slice 4 (audit C4 + C5): permadeath death cascade.
+        // Pre-fix, HandleSpouseDeath fired for spouses but lovers / FWB stayed
+        // in CurrentLovers forever (no caller invoked EndRelationship), and
+        // JealousyLevels entries for any permadied romantic partner kept ticking.
+        // Single chokepoint OnNPCPermadied unifies the cleanup; also clears any
+        // affair-registry entries via NPCMarriageRegistry.OnNPCPermadied.
         var romanceTracker = UsurperRemake.Systems.RomanceTracker.Instance;
         if (romanceTracker != null)
         {
@@ -18866,8 +18889,6 @@ public partial class CombatEngine
                 terminal.SetColor("magenta");
                 terminal.WriteLine(Loc.Get("combat.spouse_fallen", npc.DisplayName));
                 terminal.WriteLine(Loc.Get("combat.perhaps_saved"));
-                // Mark the spouse as dead in romance tracker
-                romanceTracker.HandleSpouseDeath(npcId);
             }
             else if (wasLover)
             {
@@ -18880,6 +18901,10 @@ public partial class CombatEngine
                 terminal.SetColor("yellow");
                 terminal.WriteLine(Loc.Get("combat.teammate_sacrifice", npc.DisplayName));
             }
+
+            // Always run the unified cleanup. Idempotent for non-romance NPCs.
+            romanceTracker.OnNPCPermadied(npcId);
+            NPCMarriageRegistry.Instance.OnNPCPermadied(npcId);
         }
 
         terminal.WriteLine("");

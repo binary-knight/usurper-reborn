@@ -1089,7 +1089,12 @@ namespace UsurperRemake.Locations
         }
 
         /// <summary>
-        /// Get NPCs who are eligible to marry the current player (both in love)
+        /// Get NPCs who are eligible to marry the current player (both in love).
+        /// v0.63.0 slice 1: filters out blood relatives (incest gate) and dead
+        /// NPCs (audit M4 -- !IsDead was missing alongside IsAlive). The gate
+        /// duplicates PerformMarriage's refusal but hiding ineligible candidates
+        /// at the selection screen is better UX than letting the player pick
+        /// their daughter and then refusing at the altar.
         /// </summary>
         private List<NPC> GetEligibleMarriageCandidates()
         {
@@ -1097,11 +1102,18 @@ namespace UsurperRemake.Locations
             var allNPCs = NPCSpawnSystem.Instance?.ActiveNPCs ?? new List<NPC>();
             var romance = RomanceTracker.Instance;
             var loverIds = new HashSet<string>(romance.CurrentLovers.Select(l => l.NPCId));
+            var family = UsurperRemake.Systems.FamilySystem.Instance;
 
             foreach (var npc in allNPCs)
             {
-                if (!npc.IsAlive) continue;
+                if (!npc.IsAlive || npc.IsDead) continue;
                 if (npc.IsMarried) continue;
+
+                // Blood relatives can't marry the player -- hide them at selection.
+                if (family != null
+                    && UsurperRemake.Systems.FamilySystem.IsBlockingRelation(
+                        family.GetFamilyRelation(currentPlayer, npc)))
+                    continue;
 
                 // Current lovers in RomanceTracker are eligible for marriage
                 if (loverIds.Contains(npc.ID))

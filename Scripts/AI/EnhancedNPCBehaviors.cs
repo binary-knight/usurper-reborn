@@ -544,8 +544,20 @@ public static class EnhancedNPCBehaviors
         // Both must be attracted to each other
         bool npc1AttractedTo2 = profile1.IsAttractedTo(profile2.Gender);
         bool npc2AttractedTo1 = profile2.IsAttractedTo(profile1.Gender);
+        if (!(npc1AttractedTo2 && npc2AttractedTo1)) return false;
 
-        return npc1AttractedTo2 && npc2AttractedTo1;
+        // v0.63.0 slice 1: NPC-NPC incest gate. Silent (world sim shouldn't
+        // surface refusal flavor for behind-the-scenes simulation), just
+        // filters relatives out of the candidate pool so two NPCs who share
+        // a parent (siblings) or where one is the other's parent never reach
+        // "in love" via the world-sim marriage pipeline.
+        var family = UsurperRemake.Systems.FamilySystem.Instance;
+        if (family != null
+            && UsurperRemake.Systems.FamilySystem.IsBlockingRelation(
+                   family.GetFamilyRelation(npc1, npc2)))
+            return false;
+
+        return true;
     }
 
     /// <summary>
@@ -882,6 +894,19 @@ public static class EnhancedNPCBehaviors
         // Check if old spouse is dead - still process divorce but skip hostility
         bool oldSpouseIsDead = oldSpouse?.IsDead == true || oldSpouse?.IsAlive == false;
 
+        // v0.63.0 slice 4 (audit Finding 1 from relationship-reviewer M11 follow-up):
+        // route the npc<->oldSpouse marital state through RelationshipSystem.ProcessDivorce
+        // BEFORE clearing SpouseName, so the underlying RelationshipRecord moves off
+        // RelationMarried. Pre-fix only Character.SpouseName flags + NPCMarriageRegistry
+        // got cleared; the RelationshipRecord stayed at RelationMarried, and the
+        // downstream PerformMarriage at becomeSpouse=true tripped its already-married
+        // guard on the AFFAIR PARTNER who still read as "married to oldSpouse" per
+        // GetSpouseName. Affair-to-marry silently aborted in the common case.
+        if (oldSpouse != null && !oldSpouseIsDead)
+        {
+            RelationshipSystem.ProcessDivorce(npc, oldSpouse, out _);
+        }
+
         // Divorce the NPC from their current spouse
         npc.Married = false;
         npc.IsMarried = false;
@@ -904,26 +929,48 @@ public static class EnhancedNPCBehaviors
         NPCMarriageRegistry.Instance.EndMarriage(npc.ID);
         NPCMarriageRegistry.Instance.ClearAffair(npc.ID, player.ID);
 
+        // v0.63.0 slice 4 (audit m13): clear jealousy entry against the
+        // jilted spouse so ProcessJealousyConsequences doesn't keep ticking.
+        if (!string.IsNullOrEmpty(oldSpouseId))
+        {
+            RomanceTracker.Instance?.JealousyLevels.Remove(oldSpouseId);
+        }
+
         // Now handle the new relationship with the player
         if (becomeSpouse)
         {
-            // Marry the player to the NPC
-            npc.Married = true;
-            npc.IsMarried = true;
-            npc.SpouseName = player.DisplayName;
-            npc.MarriedTimes++;
+            // v0.63.0 slice 4 (audit M11): route through RelationshipSystem
+            // .PerformMarriage so the RelationshipRecord actually says
+            // RelationMarried (pre-fix the relation record stayed at lover
+            // values and AreMarried(player, npc) returned false). The
+            // standard PerformMarriage guard chain runs (incest gate,
+            // age, dead-NPC, already-married, ban, intimacy, duration);
+            // affair-marriage deliberately skips the mutual-love gate by
+            // pre-setting the relation to Marriage band so the guard passes.
+            var affairRelation = RelationshipSystem.GetOrCreateRelationship(player, npc);
+            if (affairRelation != null)
+            {
+                affairRelation.Relation1 = GameConfig.RelationLove;
+                affairRelation.Relation2 = GameConfig.RelationLove;
+                RelationshipSystem.SaveRelationship(affairRelation);
+            }
+            // Affair marriages happen without IntimacyActs gate (the affair
+            // itself consumed it earlier); satisfy the check defensively.
+            if (player.IntimacyActs < 1) player.IntimacyActs = 1;
 
-            player.Married = true;
-            player.IsMarried = true;
-            player.SpouseName = npc.Name2;
-            player.MarriedTimes++;
+            if (!RelationshipSystem.PerformMarriage(player, npc, out string _))
+            {
+                // Guard chain refused (eg incest gate on a legacy lover that
+                // turned out to be related). Fall back: don't marry, NPC
+                // walks off post-divorce. The divorce above already fired.
+                DebugLogger.Instance.LogInfo("ROMANCE",
+                    $"Affair-to-marry refused by PerformMarriage gate for {npc.Name2}");
+                return;
+            }
 
-            // Update RomanceTracker and NPCMarriageRegistry
-            RomanceTracker.Instance?.AddSpouse(npc.ID);
-            NPCMarriageRegistry.Instance?.RegisterMarriage(
-                player.ID ?? "", npc.ID, player.DisplayName, npc.Name2);
-
-            // Generate wedding news (dramatic remarriage after affair)
+            // Generate wedding news (dramatic remarriage after affair) -- the
+            // standard PerformMarriage news entry is too tame for the affair
+            // path, so emit the scandal headline on top.
             NewsSystem.Instance?.WriteNews(
                 GameConfig.NewsCategory.Marriage,
                 $"Scandal and Romance! {npc.Name2} left {oldSpouseName} and immediately married {player.Name}!"
@@ -932,15 +979,25 @@ public static class EnhancedNPCBehaviors
         }
         else
         {
-            // Become lovers instead
-            RomanceTracker.Instance?.AddLover(npc.ID, 75, false);
+            // Become lovers instead. The affair-divorce above already fired; if
+            // the lover cap refuses, NPC is now single (not the player's lover,
+            // not their old spouse's). The news entry reflects that reality.
+            bool loverAdded = RomanceTracker.Instance?.AddLover(npc.ID, 75, false) ?? false;
 
-            // Generate drama news
-            NewsSystem.Instance?.WriteNews(
-                GameConfig.NewsCategory.Marriage,
-                $"Scandal! {npc.Name2} has left {oldSpouseName} for the adventurer {player.Name}!"
-            );
-
+            if (loverAdded)
+            {
+                NewsSystem.Instance?.WriteNews(
+                    GameConfig.NewsCategory.Marriage,
+                    $"Scandal! {npc.Name2} has left {oldSpouseName} for the adventurer {player.Name}!"
+                );
+            }
+            else
+            {
+                NewsSystem.Instance?.WriteNews(
+                    GameConfig.NewsCategory.Marriage,
+                    $"Scandal! {npc.Name2} has left {oldSpouseName} after a tryst with {player.Name}, but the adventurer's heart was already too full to keep them."
+                );
+            }
         }
     }
 
@@ -1155,6 +1212,46 @@ public class NPCMarriageRegistry
     {
         var key = $"{marriedNpcId}:{seducerId}";
         affairs.TryRemove(key, out _);
+    }
+
+    /// <summary>
+    /// v0.63.0 slice 4 (audit C5): walk the affair registry for any entry
+    /// keyed on the deceased NPC's ID (as either married-NPC or seducer) and
+    /// remove it. Pre-fix, a permadied NPC's affair record persisted in the
+    /// dictionary indefinitely and surfaced in GetAffair calls from the
+    /// dialogue layer, occasionally producing dialogue choices addressing a
+    /// dead NPC. Symmetric to RomanceTracker.OnNPCPermadied which handles
+    /// player-side romance state.
+    /// </summary>
+    public void OnNPCPermadied(string npcId)
+    {
+        if (string.IsNullOrEmpty(npcId)) return;
+        try
+        {
+            int cleared = 0;
+            // Affair keys are "marriedNpcId:seducerId" so check both sides.
+            var toRemove = affairs.Keys
+                .Where(k =>
+                {
+                    var parts = k.Split(':');
+                    return parts.Length == 2 && (parts[0] == npcId || parts[1] == npcId);
+                })
+                .ToList();
+            foreach (var key in toRemove)
+            {
+                if (affairs.TryRemove(key, out _)) cleared++;
+            }
+            if (cleared > 0)
+            {
+                DebugLogger.Instance.LogInfo("ROMANCE",
+                    $"NPCMarriageRegistry.OnNPCPermadied: cleared {cleared} affair record(s) for {npcId}");
+            }
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogWarning("ROMANCE",
+                $"NPCMarriageRegistry.OnNPCPermadied failed for {npcId}: {ex.Message}");
+        }
     }
 
     /// <summary>

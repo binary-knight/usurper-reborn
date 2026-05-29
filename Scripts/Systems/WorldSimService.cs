@@ -1311,6 +1311,20 @@ namespace UsurperRemake.Systems
                     PregnancyDueDate = data.PregnancyDueDate,
                     PregnancyFatherName = data.PregnancyFatherName,
 
+                    // Lineage (v0.63.0 -- relationship completion slice 1).
+                    // Pre-v0.63.0 world_state rows restore as empty; the same
+                    // backfill pass GameEngine.RestoreNPCs runs (BackfillNPC
+                    // LineageFromChildRegistry) also fires after this restore
+                    // so online graduated children pre-v0.63.0 still get tagged.
+                    MotherName = data.MotherName ?? "",
+                    FatherName = data.FatherName ?? "",
+                    MotherID = data.MotherID ?? "",
+                    FatherID = data.FatherID ?? "",
+                    OriginalMotherName = data.OriginalMotherName ?? "",
+                    OriginalFatherName = data.OriginalFatherName ?? "",
+                    SoulAtGraduation = data.SoulAtGraduation,
+                    WasRaisedByPlayer = data.WasRaisedByPlayer,
+
                     IsMarried = data.IsMarried,
                     Married = data.Married,
                     SpouseName = data.SpouseName ?? "",

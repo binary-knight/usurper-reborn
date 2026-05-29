@@ -527,7 +527,12 @@ namespace UsurperRemake.Systems
             // factional axis.
             try
             {
-                var romance = global::UsurperRemake.Server.SessionContext.Current?.Romance;
+                // v0.63.0 slice 4 (audit M12): route through RomanceTracker.Instance
+                // which already does the SessionContext -> fallback chain. Pre-fix
+                // a direct SessionContext.Current?.Romance read returned null in
+                // any non-online context (single-player + world-sim tick + tests)
+                // and the faction-tension flavor line fired even for a Spouse.
+                var romance = global::UsurperRemake.Systems.RomanceTracker.Instance;
                 if (romance != null && !string.IsNullOrEmpty(npc.ID))
                 {
                     var rel = romance.GetRelationType(npc.ID);

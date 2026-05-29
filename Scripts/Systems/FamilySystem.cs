@@ -39,11 +39,34 @@ namespace UsurperRemake.Systems
         public void RegisterChild(Child child)
         {
             if (child == null) return;
-            if (_children.Any(c => c.BirthDate == child.BirthDate && c.MotherID == child.MotherID && c.FatherID == child.FatherID))
-                return; // Prevent duplicates
+            // v0.63.0 slice 4 (audit npc-M3): the dedup key must remain unique even
+            // when MotherID and FatherID are both empty strings. Pre-fix two children
+            // registered at the same DateTime.Now tick (eg twins, same-tick affair
+            // pregnancy) with empty parent IDs collapsed into one. Match by names
+            // as a secondary key, and Name (post-naming) as a final disambiguator.
+            bool isDuplicate = _children.Any(c =>
+                c.BirthDate == child.BirthDate
+                && c.MotherID == child.MotherID && c.FatherID == child.FatherID
+                && c.Mother == child.Mother && c.Father == child.Father
+                && c.Name == child.Name);
+            if (isDuplicate) return;
 
             _children.Add(child);
-            // GD.Print($"[Family] Registered child: {child.Name}");
+
+            // v0.63.0 follow-up: record FamilyMemberBorn in the memory of every
+            // living relative (existing parents, siblings via shared parent name).
+            // Counterpart to WorldSimulator.RecordFamilyDeath. Wrapped in try/catch
+            // because RegisterChild can fire deep in load paths where WorldSimulator
+            // singleton might not be fully initialized yet.
+            try
+            {
+                var childDisplayName = !string.IsNullOrEmpty(child.Name) ? child.Name : "a newborn";
+                WorldSimulator.Instance?.RecordFamilyBirth(childDisplayName, child.Mother, child.Father);
+            }
+            catch
+            {
+                // Memory wiring is best-effort; child registration itself succeeded.
+            }
         }
 
         /// <summary>
@@ -57,6 +80,34 @@ namespace UsurperRemake.Systems
                 !c.Deleted &&
                 (c.MotherID == parent.ID || c.FatherID == parent.ID ||
                  c.Mother == parent.Name || c.Father == parent.Name)
+            ).ToList();
+        }
+
+        /// <summary>
+        /// v0.63.0 slice 4 follow-up (audit npc-M2 / Finding 2): return only the
+        /// children CURRENTLY in this parent's custody. After divorce,
+        /// HandleDivorceCustody flips Child.MotherAccess / FatherAccess on the
+        /// losing parent (FamilySystem.HandleDivorceCustody calls
+        /// Child.HandleDivorceCustody at FamilySystem.cs:1101), but the
+        /// Child.Mother / Father name fields stay intact for lineage queries.
+        /// GetChildrenOf returns ALL biological children regardless of custody;
+        /// this helper returns only the ones the parent has access to so that
+        /// Character.Kids recompute after divorce reflects custody not lineage.
+        /// </summary>
+        public List<Child> GetCustodialChildrenOf(Character parent)
+        {
+            if (parent == null) return new List<Child>();
+            return _children.Where(c =>
+                !c.Deleted &&
+                (
+                    // Mother-side custody: Mother slot matches AND has access.
+                    (((c.MotherID == parent.ID && !string.IsNullOrEmpty(parent.ID)) || c.Mother == parent.Name)
+                        && c.MotherAccess)
+                    ||
+                    // Father-side custody: Father slot matches AND has access.
+                    (((c.FatherID == parent.ID && !string.IsNullOrEmpty(parent.ID)) || c.Father == parent.Name)
+                        && c.FatherAccess)
+                )
             ).ToList();
         }
 
@@ -75,6 +126,459 @@ namespace UsurperRemake.Systems
                   (c.FatherID == parent1.ID || c.Father == parent1.Name)))
             ).ToList();
         }
+
+        #region Family Relations and Incest Gate (v0.63.0)
+
+        // Slice 1 of relationship completion. The audit found three classes of
+        // family-tie bugs all rooted in one missing helper: nothing in the
+        // codebase could answer "is character A blood-related to character B?"
+        // ChurchLocation.GetEligibleMarriageCandidates / CastleLocation.ProposeMarriage
+        // / LoveCornerLocation.HandleMarry / RelationshipSystem.PerformMarriage
+        // / VisualNovelDialogueSystem.HandleMarriageProposal / IntimacySystem
+        // .CheckForPregnancy / EnhancedNPCBehaviors.IsCompatibleForMarriage
+        // / WorldSimulator.FindAffairPartner all needed the answer; none had it.
+        //
+        // The helper is intentionally a single chokepoint so the rule set stays
+        // consistent across all eight call sites (mirror of how AlignmentSystem
+        // .ChangeAlignment became the single source of truth in v0.57.0).
+        //
+        // Adoption policy (per the design doc decision): adopted children COUNT
+        // as blood for the incest gate. The game already treats adoption as
+        // moral parenthood (custody on divorce, alignment events, parenting
+        // scenarios). Reading the OriginalMother / OriginalFather fields lets
+        // us also catch the case where someone adopts THEIR OWN biological kid
+        // back from the orphanage and we still need to refuse marriage to them.
+        //
+        // Sibling marriage policy: HARD BLOCK for slice 1. Can soften to a
+        // Targaryen-style soft block (allow with Chivalry penalty) in a future
+        // slice if Dark playthroughs ask for it. Hard is the safer default.
+        //
+        // Self-check: included as defense in depth. PerformMarriage already
+        // checks character1 == character2 but other call sites don't.
+
+        /// <summary>
+        /// How character A is related to character B from A's perspective.
+        /// For example, Parent means "A is B's parent".
+        /// </summary>
+        public enum FamilyRelation
+        {
+            None,
+            Self,
+            Parent,
+            Child,
+            Sibling,        // shares both biological parents
+            HalfSibling,    // shares exactly one biological parent
+            Grandparent,
+            Grandchild,
+            AdoptiveParent,
+            AdoptiveChild,
+            AdoptiveSibling
+        }
+
+        /// <summary>
+        /// Returns true for relations that block marriage / intimacy / pregnancy
+        /// in the v0.63.0 slice 1 rule set. Adoption is treated as blood here
+        /// (game already treats it as moral parenthood elsewhere). Sibling
+        /// marriage is a hard block; cousins are not tracked at depth so they
+        /// pass through.
+        /// </summary>
+        public static bool IsBlockingRelation(FamilyRelation rel)
+        {
+            return rel switch
+            {
+                FamilyRelation.Self => true,
+                FamilyRelation.Parent => true,
+                FamilyRelation.Child => true,
+                FamilyRelation.Sibling => true,
+                FamilyRelation.HalfSibling => true,
+                FamilyRelation.Grandparent => true,
+                FamilyRelation.Grandchild => true,
+                FamilyRelation.AdoptiveParent => true,
+                FamilyRelation.AdoptiveChild => true,
+                FamilyRelation.AdoptiveSibling => true,
+                _ => false,
+            };
+        }
+
+        /// <summary>
+        /// Returns the family relation of a relative to character `from`, or None
+        /// if not blood-related (or adoptive-related). Handles four matchup
+        /// shapes: Player-Player, Player-NPC, NPC-Player, NPC-NPC.
+        ///
+        /// For Player-Player and Player-NPC the canonical store is the Child
+        /// registry (`_children`). For NPC-NPC we read the lineage fields on
+        /// the NPCs themselves (populated at ConvertChildToNPC / OrphanBecomesNPC
+        /// from v0.63.0; empty on legacy NPCs, which is fine -- the gate just
+        /// won't catch incest between two pre-v0.63.0 NPCs, but new-cycle
+        /// births / graduations will tag correctly going forward).
+        /// </summary>
+        public FamilyRelation GetFamilyRelation(Character a, Character b)
+        {
+            if (a == null || b == null) return FamilyRelation.None;
+
+            // Self check (defense in depth)
+            if (ReferenceEquals(a, b)) return FamilyRelation.Self;
+            if (!string.IsNullOrEmpty(a.ID) && a.ID == b.ID) return FamilyRelation.Self;
+            if (!string.IsNullOrEmpty(a.Name) && a.Name == b.Name && a.GetType() == b.GetType())
+                return FamilyRelation.Self;
+
+            // Parent-Child via Child registry (covers Player parent of any
+            // child / adult-NPC-child). Try both directions.
+            if (IsParentOfViaChildRegistry(a, b)) return FamilyRelation.Parent;
+            if (IsParentOfViaChildRegistry(b, a)) return FamilyRelation.Child;
+
+            // Parent-Child via NPC lineage fields (covers NPC parent of
+            // adult-NPC-child, both populated by ConvertChildToNPC).
+            if (a is NPC npcA && IsParentOfViaNPCLineage(b, npcA)) return FamilyRelation.Child;
+            if (b is NPC npcB && IsParentOfViaNPCLineage(a, npcB)) return FamilyRelation.Parent;
+
+            // Sibling check: both share at least one parent.
+            var aParents = GetParentNamesOf(a);
+            var bParents = GetParentNamesOf(b);
+            if (aParents.Count > 0 && bParents.Count > 0)
+            {
+                int shared = 0;
+                foreach (var p in aParents)
+                    if (!string.IsNullOrEmpty(p) && bParents.Contains(p)) shared++;
+                if (shared >= 2) return FamilyRelation.Sibling;
+                if (shared == 1) return FamilyRelation.HalfSibling;
+            }
+
+            // Grandparent / Grandchild: check if either party appears in the
+            // OTHER's grandparent set. Walk one generation up.
+            foreach (var grandparentName in GetGrandparentNamesOf(a))
+            {
+                if (!string.IsNullOrEmpty(grandparentName) &&
+                    (grandparentName == b.Name || grandparentName == GetDisplayNameOf(b)))
+                    return FamilyRelation.Grandchild;
+            }
+            foreach (var grandparentName in GetGrandparentNamesOf(b))
+            {
+                if (!string.IsNullOrEmpty(grandparentName) &&
+                    (grandparentName == a.Name || grandparentName == GetDisplayNameOf(a)))
+                    return FamilyRelation.Grandparent;
+            }
+
+            return FamilyRelation.None;
+        }
+
+        /// <summary>
+        /// Convenience: returns true if the two characters cannot marry / mate
+        /// because of a family tie. The canonical incest gate.
+        /// </summary>
+        public bool AreBloodRelated(Character a, Character b)
+        {
+            return IsBlockingRelation(GetFamilyRelation(a, b));
+        }
+
+        /// <summary>
+        /// Returns true if the given NPC is an adult child of the given parent.
+        /// Convenience for display-tagging surfaces ("(your daughter)" markers).
+        /// Matches by both ID and name to survive id-drift (v0.54.0 lesson).
+        /// </summary>
+        public bool IsAdultChildOf(NPC? npc, Character? parent)
+        {
+            if (npc == null || parent == null) return false;
+            return IsParentOfViaNPCLineage(parent, npc)
+                || IsParentOfViaChildRegistry(parent, npc);
+        }
+
+        /// <summary>
+        /// Returns all living adult NPCs whose lineage fields point at the given
+        /// parent. Combined source: NPC.MotherID/FatherID match (post-v0.63.0
+        /// data) OR Child registry has a Deleted record whose Name + BirthDate
+        /// match an active NPC (legacy heal path). De-duplicates by NPC.ID.
+        /// </summary>
+        public List<NPC> GetAdultChildrenOf(Character parent)
+        {
+            if (parent == null) return new List<NPC>();
+            var active = NPCSpawnSystem.Instance?.ActiveNPCs;
+            if (active == null || active.Count == 0) return new List<NPC>();
+
+            var seen = new HashSet<string>();
+            var results = new List<NPC>();
+
+            // Direct lineage-field match (canonical)
+            foreach (var npc in active)
+            {
+                if (npc == null || npc.IsDead) continue;
+                if (IsParentOfViaNPCLineage(parent, npc))
+                {
+                    if (seen.Add(npc.ID ?? npc.Name2 ?? ""))
+                        results.Add(npc);
+                }
+            }
+
+            // Fallback via Child registry (covers legacy saves where lineage
+            // wasn't populated at graduation). Match Deleted children to
+            // living NPCs by Name + BirthDate.
+            foreach (var child in _children.Where(c => c.Deleted && IsParentMatchOnChild(c, parent)))
+            {
+                var match = active.FirstOrDefault(n =>
+                    n != null && !n.IsDead &&
+                    n.Name2 == child.Name && n.BirthDate == child.BirthDate);
+                if (match != null && seen.Add(match.ID ?? match.Name2 ?? ""))
+                    results.Add(match);
+            }
+
+            return results;
+        }
+
+        /// <summary>
+        /// Returns a localized "(your daughter)" / "(your son)" / "(your child)"
+        /// display tag for an NPC who is the player's adult child, or "" if
+        /// not related. Sex determines pronoun; falls back to neutral "child"
+        /// if sex is unknown. Used by Talk header / examine screens / etc.
+        /// </summary>
+        public string GetChildTagFor(NPC? npc, Character? viewer)
+        {
+            if (!IsAdultChildOf(npc, viewer)) return "";
+            return npc!.Sex switch
+            {
+                CharacterSex.Female => Loc.Get("family.tag_your_daughter"),
+                CharacterSex.Male => Loc.Get("family.tag_your_son"),
+                _ => Loc.Get("family.tag_your_child"),
+            };
+        }
+
+        // ====================================================================
+        // v0.63.0 slice 3 D1: Patriarch / Matriarch standing ladder.
+        // Derived live from the player's adult children -- no new save field
+        // (Phase-2 Dread / Renown precedent in v0.62.0). Tiers escalate with
+        // count; the Bloodline tier additionally requires alignment purity
+        // (all 5+ adult children consistently virtuous or consistently evil).
+        // Each tier grants a small passive bonus surfaced on the `[%]` status
+        // sheet so the player knows what their family has bought them.
+        // ====================================================================
+
+        public enum DynastyTier
+        {
+            None,
+            Founder,           // 1+ adult children
+            Patriarch,         // 3+ adult children
+            Bloodline,         // 5+ adult children, all consistent soul alignment
+            Dynasty,           // 5+ adult children AND >= 1 NPC-NPC grandchild
+        }
+
+        /// <summary>
+        /// Compute the player's current dynasty tier from the live adult-children
+        /// set. Pure read; no mutation. Returns DynastyTier.None for players who
+        /// haven't graduated any kids yet (which is the common case for any
+        /// character below mid-game).
+        /// </summary>
+        public DynastyTier GetDynastyTier(Character parent)
+        {
+            if (parent == null) return DynastyTier.None;
+            var adults = GetAdultChildrenOf(parent);
+            int count = adults.Count;
+            if (count == 0) return DynastyTier.None;
+            if (count < 3) return DynastyTier.Founder;
+            if (count < 5) return DynastyTier.Patriarch;
+
+            // 5+ adult children: check for alignment purity (all virtuous OR all
+            // evil at graduation -- Bloodline is the "pure ___ legacy" tier).
+            bool allVirtuous = adults.All(n => n.SoulAtGraduation > 100);
+            bool allEvil = adults.All(n => n.SoulAtGraduation < -100);
+            bool pureLine = allVirtuous || allEvil;
+
+            // Dynasty requires Bloodline + at least one NPC-NPC grandchild.
+            // A grandchild lives in the Child registry as a graduated NPC whose
+            // parent name matches one of OUR adult children's display names.
+            if (pureLine && HasAnyGrandchild(adults)) return DynastyTier.Dynasty;
+            if (pureLine) return DynastyTier.Bloodline;
+
+            // 5+ adults but mixed alignment: cap at Patriarch (the legacy is
+            // muddled; a Bloodline reading of you doesn't fit).
+            return DynastyTier.Patriarch;
+        }
+
+        /// <summary>
+        /// True if any of the player's adult children has produced their OWN
+        /// child (a grandchild from the player's perspective). Walks the
+        /// Child registry; matches either by parent's display name (covers
+        /// graduated-NPC parents) or by ID. Reads NPC.MotherName / FatherName
+        /// on living adult-NPC parents too, so post-graduation NPC-NPC births
+        /// also count.
+        /// </summary>
+        private bool HasAnyGrandchild(List<NPC> myAdultChildren)
+        {
+            if (myAdultChildren == null || myAdultChildren.Count == 0) return false;
+            // Build the name set of the player's adult kids ONCE.
+            var myNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var adult in myAdultChildren)
+            {
+                if (!string.IsNullOrEmpty(adult.Name2)) myNames.Add(adult.Name2);
+                if (!string.IsNullOrEmpty(adult.Name1)) myNames.Add(adult.Name1);
+            }
+
+            // (a) Child registry: any non-deleted minor whose Mother / Father
+            // name matches one of my adult children.
+            foreach (var child in _children)
+            {
+                if (child.Deleted) continue;
+                if (!string.IsNullOrEmpty(child.Mother) && myNames.Contains(child.Mother)) return true;
+                if (!string.IsNullOrEmpty(child.Father) && myNames.Contains(child.Father)) return true;
+            }
+            // (b) Living NPC roster: any NPC whose MotherName / FatherName
+            // matches (covers the case where the grandchild has already
+            // graduated to adult-NPC status itself).
+            var active = NPCSpawnSystem.Instance?.ActiveNPCs;
+            if (active != null)
+            {
+                foreach (var npc in active)
+                {
+                    if (npc == null || npc.IsDead) continue;
+                    if (!string.IsNullOrEmpty(npc.MotherName) && myNames.Contains(npc.MotherName)) return true;
+                    if (!string.IsNullOrEmpty(npc.FatherName) && myNames.Contains(npc.FatherName)) return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Localized display name for the dynasty tier, gendered by player sex
+        /// where the language differentiates ("Patriarch" vs "Matriarch").
+        /// Returns empty string for DynastyTier.None.
+        /// </summary>
+        public string GetDynastyTierName(DynastyTier tier, CharacterSex sex)
+        {
+            if (tier == DynastyTier.None) return "";
+            // Patriarch is the only tier where the noun changes by sex.
+            if (tier == DynastyTier.Patriarch && sex == CharacterSex.Female)
+                return Loc.Get("dynasty.tier_matriarch");
+            return Loc.Get($"dynasty.tier_{tier.ToString().ToLowerInvariant()}");
+        }
+
+        /// <summary>
+        /// Per-tier passive bonuses are mostly QoL flavor (faster NPC reaction,
+        /// small discount at relevant shops). These are derived as a multiplier
+        /// the consumers query at point of use; there's no save field to drift.
+        ///   Founder:   +5% friendly-NPC starting band shift
+        ///   Patriarch: +10% friendly-NPC starting band shift
+        ///   Bloodline: +15% friendly-NPC starting band shift + small XP%
+        ///   Dynasty:   +20% friendly-NPC starting band shift + small XP% + Gold drip
+        /// Slice 3 ships the readout + the small consumer hooks for the first
+        /// two; the XP and gold drip from Bloodline / Dynasty are slice-3b polish.
+        /// </summary>
+        public int GetDynastyReactionBonus(Character parent)
+        {
+            return GetDynastyTier(parent) switch
+            {
+                DynastyTier.Founder => 5,
+                DynastyTier.Patriarch => 10,
+                DynastyTier.Bloodline => 15,
+                DynastyTier.Dynasty => 20,
+                _ => 0,
+            };
+        }
+
+        // ---- Internal helpers ----
+
+        private static bool IsParentMatchOnChild(Child child, Character parent)
+        {
+            if (child == null || parent == null) return false;
+            var name = parent.Name ?? "";
+            var id = parent.ID ?? "";
+            return (!string.IsNullOrEmpty(id) && (child.MotherID == id || child.FatherID == id))
+                || (!string.IsNullOrEmpty(name) && (child.Mother == name || child.Father == name))
+                || (!string.IsNullOrEmpty(name) && (child.OriginalMother == name || child.OriginalFather == name));
+        }
+
+        private bool IsParentOfViaChildRegistry(Character parent, Character maybeChild)
+        {
+            if (parent == null || maybeChild == null) return false;
+            // Look up the Child record for maybeChild. Match by Name + BirthDate
+            // when maybeChild is an NPC (set at graduation), else by Name only.
+            var name = GetDisplayNameOf(maybeChild);
+            if (string.IsNullOrEmpty(name)) return false;
+
+            foreach (var child in _children)
+            {
+                if (child.Name != name) continue;
+                if (maybeChild is NPC npc && npc.BirthDate != DateTime.MinValue
+                    && child.BirthDate != DateTime.MinValue
+                    && child.BirthDate != npc.BirthDate) continue;
+
+                if (IsParentMatchOnChild(child, parent)) return true;
+            }
+            return false;
+        }
+
+        private static bool IsParentOfViaNPCLineage(Character parent, NPC child)
+        {
+            if (parent == null || child == null) return false;
+            var pName = parent.Name ?? "";
+            var pId = parent.ID ?? "";
+            // Canonical fields
+            if (!string.IsNullOrEmpty(pId) && (child.MotherID == pId || child.FatherID == pId)) return true;
+            if (!string.IsNullOrEmpty(pName) && (child.MotherName == pName || child.FatherName == pName)) return true;
+            // Biological preserved fields (covers adopted-back-from-orphanage case)
+            if (!string.IsNullOrEmpty(pName) && (child.OriginalMotherName == pName || child.OriginalFatherName == pName)) return true;
+            return false;
+        }
+
+        private List<string> GetParentNamesOf(Character ch)
+        {
+            var results = new List<string>(4);
+            if (ch is NPC npc)
+            {
+                if (!string.IsNullOrEmpty(npc.MotherName)) results.Add(npc.MotherName);
+                if (!string.IsNullOrEmpty(npc.FatherName)) results.Add(npc.FatherName);
+                if (!string.IsNullOrEmpty(npc.OriginalMotherName) && !results.Contains(npc.OriginalMotherName))
+                    results.Add(npc.OriginalMotherName);
+                if (!string.IsNullOrEmpty(npc.OriginalFatherName) && !results.Contains(npc.OriginalFatherName))
+                    results.Add(npc.OriginalFatherName);
+            }
+            // Child registry view (for Players, or NPCs whose lineage wasn't backfilled)
+            var displayName = GetDisplayNameOf(ch);
+            foreach (var child in _children.Where(c => c.Name == displayName))
+            {
+                if (!string.IsNullOrEmpty(child.Mother) && !results.Contains(child.Mother)) results.Add(child.Mother);
+                if (!string.IsNullOrEmpty(child.Father) && !results.Contains(child.Father)) results.Add(child.Father);
+                if (!string.IsNullOrEmpty(child.OriginalMother) && !results.Contains(child.OriginalMother)) results.Add(child.OriginalMother);
+                if (!string.IsNullOrEmpty(child.OriginalFather) && !results.Contains(child.OriginalFather)) results.Add(child.OriginalFather);
+            }
+            return results;
+        }
+
+        private List<string> GetGrandparentNamesOf(Character ch)
+        {
+            var results = new List<string>(8);
+            var active = NPCSpawnSystem.Instance?.ActiveNPCs;
+            // For each known parent, look up THEIR parents.
+            foreach (var parentName in GetParentNamesOf(ch))
+            {
+                if (string.IsNullOrEmpty(parentName)) continue;
+
+                // Parent's own Child record (graduated NPC) carries grandparent names
+                foreach (var child in _children.Where(c => c.Name == parentName))
+                {
+                    if (!string.IsNullOrEmpty(child.Mother) && !results.Contains(child.Mother)) results.Add(child.Mother);
+                    if (!string.IsNullOrEmpty(child.Father) && !results.Contains(child.Father)) results.Add(child.Father);
+                }
+
+                // Parent's NPC lineage (if parent is a graduated NPC)
+                var parentNpc = active?.FirstOrDefault(n => n.Name2 == parentName || n.Name1 == parentName);
+                if (parentNpc != null)
+                {
+                    if (!string.IsNullOrEmpty(parentNpc.MotherName) && !results.Contains(parentNpc.MotherName))
+                        results.Add(parentNpc.MotherName);
+                    if (!string.IsNullOrEmpty(parentNpc.FatherName) && !results.Contains(parentNpc.FatherName))
+                        results.Add(parentNpc.FatherName);
+                }
+            }
+            return results;
+        }
+
+        private static string GetDisplayNameOf(Character ch)
+        {
+            if (ch == null) return "";
+            // NPCs use Name2 as display name (Name1 may be a recruit-time alias).
+            if (ch is NPC npc && !string.IsNullOrEmpty(npc.Name2)) return npc.Name2;
+            return ch.Name ?? "";
+        }
+
+        #endregion
 
         #region Child Bonuses
 
@@ -197,13 +701,41 @@ namespace UsurperRemake.Systems
             var matches = _children
                 .Where(c => !c.Deleted && (c.Mother == playerName || c.Father == playerName))
                 .ToList();
+            return DisownChildrenInner(matches, playerName, playerId: null);
+        }
 
+        /// <summary>
+        /// v0.63.0 slice 4 (audit npc-N3): ID-first overload. Pre-fix, only the
+        /// name overload existed and a renamed player or an NPC sharing the
+        /// player's display name could trip a false match. ID-first matches
+        /// the priority that the rest of the family code uses (invariant 2).
+        /// </summary>
+        public int DisownChildrenOf(Character player)
+        {
+            if (player == null) return 0;
+            string playerName = player.Name ?? "";
+            string playerId = player.ID ?? "";
+
+            var matches = _children
+                .Where(c => !c.Deleted && (
+                    (!string.IsNullOrEmpty(playerId) && (c.MotherID == playerId || c.FatherID == playerId))
+                    || c.Mother == playerName
+                    || c.Father == playerName))
+                .ToList();
+            return DisownChildrenInner(matches, playerName, playerId);
+        }
+
+        private int DisownChildrenInner(List<Child> matches, string playerName, string? playerId)
+        {
             int disowned = 0;
             int orphaned = 0;
             foreach (var child in matches)
             {
-                bool wasMother = child.Mother == playerName;
-                bool wasFather = child.Father == playerName;
+                // v0.63.0 slice 4 (audit npc-N3): ID-first match for which slot to clear.
+                bool wasMother = child.Mother == playerName
+                    || (!string.IsNullOrEmpty(playerId) && child.MotherID == playerId);
+                bool wasFather = child.Father == playerName
+                    || (!string.IsNullOrEmpty(playerId) && child.FatherID == playerId);
 
                 if (wasMother)
                 {
@@ -286,7 +818,26 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Convert a child who has come of age into an NPC
+        /// Convert a child who has come of age into an NPC.
+        ///
+        /// v0.63.0 rewrite (relationship completion slice 1) does five things
+        /// the v0.62.x version didn't:
+        ///   (1) Populates lineage fields (MotherName / FatherName / MotherID
+        ///       / FatherID / OriginalMotherName / OriginalFatherName /
+        ///       SoulAtGraduation / WasRaisedByPlayer) so the graduated NPC
+        ///       remembers who its parents were -- prerequisite for incest
+        ///       gate AND for adult-child recognition dialogue.
+        ///   (2) Sets Base* stats so RecalculateStats() doesn't zero the NPC
+        ///       on first equip / load (the C3 pre-existing bug from the
+        ///       npc-system-reviewer audit).
+        ///   (3) Adds the missing CON / WIS / DEX / MaxMana stats (C4 --
+        ///       graduated Magicians had Mana=0; graduated Clerics had WIS=0;
+        ///       INT-scaled abilities fizzled).
+        ///   (4) Disambiguates name against living NPCs to avoid silent
+        ///       Name2 collisions (the M4 finding).
+        ///   (5) Computes Experience from level (defense in depth -- if a
+        ///       future change ever bumps starting level above 1, the field
+        ///       was previously stranded at 0).
         /// </summary>
         private void ConvertChildToNPC(Child child)
         {
@@ -310,35 +861,77 @@ namespace UsurperRemake.Systems
                 ?.FirstOrDefault(n => n.Name2 == child.Name && n.BirthDate == child.BirthDate);
             if (existingAdult != null) { child.Deleted = true; return; }
 
+            // Disambiguate the display name against any living NPC. Without this,
+            // a child named "Aldric Hammerhand" graduating while an immigrant NPC
+            // of the same name already exists ends up with two NPCs sharing Name2 --
+            // RomanceTracker / NPCMarriageRegistry name-fallback lookups (per the
+            // recurring v0.54 ID-drift fix) become ambiguous.
+            string displayName = NPCSpawnSystem.Instance?.DisambiguateNPCName(child.Name) ?? child.Name;
+
+            int level = 1;
+            int strength = 10 + Random.Shared.Next(5);
+            int defence = 10 + Random.Shared.Next(5);
+            int stamina = 10 + Random.Shared.Next(5);
+            int agility = 10 + Random.Shared.Next(5);
+            int dexterity = 10 + Random.Shared.Next(5);
+            int constitution = 10 + Random.Shared.Next(5);
+            int intelligence = 10 + Random.Shared.Next(5);
+            int wisdom = 10 + Random.Shared.Next(5);
+            int charisma = 10 + Random.Shared.Next(5);
+            int maxHP = 100;
+            // Caster classes get a real mana pool; non-casters get 0.
+            int maxMana = IsCasterClass(DetermineChildClass(child)) ? 50 + intelligence * 2 : 0;
+
             // Create NPC from child
             var npc = new NPC
             {
                 // Assign unique ID (critical for relationship/family tracking)
-                ID = $"npc_{child.Name.ToLower().Replace(" ", "_")}_{Guid.NewGuid().ToString("N").Substring(0, 8)}",
-                Name1 = child.Name,
-                Name2 = child.Name,
+                ID = $"npc_{displayName.ToLower().Replace(" ", "_")}_{Guid.NewGuid().ToString("N").Substring(0, 8)}",
+                Name1 = displayName,
+                Name2 = displayName,
                 Sex = child.Sex,
                 Age = ADULT_AGE,
                 Race = DetermineChildRace(child),
                 Class = DetermineChildClass(child),
-                Level = 1,
-                HP = 100,
-                MaxHP = 100,
-                Strength = 10 + Random.Shared.Next(5),
-                Defence = 10 + Random.Shared.Next(5),
-                Stamina = 10 + Random.Shared.Next(5),
-                Agility = 10 + Random.Shared.Next(5),
-                Intelligence = 10 + Random.Shared.Next(5),
-                Charisma = 10 + Random.Shared.Next(5),
+                Level = level,
+                Experience = GameConfig.GetExperienceForLevel(level),
+                HP = maxHP,
+                MaxHP = maxHP,
+                BaseMaxHP = maxHP,
+                MaxMana = maxMana,
+                BaseMaxMana = maxMana,
+                Strength = strength,
+                BaseStrength = strength,
+                Defence = defence,
+                BaseDefence = defence,
+                Stamina = stamina,
+                BaseStamina = stamina,
+                Agility = agility,
+                BaseAgility = agility,
+                Dexterity = dexterity,
+                BaseDexterity = dexterity,
+                Constitution = constitution,
+                BaseConstitution = constitution,
+                Intelligence = intelligence,
+                BaseIntelligence = intelligence,
+                Wisdom = wisdom,
+                BaseWisdom = wisdom,
+                Charisma = charisma,
+                BaseCharisma = charisma,
                 Gold = 100,
-                Experience = 0,
                 CurrentLocation = "Main Street",
                 AI = CharacterAI.Computer,
-                BirthDate = child.BirthDate // Carry over birth date for lifecycle aging
+                BirthDate = child.BirthDate, // Carry over birth date for lifecycle aging
+                // Lineage fields (v0.63.0 slice 1)
+                MotherName = child.Mother ?? "",
+                FatherName = child.Father ?? "",
+                MotherID = child.MotherID ?? "",
+                FatherID = child.FatherID ?? "",
+                OriginalMotherName = child.OriginalMother ?? "",
+                OriginalFatherName = child.OriginalFather ?? "",
+                SoulAtGraduation = child.Soul,
+                WasRaisedByPlayer = IsParentSlotAPlayer(child)
             };
-
-            // Set HP directly since IsAlive is computed from HP
-            npc.HP = npc.MaxHP;
 
             // Inherit some traits based on soul
             if (child.Soul > 200)
@@ -357,10 +950,13 @@ namespace UsurperRemake.Systems
                 npc.Darkness = 25;
             }
 
-            // Royal blood gives bonuses
+            // Royal blood gives bonuses (apply to both Base and live -- they were
+            // already in sync from the constructor block above).
             if (child.Royal > 0)
             {
-                npc.Charisma += 10 * child.Royal;
+                int charismaBonus = 10 * child.Royal;
+                npc.Charisma += charismaBonus;
+                npc.BaseCharisma += charismaBonus;
                 npc.Gold += 1000 * child.Royal;
             }
 
@@ -404,8 +1000,37 @@ namespace UsurperRemake.Systems
 
             // Generate news
             NewsSystem.Instance?.WriteComingOfAgeNews(child.Name, child.Mother, child.Father);
+        }
 
-            // GD.Print($"[Family] Created adult NPC: {npc.Name2} ({npc.Class})");
+        /// <summary>
+        /// True if either parent slot points at a Character.ID that matches a
+        /// known player. Used to set WasRaisedByPlayer at graduation.
+        /// </summary>
+        private static bool IsParentSlotAPlayer(Child child)
+        {
+            // Match the player-ID convention used elsewhere in the codebase.
+            // Players have non-empty Character.ID that does NOT start with "npc_"
+            // (NPC IDs are prefixed). This isn't perfect for hand-edited saves
+            // but it's the same heuristic the rest of the family code uses.
+            bool motherIsPlayer = !string.IsNullOrEmpty(child.MotherID)
+                && !child.MotherID.StartsWith("npc_", StringComparison.OrdinalIgnoreCase);
+            bool fatherIsPlayer = !string.IsNullOrEmpty(child.FatherID)
+                && !child.FatherID.StartsWith("npc_", StringComparison.OrdinalIgnoreCase);
+            return motherIsPlayer || fatherIsPlayer;
+        }
+
+        /// <summary>
+        /// True if the class needs a mana pool for spells. Mirrors the gating
+        /// used by SpellSystem.HasSpells for the core spellcasting classes.
+        /// </summary>
+        private static bool IsCasterClass(CharacterClass cls)
+        {
+            return cls == CharacterClass.Magician
+                || cls == CharacterClass.Cleric
+                || cls == CharacterClass.Sage
+                || cls == CharacterClass.Paladin
+                || cls == CharacterClass.Bard
+                || cls == CharacterClass.MysticShaman;
         }
 
         /// <summary>

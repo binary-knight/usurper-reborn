@@ -102,6 +102,46 @@ public partial class NPC : Character
     /// </summary>
     public string? PregnancyFatherName { get; set; } = null;
 
+    // ========================================================================
+    // Lineage (v0.63.0 -- Slice 1 of relationship completion). Populated when
+    // a Child graduates via FamilySystem.ConvertChildToNPC or a RoyalOrphan
+    // graduates via WorldSimulator.OrphanBecomesNPC. Empty for NPCs spawned
+    // by the immigration / starting-roster path -- their parents predate
+    // simulation so we don't fabricate them.
+    //
+    // Why four fields (Mother/FatherName + Mother/FatherID): NPCs match by ID
+    // when available (post v0.54.0 fix) and fall back to display name for
+    // legacy saves and Player parents (a Player's ID is the uppercase Character
+    // .ID which may or may not match what's in the registry at any given
+    // moment). Both are persisted so the incest check works regardless.
+    //
+    // OriginalMotherName / OriginalFatherName preserve the BIOLOGICAL parents
+    // even after divorce / adoption / kidnapping. They map directly from
+    // Child.OriginalMother / Child.OriginalFather (which are themselves
+    // preserved when custody changes). The MotherName / FatherName above carry
+    // the most recent claimed parent at graduation time (usually the
+    // biological one but in the kidnap / adopt case may not be).
+    //
+    // SoulAtGraduation: the Child.Soul value at coming-of-age, snapshot for
+    // downstream "your dynasty is Good/Evil/mixed" derivations (Patriarch
+    // standing in slice 3 reads this -- in slice 1 it's just preserved so
+    // saving the NPC doesn't lose the data).
+    //
+    // WasRaisedByPlayer: convenience flag set when EITHER MotherID OR FatherID
+    // matches a Character.ID we recognize as a player at conversion time.
+    // Used by display sites that want a fast "is this one of mine?" check
+    // without re-running the full Child registry lookup every tick. Pure
+    // optimization; the canonical check is FamilySystem.IsAdultChildOf.
+    // ========================================================================
+    public string MotherName { get; set; } = "";
+    public string FatherName { get; set; } = "";
+    public string MotherID { get; set; } = "";
+    public string FatherID { get; set; } = "";
+    public string OriginalMotherName { get; set; } = "";
+    public string OriginalFatherName { get; set; } = "";
+    public int SoulAtGraduation { get; set; } = 0;
+    public bool WasRaisedByPlayer { get; set; } = false;
+
     /// <summary>
     /// What this NPC is currently doing (set by WorldSimulator each tick).
     /// Used for location presence flavor text. Examples: "nursing a drink", "examining a blade"
