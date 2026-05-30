@@ -1261,6 +1261,9 @@ namespace UsurperRemake.Systems
                     SoulAtGraduation = npc.SoulAtGraduation,
                     WasRaisedByPlayer = npc.WasRaisedByPlayer,
 
+                    // v0.64.0 Brain v2 Slice 1 cohort flag.
+                    IsAIDriven = npc.IsAIDriven,
+
                     // Dialogue tracking. v0.57.18: cap at serialization time. The
                     // database tracks every dialogue line ever delivered to this NPC
                     // with no in-memory cap — across hundreds of sessions and 130+

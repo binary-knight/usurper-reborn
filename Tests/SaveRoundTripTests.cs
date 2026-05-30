@@ -1607,6 +1607,35 @@ public class SaveRoundTripTests
     }
 
     [Fact]
+    public void NPCData_RoundTrip_PreservesIsAIDriven()
+    {
+        // v0.64.0 Brain v2 Slice 1: cohort flag selecting which AI drives this NPC.
+        // Round-trip must preserve true and false explicitly so the cohort split
+        // survives world-state reload + per-player login. Default-false on legacy
+        // NPCData (no IsAIDriven field in the JSON) is verified by the second
+        // assertion: deserialize-from-pre-v0.64.0-shaped JSON reads as false.
+        var brainAI = new NPCData { Id = "npc_imm_alice", Name = "Alice", Level = 12, IsAIDriven = true };
+        var legacy  = new NPCData { Id = "npc_bob",       Name = "Bob",   Level = 12, IsAIDriven = false };
+
+        var brainJson  = JsonSerializer.Serialize(brainAI, _jsonOptions);
+        var legacyJson = JsonSerializer.Serialize(legacy,  _jsonOptions);
+
+        var brainRestored  = JsonSerializer.Deserialize<NPCData>(brainJson,  _jsonOptions);
+        var legacyRestored = JsonSerializer.Deserialize<NPCData>(legacyJson, _jsonOptions);
+
+        brainRestored.Should().NotBeNull();
+        brainRestored!.IsAIDriven.Should().BeTrue();
+        legacyRestored.Should().NotBeNull();
+        legacyRestored!.IsAIDriven.Should().BeFalse();
+
+        // Pre-v0.64.0 saves have no IsAIDriven key at all -- must read as false.
+        var preBrainV2Json = "{\"id\":\"npc_legacy\",\"name\":\"Legacy Citizen\",\"level\":5}";
+        var preBrainV2Restored = JsonSerializer.Deserialize<NPCData>(preBrainV2Json, _jsonOptions);
+        preBrainV2Restored.Should().NotBeNull();
+        preBrainV2Restored!.IsAIDriven.Should().BeFalse();
+    }
+
+    [Fact]
     public void NPCData_RoundTrip_PreservesInventory()
     {
         // v0.57.4 (fifth-pass fix): NPC teammates — spouses, recruited citizens,

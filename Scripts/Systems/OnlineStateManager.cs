@@ -1221,6 +1221,10 @@ namespace UsurperRemake.Systems
                     MaxMana = npc.MaxMana,
                     WeapPow = npc.WeapPow,
                     ArmPow = npc.ArmPow,
+                    // v0.63.2 Fix B: persist intrinsic gear power so it
+                    // survives the RecalculateStats reset on next load.
+                    BaseWeapPow = npc.BaseWeapPow > 0 ? npc.BaseWeapPow : npc.WeapPow,
+                    BaseArmPow = npc.BaseArmPow > 0 ? npc.BaseArmPow : npc.ArmPow,
                     BaseStrength = npc.BaseStrength > 0 ? npc.BaseStrength : npc.Strength,
                     BaseDefence = npc.BaseDefence > 0 ? npc.BaseDefence : npc.Defence,
                     BaseDexterity = npc.BaseDexterity > 0 ? npc.BaseDexterity : npc.Dexterity,
@@ -1412,6 +1416,9 @@ namespace UsurperRemake.Systems
                     OriginalFatherName = npc.OriginalFatherName ?? "",
                     SoulAtGraduation = npc.SoulAtGraduation,
                     WasRaisedByPlayer = npc.WasRaisedByPlayer,
+
+                    // v0.64.0 Brain v2 Slice 1 cohort flag.
+                    IsAIDriven = npc.IsAIDriven,
 
                     // Hostility, social graph, and gang affiliation
                     IsHostile = npc.IsHostile,

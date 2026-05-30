@@ -5518,7 +5518,12 @@ public abstract class BaseLocation
             // No alignment hit (they paid in HP), no prison, no arrest text.
         }
 
-        await Task.Delay(2000);
+        // v0.63.2: was `await Task.Delay(2000)` which flashed the post-kill
+        // info (looted gold, alignment change, bounty reward, blood price,
+        // faction standing drop) off-screen before players could read it.
+        // Player report from a Lv 9 Sage bounty kill: "isn't enough time
+        // to read it all." Switched to PressAnyKey so the player paces it.
+        await terminal.PressAnyKey();
     }
     /// <summary>
     /// Apply severe consequences for non-bounty NPC murder:

@@ -20,7 +20,12 @@ public class WorldSimulator
     /// Multiplier for NPC XP gains. Default 1.0 for normal mode.
     /// Set to less than 1.0 for 24/7 world sim mode to slow NPC progression.
     /// </summary>
-    public static float NpcXpMultiplier { get; set; } = 1.0f;
+    // v0.63.2: bumped 1.0 -> 5.0 to match the DoorMode default. See DoorMode.cs
+    // for the rationale -- 14-day live telemetry showed the throttled XP
+    // economy was starving NPC progression past Lv 30. The DoorMode flag
+    // chain (`--npc-xp`) overrides this default in MUD mode; the static
+    // value only matters when WorldSimService.NpcXpMultiplier is never set.
+    public static float NpcXpMultiplier { get; set; } = 5.0f;
 
     /// <summary>
     /// SQL backend for online mode. Set by WorldSimService so NPC marketplace
@@ -70,6 +75,59 @@ public class WorldSimulator
     {
         if (string.IsNullOrEmpty(teamName)) return false;
         lock (_teamLock) { return _playerTeamNames.Contains(teamName); }
+    }
+
+    /// <summary>
+    /// v0.64.0 Brain v2 Slice 4: Tier A triage. NPCs that should route through
+    /// the real-combat NPCCombatSimulator (abilities, potions, real damage
+    /// formulas) instead of the abstract Math.Max sim. The bar is set to
+    /// roughly 50 NPCs in a 200-NPC population: named/notable + player-adjacent.
+    /// Tier B (everyone else) stays on the abstract sim -- cheap, fast,
+    /// telemetry-comparable. Throughput envelope from the combat-reviewer audit
+    /// is ~50-80 real combat runs per 60s tick; 50 NPCs * 12% team_dungeon
+    /// weight = ~6 real combats per tick at the busy band, well inside budget.
+    /// </summary>
+    public static bool IsTierANPC(NPC npc)
+    {
+        if (npc == null) return false;
+
+        // Kings are story-relevant.
+        if (npc.King) return true;
+
+        // NPCs on a player's team get real combat (their performance affects player play).
+        if (IsPlayerTeam(npc.Team)) return true;
+
+        // v0.64.0 Brain v2 Slice 7b: Court members (Royal Advisor, Spymaster,
+        // Marshal, Royal Chaplain, etc.) get real combat. These NPCs are
+        // narratively prominent and players interact with them at Castle. A
+        // court Spymaster getting killed by an abstract-sim damage trade in
+        // some random dungeon is bad theater; they deserve real combat where
+        // their abilities matter.
+        try
+        {
+            var king = CastleLocation.GetCurrentKing();
+            if (king?.CourtMembers != null && king.CourtMembers.Count > 0)
+            {
+                string npcName = npc.Name2 ?? npc.Name1 ?? "";
+                if (king.CourtMembers.Any(c => string.Equals(c.Name, npcName, StringComparison.OrdinalIgnoreCase)))
+                    return true;
+            }
+        }
+        catch
+        {
+            // CastleLocation.GetCurrentKing can throw during startup / partial
+            // restore. Fall through to remaining criteria.
+        }
+
+        // High-level NPCs (Lv 30+) get real combat. Most named/notable NPCs
+        // climb past this threshold; low-level immigrants stay on abstract sim
+        // until they earn the tier promotion.
+        if (npc.Level >= 30) return true;
+
+        // Immortals and players (shouldn't see one here, but defensive).
+        if (npc is Player) return true;
+
+        return false;
     }
 
     // NPC Sleep Cycle: tracks which NPCs are currently sleeping and where
@@ -344,11 +402,28 @@ public class WorldSimulator
             {
                 try
                 {
-                    var action = npc.Brain.DecideNextAction(worldState);
-                    ExecuteNPCAction(npc, action, worldState);
-
-                    // NPCs have a chance to do additional activities each tick
-                    ProcessNPCActivities(npc, worldState);
+                    if (npc.IsAIDriven)
+                    {
+                        // v0.64.0 Brain v2 Slice 2 + 3: goal-driven utility scorer
+                        // cohort. Brain.DecideNextAction is skipped entirely --
+                        // its 15-minute cooldown gated goal-state updates too
+                        // tightly (29/30 ticks returned Continue without running
+                        // UpdateGoals). BrainV2ProcessActivities runs the goal /
+                        // emotional / memory updates inline before scoring, so
+                        // life-event goal promotion (KilledMyParent -> Avenge,
+                        // FamilyMemberBorn -> Protect Family, LostFamilyMember ->
+                        // Mourn) fires the same tick the scorer reads goals.
+                        BrainV2ProcessActivities(npc, worldState);
+                    }
+                    else
+                    {
+                        // Legacy heuristic cohort: existing behavior preserved exactly.
+                        // Brain output runs through ExecuteNPCAction's thin handler set
+                        // and the weighted-Markov picker runs after.
+                        var action = npc.Brain.DecideNextAction(worldState);
+                        ExecuteNPCAction(npc, action, worldState);
+                        ProcessNPCActivities(npc, worldState);
+                    }
 
                     // Process NPC relationships (marriages, friendships, enemies)
                     EnhancedNPCBehaviors.ProcessNPCRelationships(npc, npcs);
@@ -592,6 +667,19 @@ public class WorldSimulator
         {
             QueueNPCForRespawn(npc.Id ?? npc.Name);
             NewsSystem.Instance.WriteDeathNews(npc.Name, killerName, location);
+        }
+
+        // v0.64.0 Brain v2 Slice 9a: dramatic LLM-rendered epitaph for Tier A
+        // NPCs (kings, court members, player-team, high-level). Commoners
+        // skip this so the news feed isn't flooded with eulogies. Fire-and-forget;
+        // posts a second news entry alongside the standard WriteDeathNews
+        // (timing: standard fires immediately, LLM epitaph lands a few
+        // seconds later if LLM is configured). When LLM is disabled or
+        // budget-exhausted, the templated fallback inside PostDeathEpitaphAsync
+        // is what posts -- a single supplemental dramatic line.
+        if (IsTierANPC(npc))
+        {
+            _ = UsurperRemake.Systems.LLMMoments.PostDeathEpitaphAsync(npc, killerName, location);
         }
 
         return permadeath;
@@ -1574,7 +1662,9 @@ public class WorldSimulator
             // True if either recorded parent ID looks like a player slot.
             WasRaisedByPlayer =
                 (!string.IsNullOrEmpty(orphan.MotherID) && !orphan.MotherID.StartsWith("npc_", StringComparison.OrdinalIgnoreCase))
-                || (!string.IsNullOrEmpty(orphan.FatherID) && !orphan.FatherID.StartsWith("npc_", StringComparison.OrdinalIgnoreCase))
+                || (!string.IsNullOrEmpty(orphan.FatherID) && !orphan.FatherID.StartsWith("npc_", StringComparison.OrdinalIgnoreCase)),
+            // v0.64.0 Brain v2 Slice 1: graduating orphans get the goal-driven AI.
+            IsAIDriven = true
         };
 
         // Soul-based alignment
@@ -2128,6 +2218,92 @@ public class WorldSimulator
         double activityChance = UsurperRemake.BBS.DoorMode.IsOnlineMode ? 0.05 : 0.15;
         if (random.NextDouble() > activityChance) return;
 
+        var activities = BuildCandidateActivities(npc);
+        if (activities.Count == 0) return;
+
+        // Legacy weighted-random pick (heuristic cohort).
+        double totalWeight = activities.Sum(a => a.weight);
+        double roll = random.NextDouble() * totalWeight;
+        double cumulative = 0;
+        string selectedAction = "move";
+        foreach (var (action, weight) in activities)
+        {
+            cumulative += weight;
+            if (roll <= cumulative)
+            {
+                selectedAction = action;
+                break;
+            }
+        }
+
+        DispatchVerb(npc, selectedAction);
+    }
+
+    /// <summary>
+    /// v0.64.0 Brain v2 Slice 2: goal-driven utility scorer cohort path. Same
+    /// player-team gate and per-tick activity gate as the legacy picker, but
+    /// instead of a weighted-random roll over the candidate set, runs
+    /// BrainV2Scorer.PickAction which adds goal alignment / need satisfaction /
+    /// recency penalty on top of the picker's modifier chain output, then
+    /// picks argmax (with personality-Impulsiveness occasional random override
+    /// for variety). DispatchVerb is shared with the legacy path so the same
+    /// activity flavor + emotional state + telemetry fire either way.
+    /// </summary>
+    private void BrainV2ProcessActivities(NPC npc, WorldState world)
+    {
+        if (IsPlayerTeam(npc.Team)) return;
+
+        double activityChance = UsurperRemake.BBS.DoorMode.IsOnlineMode ? 0.05 : 0.15;
+        if (random.NextDouble() > activityChance) return;
+
+        // v0.64.0 Brain v2 Slice 3: tick the brain's goal / emotional / memory
+        // state inline before scoring. This replaces the legacy Brain.DecideNextAction
+        // cooldown-gated update path so family-memory goal promotion (Avenge,
+        // Protect Family, Mourn) and goal completion detection fire the same
+        // tick the scorer reads them. Cheap -- only fires when the activity
+        // gate already permitted a decision, so ~5% of ticks per NPC online.
+        var brain = npc.Brain;
+        if (brain != null)
+        {
+            try
+            {
+                brain.Emotions?.Update(brain.Memory?.GetRecentEvents() ?? new List<MemoryEvent>());
+                brain.Memory?.DecayMemories();
+                brain.Goals?.UpdateGoals(npc, world, brain.Memory, brain.Emotions);
+            }
+            catch (Exception ex)
+            {
+                UsurperRemake.Systems.DebugLogger.Instance.LogError("BRAINV2",
+                    $"Brain state update failed for {npc.Name2 ?? npc.Name}: {ex.Message}");
+                // Fall through: scorer will still run on whatever goal state exists.
+            }
+        }
+
+        var activities = BuildCandidateActivities(npc);
+        if (activities.Count == 0) return;
+
+        // Brain v2 scorer adds goal / need / recency layers on top of the
+        // picker-built candidate weights, then argmaxes (Impulsiveness gates
+        // a small random-pick override for behavioral variety).
+        string selectedAction = BrainV2Scorer.PickAction(npc, activities, random);
+
+        DispatchVerb(npc, selectedAction);
+
+        // Mark for the recency layer: next tick's scorer will discount this
+        // verb based on how long ago it ran.
+        npc.Brain?.MarkActivity(selectedAction);
+    }
+
+    /// <summary>
+    /// v0.64.0 Brain v2 Slice 2: shared candidate-set builder. Walks every
+    /// supported verb, applies the gate condition (gold / HP / level / etc),
+    /// computes the base weight, then runs the modifier chain (personality,
+    /// time-of-day, memory, relationships, neighbor pressure, world events,
+    /// memes, emergent role) that mutates the list in place. Both the legacy
+    /// weighted-random picker and the Brain v2 scorer consume the output.
+    /// </summary>
+    private List<(string action, double weight)> BuildCandidateActivities(NPC npc)
+    {
         // Weight activities based on NPC state
         var activities = new List<(string action, double weight)>();
 
@@ -2218,10 +2394,13 @@ public class WorldSimulator
             activities.Add(("temple", templeWeight));
         }
 
-        // Bank visit - more likely if has gold to deposit or needs gold
-        if (npc.Gold > 1000 || (npc.BankGold > 0 && npc.Gold < 100))
+        // Bank visit - more likely if has gold to deposit or needs gold.
+        // v0.63.2 Fix F: lowered deposit threshold from 1000 to 500 so NPCs
+        // bank earlier in the wealth curve and keep more reserves out of
+        // reach of the inn / healer / pickpocket drains.
+        if (npc.Gold > 500 || (npc.BankGold > 0 && npc.Gold < 100))
         {
-            float bankWeight = 0.1f; // Base chance
+            float bankWeight = 0.15f; // base; was 0.10f, bumped to surface more often
             // Higher greed = more likely to visit bank
             if (npc.Brain?.Personality != null)
                 bankWeight += npc.Brain.Personality.Greed * 0.08f;
@@ -2342,19 +2521,32 @@ public class WorldSimulator
         }
         else
         {
-            // In a team - team activities
+            // In a team - team activities. v0.63.2: weight is level-keyed
+            // because the 14-day telemetry showed team_dungeon at 35% death
+            // rate and 0.14% win rate, almost entirely driven by the Lv 10-19
+            // band where naked-equipment NPCs can't beat the formula-driven
+            // monster damage. Lv 5-9 are now blocked entirely at Gate 0; Lv
+            // 10-29 take a heavy weight cut so they don't run dungeon attempts
+            // they can't win; Lv 30+ keep the normal weight since they have
+            // accumulated enough Base* stats to survive their floor pick.
             if (npc.HP > npc.MaxHP * 0.6)
             {
-                activities.Add(("team_dungeon", 0.12)); // Team dungeon run
+                double teamDungeonWeight;
+                if (npc.Level < 20) teamDungeonWeight = 0.03;       // was 0.12
+                else if (npc.Level < 30) teamDungeonWeight = 0.06;  // was 0.12
+                else teamDungeonWeight = 0.12;
+                activities.Add(("team_dungeon", teamDungeonWeight));
             }
             // Was 0.15; now 0.06 — once in a team, ongoing recruiting is a
             // background activity, not a primary one.
             activities.Add(("team_recruit", 0.06));
         }
 
-        if (activities.Count == 0) return;
-
-        // Apply personality-driven, time-of-day, memory, relationship, neighbor pressure, and world event weight modifiers
+        // Apply the modifier chain in place. Each modifier mutates the list,
+        // multiplying weights based on personality / time-of-day / memory /
+        // relationships / neighbor density / world events / cultural memes /
+        // emergent role. Both the legacy weighted-random picker and the Brain
+        // v2 scorer consume the same post-modifier output.
         ApplyPersonalityWeights(activities, npc);
         ApplyTimeOfDayWeights(activities);
         ApplyMemoryWeights(activities, npc);
@@ -2364,25 +2556,23 @@ public class WorldSimulator
         CulturalMemeSystem.Instance?.ApplyMemeWeights(activities, npc);
         SocialInfluenceSystem.ApplyRoleWeights(activities, npc);
 
-        // Weighted random selection
-        double totalWeight = activities.Sum(a => a.weight);
-        double roll = random.NextDouble() * totalWeight;
-        double cumulative = 0;
+        return activities;
+    }
 
-        string selectedAction = "move";
-        foreach (var (action, weight) in activities)
-        {
-            cumulative += weight;
-            if (roll <= cumulative)
-            {
-                selectedAction = action;
-                break;
-            }
-        }
-
+    /// <summary>
+    /// v0.64.0 Brain v2 Slice 2: shared verb dispatch shared by the legacy
+    /// weighted-Markov picker (ProcessNPCActivities) AND the goal-driven
+    /// utility scorer (BrainV2Scorer). Takes a verb string from either, runs
+    /// the corresponding NPC* action method through TelemetryWrap, stamps
+    /// activity flavor and emotional state. Settler snap-back enforced at the
+    /// end so settlement residents always return to the Settlement after
+    /// doing their activity. Returns nothing -- side effects only.
+    /// </summary>
+    internal void DispatchVerb(NPC npc, string verb)
+    {
         bool isSettler = SettlementSystem.Instance?.State.SettlerNames.Contains(npc.Name) == true;
 
-        switch (selectedAction)
+        switch (verb)
         {
             case "dungeon":
                 // NPCExploreDungeon has its own internal telemetry hook with
@@ -3178,7 +3368,7 @@ public class WorldSimulator
                 npc.Experience - xpBefore,
                 hpBefore,
                 npc.HP,
-                false);
+                npc.IsAIDriven);
         }
 
         // v0.61.3 self-preservation gates for team_dungeon, mirroring the
@@ -3198,7 +3388,11 @@ public class WorldSimulator
         // low end because avgLevel - 5 still floors at 1 and low-level
         // monsters punch hard relative to NPCs without gear. Block the
         // attempt entirely; let the leader find a safer action next tick.
-        if (npc.Level < 5)
+        //
+        // v0.63.2: 283k decisions over 14 days showed the Lv 8-18 band still
+        // dying at 8-10% per action, with the Lv 10-19 cohort accumulating
+        // the most team_dungeon deaths. Raise the gate from < 5 to < 10.
+        if (npc.Level < 10)
         {
             npc.UpdateLocation("Inn");
             npc.CurrentActivity = "telling the team they aren't ready yet";
@@ -3263,11 +3457,22 @@ public class WorldSimulator
         // the same low-level kit). 20+ teams keep the old pick.
         int avgLevel = (int)teamMembers.Average(m => m.Level);
         int dungeonLevel;
+        // v0.63.2: even at avgLevel - 7, the Lv 10-19 band died at 8-10% per
+        // action across 14 days of telemetry. Drop the low-band floor to
+        // avgLevel - 10 to avgLevel - 8 (was -7 to -5), giving naked-gear
+        // NPCs a real shot at completion. High-band tuning unchanged --
+        // 40+ NPCs already survive at 1-2% death rate per existing gates.
         if (avgLevel < 20)
         {
-            dungeonLevel = avgLevel - 7 + random.Next(0, 3);
+            dungeonLevel = avgLevel - 10 + random.Next(0, 3);
             // Skip Courage/Ambition bonus -- low-level teams shouldn't
             // overreach. They die when they do.
+        }
+        else if (avgLevel < 30)
+        {
+            // Lv 20-29 mid-band: less aggressive than 30+ but more than
+            // sub-20. avgLevel - 8 to avgLevel - 6.
+            dungeonLevel = avgLevel - 8 + random.Next(0, 3);
         }
         else
         {
@@ -3290,8 +3495,36 @@ public class WorldSimulator
         // Snapshot total monster HP for the partial-XP-on-loss calc below.
         long groupStartHP = monsters.Sum(m => m.HP);
 
-        // Team combat simulation
-        bool teamWon = SimulateTeamVsMonsterCombat(teamMembers, monsters, out long totalExp, out long totalGold);
+        // v0.64.0 Brain v2 Slice 4: Tier A team leaders route the whole team
+        // through real combat. The leader's Tier A status governs the whole
+        // party so a Tier A king + his 4 Lv 5 immigrant teammates all fight
+        // with abilities / potions / real damage (the team is only as
+        // sophisticated as its weakest member would otherwise be).
+        bool teamWon;
+        long totalExp;
+        long totalGold;
+        if (IsTierANPC(npc))
+        {
+            // Real-combat path. Leader is the primary; rest are teammates.
+            var leader = teamMembers[0];
+            var partyAllies = teamMembers.Skip(1).Cast<Character>().ToList();
+            var simResult = NPCCombatSimulator.Simulate(leader, monsters, partyAllies, random);
+            totalExp = simResult.ExpReward;
+            totalGold = simResult.GoldReward;
+            teamWon = simResult.Outcome == NPCCombatOutcome.Won;
+            // Sync HP/Mana/Stamina back to team members (already mutated via
+            // refs inside the simulator). MarkNPCDead for any teammate whose
+            // HP hit 0 -- the simulator just sets HP to 0; the world-sim is
+            // responsible for the permadeath cascade.
+            foreach (var member in teamMembers.Where(m => m.HP <= 0).ToList())
+            {
+                MarkNPCDead(member, 0.05f, monsters.FirstOrDefault()?.Name ?? "a monster", "the dungeon");
+            }
+        }
+        else
+        {
+            teamWon = SimulateTeamVsMonsterCombat(teamMembers, monsters, out totalExp, out totalGold);
+        }
 
         if (teamWon)
         {
@@ -3404,12 +3637,19 @@ public class WorldSimulator
             // chance bumped 55%->70% so successful flees actually stick.
             foreach (var member in team.Where(m => m.IsAlive).ToList())
             {
-                float fleeThreshold = 0.50f;
+                // v0.63.2 Fix A retune2: flee threshold dropped further to 20%
+                // baseline (10% brave, 30% cowardly). At 35% NPCs were still
+                // bailing on combats they were trading roughly 1:1 in -- the
+                // partial-credit XP path was firing (good) but no full wins.
+                // 20% means an NPC will press on through ~80% of their HP
+                // before fleeing, which is enough to claim most kills given
+                // the new Lv*6 damage floor.
+                float fleeThreshold = 0.20f;
                 var p = member.Brain?.Personality;
                 if (p != null)
                 {
-                    if (p.Courage < 0.3f) fleeThreshold = 0.60f;
-                    else if (p.Courage > 0.7f) fleeThreshold = 0.35f;
+                    if (p.Courage < 0.3f) fleeThreshold = 0.30f;
+                    else if (p.Courage > 0.7f) fleeThreshold = 0.10f;
                 }
                 if (member.HP >= member.MaxHP * fleeThreshold) continue;
 
@@ -3442,8 +3682,15 @@ public class WorldSimulator
                 var target = monsters.Where(m => m.IsAlive).OrderBy(_ => random.Next()).FirstOrDefault();
                 if (target == null) break;
 
-                // Attack calculation with team coordination bonus
-                long damage = Math.Max(1, member.Strength + member.WeapPow - target.Defence);
+                // Attack calculation with team coordination bonus.
+                // v0.63.2 Fix A: Level-scaled damage floor. Pre-fix, naked-gear
+                // NPCs (WeapPow=0) facing high-defense monsters did 1 damage
+                // per swing -- with 1000+ monster HP, combats ran 40 rounds
+                // without a kill and "completed" with 0 XP. Floor at Lv*3 so
+                // a Lv 50 NPC does at least 150 per hit regardless of gear.
+                // The additive formula still applies when gear+stats outclass
+                // the floor (high-Str well-geared NPCs hit harder).
+                long damage = Math.Max(member.Level * 6, member.Strength + member.WeapPow - target.Defence);
                 damage += random.Next(1, (int)Math.Max(2, member.WeapPow / 3));
                 damage = (long)(damage * 1.1); // 10% team coordination bonus
 
@@ -3462,10 +3709,16 @@ public class WorldSimulator
                 var target = team.Where(m => m.IsAlive && m.Location == "Dungeon").OrderBy(_ => random.Next()).FirstOrDefault();
                 if (target == null) break;
 
-                // Monster attack - slightly reduced against teams (they help each other)
+                // Monster attack - slightly reduced against teams (they help each other).
+                // v0.63.2: also halved baseline to reflect that world-sim NPCs
+                // lack player-grade defensive tools (no potion-quaffing, no
+                // mid-fight class abilities, no dodge mechanic). Without this,
+                // combat was a flat 1:1 damage trade and NPCs traded lives
+                // with monsters at a ~0% win rate.
                 long damage = Math.Max(1, monster.Strength + monster.WeapPow - target.Defence - target.ArmPow);
                 damage += random.Next(1, (int)Math.Max(2, monster.WeapPow / 3));
-                damage = (long)(damage * 0.85); // 15% damage reduction due to team support
+                damage = (long)(damage * 0.50); // sim NPCs take half monster damage
+                damage = (long)(damage * 0.85); // additional 15% from team support
 
                 // v0.61.3 Warrior sim damage reduction (team path). Stacks
                 // multiplicatively with the existing 15% team-support reduction.
@@ -3524,7 +3777,7 @@ public class WorldSimulator
                 npc.Experience - xpBefore,
                 hpBefore,
                 npc.HP,
-                false); } catch { }
+                npc.IsAIDriven); } catch { }
             throw;
         }
 
@@ -3562,7 +3815,7 @@ public class WorldSimulator
             npc.Experience - xpBefore,
             hpBefore,
             npc.HP,
-            false);
+            npc.IsAIDriven);
     }
 
     /// <summary>
@@ -3576,8 +3829,8 @@ public class WorldSimulator
         // v0.61.2 Phase 1 NPC AI telemetry: capture before-state once at entry
         // so every outcome path can log a (before, after, outcome) row to
         // npc_decision_log. Local helper centralises the write. is_ai_driven
-        // will become real in Phase 2 once Character.IsAIDriven lands; for now
-        // every NPC is heuristic so we log false.
+        // is forwarded from npc.IsAIDriven (v0.64.0 Brain v2 Slice 1) so dungeon
+        // outcomes by Brain-driven NPCs land in the AI-cohort telemetry bucket.
         string locationBefore = npc.CurrentLocation;
         long hpBefore = npc.HP;
         long goldBefore = npc.Gold;
@@ -3596,7 +3849,7 @@ public class WorldSimulator
                 npc.Experience - xpBefore,
                 hpBefore,
                 npc.HP,
-                false);
+                npc.IsAIDriven);
         }
 
         // v0.61.2 self-preservation gates. Pre-fix the world feed was full of
@@ -3652,22 +3905,71 @@ public class WorldSimulator
         var monster = MonsterGenerator.GenerateMonster(dungeonLevel);
         long monsterStartHP = monster.HP; // Snapshot for partial-XP-on-flee calc below.
 
-        // Simulate combat
+        // v0.64.0 Brain v2 Slice 4: Tier A NPCs route through the real-combat
+        // NPCCombatSimulator (abilities, potions, real damage formulas). Tier B
+        // stays on the abstract sim below. Both paths share the same outcome
+        // schema (won/fled/died/stalemate) so dashboard pivots work uniformly.
+        if (IsTierANPC(npc))
+        {
+            var simResult = NPCCombatSimulator.Simulate(npc, new List<Monster> { monster }, null, random);
+            long expGain = (long)(simResult.ExpReward * NpcXpMultiplier);
+            long goldGain = simResult.GoldReward;
+            if (expGain > 0) npc.GainExperience(expGain);
+            if (goldGain > 0) npc.GainGold(goldGain);
+
+            // Loot drop on win (same rate as abstract sim).
+            if (simResult.Outcome == NPCCombatOutcome.Won
+                && random.NextDouble() < 0.35
+                && npc.MarketInventory.Count < npc.MaxMarketInventory)
+            {
+                var loot = NPCItemGenerator.GenerateDungeonLoot(npc, dungeonLevel);
+                npc.MarketInventory.Add(loot);
+            }
+
+            // Outcome telemetry uses the existing logger with richer outcome
+            // strings so Brain v2 NPC combats land in the same dashboard as
+            // the abstract sim (just tagged is_ai_driven=true via the existing
+            // LogDungeonDecision helper above).
+            string outcome = simResult.Outcome switch
+            {
+                NPCCombatOutcome.Won => "won",
+                NPCCombatOutcome.Fled => "fled",
+                NPCCombatOutcome.Died => "died",
+                _ => "stalemate",
+            };
+            // Update location on death/flee to match abstract sim's behavior.
+            if (simResult.Outcome == NPCCombatOutcome.Died)
+            {
+                // 5% permadeath chance from a dungeon-monster kill, matching
+                // the abstract sim's typical death pressure. MarkNPCDead
+                // respects player-team protection / race-floor / story NPC
+                // exemptions internally.
+                MarkNPCDead(npc, 0.05f, monster.Name, "the dungeon");
+            }
+            else
+            {
+                npc.UpdateLocation(simResult.Outcome == NPCCombatOutcome.Won
+                    ? "Main Street" : "Healer");
+            }
+            LogDungeonDecision(outcome);
+            return;
+        }
+
+        // Simulate combat (Tier B / abstract sim path)
         int rounds = 0;
         bool npcWon = false;
 
         bool fled = false;
-        // v0.61.2: flee threshold lifted from 30% to 50% baseline. Old code
-        // also gated flee behind "rounds > 2" so an NPC took two rounds of
-        // hits before considering it -- against a Golem (high STR) two rounds
-        // was often a one-way trip. New: no rounds gate. Personality nudges
-        // the threshold: cowardly NPCs (Courage < 0.3) flee at 60%, brave
-        // NPCs (Courage > 0.7) hold to 35%.
-        float fleeThreshold = 0.50f;
+        // v0.61.2: flee threshold lifted from 30% to 50% baseline. v0.63.2
+        // retune2: dropped to 20% baseline (10% brave, 30% cowardly). At 35%
+        // NPCs were still bailing on combats they were trading roughly 1:1 in.
+        // 20% lets them fight through ~80% HP before fleeing, enough to claim
+        // most kills with the new Lv*6 damage floor.
+        float fleeThreshold = 0.20f;
         if (personality != null)
         {
-            if (personality.Courage < 0.3f) fleeThreshold = 0.60f;
-            else if (personality.Courage > 0.7f) fleeThreshold = 0.35f;
+            if (personality.Courage < 0.3f) fleeThreshold = 0.30f;
+            else if (personality.Courage > 0.7f) fleeThreshold = 0.10f;
         }
         while (npc.IsAlive && monster.IsAlive && rounds < 50)
         {
@@ -3696,8 +3998,12 @@ public class WorldSimulator
                 }
             }
 
-            // NPC attacks
-            long npcDamage = Math.Max(1, npc.Strength + npc.WeapPow - monster.Defence);
+            // NPC attacks. v0.63.2 Fix A retune2: floor at Lv*6 (was *3, then *4).
+            // Telemetry showed Lv 50 NPCs fleeing at 20% HP after 10+ rounds
+            // without finishing the kill -- damage trade was even but combat
+            // was too slow. Lv*6 gets a Lv 50 NPC to 300/swing, killing
+            // most floor-appropriate monsters in 5 rounds.
+            long npcDamage = Math.Max(npc.Level * 6, npc.Strength + npc.WeapPow - monster.Defence);
             npcDamage += random.Next(1, (int)Math.Max(1, npc.WeapPow / 2));
             monster.HP -= npcDamage;
 
@@ -3707,9 +4013,14 @@ public class WorldSimulator
                 break;
             }
 
-            // Monster attacks
-            long monsterDamage = Math.Max(1, monster.Strength + monster.WeapPow - npc.Defence);
+            // Monster attacks. v0.63.2: also halved baseline (same rationale
+            // as team path -- sim NPCs lack player-grade defensive tools, so
+            // monster damage halved to keep the trade winnable). NPCs missing
+            // ArmPow accounted for; v0.63.2 NPCs now spawn with intrinsic
+            // gear power so target.Defence already does meaningful work.
+            long monsterDamage = Math.Max(1, monster.Strength + monster.WeapPow - npc.Defence - npc.ArmPow);
             monsterDamage += random.Next(1, (int)Math.Max(1, monster.WeapPow / 2));
+            monsterDamage = (long)(monsterDamage * 0.50);
 
             // v0.61.3 Warrior sim damage reduction. Telemetry showed Warriors
             // at 0% wins / 5.5% deaths -- they survive (lots of HP) but never
@@ -4009,6 +4320,32 @@ public class WorldSimulator
             npc.BaseStrength += random.Next(1, 3);
             npc.BaseDefence += random.Next(1, 2);
 
+            // v0.63.2 Fix B: NPCs nudge their gear up on level-up so they keep
+            // pace with the dungeons they're meant to clear. Bump the Base
+            // values so the gear power survives the next RecalculateStats()
+            // call; live WeapPow/ArmPow also bumped for immediate effect.
+            npc.BaseWeapPow += 5;
+            npc.BaseArmPow += 4;
+            npc.WeapPow += 5;
+            npc.ArmPow += 4;
+
+            // v0.63.2: grant a class-keyed mana bump on level-up so casters
+            // don't stagnate at their initial spawn-time pool. Pre-v0.63.2
+            // NPCVisitMaster only incremented HP/STR/DEF; casters who leveled
+            // up gained no extra mana, eroding spell viability at high level.
+            // Bands roughly match the spawn formula's per-level scaling.
+            long manaGain = npc.Class switch
+            {
+                CharacterClass.Magician or CharacterClass.Sage => 18 + random.Next(0, 8),
+                CharacterClass.Cleric or CharacterClass.Paladin => 15 + random.Next(0, 6),
+                CharacterClass.Bard => 13 + random.Next(0, 6),
+                CharacterClass.MysticShaman => 16 + random.Next(0, 6),
+                CharacterClass.Tidesworn or CharacterClass.Wavecaller or CharacterClass.Cyclebreaker
+                    or CharacterClass.Abysswarden or CharacterClass.Voidreaver => 16 + random.Next(0, 6),
+                _ => 0
+            };
+            if (manaGain > 0) npc.BaseMaxMana += manaGain;
+
             // Recalculate all stats with equipment bonuses
             npc.RecalculateStats();
 
@@ -4087,32 +4424,28 @@ public class WorldSimulator
     {
         npc.UpdateLocation("Healer");
 
-        long healCost = (npc.MaxHP - npc.HP) * 2;
-        var (_, _, healTotalWithTax) = CityControlSystem.CalculateTaxedPrice(healCost);
-        if (npc.Gold >= healTotalWithTax && healCost > 0)
-        {
-            npc.SpendGold(healTotalWithTax);
-            CityControlSystem.Instance.ProcessSaleTax(healCost);
-            npc.HP = npc.MaxHP;
-        }
-        else if (npc.HP < npc.MaxHP)
-        {
-            // Partial heal - spend half of gold, accounting for tax
-            long canAfford = npc.Gold / 2;
-            // Work backwards from what they can afford to base cost
-            var king = CastleLocation.GetCurrentKing();
-            int totalTaxPercent = (king?.KingTaxPercent ?? 0) + (king?.CityTaxPercent ?? 0);
-            long baseCostFromAffordable = totalTaxPercent > 0 ? (canAfford * 100) / (100 + totalTaxPercent) : canAfford;
-            long hpToHeal = baseCostFromAffordable / 2;
-            if (hpToHeal > 0)
-            {
-                var (_, _, partialHealTotal) = CityControlSystem.CalculateTaxedPrice(baseCostFromAffordable);
-                npc.SpendGold(Math.Min(partialHealTotal, npc.Gold));
-                CityControlSystem.Instance.ProcessSaleTax(baseCostFromAffordable);
-                npc.HP = Math.Min(npc.HP + hpToHeal, npc.MaxHP);
-            }
-        }
+        // v0.63.2 Fix D: NPCs heal to full for a nominal cost rather than the
+        // player-grade `(MaxHP - HP) * 2` rate. Pre-fix-D a Lv 50 NPC at half
+        // HP paid 1,500g + tax to heal -- equivalent to several days of
+        // gambling wins -- which combined with the inn drain pushed NPCs
+        // toward poverty. Now heal cost is 1g per 10 HP missing (Lv 50 NPC
+        // at half HP pays ~75g), capped at a quarter of carried gold so a
+        // poor NPC still gets healed. King's tax is bypassed for NPC heals
+        // since the cost is already symbolic. Always heals to full.
+        if (npc.HP >= npc.MaxHP) return;
+
+        long missing = npc.MaxHP - npc.HP;
+        long healCost = Math.Max(1, missing / 10);
+        long affordable = Math.Min(healCost, npc.Gold / 4);
+        if (affordable > 0) npc.SpendGold(affordable);
+        npc.HP = npc.MaxHP;
     }
+
+    // Slice 1's DispatchBrainAction (translator from Brain's narrow ActionType
+    // vocabulary to picker verbs) was removed in Slice 2 -- the scorer consumes
+    // the picker's full 17-verb candidate set directly, so the translator is
+    // dead code. Git history (v0.64.0 Slice 1 commit) has the implementation if
+    // it's ever needed again.
 
     private void ExecuteNPCAction(NPC npc, NPCAction action, WorldState world)
     {
@@ -4121,23 +4454,23 @@ public class WorldSimulator
             case ActionType.Idle:
                 // NPC does nothing this turn
                 break;
-                
+
             case ActionType.Explore:
                 MoveNPCToRandomLocation(npc);
                 break;
-                
+
             case ActionType.Trade:
                 ExecuteTrade(npc, action.Target, world);
                 break;
-                
+
             case ActionType.Socialize:
                 ExecuteSocialize(npc, action.Target, world);
                 break;
-                
+
             case ActionType.Attack:
                 ExecuteAttack(npc, action.Target, world);
                 break;
-                
+
             case ActionType.Rest:
                 ExecuteRest(npc);
                 break;
@@ -4480,11 +4813,13 @@ public class WorldSimulator
         var personality = npc.Brain?.Personality;
         float roll = (float)random.NextDouble();
 
-        // Decide what to do at the bank
-        if (npc.Gold > 1000 && roll < 0.5f)
+        // Decide what to do at the bank.
+        // v0.63.2 Fix F: deposit threshold dropped 1000 -> 500 and deposit
+        // percent bumped to 60-90% (was 50-80%) so NPCs stash more aggressively
+        // and don't keep large pools exposed to ambient drains.
+        if (npc.Gold > 500 && roll < 0.6f)
         {
-            // Deposit gold (deposit 50-80% of gold on hand)
-            double depositPercent = 0.5 + (random.NextDouble() * 0.3);
+            double depositPercent = 0.6 + (random.NextDouble() * 0.3);
             long depositAmount = (long)(npc.Gold * depositPercent);
 
             npc.SpendGold(depositAmount);
@@ -4786,8 +5121,10 @@ public class WorldSimulator
     {
         npc.UpdateLocation("Dark Alley");
 
-        // Pickpocket attempt - high greed + high dex NPCs may steal
-        if (npc.Brain?.Personality != null && npc.Brain.Personality.Greed > 0.6f && random.NextDouble() < 0.15)
+        // Pickpocket attempt - high greed + high dex NPCs may steal.
+        // v0.63.2 Fix E: bumped trigger 15% -> 25% and rewards scaled higher
+        // so the alley becomes a real income source instead of pocket change.
+        if (npc.Brain?.Personality != null && npc.Brain.Personality.Greed > 0.5f && random.NextDouble() < 0.25)
         {
             var victims = npcs
                 .Where(n => n.IsAlive && n.ID != npc.ID && n.CurrentLocation == "Dark Alley" && n.Gold > 100)
@@ -4796,7 +5133,7 @@ public class WorldSimulator
             if (victims.Any())
             {
                 var victim = victims[random.Next(victims.Count)];
-                long stolen = Math.Min(victim.Gold / 10, 50 + npc.Level * 5);
+                long stolen = Math.Min(victim.Gold / 8, 100 + npc.Level * 10);
                 if (stolen > 0)
                 {
                     victim.SpendGold(stolen);
@@ -4808,14 +5145,63 @@ public class WorldSimulator
             }
         }
 
-        // Fence stolen goods - sell inventory items at shady prices
-        if (npc.MarketInventory.Count > 0 && random.NextDouble() < 0.20)
+        // v0.63.2 Fix E: standalone "found coin pouch" income for any NPC at
+        // the alley regardless of personality. Models the loose-coin discovery
+        // + petty-theft-of-strangers that wasn't being represented when there
+        // was no other victim NPC in the alley at the same tick. Modest level-
+        // scaled payout so the alley produces baseline income even for non-
+        // Greed NPCs who'd never pickpocket.
+        if (random.NextDouble() < 0.15)
+        {
+            long found = 20 + npc.Level * 3 + random.Next(npc.Level * 2);
+            npc.Gold += found;
+        }
+
+        // Fence stolen goods - sell inventory items at shady prices.
+        // v0.63.2 Fix E: trigger 20% -> 30%, fence rate 33% -> 45% so the
+        // payout for actually fencing something feels worth it.
+        if (npc.MarketInventory.Count > 0 && random.NextDouble() < 0.30)
         {
             var item = npc.MarketInventory[random.Next(npc.MarketInventory.Count)];
-            long fencePrice = Math.Max(10, item.Value / 3); // Fence pays 33%
+            long fencePrice = Math.Max(20, (long)(item.Value * 0.45));
             npc.Gold += fencePrice;
             npc.MarketInventory.Remove(item);
             npc.Darkness += 1;
+        }
+
+        // v0.63.2: Spot-the-Mark gambling. v0.63.2 Fix E retune: WIS-keyed win
+        // chance bumped to 40-75% (was 35-65%) and payout to 1.5-2.5x (was
+        // 1.3-2.0x). Net expected value now positive for any NPC -- the alley
+        // is a real income lane, not a slow grind down to zero.
+        if (npc.Gold > 50 && random.NextDouble() < 0.30)
+        {
+            float greedFactor = npc.Brain?.Personality?.Greed ?? 0.5f;
+            long bet = (long)(npc.Gold * (0.05 + greedFactor * 0.15));
+            bet = Math.Clamp(bet, 10, 2000);
+
+            int winChance = 40 + (int)Math.Min(35L, npc.Wisdom / 2);
+            if (random.Next(100) < winChance)
+            {
+                long winnings = (long)(bet * (1.5 + random.NextDouble() * 1.0)); // 1.5-2.5x payout
+                npc.Gold += winnings;
+            }
+            else
+            {
+                npc.SpendGold(bet);
+                npc.Darkness += 1; // each loss is a small darkness tick
+            }
+        }
+
+        // v0.63.2: Mugging gone wrong. 4% chance of a violent confrontation
+        // that costs the NPC HP. Capped at 25% MaxHP per incident -- the sim
+        // is supposed to drain NPCs occasionally, not kill them off in town.
+        // Cowardly NPCs (low Courage) take less damage (they run sooner).
+        if (random.NextDouble() < 0.04)
+        {
+            float courage = npc.Brain?.Personality?.Courage ?? 0.5f;
+            int hpLoss = (int)(npc.MaxHP * (0.05 + random.NextDouble() * 0.20) * (1.2f - courage * 0.5f));
+            hpLoss = Math.Clamp(hpLoss, 5, (int)(npc.MaxHP * 0.25));
+            npc.HP = Math.Max(1, npc.HP - hpLoss); // floor at 1 -- this is a town shake-down, not a death
         }
 
         // Meet other shady NPCs
@@ -4845,11 +5231,31 @@ public class WorldSimulator
             npc.HP = Math.Min(npc.HP + healing, npc.MaxHP);
         }
 
-        // Pay for drinks
-        if (npc.Gold > 20)
+        // Pay for drinks. v0.63.2 Fix C: dramatically reduced from earlier
+        // v0.63.2 tuning. Telemetry showed sociable NPCs were running 60-100g
+        // tabs per inn visit, with inn = 19% of all actions. Over a week per
+        // NPC = ~hundreds of gold drained, faster than any income source
+        // could replenish. New: 5-15g base tab, max +10g Sociability scaling,
+        // and only fires if NPC has > 200g (poor NPCs skip the tab rather
+        // than getting deeper underwater).
+        if (npc.Gold > 200)
         {
-            long drinkCost = 5 + random.Next(15);
+            float socialFactor = npc.Brain?.Personality?.Sociability ?? 0.5f;
+            long drinkCost = (long)(5 + random.Next(10) + socialFactor * 10);
+            drinkCost = Math.Min(drinkCost, npc.Gold / 20); // cap at 5% of gold
             npc.SpendGold(drinkCost);
+        }
+
+        // v0.63.2 Fix C: Drinking too much. 4% chance (was 6%). HP penalty
+        // (alcohol poisoning), small extra gold loss. Pre-fix-C the extraTab
+        // could hit 200g per event which was inflating the gold drain. Now
+        // capped at 30g max and only fires if NPC has > 100g.
+        if (npc.Gold > 100 && random.NextDouble() < 0.04)
+        {
+            int hpLoss = (int)(npc.MaxHP * (0.03 + random.NextDouble() * 0.12));
+            npc.HP = Math.Max(1, npc.HP - hpLoss);
+            long extraTab = Math.Min(npc.Gold / 20, 10 + random.Next(20));
+            npc.SpendGold(extraTab);
         }
 
         // Socialize - meet other NPCs at the inn
@@ -4862,8 +5268,25 @@ public class WorldSimulator
             var other = otherNPCs[random.Next(otherNPCs.Count)];
             RelationshipSystem.UpdateRelationship(npc, other, 2, 0, false);
 
+            // v0.63.2: Inn brawl. 5% chance a social interaction at the Inn
+            // turns into a fistfight. Both NPCs take HP damage; the one with
+            // lower Sociability and higher Aggression loses more. Capped at
+            // 18% MaxHP so it's a black eye, not a coffin. Generates real
+            // outcome variance in inn telemetry (previously: 0 HP changes,
+            // 0 gold changes, 0 deaths -- pure null).
+            if (random.NextDouble() < 0.05)
+            {
+                float npcAggro = npc.Brain?.Personality?.Aggression ?? 0.5f;
+                float otherAggro = other.Brain?.Personality?.Aggression ?? 0.5f;
+                int npcLoss = (int)(npc.MaxHP * (0.04 + random.NextDouble() * 0.14) * (0.5f + otherAggro));
+                int otherLoss = (int)(other.MaxHP * (0.04 + random.NextDouble() * 0.14) * (0.5f + npcAggro));
+                npc.HP = Math.Max(1, npc.HP - Math.Clamp(npcLoss, 5, (int)(npc.MaxHP * 0.18)));
+                other.HP = Math.Max(1, other.HP - Math.Clamp(otherLoss, 5, (int)(other.MaxHP * 0.18)));
+                RelationshipSystem.UpdateRelationship(npc, other, -3, 0, false);
+                NewsSystem.Instance?.Newsy(false, $"{npc.Name} and {other.Name} traded blows at the Inn before the keeper threw them out.");
+            }
             // Gossip at the inn (small chance)
-            if (random.NextDouble() < 0.10)
+            else if (random.NextDouble() < 0.10)
             {
                 NewsSystem.Instance?.Newsy(false, $"{npc.Name} and {other.Name} shared drinks and gossip at the Inn.");
             }
@@ -4951,8 +5374,9 @@ public class WorldSimulator
         {
             rounds++;
 
-            // Attacker strikes
-            long attackDamage = Math.Max(1, npc.Strength + npc.WeapPow - target.Defence);
+            // Attacker strikes. v0.63.2 Fix A: Lv-scaled damage floor so naked
+            // NPCs don't get stuck doing 1 damage per round in NPC-vs-NPC fights.
+            long attackDamage = Math.Max(npc.Level * 3, npc.Strength + npc.WeapPow - target.Defence);
             attackDamage += random.Next(1, (int)Math.Max(2, npc.WeapPow / 3));
             target.TakeDamage(attackDamage);
             totalDamageToTarget += attackDamage;
@@ -4960,7 +5384,7 @@ public class WorldSimulator
             if (!target.IsAlive) break;
 
             // Defender strikes back
-            long defenderDamage = Math.Max(1, target.Strength + target.WeapPow - npc.Defence);
+            long defenderDamage = Math.Max(target.Level * 3, target.Strength + target.WeapPow - npc.Defence);
             defenderDamage += random.Next(1, (int)Math.Max(2, target.WeapPow / 3));
             npc.TakeDamage(defenderDamage);
             totalDamageToAttacker += defenderDamage;

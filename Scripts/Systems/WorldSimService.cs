@@ -1273,17 +1273,45 @@ namespace UsurperRemake.Systems
                     HP = data.HP,
                     MaxHP = data.MaxHP,
                     BaseMaxHP = data.BaseMaxHP > 0 ? data.BaseMaxHP : data.MaxHP,
-                    BaseMaxMana = data.BaseMaxMana > 0 ? data.BaseMaxMana : data.MaxMana,
+                    // v0.63.2: heal-on-load. Pre-v0.63.2 immigrant spawn only set
+                    // mana for Magician / Sage / Cleric / Paladin -- Bards /
+                    // MysticShamans / prestige classes spawned with baseMaxMana = 0
+                    // and their spells fizzled forever. If the persisted data has
+                    // a 0 baseMaxMana but the class is a caster, fix it now using
+                    // the canonical formula. Pure-stamina classes (Warrior /
+                    // Barbarian / Ranger / Assassin / Jester / Alchemist) keep
+                    // their 0 mana correctly.
+                    BaseMaxMana = data.BaseMaxMana > 0 ? data.BaseMaxMana
+                        : (data.MaxMana > 0 ? data.MaxMana : NPCSpawnSystem.GetBaseMaxManaForClass(data.Class, data.Level)),
                     CurrentLocation = data.Location,
                     Experience = data.Experience,
                     Strength = data.Strength,
                     Defence = data.Defence,
                     Agility = data.Agility,
                     Dexterity = data.Dexterity,
-                    Mana = data.Mana,
-                    MaxMana = data.MaxMana,
-                    WeapPow = data.WeapPow,
-                    ArmPow = data.ArmPow,
+                    // v0.63.2: heal live Mana/MaxMana the same way as BaseMaxMana
+                    // above. If persisted live mana is 0 but the class is a caster,
+                    // fall back to the canonical formula so the NPC can actually
+                    // cast on the next action. Non-caster classes stay at 0.
+                    Mana = data.Mana > 0 ? data.Mana
+                        : NPCSpawnSystem.GetBaseMaxManaForClass(data.Class, data.Level),
+                    MaxMana = data.MaxMana > 0 ? data.MaxMana
+                        : NPCSpawnSystem.GetBaseMaxManaForClass(data.Class, data.Level),
+                    // v0.63.2 Fix B heal-on-load: existing live NPCs spawned
+                    // with WeapPow=ArmPow=0 (NPCSpawnSystem pre-fix never
+                    // initialized them). Backfill BOTH live and Base fields
+                    // using the spawn formula. Without the Base fields,
+                    // RecalculateStats() will reset WeapPow/ArmPow back to 0
+                    // on the next call (since NPCs have no equipped items
+                    // to rebuild from).
+                    WeapPow = data.BaseWeapPow > 0 ? data.BaseWeapPow
+                        : (data.WeapPow > 0 ? data.WeapPow : data.Level * 5),
+                    ArmPow = data.BaseArmPow > 0 ? data.BaseArmPow
+                        : (data.ArmPow > 0 ? data.ArmPow : data.Level * 4),
+                    BaseWeapPow = data.BaseWeapPow > 0 ? data.BaseWeapPow
+                        : (data.WeapPow > 0 ? data.WeapPow : data.Level * 5),
+                    BaseArmPow = data.BaseArmPow > 0 ? data.BaseArmPow
+                        : (data.ArmPow > 0 ? data.ArmPow : data.Level * 4),
                     BaseStrength = data.BaseStrength > 0 ? data.BaseStrength : data.Strength,
                     BaseDefence = data.BaseDefence > 0 ? data.BaseDefence : data.Defence,
                     BaseDexterity = data.BaseDexterity > 0 ? data.BaseDexterity : data.Dexterity,
@@ -1324,6 +1352,9 @@ namespace UsurperRemake.Systems
                     OriginalFatherName = data.OriginalFatherName ?? "",
                     SoulAtGraduation = data.SoulAtGraduation,
                     WasRaisedByPlayer = data.WasRaisedByPlayer,
+
+                    // v0.64.0 Brain v2 Slice 1 cohort flag (default false on legacy saves).
+                    IsAIDriven = data.IsAIDriven,
 
                     IsMarried = data.IsMarried,
                     Married = data.Married,

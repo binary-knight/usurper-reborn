@@ -34,6 +34,52 @@ public enum NPCActionType
 public partial class NPC : Character
 {
     // NPC-specific properties
+    // v0.64.0 Brain v2 Slice 9b: cache for the LLM-generated personality
+    // summary shown on first-contact (Team Corner examine, dialogue intro).
+    // Generated lazily by LLMMoments.GeneratePersonalitySummaryAsync; cleared
+    // on major personality shift (not currently triggered; Slice 9b ships
+    // permanent caching). Transient -- not saved; regenerated on demand.
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string? PersonalitySummaryCache { get; set; }
+
+    // v0.64.0 Brain v2 Slice 11a: per-NPC cache of LLM-rendered dialogue
+    // flavor lines, keyed by `{layer}|{tone}` (e.g. "mood_anger|Negative").
+    // DialogueEnhancer's sync rendering path consults this first; on a miss
+    // it returns the existing localized template AND kicks a background
+    // Task.Run to generate the LLM variant. Subsequent enhances of the same
+    // (layer, tone) for this NPC use the cached value -- a player who chats
+    // the same NPC twice in a session sees the personalized voice from the
+    // second exchange onward. Transient (JsonIgnore) so server restarts
+    // re-warm naturally, no save bloat.
+    [System.Text.Json.Serialization.JsonIgnore]
+    public System.Collections.Generic.Dictionary<string, string>? LLMDialogueFlavorCache { get; set; }
+
+    // In-flight guard so multiple Enhance() hits while one generation is
+    // already queued don't fire N parallel HTTP calls for the same key.
+    [System.Text.Json.Serialization.JsonIgnore]
+    public System.Collections.Generic.HashSet<string>? LLMDialogueFlavorInFlight { get; set; }
+
+    // v0.64.0 Brain v2 Slice 12a: per-NPC throttle state for the LLM
+    // strategic-goal refresh. The refresh adds 1-3 long-arc personality-
+    // driven goals to the NPC's goal stack alongside the existing reactive
+    // goals (heal, earn money, become ruler). Throttled to once per
+    // wall-clock window (default 6 hours) to keep cost bounded -- the
+    // reactive system covers short-term necessity, the LLM goals shape
+    // long-arc trajectory.
+    //
+    // LastLLMGoalRefreshUtc: when the most recent refresh fired (DateTime.MinValue
+    //   means never -- triggers immediate refresh on first eligible tick).
+    // LLMGoalRefreshInFlight: prevents two concurrent ticks from kicking
+    //   parallel HTTP calls for the same NPC.
+    // Both transient (JsonIgnore) -- restart re-evaluates the refresh
+    // window naturally and the existing LLM goals (un-tagged after restart
+    // because IsLLMGenerated is also JsonIgnore) decay/complete normally.
+    [System.Text.Json.Serialization.JsonIgnore]
+    public System.DateTime LastLLMGoalRefreshUtc { get; set; } = System.DateTime.MinValue;
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool LLMGoalRefreshInFlight { get; set; }
+
     public NPCBrain? Brain { get; set; }
     public PersonalityProfile? Personality { get; set; }
     public MemorySystem? Memory { get; set; }
@@ -258,20 +304,26 @@ public partial class NPC : Character
         // Create personality based on archetype (only if not already set, e.g., from save restoration)
         Personality ??= PersonalityProfile.GenerateForArchetype(Archetype);
 
-        // Initialize memory system
-        Memory ??= new MemorySystem();
-
-        // Initialize relationship manager
-        Relationships ??= new RelationshipManager();
-
-        // Initialize emotional state
-        EmotionalState ??= new EmotionalState();
-
-        // Initialize goal system (stubbed dependency injection for now)
-        Goals ??= new GoalSystem(Personality);
-
-        // Create brain with minimal required parameters
+        // v0.64.0 Brain v2 Slice 7a: create Brain first so its internal subsystems
+        // (Memory, Goals, EmotionalState, RelationshipManager) can serve as the
+        // single source of truth. Pre-fix these were initialized as separate
+        // instances on the NPC AND inside the Brain constructor, producing two
+        // parallel sets that diverged invisibly: world-sim picker dispatch writes
+        // to npc.EmotionalState while DialogueEnhancer reads from npc.Brain.Emotions,
+        // and never saw each other's writes. The npc-system-reviewer audit flagged
+        // this as "well-shaped, under-read" without noticing the parallel-instance
+        // bug. Aliasing here unifies the storage.
         Brain ??= new NPCBrain(this, Personality);
+
+        // Alias the per-NPC convenience fields to the Brain's internal instances.
+        // Uses ??= so save-restored state survives (GameEngine.RestoreNPCs may have
+        // populated Memory/Goals/EmotionalState/Relationships directly from save
+        // data on legacy saves; on Brain v2 saves only Brain.Memory etc are persisted
+        // and the NPC fields stay null until this alias step).
+        Memory ??= Brain.Memory;
+        Relationships ??= Brain.Relationships;
+        EmotionalState ??= Brain.Emotions;
+        Goals ??= Brain.Goals;
 
         // Check if this is a special Pascal NPC
         CheckForSpecialNPC();

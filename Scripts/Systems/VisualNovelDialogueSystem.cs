@@ -2132,7 +2132,10 @@ namespace UsurperRemake.Systems
 
             await Task.Delay(1500);
 
-            // Calculate acceptance chance based on relationship and personality
+            // Calculate acceptance chance based on relationship and personality.
+            // This still computes -- it's the deterministic fallback the LLM
+            // fork below routes to when the LLM is unavailable / times out /
+            // returns an unparseable response.
             var profile = npc.Brain?.Personality;
             float commitment = profile?.Commitment ?? 0.5f;
             float romanticism = profile?.Romanticism ?? 0.5f;
@@ -2150,7 +2153,39 @@ namespace UsurperRemake.Systems
 
             float roll = (float)random.NextDouble();
 
-            if (roll < acceptChance)
+            // v0.64.0 Brain v2 Slice 12b: LLM-arbitrated dramatic fork.
+            // When LLM is active and online, the NPC makes a character-driven
+            // decision (accept / hesitate / refuse) grounded in their full
+            // personality + relationship history rather than a pure random
+            // roll against the computed acceptChance. The roll above is still
+            // used as the deterministic fallback for LLM-disabled / single-
+            // player / BBS / timeout / parse-error cases.
+            //
+            // Forks block on the LLM response (~2-3s typical) because the
+            // decision is needed NOW; the player is on a UI screen waiting
+            // for the NPC's answer. Acceptable latency for a one-shot
+            // narrative moment of this weight.
+            int heuristicChoice = roll < acceptChance ? 0
+                                : roll < acceptChance + 0.25f ? 1
+                                : 2;
+            string proposalSituation =
+                $"{player.Name} has just proposed marriage. " +
+                $"Your relationship sits at level {relationLevel} (lower numbers mean deeper love). " +
+                $"Your Commitment trait is {commitment:F2}, Romanticism is {romanticism:F2}, " +
+                $"and the proposal landed with charisma modifier {charismaModifier:+0.00;-0.00;0.00}. " +
+                $"The heuristic acceptance chance was {acceptChance:P0}. " +
+                $"Decide how YOU, this specific NPC, respond.";
+            var proposalChoices = new System.Collections.Generic.List<string>
+            {
+                "Say YES -- accept the proposal and marry them.",
+                "Hesitate -- say you're not ready yet, but stay open to the future.",
+                "Refuse -- pull away and decline the proposal.",
+            };
+            int proposalChoice = await UsurperRemake.Systems.LLMMoments.DecideForkAsync(
+                npc, "marriage_proposal", proposalSituation, proposalChoices,
+                deterministicFallback: heuristicChoice, System.Threading.CancellationToken.None);
+
+            if (proposalChoice == 0)
             {
                 // They say yes!
                 terminal.SetColor("yellow");
@@ -2169,7 +2204,7 @@ namespace UsurperRemake.Systems
                 // Wedding ceremony
                 await PerformWeddingCeremony(npc);
             }
-            else if (roll < acceptChance + 0.25f)
+            else if (proposalChoice == 1)
             {
                 // Not ready yet
                 terminal.SetColor("yellow");

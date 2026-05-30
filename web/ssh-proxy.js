@@ -1776,6 +1776,160 @@ async function handleBalanceRequest(req, res) {
     return true;
   }
 
+  // GET /api/balance/llm-stats
+  // v0.64.0 Brain v2 Slice 10 LLM telemetry surface. Returns aggregates from
+  // the llm_usage table for the balance dashboard's LLM card -- success rate,
+  // tokens used today, estimated cost, breakdown by moment type, recent
+  // rendered outputs for spot-checking. Cost model assumes Sonnet 4.6 pricing
+  // (configurable later); falls back gracefully if the table doesn't exist
+  // yet (pre-v0.64.0 db).
+  if (method === 'GET' && url === '/api/balance/llm-stats') {
+    try {
+      // Detect whether the table exists (deploys before v0.64.0 game binary won't have it).
+      const tableCheck = db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='llm_usage'`).get();
+      if (!tableCheck) {
+        sendJson(res, 200, {
+          tableExists: false,
+          message: 'llm_usage table not yet created (game binary < v0.64.0 OR no LLM calls have fired yet)'
+        });
+        return true;
+      }
+
+      // Overview cards
+      const totals24h = db.prepare(`
+        SELECT
+          COUNT(*) AS total_calls,
+          SUM(CASE WHEN succeeded = 1 THEN 1 ELSE 0 END) AS successes,
+          SUM(CASE WHEN succeeded = 0 THEN 1 ELSE 0 END) AS fallbacks,
+          COALESCE(SUM(prompt_tokens), 0) AS prompt_tokens,
+          COALESCE(SUM(completion_tokens), 0) AS completion_tokens,
+          COALESCE(SUM(total_tokens), 0) AS total_tokens,
+          COALESCE(ROUND(AVG(response_ms), 0), 0) AS avg_response_ms
+        FROM llm_usage
+        WHERE created_at >= datetime('now', '-24 hours')
+      `).get();
+
+      const totalsToday = db.prepare(`
+        SELECT
+          COUNT(*) AS total_calls,
+          SUM(CASE WHEN succeeded = 1 THEN 1 ELSE 0 END) AS successes,
+          COALESCE(SUM(total_tokens), 0) AS total_tokens
+        FROM llm_usage
+        WHERE date(created_at) = date('now')
+      `).get();
+
+      const allTime = db.prepare(`
+        SELECT
+          COUNT(*) AS total_calls,
+          COALESCE(SUM(total_tokens), 0) AS total_tokens
+        FROM llm_usage
+      `).get();
+
+      // Cost estimate: Sonnet 4.6 pricing as of 2026 ($3/M prompt, $15/M completion).
+      // If the deployed model is Haiku or gpt-4o-mini the actual cost is lower;
+      // this is a worst-case-Sonnet upper bound for the dashboard.
+      const costToday = ((totals24h.prompt_tokens * 3.0 + totals24h.completion_tokens * 15.0) / 1_000_000).toFixed(4);
+      const dailyTokenCap = 500000; // matches LLMSettings default; sysop can override via env var
+
+      // Breakdown by moment type (last 24h)
+      const byMoment = db.prepare(`
+        SELECT
+          moment_type,
+          COUNT(*) AS total,
+          SUM(CASE WHEN succeeded = 1 THEN 1 ELSE 0 END) AS successes,
+          COALESCE(SUM(total_tokens), 0) AS tokens,
+          COALESCE(ROUND(AVG(response_ms), 0), 0) AS avg_ms
+        FROM llm_usage
+        WHERE created_at >= datetime('now', '-24 hours')
+        GROUP BY moment_type
+        ORDER BY total DESC
+      `).all();
+
+      // Failure reasons (last 24h, only failures)
+      const failures = db.prepare(`
+        SELECT
+          failure_reason,
+          COUNT(*) AS n
+        FROM llm_usage
+        WHERE created_at >= datetime('now', '-24 hours')
+          AND succeeded = 0
+          AND failure_reason IS NOT NULL
+        GROUP BY failure_reason
+        ORDER BY n DESC
+        LIMIT 10
+      `).all();
+
+      // Recent successful renders for spot-checking (last 10)
+      const recentRenders = db.prepare(`
+        SELECT
+          datetime(created_at, 'localtime') AS t,
+          moment_type,
+          npc_name,
+          total_tokens,
+          response_ms,
+          rendered_text
+        FROM llm_usage
+        WHERE succeeded = 1
+        ORDER BY id DESC
+        LIMIT 10
+      `).all();
+
+      const successRate24h = totals24h.total_calls > 0
+        ? (totals24h.successes * 100 / totals24h.total_calls).toFixed(1)
+        : '0.0';
+
+      sendJson(res, 200, {
+        tableExists: true,
+        last24h: {
+          totalCalls: totals24h.total_calls,
+          successes: totals24h.successes,
+          fallbacks: totals24h.fallbacks,
+          successRatePct: successRate24h,
+          promptTokens: totals24h.prompt_tokens,
+          completionTokens: totals24h.completion_tokens,
+          totalTokens: totals24h.total_tokens,
+          avgResponseMs: totals24h.avg_response_ms,
+          estCostUSD: costToday,
+        },
+        today: {
+          totalCalls: totalsToday.total_calls,
+          successes: totalsToday.successes,
+          totalTokens: totalsToday.total_tokens,
+          dailyTokenCap: dailyTokenCap,
+          tokensRemaining: dailyTokenCap - totalsToday.total_tokens,
+          pctOfCap: dailyTokenCap > 0 ? (totalsToday.total_tokens * 100 / dailyTokenCap).toFixed(1) : '0.0',
+        },
+        allTime: {
+          totalCalls: allTime.total_calls,
+          totalTokens: allTime.total_tokens,
+        },
+        byMomentType: byMoment.map(r => ({
+          momentType: r.moment_type,
+          total: r.total,
+          successes: r.successes,
+          successRatePct: r.total > 0 ? (r.successes * 100 / r.total).toFixed(1) : '0.0',
+          tokens: r.tokens,
+          avgMs: r.avg_ms,
+        })),
+        failures: failures.map(r => ({
+          reason: r.failure_reason,
+          count: r.n,
+        })),
+        recentRenders: recentRenders.map(r => ({
+          time: r.t,
+          momentType: r.moment_type,
+          npcName: r.npc_name,
+          tokens: r.total_tokens,
+          ms: r.response_ms,
+          text: r.rendered_text,
+        })),
+      });
+    } catch (e) {
+      sendJson(res, 500, { error: e.message });
+    }
+    return true;
+  }
+
   sendJson(res, 404, { error: 'Not found' });
   return true;
 }

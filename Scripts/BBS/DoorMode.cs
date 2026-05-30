@@ -26,7 +26,15 @@ namespace UsurperRemake.BBS
         private static bool _worldSimMode = false;
         private static bool _noAutoWorldSim = false; // Disable embedded worldsim in BBS online mode
         private static int _simIntervalSeconds = 60;
-        private static float _npcXpMultiplier = 0.25f;
+        // v0.63.2: bumped 0.25 -> 5.0 after 14-day live telemetry showed NPCs
+        // were earning ~14 XP per team_dungeon attempt against a 150K XP gap
+        // to the next level at Lv 50+. At the old multiplier, the entire
+        // simulated population had 138 level-ups over 14 days vs 9,635
+        // deaths -- effectively no progression. 5.0 makes high-level NPC
+        // progression achievable while keeping per-fight XP well below
+        // player rates (player XP * 5.0 still scaled to NPC stats and
+        // typically much smaller raw fight rewards).
+        private static float _npcXpMultiplier = 5.0f;
         private static int _saveIntervalMinutes = 5;
 
         // MUD server mode (single-process multiplayer)

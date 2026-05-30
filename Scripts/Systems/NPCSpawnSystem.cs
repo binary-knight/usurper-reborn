@@ -17,6 +17,31 @@ namespace UsurperRemake.Systems
         private static NPCSpawnSystem? instance;
         public static NPCSpawnSystem Instance => instance ??= new NPCSpawnSystem();
 
+        /// <summary>
+        /// v0.63.2: single source of truth for the per-class mana baseline used
+        /// across NPC spawn (immigrant + class rebalance) and the save-restore
+        /// heal path. Pre-v0.63.2 this formula lived inline in three different
+        /// switches that disagreed -- the immigrant switch only knew Magician /
+        /// Sage / Cleric / Paladin, so Bards and MysticShamans and all five
+        /// prestige classes spawned with baseMaxMana = 0 and their spells
+        /// fizzled forever. Live sweep on the v0.63.2 server found 10 Bards
+        /// and 1 Voidreaver in that state. Returns 0 for non-caster classes
+        /// (Warrior / Barbarian / Ranger / Assassin / Jester / Alchemist).
+        /// </summary>
+        public static long GetBaseMaxManaForClass(CharacterClass cls, int level)
+        {
+            return cls switch
+            {
+                CharacterClass.Magician or CharacterClass.Sage => 50 + (level * 25),
+                CharacterClass.Cleric or CharacterClass.Paladin => 40 + (level * 20),
+                CharacterClass.Bard => 40 + (level * 18),
+                CharacterClass.MysticShaman => 45 + (level * 22),
+                CharacterClass.Tidesworn or CharacterClass.Wavecaller or CharacterClass.Cyclebreaker
+                    or CharacterClass.Abysswarden or CharacterClass.Voidreaver => 50 + (level * 22),
+                _ => 0
+            };
+        }
+
         private List<NPC> spawnedNPCs = new();
         private Random random = Random.Shared;
         private bool npcsInitialized = false;
@@ -1188,13 +1213,8 @@ namespace UsurperRemake.Systems
                     npc.HP = baseHP;
                     npc.BaseMaxHP = baseHP;
 
-                    // Recalculate mana for new class
-                    long baseMana = targetClass switch
-                    {
-                        CharacterClass.Magician or CharacterClass.Sage => 50 + (npc.Level * 25),
-                        CharacterClass.Cleric or CharacterClass.Paladin => 40 + (npc.Level * 20),
-                        _ => 0
-                    };
+                    // v0.63.2: single source of truth via GetBaseMaxManaForClass.
+                    long baseMana = GetBaseMaxManaForClass(targetClass, (int)npc.Level);
                     npc.MaxMana = baseMana;
                     npc.Mana = baseMana;
                     npc.BaseMaxMana = baseMana;
@@ -1331,16 +1351,22 @@ namespace UsurperRemake.Systems
                 npc.BaseDefence = npc.Defence;
                 npc.BaseAgility = npc.Agility;
 
-                // Set mana for caster classes
-                long baseMana = npcClass switch
-                {
-                    CharacterClass.Magician or CharacterClass.Sage => 50 + (level * 25),
-                    CharacterClass.Cleric or CharacterClass.Paladin => 40 + (level * 20),
-                    _ => 0
-                };
+                // v0.63.2: single source of truth via GetBaseMaxManaForClass.
+                long baseMana = GetBaseMaxManaForClass(npcClass, (int)level);
                 npc.MaxMana = baseMana;
                 npc.Mana = baseMana;
                 npc.BaseMaxMana = baseMana;
+
+                // v0.63.2 Fix B: Give NPCs baseline gear power so they're not
+                // naked in combat. Set BaseWeapPow/BaseArmPow so the value
+                // survives RecalculateStats() calls. Live WeapPow/ArmPow set
+                // too for immediate use; on next RecalculateStats they'll
+                // get rebuilt from the Base values plus any equipment (NPCs
+                // have no equipment so the Base values are the final answer).
+                npc.BaseWeapPow = level * 5;
+                npc.BaseArmPow = level * 4;
+                npc.WeapPow = npc.BaseWeapPow;
+                npc.ArmPow = npc.BaseArmPow;
 
                 // Random alignment
                 if (random.Next(2) == 0)
@@ -1378,6 +1404,11 @@ namespace UsurperRemake.Systems
                 {
                     npc.MarketInventory = NPCItemGenerator.GenerateStartingInventory(npc, random.Next(1, 3));
                 }
+
+                // v0.64.0 Brain v2 Slice 1: new immigrants get the goal-driven AI.
+                // Existing live NPCs stay on the legacy weighted-Markov picker so
+                // the two cohorts are telemetry-comparable via npc_decision_log.is_ai_driven.
+                npc.IsAIDriven = true;
 
                 return npc;
             }

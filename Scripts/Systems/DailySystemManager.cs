@@ -981,36 +981,47 @@ public class DailySystemManager
         }
         catch { /* Royal loan system error */ }
 
-        // Process royal finances - guard salaries, monster feeding, tax collection
-        try
+        // Process royal finances - guard salaries, monster feeding, tax collection.
+        // v0.63.2: gated on !IsOnlineMode. Pre-fix this block ran in
+        // ProcessPlayerDailyEvents which fires once per player per daily reset
+        // boundary in online mode. With N online players triggering the boundary,
+        // king.ProcessDailyActivities was being called N times, incrementing
+        // TotalReign by N each real day instead of 1. The History of Monarchs
+        // readout showed inflated reign counts as a result. In online mode,
+        // WorldSimService.ProcessWorldDailyReset is the single authoritative
+        // caller and runs the equivalent guard/treasury/loyalty logic.
+        if (!DoorMode.IsOnlineMode)
         {
-            var king = CastleLocation.GetCurrentKing();
-            if (king?.IsActive == true)
+            try
             {
-                var expensesBefore = king.CalculateDailyExpenses();
-                var incomeBefore = king.CalculateDailyIncome();
-                var treasuryBefore = king.Treasury;
-
-                king.ProcessDailyActivities();
-
-                // Process guard loyalty changes based on treasury health
-                ProcessGuardLoyalty(king, treasuryBefore, terminal);
-
-                // Check for treasury crisis
-                if (king.Treasury < king.CalculateDailyExpenses())
+                var king = CastleLocation.GetCurrentKing();
+                if (king?.IsActive == true)
                 {
-                    ProcessTreasuryCrisis(king, terminal);
-                }
+                    var expensesBefore = king.CalculateDailyExpenses();
+                    var incomeBefore = king.CalculateDailyIncome();
+                    var treasuryBefore = king.Treasury;
 
-                // Log royal finances to news
-                var netChange = incomeBefore - expensesBefore;
-                if (netChange < 0 && Math.Abs(netChange) > 100)
-                {
-                    NewsSystem.Instance?.Newsy(false, $"The royal treasury hemorrhages {Math.Abs(netChange)} gold daily!");
+                    king.ProcessDailyActivities();
+
+                    // Process guard loyalty changes based on treasury health
+                    ProcessGuardLoyalty(king, treasuryBefore, terminal);
+
+                    // Check for treasury crisis
+                    if (king.Treasury < king.CalculateDailyExpenses())
+                    {
+                        ProcessTreasuryCrisis(king, terminal);
+                    }
+
+                    // Log royal finances to news
+                    var netChange = incomeBefore - expensesBefore;
+                    if (netChange < 0 && Math.Abs(netChange) > 100)
+                    {
+                        NewsSystem.Instance?.Newsy(false, $"The royal treasury hemorrhages {Math.Abs(netChange)} gold daily!");
+                    }
                 }
             }
+            catch { /* King system not initialized */ }
         }
-        catch { /* King system not initialized */ }
 
         // King daily stipend — player kings receive personal gold income
         try

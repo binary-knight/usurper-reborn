@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace UsurperRemake.Systems
 {
@@ -211,22 +213,132 @@ namespace UsurperRemake.Systems
 
             string? flavor = dom.Value switch
             {
-                EmotionType.Anger      => PickFreshLoc(npc, "dialogue.enhance.mood_anger", 4),
-                EmotionType.Fear       => PickFreshLoc(npc, "dialogue.enhance.mood_fear", 4),
-                EmotionType.Joy        => PickFreshLoc(npc, "dialogue.enhance.mood_joy", 4),
-                EmotionType.Sadness    => PickFreshLoc(npc, "dialogue.enhance.mood_sadness", 4),
-                EmotionType.Confidence => PickFreshLoc(npc, "dialogue.enhance.mood_confidence", 4),
-                EmotionType.Greed      => PickFreshLoc(npc, "dialogue.enhance.mood_greed", 3),
-                EmotionType.Gratitude  => PickFreshLoc(npc, "dialogue.enhance.mood_gratitude", 3),
-                EmotionType.Loneliness => PickFreshLoc(npc, "dialogue.enhance.mood_loneliness", 3),
-                EmotionType.Envy       => PickFreshLoc(npc, "dialogue.enhance.mood_envy", 3),
-                EmotionType.Pride      => PickFreshLoc(npc, "dialogue.enhance.mood_pride", 3),
-                EmotionType.Hope       => PickFreshLoc(npc, "dialogue.enhance.mood_hope", 3),
-                EmotionType.Peace      => PickFreshLoc(npc, "dialogue.enhance.mood_peace", 3),
+                EmotionType.Anger      => PickMoodFlavor(npc, "anger", 4, t),
+                EmotionType.Fear       => PickMoodFlavor(npc, "fear", 4, t),
+                EmotionType.Joy        => PickMoodFlavor(npc, "joy", 4, t),
+                EmotionType.Sadness    => PickMoodFlavor(npc, "sadness", 4, t),
+                EmotionType.Confidence => PickMoodFlavor(npc, "confidence", 4, t),
+                EmotionType.Greed      => PickMoodFlavor(npc, "greed", 3, t),
+                EmotionType.Gratitude  => PickMoodFlavor(npc, "gratitude", 3, t),
+                EmotionType.Loneliness => PickMoodFlavor(npc, "loneliness", 3, t),
+                EmotionType.Envy       => PickMoodFlavor(npc, "envy", 3, t),
+                EmotionType.Pride      => PickMoodFlavor(npc, "pride", 3, t),
+                EmotionType.Hope       => PickMoodFlavor(npc, "hope", 3, t),
+                EmotionType.Peace      => PickMoodFlavor(npc, "peace", 3, t),
                 _                      => null,
             };
 
             return (flavor, t);
+        }
+
+        // ---- Slice 11a: LLM mood flavor cache + background prewarm ----
+
+        /// <summary>
+        /// v0.64.0 Brain v2 Slice 11a: mood-flavor picker that consults the
+        /// per-NPC LLM cache first and falls back to the existing localized
+        /// pool. On a cache miss (and when LLM is active for this session)
+        /// kicks a background Task.Run to generate the LLM variant -- the
+        /// current Enhance() call returns the template immediately; the next
+        /// time this NPC's mood evaluates to the same (emotion, tone) the
+        /// cached LLM line is used.
+        ///
+        /// Net behavior: first chat with an NPC sees the localized pool;
+        /// second chat (after the background gen lands, typically &lt; 3s) sees
+        /// a personality-grounded variant. Falls back gracefully if LLM is
+        /// disabled, offline, or errors -- the localized pool is always the
+        /// canonical path.
+        /// </summary>
+        private static string? PickMoodFlavor(global::NPC npc, string emotionSuffix, int count, Tone tone)
+        {
+            string locKeyPrefix = $"dialogue.enhance.mood_{emotionSuffix}";
+
+            // Cache lookup. The cache key includes tone so the same emotion
+            // under different tones (rare but possible for future expansion)
+            // gets distinct cached variants.
+            if (npc?.LLMDialogueFlavorCache != null)
+            {
+                string cacheKey = $"mood_{emotionSuffix}|{tone}";
+                if (npc.LLMDialogueFlavorCache.TryGetValue(cacheKey, out var cached)
+                    && !string.IsNullOrWhiteSpace(cached))
+                {
+                    return cached;
+                }
+            }
+
+            // Cache miss: kick background generation if LLM is active. This
+            // call is cheap when LLM is disabled (it short-circuits inside
+            // TryKickMoodFlavorGen before touching any locks).
+            TryKickMoodFlavorGen(npc, emotionSuffix, tone);
+
+            // Sync path returns the localized template -- the existing
+            // PickFreshLoc behavior, unchanged.
+            return PickFreshLoc(npc, locKeyPrefix, count);
+        }
+
+        /// <summary>
+        /// Idempotent background-gen kickoff. Skips when LLM is unavailable,
+        /// when the cache already holds this key, or when an in-flight gen
+        /// for the same key is already running. Safe to call repeatedly from
+        /// the sync dialog path.
+        /// </summary>
+        private static void TryKickMoodFlavorGen(global::NPC npc, string emotionSuffix, Tone tone)
+        {
+            if (npc == null) return;
+
+            // Early-out when LLM isn't active -- avoids the dict init dance
+            // for single-player and BBS sessions.
+            if (LLMProvider.Get() == null) return;
+
+            string layer = $"mood_{emotionSuffix}";
+            string cacheKey = $"{layer}|{tone}";
+
+            // Lazy-init the per-NPC collections. JsonIgnore on the NPC props
+            // means these start null on every fresh NPC restore.
+            if (npc.LLMDialogueFlavorCache == null)
+                npc.LLMDialogueFlavorCache = new Dictionary<string, string>();
+            if (npc.LLMDialogueFlavorInFlight == null)
+                npc.LLMDialogueFlavorInFlight = new HashSet<string>();
+
+            // Defensive double-check: another thread may have populated the
+            // cache between the caller's lookup and ours.
+            if (npc.LLMDialogueFlavorCache.ContainsKey(cacheKey)) return;
+
+            // In-flight guard. Lock on the HashSet so two concurrent Enhance()
+            // calls for the same NPC + emotion don't fire parallel generations.
+            lock (npc.LLMDialogueFlavorInFlight)
+            {
+                if (npc.LLMDialogueFlavorInFlight.Contains(cacheKey)) return;
+                npc.LLMDialogueFlavorInFlight.Add(cacheKey);
+            }
+
+            string toneStr = tone.ToString();
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var llmText = await LLMMoments.GenerateDialogueFlavorAsync(
+                        npc, layer, toneStr, CancellationToken.None);
+                    if (!string.IsNullOrWhiteSpace(llmText))
+                    {
+                        // Dictionary writes from the background thread are
+                        // safe here because the read path tolerates a stale
+                        // miss (it just returns the template) and we only
+                        // ever add new keys, never mutate existing ones.
+                        npc.LLMDialogueFlavorCache[cacheKey] = llmText;
+                    }
+                }
+                catch
+                {
+                    // Sync caller already returned the template; swallow.
+                }
+                finally
+                {
+                    lock (npc.LLMDialogueFlavorInFlight)
+                    {
+                        npc.LLMDialogueFlavorInFlight.Remove(cacheKey);
+                    }
+                }
+            });
         }
 
         /// <summary>
@@ -285,9 +397,16 @@ namespace UsurperRemake.Systems
             // the final formatted string (otherwise the cache would treat
             // "I haven't forgotten {0}" and "I haven't forgotten earlier today"
             // as different lines and let exact repeats slip through).
+            //
+            // Slice 11b: each valence routes through PickMemoryFlavor which
+            // checks the per-(NPC, player, valence) LLM cache first and
+            // kicks background gen on miss; the sync path returns the
+            // existing localized template either way.
+            string playerKeyForCache = playerKey;
+            string memDesc = pick.Description ?? "";
             if (memoryIsPositive && !forceNeutral)
             {
-                return PickFresh(npc, "dialogue.enhance.memory_pos",
+                return PickMemoryFlavor(npc, playerKeyForCache, "pos", memDesc,
                     Loc.Get("dialogue.enhance.memory_pos_1", when),
                     Loc.Get("dialogue.enhance.memory_pos_2", when),
                     Loc.Get("dialogue.enhance.memory_pos_3", when));
@@ -295,16 +414,106 @@ namespace UsurperRemake.Systems
 
             if (memoryIsNegative && !forceNeutral)
             {
-                return PickFresh(npc, "dialogue.enhance.memory_neg",
+                return PickMemoryFlavor(npc, playerKeyForCache, "neg", memDesc,
                     Loc.Get("dialogue.enhance.memory_neg_1", when),
                     Loc.Get("dialogue.enhance.memory_neg_2", when),
                     Loc.Get("dialogue.enhance.memory_neg_3", when));
             }
 
-            return PickFresh(npc, "dialogue.enhance.memory_neu",
+            return PickMemoryFlavor(npc, playerKeyForCache, "neu", memDesc,
                 Loc.Get("dialogue.enhance.memory_neu_1", when),
                 Loc.Get("dialogue.enhance.memory_neu_2", when),
                 Loc.Get("dialogue.enhance.memory_neu_3", when));
+        }
+
+        /// <summary>
+        /// v0.64.0 Brain v2 Slice 11b: memory-flavor picker that consults
+        /// the per-NPC LLM cache first and falls back to the existing
+        /// localized pool. Cache key is per (NPC, player, valence) because
+        /// the memory layer is relational -- two players may have different
+        /// memory shapes with the same NPC, so a cached line for one player
+        /// must not leak into another player's chat.
+        ///
+        /// On cache miss kicks a background Task.Run that calls
+        /// LLMMoments.GenerateDialogueFlavorAsync with the actual memory
+        /// description as extraContext, so the LLM grounds the line in what
+        /// actually happened instead of generic phrasing.
+        /// </summary>
+        private static string? PickMemoryFlavor(global::NPC npc, string playerKey, string valence,
+                                                 string memDesc, params string[] templates)
+        {
+            string layer = $"memory_{valence}";
+            string cacheKey = $"{layer}|{playerKey}";
+
+            if (npc?.LLMDialogueFlavorCache != null
+                && npc.LLMDialogueFlavorCache.TryGetValue(cacheKey, out var cached)
+                && !string.IsNullOrWhiteSpace(cached))
+            {
+                return cached;
+            }
+
+            TryKickMemoryFlavorGen(npc, playerKey, valence, memDesc);
+
+            // Sync path returns the localized template via the existing
+            // PickFresh variety helper.
+            return PickFresh(npc, $"dialogue.enhance.{layer}", templates);
+        }
+
+        /// <summary>
+        /// Idempotent background-gen kickoff for memory callbacks. Mirrors
+        /// TryKickMoodFlavorGen's safety guards (LLM-disabled short-circuit,
+        /// in-flight lock, cache double-check) but adds the actual memory
+        /// description as extraContext so the LLM grounds its output.
+        /// </summary>
+        private static void TryKickMemoryFlavorGen(global::NPC npc, string playerKey, string valence, string memDesc)
+        {
+            if (npc == null || string.IsNullOrEmpty(playerKey)) return;
+            if (LLMProvider.Get() == null) return;
+
+            string layer = $"memory_{valence}";
+            string cacheKey = $"{layer}|{playerKey}";
+
+            if (npc.LLMDialogueFlavorCache == null)
+                npc.LLMDialogueFlavorCache = new Dictionary<string, string>();
+            if (npc.LLMDialogueFlavorInFlight == null)
+                npc.LLMDialogueFlavorInFlight = new HashSet<string>();
+
+            if (npc.LLMDialogueFlavorCache.ContainsKey(cacheKey)) return;
+
+            lock (npc.LLMDialogueFlavorInFlight)
+            {
+                if (npc.LLMDialogueFlavorInFlight.Contains(cacheKey)) return;
+                npc.LLMDialogueFlavorInFlight.Add(cacheKey);
+            }
+
+            // Snapshot the description for the closure -- the world sim
+            // could mutate the memory store between this call and when
+            // the Task.Run actually starts.
+            string ctxSnapshot = memDesc ?? "";
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var llmText = await LLMMoments.GenerateDialogueFlavorAsync(
+                        npc, layer, "Neutral", CancellationToken.None, ctxSnapshot);
+                    if (!string.IsNullOrWhiteSpace(llmText))
+                    {
+                        npc.LLMDialogueFlavorCache[cacheKey] = llmText;
+                    }
+                }
+                catch
+                {
+                    // Sync caller already returned the template; swallow.
+                }
+                finally
+                {
+                    lock (npc.LLMDialogueFlavorInFlight)
+                    {
+                        npc.LLMDialogueFlavorInFlight.Remove(cacheKey);
+                    }
+                }
+            });
         }
 
         /// <summary>
@@ -313,6 +522,108 @@ namespace UsurperRemake.Systems
         /// </summary>
         public static string? GetMemoryFlavor(global::NPC npc, global::Character player)
             => IsEnglish() ? GetMemoryFlavor(npc, player, Tone.Neutral) : null;
+
+        // ---- Slice 11 batch: generic LLM enrichment helpers for the
+        // remaining DialogueEnhancer layers (witness, state, grief, trait,
+        // faction). Mood and memory still use their per-layer helpers
+        // above for minimum diff; new layers all route through these.
+
+        /// <summary>
+        /// Generic LLM-enriched flavor picker. Cache key is
+        /// `{layer}|{cacheSuffix}` when suffix is non-empty, just `{layer}`
+        /// otherwise (NPC-scoped layers like trait/grief/faction don't need
+        /// a per-player or per-tone discriminator). Falls back to the
+        /// localized template pool via PickFresh on cache miss and kicks
+        /// background generation idempotently.
+        /// </summary>
+        private static string? PickEnhancedFlavor(global::NPC npc, string layer, string? cacheSuffix,
+                                                    string? extraContext, params string[] templates)
+        {
+            string cacheKey = string.IsNullOrEmpty(cacheSuffix) ? layer : $"{layer}|{cacheSuffix}";
+
+            if (npc?.LLMDialogueFlavorCache != null
+                && npc.LLMDialogueFlavorCache.TryGetValue(cacheKey, out var cached)
+                && !string.IsNullOrWhiteSpace(cached))
+            {
+                return cached;
+            }
+
+            TryKickEnhancedFlavorGen(npc, layer, cacheSuffix, extraContext);
+
+            return PickFresh(npc, $"dialogue.enhance.{layer}", templates);
+        }
+
+        /// <summary>
+        /// Convenience wrapper that resolves numbered loc keys
+        /// `dialogue.enhance.{layer}_1`..`_{count}` and routes through
+        /// PickEnhancedFlavor. Most call sites use this rather than building
+        /// the templates array themselves.
+        /// </summary>
+        private static string? PickEnhancedFlavorLoc(global::NPC npc, string layer, string? cacheSuffix,
+                                                       string? extraContext, int count)
+        {
+            if (count <= 0) return null;
+            var templates = new string[count];
+            for (int i = 0; i < count; i++)
+                templates[i] = Loc.Get($"dialogue.enhance.{layer}_{i + 1}");
+            return PickEnhancedFlavor(npc, layer, cacheSuffix, extraContext, templates);
+        }
+
+        /// <summary>
+        /// Generic background-gen kickoff. Same safety pattern as
+        /// TryKickMoodFlavorGen / TryKickMemoryFlavorGen: LLM-disabled
+        /// short-circuit, lazy init of per-NPC collections, cache double-check,
+        /// in-flight lock, swallowed exceptions in background path.
+        /// </summary>
+        private static void TryKickEnhancedFlavorGen(global::NPC npc, string layer, string? cacheSuffix,
+                                                       string? extraContext)
+        {
+            if (npc == null || string.IsNullOrEmpty(layer)) return;
+            if (LLMProvider.Get() == null) return;
+
+            string cacheKey = string.IsNullOrEmpty(cacheSuffix) ? layer : $"{layer}|{cacheSuffix}";
+
+            if (npc.LLMDialogueFlavorCache == null)
+                npc.LLMDialogueFlavorCache = new Dictionary<string, string>();
+            if (npc.LLMDialogueFlavorInFlight == null)
+                npc.LLMDialogueFlavorInFlight = new HashSet<string>();
+
+            if (npc.LLMDialogueFlavorCache.ContainsKey(cacheKey)) return;
+
+            lock (npc.LLMDialogueFlavorInFlight)
+            {
+                if (npc.LLMDialogueFlavorInFlight.Contains(cacheKey)) return;
+                npc.LLMDialogueFlavorInFlight.Add(cacheKey);
+            }
+
+            // Snapshot context for the closure so world-sim mutations between
+            // the call and the background task starting don't leak in.
+            string ctxSnapshot = extraContext ?? "";
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var llmText = await LLMMoments.GenerateDialogueFlavorAsync(
+                        npc, layer, "Neutral", CancellationToken.None, ctxSnapshot);
+                    if (!string.IsNullOrWhiteSpace(llmText))
+                    {
+                        npc.LLMDialogueFlavorCache[cacheKey] = llmText;
+                    }
+                }
+                catch
+                {
+                    // Sync caller already returned the template; swallow.
+                }
+                finally
+                {
+                    lock (npc.LLMDialogueFlavorInFlight)
+                    {
+                        npc.LLMDialogueFlavorInFlight.Remove(cacheKey);
+                    }
+                }
+            });
+        }
 
         // ---- Witness ----
 
@@ -355,12 +666,12 @@ namespace UsurperRemake.Systems
             // Don't read out the raw description ("Saw Lumina murder Vex");
             // surface an oblique reference. Positive-EmotionalImpact witness
             // events are rare (defending an ally) and get a different beat.
-            if (match.EmotionalImpact > 0.2f)
-            {
-                return PickFreshLoc(npc, "dialogue.enhance.witness_pos", 3);
-            }
-
-            return PickFreshLoc(npc, "dialogue.enhance.witness_neg", 3);
+            // Slice 11-batch: cache key is per (NPC, player) -- two players
+            // who witnessed-the-same-NPC scenarios shouldn't share lines.
+            // The actual witnessed description is passed as extraContext so
+            // the LLM can ground the line in what actually happened.
+            string layer = match.EmotionalImpact > 0.2f ? "witness_pos" : "witness_neg";
+            return PickEnhancedFlavorLoc(npc, layer, playerName, match.Description, 3);
         }
 
         // ---- Player state (HP, wealth) ----
@@ -381,14 +692,19 @@ namespace UsurperRemake.Systems
             // Default Character() has HP=0 / MaxHP=0 which would divide by
             // zero; guard so test-shaped characters don't trigger spurious
             // "you look terrible" output.
+            // Slice 11-batch: state observations are NPC-scoped (same NPC
+            // observes the same hurt state about any player with the same
+            // voice), so cacheSuffix is null. Player HP% is passed as
+            // extraContext so the LLM can vary intensity by severity.
             if (player.MaxHP > 0 && player.HP > 0)
             {
                 float hpFrac = (float)player.HP / player.MaxHP;
                 if (hpFrac < PlayerHurtThreshold)
                 {
+                    string hpCtx = $"player HP {(int)(hpFrac * 100)}% of max";
                     if (tone == Tone.Negative)
-                        return PickFreshLoc(npc, "dialogue.enhance.state_hurt_hostile", 3);
-                    return PickFreshLoc(npc, "dialogue.enhance.state_hurt_friendly", 4);
+                        return PickEnhancedFlavorLoc(npc, "state_hurt_hostile", null, hpCtx, 3);
+                    return PickEnhancedFlavorLoc(npc, "state_hurt_friendly", null, hpCtx, 4);
                 }
             }
 
@@ -398,7 +714,8 @@ namespace UsurperRemake.Systems
             // for strong relationships too.
             if (player.Gold >= PlayerWealthThreshold && npc.Personality != null && npc.Personality.Greed > 0.55f)
             {
-                return PickFreshLoc(npc, "dialogue.enhance.state_wealth_greedy", 4);
+                string wealthCtx = $"player carries {player.Gold} gold";
+                return PickEnhancedFlavorLoc(npc, "state_wealth_greedy", null, wealthCtx, 4);
             }
 
             return null;
@@ -439,10 +756,18 @@ namespace UsurperRemake.Systems
             if (deathMemories == null || deathMemories.Count == 0) return null;
 
             var cutoff = DateTime.Now.AddDays(-GriefMemoryWindowDays);
-            bool hasRecentDeath = deathMemories.Any(m => m.Timestamp >= cutoff);
-            if (!hasRecentDeath) return null;
+            var recentDeath = deathMemories
+                .Where(m => m.Timestamp >= cutoff)
+                .OrderByDescending(m => m.Importance)
+                .ThenByDescending(m => m.Timestamp)
+                .FirstOrDefault();
+            if (recentDeath == null) return null;
 
-            return PickFreshLoc(npc, "dialogue.enhance.grief", 4);
+            // Slice 11-batch: grief is NPC-scoped (no cacheSuffix). The
+            // death memory description is passed as extraContext so the
+            // LLM can ground the grief in who actually died, even though
+            // the rendered line stays oblique (no spoken name).
+            return PickEnhancedFlavorLoc(npc, "grief", null, recentDeath.Description, 4);
         }
 
         // ---- Personality ----
@@ -483,22 +808,27 @@ namespace UsurperRemake.Systems
 
             // Tone gates: greed/ambition lines feel callous if NPC is grieving
             // (Sadness mood); compassion/peace asides clash with anger.
+            // Slice 11-batch: trait lines are NPC-scoped (same NPC always
+            // expresses the same dominant trait the same way). The trait
+            // strength is passed as extraContext so the LLM can calibrate
+            // intensity (mild Greed reads differently from extreme Greed).
+            string strengthCtx = $"trait strength {top.strength:F2}";
             switch (top.label)
             {
                 case "greed":
                     if (tone == Tone.Negative) return null;
-                    return PickFreshLoc(npc, "dialogue.enhance.trait_greed", 3);
+                    return PickEnhancedFlavorLoc(npc, "trait_greed", null, strengthCtx, 3);
                 case "trustworthy":
-                    return PickFreshLoc(npc, "dialogue.enhance.trait_trust", 3);
+                    return PickEnhancedFlavorLoc(npc, "trait_trust", null, strengthCtx, 3);
                 case "compassion":
                     if (tone == Tone.Negative) return null;
-                    return PickFreshLoc(npc, "dialogue.enhance.trait_compassion", 3);
+                    return PickEnhancedFlavorLoc(npc, "trait_compassion", null, strengthCtx, 3);
                 case "courage":
-                    return PickFreshLoc(npc, "dialogue.enhance.trait_courage", 3);
+                    return PickEnhancedFlavorLoc(npc, "trait_courage", null, strengthCtx, 3);
                 case "caution":
-                    return PickFreshLoc(npc, "dialogue.enhance.trait_caution", 3);
+                    return PickEnhancedFlavorLoc(npc, "trait_caution", null, strengthCtx, 3);
                 case "ambition":
-                    return PickFreshLoc(npc, "dialogue.enhance.trait_ambition", 3);
+                    return PickEnhancedFlavorLoc(npc, "trait_ambition", null, strengthCtx, 3);
                 default:
                     return null;
             }
@@ -549,6 +879,11 @@ namespace UsurperRemake.Systems
                 // Romance lookup failure is non-fatal -- just fall through.
             }
 
+            // Slice 11-batch: faction lines are NPC-scoped by faction
+            // shape (each NPC has one faction, the line they say to a
+            // given opposing-faction player is stable). No extraContext
+            // needed -- the layer name encodes the full faction shape and
+            // BuildAppendLayerFraming infers NPC/player factions from it.
             bool faithShadowsConflict =
                 (npcFac == Faction.TheFaith && playerFac == Faction.TheShadows) ||
                 (npcFac == Faction.TheShadows && playerFac == Faction.TheFaith);
@@ -559,12 +894,12 @@ namespace UsurperRemake.Systems
                 if (tone == Tone.Positive)
                 {
                     return npcFac == Faction.TheFaith
-                        ? PickFreshLoc(npc, "dialogue.enhance.fac_fs_warm_faith", 2)
-                        : PickFreshLoc(npc, "dialogue.enhance.fac_fs_warm_shadow", 2);
+                        ? PickEnhancedFlavorLoc(npc, "fac_fs_warm_faith", null, null, 2)
+                        : PickEnhancedFlavorLoc(npc, "fac_fs_warm_shadow", null, null, 2);
                 }
                 return npcFac == Faction.TheFaith
-                    ? PickFreshLoc(npc, "dialogue.enhance.fac_fs_faith", 3)
-                    : PickFreshLoc(npc, "dialogue.enhance.fac_fs_shadow", 3);
+                    ? PickEnhancedFlavorLoc(npc, "fac_fs_faith", null, null, 3)
+                    : PickEnhancedFlavorLoc(npc, "fac_fs_shadow", null, null, 3);
             }
 
             bool crownShadowsTension =
@@ -575,12 +910,12 @@ namespace UsurperRemake.Systems
                 if (tone == Tone.Positive)
                 {
                     return npcFac == Faction.TheCrown
-                        ? PickFreshLoc(npc, "dialogue.enhance.fac_cs_warm_crown", 2)
-                        : PickFreshLoc(npc, "dialogue.enhance.fac_cs_warm_shadow", 2);
+                        ? PickEnhancedFlavorLoc(npc, "fac_cs_warm_crown", null, null, 2)
+                        : PickEnhancedFlavorLoc(npc, "fac_cs_warm_shadow", null, null, 2);
                 }
                 return npcFac == Faction.TheCrown
-                    ? PickFreshLoc(npc, "dialogue.enhance.fac_cs_crown", 3)
-                    : PickFreshLoc(npc, "dialogue.enhance.fac_cs_shadow", 3);
+                    ? PickEnhancedFlavorLoc(npc, "fac_cs_crown", null, null, 3)
+                    : PickEnhancedFlavorLoc(npc, "fac_cs_shadow", null, null, 3);
             }
 
             return null;

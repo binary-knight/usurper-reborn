@@ -967,7 +967,9 @@ namespace UsurperRemake.Systems
                 OriginalMotherName = child.OriginalMother ?? "",
                 OriginalFatherName = child.OriginalFather ?? "",
                 SoulAtGraduation = child.Soul,
-                WasRaisedByPlayer = IsParentSlotAPlayer(child)
+                WasRaisedByPlayer = IsParentSlotAPlayer(child),
+                // v0.64.0 Brain v2 Slice 1: graduating children get the goal-driven AI.
+                IsAIDriven = true
             };
 
             // Inherit some traits based on soul

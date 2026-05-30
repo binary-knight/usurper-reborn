@@ -450,6 +450,15 @@ public class Character
     public long BaseStamina { get; set; }
     public long BaseAgility { get; set; }
 
+    // v0.63.2 Fix B: intrinsic gear power for NPCs who don't actually equip
+    // items. RecalculateStats() resets WeapPow/ArmPow to 0 and rebuilds from
+    // EquippedItems; since NPCs don't equip anything, they ended up at 0
+    // forever which made world-sim combat impossible to win. These two
+    // fields are the floor that RecalculateStats() preserves; equipment
+    // bonuses still stack on top for players who actually wear gear.
+    public long BaseWeapPow { get; set; }
+    public long BaseArmPow { get; set; }
+
     // Training System - D&D style proficiency
     public int TrainingPoints { get; set; } = 0;
     public Dictionary<string, TrainingSystem.ProficiencyLevel> SkillProficiencies { get; set; } = new();
@@ -834,6 +843,17 @@ public class Character
     // (eg via reload) doesn't double-count them.
     public int CompletedFamilyArcs { get; set; } = 0;
     public HashSet<string> CompletedArcChildNames { get; set; } = new();
+
+    // v0.64.0 Brain v2 Slice 1: per-NPC flag selecting which AI drives this NPC's
+    // per-tick decisions in WorldSimulator.SimulateStep. When false (default), the
+    // legacy weighted-Markov picker in ProcessNPCActivities runs. When true, the
+    // NPCBrain.DecideNextAction goal-driven path drives, falling back to the picker
+    // only when Brain returns Continue or Idle. Players ignore this field entirely
+    // (only consulted on NPC instances). New immigrants and child graduations default
+    // to true; existing live NPCs default to false so the cohorts are A/B comparable
+    // via the npc_decision_log.is_ai_driven column.
+    public bool IsAIDriven { get; set; } = false;
+
     public bool HasActiveShrineAttunement
     {
         get
@@ -1398,8 +1418,13 @@ public class Character
         Defence = BaseDefence;
         Stamina = BaseStamina;
         Agility = BaseAgility;
-        WeapPow = 0;
-        ArmPow = 0;
+        // v0.63.2 Fix B: WeapPow/ArmPow start from BaseWeapPow/BaseArmPow
+        // (intrinsic gear power for NPCs who don't equip items) instead of
+        // 0. Equipment bonuses from EquippedItems still stack on top via
+        // the ApplyToCharacter calls below, so players who wear gear get
+        // the full sum.
+        WeapPow = BaseWeapPow;
+        ArmPow = BaseArmPow;
 
         // Guard: detect and fix equipment corruption (same ID in multiple slots)
         var seenIds = new HashSet<int>();

@@ -4026,6 +4026,7 @@
   "team.recruit_quote": "\"{0} says: 'I'll fight alongside you, boss!'\"",
   "team.invalid_choice_generic": "Invalid choice.",
   "team.examine_prompt": "Examine which team member? (enter ? to see your team)",
+  "team.examine_section_impression": "-- FIRST IMPRESSION --",
   "team.examine_section_identity": "-- IDENTITY --",
   "team.examine_section_alignment": "-- ALIGNMENT & FAITH --",
   "team.examine_section_attitude": "-- ATTITUDE --",

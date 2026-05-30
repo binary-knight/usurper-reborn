@@ -822,6 +822,9 @@ namespace UsurperRemake.Systems
         public long BaseIntelligence { get; set; }
         public long BaseWisdom { get; set; }
         public long BaseCharisma { get; set; }
+        // v0.63.2 Fix B: intrinsic gear power (NPCs don't equip items).
+        public long BaseWeapPow { get; set; }
+        public long BaseArmPow { get; set; }
 
         // Class and race
         public CharacterClass Class { get; set; }
@@ -930,6 +933,14 @@ namespace UsurperRemake.Systems
         public string OriginalFatherName { get; set; } = "";
         public int SoulAtGraduation { get; set; } = 0;
         public bool WasRaisedByPlayer { get; set; } = false;
+
+        // v0.64.0 Brain v2 Slice 1: cohort flag for the goal-driven AI replacement.
+        // When true, WorldSimulator.SimulateStep routes this NPC's per-tick decision
+        // through NPCBrain.DecideNextAction; when false, the legacy weighted-Markov
+        // picker drives. New immigrants and child graduations default true so the
+        // cohort grows organically. Pre-v0.64.0 saves restore as false (legacy
+        // behavior preserved). Round-trips via the 5-site NPC save path.
+        public bool IsAIDriven { get; set; } = false;
     }
 
     /// <summary>

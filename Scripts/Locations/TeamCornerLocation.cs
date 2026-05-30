@@ -1826,6 +1826,32 @@ public class TeamCornerLocation : BaseLocation
         WriteSectionHeader(examineHeader, "bright_cyan");
         terminal.WriteLine("");
 
+        // v0.64.0 Brain v2 Slice 9b: First Impression block. When LLM is
+        // configured, generates a 2-3 sentence character impression keyed
+        // to the NPC's personality + archetype + class. Cached on the NPC
+        // after first generation so subsequent examines are free. When LLM
+        // is disabled or fails, falls back to a templated string driven by
+        // the NPC's strongest personality traits. The Task is awaited
+        // because the player is waiting on the UI; bounded by the LLM
+        // timeout (default 3s).
+        try
+        {
+            string impression = await UsurperRemake.Systems.LLMMoments
+                .GeneratePersonalitySummaryAsync(member, System.Threading.CancellationToken.None);
+            if (!string.IsNullOrWhiteSpace(impression))
+            {
+                terminal.SetColor("bright_white");
+                terminal.WriteLine(Loc.Get("team.examine_section_impression"));
+                terminal.SetColor("white");
+                terminal.WriteLine($"  {impression}");
+                terminal.WriteLine("");
+            }
+        }
+        catch
+        {
+            // First-impression is decorative; never block the examine screen.
+        }
+
         // --- Identity ---
         terminal.SetColor("bright_white");
         terminal.WriteLine(Loc.Get("team.examine_section_identity"));

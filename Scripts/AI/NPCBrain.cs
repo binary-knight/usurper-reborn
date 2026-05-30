@@ -480,6 +480,33 @@ public class NPCBrain
         }
         return TimeSpan.FromDays(1); // Force first-time processing
     }
+
+    /// <summary>
+    /// v0.64.0 Brain v2 Slice 2: read accessor for the per-verb last-dispatch
+    /// timestamps. Used by BrainV2Scorer.RecencyPenalty to discourage repeating
+    /// the same verb tick after tick. Returns null if the verb has never been
+    /// dispatched. Wall-clock based (DateTime.Now), so survives world-sim
+    /// reload as fresh state -- a brief "I haven't done anything yet" window
+    /// post-restore is acceptable.
+    /// </summary>
+    public TimeSpan? TimeSinceActivity(string verb)
+    {
+        if (string.IsNullOrEmpty(verb)) return null;
+        if (lastActivities.TryGetValue(verb, out var when))
+            return DateTime.Now - when;
+        return null;
+    }
+
+    /// <summary>
+    /// v0.64.0 Brain v2 Slice 2: record that the NPC just dispatched this verb.
+    /// Called from WorldSimulator.BrainV2ProcessActivities right after
+    /// DispatchVerb so the next tick's RecencyPenalty has fresh data.
+    /// </summary>
+    public void MarkActivity(string verb)
+    {
+        if (string.IsNullOrEmpty(verb)) return;
+        lastActivities[verb] = DateTime.Now;
+    }
     
     private void InitializeGoals()
     {

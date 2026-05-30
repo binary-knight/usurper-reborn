@@ -675,6 +675,7 @@ namespace UsurperRemake.Systems
                         hp_before INTEGER DEFAULT 0,
                         hp_after INTEGER DEFAULT 0,
                         is_ai_driven INTEGER DEFAULT 0,
+                        decision_source TEXT DEFAULT 'sim',
                         created_at TEXT DEFAULT (datetime('now'))
                     );
                     CREATE INDEX IF NOT EXISTS idx_npc_decision_log_npc ON npc_decision_log(npc_name, created_at DESC);
@@ -695,6 +696,28 @@ namespace UsurperRemake.Systems
                         created_at TEXT DEFAULT (datetime('now'))
                     );
                     CREATE INDEX IF NOT EXISTS idx_pending_inheritance_player ON pending_inheritance(player_username);
+
+                    -- v0.64.0 Brain v2 Slice 10: LLM moment telemetry. One row
+                    -- per LLM call attempt (success OR fallback). Powers the
+                    -- balance dashboard's LLM stats card so the sysop can
+                    -- watch token spend, success rate, and rendered output
+                    -- without grepping the debug log. Pruned to last 30 days.
+                    -- moment_type values: 'avenge' | 'death_epitaph' | 'personality_summary'
+                    CREATE TABLE IF NOT EXISTS llm_usage (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        moment_type TEXT NOT NULL,
+                        npc_name TEXT,
+                        succeeded INTEGER NOT NULL DEFAULT 0,
+                        prompt_tokens INTEGER DEFAULT 0,
+                        completion_tokens INTEGER DEFAULT 0,
+                        total_tokens INTEGER DEFAULT 0,
+                        response_ms INTEGER DEFAULT 0,
+                        rendered_text TEXT,
+                        failure_reason TEXT,
+                        created_at TEXT DEFAULT (datetime('now'))
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_llm_usage_created ON llm_usage(created_at DESC);
+                    CREATE INDEX IF NOT EXISTS idx_llm_usage_moment ON llm_usage(moment_type, created_at DESC);
                 ";
                 cmd.ExecuteNonQuery();
             }
@@ -765,6 +788,19 @@ namespace UsurperRemake.Systems
             {
                 using var migCmd = connection.CreateCommand();
                 migCmd.CommandText = "ALTER TABLE players ADD COLUMN language TEXT DEFAULT 'en';";
+                migCmd.ExecuteNonQuery();
+            }
+            catch { /* Column already exists - expected */ }
+
+            // v0.63.2: add decision_source column to npc_decision_log so future
+            // telemetry can distinguish world-sim writes ('sim') from external
+            // killers (player murders, PvP, world events). Defaults to 'sim'
+            // for existing rows since pre-v0.63.2 the only writer was the
+            // world-sim dispatcher.
+            try
+            {
+                using var migCmd = connection.CreateCommand();
+                migCmd.CommandText = "ALTER TABLE npc_decision_log ADD COLUMN decision_source TEXT DEFAULT 'sim';";
                 migCmd.ExecuteNonQuery();
             }
             catch { /* Column already exists - expected */ }
@@ -2041,7 +2077,8 @@ namespace UsurperRemake.Systems
             string npcName, int npcLevel, string npcClass,
             string action, string? locationBefore, string? locationAfter,
             string? outcome, long goldDelta, long xpDelta,
-            long hpBefore, long hpAfter, bool isAiDriven)
+            long hpBefore, long hpAfter, bool isAiDriven,
+            string decisionSource = "sim")
         {
             try
             {
@@ -2051,11 +2088,13 @@ namespace UsurperRemake.Systems
                     INSERT INTO npc_decision_log (
                         npc_name, npc_level, npc_class,
                         action, location_before, location_after, outcome,
-                        gold_delta, xp_delta, hp_before, hp_after, is_ai_driven
+                        gold_delta, xp_delta, hp_before, hp_after, is_ai_driven,
+                        decision_source
                     ) VALUES (
                         @name, @level, @class,
                         @action, @locBefore, @locAfter, @outcome,
-                        @goldDelta, @xpDelta, @hpBefore, @hpAfter, @aiDriven
+                        @goldDelta, @xpDelta, @hpBefore, @hpAfter, @aiDriven,
+                        @source
                     );
                 ";
                 cmd.Parameters.AddWithValue("@name", npcName ?? "");
@@ -2070,11 +2109,62 @@ namespace UsurperRemake.Systems
                 cmd.Parameters.AddWithValue("@hpBefore", hpBefore);
                 cmd.Parameters.AddWithValue("@hpAfter", hpAfter);
                 cmd.Parameters.AddWithValue("@aiDriven", isAiDriven ? 1 : 0);
+                cmd.Parameters.AddWithValue("@source", decisionSource ?? "sim");
                 cmd.ExecuteNonQuery();
             }
             catch (Exception ex)
             {
                 DebugLogger.Instance.LogError("SQL", $"Failed to log NPC decision: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// v0.64.0 Brain v2 Slice 10: persist one LLM call attempt to llm_usage
+        /// for the balance dashboard's LLM stats card. Captures both successes
+        /// (with token counts + rendered text + latency) and fallbacks (with
+        /// failure_reason). Fire-and-forget from LLMMoments call sites so a
+        /// write failure doesn't break the moment generator.
+        /// </summary>
+        public void RecordLLMUsage(
+            string momentType,
+            string? npcName,
+            bool succeeded,
+            int promptTokens,
+            int completionTokens,
+            int totalTokens,
+            int responseMs,
+            string? renderedText,
+            string? failureReason)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    INSERT INTO llm_usage (
+                        moment_type, npc_name, succeeded,
+                        prompt_tokens, completion_tokens, total_tokens,
+                        response_ms, rendered_text, failure_reason
+                    ) VALUES (
+                        @moment, @npc, @ok,
+                        @ptok, @ctok, @ttok,
+                        @ms, @text, @reason
+                    );
+                ";
+                cmd.Parameters.AddWithValue("@moment", momentType ?? "unknown");
+                cmd.Parameters.AddWithValue("@npc", (object?)npcName ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@ok", succeeded ? 1 : 0);
+                cmd.Parameters.AddWithValue("@ptok", promptTokens);
+                cmd.Parameters.AddWithValue("@ctok", completionTokens);
+                cmd.Parameters.AddWithValue("@ttok", totalTokens);
+                cmd.Parameters.AddWithValue("@ms", responseMs);
+                cmd.Parameters.AddWithValue("@text", (object?)renderedText ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@reason", (object?)failureReason ?? DBNull.Value);
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to log LLM usage: {ex.Message}");
             }
         }
 

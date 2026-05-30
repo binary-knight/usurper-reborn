@@ -6269,6 +6269,9 @@ public partial class GameEngine
                 SoulAtGraduation = data.SoulAtGraduation,
                 WasRaisedByPlayer = data.WasRaisedByPlayer,
 
+                // v0.64.0 Brain v2 Slice 1 cohort flag (default false on legacy saves).
+                IsAIDriven = data.IsAIDriven,
+
                 // Marriage status
                 IsMarried = data.IsMarried,
                 Married = data.Married,
