@@ -637,6 +637,7 @@ namespace UsurperRemake.Systems
         public int DesecrationsToday { get; set; }
         public int ConfessionsToday { get; set; }
         public int MurdersToday { get; set; }
+        public int SparesToday { get; set; }
         public int TeamWarsToday { get; set; }
         public int DrinkingGamesToday { get; set; }
         public int LoveStreetVisitsToday { get; set; }
@@ -1294,6 +1295,14 @@ namespace UsurperRemake.Systems
         public DateTime CreatedTime { get; set; }
         public DateTime? CompletionTime { get; set; }
         public Dictionary<string, object> Parameters { get; set; } = new();
+        // v0.64.1 audit fix: TargetCharacter became load-bearing in v0.64.1
+        // (Slice 13 target steering, Slice 14b/19 goal-aware greetings/hails,
+        // Slice 20 NPC-issued quests, Slice 3 revenge completion detection all
+        // read it). Without round-trip, a restored in-flight Avenge goal had
+        // TargetCharacter=null -- a zombie that could never complete and
+        // silently killed the target-keyed features after any reload.
+        // Additive field; pre-v0.64.1 saves default to "" (old behavior).
+        public string TargetCharacter { get; set; } = "";
     }
 
     /// <summary>

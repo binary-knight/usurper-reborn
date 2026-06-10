@@ -380,6 +380,15 @@ public class WorldSimulator
 
             // Process NPC divorces
             ProcessNPCDivorces();
+
+            // v0.64.0 hygiene: prune permanently-dead NPCs (aged death,
+            // permadeath) whose grace window has elapsed. Without this,
+            // the npcs list grows unbounded over time as corpses
+            // accumulate and never get garbage-collected. Lazy / cheap:
+            // walks the list once, removes anything older than the grace
+            // window. Runs every 120 ticks (~1 hour at 30-sec ticks) so
+            // the cost is negligible.
+            if (_currentTick % 120 == 0) PrunePermanentlyDeadNPCs();
         }
 
         // Process NPC sleep cycle (some NPCs go to sleep, others wake up)
@@ -584,6 +593,61 @@ public class WorldSimulator
     }
 
     /// <summary>
+    /// v0.64.0 hygiene: garbage-collect permanently-dead NPCs from the
+    /// `npcs` list after their grace window has elapsed. Without this,
+    /// IsAgedDeath / IsPermaDead corpses accumulate forever in
+    /// `NPCSpawnSystem.ActiveNPCs`, eventually pushing the list past the
+    /// MaxNPCPopulation cap and silently disabling immigration, births,
+    /// and orphan graduation (the bug this method fixes the long tail of).
+    ///
+    /// Pruning criteria: corpse must be permanently dead (IsAgedDeath or
+    /// IsPermaDead) AND either have no DeathDate set (legacy corpses from
+    /// before this field was introduced -- pruned on first run) OR have a
+    /// DeathDate older than the grace window (7 days, matching the
+    /// `/restore` window and the DialogueEnhancer grief memory window).
+    ///
+    /// The grace window protects recent-death lookups: news feed entries
+    /// from the past week can still resolve the deceased's NPC record;
+    /// adult children who lost a parent in the past week still find them
+    /// for grief / cinematic purposes. After 7 days the corpse is purely
+    /// historical and its name lives on in the children's lineage fields
+    /// (which are strings on the children's records, independent of
+    /// whether the parent's NPC record still exists).
+    /// </summary>
+    private void PrunePermanentlyDeadNPCs()
+    {
+        try
+        {
+            var spawnSystem = UsurperRemake.Systems.NPCSpawnSystem.Instance;
+            if (spawnSystem?.ActiveNPCs == null) return;
+
+            var cutoff = DateTime.UtcNow.AddDays(-7);
+            var toRemove = spawnSystem.ActiveNPCs
+                .Where(n => (n.IsAgedDeath || n.IsPermaDead)
+                            && (n.DeathDate == null || n.DeathDate.Value < cutoff))
+                .ToList();
+
+            if (toRemove.Count == 0) return;
+
+            foreach (var corpse in toRemove)
+            {
+                spawnSystem.ActiveNPCs.Remove(corpse);
+                // Also clear the respawn timer just in case it lingered.
+                deadNPCRespawnTimers.Remove(corpse.Id ?? corpse.Name);
+            }
+
+            DebugLogger.Instance.LogInfo("LIFECYCLE",
+                $"PrunePermanentlyDeadNPCs: removed {toRemove.Count} aged/permadead corpse(s) " +
+                $"from active list. Remaining: {spawnSystem.ActiveNPCs.Count}.");
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("LIFECYCLE",
+                $"PrunePermanentlyDeadNPCs failed: {ex.Message}. Corpse pruning will retry next cycle.");
+        }
+    }
+
+    /// <summary>
     /// Handle an NPC death with permadeath roll. Replaces the old IsDead=true + QueueNPCForRespawn pattern.
     /// </summary>
     /// <param name="npc">The NPC who died</param>
@@ -599,7 +663,15 @@ public class WorldSimulator
         // from world sim deaths. They can still "die" temporarily but skip permadeath.
         if (npc.IsInConversation)
         {
-            DebugLogger.Instance.LogInfo("WORLDSIM", $"Skipping death for {npc.Name} — engaged with player");
+            // v0.64.1 spouse-death fix: blocking the death flag is not enough --
+            // IsAlive is computed as HP > 0, so leaving HP at 0 still reads as
+            // dead everywhere (home resolution, resurrection screen, party
+            // filters). Heal like the IsPlayerTeam branch below so a "blocked"
+            // death never produces a zombie 0-HP state. Bug report: spouse in
+            // dungeon party showed full health in-party, then appeared dead at
+            // Home after exit, three separate occurrences.
+            npc.HP = Math.Max(1, npc.MaxHP / 4);
+            DebugLogger.Instance.LogInfo("WORLDSIM", $"Skipping death for {npc.Name} -- engaged with player (healed to {npc.HP})");
             return false;
         }
 
@@ -647,6 +719,12 @@ public class WorldSimulator
             // on its own IsAgedDeath check independently.
             if (npc.Married || npc.IsMarried)
             {
+                // v0.64.1 audit fix: notify a player spouse BEFORE bereavement
+                // clears the deceased's Married/IsMarried/SpouseName flags --
+                // the notification's own gate reads those flags, so calling it
+                // after bereavement (as the original v0.64.1 code did) made it
+                // dead code on every permanent-death path.
+                NotifyPlayerSpouseOfDeath(npc, killerName, location);
                 HandleSpouseBereavement(npc);
             }
 
@@ -669,20 +747,93 @@ public class WorldSimulator
             NewsSystem.Instance.WriteDeathNews(npc.Name, killerName, location);
         }
 
-        // v0.64.0 Brain v2 Slice 9a: dramatic LLM-rendered epitaph for Tier A
-        // NPCs (kings, court members, player-team, high-level). Commoners
-        // skip this so the news feed isn't flooded with eulogies. Fire-and-forget;
-        // posts a second news entry alongside the standard WriteDeathNews
-        // (timing: standard fires immediately, LLM epitaph lands a few
-        // seconds later if LLM is configured). When LLM is disabled or
-        // budget-exhausted, the templated fallback inside PostDeathEpitaphAsync
-        // is what posts -- a single supplemental dramatic line.
-        if (IsTierANPC(npc))
-        {
-            _ = UsurperRemake.Systems.LLMMoments.PostDeathEpitaphAsync(npc, killerName, location);
-        }
+        // Death epitaphs disabled: budget review showed they were the single
+        // largest LLM cost driver (~676 calls / 123k tokens per 24h, ~73%
+        // success rate) for marginal flavor return. WriteDeathNews above
+        // already posts the death; the supplemental dramatic line was not
+        // worth the spend. LLMMoments.PostDeathEpitaphAsync kept in code +
+        // tests for future re-enable; just no call site.
+
+        // v0.64.1 audit fix: the spouse-death notification fires ONLY inside
+        // the permadeath branch above (before HandleSpouseBereavement clears
+        // the marriage flags). It deliberately does NOT fire on the temp-death
+        // respawn branch -- a spouse who respawns in ~10 minutes is not a
+        // widowing event, and mailing "your spouse has died" for every world-
+        // sim knockdown would be both false and spammy.
 
         return permadeath;
+    }
+
+    /// <summary>
+    /// v0.64.1: targeted death notification for a player whose NPC spouse
+    /// just died. Online: in-game mail (persists; unread-mail notice fires on
+    /// next login). Single-player: PendingNotifications queue (shown at next
+    /// location entry). NPC-NPC marriages are handled by the existing
+    /// HandleSpouseBereavement path; this is only for NPC-married-to-player.
+    /// Best-effort -- failure never breaks the death cascade.
+    /// </summary>
+    private void NotifyPlayerSpouseOfDeath(NPC npc, string killerName, string location)
+    {
+        try
+        {
+            if (npc == null) return;
+            if (!(npc.Married || npc.IsMarried)) return;
+            if (string.IsNullOrWhiteSpace(npc.SpouseName)) return;
+
+            string spouseName = npc.SpouseName.Trim();
+
+            // v0.64.1 audit fix: the common world-sim case is an NPC-NPC
+            // marriage -- SpouseName holds another NPC's display name. NPC
+            // names come from finite pools, so a player whose display name
+            // collides with an NPC spouse name would receive a false widow
+            // mail. If the spouse name matches ANY pool NPC (alive or dead),
+            // this is an NPC-NPC marriage: bereavement handles it; skip the
+            // player notification entirely.
+            var pool = NPCSpawnSystem.Instance?.ActiveNPCs;
+            if (pool != null && pool.Any(n =>
+                n != null && n != npc &&
+                (string.Equals(n.Name2, spouseName, StringComparison.OrdinalIgnoreCase)
+                 || string.Equals(n.Name1, spouseName, StringComparison.OrdinalIgnoreCase))))
+            {
+                return;
+            }
+            string npcName = npc.Name2 ?? npc.Name1 ?? npc.Name ?? "Your spouse";
+            string killer = string.IsNullOrWhiteSpace(killerName) ? "unknown forces" : killerName;
+            string place = string.IsNullOrWhiteSpace(location) ? "parts unknown" : location;
+            string when = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm 'UTC'");
+            string body = Loc.Get("worldsim.spouse_death_notice", npcName, killer, place, when);
+
+            // Online: if the spouse name resolves to a real player, send mail.
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode && SqlBackend != null)
+            {
+                var username = SqlBackend.ResolvePlayerUsername(spouseName);
+                if (!string.IsNullOrEmpty(username))
+                {
+                    _ = SqlBackend.SendMessage("The Town Crier", username, "death", body);
+                    DebugLogger.Instance.LogInfo("WORLDSIM",
+                        $"Spouse-death mail sent to player '{username}' for {npcName}");
+                }
+                return;
+            }
+
+            // Single-player: if the current player is the spouse, queue a
+            // pending notification.
+            var current = GameEngine.Instance?.CurrentPlayer;
+            if (current != null &&
+                (string.Equals(current.Name2, spouseName, StringComparison.OrdinalIgnoreCase)
+                 || string.Equals(current.Name1, spouseName, StringComparison.OrdinalIgnoreCase)
+                 || string.Equals(current.DisplayName, spouseName, StringComparison.OrdinalIgnoreCase)))
+            {
+                GameEngine.PendingNotifications.Enqueue(body);
+                DebugLogger.Instance.LogInfo("WORLDSIM",
+                    $"Spouse-death notification queued for single-player spouse of {npcName}");
+            }
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("WORLDSIM",
+                $"Spouse-death notification failed: {ex.Message}");
+        }
     }
 
     /// <summary>
@@ -1010,6 +1161,7 @@ public class WorldSimulator
                     // Natural death - permanent, no respawn
                     npc.IsDead = true;
                     npc.IsAgedDeath = true;
+                    npc.DeathDate = DateTime.UtcNow; // for PrunePermanentlyDeadNPCs grace window
                     npc.HP = 0;
                     npc.PregnancyDueDate = null;
                     npc.PregnancyFatherName = null;
@@ -1021,6 +1173,11 @@ public class WorldSimulator
                     // Handle marriage - widow the spouse
                     if (npc.Married || npc.IsMarried)
                     {
+                        // v0.64.1 audit fix: notify a player spouse BEFORE
+                        // bereavement clears the marriage flags (the notify
+                        // gate reads them). Aging path doesn't route through
+                        // MarkNPCDead, so it needs its own hook.
+                        NotifyPlayerSpouseOfDeath(npc, "old age", npc.CurrentLocation ?? "their home");
                         HandleSpouseBereavement(npc);
                     }
 
@@ -1054,10 +1211,14 @@ public class WorldSimulator
     {
         var aliveNPCs = npcs.Where(n => n.IsAlive && !n.IsDead && !n.IsAgedDeath && !n.IsPermaDead).ToList();
 
-        // Hard cap on total NPC population
-        if (npcs.Count >= GameConfig.MaxNPCPopulation) return;
+        // Hard cap on LIVING NPC population. Pre-fix this checked
+        // `npcs.Count` (total list including permadead corpses), which
+        // froze immigration in any world that had accumulated more dead
+        // NPCs than the cap. Permadead corpses are inert records that
+        // shouldn't block new arrivals from replacing them.
+        if (aliveNPCs.Count >= GameConfig.MaxNPCPopulation) return;
 
-        bool populationHigh = npcs.Count >= GameConfig.MaxNPCPopulation - 10; // Slow down near the cap
+        bool populationHigh = aliveNPCs.Count >= GameConfig.MaxNPCPopulation - 10; // Slow down near the cap
 
         // Calculate average level of alive NPCs for immigrant scaling
         int avgLevel = aliveNPCs.Count > 0 ? Math.Max(1, (int)aliveNPCs.Average(n => n.Level)) : 5;
@@ -1591,8 +1752,11 @@ public class WorldSimulator
     /// </summary>
     public void OrphanBecomesNPC(RoyalOrphan orphan)
     {
-        // Don't exceed population cap
-        if (npcs.Count >= GameConfig.MaxNPCPopulation) return;
+        // Don't exceed LIVING population cap. Pre-fix this checked
+        // `npcs.Count` (total list including permadead), which blocked
+        // orphan graduation in worlds with heavy accumulated permadeath.
+        int aliveCount = npcs.Count(n => n.IsAlive && !n.IsDead && !n.IsAgedDeath && !n.IsPermaDead);
+        if (aliveCount >= GameConfig.MaxNPCPopulation) return;
 
         string displayName = NPCSpawnSystem.Instance?.DisambiguateNPCName(orphan.Name) ?? orphan.Name;
 
@@ -1984,8 +2148,13 @@ public class WorldSimulator
         int childCount = FamilySystem.Instance?.AllChildren.Count(c => !c.Deleted) ?? 0;
         int totalPop = aliveCount + childCount;
 
-        // Hard cap: no new pregnancies when at population limit
-        if (npcs.Count >= GameConfig.MaxNPCPopulation)
+        // Hard cap: no new pregnancies when LIVING population is at limit.
+        // Pre-fix this checked `npcs.Count` (total list size including
+        // permadead corpses). Live audit found a world with 99 alive + 11
+        // dead + 134 permadead = 244 records, well past the 200 cap, with
+        // pregnancy permanently disabled despite 71 marriages. Permadead
+        // corpses are inert records that shouldn't block new life.
+        if (aliveCount >= GameConfig.MaxNPCPopulation)
         {
             return;
         }
@@ -2249,6 +2418,152 @@ public class WorldSimulator
     /// for variety). DispatchVerb is shared with the legacy path so the same
     /// activity flavor + emotional state + telemetry fire either way.
     /// </summary>
+
+    // v0.64.1: case-insensitive lookup of a living NPC by display or first name.
+    // Used by TryTargetSteerToTarget to resolve Goal.TargetCharacter strings
+    // (which are populated by family-memory promotion in Slice 3 and by the
+    // LLM strategic-goals generator in Slice 12a) into actual NPC references.
+    // Returns null if no match or the target is dead/permadead -- caller falls
+    // through to normal verb dispatch in those cases.
+    internal NPC? FindLivingNPCByName(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return null;
+        var trimmed = name.Trim();
+        foreach (var n in npcs)
+        {
+            if (n == null || !n.IsAlive || n.IsDead) continue;
+            if (string.Equals(n.Name2, trimmed, StringComparison.OrdinalIgnoreCase)) return n;
+            if (string.Equals(n.Name1, trimmed, StringComparison.OrdinalIgnoreCase)) return n;
+            if (string.Equals(n.Name, trimmed, StringComparison.OrdinalIgnoreCase)) return n;
+        }
+        return null;
+    }
+
+    // v0.64.1 Brain v2 Slice 13: target-aware dispatch. When the NPC's
+    // priority goal has a TargetCharacter (LLM-populated for revenge,
+    // romance, rivalry, mentorship, etc., or set by family-memory promotion
+    // for Avenge goals) and that target is alive, steer the NPC to the
+    // target's current location instead of running the normal verb. This
+    // turns dashboard goal text like "Crush Lucinda Foxglove" from
+    // verb-family bias into literal in-game pursuit -- the NPC will physically
+    // show up wherever Lucinda is, with goal-type-keyed activity flavor.
+    //
+    // Probability scales with goal priority so low-priority strategic threads
+    // don't dominate behavior; high-priority Avenge goals will pursue
+    // aggressively. Settlement residents respect snap-back.
+    //
+    // Returns true if steered (caller skips normal verb dispatch).
+    private bool TryTargetSteerToTarget(NPC npc)
+    {
+        var brain = npc.Brain;
+        var goal = brain?.Goals?.GetPriorityGoal();
+        if (goal == null || string.IsNullOrWhiteSpace(goal.TargetCharacter)) return false;
+
+        // v0.64.1 audit fix: never steer an NPC who is engaged with a player
+        // (dungeon party, conversation) -- yanking a partied spouse's location
+        // out of "Dungeon" mid-run corrupts the party bookkeeping and fights
+        // the engaged-protection work in this same release. Likewise never
+        // steer an NPC who is themselves in the Dungeon (their own run's exit
+        // bookkeeping expects to find them there).
+        if (npc.IsInConversation) return false;
+        if (string.Equals(npc.CurrentLocation, "Dungeon", StringComparison.OrdinalIgnoreCase)) return false;
+
+        // Settlers stay put; their snap-back enforcement would undo any move.
+        if (SettlementSystem.Instance?.State.SettlerNames.Contains(npc.Name) == true) return false;
+
+        var target = FindLivingNPCByName(goal.TargetCharacter);
+        if (target == null) return false;
+        if (string.IsNullOrWhiteSpace(target.CurrentLocation)) return false;
+        // Don't follow the target into the Dungeon -- the dungeon verb has its
+        // own combat / floor-pick semantics that the steer can't replicate, and
+        // mass-tracking a target across dungeon floors would be silly.
+        if (target.CurrentLocation == "Dungeon") return false;
+        // Already there? Nothing to do; fall through to normal verb selection
+        // so the NPC actually does something this tick.
+        if (string.Equals(npc.CurrentLocation, target.CurrentLocation, StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        // Probability scales with goal priority: priority 0.9 = 36% steer,
+        // priority 0.5 = 20% steer, priority 0.3 = 12% steer. Tuned so a
+        // single tick almost never pursues, but over many ticks the NPC
+        // accumulates time near the target.
+        double steerChance = Math.Clamp(goal.Priority * 0.4, 0.05, 0.50);
+        if (random.NextDouble() > steerChance) return false;
+
+        // Goal-type-keyed flavor + emotional impact.
+        string targetName = target.Name2 ?? target.Name1 ?? "their mark";
+        string activity;
+        EmotionType primaryEmotion;
+        float emotionStrength;
+        switch (goal.Type)
+        {
+            case GoalType.Combat:
+                activity = $"shadowing {targetName} with hostile intent";
+                primaryEmotion = EmotionType.Anger;
+                emotionStrength = 0.5f;
+                break;
+            case GoalType.Social:
+                activity = goal.Name.Contains("Reconcile", StringComparison.OrdinalIgnoreCase)
+                    || goal.Name.Contains("Protect", StringComparison.OrdinalIgnoreCase)
+                    || goal.Name.Contains("Friend", StringComparison.OrdinalIgnoreCase)
+                    ? $"seeking out {targetName} to talk"
+                    : $"watching {targetName} from across the room";
+                primaryEmotion = goal.Name.Contains("Reconcile", StringComparison.OrdinalIgnoreCase)
+                    || goal.Name.Contains("Protect", StringComparison.OrdinalIgnoreCase)
+                    ? EmotionType.Hope
+                    : EmotionType.Envy;
+                emotionStrength = 0.4f;
+                break;
+            case GoalType.Personal:
+                activity = $"keeping watch over {targetName}";
+                primaryEmotion = EmotionType.Hope;
+                emotionStrength = 0.3f;
+                break;
+            default:
+                activity = $"trailing {targetName}";
+                primaryEmotion = EmotionType.Confidence;
+                emotionStrength = 0.3f;
+                break;
+        }
+
+        string locationBefore = npc.CurrentLocation;
+        // v0.64.1 audit fix: route through UpdateLocation (the single movement
+        // chokepoint) instead of a raw field write -- the raw write skipped the
+        // LocationManager presence-registry remove/add, leaving ghost entries
+        // at the pre-steer location that accumulated per steer. UpdateLocation
+        // clears CurrentActivity, so set the flavor AFTER the move.
+        npc.UpdateLocation(target.CurrentLocation);
+        npc.CurrentActivity = activity;
+        npc.EmotionalState?.AddEmotion(primaryEmotion, emotionStrength, 90);
+
+        // Telemetry: log as action=target_steer so dashboard pivots can isolate
+        // the new behavior from normal verbs. Outcome captures the goal type
+        // for finer rollup ("target_steer/Combat", "target_steer/Social").
+        try
+        {
+            SqlBackend?.LogNPCDecision(
+                npc.Name2 ?? npc.Name1 ?? "(unknown)",
+                (int)npc.Level,
+                npc.Class.ToString(),
+                "target_steer",
+                locationBefore,
+                npc.CurrentLocation,
+                $"goal:{goal.Type}",
+                0,
+                0,
+                npc.HP,
+                npc.HP,
+                npc.IsAIDriven);
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("WORLDSIM",
+                $"target_steer telemetry failed for {npc.Name2 ?? npc.Name1}: {ex.Message}");
+        }
+
+        return true;
+    }
+
     private void BrainV2ProcessActivities(NPC npc, WorldState world)
     {
         if (IsPlayerTeam(npc.Team)) return;
@@ -2278,6 +2593,14 @@ public class WorldSimulator
                 // Fall through: scorer will still run on whatever goal state exists.
             }
         }
+
+        // v0.64.1 Brain v2 Slice 13: target-aware pre-pick. If the priority
+        // goal has a TargetCharacter and the target NPC is alive and
+        // reachable, probabilistically steer to their location instead of
+        // running a normal verb this tick. Probability scales with goal
+        // priority. See TryTargetSteerToTarget for the policy details. When
+        // this fires, skip the rest of the tick -- the steer IS the action.
+        if (TryTargetSteerToTarget(npc)) return;
 
         var activities = BuildCandidateActivities(npc);
         if (activities.Count == 0) return;
@@ -2329,19 +2652,23 @@ public class WorldSimulator
             activities.Add(("shop", shopWeight));
         }
 
-        // Training at gym. v0.61.3 bumped 0.15 -> 0.25 to nudge NPCs toward
-        // the gym, but v0.61.5 production telemetry showed train still at
-        // 1.1% of all actions (1,886 events in 174,535). Even the busiest
-        // trainer in the dataset (Hadwin Ravenscroft) trained only 2.6% of
-        // their actions. Doubling base to 0.50 should bring train closer to
-        // its intended ~5% share of NPC time. Lowered gold gate 50 -> 20 so
-        // low-level NPCs with empty pockets can still afford the gym (charge
-        // scales with level; 50g was a real barrier for early-career NPCs).
+        // Training at gym. v0.64.1 tuning: post-deploy telemetry showed train
+        // at 42% of all NPC actions -- a runaway. The v0.61.5 0.15 -> 0.25 bump,
+        // followed by the later 0.25 -> 0.50 bump (to push NPCs to the gym
+        // because previous telemetry showed train at only 1%), plus the
+        // compounding personality multipliers (Aggression 1.3x / Intelligence
+        // 1.4x / Mysticism 1.2x / Patience-impatient 1.3x) and Brain v2
+        // scorer multipliers (Personal-goal 1.6x / Combat-goal 1.3x /
+        // need-sat 1.3x for low-level NPCs), stacked to make train dominate
+        // every other action. Cutting base 0.50 -> 0.22 and Ambition
+        // contribution 0.15 -> 0.08, paired with scorer + personality
+        // reductions, should bring train share to ~20% -- still a top
+        // activity, no longer eating half the world. Gold gate kept at 20.
         if (npc.Gold > 20)
         {
-            float trainWeight = 0.50f;
+            float trainWeight = 0.22f;
             if (npc.Brain?.Personality != null)
-                trainWeight += npc.Brain.Personality.Ambition * 0.15f;
+                trainWeight += npc.Brain.Personality.Ambition * 0.08f;
             activities.Add(("train", trainWeight));
         }
 
@@ -2542,6 +2869,14 @@ public class WorldSimulator
             activities.Add(("team_recruit", 0.06));
         }
 
+        // v0.64.1 Brain v2 Slice 15: NPC bounty questing. Players visit Quest
+        // Hall to claim bounties from the board (kill X monsters, clear Y
+        // floors). NPCs never did. This makes them. Base weight modest so
+        // questing competes with other goal-driven actions; Aggression /
+        // Greed / Courage personality boosts in ApplyPersonalityWeights
+        // make combat-leaning NPCs more likely to seek out bounties.
+        activities.Add(("quest", 0.08));
+
         // Apply the modifier chain in place. Each modifier mutates the list,
         // multiplying weights based on personality / time-of-day / memory /
         // relationships / neighbor density / world events / cultural memes /
@@ -2624,6 +2959,11 @@ public class WorldSimulator
                 TelemetryWrap(npc, "team_recruit", () => NPCTeamRecruitment(npc));
                 npc.CurrentActivity = "looking for recruits";
                 npc.EmotionalState?.AddEmotion(EmotionType.Hope, 0.3f, 60);
+                break;
+            case "quest":
+                TelemetryWrap(npc, "quest", () => NPCTakeBountyQuest(npc));
+                // CurrentActivity stamped inside NPCTakeBountyQuest based on
+                // the outcome (claimed / completed / failed / nothing-available).
                 break;
             case "team_dungeon":
                 TelemetryWrap(npc, "team_dungeon", () => NPCTeamDungeonRun(npc));
@@ -2747,9 +3087,10 @@ public class WorldSimulator
         {
             MultiplyWeight(activities, "dungeon", 1.5);
             MultiplyWeight(activities, "team_dungeon", 1.4);
-            MultiplyWeight(activities, "train", 1.3);
+            MultiplyWeight(activities, "train", 1.15); // v0.64.1 anti-runaway: 1.3 -> 1.15
             MultiplyWeight(activities, "dark_alley", 1.4);
             MultiplyWeight(activities, "shop", 0.7);
+            MultiplyWeight(activities, "quest", 1.5); // bounties feed the hunt
         }
         if (p.Sociability > 0.6f)
         {
@@ -2765,17 +3106,18 @@ public class WorldSimulator
             MultiplyWeight(activities, "marketplace", 1.4);
             MultiplyWeight(activities, "dark_alley", 1.3);
             MultiplyWeight(activities, "dungeon", 1.2);
+            MultiplyWeight(activities, "quest", 1.4); // bounties pay coin
         }
         if (p.Intelligence > 0.6f)
         {
-            MultiplyWeight(activities, "train", 1.4);
+            MultiplyWeight(activities, "train", 1.2); // v0.64.1 anti-runaway: 1.4 -> 1.2
             MultiplyWeight(activities, "shop", 1.2);
             MultiplyWeight(activities, "dungeon", 0.8);
         }
         if (p.Mysticism > 0.6f)
         {
             MultiplyWeight(activities, "temple", 1.5);
-            MultiplyWeight(activities, "train", 1.2);
+            MultiplyWeight(activities, "train", 1.1); // v0.64.1 anti-runaway: 1.2 -> 1.1
             MultiplyWeight(activities, "shop", 0.8);
         }
         if (p.Caution > 0.6f)
@@ -2790,6 +3132,7 @@ public class WorldSimulator
             MultiplyWeight(activities, "dungeon", 1.4);
             MultiplyWeight(activities, "team_dungeon", 1.3);
             MultiplyWeight(activities, "castle", 1.3);
+            MultiplyWeight(activities, "quest", 1.3); // brave NPCs answer the board
         }
         if (p.Patience < 0.3f)
         {
@@ -2822,7 +3165,7 @@ public class WorldSimulator
 
         if (hour >= 6 && hour < 12) // Morning
         {
-            MultiplyWeight(activities, "train", 1.3);
+            MultiplyWeight(activities, "train", 1.15); // v0.64.1 anti-runaway: 1.3 -> 1.15
             MultiplyWeight(activities, "shop", 1.2);
             MultiplyWeight(activities, "temple", 1.3);
         }
@@ -4439,6 +4782,129 @@ public class WorldSimulator
         long affordable = Math.Min(healCost, npc.Gold / 4);
         if (affordable > 0) npc.SpendGold(affordable);
         npc.HP = npc.MaxHP;
+    }
+
+    // v0.64.1 Brain v2 Slice 15: NPC bounty questing. Players visit Quest
+    // Hall to claim bounties from the board (kill X monsters, clear Y
+    // floors); NPCs never did. This is the minimal "narrative theater"
+    // version: the NPC reads the available board, picks a level-appropriate
+    // bounty, rolls success based on level matching, and applies the
+    // reward + news on success. Does NOT claim or remove the quest from
+    // questDatabase -- players still see the same bounty on the board.
+    //
+    // Future slice could promote this to real competition (NPC sets Occupier,
+    // quest disappears from player board, takes N ticks to complete) but
+    // that needs careful interaction with QuestSystem.ClaimQuest's
+    // Player-typed signature. Read-only is the safe MVP.
+    private void NPCTakeBountyQuest(NPC npc)
+    {
+        npc.UpdateLocation("Quest Hall");
+
+        List<Quest> available;
+        try
+        {
+            available = QuestSystem.GetBountyBoardQuests(npc) ?? new List<Quest>();
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("WORLDSIM",
+                $"NPCTakeBountyQuest GetBountyBoardQuests failed for {npc.Name2 ?? npc.Name}: {ex.Message}");
+            available = new List<Quest>();
+        }
+
+        if (available.Count == 0)
+        {
+            // Empty board -- NPC walks in, sees nothing in their level band,
+            // walks back out. Mild Sadness so the personality state reads
+            // "tried, found nothing" rather than aimless.
+            npc.CurrentActivity = "scanning a sparse bounty board";
+            npc.EmotionalState?.AddEmotion(EmotionType.Sadness, 0.2f, 30);
+            return;
+        }
+
+        // Pick a level-appropriate quest -- prefer one closest to NPC level
+        // so the success roll is meaningful (skip the trivial cleanup quests
+        // and the absurdly over-leveled ones the NPC would always fail).
+        var pick = available
+            .OrderBy(q => Math.Abs(q.MinLevel - (int)npc.Level))
+            .First();
+
+        // Success probability: base 55%, +4% per level the NPC has over the
+        // quest's MinLevel (cap +35), -3% per level the quest is over the
+        // NPC. Clamped to [0.15, 0.92] so even a flawless match has a 8%
+        // surprise failure (board-rumor wasn't what it seemed) and even an
+        // outclassed NPC has a slim chance to come back winning.
+        int levelDelta = (int)npc.Level - pick.MinLevel;
+        double successChance;
+        if (levelDelta >= 0)
+            successChance = 0.55 + Math.Min(0.35, levelDelta * 0.04);
+        else
+            successChance = 0.55 + (levelDelta * 0.03);
+        successChance = Math.Clamp(successChance, 0.15, 0.92);
+
+        bool succeeded = random.NextDouble() < successChance;
+        string questDesc;
+        try
+        {
+            questDesc = pick.GetTargetDescription();
+            if (string.IsNullOrWhiteSpace(questDesc)) questDesc = "a bounty";
+        }
+        catch
+        {
+            questDesc = "a bounty";
+        }
+
+        if (succeeded)
+        {
+            // Reward scales on the QUEST's intended level (so NPCs hunting
+            // big bounties get paid like big bounties).
+            long goldReward = 0;
+            long xpReward = 0;
+            try
+            {
+                if (pick.RewardType == QuestRewardType.Money)
+                    goldReward = pick.CalculateReward(pick.MinLevel);
+                else if (pick.RewardType == QuestRewardType.Experience)
+                    xpReward = pick.CalculateReward(pick.MinLevel);
+                // Direct gold bounty (king-style) bypasses the byte Reward.
+                if (pick.BountyGold > 0) goldReward += pick.BountyGold;
+            }
+            catch { /* malformed quest data, fall through with zero rewards */ }
+
+            // Floor rewards so even a malformed quest pays something for the
+            // successful hunt -- otherwise news fires "claimed bounty" for 0g.
+            if (goldReward <= 0 && xpReward <= 0)
+            {
+                goldReward = pick.MinLevel * 100;
+            }
+
+            if (goldReward > 0) npc.Gold += goldReward;
+            if (xpReward > 0) npc.GainExperience(xpReward);
+
+            npc.CurrentActivity = $"collecting the bounty on {questDesc}";
+            npc.EmotionalState?.AddEmotion(EmotionType.Pride, 0.5f, 120);
+            npc.EmotionalState?.AddEmotion(EmotionType.Joy, 0.4f, 90);
+
+            try
+            {
+                NewsSystem.Instance?.Newsy(true,
+                    $"{npc.Name2 ?? npc.Name} returned victorious from a hunt for {questDesc}!");
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("WORLDSIM",
+                    $"NPCTakeBountyQuest news write failed: {ex.Message}");
+            }
+        }
+        else
+        {
+            // Failed: no penalty, just a beat of disappointment. Could be
+            // expanded later (lose face / NPC pays the entry fee) but for
+            // MVP a no-cost retry next tick keeps the verb low-friction.
+            npc.CurrentActivity = "returning empty-handed from the hunt";
+            npc.EmotionalState?.AddEmotion(EmotionType.Sadness, 0.3f, 60);
+            npc.EmotionalState?.AddEmotion(EmotionType.Anger, 0.2f, 30);
+        }
     }
 
     // Slice 1's DispatchBrainAction (translator from Brain's narrow ActionType

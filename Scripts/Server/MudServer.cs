@@ -290,15 +290,49 @@ public class MudServer
         try
         {
             client.NoDelay = true;
-            var stream = client.GetStream();
+            var rawStream = client.GetStream();
 
-            // Try to read the AUTH header line (timeout after 3 seconds)
+            // v0.64.0 PROXY protocol v2: check for a PROXY header at the
+            // very start of the connection. sslh (when configured with
+            // `proxyprotocol: 2` on a protocol stanza) prepends a 16-byte
+            // header containing the original client IP before forwarding
+            // raw user data. We need that IP for ban enforcement -- without
+            // it, sslh's loopback forward makes every connection look like
+            // 127.0.0.1 and bans would lock out the relay itself.
+            //
+            // If a PROXY header is present, parse it and use the source IP
+            // as forwardedIP (same role as the X-IP header that relay paths
+            // already use). If no PROXY header, the 12 read-ahead bytes are
+            // real user data and get re-injected via PrependedStream so the
+            // subsequent ReadLineAsync sees them as the start of the first
+            // line (preserves backward compat with existing relays + raw
+            // clients connecting without PROXY).
+            string? forwardedIP = null;
+            Stream stream;
+            {
+                var (proxySrcIp, leftover) = await TryReadProxyProtocolV2Async(rawStream, ct);
+                if (proxySrcIp != null)
+                {
+                    forwardedIP = proxySrcIp;
+                    Console.Error.WriteLine($"[MUD] PROXY v2 client IP: {forwardedIP}");
+                    stream = rawStream; // header consumed; raw stream now at user data
+                }
+                else if (leftover != null && leftover.Length > 0)
+                {
+                    stream = new PrependedStream(rawStream, leftover);
+                }
+                else
+                {
+                    stream = rawStream;
+                }
+            }
+
+            // Try to read the AUTH header line (timeout after 500ms)
             // If we get an AUTH: header, use protocol mode.
             // If we get anything else or timeout, switch to interactive mode.
             string? authLine = null;
             bool isInteractive = false;
             byte[]? firstBytes = null;
-            string? forwardedIP = null;
 
             try
             {
@@ -312,9 +346,14 @@ public class MudServer
                 isInteractive = true;
             }
 
-            // Check for X-IP forwarded client IP from relay/proxy
+            // Check for X-IP forwarded client IP from relay/proxy.
+            // v0.64.0: skip this if PROXY v2 already supplied the source IP.
+            // PROXY comes from sslh on the loopback path (trusted); X-IP comes
+            // from the AUTH protocol (untrusted -- any client could spoof it).
+            // Letting X-IP override a PROXY-supplied IP would defeat the whole
+            // point of the PROXY parsing.
             string? proxyClientType = null;
-            if (authLine != null && authLine.StartsWith("X-IP:"))
+            if (forwardedIP == null && authLine != null && authLine.StartsWith("X-IP:"))
             {
                 forwardedIP = authLine.Substring(5).Trim();
                 Console.Error.WriteLine($"[MUD] Forwarded client IP: {forwardedIP}");
@@ -633,7 +672,7 @@ public class MudServer
     /// and raw telnet connections that don't send an AUTH header.
     /// </summary>
     private async Task<(string username, string connectionType)?> InteractiveAuthAsync(
-        NetworkStream stream, SqlSaveBackend sqlBackend, CancellationToken ct, bool isPlainText = false, bool isCp437 = false, string? effectiveIp = null)
+        Stream stream, SqlSaveBackend sqlBackend, CancellationToken ct, bool isPlainText = false, bool isCp437 = false, string? effectiveIp = null)
     {
         const int MAX_ATTEMPTS = 5;
 
@@ -829,7 +868,7 @@ public class MudServer
     private static System.Text.Encoding? _cp437Encoding;
 
     /// <summary>Write ANSI text to a network stream, optionally encoding as CP437.</summary>
-    private static async Task WriteAnsiAsync(NetworkStream stream, string text, bool cp437 = false)
+    private static async Task WriteAnsiAsync(Stream stream, string text, bool cp437 = false)
     {
         byte[] bytes;
         if (cp437)
@@ -858,7 +897,7 @@ public class MudServer
     /// gmcpEnabled=true if the client responded IAC DO GMCP to our IAC WILL GMCP offer.
     /// Called only for interactive (non-AUTH) connections after the 500ms AUTH timeout.
     /// </summary>
-    private static async Task<(bool isPlainText, bool isCp437, string? ttype, bool gmcpEnabled)> ProbeTtypeAsync(NetworkStream stream, CancellationToken ct)
+    private static async Task<(bool isPlainText, bool isCp437, string? ttype, bool gmcpEnabled)> ProbeTtypeAsync(Stream stream, CancellationToken ct)
     {
         bool gmcpEnabled = false;
         try
@@ -964,7 +1003,7 @@ public class MudServer
     /// <param name="echo">If true, echo each typed character back to the stream (for MUD clients
     /// that disabled local echo after receiving IAC WILL ECHO).</param>
     /// <param name="maskChar">If set and echo is true, echo this character instead of the real one (for passwords).</param>
-    private static async Task<string?> ReadLineAsync(NetworkStream stream, CancellationToken ct,
+    private static async Task<string?> ReadLineAsync(Stream stream, CancellationToken ct,
         bool echo = false, char? maskChar = null)
     {
         var buffer = new byte[1];
@@ -1013,8 +1052,16 @@ public class MudServer
             }
             if (c == '\r')
             {
-                // Drain trailing \n if it's already in the buffer (sent as \r\n packet)
-                if (stream.DataAvailable)
+                // Drain trailing \n if it's already in the buffer (sent as \r\n packet).
+                // v0.64.0: DataAvailable is NetworkStream-specific; pattern-match
+                // so we work with both NetworkStream and PrependedStream wrapper.
+                bool hasMore = stream switch
+                {
+                    System.Net.Sockets.NetworkStream ns => ns.DataAvailable,
+                    PrependedStream ps => ps.HasReadableData,
+                    _ => false,
+                };
+                if (hasMore)
                 {
                     int peek = await stream.ReadAsync(buffer, 0, 1, ct);
                     // If it wasn't \n, we lost a byte — but \r without \n is extremely rare
@@ -1052,8 +1099,153 @@ public class MudServer
         return null;
     }
 
-    /// <summary>Write a line to a network stream with \r\n terminator.</summary>
-    private static async Task WriteLineAsync(NetworkStream stream, string message)
+    // v0.64.0 PROXY protocol v2 signature: the first 12 bytes of every
+    // PROXY v2 header. Standard, public spec, used by HAProxy, sslh, nginx,
+    // etc. https://www.haproxy.org/download/2.8/doc/proxy-protocol.txt
+    private static readonly byte[] ProxyV2Signature = new byte[]
+    {
+        0x0D, 0x0A, 0x0D, 0x0A, 0x00, 0x0D, 0x0A, 0x51, 0x55, 0x49, 0x54, 0x0A
+    };
+
+    /// <summary>
+    /// v0.64.0: Try to parse a PROXY protocol v2 header at the start of
+    /// the connection. Reads up to 12 bytes; if they match the PROXY v2
+    /// signature, consumes the rest of the header and returns the parsed
+    /// source IP. If they don't match, those 12 bytes were real user data
+    /// and are returned via `leftover` so the caller can prepend them back
+    /// into the stream (via PrependedStream).
+    ///
+    /// Used by sslh in PROXY-protocol mode to forward the original client
+    /// IP through to the game server when sslh would otherwise hide it
+    /// (transparent mode caused routing problems; PROXY protocol is the
+    /// in-band alternative).
+    ///
+    /// Returns (sourceIp, null) on successful PROXY parse, or
+    /// (null, leftover) when bytes were read but not a PROXY header.
+    /// Returns (null, null) on read error / EOF before 12 bytes.
+    /// </summary>
+    private static async Task<(string? sourceIp, byte[]? leftover)> TryReadProxyProtocolV2Async(
+        Stream stream, CancellationToken ct)
+    {
+        var buf = new byte[12];
+        int got = 0;
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(TimeSpan.FromMilliseconds(200));
+            while (got < 12)
+            {
+                int n = await stream.ReadAsync(buf, got, 12 - got, cts.Token);
+                if (n <= 0)
+                {
+                    // EOF before 12 bytes -- whatever we did read isn't a PROXY
+                    // header. Return as leftover so caller can use them.
+                    return (null, got > 0 ? buf[..got] : null);
+                }
+                got += n;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // 200ms read timeout -- common for interactive clients that don't
+            // send a PROXY header. Return what we got (possibly nothing) as
+            // leftover; subsequent reads on the wrapped stream pick up where
+            // we left off when the user finally types something.
+            return (null, got > 0 ? buf[..got] : null);
+        }
+        catch
+        {
+            // Other I/O error -- propagate up by returning empty so caller
+            // can handle the bad-connection case via the existing path.
+            return (null, null);
+        }
+
+        // Check signature
+        for (int i = 0; i < 12; i++)
+        {
+            if (buf[i] != ProxyV2Signature[i])
+            {
+                // Not a PROXY header. The 12 bytes are real client data.
+                return (null, buf);
+            }
+        }
+
+        // Signature matched. Read the next 4 bytes: ver+cmd, family+proto, length (2 bytes).
+        var hdr = new byte[4];
+        int hdrGot = 0;
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(TimeSpan.FromMilliseconds(500));
+            while (hdrGot < 4)
+            {
+                int n = await stream.ReadAsync(hdr, hdrGot, 4 - hdrGot, cts.Token);
+                if (n <= 0) return (null, null); // truncated PROXY header
+                hdrGot += n;
+            }
+        }
+        catch
+        {
+            return (null, null);
+        }
+
+        byte verCmd = hdr[0];        // bits 7-4 = version (2), bits 3-0 = command (0=LOCAL, 1=PROXY)
+        byte famProto = hdr[1];      // bits 7-4 = family (1=AF_INET, 2=AF_INET6), bits 3-0 = transport
+        int payloadLen = (hdr[2] << 8) | hdr[3];
+
+        // Read the payload (variable length per family).
+        var payload = new byte[payloadLen];
+        int payGot = 0;
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(TimeSpan.FromMilliseconds(500));
+            while (payGot < payloadLen)
+            {
+                int n = await stream.ReadAsync(payload, payGot, payloadLen - payGot, cts.Token);
+                if (n <= 0) return (null, null); // truncated
+                payGot += n;
+            }
+        }
+        catch
+        {
+            return (null, null);
+        }
+
+        // PROXY command (verCmd lower nibble = 1). LOCAL command (0) means
+        // "no real client" (health checks) -- treat as no source IP.
+        if ((verCmd & 0x0F) != 0x01) return (null, null);
+        // Version check (upper nibble must be 2).
+        if ((verCmd & 0xF0) != 0x20) return (null, null);
+
+        // Parse source IP from payload based on address family.
+        try
+        {
+            if (famProto == 0x11 && payloadLen >= 12) // TCP over IPv4
+            {
+                var srcBytes = new byte[4];
+                Array.Copy(payload, 0, srcBytes, 0, 4);
+                return (new System.Net.IPAddress(srcBytes).ToString(), null);
+            }
+            if (famProto == 0x21 && payloadLen >= 36) // TCP over IPv6
+            {
+                var srcBytes = new byte[16];
+                Array.Copy(payload, 0, srcBytes, 0, 16);
+                return (new System.Net.IPAddress(srcBytes).ToString(), null);
+            }
+        }
+        catch
+        {
+            // Bad address bytes -- treat as no source IP.
+        }
+
+        // Unsupported family (AF_UNIX, AF_UNSPEC) or malformed payload --
+        // header was consumed, caller can continue but without a real IP.
+        return (null, null);
+    }
+
+    /// <summary>Write a line to a stream with \r\n terminator.</summary>
+    private static async Task WriteLineAsync(Stream stream, string message)
     {
         var bytes = System.Text.Encoding.UTF8.GetBytes(message + "\r\n");
         await stream.WriteAsync(bytes, 0, bytes.Length);

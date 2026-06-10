@@ -1,4 +1,4 @@
-# v0.64.0 -- Brain v2
+# v0.64.0 -- The Brain
 
 ## TL;DR
 

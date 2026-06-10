@@ -5791,6 +5791,7 @@ public partial class GameEngine
         player.DesecrationsToday = playerData.DesecrationsToday;
         player.ConfessionsToday = playerData.ConfessionsToday;
         player.MurdersToday = playerData.MurdersToday;
+        player.SparesToday = playerData.SparesToday;
         player.TeamWarsToday = playerData.TeamWarsToday;
         player.DrinkingGamesToday = playerData.DrinkingGamesToday;
         player.LoveStreetVisitsToday = playerData.LoveStreetVisitsToday;
@@ -6471,7 +6472,8 @@ public partial class GameEngine
                                 IsActive = goalData.IsActive,
                                 TargetValue = goalData.TargetValue,
                                 CurrentValue = goalData.CurrentValue,
-                                CreatedTime = goalData.CreatedTime
+                                CreatedTime = goalData.CreatedTime,
+                                TargetCharacter = goalData.TargetCharacter ?? "" // v0.64.1: round-trip
                             };
                             npc.Brain.Goals?.AddGoal(goal);
                         }

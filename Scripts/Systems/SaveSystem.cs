@@ -927,6 +927,7 @@ namespace UsurperRemake.Systems
                 DesecrationsToday = player.DesecrationsToday,
                 ConfessionsToday = player.ConfessionsToday,
                 MurdersToday = player.MurdersToday,
+                SparesToday = player.SparesToday,
                 TeamWarsToday = player.TeamWarsToday,
                 DrinkingGamesToday = player.DrinkingGamesToday,
                 LoveStreetVisitsToday = player.LoveStreetVisitsToday,
@@ -1718,7 +1719,8 @@ namespace UsurperRemake.Systems
                 Progress = g.Progress,
                 IsActive = g.IsActive,
                 TargetValue = g.TargetValue,
-                CurrentValue = g.CurrentValue
+                CurrentValue = g.CurrentValue,
+                TargetCharacter = g.TargetCharacter ?? "" // v0.64.1: load-bearing for Slices 13/14b/19/20 + revenge completion
             }).ToList();
         }
         

@@ -210,6 +210,16 @@ public abstract class BaseLocation
             }
         }
 
+        // v0.64.1 Brain v2 Slice 13b: surface NPCs whose top strategic goal
+        // targets the current player. Slice 13 made NPCs physically steer
+        // toward their target's location, but the player saw no signal --
+        // just the NPC's name in a generic "also here" list. This emits a
+        // tone-keyed line so a hunted player gets the warning, a courted
+        // player gets the openness, etc. Pure mechanical read of state
+        // already populated by Slice 12a (LLM strategic goals) + Slice 13
+        // (target steering); no new save data, no LLM cost.
+        WriteTargetingNPCNotifications(player, term);
+
         // Check for achievements on location entry (catches non-combat achievements)
         AchievementSystem.CheckAchievements(player);
         await AchievementSystem.ShowPendingNotifications(term, player);
@@ -361,6 +371,98 @@ public abstract class BaseLocation
     /// <summary>
     /// Show subtle reputation whisper when player enters a location with NPCs who've heard about them (v0.42.0)
     /// </summary>
+    // v0.64.1 Brain v2 Slice 13b: emit a line for each NPC at this location
+    // whose top strategic goal names the current player as its target. Lines
+    // are tone-keyed to goal type (Combat=hostile, Social=watchful or
+    // welcoming depending on goal name, Personal=guarded, other=neutral).
+    // Pure read of state populated by Slice 12a (LLM strategic goals,
+    // populates Goal.TargetCharacter) + Slice 13 (steers NPC to target's
+    // location). Skipped in single-player and BBS modes since strategic goals
+    // are online-only. Failure is swallowed -- this is decoration.
+    private void WriteTargetingNPCNotifications(Character player, TerminalEmulator term)
+    {
+        try
+        {
+            // Skip in offline modes: strategic goals are LLM-driven and only
+            // populated for online Brain v2 NPCs. Reading goals out of band
+            // is cheap, but the lines would never fire in single-player.
+            if (!UsurperRemake.BBS.DoorMode.IsOnlineMode) return;
+
+            string playerKey = player?.Name2 ?? player?.Name1 ?? player?.DisplayName ?? "";
+            if (string.IsNullOrWhiteSpace(playerKey)) return;
+
+            var npcsHere = NPCSpawnSystem.Instance?.ActiveNPCs?
+                .Where(n => n != null && n.IsAlive && !n.IsDead && n.CurrentLocation == Name)
+                .ToList();
+            if (npcsHere == null || npcsHere.Count == 0) return;
+
+            foreach (var npc in npcsHere)
+            {
+                var goal = npc.Brain?.Goals?.GetPriorityGoal();
+                if (goal == null || string.IsNullOrWhiteSpace(goal.TargetCharacter)) continue;
+                if (!string.Equals(goal.TargetCharacter.Trim(), playerKey.Trim(),
+                    StringComparison.OrdinalIgnoreCase)) continue;
+
+                string npcName = npc.Name2 ?? npc.Name1 ?? npc.Name ?? "Someone";
+                string color;
+                string flavorKey;
+                switch (goal.Type)
+                {
+                    case GoalType.Combat:
+                        color = "red";
+                        flavorKey = "base.target_npc_hostile";
+                        break;
+                    case GoalType.Social:
+                        bool friendly = goal.Name.Contains("Reconcile", StringComparison.OrdinalIgnoreCase)
+                                     || goal.Name.Contains("Protect", StringComparison.OrdinalIgnoreCase)
+                                     || goal.Name.Contains("Friend", StringComparison.OrdinalIgnoreCase)
+                                     || goal.Name.Contains("Court", StringComparison.OrdinalIgnoreCase)
+                                     || goal.Name.Contains("Bond", StringComparison.OrdinalIgnoreCase);
+                        color = friendly ? "bright_cyan" : "yellow";
+                        flavorKey = friendly ? "base.target_npc_friendly" : "base.target_npc_watchful";
+                        break;
+                    case GoalType.Personal:
+                        color = "gray";
+                        flavorKey = "base.target_npc_guarded";
+                        break;
+                    default:
+                        color = "gray";
+                        flavorKey = "base.target_npc_neutral";
+                        break;
+                }
+
+                term.SetColor(color);
+                term.WriteLine($"  {Loc.Get(flavorKey, npcName)}");
+
+                // v0.64.1 Slice 19: surface cached goal-aware greeting (Slice
+                // 14b) as a hail on subsequent entries. If the player has
+                // previously initiated Talk with this NPC about this goal,
+                // the LLM-generated opener is in NPC.LLMGoalGreetingCache;
+                // re-emit it here so the NPC's "voice" carries across
+                // re-encounters without requiring another Talk click. Cache
+                // miss is silent -- first-time entries just show the threat
+                // line above; the hail appears after the first conversation
+                // populates the cache. Zero LLM cost (read-only cache lookup).
+                {
+                    string greetCacheKey = $"{goal.Name}|{playerKey}";
+                    if (npc.LLMGoalGreetingCache.TryGetValue(greetCacheKey, out var cachedHail)
+                        && !string.IsNullOrWhiteSpace(cachedHail))
+                    {
+                        term.SetColor("yellow");
+                        term.WriteLine($"  {Loc.Get("base.target_npc_calls_out", npcName, cachedHail)}");
+                    }
+                }
+
+                term.SetColor("white");
+            }
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("LOCATION",
+                $"[WriteTargetingNPCNotifications] failed: {ex.Message}");
+        }
+    }
+
     private Task CheckReputationWhispers(Character player, TerminalEmulator term)
     {
         try

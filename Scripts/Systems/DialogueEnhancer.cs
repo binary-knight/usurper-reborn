@@ -255,7 +255,7 @@ namespace UsurperRemake.Systems
             // Cache lookup. The cache key includes tone so the same emotion
             // under different tones (rare but possible for future expansion)
             // gets distinct cached variants.
-            if (npc?.LLMDialogueFlavorCache != null)
+            if (npc != null)
             {
                 string cacheKey = $"mood_{emotionSuffix}|{tone}";
                 if (npc.LLMDialogueFlavorCache.TryGetValue(cacheKey, out var cached)
@@ -294,10 +294,6 @@ namespace UsurperRemake.Systems
 
             // Lazy-init the per-NPC collections. JsonIgnore on the NPC props
             // means these start null on every fresh NPC restore.
-            if (npc.LLMDialogueFlavorCache == null)
-                npc.LLMDialogueFlavorCache = new Dictionary<string, string>();
-            if (npc.LLMDialogueFlavorInFlight == null)
-                npc.LLMDialogueFlavorInFlight = new HashSet<string>();
 
             // Defensive double-check: another thread may have populated the
             // cache between the caller's lookup and ours.
@@ -445,7 +441,7 @@ namespace UsurperRemake.Systems
             string layer = $"memory_{valence}";
             string cacheKey = $"{layer}|{playerKey}";
 
-            if (npc?.LLMDialogueFlavorCache != null
+            if (npc != null
                 && npc.LLMDialogueFlavorCache.TryGetValue(cacheKey, out var cached)
                 && !string.IsNullOrWhiteSpace(cached))
             {
@@ -473,10 +469,6 @@ namespace UsurperRemake.Systems
             string layer = $"memory_{valence}";
             string cacheKey = $"{layer}|{playerKey}";
 
-            if (npc.LLMDialogueFlavorCache == null)
-                npc.LLMDialogueFlavorCache = new Dictionary<string, string>();
-            if (npc.LLMDialogueFlavorInFlight == null)
-                npc.LLMDialogueFlavorInFlight = new HashSet<string>();
 
             if (npc.LLMDialogueFlavorCache.ContainsKey(cacheKey)) return;
 
@@ -541,7 +533,7 @@ namespace UsurperRemake.Systems
         {
             string cacheKey = string.IsNullOrEmpty(cacheSuffix) ? layer : $"{layer}|{cacheSuffix}";
 
-            if (npc?.LLMDialogueFlavorCache != null
+            if (npc != null
                 && npc.LLMDialogueFlavorCache.TryGetValue(cacheKey, out var cached)
                 && !string.IsNullOrWhiteSpace(cached))
             {
@@ -583,10 +575,6 @@ namespace UsurperRemake.Systems
 
             string cacheKey = string.IsNullOrEmpty(cacheSuffix) ? layer : $"{layer}|{cacheSuffix}";
 
-            if (npc.LLMDialogueFlavorCache == null)
-                npc.LLMDialogueFlavorCache = new Dictionary<string, string>();
-            if (npc.LLMDialogueFlavorInFlight == null)
-                npc.LLMDialogueFlavorInFlight = new HashSet<string>();
 
             if (npc.LLMDialogueFlavorCache.ContainsKey(cacheKey)) return;
 

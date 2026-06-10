@@ -12,6 +12,37 @@ public partial class GoalSystem
     private PersonalityProfile personality;
     private const int MaxGoals = 30;
 
+    // v0.64.1 audit fix (third pass at the avenge-loop): PROCESS-WIDE settled-
+    // revenge registry, keyed "{ownerName}|{targetName}". Two prior fixes
+    // failed for structural reasons the audit surfaced:
+    //   (1) AddGoal's completed-goal dedup was hollow -- UpdateGoals runs
+    //       `goals.RemoveAll(IsCompleted || !IsActive)` at the TOP of every
+    //       tick, so the completed record the dedup keyed on survived less
+    //       than one tick after Complete().
+    //   (2) A per-instance HashSet reset not just on restart but on EVERY
+    //       online world-state reload (LoadWorldState rebuilds every NPC and
+    //       its Brain/GoalSystem) -- minutes apart on a busy server.
+    // A static registry survives reloads (resets only on true process
+    // restart) and is consulted BOTH at goal-add time (stops the loop at the
+    // source: a revenge already settled is never re-added) AND at the news-
+    // fire seam (belt and braces). ConcurrentDictionary because the LLM
+    // strategic-goal callback runs on a background thread.
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte>
+        SettledRevengeTargets = new(StringComparer.OrdinalIgnoreCase);
+
+    // Owner name captured at the top of UpdateGoals so AddGoal (which has no
+    // owner parameter) can key the settled-revenge registry. Set before any
+    // AddGoal can run for this tick; the LLM background callback enqueues
+    // rather than calling AddGoal directly (see _pendingLlmGoals), so it
+    // never races this field.
+    private string _ownerName = "";
+
+    // v0.64.1 audit fix: handoff queue from the LLM strategic-goal background
+    // callback to the tick thread. The callback must NOT touch `goals`
+    // directly (plain List<Goal>, concurrently iterated by UpdateGoals).
+    private readonly System.Collections.Concurrent.ConcurrentQueue<Goal>
+        _pendingLlmGoals = new();
+
     // v0.64.0 Brain v2 Slice 12a: how often the LLM strategic-goal
     // generator runs per NPC. Reactive goals (heal/earn money/etc) keep
     // firing every tick from their concrete triggers; the LLM layer
@@ -42,6 +73,40 @@ public partial class GoalSystem
         // Skip if an active goal with the same name already exists
         if (goals.Any(g => g.Name == goal.Name && g.IsActive))
             return;
+
+        // v0.64.1 audit fix: stop the avenge-loop at the SOURCE. Two parts:
+        // (1) a revenge already settled (per the process-wide registry) is
+        // never re-added -- this is what actually breaks the LLM-refresh /
+        // family-memory re-promotion churn, since both in-list dedups get
+        // erased by UpdateGoals' per-tick RemoveAll prune; (2) a revenge goal
+        // that would be BORN COMPLETE (target already dead) is refused --
+        // promoting a goal that auto-completes on its first tick is the
+        // engine of the loop.
+        bool isRevengeFamily =
+            (goal.Type == GoalType.Combat && goal.Name.StartsWith("Avenge"))
+            || (goal.Type == GoalType.Social && goal.Name.StartsWith("Revenge"));
+        if (isRevengeFamily && !string.IsNullOrEmpty(goal.TargetCharacter))
+        {
+            if (!string.IsNullOrEmpty(_ownerName)
+                && SettledRevengeTargets.ContainsKey($"{_ownerName}|{goal.TargetCharacter}"))
+            {
+                return;
+            }
+            // Born-complete refusal requires CONFIRMED death -- the target
+            // resolves to a pool NPC with IsDead=true. Deliberately stricter
+            // than IsTargetCharacterDead (which treats not-in-pool as settled):
+            // a player killer or a transient hostile never appears in the
+            // pool, and refusing those promotions would block legitimate
+            // first-time vengeance. The not-in-pool auto-complete still
+            // settles such goals on the next tick, and the settled registry
+            // then blocks every subsequent re-add.
+            if (IsTargetConfirmedDeadInPool(goal.TargetCharacter))
+            {
+                if (!string.IsNullOrEmpty(_ownerName))
+                    SettledRevengeTargets.TryAdd($"{_ownerName}|{goal.TargetCharacter}", 1);
+                return;
+            }
+        }
 
         // Hard cap: prune before adding
         if (goals.Count >= MaxGoals)
@@ -83,6 +148,21 @@ public partial class GoalSystem
     
     public void UpdateGoals(NPC owner, WorldState world, MemorySystem memory, EmotionalState emotions)
     {
+        // v0.64.1 audit fix: capture owner identity for AddGoal's settled-
+        // revenge registry key (AddGoal has no owner parameter).
+        _ownerName = owner?.Name2 ?? owner?.Name1 ?? owner?.Name ?? "";
+
+        // v0.64.1 audit fix: drain LLM-generated goals enqueued by the
+        // background refresh callback. Pre-fix the Task.Run called AddGoal
+        // directly from the callback thread, mutating the plain List<Goal>
+        // concurrently with this method's RemoveAll/foreach -- a swallowed
+        // InvalidOperationException at best, silent list corruption at worst.
+        // The queue moves all goal-list mutation onto the tick thread.
+        while (_pendingLlmGoals.TryDequeue(out var pending))
+        {
+            AddGoal(pending);
+        }
+
         // Prune completed/inactive goals to prevent unbounded list growth
         goals.RemoveAll(g => g.IsCompleted || !g.IsActive);
 
@@ -193,11 +273,16 @@ public partial class GoalSystem
                     // transient (JsonIgnore) so it resets on restart -- the
                     // goal itself persists via the normal Goal serialization.
                     g.IsLLMGenerated = true;
-                    AddGoal(g); // name-dedup means re-running is idempotent
+                    // v0.64.1 audit fix: enqueue instead of AddGoal -- this
+                    // callback runs on a background thread and must not mutate
+                    // the plain List<Goal> the tick thread iterates. UpdateGoals
+                    // drains the queue at the top of the next tick (where
+                    // AddGoal's dedups also see a stable list).
+                    _pendingLlmGoals.Enqueue(g);
                 }
 
                 UsurperRemake.Systems.DebugLogger.Instance.LogInfo("GOALS",
-                    $"LLM strategic refresh for {owner.Name2 ?? owner.Name}: added " +
+                    $"LLM strategic refresh for {owner.Name2 ?? owner.Name}: queued " +
                     $"{candidates.Count} candidate goal(s)");
             }
             catch (Exception ex)
@@ -275,6 +360,23 @@ public partial class GoalSystem
         if (match == null) return true;  // no longer in the world -> consider settled
         return match.IsDead;
     }
+
+    /// <summary>
+    /// v0.64.1 audit fix: stricter variant for AddGoal's born-complete
+    /// refusal -- true ONLY when the target resolves to a pool NPC that is
+    /// confirmed dead. Not-in-pool returns false (unknown != dead), so
+    /// vengeance against player killers / transient hostiles still promotes
+    /// once before the auto-complete settles it.
+    /// </summary>
+    private static bool IsTargetConfirmedDeadInPool(string targetName)
+    {
+        if (string.IsNullOrEmpty(targetName)) return false;
+        var pool = NPCSpawnSystem.Instance?.ActiveNPCs;
+        if (pool == null) return false;
+        var match = pool.FirstOrDefault(n =>
+            (n.Name2 ?? n.Name1 ?? "").Equals(targetName, StringComparison.OrdinalIgnoreCase));
+        return match != null && match.IsDead;
+    }
     
     /// <summary>
     /// Generate visible consequences when an NPC achieves a goal - news events, emotional effects, gossip.
@@ -324,6 +426,36 @@ public partial class GoalSystem
             // Catharsis: anger subsides after revenge
             owner.EmotionalState?.ClearEmotion(EmotionType.Anger);
             string targetName = goal.TargetCharacter ?? "their enemy";
+
+            // v0.64.1 audit fix: belt-and-braces throttle at the news-fire
+            // seam, keyed on the process-wide SettledRevengeTargets registry
+            // (survives world-state reloads; see field declaration). The
+            // add-time dedup in AddGoal is the primary loop-breaker; this
+            // catches any path that reaches completion through a goal that
+            // predates the registry entry. Gossip / emotion still fire
+            // (cheap); only the news entry + LLM call are throttled.
+            string settledKey = !string.IsNullOrEmpty(goal.TargetCharacter)
+                ? $"{npcName}|{goal.TargetCharacter}" : null;
+            bool alreadyAvengedTarget = settledKey != null
+                && SettledRevengeTargets.ContainsKey(settledKey);
+
+            // v0.64.1 audit fix: only CELEBRATE a revenge whose target is
+            // confirmed dead in the NPC pool. IsTargetCharacterDead treats
+            // not-in-pool as settled (correct for closing the goal -- a player
+            // killer or transient hostile will never appear in the pool), but
+            // broadcasting "X took blood for blood from PlayerName" against a
+            // living player the NPC never touched is a false, public claim.
+            // Not-confirmed targets complete SILENTLY: goal closes, emotional
+            // catharsis fires (internal), settled-registry records it, but no
+            // news/gossip posts.
+            bool targetConfirmedDead = !string.IsNullOrEmpty(goal.TargetCharacter)
+                && IsTargetConfirmedDeadInPool(goal.TargetCharacter);
+            if (!targetConfirmedDead && settledKey != null)
+            {
+                SettledRevengeTargets.TryAdd(settledKey, 1);
+                alreadyAvengedTarget = true; // suppress the news/gossip below
+            }
+
             // v0.64.0 Brain v2 Slice 3: family revenge gets weightier news / gossip.
             bool isFamilyVengeance = goal.Name.StartsWith("Avenge");
             if (isFamilyVengeance)
@@ -334,13 +466,23 @@ public partial class GoalSystem
                 // Fire-and-forget -- world-sim tick continues, news lands within
                 // a few seconds. The previous inline NewsSystem.Newsy is now
                 // inside PostAvengeNewsAsync's fallback path.
-                _ = UsurperRemake.Systems.LLMMoments.PostAvengeNewsAsync(owner, targetName);
-                WorldSimulator.AddGossip($"{npcName} took blood for blood from {targetName}");
+                if (!alreadyAvengedTarget)
+                {
+                    _ = UsurperRemake.Systems.LLMMoments.PostAvengeNewsAsync(owner, targetName);
+                    WorldSimulator.AddGossip($"{npcName} took blood for blood from {targetName}");
+                    if (settledKey != null)
+                        SettledRevengeTargets.TryAdd(settledKey, 1);
+                }
             }
             else
             {
-                NewsSystem.Instance?.Newsy($"{npcName} has finally settled the score with {targetName}.");
-                WorldSimulator.AddGossip($"{npcName} got revenge on {targetName}");
+                if (!alreadyAvengedTarget)
+                {
+                    NewsSystem.Instance?.Newsy($"{npcName} has finally settled the score with {targetName}.");
+                    WorldSimulator.AddGossip($"{npcName} got revenge on {targetName}");
+                    if (settledKey != null)
+                        SettledRevengeTargets.TryAdd(settledKey, 1);
+                }
             }
         }
         else if (goal.Name == "Mourn the Dead")

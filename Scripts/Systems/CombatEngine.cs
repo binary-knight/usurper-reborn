@@ -191,7 +191,13 @@ public partial class CombatEngine
     /// Player vs Player combat
     /// Based on PLVSPLC.PAS and MURDER.PAS
     /// </summary>
-    public async Task<CombatResult> PlayerVsPlayer(Character attacker, Character defender)
+    /// <param name="allowSurrender">v0.64.1 audit fix: staged-fight contexts
+    /// (pit fights, gang wars, throne challenges, bounty hunts) must suppress
+    /// the Slice 18 NPC surrender prompt -- their callers treat any
+    /// non-Victory outcome as a loss (gold penalties, war forfeit, defeat
+    /// broadcasts), so a player choosing mercy would be punished. Default
+    /// true preserves surrender for open-world PvP (street, dormitory, inn).</param>
+    public async Task<CombatResult> PlayerVsPlayer(Character attacker, Character defender, bool allowSurrender = true)
     {
         // Wizard godmode: save HP/Mana before combat to restore after
         bool isGodMode = UsurperRemake.Server.SessionContext.IsActive
@@ -249,6 +255,11 @@ public partial class CombatEngine
         defender.ShamanEnchantType = 0;
         defender.ShamanEnchantRounds = 0;
         defender.ShamanEnchantPower = 0;
+        // v0.64.1 Slice 18: reset surrender flag so a freshly-recruited NPC
+        // who was spared in a prior fight can still beg again in the next one
+        // (one-beg-per-combat, not one-beg-per-life).
+        attacker.HasSurrenderedThisCombat = false;
+        defender.HasSurrenderedThisCombat = false;
         abilityCooldowns.Clear();
         pvpDefenderCooldowns.Clear();
         teammateCooldowns.Clear();
@@ -335,6 +346,13 @@ public partial class CombatEngine
 
         while (attacker.IsAlive && defender.IsAlive && !globalEscape)
         {
+            // v0.64.1 Slice 18: snapshot round-start HP so the surrender
+            // threshold check can tell "killed from a fighting chance" apart
+            // from "nibble-killed at low HP". Captured at the top of every
+            // round; consumed only by OfferNPCSurrenderAsync.
+            attacker.HpAtRoundStart = attacker.HP;
+            defender.HpAtRoundStart = defender.HP;
+
             // Attacker's turn — check for status effects that prevent action
             if (attacker.IsAlive && defender.IsAlive)
             {
@@ -348,6 +366,21 @@ public partial class CombatEngine
                 {
                     var attackerAction = await GetPlayerAction(attacker, null, result, defender);
                     await ProcessPlayerVsPlayerAction(attackerAction, attacker, defender, result);
+
+                    // v0.64.1 Slice 18: if the attacker (player) just dropped
+                    // an NPC defender to 0 HP this turn AND the NPC entered
+                    // the round with > 35% HP, offer the surrender path.
+                    // OfferNPCSurrenderAsync runs the LLM fork + UI prompt.
+                    // Returns true if the player spared the NPC (we break the
+                    // loop with result.Outcome = OpponentSpared already set);
+                    // returns false in every other case (NPC chose to fight,
+                    // player chose to finish, gates failed) and the loop
+                    // proceeds with standard death.
+                    if (!defender.IsAlive && allowSurrender)
+                    {
+                        bool spared = await OfferNPCSurrenderAsync(attacker, defender, result);
+                        if (spared) break;
+                    }
                 }
             }
 
@@ -6474,6 +6507,15 @@ public partial class CombatEngine
         if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && result.Player.Fatigue >= GameConfig.FatigueExhaustedThreshold)
         {
             expReward -= (long)(expReward * GameConfig.FatigueExhaustedXPPenalty);
+        }
+
+        // v0.64.1 early-game XP multiplier. Telemetry showed Lv 1->10 takes
+        // ~200 combats (engaged players hitting the wall and quitting before
+        // breakthrough). Compress the onboarding grind; transparent at Lv 21+.
+        double earlyGameMult = GameConfig.GetEarlyGameXPMultiplier((int)result.Player.Level);
+        if (earlyGameMult > 1.0)
+        {
+            expReward = (long)(expReward * earlyGameMult);
         }
 
         // Session XP diminishing returns removed in v0.54.7 — wasn't working as intended.
@@ -18817,8 +18859,20 @@ public partial class CombatEngine
             // not real combat deaths)
             var savedTeam = worldNpc.Team;
             worldNpc.Team = "";
+            // v0.64.1 audit fix: also suspend the IsInConversation engaged-
+            // protection around this call, exactly like Team. v0.64.1's
+            // dungeon-party protection guarantees every partied NPC carries
+            // IsInConversation=true, and MarkNPCDead's guard now HEALS the
+            // NPC and returns false -- which would turn this legitimate
+            // player-combat death into an IsDead=true + HP=MaxHP/4 inverse
+            // zombie that skips the entire death cascade (king check, respawn
+            // queue, news, bereavement, family memories). Both guards exist
+            // for background NPC-vs-NPC violence, not real combat deaths.
+            var savedEngaged = worldNpc.IsInConversation;
+            worldNpc.IsInConversation = false;
             wasPermadeath = WorldSimulator.Instance?.MarkNPCDead(worldNpc, GameConfig.PermadeathChancePlayerKill,
                 killerName, deathLocation) ?? false;
+            worldNpc.IsInConversation = savedEngaged;
             worldNpc.Team = savedTeam;
 
             DebugLogger.Instance.LogInfo("NPC", $"NPC DIED IN COMBAT: {worldNpc.Name} (ID: {npcId}) - permadeath={wasPermadeath}");
@@ -19212,6 +19266,14 @@ public partial class CombatEngine
         if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && result.Player.Fatigue >= GameConfig.FatigueExhaustedThreshold)
         {
             adjustedExp -= (long)(adjustedExp * GameConfig.FatigueExhaustedXPPenalty);
+        }
+
+        // v0.64.1 early-game XP multiplier (multi-monster path). See
+        // HandleVictory for the rationale; transparent at Lv 21+.
+        double earlyGameMultMM = GameConfig.GetEarlyGameXPMultiplier((int)result.Player.Level);
+        if (earlyGameMultMM > 1.0)
+        {
+            adjustedExp = (long)(adjustedExp * earlyGameMultMM);
         }
 
         // Session XP diminishing returns removed in v0.54.7.
@@ -19730,6 +19792,13 @@ public partial class CombatEngine
         if (result.Player.HQTrainingLevel > 0)
         {
             adjustedExp += (long)(adjustedExp * (result.Player.HQTrainingLevel * 0.05));
+        }
+
+        // v0.64.1 early-game XP multiplier (berserker / special path).
+        double earlyGameMultPV = GameConfig.GetEarlyGameXPMultiplier((int)result.Player.Level);
+        if (earlyGameMultPV > 1.0)
+        {
+            adjustedExp = (long)(adjustedExp * earlyGameMultPV);
         }
 
         // Auto-reset XP distribution when fighting solo — prevents 0% XP trap
@@ -24288,8 +24357,226 @@ public partial class CombatEngine
         await Task.Delay(GetCombatDelay(800));
     }
     
+    // v0.64.1 Brain v2 Slice 18: PvP NPC surrender mechanic.
+    //
+    // When a player's attack drops an NPC opponent to 0 HP in PvP combat,
+    // check if the NPC should beg for mercy instead of dying outright. Three
+    // gates: (1) defender is an NPC (NPCs don't beg from other NPCs --
+    // world-sim NPC-NPC combat is its own track); (2) defender hasn't
+    // surrendered this combat already (one-shot); (3) defender entered this
+    // round with > 35% MaxHP (prevents nibble kills from triggering -- only
+    // a "fighting chance" -> sudden brink moment qualifies).
+    //
+    // If gates pass: LLM fork decides fight-to-the-death vs beg-for-mercy
+    // based on Courage / Aggression / Vengefulness. If fight: NPC dies
+    // normally, no UI change. If beg: NPC is revived to 1 HP, an in-character
+    // begging line plays, the player gets a Spare/Finish prompt.
+    //
+    // Returns true if the player spared the NPC (caller breaks the combat
+    // loop with result.Outcome already set to OpponentSpared); returns false
+    // in every other case (NPC chose to fight, player chose to finish, LLM
+    // unavailable, gates failed, etc) -- caller proceeds with normal death.
+    private async Task<bool> OfferNPCSurrenderAsync(Character attacker, Character defender, CombatResult result)
+    {
+        // Gate 1: only NPCs beg. Player-vs-player permadeath is its own
+        // architecture (resurrections etc); a player begging for mercy from
+        // another player would need a whole different UX (PvP-target prompts
+        // the OTHER player), out of slice scope.
+        if (defender is not NPC npc) return false;
+
+        // Gate 2: one beg per combat.
+        if (npc.HasSurrenderedThisCombat) return false;
+
+        // Gate 3: must have started the round with a "fighting chance".
+        // Threshold 35% of MaxHP -- catches the dramatic "winning until you
+        // weren't" moment, skips the desperate-grind nibble-to-zero ending.
+        long roundStart = npc.HpAtRoundStart;
+        if (roundStart <= 0) return false;
+        double startPct = (double)roundStart / Math.Max(1, npc.MaxHP);
+        if (startPct < 0.35) return false;
+
+        var p = npc.Brain?.Personality;
+        float courage = p?.Courage ?? 0.5f;
+        float aggression = p?.Aggression ?? 0.5f;
+        float vengefulness = p?.Vengefulness ?? 0.5f;
+
+        // Heuristic fallback: high Courage / Aggression / Vengefulness ->
+        // fight to the death (0). Low across the board -> beg (1). Tuned so
+        // a 0.5/0.5/0.5 balanced NPC has a ~40% chance to beg; brave NPCs
+        // rarely beg; cowardly NPCs almost always do.
+        float fightScore = (courage + aggression + vengefulness) / 3f;
+        int heuristicChoice = fightScore >= 0.55f ? 0 : 1;
+
+        string situation =
+            $"You have just been brought to 0 HP in combat by " +
+            $"{attacker.DisplayName ?? attacker.Name1 ?? "an attacker"}. " +
+            $"You entered this round at {startPct:P0} of your max HP -- the killing " +
+            $"blow was sudden. Your Courage is {courage:F2}, Aggression {aggression:F2}, " +
+            $"Vengefulness {vengefulness:F2}. Decide whether YOU, this specific NPC, " +
+            $"meet death on your feet or beg for your life in the dust.";
+        var choices = new System.Collections.Generic.List<string>
+        {
+            "Fight to the death -- spit defiance, die with your weapon raised.",
+            "Beg for mercy -- drop to your knees, plead for your life.",
+        };
+        int chosen = await UsurperRemake.Systems.LLMMoments.DecideForkAsync(
+            npc, "combat_surrender", situation, choices,
+            deterministicFallback: heuristicChoice, System.Threading.CancellationToken.None);
+
+        if (chosen == 0)
+        {
+            // Fight to the death: standard death, no UI change. Stamp a flag
+            // so combat-end news can read "fought to the end" if we want
+            // (not used yet but cheap to set).
+            npc.HasSurrenderedThisCombat = true; // prevents re-prompt on a freak revive
+            terminal.WriteLine("");
+            terminal.SetColor("dark_red");
+            terminal.WriteLine($"  {Loc.Get("combat.npc_fights_to_death", npc.DisplayName ?? npc.Name1 ?? "Your opponent")}");
+            terminal.SetColor("white");
+            await Task.Delay(GetCombatDelay(800));
+            return false;
+        }
+
+        // Beg-for-mercy path. Revive to 1 HP so the combat loop doesn't
+        // immediately exit, generate an in-character begging line via LLM
+        // (mirrors Slice 16 reaction pattern), prompt the player Y/N.
+        npc.HP = 1;
+        npc.HasSurrenderedThisCombat = true;
+
+        string templatedPlea = Loc.Get("combat.npc_begs_mercy_default");
+        Task<string> llmPleaTask = UsurperRemake.Systems.LLMMoments.GenerateRomanceReactionAsync(
+            npc, attacker, "combat_surrender", "begs_mercy",
+            $"You have been beaten to within an inch of your life by " +
+            $"{attacker.DisplayName ?? attacker.Name1 ?? "the attacker"}. You have chosen to " +
+            $"beg for mercy rather than die. Write your plea -- pride wounded, voice " +
+            $"cracking, hand raised in surrender. One or two sentences of spoken speech.",
+            templatedPlea, System.Threading.CancellationToken.None);
+
+        terminal.WriteLine("");
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine($"  {Loc.Get("combat.npc_drops_to_knees", npc.DisplayName ?? npc.Name1 ?? "Your opponent")}");
+        terminal.WriteLine("");
+        await Task.Delay(GetCombatDelay(600));
+
+        string plea = await llmPleaTask;
+        terminal.SetColor("yellow");
+        terminal.WriteLine($"  \"{plea}\"");
+        terminal.WriteLine("");
+
+        terminal.SetColor("white");
+        terminal.WriteLine($"  {Loc.Get("combat.spare_or_finish_prompt")}");
+        terminal.SetColor("gray");
+        terminal.WriteLine($"  {Loc.Get("combat.spare_or_finish_options")}");
+        string choice = (await terminal.GetInput("  > "))?.Trim().ToUpperInvariant() ?? "";
+
+        // v0.64.1 audit fix: accept localized affirmatives (Y/S/O/I per the
+        // v0.57.7 precedent -- yes/si/oui/igen) alongside 1/SPARE. Anything
+        // else defaults to Finish: the irreversible branch should require a
+        // deliberate Spare, but a localized "yes" must not execute the NPC
+        // the player meant to save.
+        bool spared = choice == "1" || choice == "S" || choice == "SPARE"
+            || choice == "Y" || choice == "O" || choice == "I" || choice == "SI" || choice == "IGEN";
+        if (spared)
+        {
+            result.Outcome = CombatOutcome.OpponentSpared;
+
+            // v0.64.1 audit fix: scrub combat statuses + persistent poison so
+            // a leaked DoT can't kill the spared NPC out-of-combat one tick
+            // later (a delayed, unattributed death that silently undoes the
+            // mercy the player just chose). Also heal to MaxHP/4, mirroring
+            // MarkNPCDead's protection branches, so the NPC isn't one nibble
+            // from death when the world sim resumes simulating them.
+            npc.RemoveStatus(StatusEffect.Poisoned);
+            npc.RemoveStatus(StatusEffect.Bleeding);
+            npc.RemoveStatus(StatusEffect.Burning);
+            npc.RemoveStatus(StatusEffect.Diseased);
+            npc.RemoveStatus(StatusEffect.Stunned);
+            npc.RemoveStatus(StatusEffect.Paralyzed);
+            npc.RemoveStatus(StatusEffect.Frozen);
+            npc.RemoveStatus(StatusEffect.Sleeping);
+            npc.Poison = 0;
+            npc.PoisonTurns = 0;
+            npc.HP = Math.Max(1, npc.MaxHP / 4);
+
+            terminal.WriteLine("");
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine($"  {Loc.Get("combat.you_spare_npc", npc.DisplayName ?? npc.Name1 ?? "your opponent")}");
+            terminal.SetColor("white");
+            await Task.Delay(GetCombatDelay(800));
+            return true;
+        }
+
+        // Player chose Finish: drop NPC's HP to 0 again so the loop's
+        // IsAlive check exits with standard death, and the normal
+        // DeterminePvPOutcome Victory path runs (XP / gold / news / blood
+        // price all fire normally).
+        npc.HP = 0;
+        terminal.WriteLine("");
+        terminal.SetColor("dark_red");
+        terminal.WriteLine($"  {Loc.Get("combat.you_finish_npc", npc.DisplayName ?? npc.Name1 ?? "your opponent")}");
+        terminal.SetColor("white");
+        await Task.Delay(GetCombatDelay(800));
+        return false;
+    }
+
     private async Task DeterminePvPOutcome(CombatResult result)
     {
+        // v0.64.1 Slice 18: spared-NPC path. OfferNPCSurrenderAsync sets
+        // result.Outcome = OpponentSpared before breaking the combat loop;
+        // pick that up before the standard player-died / opponent-died
+        // checks so spared NPCs (HP = 1, IsAlive = true) don't fall through
+        // to one of the death branches.
+        if (result.Outcome == CombatOutcome.OpponentSpared)
+        {
+            terminal.WriteLine("", "white");
+            string opponentName = result.Opponent?.DisplayName ?? result.Opponent?.Name1 ?? "your opponent";
+
+            // Sparing is a meaningfully good act -- Chivalry gain, alignment
+            // shift toward Holy, relationship rebuild (cool acquaintance not
+            // hostile stranger). Paired alignment movement so it nudges the
+            // scale rather than just adding Chivalry.
+            // v0.64.1 audit fix: daily cap on the alignment reward (the
+            // project's standard anti-farm pattern -- murders 3/day, tribute
+            // 3/day, Love Street 2/day). Sparing itself is never blocked;
+            // only the alignment pump stops after MaxAlignedSparesPerDay.
+            try
+            {
+                result.Player.SparesToday++;
+                if (result.Player.SparesToday <= GameConfig.MaxAlignedSparesPerDay)
+                {
+                    UsurperRemake.Systems.AlignmentSystem.Instance?.ChangeAlignment(
+                        result.Player, 10, isGood: true, reason: "spared_npc_in_pvp");
+                }
+            }
+            catch { /* alignment is decoration here, don't break the outcome */ }
+
+            // Relationship reset: the NPC remembers being spared. Pull the
+            // current relationship score back toward neutral so the next
+            // encounter isn't "you just tried to kill me."
+            if (result.Opponent != null)
+            {
+                try
+                {
+                    global::RelationshipSystem.UpdateRelationship(
+                        result.Player, result.Opponent, 1, 2, false, true);
+                }
+                catch { /* relationship update is decoration, don't break outcome */ }
+            }
+
+            // Public news entry -- mercy is a visible deed.
+            try
+            {
+                string location = result.Opponent?.CurrentLocation ?? "battle";
+                NewsSystem.Instance?.Newsy(false,
+                    $"{result.Player.DisplayName} spared {opponentName}'s life at the {location}.");
+            }
+            catch { /* news is decoration */ }
+
+            // No XP/gold reward -- sparing isn't a kill. The alignment +
+            // relationship swing is the reward.
+            return;
+        }
+
         if (!result.Player.IsAlive)
         {
             result.Outcome = CombatOutcome.PlayerDied;
@@ -28397,6 +28684,13 @@ public partial class CombatEngine
             if (groupedPlayer.HQTrainingLevel > 0)
                 playerExp += (long)(playerExp * (groupedPlayer.HQTrainingLevel * 0.05));
 
+            // v0.64.1 early-game XP multiplier (per-grouped-player path).
+            // Each grouped player's level keys into the curve independently
+            // so a Lv 5 follower benefits even when grouped with a Lv 50 leader.
+            double earlyGameMultGP = GameConfig.GetEarlyGameXPMultiplier((int)groupedPlayer.Level);
+            if (earlyGameMultGP > 1.0)
+                playerExp = (long)(playerExp * earlyGameMultGP);
+
             // Group level gap penalty
             float groupXPMult = GroupSystem.GetGroupXPMultiplier(groupedPlayer.Level, highestLevel);
             if (groupXPMult < 1.0f)
@@ -28686,7 +28980,12 @@ public enum CombatOutcome
     PlayerDied,
     PlayerEscaped,
     Stalemate,
-    Interrupted
+    Interrupted,
+    // v0.64.1 Slice 18: PvP NPC begged for mercy and player chose to spare.
+    // Treated as a non-violent combat-end -- no XP/gold reward, NPC walks
+    // away at 1 HP, player earns alignment + relationship boost. Distinct
+    // from Victory (which carries kill rewards + death news).
+    OpponentSpared
 }
 
 /// <summary>

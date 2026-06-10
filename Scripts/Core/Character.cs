@@ -308,6 +308,21 @@ public class Character
     public bool DeathsEmbraceActive { get; set; } = false; // Voidreaver: revive on death once (combat-transient)
     public int StatusImmunityDuration { get; set; } = 0;
 
+    // v0.64.1 Brain v2 Slice 18: PvP NPC surrender mechanic. When a player
+    // brings an NPC to 0 HP in PvP combat, the NPC may beg for mercy instead
+    // of dying outright. LLM-fork picks fight-to-the-death vs beg based on
+    // Courage / Aggression / Vengefulness. Beg path lets the player choose
+    // [1] Spare (NPC reduced to 1 HP, walks away, alignment + relationship
+    // swing) or [2] Finish (standard kill). HasSurrenderedThisCombat tracks
+    // one-shot so an NPC can't keep begging if the player chose Finish then
+    // dealt another killing blow. HpAtRoundStart captured at top of every
+    // PvP round and used by the threshold check (NPC must have entered the
+    // round with > 35% HP to be eligible -- prevents end-of-fight nibble
+    // kills from triggering surrender). All transient (JsonIgnore via not
+    // being on the serializer path -- combat-only state).
+    public bool HasSurrenderedThisCombat { get; set; } = false;
+    public long HpAtRoundStart { get; set; } = 0;
+
     // Boss fight party mechanics (v0.52.1 — combat-transient, not serialized)
     public int CorruptionStacks { get; set; } = 0;        // Stacking DoT from boss abilities (only healers cleanse)
     public int DoomCountdown { get; set; } = 0;           // Rounds until Doom kills (0 = no doom, only healers dispel)
@@ -711,6 +726,7 @@ public class Character
     public int DesecrationsToday { get; set; } = 0;             // Daily desecration counter (max 2)
     public int ConfessionsToday { get; set; } = 0;              // v0.57.0: Daily confession counter (max 2, matches desecration cadence)
     public int MurdersToday { get; set; } = 0;                  // v0.57.6: Daily non-bounty NPC-murder counter (cap: GameConfig.MaxMurdersPerDay)
+    public int SparesToday { get; set; } = 0;                   // v0.64.1: Daily PvP-spare counter; alignment reward only for first MaxAlignedSparesPerDay spares
     public int TeamWarsToday { get; set; } = 0;                 // v0.57.17: Team Corner team-war daily counter (cap: GameConfig.MaxTeamWarsPerDay). Plugs the "find a beatable team, spam wars for free 2x wager gold" exploit reported by a Lv.100 Barbarian.
     public int DrinkingGamesToday { get; set; } = 0;            // v0.57.17: Inn drinking-game daily counter (cap: GameConfig.MaxDrinkingGamesPerDay). Player report: high STR/CON = consistent wins for level*700 XP per ~30s, no limit, free leveling.
     public int LoveStreetVisitsToday { get; set; } = 0;         // v0.60.10: Love Street paid-encounter daily counter (cap: GameConfig.MaxLoveStreetVisitsPerDay). Counts both Courtesan and Gigolo visits.

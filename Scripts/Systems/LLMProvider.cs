@@ -43,6 +43,18 @@ public class LLMRequest
     public string UserPrompt { get; set; } = "";
     public int MaxTokens { get; set; } = 200;
     public double Temperature { get; set; } = 0.8;
+
+    /// <summary>
+    /// v0.64.1 model tiering: optional per-request model override. When null,
+    /// the provider uses its default model (LLMSettings.Model). When set, the
+    /// provider uses this instead -- typically used to route low-stakes
+    /// decorations (dialogue mood prefixes, fork decisions, avenge flavor) to
+    /// a cheaper model (LLMSettings.CheapModel, e.g. Haiku) while keeping
+    /// narrative-depth generations (strategic goals, topic responses,
+    /// personality summaries) on the premium default (Sonnet). Falls back to
+    /// default model if the env-configured cheap model is unset.
+    /// </summary>
+    public string? Model { get; set; }
 }
 
 /// <summary>
@@ -147,9 +159,17 @@ internal class HttpChatCompletionsProvider : ILLMProvider
             using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(_timeoutMs));
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
 
+            // v0.64.1 model tiering: per-request override beats provider default.
+            // Callers that opt into the cheap tier pass request.Model =
+            // LLMSettings.GetCheapModelOrDefault(); narrative-depth callers
+            // leave it null and fall through to _model.
+            string modelForRequest = !string.IsNullOrWhiteSpace(request.Model)
+                ? request.Model!
+                : _model;
+
             var requestBody = new ChatCompletionRequest
             {
-                Model = _model,
+                Model = modelForRequest,
                 Messages = new List<ChatMessage>
                 {
                     new() { Role = "system", Content = request.SystemPrompt },

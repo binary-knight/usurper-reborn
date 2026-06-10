@@ -5946,7 +5946,7 @@ public class CastleLocation : BaseLocation
             terminal.WriteLine("");
 
             var combatEngine = new CombatEngine(terminal);
-            var kingResult = await combatEngine.PlayerVsPlayer(currentPlayer, kingCharacter);
+            var kingResult = await combatEngine.PlayerVsPlayer(currentPlayer, kingCharacter, allowSurrender: false); // v0.64.1: throne challenge treats non-Victory as defeat
 
             // Restore original NPC stats after combat
             kingCharacter.Defence = origDef;
@@ -6011,7 +6011,7 @@ public class CastleLocation : BaseLocation
             terminal.WriteLine("");
 
             var combatEngine = new CombatEngine(terminal);
-            var kingResult = await combatEngine.PlayerVsPlayer(currentPlayer, kingCharacter);
+            var kingResult = await combatEngine.PlayerVsPlayer(currentPlayer, kingCharacter, allowSurrender: false); // v0.64.1: throne challenge treats non-Victory as defeat
 
             if (kingResult.Outcome != CombatOutcome.Victory)
                 goto KingFightLost;
@@ -6039,7 +6039,7 @@ public class CastleLocation : BaseLocation
             terminal.WriteLine("");
 
             var combatEngine = new CombatEngine(terminal);
-            var kingResult = await combatEngine.PlayerVsPlayer(currentPlayer, kingCharacter);
+            var kingResult = await combatEngine.PlayerVsPlayer(currentPlayer, kingCharacter, allowSurrender: false); // v0.64.1: throne challenge treats non-Victory as defeat
 
             if (kingResult.Outcome != CombatOutcome.Victory)
                 goto KingFightLost;

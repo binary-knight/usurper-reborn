@@ -1504,7 +1504,8 @@ namespace UsurperRemake.Systems
                     Progress = g.Progress,
                     IsActive = g.IsActive,
                     TargetValue = g.TargetValue,
-                    CurrentValue = g.CurrentValue
+                    CurrentValue = g.CurrentValue,
+                    TargetCharacter = g.TargetCharacter ?? "" // v0.64.1: load-bearing for Slices 13/14b/19/20 + revenge completion
                 }).ToList();
         }
 
@@ -1672,6 +1673,11 @@ namespace UsurperRemake.Systems
                     Forced = quest.Forced,
                     Objectives = new List<QuestObjectiveData>(),
                     Monsters = new List<QuestMonsterData>(),
+                    // v0.64.1 audit fix: the SP writer copies TargetNPCName but this
+                    // online writer didn't -- so the world_state copy of DefeatNPC
+                    // bounties (king bounties + Slice 20 NPC-issued quests) couldn't
+                    // track their target across a server restart.
+                    TargetNPCName = quest.TargetNPCName ?? "",
                     // v0.62.x Phase 4 (Mercenary board): faction-issued freelance contract fields.
                     IsMercContract = quest.IsMercContract,
                     IssuingFaction = quest.IssuingFaction.HasValue ? (int)quest.IssuingFaction.Value : -1,

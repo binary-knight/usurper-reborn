@@ -29,6 +29,13 @@ namespace UsurperRemake.Systems
         private long lastRoyalCourtVersion = 0;  // Track royal_court version to detect player changes (treasury, taxes, etc.)
         private string? _lastNpcJsonHash;  // Dirty-check: skip NPC save when nothing changed
 
+        // v0.64.1 audit fix: TTL bookkeeping for the engaged-NPC reload
+        // preservation. Keyed by NPC name; value = when the flag was first
+        // observed set. Entries cleared when the flag is observed released.
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, DateTime>
+            _engagedFirstSeen = new(StringComparer.OrdinalIgnoreCase);
+        private static readonly TimeSpan EngagedProtectionTtl = TimeSpan.FromHours(2);
+
         // Heartbeat support for embedded worldsim (database-level leader election)
         private string? _heartbeatOwnerId;
 
@@ -298,6 +305,20 @@ namespace UsurperRemake.Systems
                     // marriage state changes, equipment changes, or other world-sim-driven mutations.
                     var activePregnancies = new Dictionary<string, (DateTime DueDate, string? FatherName)>();
                     var activeEquipment = new Dictionary<string, Dictionary<EquipmentSlot, int>>();
+                    // v0.64.1 spouse-death fix: IsInConversation is a TRANSIENT flag
+                    // (not serialized) that protects NPCs in a player's dungeon party
+                    // from world-sim kills. A reload rebuilds every NPC object with the
+                    // flag defaulting to false, silently stripping the protection from
+                    // a spouse who is mid-dungeon-run with a player. Capture + restore
+                    // it across the reload like pregnancies/equipment.
+                    //
+                    // v0.64.1 audit fix (TTL): a hard crash mid-dungeon (no finally)
+                    // can leave the flag stuck true; without an expiry this
+                    // capture/restore would immortalize the leak (the NPC permanently
+                    // immune to world-sim death AND un-interactable). Track when each
+                    // name was FIRST seen engaged and stop restoring after 2 hours --
+                    // far longer than any dungeon run, short enough to self-heal leaks.
+                    var engagedNpcs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                     foreach (var npc in NPCSpawnSystem.Instance.ActiveNPCs)
                     {
                         var key = npc.Name2 ?? npc.Name1;
@@ -310,10 +331,51 @@ namespace UsurperRemake.Systems
                         {
                             activeEquipment[key] = new Dictionary<EquipmentSlot, int>(npc.EquippedItems);
                         }
+                        if (npc.IsInConversation)
+                        {
+                            // TTL bookkeeping: record first-seen-engaged time; only
+                            // carry the protection across the reload while the entry
+                            // is younger than the expiry window.
+                            var firstSeen = _engagedFirstSeen.GetOrAdd(key, _ => DateTime.UtcNow);
+                            if (DateTime.UtcNow - firstSeen < EngagedProtectionTtl)
+                            {
+                                engagedNpcs.Add(key);
+                            }
+                            else
+                            {
+                                DebugLogger.Instance.LogInfo("WORLDSIM",
+                                    $"Engaged-protection TTL expired for {key} -- dropping stale IsInConversation across reload");
+                            }
+                        }
+                        else
+                        {
+                            // Flag released normally -- clear the first-seen record
+                            // so a future re-engagement starts a fresh TTL window.
+                            _engagedFirstSeen.TryRemove(key, out _);
+                        }
                     }
 
                     await LoadWorldState();
                     _lastNpcJsonHash = null; // Invalidate hash so next save always writes after reload+merge
+
+                    // Merge back engaged-with-player protection (see capture note above)
+                    if (engagedNpcs.Count > 0)
+                    {
+                        int reprotected = 0;
+                        foreach (var npc in NPCSpawnSystem.Instance.ActiveNPCs)
+                        {
+                            var key = npc.Name2 ?? npc.Name1;
+                            if (engagedNpcs.Contains(key))
+                            {
+                                npc.IsInConversation = true;
+                                reprotected++;
+                            }
+                        }
+                        if (reprotected > 0)
+                        {
+                            DebugLogger.Instance.LogInfo("WORLDSIM", $"Re-protected {reprotected} player-engaged NPCs after reload");
+                        }
+                    }
 
                     // Merge back pregnancies that the player session overwrote with stale data
                     if (activePregnancies.Count > 0)
@@ -1604,7 +1666,8 @@ namespace UsurperRemake.Systems
                                     IsActive = goalData.IsActive,
                                     TargetValue = goalData.TargetValue,
                                     CurrentValue = goalData.CurrentValue,
-                                    CreatedTime = goalData.CreatedTime
+                                    CreatedTime = goalData.CreatedTime,
+                                    TargetCharacter = goalData.TargetCharacter ?? "" // v0.64.1: round-trip
                                 };
                                 npc.Brain.Goals?.AddGoal(goal);
                             }

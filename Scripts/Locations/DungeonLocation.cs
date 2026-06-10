@@ -357,10 +357,25 @@ public class DungeonLocation : BaseLocation
         }
         finally
         {
-            // Release NPC teammates when leaving the dungeon
+            // Release NPC teammates when leaving the dungeon.
+            // v0.64.1 audit fix: ALSO release on the LIVE ActiveNPCs object
+            // (v0.57.2 orphan pattern). In online mode a world-state reload
+            // mid-dungeon rebuilds the NPC list; the party holds the OLD
+            // orphaned object, so clearing only the held reference left the
+            // live twin permanently flagged -- immune to world-sim death AND
+            // un-interactable (CanInteract checks !IsInConversation) -- and
+            // the WorldSimService reload-preservation would then re-assert it
+            // forever.
             foreach (var mate in teammates)
             {
-                if (mate is NPC npcMate) npcMate.IsInConversation = false;
+                if (mate is NPC npcMate)
+                {
+                    npcMate.IsInConversation = false;
+                    var live = UsurperRemake.Systems.NPCSpawnSystem.Instance?.ActiveNPCs?
+                        .FirstOrDefault(n => n.ID == npcMate.ID);
+                    if (live != null && !ReferenceEquals(live, npcMate))
+                        live.IsInConversation = false;
+                }
             }
 
             // Clean up group dungeon state when leader leaves
@@ -1486,6 +1501,32 @@ public class DungeonLocation : BaseLocation
             .Where(n => !string.IsNullOrEmpty(n))
             .ToList();
         GameEngine.Instance?.SetDungeonPartyPlayers(echoNames);
+
+        // v0.64.1 spouse-death fix: re-assert world-sim protection on every
+        // party mutation. The IsInConversation=true sweep at dungeon entry
+        // (EnterLocation, before base.EnterLocation) only covers NPCs who were
+        // in the party AT ENTRY. A spouse/lover/team NPC added mid-dungeon via
+        // [Y] Party never got the flag, so the world sim freely simulated them
+        // (their own dungeon runs, NPC-NPC revenge attacks) and could kill
+        // them while they walked beside the player. This method is called
+        // after every party mutation, making it the single chokepoint to
+        // re-protect the current roster. The release sweep in EnterLocation's
+        // finally iterates the final teammates list, so everyone flagged here
+        // is correctly released on exit.
+        // Audit fix: also flag the LIVE ActiveNPCs object -- after an online
+        // world-state reload the party reference may be an orphan, and the
+        // world sim only consults the live twin.
+        foreach (var mate in teammates)
+        {
+            if (mate is NPC npcMate)
+            {
+                npcMate.IsInConversation = true;
+                var liveMate = UsurperRemake.Systems.NPCSpawnSystem.Instance?.ActiveNPCs?
+                    .FirstOrDefault(n => n.ID == npcMate.ID);
+                if (liveMate != null && !ReferenceEquals(liveMate, npcMate))
+                    liveMate.IsInConversation = true;
+            }
+        }
     }
 
     /// <summary>
@@ -10716,6 +10757,24 @@ public class DungeonLocation : BaseLocation
 
             teammates.RemoveAt(index);
 
+            // v0.64.1 spouse-death fix companion: release world-sim protection
+            // on mid-dungeon removal. SyncNPCTeammatesToGameEngine re-asserts
+            // IsInConversation=true for the CURRENT roster; an NPC removed here
+            // would otherwise stay flagged until dungeon exit's finally sweep,
+            // which iterates the final roster -- the removed NPC isn't in it,
+            // so they'd be stuck protected (and un-interactable, since
+            // CanInteract checks !IsInConversation) until next server restart.
+            // Audit fix: also release on the LIVE ActiveNPCs object (the held
+            // reference may be a reload orphan).
+            if (member is NPC removedNpc)
+            {
+                removedNpc.IsInConversation = false;
+                var liveRemoved = UsurperRemake.Systems.NPCSpawnSystem.Instance?.ActiveNPCs?
+                    .FirstOrDefault(n => n.ID == removedNpc.ID);
+                if (liveRemoved != null && !ReferenceEquals(liveRemoved, removedNpc))
+                    liveRemoved.IsInConversation = false;
+            }
+
             // Handle companion removal - put them on standby, not "return to town"
             if (member.IsCompanion && member.CompanionId.HasValue)
             {
@@ -11002,6 +11061,15 @@ public class DungeonLocation : BaseLocation
                     if (memberToRemove is NPC npc)
                     {
                         npc.UpdateLocation("Main Street");
+                        // v0.64.1 spouse-death fix companion: release world-sim
+                        // protection so the removed NPC isn't stuck flagged
+                        // (see the other RemoveAt site for full rationale).
+                        // Audit fix: also release on the LIVE ActiveNPCs object.
+                        npc.IsInConversation = false;
+                        var liveNpc = UsurperRemake.Systems.NPCSpawnSystem.Instance?.ActiveNPCs?
+                            .FirstOrDefault(n => n.ID == npc.ID);
+                        if (liveNpc != null && !ReferenceEquals(liveNpc, npc))
+                            liveNpc.IsInConversation = false;
                     }
 
                     // If it was a companion, just deactivate them (they're still recruited)

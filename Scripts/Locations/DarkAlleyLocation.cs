@@ -2423,7 +2423,7 @@ namespace UsurperRemake.Locations
                 opponent.ArmPow = 0;
 
                 var combatEngine = new CombatEngine(terminal);
-                var result = await combatEngine.PlayerVsPlayer(currentPlayer, opponent);
+                var result = await combatEngine.PlayerVsPlayer(currentPlayer, opponent, allowSurrender: false); // v0.64.1: pit fights are to the finish; loss branch takes gold
 
                 currentPlayer.PitFightsToday++;
                 currentPlayer.DarkAlleyReputation = Math.Min(1000, currentPlayer.DarkAlleyReputation + 8); // NPC fights give more rep

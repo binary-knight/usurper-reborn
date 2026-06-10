@@ -4907,6 +4907,26 @@ namespace UsurperRemake.Systems
         catch { return null; }
     }
 
+    /// <summary>
+    /// v0.64.1: resolve a name-or-display-name to the canonical USERNAME
+    /// (the messages table's to_player key). Twin of ResolvePlayerDisplayName.
+    /// Used by the spouse-death notification to route in-game mail to the
+    /// widowed player. Returns null if no matching player.
+    /// </summary>
+    public string? ResolvePlayerUsername(string nameOrDisplay)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT username FROM players WHERE (LOWER(username) = LOWER(@name) OR LOWER(display_name) = LOWER(@name)) AND is_banned = 0 AND username NOT LIKE 'emergency_%' LIMIT 1;";
+            cmd.Parameters.AddWithValue("@name", nameOrDisplay);
+            var result = cmd.ExecuteScalar();
+            return result?.ToString();
+        }
+        catch { return null; }
+    }
+
     public async Task<List<PlayerMessage>> GetMailInbox(string username, int limit = 20, int offset = 0)
     {
         var messages = new List<PlayerMessage>();

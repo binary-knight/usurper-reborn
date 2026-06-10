@@ -478,7 +478,7 @@ public class AnchorRoadLocation : BaseLocation
 
             // Real combat using CombatEngine
             var combatEngine = new CombatEngine(terminal);
-            var result = await combatEngine.PlayerVsPlayer(currentPlayer, target);
+            var result = await combatEngine.PlayerVsPlayer(currentPlayer, target, allowSurrender: false); // v0.64.1: bounty hunt treats non-Victory as loss
 
             if (result.Outcome == CombatOutcome.Victory)
             {
@@ -716,7 +716,7 @@ public class AnchorRoadLocation : BaseLocation
                 await Task.Delay(1000);
 
                 var combatEngine = new CombatEngine(terminal);
-                var result = await combatEngine.PlayerVsPlayer(currentPlayer, enemy);
+                var result = await combatEngine.PlayerVsPlayer(currentPlayer, enemy, allowSurrender: false); // v0.64.1: gang war chain treats non-Victory as forfeit
 
                 if (result.Outcome == CombatOutcome.Victory)
                 {

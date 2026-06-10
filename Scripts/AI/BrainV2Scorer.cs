@@ -110,7 +110,7 @@ public static class BrainV2Scorer
             },
             GoalType.Personal => verb switch
             {
-                "train"   => 1.6,
+                "train"   => 1.25, // v0.64.1 anti-runaway: 1.6 -> 1.25
                 "levelup" => 2.0,
                 "heal"    => 1.5,
                 "temple"  => 1.4,
@@ -122,7 +122,7 @@ public static class BrainV2Scorer
             {
                 "dungeon"      => 1.8,
                 "team_dungeon" => 1.7,
-                "train"        => 1.3,
+                "train"        => 1.15, // v0.64.1 anti-runaway: 1.3 -> 1.15
                 "dark_alley"   => 1.2,
                 "shop"         => 1.1,
                 "heal"         => 1.4,
@@ -236,7 +236,7 @@ public static class BrainV2Scorer
         // Training: NPC whose level is climbing through the early game (when
         // proficiencies matter most) should train more.
         if (verb == "train" && npc.Level < 25 && npc.Gold > 50)
-            mult *= 1.3;
+            mult *= 1.15; // v0.64.1 anti-runaway: 1.3 -> 1.15
 
         return mult;
     }

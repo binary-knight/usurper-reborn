@@ -130,6 +130,59 @@ public static class LLMMoments
     // world state. Output is structured JSON so the goal system can parse
     // it reliably; we instruct the model to keep goals to short imperative
     // names that the existing GoalSystem's name-keyed dedup understands.
+    // v0.64.1 Brain v2 Slice 14b: goal-aware greeting prompt. Fires when the
+    // NPC's priority strategic goal names the conversation partner (the
+    // player) as its target. Output replaces the standard relationship-tier
+    // greeting so the conversation opens with an in-character acknowledgment
+    // of the standing arc instead of a templated hello.
+    private const string SystemPromptGoalGreeting =
+        "You are an NPC in a dark fantasy MUD opening a conversation with " +
+        "a specific player who is the named target of one of your strategic " +
+        "long-arc goals. Write ONE spoken opening line (1-2 sentences) that " +
+        "ACKNOWLEDGES the standing arc -- either directly (a threat, a " +
+        "plea, a confession) or sideways (a loaded remark, a knowing look " +
+        "rendered in words) depending on your personality and goal type. " +
+        "Stay strictly in character. No stage directions (no '*smiles*', no " +
+        "'they say'), no preamble, no quotes around the line. Spoken voice " +
+        "only -- it will be quoted in-game." +
+        PunctuationRule;
+
+    // v0.64.1 audit fix: neutral spoken-line prompt for the reaction-style
+    // generators (romance reactions, news comments, NPC-initiated flirts,
+    // quest requests). These previously reused SystemPromptGoalGreeting,
+    // whose framing ("the player is the named target of one of your
+    // strategic goals... a threat, a plea, a confession") was factually
+    // wrong for a compliment-thanks or news aside, and DIRECTLY contradicted
+    // the quest-request user prompt (where the goal's target is a third
+    // party the NPC wants hunted, not the player). The user prompt supplies
+    // the situation; this system prompt only enforces voice + shape.
+    private const string SystemPromptSpokenLine =
+        "You are an NPC in a dark fantasy MUD speaking aloud to a player. " +
+        "The user prompt describes the situation. Write ONE short spoken " +
+        "line (1-2 sentences) strictly in character. No stage directions " +
+        "(no '*smiles*', no 'they say'), no preamble, no quotes around the " +
+        "line (it will be quoted in-game). Spoken voice only." +
+        PunctuationRule;
+
+    // v0.64.1 Brain v2 Slice 14: topic response generator prompt. The LLM
+    // plays the NPC and answers a player's conversational topic ("Tell me
+    // about your life goals", "Where did you come from?", etc.) grounded in
+    // the NPC's actual personality, class, level, current goal stack, and
+    // relationship to the asking player. Single short paragraph -- this is
+    // an in-character spoken reply, not a stage direction. Replaces a
+    // hardcoded template line.
+    private const string SystemPromptTopicResponse =
+        "You are an NPC in a dark fantasy MUD speaking aloud to a player " +
+        "who has asked you about a personal topic. Stay strictly in " +
+        "character. Ground your reply in THIS SPECIFIC NPC's personality, " +
+        "class, current life goals, and relationship to the player. Write " +
+        "2-4 sentences of direct first-person speech. No stage directions " +
+        "(no '*smiles*', no 'they say'), no preamble, no quotes around the " +
+        "whole reply (it will be quoted in-game). Spoken voice only. If the " +
+        "NPC would refuse to answer (cold relationship, guarded personality), " +
+        "say so in character with a short evasion." +
+        PunctuationRule;
+
     private const string SystemPromptStrategicGoals =
         "You design 1-3 long-arc life goals for an NPC in a dark fantasy MUD. " +
         "Each goal MUST advance the NPC's character given their personality, " +
@@ -142,8 +195,11 @@ public static class LLMMoments
         "\"name\" (short imperative phrase under 40 chars), " +
         "\"type\" (one of: Personal, Social, Economic, Combat, Exploration), " +
         "\"priority\" (number 0.0-1.0, higher = more urgent), " +
-        "\"target\" (string, optional NPC name for revenge/romance goals, " +
-        "empty string if N/A). " +
+        "\"target\" (string, name of the specific NPC this goal centers on " +
+        "if any -- include for revenge, romance, rivalry, mentorship, " +
+        "protection, exposure, surpassing-a-legend type goals so the engine " +
+        "can steer the NPC toward that target; empty string only if the goal " +
+        "is genuinely target-less like 'build a shrine' or 'master arcana'). " +
         "Output ONLY the JSON array, no preamble, no explanation. Example: " +
         "[{\"name\":\"Avenge Maelketh's mark\",\"type\":\"Combat\"," +
         "\"priority\":0.85,\"target\":\"Old God Maelketh\"}]";
@@ -198,6 +254,8 @@ public static class LLMMoments
                         UserPrompt = userPrompt,
                         MaxTokens = 120,
                         Temperature = 0.85,
+                        // v0.64.1: low-stakes news flavor, route to cheap tier
+                        Model = LLMSettings.GetCheapModelOrDefault(),
                     }, CancellationToken.None);
 
                     if (llmResp != null && !string.IsNullOrWhiteSpace(llmResp.Text))
@@ -288,6 +346,10 @@ public static class LLMMoments
                         UserPrompt = userPrompt,
                         MaxTokens = 100,
                         Temperature = 0.8,
+                        // v0.64.1: low-stakes flavor, cheap tier (path is currently
+                        // unreachable -- call site removed in v0.64.1 -- but kept
+                        // configured so future re-enable lands on the right model)
+                        Model = LLMSettings.GetCheapModelOrDefault(),
                     }, CancellationToken.None);
 
                     if (llmResp != null && !string.IsNullOrWhiteSpace(llmResp.Text))
@@ -528,6 +590,10 @@ public static class LLMMoments
                     UserPrompt = userPrompt,
                     MaxTokens = isMood ? 40 : 80,
                     Temperature = 0.9,
+                    // v0.64.1: highest-volume call site (per-NPC dialogue
+                    // decoration on every conversation surface). Route to
+                    // cheap tier -- short decorative lines don't need premium.
+                    Model = LLMSettings.GetCheapModelOrDefault(),
                 }, ct);
 
                 if (llmResp != null && !string.IsNullOrWhiteSpace(llmResp.Text))
@@ -853,6 +919,8 @@ public static class LLMMoments
                     UserPrompt = userPrompt,
                     MaxTokens = 10,
                     Temperature = 0.6, // lower than dialogue: we want consistent character decisions
+                    // v0.64.1: just picking a digit, cheap tier is fine
+                    Model = LLMSettings.GetCheapModelOrDefault(),
                 }, ct);
 
                 if (llmResp != null && !string.IsNullOrWhiteSpace(llmResp.Text))
@@ -937,6 +1005,816 @@ public static class LLMMoments
         if (n < 1 || n > choiceCount) return -1;
 
         return n - 1; // convert to 0-indexed
+    }
+
+    /// <summary>
+    /// v0.64.1 Brain v2 Slice 14: LLM-generated topic response. Replaces a
+    /// hardcoded template with a per-NPC personalized reply grounded in the
+    /// NPC's personality, class, current goal stack, and relationship to the
+    /// asking player. Used by VisualNovelDialogueSystem.HandleChatOption.
+    ///
+    /// Per-(NPC, topic, player) cached on success. Player is already on a
+    /// "considers..." pause in the UI when this fires, so awaiting the LLM
+    /// (~2-3s typical) is acceptable. First ask of a topic by a player
+    /// pays the latency; subsequent asks of the same topic by the same
+    /// player return the cached line instantly.
+    ///
+    /// Returns the templated fallback when LLM is disabled, the call fails,
+    /// the response is empty, or any exception is thrown -- caller always
+    /// gets a non-null string suitable to print.
+    /// </summary>
+    public static async Task<string> GenerateTopicResponseAsync(
+        NPC npc, string topicId, Character player,
+        string templatedFallback, CancellationToken ct)
+    {
+        if (npc == null || player == null || string.IsNullOrWhiteSpace(topicId))
+            return templatedFallback ?? "";
+
+        // Per-(topic, player) cache hit -> instant return, no LLM cost.
+        string playerKey = player.Name1 ?? player.Name ?? player.Name2 ?? "(unknown)";
+        string cacheKey = $"{topicId}|{playerKey}";
+        if (npc.LLMTopicResponseCache.TryGetValue(cacheKey, out var cached)
+            && !string.IsNullOrWhiteSpace(cached))
+        {
+            return cached;
+        }
+
+        string name = npc.Name2 ?? npc.Name1 ?? "the NPC";
+        string charClass = npc.Class.ToString();
+        string archetype = npc.Archetype ?? "citizen";
+        var p = npc.Brain?.Personality;
+        string personalityDesc = p == null ? "balanced disposition" : FormatPersonalityTraits(p);
+
+        // Relationship tone hint for the LLM. Lower numbers = closer in this
+        // game's convention (1 = spouse, 100 = stranger).
+        int relLevel = 50;
+        try
+        {
+            relLevel = global::RelationshipSystem.GetRelationshipLevel(npc, player);
+        }
+        catch { /* fallback handled below */ }
+        string relWord = relLevel <= 15 ? "deeply close (spouse/lover-tier)"
+                       : relLevel <= 35 ? "warm friendship"
+                       : relLevel <= 55 ? "neutral acquaintance"
+                       : relLevel <= 75 ? "cool / suspicious"
+                       : "hostile or stranger";
+
+        // Top 1-2 goals so the LLM can ground "what's on my mind" topics in
+        // the NPC's actual ambitions. Slice 12a populates strategic goals;
+        // reactive goals are also surfaced.
+        var topGoals = new System.Collections.Generic.List<string>();
+        try
+        {
+            var topGoal = npc.Brain?.Goals?.GetPriorityGoal();
+            if (topGoal != null) topGoals.Add(topGoal.Name);
+            var allGoals = npc.Brain?.Goals?.GetActiveGoals();
+            if (allGoals != null)
+            {
+                foreach (var g in allGoals)
+                {
+                    if (topGoals.Contains(g.Name)) continue;
+                    topGoals.Add(g.Name);
+                    if (topGoals.Count >= 3) break;
+                }
+            }
+        }
+        catch { /* goals are optional context */ }
+        string goalsLine = topGoals.Count == 0
+            ? "(no significant ambitions)"
+            : string.Join("; ", topGoals);
+
+        // Topic framing -- maps a topicId to a player-facing prompt the LLM
+        // should answer in-character. Each framing is a short paragraph that
+        // tells the model what the player just asked and what to ground the
+        // reply in. The 5 high-value relational topics from Slice 14's
+        // whitelist; extend here as the whitelist grows.
+        string topicPrompt = topicId switch
+        {
+            "life_goals" =>
+                "The player has asked: \"What do you want out of life? What are " +
+                "you working toward?\" Answer honestly given your goal stack and " +
+                "personality. If you have a specific named target in your goals " +
+                "(revenge, rivalry, devotion), reference them by name.",
+            "origins" =>
+                "The player has asked: \"Where did you come from originally? " +
+                "What's your story?\" Answer in character. Improvise a brief " +
+                "biographical hook (birthplace, what drove you here, what you " +
+                "left behind) consistent with your class, race, and personality. " +
+                "Match openness to your relationship with the player -- guarded " +
+                "with strangers, fuller with friends.",
+            "family" =>
+                "The player has asked about your family. Answer in character. " +
+                "If you have personality traits suggesting closeness (high " +
+                "Compassion, low Aggression), speak with warmth or grief. If " +
+                "guarded or hostile, deflect briefly. Reference real family " +
+                "members only if obvious from your name or context; otherwise " +
+                "speak of family in general terms.",
+            "friends" =>
+                "The player has asked about your friends or who you trust. " +
+                "Answer in character, grounded in your Sociability and " +
+                "Trustworthiness traits. Sociable NPCs might name a few; " +
+                "solitary or paranoid ones might dismiss the question.",
+            "romance_views" =>
+                "The player has asked about your views on love or relationships. " +
+                "Answer in character, grounded in your Romanticism and " +
+                "Commitment traits. Romantic NPCs wax lyrical; cynical ones " +
+                "scoff. Tailor the answer to your relationship with the player " +
+                "(a confidant gets honesty, a stranger gets a quip).",
+            _ => $"The player has asked you about: {topicId}. Answer in-character.",
+        };
+
+        string playerName = player.Name1 ?? player.Name ?? "the traveler";
+        string userPrompt =
+            $"You are {name}, a Lv {(int)npc.Level} {charClass} of the {archetype} archetype.\n" +
+            $"Personality: {personalityDesc}.\n" +
+            $"Current goals: {goalsLine}.\n" +
+            $"You are talking to {playerName}. Your relationship with them is: {relWord}.\n" +
+            $"\n{topicPrompt}";
+
+        string? resultText = null;
+        string? failureReason = "llm_disabled";
+        int promptTok = 0, completionTok = 0, totalTok = 0, responseMs = 0;
+        bool succeeded = false;
+
+        try
+        {
+            var provider = LLMProvider.Get();
+            if (provider != null)
+            {
+                var llmResp = await provider.CompleteAsync(new LLMRequest
+                {
+                    SystemPrompt = SystemPromptTopicResponse,
+                    UserPrompt = userPrompt,
+                    MaxTokens = 200,
+                    Temperature = 0.85,
+                }, ct);
+
+                if (llmResp != null && !string.IsNullOrWhiteSpace(llmResp.Text))
+                {
+                    resultText = SanitizeLLMOutput(llmResp.Text, maxLen: 600); // v0.64.1: cap moved into sanitizer (default 300 silently overrode this)
+                    promptTok = llmResp.PromptTokens;
+                    completionTok = llmResp.CompletionTokens;
+                    totalTok = llmResp.TotalTokens;
+                    responseMs = llmResp.ResponseMs;
+                    succeeded = !string.IsNullOrWhiteSpace(resultText);
+                    failureReason = succeeded ? null : "llm_sanitize_empty";
+
+                    if (succeeded)
+                    {
+                        npc.LLMTopicResponseCache[cacheKey] = resultText!;
+                    }
+                }
+                else
+                {
+                    failureReason = "llm_call_returned_null";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            failureReason = $"exception: {ex.GetType().Name}: {ex.Message}";
+            DebugLogger.Instance.LogError("LLM",
+                $"GenerateTopicResponseAsync({topicId}) failed for {name}: {ex.Message}. " +
+                $"Returning templated fallback.");
+            resultText = null;
+        }
+        finally
+        {
+            try
+            {
+                SqlBackend?.RecordLLMUsage(
+                    $"topic_response_{topicId}", name, succeeded,
+                    promptTok, completionTok, totalTok, responseMs,
+                    resultText, failureReason);
+            }
+            catch { /* recording is best-effort */ }
+        }
+
+        return succeeded && resultText != null ? resultText : (templatedFallback ?? "");
+    }
+
+    /// <summary>
+    /// v0.64.1 Brain v2 Slice 14b: LLM-generated goal-aware GREETING. Called
+    /// from VisualNovelDialogueSystem.ShowGreeting when the NPC's priority
+    /// strategic goal targets the conversation partner (player). Replaces the
+    /// standard relationship-tier greeting with an in-character opener that
+    /// acknowledges the standing arc.
+    ///
+    /// Per-(NPC, player, goalName) cached in `NPC.LLMGoalGreetingCache`. Cache
+    /// key includes goalName so when the goal changes (Slice 12a refresh or
+    /// completion), the next greeting regenerates. Cheap-tier model (Haiku)
+    /// because greetings are short flavor; per-conversation cost is one call
+    /// per NPC-player-goal-cycle, amortized across all subsequent re-talks.
+    ///
+    /// Returns the templated fallback on every failure path (LLM disabled,
+    /// timeout, empty result, exception). Caller always gets a non-null
+    /// string suitable to print.
+    /// </summary>
+    public static async Task<string> GenerateGoalAwareGreetingAsync(
+        NPC npc, Character player, string goalName, string goalType,
+        string templatedFallback, CancellationToken ct)
+    {
+        if (npc == null || player == null || string.IsNullOrWhiteSpace(goalName))
+            return templatedFallback ?? "";
+
+        // Per-(goal, player) cache hit -> instant return, no LLM cost.
+        // v0.64.1 audit fix: key MUST be Name2-first to match the external
+        // reader in BaseLocation.WriteTargetingNPCNotifications (the Slice 19
+        // hail re-emit). The original Name1-first key never matched for any
+        // online player whose account name differs from display name, so the
+        // "calls out" hail silently never fired for them.
+        string playerKey = player.Name2 ?? player.Name1 ?? player.DisplayName ?? "(unknown)";
+        string cacheKey = $"{goalName}|{playerKey}";
+        if (npc.LLMGoalGreetingCache.TryGetValue(cacheKey, out var cached)
+            && !string.IsNullOrWhiteSpace(cached))
+        {
+            return cached;
+        }
+
+        string name = npc.Name2 ?? npc.Name1 ?? "the NPC";
+        string charClass = npc.Class.ToString();
+        string archetype = npc.Archetype ?? "citizen";
+        var p = npc.Brain?.Personality;
+        string personalityDesc = p == null ? "balanced disposition" : FormatPersonalityTraits(p);
+
+        int relLevel = 50;
+        try
+        {
+            relLevel = global::RelationshipSystem.GetRelationshipLevel(npc, player);
+        }
+        catch { /* fallback */ }
+        string relWord = relLevel <= 15 ? "deeply close (spouse/lover-tier)"
+                       : relLevel <= 35 ? "warm friendship"
+                       : relLevel <= 55 ? "neutral acquaintance"
+                       : relLevel <= 75 ? "cool / suspicious"
+                       : "hostile or stranger";
+
+        string playerName = player.Name1 ?? player.Name ?? "the traveler";
+        string userPrompt =
+            $"You are {name}, a Lv {(int)npc.Level} {charClass} of the {archetype} archetype.\n" +
+            $"Personality: {personalityDesc}.\n" +
+            $"Your relationship with {playerName} is: {relWord}.\n" +
+            $"\n" +
+            $"Your priority strategic goal is: \"{goalName}\" (type: {goalType}).\n" +
+            $"This goal NAMES {playerName} as its target. They have just walked up to talk to you.\n" +
+            $"\nWrite your opening line acknowledging this standing arc.";
+
+        string? resultText = null;
+        string? failureReason = "llm_disabled";
+        int promptTok = 0, completionTok = 0, totalTok = 0, responseMs = 0;
+        bool succeeded = false;
+
+        try
+        {
+            var provider = LLMProvider.Get();
+            if (provider != null)
+            {
+                var llmResp = await provider.CompleteAsync(new LLMRequest
+                {
+                    SystemPrompt = SystemPromptGoalGreeting,
+                    UserPrompt = userPrompt,
+                    MaxTokens = 100,
+                    Temperature = 0.85,
+                    // Cheap tier: short flavor line, doesn't need Sonnet quality
+                    Model = LLMSettings.GetCheapModelOrDefault(),
+                }, ct);
+
+                if (llmResp != null && !string.IsNullOrWhiteSpace(llmResp.Text))
+                {
+                    resultText = SanitizeLLMOutput(llmResp.Text);
+                    // Cap length so a runaway reply can't blow up the UI.
+                    if (resultText.Length > 300)
+                        resultText = resultText.Substring(0, 300).TrimEnd() + "...";
+                    promptTok = llmResp.PromptTokens;
+                    completionTok = llmResp.CompletionTokens;
+                    totalTok = llmResp.TotalTokens;
+                    responseMs = llmResp.ResponseMs;
+                    succeeded = !string.IsNullOrWhiteSpace(resultText);
+                    failureReason = succeeded ? null : "llm_sanitize_empty";
+
+                    if (succeeded)
+                    {
+                        npc.LLMGoalGreetingCache[cacheKey] = resultText!;
+                    }
+                }
+                else
+                {
+                    failureReason = "llm_call_returned_null";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            failureReason = $"exception: {ex.GetType().Name}: {ex.Message}";
+            DebugLogger.Instance.LogError("LLM",
+                $"GenerateGoalAwareGreetingAsync({goalName}) failed for {name}: {ex.Message}. " +
+                $"Returning templated fallback.");
+            resultText = null;
+        }
+        finally
+        {
+            try
+            {
+                SqlBackend?.RecordLLMUsage(
+                    "goal_aware_greeting", name, succeeded,
+                    promptTok, completionTok, totalTok, responseMs,
+                    resultText, failureReason);
+            }
+            catch { /* recording is best-effort */ }
+        }
+
+        return succeeded && resultText != null ? resultText : (templatedFallback ?? "");
+    }
+
+    /// <summary>
+    /// v0.64.1 Brain v2 Slice 16: LLM-generated romance / social reaction
+    /// line. Replaces templated NPC responses to compliment / provocation /
+    /// flirt-refusal interactions with per-NPC personalized lines grounded
+    /// in personality + relationship to this specific player. Per-(NPC,
+    /// player, interactionType, bucket) cached so repeat encounters of the
+    /// same emotional shape reuse the same in-character line.
+    ///
+    /// Cheap-tier model (Haiku) -- these are short spoken lines, not
+    /// narrative. Falls through to templated fallback on every failure path.
+    /// </summary>
+    public static async Task<string> GenerateRomanceReactionAsync(
+        NPC npc, Character player, string interactionType, string bucket,
+        string situationHint, string templatedFallback, CancellationToken ct)
+    {
+        if (npc == null || player == null
+            || string.IsNullOrWhiteSpace(interactionType)
+            || string.IsNullOrWhiteSpace(bucket))
+            return templatedFallback ?? "";
+
+        string playerKey = player.Name1 ?? player.Name ?? player.Name2 ?? "(unknown)";
+        string cacheKey = $"{interactionType}|{bucket}|{playerKey}";
+        if (npc.LLMRomanceReactionCache.TryGetValue(cacheKey, out var cached)
+            && !string.IsNullOrWhiteSpace(cached))
+        {
+            return cached;
+        }
+
+        string name = npc.Name2 ?? npc.Name1 ?? "the NPC";
+        string charClass = npc.Class.ToString();
+        string archetype = npc.Archetype ?? "citizen";
+        var p = npc.Brain?.Personality;
+        string personalityDesc = p == null ? "balanced disposition" : FormatPersonalityTraits(p);
+
+        int relLevel = 50;
+        try
+        {
+            relLevel = global::RelationshipSystem.GetRelationshipLevel(npc, player);
+        }
+        catch { /* fallback */ }
+        string relWord = relLevel <= 15 ? "deeply close (spouse/lover-tier)"
+                       : relLevel <= 35 ? "warm friendship"
+                       : relLevel <= 55 ? "neutral acquaintance"
+                       : relLevel <= 75 ? "cool / suspicious"
+                       : "hostile or stranger";
+
+        string playerName = player.Name1 ?? player.Name ?? "the traveler";
+        string userPrompt =
+            $"You are {name}, a Lv {(int)npc.Level} {charClass} of the {archetype} archetype.\n" +
+            $"Personality: {personalityDesc}.\n" +
+            $"Your relationship with {playerName} is: {relWord}.\n" +
+            $"\n{situationHint}\n" +
+            $"\nWrite ONE spoken line (1-2 sentences) as your reaction.";
+
+        string? resultText = null;
+        string? failureReason = "llm_disabled";
+        int promptTok = 0, completionTok = 0, totalTok = 0, responseMs = 0;
+        bool succeeded = false;
+
+        try
+        {
+            var provider = LLMProvider.Get();
+            if (provider != null)
+            {
+                var llmResp = await provider.CompleteAsync(new LLMRequest
+                {
+                    SystemPrompt = SystemPromptSpokenLine, // v0.64.1 audit fix: neutral prompt (goal-greeting framing was wrong here)
+                    UserPrompt = userPrompt,
+                    MaxTokens = 100,
+                    Temperature = 0.85,
+                    Model = LLMSettings.GetCheapModelOrDefault(),
+                }, ct);
+
+                if (llmResp != null && !string.IsNullOrWhiteSpace(llmResp.Text))
+                {
+                    resultText = SanitizeLLMOutput(llmResp.Text);
+                    if (resultText.Length > 300)
+                        resultText = resultText.Substring(0, 300).TrimEnd() + "...";
+                    promptTok = llmResp.PromptTokens;
+                    completionTok = llmResp.CompletionTokens;
+                    totalTok = llmResp.TotalTokens;
+                    responseMs = llmResp.ResponseMs;
+                    succeeded = !string.IsNullOrWhiteSpace(resultText);
+                    failureReason = succeeded ? null : "llm_sanitize_empty";
+
+                    if (succeeded)
+                    {
+                        npc.LLMRomanceReactionCache[cacheKey] = resultText!;
+                    }
+                }
+                else
+                {
+                    failureReason = "llm_call_returned_null";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            failureReason = $"exception: {ex.GetType().Name}: {ex.Message}";
+            DebugLogger.Instance.LogError("LLM",
+                $"GenerateRomanceReactionAsync({interactionType}/{bucket}) failed for {name}: {ex.Message}. " +
+                $"Returning templated fallback.");
+            resultText = null;
+        }
+        finally
+        {
+            try
+            {
+                SqlBackend?.RecordLLMUsage(
+                    $"romance_{interactionType}_{bucket}", name, succeeded,
+                    promptTok, completionTok, totalTok, responseMs,
+                    resultText, failureReason);
+            }
+            catch { /* recording is best-effort */ }
+        }
+
+        return succeeded && resultText != null ? resultText : (templatedFallback ?? "");
+    }
+
+    /// <summary>
+    /// v0.64.1 Brain v2 Slice 21: LLM-generated NPC news-comment line. Fires
+    /// during ShowGreeting when a recent major world event qualifies. Returns
+    /// a one-sentence in-character reaction ("Hear about the king? Strange
+    /// days.") that lands as a supplementary line after the standard
+    /// greeting. Lets NPCs reference the same news the player sees in the
+    /// feed -- world feels responsive.
+    ///
+    /// Per-(NPC, newsId, player) cached in `NPC.LLMNewsCommentCache`. Cheap-
+    /// tier (Haiku). Falls through to null on every failure path; caller
+    /// skips emission if null returned (no template fallback -- silent skip
+    /// reads better than canned commentary).
+    /// </summary>
+    public static async Task<string?> GenerateNewsCommentAsync(
+        NPC npc, Character player, int newsId, string newsHeadline,
+        CancellationToken ct)
+    {
+        if (npc == null || player == null || string.IsNullOrWhiteSpace(newsHeadline))
+            return null;
+
+        string playerKey = player.Name1 ?? player.Name ?? player.Name2 ?? "(unknown)";
+        string cacheKey = $"{newsId}|{playerKey}";
+        if (npc.LLMNewsCommentCache.TryGetValue(cacheKey, out var cached)
+            && !string.IsNullOrWhiteSpace(cached))
+        {
+            return cached;
+        }
+
+        string name = npc.Name2 ?? npc.Name1 ?? "the NPC";
+        string charClass = npc.Class.ToString();
+        string archetype = npc.Archetype ?? "citizen";
+        var p = npc.Brain?.Personality;
+        string personalityDesc = p == null ? "balanced disposition" : FormatPersonalityTraits(p);
+
+        string playerName = player.Name1 ?? player.Name ?? "the traveler";
+        string userPrompt =
+            $"You are {name}, a Lv {(int)npc.Level} {charClass} of the {archetype} archetype.\n" +
+            $"Personality: {personalityDesc}.\n" +
+            $"You are speaking with {playerName}.\n" +
+            $"\n" +
+            $"Word around town today: {newsHeadline}\n" +
+            $"\n" +
+            $"Mention it. ONE sentence, in your voice -- a remark, a worry, a snide " +
+            $"aside, a piece of gossip, whatever fits your personality. Do not " +
+            $"restate the news verbatim; react to it.";
+
+        string? resultText = null;
+        string? failureReason = "llm_disabled";
+        int promptTok = 0, completionTok = 0, totalTok = 0, responseMs = 0;
+        bool succeeded = false;
+
+        try
+        {
+            var provider = LLMProvider.Get();
+            if (provider != null)
+            {
+                var llmResp = await provider.CompleteAsync(new LLMRequest
+                {
+                    SystemPrompt = SystemPromptSpokenLine, // v0.64.1 audit fix: neutral prompt (goal-greeting framing was wrong here)
+                    UserPrompt = userPrompt,
+                    MaxTokens = 80,
+                    Temperature = 0.9,
+                    Model = LLMSettings.GetCheapModelOrDefault(),
+                }, ct);
+
+                if (llmResp != null && !string.IsNullOrWhiteSpace(llmResp.Text))
+                {
+                    resultText = SanitizeLLMOutput(llmResp.Text);
+                    if (resultText.Length > 250)
+                        resultText = resultText.Substring(0, 250).TrimEnd() + "...";
+                    promptTok = llmResp.PromptTokens;
+                    completionTok = llmResp.CompletionTokens;
+                    totalTok = llmResp.TotalTokens;
+                    responseMs = llmResp.ResponseMs;
+                    succeeded = !string.IsNullOrWhiteSpace(resultText);
+                    failureReason = succeeded ? null : "llm_sanitize_empty";
+
+                    if (succeeded)
+                    {
+                        npc.LLMNewsCommentCache[cacheKey] = resultText!;
+                    }
+                }
+                else
+                {
+                    failureReason = "llm_call_returned_null";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            failureReason = $"exception: {ex.GetType().Name}: {ex.Message}";
+            DebugLogger.Instance.LogError("LLM",
+                $"GenerateNewsCommentAsync(news#{newsId}) failed for {name}: {ex.Message}.");
+            resultText = null;
+        }
+        finally
+        {
+            try
+            {
+                SqlBackend?.RecordLLMUsage(
+                    "npc_news_comment", name, succeeded,
+                    promptTok, completionTok, totalTok, responseMs,
+                    resultText, failureReason);
+            }
+            catch { /* recording is best-effort */ }
+        }
+
+        return succeeded ? resultText : null;
+    }
+
+    /// <summary>
+    /// v0.64.1 Brain v2 Slice 22: LLM-generated NPC-initiated flirt opener.
+    /// Called from VisualNovelDialogueSystem.ShowGreeting when a single,
+    /// attracted, warmly-disposed, high-Romanticism NPC's greeting fires.
+    /// Returns a 1-2 sentence opening flirt line that lands as a
+    /// supplementary greeting beat -- the NPC making the first move instead
+    /// of waiting for the player to pick Flirt from the menu.
+    ///
+    /// Per-(NPC, player) cached in `NPC.LLMNPCFlirtCache` so the same NPC's
+    /// first-move toward the same player stays consistent across encounters.
+    /// Cheap-tier (Haiku). Falls through to null on every failure path;
+    /// caller skips emission if null (no templated fallback -- silent skip
+    /// reads better than canned flirts).
+    /// </summary>
+    public static async Task<string?> GenerateNPCFlirtAsync(
+        NPC npc, Character player, bool npcIsMarried, CancellationToken ct)
+    {
+        if (npc == null || player == null) return null;
+
+        string playerKey = player.Name1 ?? player.Name ?? player.Name2 ?? "(unknown)";
+        if (npc.LLMNPCFlirtCache.TryGetValue(playerKey, out var cached)
+            && !string.IsNullOrWhiteSpace(cached))
+        {
+            return cached;
+        }
+
+        string name = npc.Name2 ?? npc.Name1 ?? "the NPC";
+        string charClass = npc.Class.ToString();
+        string archetype = npc.Archetype ?? "citizen";
+        var p = npc.Brain?.Personality;
+        string personalityDesc = p == null ? "balanced disposition" : FormatPersonalityTraits(p);
+        float romanticism = p?.Romanticism ?? 0.5f;
+        float flirtatiousness = p?.Flirtatiousness ?? 0.5f;
+
+        int relLevel = 50;
+        try
+        {
+            relLevel = global::RelationshipSystem.GetRelationshipLevel(npc, player);
+        }
+        catch { /* fallback */ }
+        string relWord = relLevel <= 15 ? "deeply close (spouse/lover-tier)"
+                       : relLevel <= 35 ? "warm friendship"
+                       : "neutral acquaintance with potential";
+
+        string playerName = player.Name1 ?? player.Name ?? "the traveler";
+        // v0.64.1 audit fix: the prompt previously hardcoded "you are not
+        // married or committed" even when a low-Commitment married NPC took
+        // the affair-capable path -- married initiators spoke as singles.
+        string commitmentLine = npcIsMarried
+            ? "You ARE married, but your commitment wavers and you know it -- " +
+              "this flirt is a forbidden, guilty test of the waters. Let that " +
+              "tension color the line. "
+            : "You are not married or committed to anyone else; you are attracted; " +
+              "you have decided to test the waters. ";
+        string userPrompt =
+            $"You are {name}, a Lv {(int)npc.Level} {charClass} of the {archetype} archetype.\n" +
+            $"Personality: {personalityDesc}.\n" +
+            $"Your Romanticism trait is {romanticism:F2}, Flirtatiousness {flirtatiousness:F2}.\n" +
+            $"Your relationship with {playerName} is: {relWord}.\n" +
+            $"\n" +
+            $"You have decided to make a SMALL FIRST MOVE in this conversation. " +
+            commitmentLine +
+            $"Write ONE opening flirt -- a " +
+            $"glance held a beat too long made into words, a compliment that lands " +
+            $"warmer than friendship, a question that invites them closer. 1-2 " +
+            $"sentences. Match your personality (a shy NPC ventures softly; a bold " +
+            $"NPC swings; a witty NPC teases). No stage directions, no quotes " +
+            $"around the line, no preamble. Spoken voice only -- it will be quoted " +
+            $"in-game.";
+
+        string? resultText = null;
+        string? failureReason = "llm_disabled";
+        int promptTok = 0, completionTok = 0, totalTok = 0, responseMs = 0;
+        bool succeeded = false;
+
+        try
+        {
+            var provider = LLMProvider.Get();
+            if (provider != null)
+            {
+                var llmResp = await provider.CompleteAsync(new LLMRequest
+                {
+                    SystemPrompt = SystemPromptSpokenLine, // v0.64.1 audit fix: neutral prompt (goal-greeting framing was wrong here)
+                    UserPrompt = userPrompt,
+                    MaxTokens = 100,
+                    Temperature = 0.9,
+                    Model = LLMSettings.GetCheapModelOrDefault(),
+                }, ct);
+
+                if (llmResp != null && !string.IsNullOrWhiteSpace(llmResp.Text))
+                {
+                    resultText = SanitizeLLMOutput(llmResp.Text);
+                    if (resultText.Length > 300)
+                        resultText = resultText.Substring(0, 300).TrimEnd() + "...";
+                    promptTok = llmResp.PromptTokens;
+                    completionTok = llmResp.CompletionTokens;
+                    totalTok = llmResp.TotalTokens;
+                    responseMs = llmResp.ResponseMs;
+                    succeeded = !string.IsNullOrWhiteSpace(resultText);
+                    failureReason = succeeded ? null : "llm_sanitize_empty";
+
+                    if (succeeded)
+                    {
+                        npc.LLMNPCFlirtCache[playerKey] = resultText!;
+                    }
+                }
+                else
+                {
+                    failureReason = "llm_call_returned_null";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            failureReason = $"exception: {ex.GetType().Name}: {ex.Message}";
+            DebugLogger.Instance.LogError("LLM",
+                $"GenerateNPCFlirtAsync failed for {name}: {ex.Message}.");
+            resultText = null;
+        }
+        finally
+        {
+            try
+            {
+                SqlBackend?.RecordLLMUsage(
+                    "npc_initiated_flirt", name, succeeded,
+                    promptTok, completionTok, totalTok, responseMs,
+                    resultText, failureReason);
+            }
+            catch { /* recording is best-effort */ }
+        }
+
+        return succeeded ? resultText : null;
+    }
+
+    /// <summary>
+    /// v0.64.1 Brain v2 Slice 20: LLM-generated NPC quest-request line.
+    /// Called from VisualNovelDialogueSystem.HandleAcceptQuestOption when the
+    /// player picks the "Is there something you need?" option on an NPC who
+    /// has a priority Combat goal with a named TargetCharacter. Returns a
+    /// 2-3 sentence in-character ask: the NPC names the target, explains
+    /// the grievance, asks the player for help.
+    ///
+    /// Per-(NPC, player, goalName) cached in `NPC.LLMQuestRequestCache`.
+    /// Re-keyed on goalName so when the strategic goal cycles (Slice 12a
+    /// refresh or completion), the next ask regenerates against the new arc.
+    /// Cheap-tier model (Haiku). Falls through to a templated fallback on
+    /// every failure path.
+    /// </summary>
+    public static async Task<string> GenerateQuestRequestAsync(
+        NPC npc, Character player, string goalName, string targetName,
+        string templatedFallback, CancellationToken ct)
+    {
+        if (npc == null || player == null
+            || string.IsNullOrWhiteSpace(goalName)
+            || string.IsNullOrWhiteSpace(targetName))
+            return templatedFallback ?? "";
+
+        string playerKey = player.Name1 ?? player.Name ?? player.Name2 ?? "(unknown)";
+        string cacheKey = $"{goalName}|{playerKey}";
+        if (npc.LLMQuestRequestCache.TryGetValue(cacheKey, out var cached)
+            && !string.IsNullOrWhiteSpace(cached))
+        {
+            return cached;
+        }
+
+        string name = npc.Name2 ?? npc.Name1 ?? "the NPC";
+        string charClass = npc.Class.ToString();
+        string archetype = npc.Archetype ?? "citizen";
+        var p = npc.Brain?.Personality;
+        string personalityDesc = p == null ? "balanced disposition" : FormatPersonalityTraits(p);
+
+        int relLevel = 50;
+        try
+        {
+            relLevel = global::RelationshipSystem.GetRelationshipLevel(npc, player);
+        }
+        catch { /* fallback */ }
+        string relWord = relLevel <= 15 ? "deeply close (spouse/lover-tier)"
+                       : relLevel <= 35 ? "warm friendship"
+                       : relLevel <= 55 ? "neutral acquaintance"
+                       : relLevel <= 75 ? "cool / suspicious"
+                       : "hostile or stranger";
+
+        string playerName = player.Name1 ?? player.Name ?? "the traveler";
+        string userPrompt =
+            $"You are {name}, a Lv {(int)npc.Level} {charClass} of the {archetype} archetype.\n" +
+            $"Personality: {personalityDesc}.\n" +
+            $"Your relationship with {playerName} is: {relWord}.\n" +
+            $"\n" +
+            $"Your priority strategic goal is: \"{goalName}\".\n" +
+            $"It centers on a specific person: {targetName}.\n" +
+            $"\n" +
+            $"{playerName} has just asked if there's something you need. You see " +
+            $"an opening: ask them for help dealing with {targetName}. Write 2-3 " +
+            $"sentences of spoken speech -- name {targetName}, give a glimpse of why " +
+            $"this matters to you, and make the ask. Pride or shame can color the " +
+            $"request to fit your personality, but the ask must be clear: would " +
+            $"they hunt {targetName} for you?";
+
+        string? resultText = null;
+        string? failureReason = "llm_disabled";
+        int promptTok = 0, completionTok = 0, totalTok = 0, responseMs = 0;
+        bool succeeded = false;
+
+        try
+        {
+            var provider = LLMProvider.Get();
+            if (provider != null)
+            {
+                var llmResp = await provider.CompleteAsync(new LLMRequest
+                {
+                    SystemPrompt = SystemPromptSpokenLine, // v0.64.1 audit fix: neutral prompt (goal-greeting framing directly contradicted the quest ask)
+                    UserPrompt = userPrompt,
+                    MaxTokens = 180,
+                    Temperature = 0.85,
+                    Model = LLMSettings.GetCheapModelOrDefault(),
+                }, ct);
+
+                if (llmResp != null && !string.IsNullOrWhiteSpace(llmResp.Text))
+                {
+                    resultText = SanitizeLLMOutput(llmResp.Text, maxLen: 500); // v0.64.1: cap moved into sanitizer (default 300 silently overrode this)
+                    promptTok = llmResp.PromptTokens;
+                    completionTok = llmResp.CompletionTokens;
+                    totalTok = llmResp.TotalTokens;
+                    responseMs = llmResp.ResponseMs;
+                    succeeded = !string.IsNullOrWhiteSpace(resultText);
+                    failureReason = succeeded ? null : "llm_sanitize_empty";
+
+                    if (succeeded)
+                    {
+                        npc.LLMQuestRequestCache[cacheKey] = resultText!;
+                    }
+                }
+                else
+                {
+                    failureReason = "llm_call_returned_null";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            failureReason = $"exception: {ex.GetType().Name}: {ex.Message}";
+            DebugLogger.Instance.LogError("LLM",
+                $"GenerateQuestRequestAsync({goalName}) failed for {name}: {ex.Message}. " +
+                $"Returning templated fallback.");
+            resultText = null;
+        }
+        finally
+        {
+            try
+            {
+                SqlBackend?.RecordLLMUsage(
+                    "npc_quest_request", name, succeeded,
+                    promptTok, completionTok, totalTok, responseMs,
+                    resultText, failureReason);
+            }
+            catch { /* recording is best-effort */ }
+        }
+
+        return succeeded && resultText != null ? resultText : (templatedFallback ?? "");
     }
 
     /// <summary>
@@ -1206,7 +2084,13 @@ public static class LLMMoments
     /// news flash:" preambles, and trailing whitespace. Defensive -- we trust
     /// the system prompt but harden against models that ignore it.
     /// </summary>
-    private static string SanitizeLLMOutput(string raw)
+    // v0.64.1 audit fix: maxLen parameter. The hardcoded 300-char cap (a
+    // news-feed-era rule) silently overrode the longer caps the topic-response
+    // (600) and quest-request (500) callers applied AFTER sanitization --
+    // those longer caps were unreachable, and 2-4 sentence topic replies
+    // truncated mid-sentence at 297 + "...". Default stays 300 for the
+    // news/epitaph callers.
+    private static string SanitizeLLMOutput(string raw, int maxLen = 300)
     {
         if (string.IsNullOrWhiteSpace(raw)) return raw;
         string t = raw.Trim();
@@ -1245,8 +2129,9 @@ public static class LLMMoments
              .Replace('\u2018', '\'').Replace('\u2019', '\'')
              .Replace('\u201c', '"').Replace('\u201d', '"');
 
-        // Cap length at ~300 chars to keep news feed clean.
-        if (t.Length > 300) t = t.Substring(0, 297).TrimEnd() + "...";
+        // Cap length to keep the consuming surface clean (default 300 for
+        // news-feed callers; topic/quest callers pass larger budgets).
+        if (t.Length > maxLen) t = t.Substring(0, Math.Max(1, maxLen - 3)).TrimEnd() + "...";
 
         return t;
     }

@@ -10,8 +10,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.64.0";
-    public const string VersionName = "Brain v2";
+    public const string Version = "0.64.1";
+    public const string VersionName = "The Brain";
 
     // v0.57.12: Alignment scale cap. Character.Chivalry and Character.Darkness setters clamp to [0, AlignmentCap]
     // as defense in depth against direct-mutation bypass sites that don't route through AlignmentSystem.ChangeAlignment.
@@ -739,6 +739,7 @@ public static partial class GameConfig
     public const float MurderGoldTheftPercent = 0.50f;       // Steal 50% of NPC's gold on murder
     public const int MurderDarknessGain = 250;                // 50 -> 250 (paired with -125 chivalry).
     public const int MaxMurdersPerDay = 3;                    // v0.57.6: cap non-bounty NPC murders to prevent a dark-aligned player from wiping the town in a single play session.
+    public const int MaxAlignedSparesPerDay = 3;              // v0.64.1: cap the +10 paired-good alignment reward from sparing beaten PvP NPCs (mirror of the murder cap; sparing itself is never blocked).
 
     // v0.62.x "Light and Dark" Phase 3 (Dread/Renown reward-loop content).
     // DREAD: Demand Tribute is the Dark/Evil "active income" verb. Capped to prevent infinite
@@ -1436,6 +1437,29 @@ public static partial class GameConfig
             exp += (long)(Math.Pow(i, exponent) * 50);
         }
         return exp;
+    }
+
+    /// <summary>
+    /// v0.64.1: Early-game XP multiplier. Post-deploy telemetry showed
+    /// the path from Lv 1 to Lv 10 took ~200 combats (engaged players hit
+    /// the wall here -- Rozro played 345 hours and only reached Lv 14
+    /// before quitting). Combat win rate is 95-100% at low levels so
+    /// difficulty isn't the issue; the issue is XP rewards are tiny when
+    /// fighting under-leveled monsters on low floors. This multiplier
+    /// compresses the onboarding grind without touching endgame
+    /// progression. Applied in HandleVictory / HandleVictoryMultiMonster
+    /// at the end of the XP-modifier chain.
+    ///
+    /// Curve targets ~30 combats to Lv 5, ~50 to Lv 10, transparent at Lv 21+.
+    /// </summary>
+    public static double GetEarlyGameXPMultiplier(int playerLevel)
+    {
+        if (playerLevel <= 0) return 1.0;
+        if (playerLevel <= 5)  return 3.0;
+        if (playerLevel <= 10) return 2.0;
+        if (playerLevel <= 15) return 1.5;
+        if (playerLevel <= 20) return 1.2;
+        return 1.0;
     }
 
     /// <summary>

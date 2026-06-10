@@ -889,7 +889,16 @@ namespace UsurperRemake.Systems
             // family roster (shown as away, not as a dependent at home) and the
             // ProcessDailyAging self-heal pass retries the conversion each tick, so
             // they graduate into a real world NPC as soon as the population frees up.
-            if ((NPCSpawnSystem.Instance?.ActiveNPCs.Count ?? 0) >= GameConfig.MaxNPCPopulation)
+            //
+            // v0.64.0: this used to check ActiveNPCs.Count (total list including
+            // permadead corpses). On the live server the corpse pile pushed total
+            // above the 200 cap, and every 18-year-old got parked indefinitely
+            // (52 children waiting at first audit). Now checks alive NPCs only,
+            // matching the parallel fixes in WorldSimulator.ProcessNPCPregnancies
+            // / ProcessNPCImmigration / OrphanBecomesNPC.
+            int aliveNpcCount = NPCSpawnSystem.Instance?.ActiveNPCs?.Count(n =>
+                n.IsAlive && !n.IsDead && !n.IsAgedDeath && !n.IsPermaDead) ?? 0;
+            if (aliveNpcCount >= GameConfig.MaxNPCPopulation)
             {
                 child.Location = GameConfig.ChildLocationAway;
                 return;

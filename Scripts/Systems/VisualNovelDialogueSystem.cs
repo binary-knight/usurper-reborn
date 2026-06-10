@@ -305,6 +305,36 @@ namespace UsurperRemake.Systems
         {
             string greeting = GenerateContextualGreeting(npc, relationLevel, romanceType);
 
+            // v0.64.1 Brain v2 Slice 14b: when this NPC's priority strategic
+            // goal names the player as its target, replace the templated
+            // greeting with an LLM-generated opener that acknowledges the
+            // standing arc. Slice 13b surfaced "Magnus watches you with
+            // hostility" when Magnus walks in with a Crush-Lumina goal; this
+            // closes the loop -- when Lumina actually clicks Talk to Magnus,
+            // the conversation opens with something like "You. I've been
+            // waiting." instead of a templated generic hello.
+            //
+            // Per-(NPC, player, goalName) cached so re-talks within a goal
+            // cycle are instant. Cheap-tier (Haiku). Falls through to the
+            // template on every failure path.
+            if (player != null)
+            {
+                var priorityGoal = npc.Brain?.Goals?.GetPriorityGoal();
+                if (priorityGoal != null
+                    && !string.IsNullOrWhiteSpace(priorityGoal.TargetCharacter))
+                {
+                    string playerKey = player.Name2 ?? player.Name1 ?? player.DisplayName ?? "";
+                    if (!string.IsNullOrWhiteSpace(playerKey)
+                        && string.Equals(priorityGoal.TargetCharacter.Trim(), playerKey.Trim(),
+                            System.StringComparison.OrdinalIgnoreCase))
+                    {
+                        greeting = await UsurperRemake.Systems.LLMMoments.GenerateGoalAwareGreetingAsync(
+                            npc, player, priorityGoal.Name, priorityGoal.Type.ToString(),
+                            greeting, System.Threading.CancellationToken.None);
+                    }
+                }
+            }
+
             // Phase 1.5 dialogue enhancer: layer contextual flavor (mood / memory /
             // witness / personality / faction / etc) on top of the base greeting.
             // Language-gated to en/hu inside Enhance() so non-supported languages
@@ -327,7 +357,178 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  \"{greeting}\"");
             terminal.WriteLine("");
 
+            // v0.64.1 Brain v2 Slice 21: news-driven follow-up line. ~18%
+            // chance per conversation, gated on a recent "major" news entry
+            // existing. NPC emits a one-sentence in-character reaction so the
+            // player feels the world is responding to events both of them
+            // see in the news feed.
+            if (player != null && random.NextDouble() < 0.18)
+            {
+                await TryEmitNewsCommentLine(npc);
+            }
+
+            // v0.64.1 Brain v2 Slice 22: NPC-initiated flirt. ~14% per-greeting
+            // gate, plus eligibility filter (Romanticism > 0.6, single, attracted,
+            // warm relationship, not adult child, not already spouse/lover). When
+            // it fires, NPC volunteers an opening flirt as a supplementary beat
+            // -- they make the first move. Player can respond with the standard
+            // Flirt menu option (Slice 17 handles reciprocate / awkward branches)
+            // or simply move on. NEW pattern: the player is the one being
+            // approached, not the approacher.
+            if (player != null && romanceType != RomanceRelationType.Spouse
+                && romanceType != RomanceRelationType.Lover
+                && random.NextDouble() < 0.14)
+            {
+                await TryEmitNPCFlirtLine(npc, relationLevel);
+            }
+
             await Task.Delay(500);
+        }
+
+        /// <summary>
+        /// v0.64.1 Brain v2 Slice 22: try to render an LLM NPC-flirt line as a
+        /// supplementary greeting beat. Eligibility-gated: NPC must be single,
+        /// attracted to player's gender, warmly disposed (relation <= 40),
+        /// high-Romanticism (> 0.6), not the player's adult child. Silent skip
+        /// if any check fails or LLM unavailable / generation fails.
+        /// </summary>
+        private async Task TryEmitNPCFlirtLine(NPC npc, int relationLevel)
+        {
+            try
+            {
+                if (npc.IsDead || player == null) return;
+
+                // Don't flirt at your own kids.
+                var family = UsurperRemake.Systems.FamilySystem.Instance;
+                if (family?.IsAdultChildOf(npc, player) ?? false) return;
+
+                var profile = npc.Brain?.Personality;
+                if (profile == null) return;
+
+                // Romanticism gate. Below this and the NPC isn't a flirt-initiator
+                // personality regardless of relationship state.
+                if (profile.Romanticism <= 0.6f) return;
+
+                // Attraction gate -- has to be attracted to player's gender.
+                var playerGender = player.Sex == CharacterSex.Female
+                    ? GenderIdentity.Female : GenderIdentity.Male;
+                if (!profile.IsAttractedTo(playerGender)) return;
+
+                // v0.64.1 audit fix: respect the player's orientation too --
+                // an asexual player shouldn't receive unsolicited flirts.
+                if (player.Orientation == SexualOrientation.Asexual) return;
+
+                // Relationship gate -- needs at least warm friendship territory
+                // for an unsolicited flirt to land plausibly rather than read
+                // creepy.
+                if (relationLevel > 40) return;
+
+                // Marriage / commitment gate. Married NPCs with high Commitment
+                // refuse flirts via Slice 16 -- they wouldn't initiate either.
+                // Use the authoritative marriage-registry check (matches the
+                // gossip screen / refusal logic).
+                bool npcIsMarried = NPCMarriageRegistry.Instance?.IsMarriedToNPC(npc.ID) == true;
+                if (npcIsMarried && profile.Commitment > 0.6f) return;
+
+                // v0.64.1 audit fix: the romanceType Spouse/Lover gate at the
+                // 14% roll rides on RomanceTracker.GetRelationType(npc.ID),
+                // which returns None under the known id-drift class (legacy
+                // npc_<name> restores, raw-name NPCIds). Name-fallback check
+                // (the v0.57.7 pattern): if this NPC's SpouseName IS the
+                // player, they're already married -- don't "first move" flirt
+                // at your own spouse.
+                if (!string.IsNullOrWhiteSpace(npc.SpouseName)
+                    && IsNameMatchForPlayer(npc.SpouseName, player)) return;
+
+                string? flirtLine = await UsurperRemake.Systems.LLMMoments.GenerateNPCFlirtAsync(
+                    npc, player, npcIsMarried, System.Threading.CancellationToken.None);
+                if (string.IsNullOrWhiteSpace(flirtLine)) return;
+
+                terminal!.SetColor("dark_magenta");
+                terminal.WriteLine($"  {Loc.Get("dialogue.npc_initiated_flirt_intro", npc.Name2 ?? npc.Name1)}");
+                terminal.SetColor("bright_magenta");
+                terminal.WriteLine($"  \"{flirtLine}\"");
+                terminal.WriteLine("");
+                terminal.SetColor("white");
+            }
+            catch (Exception ex)
+            {
+                UsurperRemake.Systems.DebugLogger.Instance.LogError("DIALOGUE",
+                    $"[TryEmitNPCFlirtLine] failed: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// v0.64.1 Brain v2 Slice 21: try to render an LLM news-comment line
+        /// as a supplementary greeting beat. Pulls recent news, filters to
+        /// "major" categories, picks the freshest, generates (or reads from
+        /// cache) an in-character reaction. Silent skip if LLM unavailable,
+        /// no qualifying news, or generation fails.
+        /// </summary>
+        private async Task TryEmitNewsCommentLine(NPC npc)
+        {
+            try
+            {
+                // Read recent news from the world state. Only available in
+                // online mode (single-player has no shared news stream
+                // worth quoting).
+                if (!UsurperRemake.BBS.DoorMode.IsOnlineMode) return;
+
+                var stateMgr = UsurperRemake.Systems.OnlineStateManager.Instance;
+                if (stateMgr == null) return;
+
+                var recent = await stateMgr.GetRecentNews(15);
+                if (recent == null || recent.Count == 0) return;
+
+                // Filter to major events. Category strings vary across the
+                // codebase; combine a category whitelist with a keyword scan
+                // on the headline so we catch death/boss/kingship news
+                // regardless of which write path it came from.
+                var majorCategories = new System.Collections.Generic.HashSet<string>(
+                    StringComparer.OrdinalIgnoreCase)
+                { "death", "boss", "kingship", "throne", "marriage", "world_event", "war" };
+                bool IsMajor(UsurperRemake.Systems.NewsEntry e)
+                {
+                    if (e == null) return false;
+                    if (!string.IsNullOrEmpty(e.Category) && majorCategories.Contains(e.Category)) return true;
+                    string msg = (e.Message ?? "").ToLowerInvariant();
+                    if (msg.Contains("slain")
+                        || msg.Contains("killed")
+                        || msg.Contains("defeated")
+                        || msg.Contains("king ")
+                        || msg.Contains("queen ")
+                        || msg.Contains("throne")
+                        || msg.Contains("world boss")
+                        || msg.Contains("wed ")
+                        || msg.Contains("married")) return true;
+                    return false;
+                }
+
+                var pick = recent.FirstOrDefault(IsMajor);
+                if (pick == null) return;
+
+                // Skip news older than 36h -- by that point it's stale and
+                // commenting feels out of step.
+                if ((DateTime.UtcNow - pick.CreatedAt.ToUniversalTime()).TotalHours > 36) return;
+
+                string? comment = await UsurperRemake.Systems.LLMMoments.GenerateNewsCommentAsync(
+                    npc, player!, pick.Id, pick.Message ?? "",
+                    System.Threading.CancellationToken.None);
+
+                if (string.IsNullOrWhiteSpace(comment)) return;
+
+                terminal!.SetColor("gray");
+                terminal.WriteLine($"  {Loc.Get("dialogue.npc_news_aside", npc.Name2 ?? npc.Name1)}");
+                terminal.SetColor("yellow");
+                terminal.WriteLine($"  \"{comment}\"");
+                terminal.WriteLine("");
+                terminal.SetColor("white");
+            }
+            catch (Exception ex)
+            {
+                UsurperRemake.Systems.DebugLogger.Instance.LogError("DIALOGUE",
+                    $"[TryEmitNewsCommentLine] failed: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -591,6 +792,82 @@ namespace UsurperRemake.Systems
                 Text = personalText,
                 Color = "bright_cyan"
             });
+
+            // v0.64.1 Brain v2 Slice 20: NPC-issued quest option. Surfaces
+            // when this NPC has a priority Combat goal with a named
+            // TargetCharacter that resolves to a living NPC. Player picking
+            // this hears the NPC's in-character ask (LLM-generated) and
+            // gets Y/N to accept a real DefeatNPC bounty quest. Quest
+            // completion (player kills target) advances the NPC's goal via
+            // Slice 3's IsTargetCharacterDead completion check.
+            //
+            // Hidden from adult-child interactions per Slice 14b convention.
+            if (!isAdultChild && player != null)
+            {
+                var qrGoal = npc.Brain?.Goals?.GetPriorityGoal();
+                if (qrGoal != null
+                    && qrGoal.Type == global::GoalType.Combat
+                    && !string.IsNullOrWhiteSpace(qrGoal.TargetCharacter)
+                    // v0.64.1 audit fix: if the goal's target IS the player
+                    // (family-revenge memories store the player's display name
+                    // as the killer), don't offer "hunt yourself" -- the old
+                    // guard compared questTarget.ID vs player.ID, but
+                    // Character.ID is never populated for players (always ""),
+                    // so it matched nothing and a same-named NPC bystander
+                    // would get a kill quest issued against them.
+                    && !IsNameMatchForPlayer(qrGoal.TargetCharacter, player))
+                {
+                    // Resolve the target -- only surface the option if the
+                    // target is a real living NPC (no point asking the
+                    // player to hunt someone they can't find).
+                    NPC? questTarget = null;
+                    try
+                    {
+                        var pool = NPCSpawnSystem.Instance?.ActiveNPCs;
+                        if (pool != null)
+                        {
+                            string targetName = qrGoal.TargetCharacter.Trim();
+                            foreach (var candidate in pool)
+                            {
+                                if (candidate == null || !candidate.IsAlive || candidate.IsDead) continue;
+                                if (string.Equals(candidate.Name2, targetName, StringComparison.OrdinalIgnoreCase)
+                                    || string.Equals(candidate.Name1, targetName, StringComparison.OrdinalIgnoreCase)
+                                    || string.Equals(candidate.Name, targetName, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    questTarget = candidate;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    catch { /* leave questTarget null; option won't surface */ }
+
+                    if (questTarget != null)
+                    {
+                        // Don't double-offer if player already on this exact quest.
+                        bool alreadyOnIt = false;
+                        try
+                        {
+                            var existing = QuestSystem.GetActiveQuestsForPlayer(player.Name2 ?? player.Name1 ?? "");
+                            alreadyOnIt = existing?.Any(q =>
+                                q.QuestTarget == QuestTarget.DefeatNPC
+                                && string.Equals(q.TargetNPCName, questTarget.Name2 ?? questTarget.Name1,
+                                                 StringComparison.OrdinalIgnoreCase)) ?? false;
+                        }
+                        catch { }
+
+                        if (!alreadyOnIt)
+                        {
+                            options.Add(new ConversationOption
+                            {
+                                Type = ConversationType.AcceptQuest,
+                                Text = Loc.Get("dialogue.opt_npc_quest_offer"),
+                                Color = "bright_yellow"
+                            });
+                        }
+                    }
+                }
+            }
 
             // Flirtation - with cooldown and escalation
             // Allow more attempts if player hasn't reached 2 successful flirts yet (needed for confession)
@@ -1041,6 +1318,9 @@ namespace UsurperRemake.Systems
                 case ConversationType.AskToLeave:
                     await HandleAskToLeaveOption(npc, relationLevel);
                     break;
+                case ConversationType.AcceptQuest:
+                    await HandleAcceptQuestOption(npc, relationLevel);
+                    break;
             }
 
             // Store conversation in memory
@@ -1060,16 +1340,40 @@ namespace UsurperRemake.Systems
             // Generate response based on topic
             string response = GenerateTopicResponse(npc, topicId ?? "generic", relationLevel);
 
-            // Phase 1.5 dialogue enhancer: layer contextual flavor on the NPC's
-            // topic reply. Language-gated inside Enhance().
-            if (player != null)
-                response = UsurperRemake.Systems.DialogueEnhancer.Enhance(response, npc, player);
+            // v0.64.1 Brain v2 Slice 14: for select high-value topics, replace
+            // the templated response with an LLM-generated paragraph grounded
+            // in the NPC's actual goals + personality + relationship to this
+            // specific player. Per-(NPC, topic, player) cached so re-asks are
+            // instant. Falls through to the template above when LLM is off /
+            // call fails / single-player.
+            //
+            // Latency optimization: kick the LLM call BEFORE the "considers..."
+            // narration + 500ms pause, then await it after. The pause runs
+            // concurrently with the HTTP round-trip, hiding up to ~500ms of
+            // perceived latency on the first ask. On cached re-asks the task
+            // completes near-instantly so the await is a no-op.
+            Task<string>? llmTopicTask = null;
+            if (player != null && IsLLMTopicResponseEnabled(topicId))
+            {
+                llmTopicTask = UsurperRemake.Systems.LLMMoments.GenerateTopicResponseAsync(
+                    npc, topicId!, player, response, System.Threading.CancellationToken.None);
+            }
 
             terminal!.SetColor("yellow");
             terminal.WriteLine($"  {Loc.Get("dialogue.narr_considers", npc.Name2)}");
             terminal.WriteLine("");
 
             await Task.Delay(500);
+
+            if (llmTopicTask != null)
+            {
+                response = await llmTopicTask;
+            }
+
+            // Phase 1.5 dialogue enhancer: layer contextual flavor on the NPC's
+            // topic reply. Language-gated inside Enhance().
+            if (player != null)
+                response = UsurperRemake.Systems.DialogueEnhancer.Enhance(response, npc, player);
 
             terminal.SetColor("white");
             terminal.WriteLine($"  \"{response}\"");
@@ -1097,6 +1401,27 @@ namespace UsurperRemake.Systems
 
             terminal.WriteLine("");
             await terminal.GetInput($"  {Loc.Get("ui.press_enter")}");
+        }
+
+        /// <summary>
+        /// v0.64.1 Brain v2 Slice 14: whitelist of topics that route through
+        /// the LLM topic-response generator instead of the template switch in
+        /// GenerateTopicResponse. Ships with the 5 high-value relational
+        /// topics that benefit most from grounding in the NPC's actual goals,
+        /// personality, and relationship to the asking player. Topics outside
+        /// the whitelist keep the existing templated response (still gets
+        /// Slice 11 dialogue-enhancer flavor decoration). Class-specific
+        /// topics (warrior_training, mage_magic, etc.) stay on templates --
+        /// they're not deep enough to need LLM personalization.
+        /// </summary>
+        private static bool IsLLMTopicResponseEnabled(string? topicId)
+        {
+            if (string.IsNullOrWhiteSpace(topicId)) return false;
+            return topicId == "life_goals"
+                || topicId == "origins"
+                || topicId == "family"
+                || topicId == "friends"
+                || topicId == "romance_views";
         }
 
         /// <summary>
@@ -1375,21 +1700,31 @@ namespace UsurperRemake.Systems
             // Check for "impossible" scenarios - NPC outright refuses
             if (npcIsMarried && profile != null && profile.Commitment > 0.7f)
             {
+                // v0.64.1 Slice 16: replace hardcoded English refusal array with
+                // LLM-generated in-character refusal grounded in this NPC's
+                // commitment + relationship history. Kick the call before the
+                // 500ms narration pause so latency hides behind it.
+                string templatedRefusal = Loc.Get("dialogue.vn.flirt.married_refuse"); // v0.64.1 audit: loc-keyed (was hardcoded English)
+                Task<string>? llmRefusalTask = UsurperRemake.Systems.LLMMoments.GenerateRomanceReactionAsync(
+                    npc, player!, "flirt", "married_refuse",
+                    $"{player!.Name1 ?? player.Name} has just flirted with you. You are HAPPILY MARRIED " +
+                    $"to {npc.SpouseName ?? "your spouse"} and your Commitment trait is high " +
+                    $"({profile.Commitment:F2}). Refuse firmly and unambiguously -- make clear the answer " +
+                    $"is no, your marriage matters, this conversation is over.",
+                    templatedRefusal, System.Threading.CancellationToken.None);
+
                 terminal.WriteLine($"  {Loc.Get("dialogue.narr_catch_eye", npc.Name2)}");
                 terminal.WriteLine("");
                 await Task.Delay(500);
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  {Loc.Get("dialogue.narr_stops_you", npc.Name2)}");
                 terminal.SetColor("red");
-                var marriedResponses = new[]
-                {
-                    $"  \"I'm married. Happily. This conversation is over.\"",
-                    $"  *coldly* \"I have a spouse I love dearly. Don't try this again.\"",
-                    $"  \"I don't know what you think you're doing, but I'm not interested. I'm married.\""
-                };
-                terminal.WriteLine(marriedResponses[random.Next(marriedResponses.Length)]);
+                string refusal = await llmRefusalTask;
+                terminal.WriteLine($"  \"{refusal}\"");
                 RelationshipSystem.UpdateRelationship(player!, npc, -2);
-                flirtCountThisSession++;
+                // v0.64.1 audit fix: removed in-handler flirtCountThisSession++
+                // (the caller increments after every Flirt dispatch; this was
+                // a double-count burning 2 of the 5-per-session budget).
                 terminal.WriteLine("");
                 await terminal!.PressAnyKey();
                 return;
@@ -1398,20 +1733,27 @@ namespace UsurperRemake.Systems
             // NPC has a lover and is very jealous/committed
             if (npcHasLover && profile != null && (profile.Jealousy > 0.7f || profile.Commitment > 0.65f))
             {
+                // v0.64.1 Slice 16: replace hardcoded English "taken" refusal array
+                // with LLM-generated refusal grounded in jealousy + commitment +
+                // relationship history.
+                string templatedRefusal = Loc.Get("dialogue.vn.flirt.taken_refuse"); // v0.64.1 audit: loc-keyed (was hardcoded English)
+                Task<string>? llmRefusalTask = UsurperRemake.Systems.LLMMoments.GenerateRomanceReactionAsync(
+                    npc, player!, "flirt", "taken_refuse",
+                    $"{player!.Name1 ?? player.Name} has just flirted with you. You are with " +
+                    $"{npc.SpouseName ?? "someone you love"} (not formally married but deeply " +
+                    $"committed). Your Jealousy is {profile.Jealousy:F2}, Commitment {profile.Commitment:F2}. " +
+                    $"Refuse with dignity -- your heart isn't free to take, and the player should know that.",
+                    templatedRefusal, System.Threading.CancellationToken.None);
+
                 terminal.WriteLine($"  {Loc.Get("dialogue.narr_catch_eye", npc.Name2)}");
                 terminal.WriteLine("");
                 await Task.Delay(500);
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  {Loc.Get("dialogue.narr_shakes_head", npc.Name2)}");
                 terminal.SetColor("dark_red");
-                var takenResponses = new[]
-                {
-                    $"  \"I'm with someone. I'm not looking elsewhere.\"",
-                    $"  \"Flattering, but my heart belongs to another.\"",
-                    $"  *firmly* \"I have someone special in my life. This isn't happening.\""
-                };
-                terminal.WriteLine(takenResponses[random.Next(takenResponses.Length)]);
-                flirtCountThisSession++;
+                string refusal = await llmRefusalTask;
+                terminal.WriteLine($"  \"{refusal}\"");
+                // v0.64.1 audit fix: removed double-count (see married branch).
                 terminal.WriteLine("");
                 await terminal!.PressAnyKey();
                 return;
@@ -1431,7 +1773,7 @@ namespace UsurperRemake.Systems
                 {
                     state.LastFlirtWasPositive = true;
                     if (!flirtSuccessRecorded) { state.FlirtSuccessCount++; flirtSuccessRecorded = true; }
-                    flirtCountThisSession++;
+                    // v0.64.1 audit fix: removed double-count (caller increments).
 
                     // Show milestone-specific dialogue
                     switch (affairResult.Milestone)
@@ -1529,7 +1871,7 @@ namespace UsurperRemake.Systems
                 else
                 {
                     state.LastFlirtWasPositive = false;
-                    flirtCountThisSession++;
+                    // v0.64.1 audit fix: removed double-count (caller increments).
 
                     terminal.SetColor("yellow");
                     terminal.WriteLine($"  {affairResult.Message}");
@@ -1565,46 +1907,80 @@ namespace UsurperRemake.Systems
                 state.LastFlirtWasPositive = true;
                 if (!flirtSuccessRecorded) { state.FlirtSuccessCount++; flirtSuccessRecorded = true; }
 
-                terminal.SetColor("yellow");
-                terminal.WriteLine($"  {Loc.Get("dialogue.narr_responds_warmly", npc.Name2)}");
-                terminal.SetColor("bright_magenta");
-
-                // Varied positive responses
+                // v0.64.1 Slice 17: LLM-generated flirt success line grounded
+                // in this specific NPC's Romanticism + relationship. Falls
+                // through to templated tier-keyed line on any failure path.
+                // Audit fix: the warmth TIER is part of the cache bucket
+                // ("success_mild" / "_medium" / "_strong") -- pre-fix a single
+                // "success" bucket meant the first landed flirt's cached line
+                // (one warmth level) replayed verbatim for later STRONG-tier
+                // successes.
+                string warmthDesc;
+                string warmthTier;
+                int templateIdx;
+                string templateKey;
+                int relBoost;
                 if (flirtReceptiveness > 0.5f && state.FlirtSuccessCount >= 2)
                 {
-                    int idx = random.Next(3) + 1;
-                    string line = Loc.Get($"dialogue.vn.flirt.strong_pos_{idx}");
-                    terminal.WriteLine($"  {line}");
-                    // Strong flirt success - allow breaking through friendship cap
-                    RelationshipSystem.UpdateRelationship(player!, npc, 1, 3, false, true);
+                    warmthDesc = "STRONG (repeated successful flirts; deepening attraction)";
+                    warmthTier = "strong";
+                    templateIdx = random.Next(3) + 1;
+                    templateKey = $"dialogue.vn.flirt.strong_pos_{templateIdx}";
+                    relBoost = 3;
                 }
                 else if (state.FlirtSuccessCount == 1)
                 {
-                    int idx = random.Next(3) + 1;
-                    string line = Loc.Get($"dialogue.vn.flirt.med_pos_{idx}");
-                    terminal.WriteLine($"  {line}");
-                    // Successful flirt - allow progression with override
-                    RelationshipSystem.UpdateRelationship(player!, npc, 1, 2, false, true);
+                    warmthDesc = "MEDIUM (you're warming to them after an earlier success)";
+                    warmthTier = "medium";
+                    templateIdx = random.Next(3) + 1;
+                    templateKey = $"dialogue.vn.flirt.med_pos_{templateIdx}";
+                    relBoost = 2;
                 }
                 else
                 {
-                    terminal.WriteLine($"  {Loc.Get("dialogue.vn.flirt.mild_pos")}");
-                    // First successful flirt - modest boost with override
-                    RelationshipSystem.UpdateRelationship(player!, npc, 1, 1, false, true);
+                    warmthDesc = "MILD (first flirt that landed; cautious openness)";
+                    warmthTier = "mild";
+                    templateKey = "dialogue.vn.flirt.mild_pos";
+                    relBoost = 1;
                 }
+                string templatedFlirtSuccess = Loc.Get(templateKey);
+                float romanticism = profile?.Romanticism ?? 0.5f;
+                Task<string> llmFlirtSuccessTask = UsurperRemake.Systems.LLMMoments.GenerateRomanceReactionAsync(
+                    npc, player!, "flirt", $"success_{warmthTier}",
+                    $"{player!.Name1 ?? player.Name} has just flirted with you and it LANDED. " +
+                    $"Warmth level: {warmthDesc}. Your Romanticism trait is {romanticism:F2}. " +
+                    $"Respond with warmth, charm, or pleased interest matching the warmth level " +
+                    $"and your personality.",
+                    templatedFlirtSuccess, System.Threading.CancellationToken.None);
+
+                terminal.SetColor("yellow");
+                terminal.WriteLine($"  {Loc.Get("dialogue.narr_responds_warmly", npc.Name2)}");
+                terminal.SetColor("bright_magenta");
+                string flirtSuccessLine = await llmFlirtSuccessTask;
+                terminal.WriteLine($"  {flirtSuccessLine}");
+                RelationshipSystem.UpdateRelationship(player!, npc, 1, relBoost, false, true);
             }
             else if (roll < flirtReceptiveness + 0.25f)
             {
                 // Neutral response (narrower range now)
                 state.LastFlirtWasPositive = false;
 
+                // v0.64.1 Slice 17: LLM-generated awkward/uncertain response.
+                int idx = random.Next(3) + 1;
+                string templatedFlirtNeutral = Loc.Get($"dialogue.vn.flirt.neutral_{idx}");
+                Task<string> llmFlirtNeutralTask = UsurperRemake.Systems.LLMMoments.GenerateRomanceReactionAsync(
+                    npc, player!, "flirt", "awkward",
+                    $"{player!.Name1 ?? player.Name} has just flirted with you and it landed AWKWARDLY. " +
+                    $"You don't feel a clear yes or a clear no -- maybe surprise, maybe gentle uncertainty, " +
+                    $"maybe deflection. Respond with politeness or hesitation rather than enthusiasm or " +
+                    $"rejection.",
+                    templatedFlirtNeutral, System.Threading.CancellationToken.None);
+
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  {Loc.Get("dialogue.narr_unsure", npc.Name2)}");
                 terminal.SetColor("gray");
-
-                int idx = random.Next(3) + 1;
-                string line = Loc.Get($"dialogue.vn.flirt.neutral_{idx}");
-                terminal.WriteLine($"  {line}");
+                string flirtNeutralLine = await llmFlirtNeutralTask;
+                terminal.WriteLine($"  {flirtNeutralLine}");
             }
             else
             {
@@ -1658,13 +2034,34 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  {Loc.Get("dialogue.narr_offer_compliment", npc.Name2)}");
             terminal.WriteLine("");
 
+            // v0.64.1 Brain v2 Slice 16: kick LLM reaction in the background while
+            // the existing 500ms narration pause runs, so first-ask latency is
+            // hidden. Cached per-(NPC, player) for the "pleased" bucket so
+            // subsequent compliments from the same player to the same NPC reuse
+            // the same in-character thanks. Cheap-tier (Haiku).
+            string templatedReply = Loc.Get("dialogue.compliment_reply");
+            Task<string>? llmReactionTask = null;
+            if (player != null)
+            {
+                llmReactionTask = UsurperRemake.Systems.LLMMoments.GenerateRomanceReactionAsync(
+                    npc, player, "compliment", "pleased",
+                    $"{player.Name1 ?? player.Name} has just paid you a compliment. " +
+                    $"Respond with warmth or grace appropriate to your personality and your " +
+                    $"relationship with them.",
+                    templatedReply, System.Threading.CancellationToken.None);
+            }
+
             await Task.Delay(500);
 
             // Compliments almost always work positively
             terminal.SetColor("yellow");
             terminal.WriteLine($"  {Loc.Get("dialogue.narr_pleased", npc.Name2)}");
             terminal.SetColor("white");
-            terminal.WriteLine($"  \"{Loc.Get("dialogue.compliment_reply")}\"");
+
+            string complimentReply = templatedReply;
+            if (llmReactionTask != null)
+                complimentReply = await llmReactionTask;
+            terminal.WriteLine($"  \"{complimentReply}\"");
 
             RelationshipSystem.UpdateRelationship(player!, npc, 1);
 
@@ -1680,6 +2077,7 @@ namespace UsurperRemake.Systems
             var profile = npc.Brain?.Personality;
             bool isAttracted = profile?.IsAttractedTo(player!.Sex == CharacterSex.Female ? GenderIdentity.Female : GenderIdentity.Male) ?? true;
             bool confessionAccepted = false; // v0.63.0 slice 4 (audit m11): success tracker
+            bool confessionConsumed = true;  // v0.64.1: false only on lover-cap rejection (retry path)
 
             terminal!.SetColor("bright_magenta");
             terminal.WriteLine($"  {Loc.Get("dialogue.narr_confess")}");
@@ -1704,7 +2102,35 @@ namespace UsurperRemake.Systems
 
             float roll = (float)random.NextDouble();
 
-            if (roll < successChance)
+            // v0.65.0 Brain v2 Slice 12b extension: LLM-arbitrated dramatic fork
+            // for love confession. Same shape as marriage proposal fork. Heuristic
+            // roll above is the deterministic fallback when LLM is disabled /
+            // single-player / BBS / timeout / parse-error. Choice 0 = reciprocate,
+            // 1 = need time, 2 = reject. Blocks on LLM (~2-3s) -- acceptable
+            // because player is on a UI screen waiting for NPC's reaction.
+            float romanticismVal = profile?.Romanticism ?? 0.5f;
+            int heuristicConfessChoice = roll < successChance ? 0
+                                       : roll < successChance + 0.3f ? 1
+                                       : 2;
+            string confessSituation =
+                $"{player!.Name} has just confessed romantic love to you. " +
+                $"Your relationship sits at level {relationLevel} (lower numbers mean deeper feeling). " +
+                $"You {(isAttracted ? "are" : "are NOT")} attracted to their gender. " +
+                $"Your Romanticism trait is {romanticismVal:F2}. " +
+                $"The confession landed with charisma modifier {charismaModifier:+0.00;-0.00;0.00}. " +
+                $"The heuristic reciprocation chance was {successChance:P0}. " +
+                $"Decide how YOU, this specific NPC, respond.";
+            var confessChoices = new System.Collections.Generic.List<string>
+            {
+                "Reciprocate -- return the feelings and become their lover.",
+                "Need time -- you're moved but not ready to commit; stay open.",
+                "Reject -- you don't feel the same way; let them down.",
+            };
+            int confessChoice = await UsurperRemake.Systems.LLMMoments.DecideForkAsync(
+                npc, "confession", confessSituation, confessChoices,
+                deterministicFallback: heuristicConfessChoice, System.Threading.CancellationToken.None);
+
+            if (confessChoice == 0)
             {
                 // They reciprocate!
                 terminal.SetColor("yellow");
@@ -1717,24 +2143,32 @@ namespace UsurperRemake.Systems
                 RelationshipSystem.UpdateRelationship(player!, npc, 1, 8, false, true);
                 bool loverAdded = RomanceTracker.Instance.AddLover(npc.ID, 30);
 
-                // v0.63.0 slice 4 (audit m11): track success so the bottom
-                // postState write doesn't blow the ConfessionAccepted flag.
-                // Confession is accepted in feeling either way; the lover cap
-                // only blocks the romance formalization, not the emotional beat.
-                confessionAccepted = true;
-
                 if (loverAdded)
                 {
+                    // v0.63.0 slice 4 (audit m11): track success so the bottom
+                    // postState write doesn't blow the ConfessionAccepted flag.
+                    confessionAccepted = true;
                     terminal.SetColor("bright_cyan");
                     terminal.WriteLine($"  {Loc.Get("dialogue.new_romance")}");
                 }
                 else
                 {
+                    // v0.64.1 audit fix: lover cap hit. Pre-fix this still set
+                    // confessionAccepted=true AND the bottom write set
+                    // HasConfessed=true -- a PERMANENT desync: ConfessionAccepted
+                    // true with no Lover record, and no retry path (the Confess
+                    // option gates on !HasConfessed) even after the player frees
+                    // a lover slot. Now the confession is NOT consumed: neither
+                    // flag is set, so the player can free a slot and confess
+                    // again. The relationship boost above already applied, but
+                    // UpdateRelationship's daily caps bound any re-confess gain.
+                    confessionAccepted = false;
+                    confessionConsumed = false;
                     terminal.SetColor("gray");
                     terminal.WriteLine($"  {Loc.Get("dialogue.lover_cap_reached", npc.Name2)}");
                 }
             }
-            else if (roll < successChance + 0.3f)
+            else if (confessChoice == 1)
             {
                 // They need time
                 terminal.SetColor("yellow");
@@ -1757,12 +2191,11 @@ namespace UsurperRemake.Systems
 
             // v0.63.0 slice 4 (audit m11): single canonical state write that
             // preserves ConfessionAccepted if it was set in the success branch.
-            // Pre-fix the success-branch write happened FIRST, then the bottom
-            // post-state write overwrote ConfessionAccepted to false implicitly
-            // (the dict re-read fetched the now-saved success state, but the
-            // pattern was fragile to refactor).
+            // v0.64.1 audit fix: HasConfessed is only written when the
+            // confession was actually consumed -- a lover-cap rejection leaves
+            // both flags unset so the player can retry after freeing a slot.
             var postState = npcConversationStates.GetValueOrDefault(npc.ID) ?? new ConversationState();
-            postState.HasConfessed = true;
+            if (confessionConsumed) postState.HasConfessed = true;
             if (confessionAccepted) postState.ConfessionAccepted = true;
             npcConversationStates[npc.ID] = postState;
 
@@ -1890,17 +2323,42 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  {Loc.Get("dialogue.narr_provoke", npc.Name2)}");
             terminal.WriteLine("");
 
-            await Task.Delay(500);
-
             var profile = npc.Brain?.Personality;
             float aggression = profile?.Aggression ?? 0.5f;
+            bool isAggressive = aggression > 0.6f;
 
-            if (aggression > 0.6f)
+            // v0.64.1 Brain v2 Slice 16: kick LLM reaction in background during
+            // the 500ms narration pause. Two buckets: "aggressive" (NPC bristles
+            // and threatens back) vs "dismissive" (NPC laughs it off cold).
+            // Cached per-(NPC, player) for each bucket. Cheap-tier (Haiku).
+            string templatedReply = Loc.Get(isAggressive ? "dialogue.provoke_threat" : "dialogue.provoke_dismiss");
+            string bucket = isAggressive ? "aggressive" : "dismissive";
+            // v0.64.1 audit fix: null-guard player before interpolating into
+            // the situation string (mirrors the compliment site's guard).
+            string provokerName = player?.Name1 ?? player?.Name ?? "the stranger";
+            string situation = isAggressive
+                ? $"{provokerName} has just deliberately provoked you. Your Aggression " +
+                  $"is high ({aggression:F2}). Respond with anger -- a threat, a warning, an open challenge. " +
+                  $"Show that you take this seriously and the player should regret it."
+                : $"{provokerName} has just tried to provoke you. Your Aggression is " +
+                  $"low ({aggression:F2}). Brush it off with cold disdain, a cutting jest, or weary " +
+                  $"contempt. They're beneath your reaction.";
+            Task<string>? llmReactionTask = player != null
+                ? UsurperRemake.Systems.LLMMoments.GenerateRomanceReactionAsync(
+                    npc, player, "provocation", bucket, situation,
+                    templatedReply, System.Threading.CancellationToken.None)
+                : null;
+
+            await Task.Delay(500);
+
+            string reply = llmReactionTask != null ? await llmReactionTask : templatedReply;
+
+            if (isAggressive)
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  {Loc.Get("dialogue.narr_eyes_anger", npc.Name2)}");
                 terminal.SetColor("red");
-                terminal.WriteLine($"  \"{Loc.Get("dialogue.provoke_threat")}\"");
+                terminal.WriteLine($"  \"{reply}\"");
 
                 RelationshipSystem.UpdateRelationship(player!, npc, -1, 2);
             }
@@ -1909,7 +2367,7 @@ namespace UsurperRemake.Systems
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  {Loc.Get("dialogue.narr_scoffs", npc.Name2)}");
                 terminal.SetColor("gray");
-                terminal.WriteLine($"  \"{Loc.Get("dialogue.provoke_dismiss")}\"");
+                terminal.WriteLine($"  \"{reply}\"");
 
                 RelationshipSystem.UpdateRelationship(player!, npc, -1);
             }
@@ -1965,7 +2423,38 @@ namespace UsurperRemake.Systems
 
             baseChance = Math.Clamp(baseChance, 0.05f, 0.85f);
 
-            if (random.NextDouble() < baseChance)
+            // v0.65.0 Brain v2 Slice 12b extension: LLM-arbitrated dramatic fork
+            // for leave-spouse-for-affair-partner decision. This is a high-stakes
+            // narrative moment that breaks an existing marriage; letting an LLM
+            // weigh the NPC's commitment, current affair depth, and spouse
+            // suspicion produces more character-grounded outcomes than the
+            // single deterministic roll. Choice 0 = leave spouse, 1 = decline.
+            // Heuristic roll above is the fallback when LLM disabled / fails.
+            float affairRoll = (float)random.NextDouble();
+            int heuristicLeaveChoice = affairRoll < baseChance ? 0 : 1;
+            string leaveSituation =
+                $"{player!.Name} (your lover, with whom you've been having an affair) is asking " +
+                $"you to leave your spouse {npc.SpouseName} and choose them. " +
+                $"Your Commitment trait is {profile.Commitment:F2}. " +
+                $"Affair depth is {affair.AffairProgress} (out of 200). " +
+                $"Secret meetings so far: {affair.SecretMeetings}. " +
+                $"Spouse suspicion level: {affair.SpouseSuspicion} (60+ means they already suspect). " +
+                $"The heuristic agreement chance was {baseChance:P0}. " +
+                $"Decide how YOU, this specific NPC, respond to the ultimatum.";
+            var leaveChoices = new System.Collections.Generic.List<string>
+            {
+                "Agree to leave your spouse and commit to your lover.",
+                // v0.64.1 audit fix: choice text matched to actual mechanics --
+                // the decline path advances AffairProgress and keeps the affair
+                // alive; telling the LLM "the affair ends here" made it weigh a
+                // consequence that doesn't exist.
+                "Decline for now -- you cannot yet break your marriage; the affair continues in secret.",
+            };
+            int leaveChoice = await UsurperRemake.Systems.LLMMoments.DecideForkAsync(
+                npc, "affair_leave_spouse", leaveSituation, leaveChoices,
+                deterministicFallback: heuristicLeaveChoice, System.Threading.CancellationToken.None);
+
+            if (leaveChoice == 0)
             {
                 // They agree to leave!
                 terminal.SetColor("bright_yellow");
@@ -1978,9 +2467,9 @@ namespace UsurperRemake.Systems
 
                 terminal.SetColor("yellow");
                 if (affair.SpouseSuspicion >= 60)
-                    terminal.WriteLine($"  {npc.Name2}'s eyes fill with tears. \"{npc.SpouseName} already suspects. You're right... I choose you.\"");
+                    terminal.WriteLine($"  {Loc.Get("dialogue.affair_tearful_choose_you", npc.Name2, npc.SpouseName ?? "")}");
                 else
-                    terminal.WriteLine($"  {npc.Name2} squeezes your hand. \"I've been thinking about it too. I can't live this lie anymore.\"");
+                    terminal.WriteLine($"  {Loc.Get("dialogue.affair_squeeze_hand", npc.Name2)}");
                 terminal.WriteLine("");
                 await Task.Delay(800);
 
@@ -2038,19 +2527,19 @@ namespace UsurperRemake.Systems
 
                 if (profile.Commitment > 0.7f)
                 {
-                    terminal.WriteLine($"  {npc.Name2} pulls their hand away.");
+                    terminal.WriteLine($"  {Loc.Get("dialogue.affair_pulls_away", npc.Name2)}");
                     terminal.SetColor("white");
                     terminal.WriteLine($"  \"{Loc.Get("dialogue.affair_vows", npc.SpouseName)}\"");
                 }
                 else if (affair.AffairProgress < 120)
                 {
-                    terminal.WriteLine($"  {npc.Name2} hesitates, conflicted.");
+                    terminal.WriteLine($"  {Loc.Get("dialogue.affair_hesitates", npc.Name2)}");
                     terminal.SetColor("white");
                     terminal.WriteLine($"  \"{Loc.Get("dialogue.affair_not_ready")}\"");
                 }
                 else
                 {
-                    terminal.WriteLine($"  {npc.Name2} looks away, torn.");
+                    terminal.WriteLine($"  {Loc.Get("dialogue.affair_looks_away", npc.Name2)}");
                     terminal.SetColor("white");
                     terminal.WriteLine($"  \"{Loc.Get("dialogue.affair_afraid")}\"");
                 }
@@ -2233,6 +2722,187 @@ namespace UsurperRemake.Systems
 
                 // Relationship takes a small hit
                 RelationshipSystem.UpdateRelationship(player, npc, -1);
+            }
+
+            terminal.WriteLine("");
+            await terminal.GetInput($"  {Loc.Get("ui.press_enter")}");
+        }
+
+        // v0.64.1 audit fix: case-insensitive name match between a goal's
+        // TargetCharacter string and the player's identities. Used by both
+        // the Slice 20 option builder and the handler -- Character.ID is
+        // never populated for players, so ID comparison was dead code.
+        private static bool IsNameMatchForPlayer(string? targetName, Character player)
+        {
+            if (string.IsNullOrWhiteSpace(targetName) || player == null) return false;
+            string t = targetName.Trim();
+            return string.Equals(player.Name2, t, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(player.Name1, t, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(player.DisplayName, t, StringComparison.OrdinalIgnoreCase);
+        }
+
+        // v0.64.1 Brain v2 Slice 20: player picks the NPC-issued quest option.
+        // Surfaces the NPC's in-character ask (LLM-generated), prompts the
+        // player Y/N, and on accept creates + claims a real DefeatNPC bounty
+        // for the named target. Quest completion (player kills target) then
+        // naturally satisfies the NPC's `IsTargetCharacterDead` completion
+        // check from Slice 3, advancing the NPC's strategic goal.
+        private async Task HandleAcceptQuestOption(NPC npc, int relationLevel)
+        {
+            if (npc.IsDead || player == null) return;
+
+            var goal = npc.Brain?.Goals?.GetPriorityGoal();
+            if (goal == null || string.IsNullOrWhiteSpace(goal.TargetCharacter)) return;
+
+            // v0.64.1 audit fix: mirror the builder's player-self guard --
+            // never issue a kill quest whose target name is the player.
+            if (IsNameMatchForPlayer(goal.TargetCharacter, player)) return;
+
+            // Re-resolve target (state may have shifted since the menu built)
+            NPC? target = null;
+            try
+            {
+                string targetName = goal.TargetCharacter.Trim();
+                var pool = NPCSpawnSystem.Instance?.ActiveNPCs;
+                if (pool != null)
+                {
+                    foreach (var candidate in pool)
+                    {
+                        if (candidate == null || !candidate.IsAlive || candidate.IsDead) continue;
+                        if (string.Equals(candidate.Name2, targetName, StringComparison.OrdinalIgnoreCase)
+                            || string.Equals(candidate.Name1, targetName, StringComparison.OrdinalIgnoreCase)
+                            || string.Equals(candidate.Name, targetName, StringComparison.OrdinalIgnoreCase))
+                        {
+                            target = candidate;
+                            break;
+                        }
+                    }
+                }
+            }
+            catch { }
+            if (target == null)
+            {
+                terminal!.SetColor("gray");
+                terminal.WriteLine($"  {Loc.Get("dialogue.npc_quest_target_gone", npc.Name2)}");
+                terminal.WriteLine("");
+                await terminal.GetInput($"  {Loc.Get("ui.press_enter")}");
+                return;
+            }
+
+            string targetName2 = target.Name2 ?? target.Name1 ?? target.Name ?? "your mark";
+
+            // Kick LLM ask in background during the 500ms narration pause.
+            string templatedAsk = Loc.Get("dialogue.npc_quest_ask_default", targetName2);
+            Task<string> llmAskTask = UsurperRemake.Systems.LLMMoments.GenerateQuestRequestAsync(
+                npc, player, goal.Name, targetName2, templatedAsk,
+                System.Threading.CancellationToken.None);
+
+            terminal!.SetColor("yellow");
+            terminal.WriteLine($"  {Loc.Get("dialogue.narr_considers", npc.Name2)}");
+            terminal.WriteLine("");
+            await Task.Delay(500);
+
+            string ask = await llmAskTask;
+            terminal.SetColor("white");
+            terminal.WriteLine($"  \"{ask}\"");
+            terminal.WriteLine("");
+
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine($"  {Loc.Get("dialogue.npc_quest_accept_prompt", targetName2)}");
+            terminal.SetColor("gray");
+            terminal.WriteLine($"  {Loc.Get("dialogue.npc_quest_accept_options")}");
+            string choice = (await terminal.GetInput("  > "))?.Trim().ToUpperInvariant() ?? "";
+            bool accepted = choice == "Y" || choice == "1" || choice == "S" || choice == "O" || choice == "I";
+
+            if (!accepted)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine("");
+                terminal.WriteLine($"  {Loc.Get("dialogue.npc_quest_declined", npc.Name2)}");
+                terminal.WriteLine("");
+                await terminal.GetInput($"  {Loc.Get("ui.press_enter")}");
+                return;
+            }
+
+            // Build the quest. Mirrors the bounty pattern in QuestSystem.CreateBountyForCriminalNPC
+            // (private), but the simpler shape suffices here -- difficulty scaled
+            // to the target's level, gold + XP reward, 7-day window.
+            try
+            {
+                int targetLevel = (int)target.Level;
+                byte difficulty = (byte)Math.Clamp(targetLevel / 15 + 1, 1, 4);
+                long goldReward = Math.Max(50, targetLevel * 100 * difficulty);
+
+                var quest = new Quest
+                {
+                    Title = Loc.Get("dialogue.npc_quest_title", targetName2),
+                    TitleKey = "dialogue.npc_quest_title",
+                    TitleArgs = new List<string> { targetName2 },
+                    Initiator = npc.Name2 ?? npc.Name1 ?? "An ally",
+                    QuestType = QuestType.SingleQuest,
+                    QuestTarget = QuestTarget.DefeatNPC,
+                    Difficulty = difficulty,
+                    Comment = Loc.Get("dialogue.npc_quest_comment", npc.Name2 ?? npc.Name1, targetName2),
+                    CommentKey = "dialogue.npc_quest_comment",
+                    CommentArgs = new List<string> { npc.Name2 ?? npc.Name1, targetName2 },
+                    Date = DateTime.Now,
+                    MinLevel = Math.Max(1, targetLevel - 10),
+                    MaxLevel = 9999,
+                    DaysToComplete = 7,
+                    Reward = (byte)Math.Min(255, goldReward / 100),
+                    RewardType = QuestRewardType.Money,
+                    TargetNPCName = targetName2
+                };
+                quest.Objectives.Add(QuestObjective.Localized(
+                    QuestObjectiveType.DefeatNPC,
+                    "quest.objective.defeat_npc",
+                    new object[] { targetName2 },
+                    1, targetName2, targetName2));
+
+                // v0.64.1 audit fix: defense in depth -- restrict the quest to
+                // this player so a claim failure can't leak a claimable quest
+                // onto the shared Quest Hall board for everyone.
+                quest.OfferedTo = player.Name2 ?? player.Name1 ?? "";
+
+                QuestSystem.AddQuestToDatabase(quest);
+
+                // v0.64.1 audit fix: check the claim result. ClaimQuest can
+                // refuse (LevelTooLow when the target outlevels the player by
+                // 10+, DailyLimitReached, RoyalsNotAllowed). The original code
+                // ignored the return -- it printed "accepted!" regardless and
+                // left an unclaimed quest in the shared database.
+                bool claimed = false;
+                if (player is Player playerObj)
+                {
+                    claimed = QuestSystem.ClaimQuest(playerObj, quest) == QuestClaimResult.CanClaim;
+                }
+                if (!claimed)
+                {
+                    // Remove the orphan quest and show an honest refusal beat.
+                    quest.Deleted = true;
+                    terminal.SetColor("gray");
+                    terminal.WriteLine("");
+                    terminal.WriteLine($"  {Loc.Get("dialogue.npc_quest_failed")}");
+                    terminal.WriteLine("");
+                    await terminal.GetInput($"  {Loc.Get("ui.press_enter")}");
+                    return;
+                }
+
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine("");
+                terminal.WriteLine($"  {Loc.Get("dialogue.npc_quest_accepted", npc.Name2, targetName2)}");
+                terminal.SetColor("gray");
+                terminal.WriteLine($"  {Loc.Get("dialogue.npc_quest_accepted_hint")}");
+
+                // Small relationship boost -- taking up someone's burden is bond-forming.
+                RelationshipSystem.UpdateRelationship(player, npc, 1);
+            }
+            catch (Exception ex)
+            {
+                UsurperRemake.Systems.DebugLogger.Instance.LogError("QUEST",
+                    $"NPC-issued quest creation failed: {ex.Message}");
+                terminal.SetColor("dark_red");
+                terminal.WriteLine($"  {Loc.Get("dialogue.npc_quest_failed")}");
             }
 
             terminal.WriteLine("");
@@ -2475,7 +3145,12 @@ namespace UsurperRemake.Systems
         Proposition,
         Propose,
         Provoke,
-        AskToLeave
+        AskToLeave,
+        // v0.64.1 Slice 20: NPC-issued quest. Surfaces when the NPC has a
+        // priority Combat goal with a named TargetCharacter that's a living
+        // NPC. Player picking this option hears the NPC's in-character ask
+        // (LLM-generated) and gets a Y/N to accept a real DefeatNPC bounty.
+        AcceptQuest
     }
 
     /// <summary>

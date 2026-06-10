@@ -5917,6 +5917,13 @@ public class InnLocation : BaseLocation
 
             await Task.Delay(2000);
         }
+        else if (result.Outcome == CombatOutcome.OpponentSpared)
+        {
+            // v0.64.1: mercy granted; spare narration already shown by the
+            // combat engine. Skip the contradictory "fought you off" line.
+            WorldSimulator.WakeUpNPC(npcName);
+            await Task.Delay(1000);
+        }
         else
         {
             terminal.SetColor("cyan");

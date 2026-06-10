@@ -31,7 +31,11 @@ public class PlayerSession : IDisposable
     public string ActiveCharacterName { get; set; }
 
     private readonly TcpClient _tcpClient;
-    private readonly NetworkStream _stream;
+    // v0.64.0 PROXY-protocol support: stream may be a NetworkStream OR a
+    // PrependedStream wrapping one (when the connection started with bytes
+    // that turned out NOT to be a PROXY header and needed to be re-injected
+    // into the auth flow). Both expose the same Stream contract.
+    private readonly Stream _stream;
     private readonly SqlSaveBackend _sqlBackend;
     private readonly MudServer _server;
     private readonly CancellationToken _serverCancellationToken;
@@ -109,7 +113,7 @@ public class PlayerSession : IDisposable
         string username,
         string connectionType,
         TcpClient tcpClient,
-        NetworkStream stream,
+        Stream stream,
         SqlSaveBackend sqlBackend,
         MudServer server,
         CancellationToken cancellationToken,

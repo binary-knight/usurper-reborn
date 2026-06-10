@@ -44,6 +44,25 @@ public static class LLMSettings
     public static int TimeoutMs => (int)GetLong("USURPER_LLM_TIMEOUT_MS", 3000);
 
     /// <summary>
+    /// v0.64.1 model tiering: optional cheaper model identifier for low-stakes
+    /// decoration calls (dialogue mood/memory/witness/state/grief/trait/faction
+    /// layers, fork decisions, avenge news). When unset, all calls use Model.
+    /// When set (e.g. "claude-haiku-4-5-20251001" while Model is
+    /// "claude-sonnet-4-6"), routed callers pass GetCheapModelOrDefault() in
+    /// LLMRequest.Model and the provider sends that model for the call.
+    /// Narrative-depth callers (strategic goals, topic responses, personality
+    /// summaries) leave the field null and stay on Model.
+    /// </summary>
+    public static string? CheapModel => GetString("USURPER_LLM_MODEL_CHEAP");
+
+    /// <summary>
+    /// Returns CheapModel if set, otherwise falls back to Model. Callers that
+    /// want the cheap tier when available but tolerate the premium tier when
+    /// no cheap is configured set LLMRequest.Model to this helper's return.
+    /// </summary>
+    public static string? GetCheapModelOrDefault() => CheapModel ?? Model;
+
+    /// <summary>
     /// True when LLM is fully configured AND we're running in online mode.
     /// Moment generators check this and skip the LLM path entirely when false.
     /// </summary>

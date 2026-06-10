@@ -645,6 +645,15 @@ public class DormitoryLocation : BaseLocation
 
             await Task.Delay(2000);
         }
+        else if (result.Outcome == CombatOutcome.OpponentSpared)
+        {
+            // v0.64.1: player beat the NPC down then granted mercy. The combat
+            // engine already showed the spare narration + applied alignment /
+            // relationship rewards; don't print the contradictory "fought you
+            // off" line.
+            WorldSimulator.WakeUpNPC(npcName);
+            await Task.Delay(1000);
+        }
         else
         {
             terminal.SetColor("cyan");
