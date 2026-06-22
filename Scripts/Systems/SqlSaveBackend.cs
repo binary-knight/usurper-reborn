@@ -697,6 +697,20 @@ namespace UsurperRemake.Systems
                     );
                     CREATE INDEX IF NOT EXISTS idx_pending_inheritance_player ON pending_inheritance(player_username);
 
+                    -- v0.65.0: player-to-player bank wire transfers. Queue model so the
+                    -- recipient can be offline; the amount (already net of the bank fee)
+                    -- is auto-deposited to their bank account on next login. The recipient's
+                    -- OWN session applies the credit, so there is no cross-session save write.
+                    CREATE TABLE IF NOT EXISTS pending_gold_transfers (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        recipient_username TEXT NOT NULL,
+                        sender_display TEXT NOT NULL,
+                        amount INTEGER NOT NULL,
+                        note TEXT DEFAULT '',
+                        created_at TEXT DEFAULT (datetime('now'))
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_pending_gold_transfers_recipient ON pending_gold_transfers(recipient_username);
+
                     -- v0.64.0 Brain v2 Slice 10: LLM moment telemetry. One row
                     -- per LLM call attempt (success OR fallback). Powers the
                     -- balance dashboard's LLM stats card so the sysop can
@@ -718,6 +732,29 @@ namespace UsurperRemake.Systems
                     );
                     CREATE INDEX IF NOT EXISTS idx_llm_usage_created ON llm_usage(created_at DESC);
                     CREATE INDEX IF NOT EXISTS idx_llm_usage_moment ON llm_usage(moment_type, created_at DESC);
+
+                    -- v1.0 release prep (B1a): onboarding funnel telemetry.
+                    -- One row per (username, milestone), written fire-and-forget
+                    -- at five seams: account_created (RegisterPlayer),
+                    -- character_created (first online save of a new character),
+                    -- reached_town (first Main Street entry), first_kill
+                    -- (MKills 0 -> 1), second_login (first login on a later
+                    -- calendar day). UNIQUE(username, event) + INSERT OR IGNORE
+                    -- makes every write idempotent, so hot paths can fire
+                    -- without once-only bookkeeping. Diagnoses the new-account
+                    -- bounce (87% of accounts played zero minutes as of Beta)
+                    -- by showing exactly which step loses people, split by
+                    -- connection type (Web drive-bys vs Steam buyers are
+                    -- different populations).
+                    CREATE TABLE IF NOT EXISTS onboarding_events (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        username TEXT NOT NULL,
+                        event TEXT NOT NULL,
+                        connection_type TEXT,
+                        created_at TEXT DEFAULT (datetime('now')),
+                        UNIQUE(username, event)
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_onboarding_event ON onboarding_events(event, created_at DESC);
                 ";
                 cmd.ExecuteNonQuery();
             }
@@ -1009,8 +1046,15 @@ namespace UsurperRemake.Systems
         /// addresses that class of leak: the player_data was cleared but the
         /// guild_members row, world_boss_damage row, bounties, etc. all still
         /// referenced the same username, so the new character inherited them.
+        ///
+        /// v0.65.0: displayName (Character.Name2) is also taken so the in-memory
+        /// PermadeathPurgeHook can clear systems keyed by display name (god
+        /// worship, relationships) rather than the account username -- those two
+        /// differ for many players, and keying the purge by username alone let
+        /// that state survive and re-bind to a same-name recreation. Falls back
+        /// to username when displayName is null.
         /// </summary>
-        public void PurgePlayerWorldState(string username)
+        public void PurgePlayerWorldState(string username, string? displayName = null)
         {
             if (string.IsNullOrWhiteSpace(username)) return;
             try
@@ -1033,6 +1077,18 @@ namespace UsurperRemake.Systems
                 ExecPurge(connection, tx, "auction_listings",  "LOWER(seller) = LOWER(@u) OR LOWER(buyer) = LOWER(@u)", username);
                 ExecPurge(connection, tx, "world_boss_damage", "LOWER(player_name) = LOWER(@u)", username);
 
+                // v0.65.0: pvp_log was deliberately excluded in v0.60.5 ("history
+                // should survive permadeath"), but that conflated distinct
+                // characters on the same account -- a permadied character's arena
+                // wins re-joined to a same-account/same-name recreation on the
+                // leaderboard (the winner column is the lowercase account name,
+                // re-joined to the CURRENT display name). Purge by WINNER ONLY:
+                // that zeroes the erased character's win count so a recreation
+                // inherits nothing, while preserving rows where this character
+                // was the LOSER -- those credit a win to a STILL-LIVING opponent
+                // and must not be deleted out from under them.
+                ExecPurge(connection, tx, "pvp_log", "LOWER(winner) = LOWER(@u)", username);
+
                 tx.Commit();
                 DebugLogger.Instance.LogInfo("PERMADEATH",
                     $"Purged shared world-state references for '{username}' (guild, bounties, trades, auctions, etc.)");
@@ -1041,7 +1097,7 @@ namespace UsurperRemake.Systems
                 // state outside SQLite (GodSystem, RelationshipSystem, etc.).
                 // Caught broadly because any one hook throwing shouldn't block
                 // the rest of the permadeath flow.
-                try { PermadeathPurgeHook?.Invoke(username); }
+                try { PermadeathPurgeHook?.Invoke(username, displayName); }
                 catch (Exception hookEx)
                 {
                     DebugLogger.Instance.LogWarning("PERMADEATH",
@@ -1083,7 +1139,10 @@ namespace UsurperRemake.Systems
         /// PurgePlayerWorldState can fan out without a hard reference. Static
         /// to mirror KickActiveSessionHook.
         /// </summary>
-        public static Action<string>? PermadeathPurgeHook { get; set; }
+        // v0.65.0: second arg is the character display name (Name2) for hooks
+        // that key per-player state by display name (god worship, relationships)
+        // rather than the account username.
+        public static Action<string, string?>? PermadeathPurgeHook { get; set; }
 
         /// <summary>
         /// Delete a player's character. Default behavior archives to deleted_characters
@@ -1624,6 +1683,72 @@ namespace UsurperRemake.Systems
         // =====================================================================
 
         // --- World State ---
+
+        /// <summary>
+        /// v0.65.0 (1.0-prep SR): version-guarded world_state write (CAS).
+        /// Writes only if the row's version still equals expectedVersion --
+        /// i.e. nobody else wrote since the caller last reconciled with the
+        /// stored state. Returns false on conflict so the caller can skip
+        /// this cycle and reload-merge on the next one instead of clobbering
+        /// the concurrent write (the v0.61.2 stale-snapshot race class:
+        /// world-sim's serialize window vs a player session's
+        /// SaveAllSharedState). expectedVersion 0 = "key should not exist
+        /// yet" (first-ever write).
+        /// </summary>
+        public async Task<bool> SaveWorldStateIfVersion(string key, string jsonValue, long expectedVersion)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var transaction = connection.BeginTransaction();
+
+                long currentVersion = -1; // -1 = row absent
+                using (var readCmd = connection.CreateCommand())
+                {
+                    readCmd.Transaction = transaction;
+                    readCmd.CommandText = "SELECT version FROM world_state WHERE key = @key;";
+                    readCmd.Parameters.AddWithValue("@key", key);
+                    var result = await readCmd.ExecuteScalarAsync();
+                    if (result != null && result != DBNull.Value)
+                        currentVersion = Convert.ToInt64(result);
+                }
+
+                if (currentVersion == -1)
+                {
+                    if (expectedVersion != 0) { transaction.Rollback(); return false; }
+                    using var insertCmd = connection.CreateCommand();
+                    insertCmd.Transaction = transaction;
+                    insertCmd.CommandText = @"
+                        INSERT INTO world_state (key, value, version, updated_at)
+                        VALUES (@key, @value, 1, datetime('now'));";
+                    insertCmd.Parameters.AddWithValue("@key", key);
+                    insertCmd.Parameters.AddWithValue("@value", jsonValue);
+                    await insertCmd.ExecuteNonQueryAsync();
+                }
+                else
+                {
+                    if (currentVersion != expectedVersion) { transaction.Rollback(); return false; }
+                    using var updateCmd = connection.CreateCommand();
+                    updateCmd.Transaction = transaction;
+                    updateCmd.CommandText = @"
+                        UPDATE world_state SET value = @value, version = version + 1, updated_at = datetime('now')
+                        WHERE key = @key AND version = @expected;";
+                    updateCmd.Parameters.AddWithValue("@key", key);
+                    updateCmd.Parameters.AddWithValue("@value", jsonValue);
+                    updateCmd.Parameters.AddWithValue("@expected", expectedVersion);
+                    int rows = await updateCmd.ExecuteNonQueryAsync();
+                    if (rows == 0) { transaction.Rollback(); return false; }
+                }
+
+                transaction.Commit();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"SaveWorldStateIfVersion('{key}') failed: {ex.Message}");
+                return false;
+            }
+        }
 
         public async Task SaveWorldState(string key, string jsonValue)
         {
@@ -2188,6 +2313,52 @@ namespace UsurperRemake.Systems
             }
         }
 
+        /// <summary>
+        /// v1.0 release prep (B5): prune llm_usage rows older than the cutoff.
+        /// The table's own creation comment claimed "Pruned to last 30 days"
+        /// since v0.64.0 but no prune ever existed -- with Slice 11 dialogue
+        /// flavor writing one row per LLM attempt per (NPC, cache key), the
+        /// production DB grew without bound. Called from the same maintenance
+        /// pass as PruneOldNPCDecisionLog.
+        /// </summary>
+        public async Task PruneOldLLMUsage(int daysToKeep = 30)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"DELETE FROM llm_usage WHERE created_at < datetime('now', @cutoff);";
+                cmd.Parameters.AddWithValue("@cutoff", $"-{daysToKeep} days");
+                await cmd.ExecuteNonQueryAsync();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to prune llm_usage: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// v0.65.0 (1.0-prep SR): total LLM tokens recorded today (UTC) --
+        /// used by LLMBudget.RehydrateFromBackend so a server restart no
+        /// longer resets the daily cap. Synchronous single SUM on an indexed
+        /// column; called once at startup.
+        /// </summary>
+        public long GetLLMTokensUsedTodayUtc()
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"SELECT COALESCE(SUM(total_tokens), 0) FROM llm_usage WHERE created_at >= date('now');";
+                return Convert.ToInt64(cmd.ExecuteScalar());
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"GetLLMTokensUsedTodayUtc failed: {ex.Message}");
+                return 0;
+            }
+        }
+
         public async Task PruneOldNews(string category, int hoursToKeep = 24)
         {
             try
@@ -2306,6 +2477,12 @@ namespace UsurperRemake.Systems
                     "DELETE FROM sleeping_players WHERE username NOT IN (SELECT username FROM players)",
                     "DELETE FROM online_players WHERE username NOT IN (SELECT username FROM players)",
                     "DELETE FROM combat_events WHERE player_name NOT IN (SELECT username FROM players) AND player_name NOT IN (SELECT display_name FROM players)",
+                    // v0.65.0 (save-state-review F1): reap pending wire transfers + inheritance
+                    // whose recipient permadied/was deleted before delivery. The gold was already
+                    // a sink (sender paid, recipient gone); this just stops dead rows accumulating.
+                    // Both columns are stored lowercase, matching players.username (also lowercase).
+                    "DELETE FROM pending_gold_transfers WHERE recipient_username NOT IN (SELECT username FROM players)",
+                    "DELETE FROM pending_inheritance WHERE player_username NOT IN (SELECT username FROM players)",
                 };
 
                 foreach (var sql in orphanQueries)
@@ -3720,6 +3897,33 @@ namespace UsurperRemake.Systems
         /// <summary>
         /// Register a new player account. Returns true if successful, false if username taken.
         /// </summary>
+        /// <summary>
+        /// v1.0 release prep (B1a): record an onboarding-funnel milestone.
+        /// Idempotent (UNIQUE(username, event) + INSERT OR IGNORE), so callers
+        /// can fire from hot paths without once-only bookkeeping. Best-effort:
+        /// telemetry failure never breaks gameplay.
+        /// </summary>
+        public void RecordOnboardingEvent(string username, string eventName, string? connectionType = null)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(eventName)) return;
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    INSERT OR IGNORE INTO onboarding_events (username, event, connection_type)
+                    VALUES (@username, @event, @ctype);";
+                cmd.Parameters.AddWithValue("@username", username.ToLowerInvariant());
+                cmd.Parameters.AddWithValue("@event", eventName);
+                cmd.Parameters.AddWithValue("@ctype", (object?)connectionType ?? DBNull.Value);
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogDebug("FUNNEL", $"RecordOnboardingEvent failed: {ex.Message}");
+            }
+        }
+
         public async Task<(bool success, string message)> RegisterPlayer(string username, string password, string? ipAddress = null)
         {
             // v0.60.5: full ban means no new accounts from this IP either. Same
@@ -3811,6 +4015,12 @@ namespace UsurperRemake.Systems
                 await insertCmd.ExecuteNonQueryAsync();
 
                 DebugLogger.Instance.LogInfo("SQL", $"New player registered: '{username}'");
+
+                // v1.0 release prep (B1a): funnel milestone 1 of 5.
+                RecordOnboardingEvent(username,
+                    "account_created",
+                    UsurperRemake.Server.SessionContext.Current?.ConnectionType);
+
                 return (true, "Account created successfully!");
             }
             catch (Exception ex)
@@ -4695,6 +4905,97 @@ namespace UsurperRemake.Systems
         catch (Exception ex)
         {
             DebugLogger.Instance.LogError("SQL", $"Failed to clear inheritance: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// v0.65.0: queue a player-to-player bank wire. The amount is ALREADY net of the
+    /// bank fee (the sender's bank was debited the gross; the fee is a gold sink that is
+    /// never queued). Delivered to the recipient's bank on their next login. Username is
+    /// stored lowercase so it matches the lowercased lookup in GetPendingGoldTransfers
+    /// regardless of session casing.
+    /// </summary>
+    public bool QueueGoldTransfer(string recipientUsername, string senderDisplay, long amount, string note = "")
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"
+                INSERT INTO pending_gold_transfers (recipient_username, sender_display, amount, note)
+                VALUES (@user, @sender, @amount, @note);";
+            cmd.Parameters.AddWithValue("@user", recipientUsername.ToLower());
+            cmd.Parameters.AddWithValue("@sender", senderDisplay ?? "");
+            cmd.Parameters.AddWithValue("@amount", amount);
+            cmd.Parameters.AddWithValue("@note", note ?? "");
+            cmd.ExecuteNonQuery();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to queue gold transfer for '{recipientUsername}': {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// v0.65.0: fetch all pending wire transfers for a recipient. Rows are NOT deleted
+    /// here — the caller credits the in-memory Character then calls ClearGoldTransfers(ids),
+    /// matching the inheritance pattern (a crash before clear re-delivers next login; a
+    /// crash after clear but before the credit is persisted loses the gold to the sink
+    /// rather than duplicating it).
+    /// </summary>
+    public List<(long Id, string Sender, long Amount, string Note)> GetPendingGoldTransfers(string recipientUsername)
+    {
+        var results = new List<(long, string, long, string)>();
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"
+                SELECT id, sender_display, amount, note
+                FROM pending_gold_transfers
+                WHERE recipient_username = @user
+                ORDER BY created_at ASC;";
+            cmd.Parameters.AddWithValue("@user", recipientUsername.ToLower());
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                results.Add((
+                    reader.GetInt64(0),
+                    reader.IsDBNull(1) ? "" : reader.GetString(1),
+                    reader.IsDBNull(2) ? 0L : reader.GetInt64(2),
+                    reader.IsDBNull(3) ? "" : reader.GetString(3)
+                ));
+            }
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to fetch pending gold transfers for '{recipientUsername}': {ex.Message}");
+        }
+        return results;
+    }
+
+    /// <summary>
+    /// v0.65.0: delete delivered wire-transfer rows by ID after their gold has been
+    /// credited to the in-memory Character.
+    /// </summary>
+    public void ClearGoldTransfers(IEnumerable<long> ids)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            foreach (var id in ids)
+            {
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "DELETE FROM pending_gold_transfers WHERE id = @id;";
+                cmd.Parameters.AddWithValue("@id", id);
+                cmd.ExecuteNonQuery();
+            }
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to clear gold transfers: {ex.Message}");
         }
     }
 

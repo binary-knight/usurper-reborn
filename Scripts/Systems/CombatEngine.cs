@@ -1062,7 +1062,8 @@ public partial class CombatEngine
                             }
 
                             // Maelketh spawns minions on phase 2
-                            if (BossContext.GodType == OldGodType.Maelketh && phase == 2)
+                            if (BossContext.GodType == OldGodType.Maelketh && phase == 2
+                                && monsters.Count(m => m.IsAlive) < 6) // v0.65.0: boss summon cap
                             {
                                 var soldiers = CreateSpectralSoldiers(2, bossMonster.Level);
                                 monsters.AddRange(soldiers);
@@ -1075,7 +1076,8 @@ public partial class CombatEngine
                     if (BossContext.GodType == OldGodType.Maelketh && BossContext.CurrentPhase >= 2)
                     {
                         BossContext.RoundsSinceLastSummon++;
-                        if (BossContext.RoundsSinceLastSummon >= 3)
+                        if (BossContext.RoundsSinceLastSummon >= 3
+                            && monsters.Count(m => m.IsAlive) < 6) // v0.65.0: boss summon cap
                         {
                             BossContext.RoundsSinceLastSummon = 0;
                             int count = 1 + random.Next(2);
@@ -1424,7 +1426,7 @@ public partial class CombatEngine
                         // Still call ProcessMonsterAction to tick down durations and print status messages
                         if (hasGroup) terminal.StartCapture();
                         terminal.WriteLine("");
-                        await ProcessMonsterAction(monster, player, result);
+                        await ProcessMonsterAction(monster, player, result, monsters);
                         if (hasGroup)
                         {
                             string? statusOutput = terminal.StopCapture();
@@ -1453,7 +1455,7 @@ public partial class CombatEngine
                     // "attacks you!" is now printed inside ProcessMonsterAction
                     // after target selection, only when the monster actually targets the player
 
-                    await ProcessMonsterAction(monster, player, result);
+                    await ProcessMonsterAction(monster, player, result, monsters);
 
                     // Broadcast this attack to followers — but skip if monster targeted a grouped
                     // player, because MonsterAttacksCompanion already sent them direct messages.
@@ -4244,7 +4246,7 @@ public partial class CombatEngine
     /// Process monster action - Pascal AI
     /// Based on monster behavior from PLVSMON.PAS
     /// </summary>
-    private async Task ProcessMonsterAction(Monster monster, Character player, CombatResult result)
+    private async Task ProcessMonsterAction(Monster monster, Character player, CombatResult result, List<Monster>? liveMonsterList = null)
     {
         if (!monster.IsAlive) return;
 
@@ -4571,7 +4573,7 @@ public partial class CombatEngine
             if (targetChoice != null && targetChoice != player)
             {
                 if (targetChoice.IsGroupedPlayer) _lastMonsterTargetedGroupPlayer = true;
-                await MonsterAttacksCompanion(monster, targetChoice, result);
+                await MonsterAttacksCompanion(monster, targetChoice, result, liveMonsterList);
                 return;
             }
             // If targetChoice is player but player is dead, redirect to a random alive teammate
@@ -4579,7 +4581,7 @@ public partial class CombatEngine
             {
                 var fallbackTarget = aliveTeammates[random.Next(aliveTeammates.Count)];
                 if (fallbackTarget.IsGroupedPlayer) _lastMonsterTargetedGroupPlayer = true;
-                await MonsterAttacksCompanion(monster, fallbackTarget, result);
+                await MonsterAttacksCompanion(monster, fallbackTarget, result, liveMonsterList);
                 return;
             }
         }
@@ -4593,7 +4595,12 @@ public partial class CombatEngine
 
         // === MONSTER SPECIAL ABILITIES ===
         // Chance for monster to use a special ability instead of normal attack
-        bool usedSpecialAbility = await TryMonsterSpecialAbility(monster, player, result, null);
+        // v0.65.0 (1.0-prep SR): forward the LIVE monster list. It was
+        // hardcoded null here, which silently no-op'd every summon path --
+        // both the boss-ability summons (TryBossAbility's monsterList guard)
+        // and the generic SummonMonsters flag (which additionally had no
+        // reader at all; wired below in TryMonsterSpecialAbility).
+        bool usedSpecialAbility = await TryMonsterSpecialAbility(monster, player, result, liveMonsterList);
         if (usedSpecialAbility)
         {
             await Task.Delay(GetCombatDelay(800));
@@ -5129,6 +5136,50 @@ public partial class CombatEngine
     /// Try to use a monster special ability instead of normal attack
     /// Returns true if ability was used (skip normal attack), false otherwise
     /// </summary>
+    /// <summary>
+    /// v0.65.0 (1.0-prep SR, combat-review F1/F3): shared handler for the
+    /// generic AbilityResult.SummonMonsters flag -- called from BOTH the
+    /// player-target path (TryMonsterSpecialAbility) and the companion-target
+    /// path (MonsterAttacksCompanion) so summons fire regardless of who the
+    /// monster was swinging at. Respects the ability's own SummonCount and
+    /// caps the fight at 5 active monsters so summon-spam can't snowball.
+    /// </summary>
+    private void TrySpawnSummonReinforcements(Monster monster, AbilityResult abilityResult,
+        List<Monster>? monsterList, CombatResult result)
+    {
+        if (!abilityResult.SummonMonsters || monsterList == null) return;
+
+        int aliveNow = monsterList.Count(m => m.IsAlive);
+        if (aliveNow >= 5) return;
+
+        int desired = Math.Max(1, abilityResult.SummonCount > 0 ? abilityResult.SummonCount : 1 + random.Next(2));
+        int summonCount = Math.Min(5 - aliveNow, desired);
+        var summons = new List<Monster>();
+        for (int i = 0; i < summonCount; i++)
+        {
+            long sHp = 40 + monster.Level * 3;
+            summons.Add(new Monster
+            {
+                Name = Loc.Get("combat.summoned_minion_name", monster.Name),
+                Level = Math.Max(1, monster.Level - 8),
+                HP = sHp, MaxHP = sHp,
+                Strength = 8 + (long)(monster.Level * 1.5),
+                Defence = (int)(4 + monster.Level / 2),
+                WeapPow = 4 + monster.Level / 2,
+                ArmPow = 2 + monster.Level / 3,
+                MonsterColor = "dark_red",
+                FamilyName = monster.FamilyName ?? "Summoned",
+                MonsterClass = monster.MonsterClass,
+                IsBoss = false, IsActive = true, CanSpeak = false
+            });
+        }
+        monsterList.AddRange(summons);
+        result.Monsters?.AddRange(summons);
+        terminal.SetColor("red");
+        terminal.WriteLine(Loc.Get("combat.reinforcements_arrive", summonCount));
+        result.CombatLog.Add($"{monster.Name} summons {summonCount} reinforcements");
+    }
+
     private async Task<bool> TryMonsterSpecialAbility(Monster monster, Character player, CombatResult result, List<Monster>? monsterList = null)
     {
         // No abilities? Normal attack
@@ -5166,6 +5217,18 @@ public partial class CombatEngine
             terminal.SetColor(abilityResult.MessageColor ?? "red");
             terminal.WriteLine(abilityResult.Message);
         }
+
+        // v0.65.0 (1.0-prep SR): the generic SummonMonsters flag, set by 7
+        // ability handlers (SummonMinions and friends) since the ability
+        // system shipped, was read by NOTHING -- "calls for reinforcements"
+        // flavor printed and no monsters ever appeared (flagged by the
+        // v0.62.0 combat review; Vex's Gauntlet kit was swapped to Curse as
+        // a workaround). Spawn 1-2 weaker reinforcements into the live
+        // fight, mirroring the boss-summon shape. Capped at 5 active
+        // monsters so summon-spam can't snowball; skipped entirely when the
+        // live list isn't available (defensive -- both real combat paths now
+        // pass it).
+        TrySpawnSummonReinforcements(monster, abilityResult, monsterList, result);
 
         // v0.56.1 Old God solo adjustment applies to ability damage too (not just basic attacks).
         // Computed once here and reused across all 3 ability-damage branches (direct, life-steal, non-lifesteal multiplier).
@@ -5657,6 +5720,17 @@ public partial class CombatEngine
             {
                 if (monsterList != null)
                 {
+                    // v0.65.0 (combat-review F2): cap boss summons at 6 active
+                    // monsters. This block was a guarded no-op pre-fix (monsterList
+                    // was always null); now that the list is live, Maelketh's
+                    // ability-path summons stack with his two hardcoded phase
+                    // summon sources -- without a ceiling a phase-2+ round could
+                    // add ~6 monsters per round, compounding.
+                    if (monsterList.Count(m => m.IsAlive) >= 6)
+                    {
+                        terminal.WriteLine(Loc.Get("combat.monster_uses_ability", monster.Name, abilityName), "bright_red");
+                        return true; // turn spent; the call goes unanswered
+                    }
                     int count = 1 + random.Next(2);
                     string minionName = abilityName switch
                     {
@@ -6283,6 +6357,30 @@ public partial class CombatEngine
     /// <summary>
     /// Handle player victory - Pascal rewards
     /// </summary>
+
+    /// <summary>
+    /// v1.0 release prep (B1a): funnel milestone 4 of 5 -- the player's first
+    /// monster kill. Fires only on the 0 -> 1 transition (idempotent at the
+    /// DB layer regardless). Online-only, best-effort.
+    /// </summary>
+    private static void RecordFirstKillFunnel(Character player)
+    {
+        try
+        {
+            if (player == null || player.MKills != 1) return;
+            if (!UsurperRemake.BBS.DoorMode.IsOnlineMode) return;
+            var ctx = UsurperRemake.Server.SessionContext.Current;
+            // Grouped followers run inside the LEADER's session -- their kill
+            // must be attributed to their own account, not the leader's.
+            string username = player.IsGroupedPlayer
+                ? (player.GroupPlayerUsername ?? player.Name2 ?? "")
+                : (ctx?.Username ?? player.Name2 ?? "");
+            (SaveSystem.Instance?.Backend as UsurperRemake.Systems.SqlSaveBackend)?.RecordOnboardingEvent(
+                username, "first_kill", ctx?.ConnectionType);
+        }
+        catch { /* telemetry is decoration */ }
+    }
+
     private async Task HandleVictory(CombatResult result)
     {
         // Check if this was a boss fight for dramatic art display
@@ -6546,6 +6644,7 @@ public partial class CombatEngine
         DebugLogger.Instance.LogInfo("GOLD", $"COMBAT VICTORY: {result.Player.DisplayName} +{goldReward:N0}g from {result.Monster?.Name ?? "monster"} (gold now {result.Player.Gold:N0})");
         bool isFirstKill = result.Player.MKills == 0;
         result.Player.MKills++;
+        RecordFirstKillFunnel(result.Player); // v1.0 B1a funnel
 
         // Award per-slot XP to teammates based on percentage allocation
         DistributeTeamSlotXP(result.Player, result.Teammates, totalXPPot, terminal);
@@ -18366,7 +18465,7 @@ public partial class CombatEngine
     /// <summary>
     /// Handle monster attacking a companion instead of the player
     /// </summary>
-    private async Task MonsterAttacksCompanion(Monster monster, Character companion, CombatResult result)
+    private async Task MonsterAttacksCompanion(Monster monster, Character companion, CombatResult result, List<Monster>? liveMonsterList = null)
     {
         // Check if companion will dodge (from Time Stop, abilities, etc.)
         if (companion.DodgeNextAttack)
@@ -18526,6 +18625,12 @@ public partial class CombatEngine
                     // resolved, so companions took zero damage from a monster that used a
                     // self-buff ability that turn while the player took the followup hit.
                     // Mirror the player-path "did the ability consume the turn?" check:
+                    // v0.65.0 (combat-review F1): summons fire on the companion-target
+                    // path too -- pre-fix the flag was only handled when the monster
+                    // targeted the player, so with a full party (monsters mostly
+                    // target companions) the summon abilities stayed silently inert.
+                    TrySpawnSummonReinforcements(monster, abilityResult, liveMonsterList, result);
+
                     bool abilityConsumedTurn = abilityResult.SkipNormalAttack
                         || abilityResult.DirectDamage > 0
                         || abilityResult.ManaDrain > 0
@@ -19123,6 +19228,7 @@ public partial class CombatEngine
 
             // Track monster kill stats
             result.Player.MKills++;
+            RecordFirstKillFunnel(result.Player); // v1.0 B1a funnel
             result.Player.Statistics.RecordMonsterKill(expReward, goldReward, isBoss, monster.IsUnique);
             ArchetypeTracker.Instance.RecordMonsterKill(monster.Level, monster.IsUnique);
             if (isBoss)
@@ -23836,10 +23942,37 @@ public partial class CombatEngine
     /// </summary>
     private async Task ExecutePvPAttack(Character attacker, Character defender, CombatResult result)
     {
+        // v0.65.0 (druidah report: gang war "i didn't attack twice, my life steal didn't").
+        // PvP used a single bespoke swing with no dual-wield and no lifesteal. Mirror the PvE
+        // swing count -- GetAttackCount returns dual-wield off-hand + class extra attacks +
+        // windfury proc -- and apply per-hand lifesteal after each hit. Off-hand damage
+        // reduction comes from GetWeaponConfigDamageModifier(attacker, isOffHand), the same
+        // modifier PvE uses, so dual-wielders swing twice at the correct power. (Elemental /
+        // thorns / other enchant procs stay PvE-only for now: ApplyPostHitEnchantments is
+        // Monster-typed; a Character-target overload is a larger follow-up.)
+        var (swings, windfuryProc) = GetAttackCount(attacker);
+        int baseSwings = 1 + attacker.GetClassCombatModifiers().ExtraAttacks + (windfuryProc ? 1 : 0);
+
+        for (int s = 0; s < swings && defender.HP > 0; s++)
+        {
+            bool isOffHand = attacker.IsDualWielding && s >= baseSwings;
+            await ExecutePvPSingleHit(attacker, defender, result, isOffHand);
+        }
+    }
+
+    private async Task ExecutePvPSingleHit(Character attacker, Character defender, CombatResult result, bool isOffHand)
+    {
+        if (isOffHand)
+        {
+            terminal.SetColor("cyan");
+            terminal.WriteLine(Loc.Get("combat.off_hand_strike"));
+        }
+
         long attackPower = attacker.Strength + GetEffectiveWeapPow(attacker.WeapPow) + random.Next(1, 16);
 
-        // Apply weapon configuration damage modifier
-        double damageModifier = GetWeaponConfigDamageModifier(attacker);
+        // Weapon config modifier; the off-hand flag applies the same reduced-power
+        // off-hand multiplier the PvE path uses.
+        double damageModifier = GetWeaponConfigDamageModifier(attacker, isOffHand);
         attackPower = (long)(attackPower * damageModifier);
 
         // Check for critical hit
@@ -23880,6 +24013,30 @@ public partial class CombatEngine
 
         terminal.SetColor(isCritical ? "bright_red" : "red");
         terminal.WriteLine(Loc.Get("combat.pvp_strike", defender.DisplayName, damage));
+
+        // v0.65.0: lifesteal (Lifedrinker), per attacking hand -- the reported gap.
+        // GetEffectiveLifeStealPercent sums the attacking weapon's lifesteal and is
+        // already capped. Heal applies for any attacker; the "your weapon" message is
+        // gated to a human attacker for correct attribution. NOTE: today only the human
+        // attacker reaches this method -- the NPC/opponent turn runs through
+        // ProcessComputerPlayerAction, which keeps its own (still single-swing, no
+        // lifesteal) attack. The gate is defensive so this stays correct if the NPC
+        // turn is ever routed here. NPC-side dual-wield/lifesteal parity (and the
+        // perspective-correct HP display it would require) is a deferred follow-up.
+        int lifestealPct = attacker.GetEffectiveLifeStealPercent(isOffHand ? EquipmentSlot.OffHand : EquipmentSlot.MainHand);
+        if (lifestealPct > 0 && damage > 0 && attacker.HP < attacker.MaxHP)
+        {
+            long heal = Math.Max(1, damage * lifestealPct / 100);
+            long before = attacker.HP;
+            attacker.HP = Math.Min(attacker.MaxHP, attacker.HP + heal);
+            long actual = attacker.HP - before;
+            if (actual > 0 && attacker.AI == CharacterAI.Human)
+            {
+                terminal.SetColor("green");
+                terminal.WriteLine(Loc.Get("combat.lifedrinker", actual));
+            }
+        }
+
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("combat.pvp_your_hp", attacker.HP, attacker.MaxHP));
         terminal.WriteLine(Loc.Get("combat.pvp_opponent_hp", defender.DisplayName, defender.HP, defender.MaxHP));
@@ -28711,6 +28868,7 @@ public partial class CombatEngine
             foreach (var monster in result.DefeatedMonsters)
             {
                 groupedPlayer.MKills++;
+                RecordFirstKillFunnel(groupedPlayer); // v1.0 B1a funnel
                 groupedPlayer.Statistics.RecordMonsterKill(playerExp / Math.Max(1, result.DefeatedMonsters.Count),
                     goldPerPlayer / Math.Max(1, result.DefeatedMonsters.Count),
                     monster.IsBoss, monster.IsUnique);

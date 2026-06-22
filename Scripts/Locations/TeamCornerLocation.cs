@@ -122,7 +122,7 @@ public class TeamCornerLocation : BaseLocation
         }
         else
         {
-            WriteMenuOption("Q", Loc.Get("team.menu_quit"), "N", Loc.Get("team.menu_recruit_npc"));
+            WriteMenuOption("L", Loc.Get("team.menu_quit"), "N", Loc.Get("team.menu_recruit_npc")); // v0.64.2: Quit Team moved Q -> L (Q = back)
             WriteMenuOption("2", Loc.Get("team.menu_sack"), "G", Loc.Get("team.menu_equip"));
             WriteMenuOption("X", Loc.Get("team.menu_specialize"), "V", Loc.Get("team.menu_view_inventories"));
         }
@@ -206,7 +206,7 @@ public class TeamCornerLocation : BaseLocation
         }
         else
         {
-            WriteSRMenuOption("Q", Loc.Get("team_corner.quit"));
+            WriteSRMenuOption("L", Loc.Get("team_corner.quit")); // v0.64.2: Quit Team moved Q -> L (Q = back)
             WriteSRMenuOption("N", Loc.Get("team_corner.recruit_npc"));
             WriteSRMenuOption("2", Loc.Get("team_corner.sack"));
             WriteSRMenuOption("G", Loc.Get("team_corner.equip"));
@@ -331,7 +331,7 @@ public class TeamCornerLocation : BaseLocation
         }
         else
         {
-            ShowBBSMenuRow(("Q", "bright_yellow", Loc.Get("team.bbs_quit_team")), ("N", "bright_yellow", Loc.Get("team.bbs_recruit_npc")), ("2", "bright_yellow", Loc.Get("team.bbs_sack_member")), ("G", "bright_yellow", Loc.Get("team.bbs_equip_mbr")), ("X", "bright_yellow", Loc.Get("team.bbs_specialize")));
+            ShowBBSMenuRow(("L", "bright_yellow", Loc.Get("team.bbs_quit_team")), ("N", "bright_yellow", Loc.Get("team.bbs_recruit_npc")), ("2", "bright_yellow", Loc.Get("team.bbs_sack_member")), ("G", "bright_yellow", Loc.Get("team.bbs_equip_mbr")), ("X", "bright_yellow", Loc.Get("team.bbs_specialize")));
             // Message gated on online-mode; Resurrect always shown when in-team.
             if (showMessageBbs)
             {
@@ -401,9 +401,20 @@ public class TeamCornerLocation : BaseLocation
                 await JoinTeam();
                 return false;
 
-            case "Q":
+            case "L":
+                // v0.64.2 (player feedback on key consistency): Quit Team moved
+                // from [Q] to [L] (Leave Team). Q was a destructive landmine --
+                // in most town locations Q backs out to Main Street, so a player
+                // reflexively pressing Q then confirming with Y could nuke their
+                // team membership while trying to LEAVE THE MENU. Q now backs
+                // out like everywhere else (case below).
                 await QuitTeam();
                 return false;
+
+            case "Q":
+                // v0.64.2: Q = back out (standardized). Was QuitTeam (moved to L).
+                await NavigateToLocation(GameLocation.MainStreet);
+                return true;
 
             case "N":
                 await RecruitNPCToTeam();
@@ -2641,6 +2652,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.SetColor("cyan");
             terminal.WriteLine(Loc.Get("team.options_label"));
             WriteSRMenuOption("E", Loc.Get("team_corner.equip_item"));
+            WriteSRMenuOption("B", Loc.Get("inn.equip_best"));
             WriteSRMenuOption("U", Loc.Get("team_corner.unequip_item"));
             WriteSRMenuOption("T", Loc.Get("team_corner.take_all"));
             WriteSRMenuOption("Q", Loc.Get("team_corner.done"));
@@ -2656,6 +2668,12 @@ public class TeamCornerLocation : BaseLocation
             {
                 case "E":
                     await EquipItemToCharacter(target);
+                    break;
+                case "B":
+                    // v0.64.2 (player request): auto-equip best applicable gear
+                    // from the player's backpack across all slots, instead of
+                    // forcing slot-by-slot outfitting of a naked recruit.
+                    await RunEquipBestGear(target);
                     break;
                 case "U":
                     await UnequipItemFromCharacter(target);
@@ -2683,154 +2701,162 @@ public class TeamCornerLocation : BaseLocation
     /// </summary>
     private async Task EquipItemToCharacter(Character target)
     {
-        terminal.ClearScreen();
-        WriteSectionHeader(Loc.Get("team.equip_to_header", target.DisplayName.ToUpper()), "bright_cyan");
-        terminal.WriteLine("");
-
-        // Step 1: Pick a slot
-        var selectedSlot = await PromptForEquipmentSlot(target);
-        if (selectedSlot == null) return;
-
-        // Step 2: Get items that match this slot
-        var equipmentItems = GetItemsForSlot(selectedSlot.Value);
-
-        if (equipmentItems.Count == 0)
+        // v0.64.2 (player request): loop back to the SLOT PICKER after each
+        // equip instead of kicking out to the parent menu -- outfitting a
+        // naked recruit means many equips in a row. Cancel at the slot picker
+        // (Q / 0 / invalid) exits the whole flow.
+        while (true)
         {
+
+            terminal.ClearScreen();
+            WriteSectionHeader(Loc.Get("team.equip_to_header", target.DisplayName.ToUpper()), "bright_cyan");
             terminal.WriteLine("");
-            terminal.SetColor("yellow");
-            terminal.WriteLine("  No items available for this slot.");
-            await Task.Delay(2000);
-            return;
-        }
 
-        // Step 3: Show current item in slot
-        terminal.WriteLine("");
-        var currentItem = target.GetEquipment(selectedSlot.Value);
-        terminal.SetColor("white");
-        terminal.Write($"  Current: ");
-        if (currentItem != null)
-        {
-            terminal.SetColor(currentItem.IsIdentified ? currentItem.GetRarityColor() : "magenta");
-            terminal.Write(currentItem.IsIdentified ? currentItem.Name : "Unidentified");
-            if (currentItem.IsIdentified) WriteEquipmentStatSummary(currentItem);
-            terminal.WriteLine("");
-        }
-        else
-        {
-            terminal.SetColor("darkgray");
-            terminal.WriteLine("Empty");
-        }
-        terminal.WriteLine("");
+            // Step 1: Pick a slot
+            var selectedSlot = await PromptForEquipmentSlot(target);
+            if (selectedSlot == null) return; // exit: cancel at slot picker
 
-        // Step 4: Display matching items with full stats
-        terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("team.available_equipment"));
-        terminal.WriteLine("");
-        DisplayEquipmentItemList(equipmentItems, target);
+            // Step 2: Get items that match this slot
+            var equipmentItems = GetItemsForSlot(selectedSlot.Value);
 
-        terminal.WriteLine("");
-        terminal.SetColor("cyan");
-        terminal.Write(Loc.Get("team.select_item"));
-        terminal.SetColor("white");
-
-        var input = await terminal.ReadLineAsync();
-        if (!int.TryParse(input, out int itemIdx) || itemIdx < 1 || itemIdx > equipmentItems.Count)
-        {
-            terminal.SetColor("gray");
-            terminal.WriteLine(Loc.Get("ui.cancelled"));
-            await Task.Delay(1000);
-            return;
-        }
-
-        var (selectedItem, wasEquipped, sourceSlot) = equipmentItems[itemIdx - 1];
-
-        // Block unidentified items
-        if (!selectedItem.IsIdentified)
-        {
-            terminal.SetColor("yellow");
-            terminal.WriteLine("  Must identify the item first.");
-            await Task.Delay(2000);
-            return;
-        }
-
-        // Check if target can equip
-        if (!selectedItem.CanEquip(target, out string equipReason))
-        {
-            terminal.SetColor("red");
-            terminal.WriteLine(Loc.Get("team.cannot_use_item", target.DisplayName, equipReason));
-            await Task.Delay(2000);
-            return;
-        }
-
-        // Use the slot the player already picked (no need to ask which hand)
-        EquipmentSlot? targetSlot = selectedSlot.Value;
-
-        // Remove from player
-        if (wasEquipped && sourceSlot.HasValue)
-        {
-            currentPlayer.UnequipSlot(sourceSlot.Value);
-            currentPlayer.RecalculateStats();
-        }
-        else
-        {
-            // Remove from inventory (find by name)
-            // Two-pass match: first try Name+Attack+ArmorClass for precision, then fallback to name-only
-            var invItem = currentPlayer.Inventory.FirstOrDefault(i =>
-                i.Name == selectedItem.Name && i.Attack == selectedItem.WeaponPower && i.Armor == selectedItem.ArmorClass)
-                ?? currentPlayer.Inventory.FirstOrDefault(i => i.Name == selectedItem.Name);
-            if (invItem != null)
+            if (equipmentItems.Count == 0)
             {
-                currentPlayer.Inventory.Remove(invItem);
+                terminal.WriteLine("");
+                terminal.SetColor("yellow");
+                terminal.WriteLine("  No items available for this slot.");
+                await Task.Delay(2000);
+                continue;
             }
-        }
 
-        // Track items in target's inventory BEFORE equipping, so we can move displaced items to player
-        var targetInventoryBefore = target.Inventory.Count;
-
-        // Equip to target - EquipItem adds displaced items to target's inventory
-        var result = target.EquipItem(selectedItem, targetSlot, out string message);
-        target.RecalculateStats();
-
-        if (result)
-        {
-            // Move any items that were added to target's inventory (displaced equipment) to player's inventory
-            if (target.Inventory.Count > targetInventoryBefore)
+            // Step 3: Show current item in slot
+            terminal.WriteLine("");
+            var currentItem = target.GetEquipment(selectedSlot.Value);
+            terminal.SetColor("white");
+            terminal.Write($"  Current: ");
+            if (currentItem != null)
             {
-                var displacedItems = target.Inventory.Skip(targetInventoryBefore).ToList();
-                foreach (var displaced in displacedItems)
+                terminal.SetColor(currentItem.IsIdentified ? currentItem.GetRarityColor() : "magenta");
+                terminal.Write(currentItem.IsIdentified ? currentItem.Name : "Unidentified");
+                if (currentItem.IsIdentified) WriteEquipmentStatSummary(currentItem);
+                terminal.WriteLine("");
+            }
+            else
+            {
+                terminal.SetColor("darkgray");
+                terminal.WriteLine("Empty");
+            }
+            terminal.WriteLine("");
+
+            // Step 4: Display matching items with full stats
+            terminal.SetColor("white");
+            terminal.WriteLine(Loc.Get("team.available_equipment"));
+            terminal.WriteLine("");
+            DisplayEquipmentItemList(equipmentItems, target);
+
+            terminal.WriteLine("");
+            terminal.SetColor("cyan");
+            terminal.Write(Loc.Get("team.select_item"));
+            terminal.SetColor("white");
+
+            var input = await terminal.ReadLineAsync();
+            if (!int.TryParse(input, out int itemIdx) || itemIdx < 1 || itemIdx > equipmentItems.Count)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine(Loc.Get("ui.cancelled"));
+                await Task.Delay(1000);
+                continue;
+            }
+
+            var (selectedItem, wasEquipped, sourceSlot) = equipmentItems[itemIdx - 1];
+
+            // Block unidentified items
+            if (!selectedItem.IsIdentified)
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine("  Must identify the item first.");
+                await Task.Delay(2000);
+                continue;
+            }
+
+            // Check if target can equip
+            if (!selectedItem.CanEquip(target, out string equipReason))
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine(Loc.Get("team.cannot_use_item", target.DisplayName, equipReason));
+                await Task.Delay(2000);
+                continue;
+            }
+
+            // Use the slot the player already picked (no need to ask which hand)
+            EquipmentSlot? targetSlot = selectedSlot.Value;
+
+            // Remove from player
+            if (wasEquipped && sourceSlot.HasValue)
+            {
+                currentPlayer.UnequipSlot(sourceSlot.Value);
+                currentPlayer.RecalculateStats();
+            }
+            else
+            {
+                // Remove from inventory (find by name)
+                // Two-pass match: first try Name+Attack+ArmorClass for precision, then fallback to name-only
+                var invItem = currentPlayer.Inventory.FirstOrDefault(i =>
+                    i.Name == selectedItem.Name && i.Attack == selectedItem.WeaponPower && i.Armor == selectedItem.ArmorClass)
+                    ?? currentPlayer.Inventory.FirstOrDefault(i => i.Name == selectedItem.Name);
+                if (invItem != null)
                 {
-                    target.Inventory.Remove(displaced);
-                    currentPlayer.Inventory.Add(displaced);
+                    currentPlayer.Inventory.Remove(invItem);
                 }
             }
 
-            // v0.57.7 (Hesperos report): `target` is a WRAPPER Character built fresh by
-            // CompanionSystem.GetCompanionsAsCharacters() — edits to wrapper.EquippedItems
-            // don't mutate the underlying Companion unless we explicitly sync. Without this
-            // call Lyris reverted to her EquipStartingGear set on next wrapper regeneration.
-            // Safe no-op for non-companion targets (team NPC).
-            if (target.IsCompanion)
-                CompanionSystem.Instance?.SyncCompanionEquipment(target);
+            // Track items in target's inventory BEFORE equipping, so we can move displaced items to player
+            var targetInventoryBefore = target.Inventory.Count;
 
-            terminal.WriteLine("");
-            terminal.SetColor("bright_green");
-            terminal.WriteLine(Loc.Get("team.equipped_success", target.DisplayName, selectedItem.Name));
-            if (!string.IsNullOrEmpty(message))
+            // Equip to target - EquipItem adds displaced items to target's inventory
+            var result = target.EquipItem(selectedItem, targetSlot, out string message);
+            target.RecalculateStats();
+
+            if (result)
             {
-                terminal.SetColor("yellow");
-                terminal.WriteLine(message);
-            }
-        }
-        else
-        {
-            // Failed - return item to player
-            var legacyItem = ConvertEquipmentToItem(selectedItem);
-            currentPlayer.Inventory.Add(legacyItem);
-            terminal.SetColor("red");
-            terminal.WriteLine(Loc.Get("team.equip_failed", message));
-        }
+                // Move any items that were added to target's inventory (displaced equipment) to player's inventory
+                if (target.Inventory.Count > targetInventoryBefore)
+                {
+                    var displacedItems = target.Inventory.Skip(targetInventoryBefore).ToList();
+                    foreach (var displaced in displacedItems)
+                    {
+                        target.Inventory.Remove(displaced);
+                        currentPlayer.Inventory.Add(displaced);
+                    }
+                }
 
-        await Task.Delay(2000);
+                // v0.57.7 (Hesperos report): `target` is a WRAPPER Character built fresh by
+                // CompanionSystem.GetCompanionsAsCharacters() — edits to wrapper.EquippedItems
+                // don't mutate the underlying Companion unless we explicitly sync. Without this
+                // call Lyris reverted to her EquipStartingGear set on next wrapper regeneration.
+                // Safe no-op for non-companion targets (team NPC).
+                if (target.IsCompanion)
+                    CompanionSystem.Instance?.SyncCompanionEquipment(target);
+
+                terminal.WriteLine("");
+                terminal.SetColor("bright_green");
+                terminal.WriteLine(Loc.Get("team.equipped_success", target.DisplayName, selectedItem.Name));
+                if (!string.IsNullOrEmpty(message))
+                {
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine(message);
+                }
+            }
+            else
+            {
+                // Failed - return item to player
+                var legacyItem = ConvertEquipmentToItem(selectedItem);
+                currentPlayer.Inventory.Add(legacyItem);
+                terminal.SetColor("red");
+                terminal.WriteLine(Loc.Get("team.equip_failed", message));
+            }
+
+            await Task.Delay(2000);
+        }
     }
 
     /// <summary>

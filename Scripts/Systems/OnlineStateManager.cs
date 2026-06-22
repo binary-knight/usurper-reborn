@@ -294,6 +294,22 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
+        /// v0.65.0: push the current shared quest list to world_state immediately,
+        /// mirroring SaveSharedChildrenNow. Used by permadeath after purging a
+        /// dead character's quests from questDatabase so the removal is durable
+        /// in world_state["quests"] right away, rather than waiting for (and
+        /// racing) the next world-sim save cycle.
+        /// </summary>
+        public async Task SaveSharedQuestsNow()
+        {
+            try { await SaveSharedQuests(SerializeCurrentQuests()); }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("ONLINE", $"SaveSharedQuestsNow failed: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// Save quest data to shared state.
         /// </summary>
         public async Task SaveSharedQuests(List<QuestData> quests)

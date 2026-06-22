@@ -178,12 +178,47 @@ namespace UsurperRemake.Systems
                     // resolve. Player report (Rage): "lost all 4 lives, made a new
                     // char, came back in my guild still, actually still worshiping
                     // the same god." Fixed by this purge + the in-memory hook.
-                    sqlBackend.PurgePlayerWorldState(username);
+                    sqlBackend.PurgePlayerWorldState(username, displayName);
 
                     sqlBackend.DeleteGameData(username, bypassArchive: false);
                     DebugLogger.Instance.LogWarning("DEATH_CAP",
                         $"Permadeleted '{username}' (display='{displayName}', lv={finalLevel}, class={className}, killer={killerName}). 7-day /restore window active.");
                 }
+
+                // v0.65.0 (eldruin/Eldruin report): permadeath must also clear the
+                // character's identity-linked state that lives OUTSIDE the players
+                // row, or a same-name recreation re-binds to it. SQL-side state is
+                // handled by PurgePlayerWorldState above; these three live in
+                // shared in-memory systems + their world_state mirrors.
+                try
+                {
+                    // (1) Claimed quests: keyed by Occupier = display name in the
+                    // shared questDatabase. Remove them and push the cleaned list
+                    // to world_state["quests"] so it's durable (otherwise they
+                    // re-surface for the next character named the same).
+                    int removedQuests = QuestSystem.RemovePlayerQuests(displayName, username, player.Name1, player.Name2);
+                    if (removedQuests > 0)
+                        DebugLogger.Instance.LogInfo("DEATH_CAP", $"Removed {removedQuests} claimed quest(s) for permadied '{displayName}'.");
+                    if (UsurperRemake.BBS.DoorMode.IsOnlineMode && OnlineStateManager.IsActive)
+                        await OnlineStateManager.Instance!.SaveSharedQuestsNow();
+                }
+                catch (Exception qex) { DebugLogger.Instance.LogWarning("DEATH_CAP", $"Quest purge failed: {qex.Message}"); }
+
+                try
+                {
+                    // (2) Children: disown so the dead parent's kids don't grant a
+                    // same-name recreation family bonuses / show as their children.
+                    // Use the ID-first Character overload (v0.63.0 slice 4) for the
+                    // same rename/name-collision robustness the NG+/delete paths use.
+                    int disowned = UsurperRemake.Systems.FamilySystem.Instance?.DisownChildrenOf(player) ?? 0;
+                    if (disowned > 0)
+                    {
+                        DebugLogger.Instance.LogInfo("DEATH_CAP", $"Disowned {disowned} child(ren) of permadied '{displayName}'.");
+                        if (UsurperRemake.BBS.DoorMode.IsOnlineMode && OnlineStateManager.IsActive)
+                            await OnlineStateManager.Instance!.SaveSharedChildrenNow();
+                    }
+                }
+                catch (Exception cex) { DebugLogger.Instance.LogWarning("DEATH_CAP", $"Child disown failed: {cex.Message}"); }
 
                 if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
                 {

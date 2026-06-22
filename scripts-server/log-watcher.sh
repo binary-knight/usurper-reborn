@@ -82,8 +82,12 @@ process_line() {
     # Only care about ERR level
     echo "$line" | grep -q '\[ERR\]' || return
 
-    # Skip noisy/expected errors
-    echo "$line" | grep -qE 'fail silently|best-effort|not available' && return
+    # Skip noisy/expected errors.
+    # [LLM] errors are benign by design: every LLM moment generator falls back
+    # to a deterministic template on any failure (HTTP 4xx/5xx, timeout, budget,
+    # disconnect), so an LLM failure is expected degradation, not a server fault.
+    # Never page Discord for them.
+    echo "$line" | grep -qE 'fail silently|best-effort|not available|\[LLM\]' && return
 
     # Extract category and message
     local category=$(echo "$line" | sed -E 's/.*\[ERR\] \[([A-Z_]+)\].*/\1/')

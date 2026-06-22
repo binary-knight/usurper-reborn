@@ -77,6 +77,11 @@ public class SessionContext : IDisposable
     // including it would force an emit every round and defeat the change-detection.
     public string LastGmcpEnemiesSnapshot { get; set; } = "";
 
+    // v1.0 release prep (B1a): once-per-session gate for the reached_town
+    // onboarding-funnel write so Main Street entry doesn't fire a DB write on
+    // every visit. Cross-session dedup is the table's UNIQUE constraint.
+    public bool OnboardingTownRecorded { get; set; } = false;
+
     /// <summary>
     /// v0.60.3: consecutive emit failure counter. Reset to 0 on every successful
     /// emit; after GmcpBridge.MaxConsecutiveErrors failures in a row the bridge

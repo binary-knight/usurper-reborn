@@ -114,6 +114,34 @@ public class CharacterCreationSystem
                 character.Name2 = characterName;
             }
             
+            // v1.0 release prep (B1b): Quick Start. Full creation is ~10
+            // decision screens (gender, orientation, 10 races, 17 classes,
+            // difficulty, 5 stat rerolls) before any gameplay -- a plausible
+            // driver of the new-account bounce. Quick Start collapses it to
+            // TWO choices (archetype + gender) with sane defaults for the
+            // rest; every skipped choice has a Preferences mirror so nothing
+            // is permanently lost. Target: under 60 seconds to Main Street.
+            // Custom path is completely unchanged.
+            if (await TryQuickStart(character))
+            {
+                // Quick Start handled steps 2-9 (gender, archetype race+class,
+                // defaults, single stat roll, appearance, config, compact
+                // summary). AutoLook defaults ON for Quick Start players in
+                // MUD mode -- the friendlier behavior for someone new to
+                // terminal games; toggle lives in Preferences.
+                if (DoorMode.IsMudServerMode)
+                {
+                    character.AutoLook = true;
+                    GameConfig.AutoLook = true;
+                }
+
+                terminal.WriteLine("");
+                terminal.WriteLine(Loc.Get("creation.created"), "green");
+                terminal.WriteLine(Loc.Get("creation.entering"), "cyan");
+                await Task.Delay(2000);
+                return character;
+            }
+
             // Step 2: Select gender (Pascal gender selection)
             character.Sex = await SelectGender();
 
@@ -122,7 +150,7 @@ public class CharacterCreationSystem
 
             // Step 3: Select race (Pascal race selection with help + portrait preview)
             character.Race = await SelectRace(character.Name2, character.Sex);
-            
+
             // Step 4: Select class (Pascal class selection with validation)
             character.Class = await SelectClass(character.Race);
 
@@ -194,6 +222,143 @@ public class CharacterCreationSystem
         }
     }
     
+    /// <summary>
+    /// v1.0 release prep (B1b): Quick Start path. Offers [Q]uick / [C]ustom;
+    /// on Quick, the player picks one of three curated archetypes and a
+    /// gender, everything else defaults (orientation Straight, difficulty
+    /// Normal, single stat roll, standard appearance + starting config), and
+    /// a compact summary shows what was chosen with a pointer to Preferences.
+    /// Returns true when Quick Start completed the character; false = player
+    /// chose Custom (or gave no clear answer) and the full flow proceeds.
+    /// </summary>
+    private async Task<bool> TryQuickStart(Character character)
+    {
+        terminal.WriteLine("");
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine($"  [Q] {Loc.Get("creation.quick_start")}");
+        terminal.SetColor("white");
+        terminal.WriteLine($"      {Loc.Get("creation.quick_start_desc")}");
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine($"  [C] {Loc.Get("creation.custom_start")}");
+        terminal.SetColor("white");
+        terminal.WriteLine($"      {Loc.Get("creation.custom_start_desc")}");
+        terminal.WriteLine("");
+
+        // v0.65.0 (druidah report): mode pick re-prompts on anything that
+        // isn't Q or C instead of silently falling into Custom. [0]/C exit to
+        // the full flow.
+        while (true)
+        {
+            var mode = (await terminal.GetInputAsync(Loc.Get("ui.your_choice")) ?? "").Trim().ToUpperInvariant();
+            if (mode == "C" || mode == "0") return false; // Custom / full flow
+            if (mode == "Q") break;
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"  {Loc.Get("creation.qs_invalid_mode")}");
+            terminal.SetColor("white");
+        }
+
+        // Three curated archetypes: a straightforward melee, a caster, and a
+        // durable healer -- the classic trio, all race/class-legal combos.
+        var archetypes = new (CharacterRace Race, CharacterClass Class, string NameKey, string DescKey)[]
+        {
+            (CharacterRace.Human, CharacterClass.Warrior, "creation.qs_warrior", "creation.qs_warrior_desc"),
+            (CharacterRace.Elf, CharacterClass.Magician, "creation.qs_magician", "creation.qs_magician_desc"),
+            (CharacterRace.Dwarf, CharacterClass.Cleric, "creation.qs_cleric", "creation.qs_cleric_desc"),
+        };
+
+        // v0.65.0 (druidah report): archetype + gender now VALIDATE input and
+        // re-prompt with a clear message instead of silently defaulting (typing
+        // "g" used to yield a silent Human Warrior). [0] backs out -- from the
+        // archetype list it exits Quick Start to the full Custom flow; from the
+        // gender prompt it returns to the archetype list.
+        int idx = 1;
+        bool genderChosen = false;
+        while (!genderChosen)
+        {
+            terminal.WriteLine("");
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine($"  {Loc.Get("creation.qs_pick_hero")}");
+            terminal.WriteLine("");
+            for (int i = 0; i < archetypes.Length; i++)
+            {
+                terminal.SetColor("bright_cyan");
+                terminal.Write($"  [{i + 1}] ");
+                terminal.SetColor("white");
+                terminal.Write(Loc.Get(archetypes[i].NameKey));
+                terminal.SetColor("gray");
+                terminal.WriteLine($" -- {Loc.Get(archetypes[i].DescKey)}");
+            }
+            terminal.SetColor("gray");
+            terminal.WriteLine($"  {Loc.Get("creation.qs_back_hint")}");
+            terminal.WriteLine("");
+
+            bool archetypePicked = false;
+            while (!archetypePicked)
+            {
+                var pick = (await terminal.GetInputAsync(Loc.Get("ui.your_choice")) ?? "").Trim();
+                if (pick == "0" || pick.Equals("B", StringComparison.OrdinalIgnoreCase))
+                    return false; // back out of Quick Start -> full Custom flow
+                if (int.TryParse(pick, out idx) && idx >= 1 && idx <= archetypes.Length)
+                {
+                    archetypePicked = true;
+                }
+                else
+                {
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine($"  {Loc.Get("creation.qs_invalid_pick")}");
+                    terminal.SetColor("white");
+                }
+            }
+
+            // One quick gender pick (matters for romance/pronouns; not in
+            // Preferences). NUMBERED, not lettered: gender initials collide
+            // across languages (Spanish M = Mujer = female vs English M = male;
+            // Hungarian F = Ferfi = male vs English F = female), so letters
+            // can't be made safe in a shared handler.
+            terminal.WriteLine("");
+            terminal.SetColor("gray");
+            terminal.WriteLine($"  {Loc.Get("creation.qs_back_hint")}");
+            terminal.SetColor("white");
+            while (true)
+            {
+                var g = (await terminal.GetInputAsync(Loc.Get("creation.qs_gender")) ?? "").Trim();
+                if (g == "0" || g.Equals("B", StringComparison.OrdinalIgnoreCase))
+                    break; // back to the archetype list (outer loop re-runs)
+                if (g == "1") { character.Sex = CharacterSex.Male; genderChosen = true; break; }
+                if (g == "2") { character.Sex = CharacterSex.Female; genderChosen = true; break; }
+                terminal.SetColor("yellow");
+                terminal.WriteLine($"  {Loc.Get("creation.qs_invalid_gender")}");
+                terminal.SetColor("white");
+            }
+        }
+
+        var chosen = archetypes[idx - 1];
+        character.Race = chosen.Race;
+        character.Class = chosen.Class;
+
+        // Defaults for everything that has a Preferences mirror.
+        character.Orientation = SexualOrientation.Straight;
+        character.Difficulty = DifficultyMode.Normal;
+        DifficultySystem.CurrentDifficulty = DifficultyMode.Normal;
+
+        // Single stat roll -- no reroll loop. Quick Start players don't know
+        // what the numbers mean yet anyway; the Level Master explains later.
+        RollStats(character);
+
+        GeneratePhysicalAppearance(character);
+        SetStartingConfiguration(character);
+
+        // Compact summary: what they got + where to change the defaults.
+        terminal.WriteLine("");
+        terminal.SetColor("bright_green");
+        terminal.WriteLine($"  {Loc.Get("creation.qs_summary", character.Name2, GameConfig.RaceNames[(int)character.Race], character.ClassName)}");
+        terminal.SetColor("gray");
+        terminal.WriteLine($"  {Loc.Get("creation.qs_defaults_hint")}");
+        terminal.WriteLine("");
+        await terminal.GetInputAsync(Loc.Get("creation.qs_begin"));
+        return true;
+    }
+
     /// <summary>
     /// Create base character with Pascal default values (USERHUNC.PAS)
     /// </summary>

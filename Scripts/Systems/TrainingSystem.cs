@@ -405,7 +405,40 @@ public static class TrainingSystem
 
         int playerAC = CalculatePlayerHitRollAC(target);
 
-        return RollD20(monsterMod, playerAC, random);
+        // v0.65.0 (1.0-prep B2): bounded accuracy vs at-level threats. Player
+        // AC scales with DEX/3 + ArmPow/25 while monster accuracy scales with
+        // Level/2 + Str/3 -- and player stat/gear growth so outpaces it that
+        // by floor ~30 a geared player's AC exceeds the monster's best
+        // possible roll entirely: monsters could ONLY hit on natural 20s.
+        // Telemetry flagged this twice (v0.61.5, v0.61.6: "damage taken at
+        // floor 30+ is literally 0") and it survived two deferrals; the
+        // result was the longest stretch of the game running on autopilot.
+        //
+        // Fix: clamp the NATURAL ROLL NEEDED, not the stats. Against an
+        // at-level monster (within AtLevelAccuracyGap levels of the player),
+        // the needed roll is clamped to [MinNeeded, MaxNeeded] -- i.e. an
+        // at-level monster always has at least a (21-MaxNeeded)*5% chance to
+        // land a swing and never more than (21-MinNeeded)*5%. Weaker monsters
+        // (the player descending to farm) keep their natural near-zero hit
+        // chance, capped only by the universal MaxNeeded so no monster is
+        // ever 100% hopeless beyond nat-20. Early game is untouched: needed
+        // rolls there already fall inside the clamp window. Tank gear still
+        // matters -- it moves you from the natural needed-roll toward the
+        // floor, and the per-hit damage reduction layers are unchanged.
+        int needed = playerAC - monsterMod;
+        bool atLevelThreat = monster.Level >= target.Level - GameConfig.AtLevelAccuracyGap;
+        int maxNeeded = atLevelThreat
+            ? GameConfig.MonsterAccuracyMaxNeededAtLevel   // 16 -> at least 25% hit chance
+            : GameConfig.MonsterAccuracyMaxNeededWeak;     // 19 -> at least 10% hit chance
+        needed = Math.Min(needed, maxNeeded);
+        if (atLevelThreat)
+            needed = Math.Max(needed, GameConfig.MonsterAccuracyMinNeeded); // 3 -> at most 90%
+
+        // Express the clamp through the effective DC so the roll display
+        // (natural + modifier vs DC) stays internally consistent.
+        int effectiveAC = monsterMod + needed;
+
+        return RollD20(monsterMod, effectiveAC, random);
     }
 
     /// <summary>
@@ -701,7 +734,7 @@ public static class TrainingSystem
             terminal.WriteLine("");
 
             var input = await terminal.GetInput("> ");
-            if (string.IsNullOrWhiteSpace(input) || input.Trim().ToUpper() == "X")
+            if (string.IsNullOrWhiteSpace(input) || input.Trim().ToUpper() == "X" || input.Trim().ToUpper() == "Q") // v0.64.2: Q backs out everywhere
                 return;
 
             if (input.Trim() == "1")
@@ -763,7 +796,7 @@ public static class TrainingSystem
         terminal.WriteLine(Loc.Get("training.reset_skill_prompt"), "yellow");
 
         var input = await terminal.GetInput("> ");
-        if (string.IsNullOrWhiteSpace(input) || input.Trim().ToUpper() == "X")
+        if (string.IsNullOrWhiteSpace(input) || input.Trim().ToUpper() == "X" || input.Trim().ToUpper() == "Q") // v0.64.2: Q backs out everywhere
             return;
 
         if (int.TryParse(input, out int choice) && choice >= 1 && choice <= trainedSkills.Count)
@@ -964,7 +997,7 @@ public static class TrainingSystem
             terminal.WriteLine(Loc.Get("training.menu_prompt"), "yellow");
 
             var input = await terminal.GetInput("> ");
-            if (string.IsNullOrWhiteSpace(input) || input.Trim().ToUpper() == "X")
+            if (string.IsNullOrWhiteSpace(input) || input.Trim().ToUpper() == "X" || input.Trim().ToUpper() == "Q") // v0.64.2: Q backs out everywhere
                 break;
 
             if (input.Trim().ToUpper() == "R")
@@ -1053,7 +1086,7 @@ public static class TrainingSystem
         terminal.WriteLine("");
 
         var choice = await terminal.GetInput("> ");
-        if (string.IsNullOrWhiteSpace(choice) || choice.Trim().ToUpper() == "X")
+        if (string.IsNullOrWhiteSpace(choice) || choice.Trim().ToUpper() == "X" || choice.Trim().ToUpper() == "Q") // v0.64.2: Q backs out everywhere
         {
             return;
         }

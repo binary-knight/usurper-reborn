@@ -2651,6 +2651,7 @@ public partial class MagicShopLocation : BaseLocation
 
             case "B":
             case "X":
+            case "Q": // v0.64.2: Q backs out one level everywhere (key-consistency feedback)
                 _currentAccessoryCategory = null;
                 _accessoryPage = 0;
                 RequestRedisplay();

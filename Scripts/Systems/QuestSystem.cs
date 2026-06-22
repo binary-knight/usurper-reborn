@@ -555,7 +555,15 @@ public partial class QuestSystem
         public int Tier;                     // 1-5; slice 1 ships only tier 1
     }
 
-    // Slice 1: 2 contracts per faction at tier 1. Tier 2+ deferred to slice 4b.
+    // Slice 1: 2 contracts per faction at tier 1.
+    // v0.65.0 (1.0-prep SR): tier 2 ships -- 2 more per faction, unlocked at
+    // Sellsword rank (10 completions; the existing `Tier <= max(1, rankIdx)`
+    // visibility gate makes this work with zero new gating code). Payout
+    // multipliers 1.40-1.60 vs tier 1's 0.85-1.00, so climbing the ladder
+    // visibly pays. Kill targets chosen from mid-band monster names that
+    // actually spawn (Orc 5-20, Ghoul 16-30); the harder jobs lean on
+    // ExploreRooms / KillMonsters which have no spawn-band dependency.
+    // Tiers 3-5 + Legend's Pick stay deferred.
     private static readonly MercTemplate[] MercTemplatesSlice1 = new[]
     {
         new MercTemplate { Id = "crown_bandit_purge",    Faction = UsurperRemake.Systems.Faction.TheCrown,   ObjectiveType = QuestObjectiveType.KillSpecificMonster, TargetId = "Bandit",     BaseProgress = 3, PayoutMultiplier = 1.00f, Tier = 1 },
@@ -564,6 +572,14 @@ public partial class QuestSystem
         new MercTemplate { Id = "shadows_jailbreak",     Faction = UsurperRemake.Systems.Faction.TheShadows, ObjectiveType = QuestObjectiveType.VisitLocation,       TargetId = "Prison",     BaseProgress = 1, PayoutMultiplier = 0.90f, Tier = 1 },
         new MercTemplate { Id = "faith_purge_undead",    Faction = UsurperRemake.Systems.Faction.TheFaith,   ObjectiveType = QuestObjectiveType.KillSpecificMonster, TargetId = "Zombie",     BaseProgress = 3, PayoutMultiplier = 1.00f, Tier = 1 },
         new MercTemplate { Id = "faith_escort_pilgrim",  Faction = UsurperRemake.Systems.Faction.TheFaith,   ObjectiveType = QuestObjectiveType.KillMonsters,        TargetId = "",           BaseProgress = 5, PayoutMultiplier = 0.95f, Tier = 1 },
+
+        // Tier 2 (Sellsword rank, 10+ completions)
+        new MercTemplate { Id = "crown_warband_breaker", Faction = UsurperRemake.Systems.Faction.TheCrown,   ObjectiveType = QuestObjectiveType.KillSpecificMonster, TargetId = "Orc",        BaseProgress = 5, PayoutMultiplier = 1.60f, Tier = 2 },
+        new MercTemplate { Id = "crown_deep_survey",     Faction = UsurperRemake.Systems.Faction.TheCrown,   ObjectiveType = QuestObjectiveType.ExploreRooms,        TargetId = "",           BaseProgress = 25, PayoutMultiplier = 1.40f, Tier = 2 },
+        new MercTemplate { Id = "shadows_message_job",   Faction = UsurperRemake.Systems.Faction.TheShadows, ObjectiveType = QuestObjectiveType.KillMonsters,        TargetId = "",           BaseProgress = 12, PayoutMultiplier = 1.55f, Tier = 2 },
+        new MercTemplate { Id = "shadows_route_scout",   Faction = UsurperRemake.Systems.Faction.TheShadows, ObjectiveType = QuestObjectiveType.ExploreRooms,        TargetId = "",           BaseProgress = 20, PayoutMultiplier = 1.50f, Tier = 2 },
+        new MercTemplate { Id = "faith_ghoul_cleansing", Faction = UsurperRemake.Systems.Faction.TheFaith,   ObjectiveType = QuestObjectiveType.KillSpecificMonster, TargetId = "Ghoul",      BaseProgress = 4, PayoutMultiplier = 1.60f, Tier = 2 },
+        new MercTemplate { Id = "faith_lantern_vigil",   Faction = UsurperRemake.Systems.Faction.TheFaith,   ObjectiveType = QuestObjectiveType.ExploreRooms,        TargetId = "",           BaseProgress = 20, PayoutMultiplier = 1.45f, Tier = 2 },
     };
 
     /// <summary>
@@ -1247,6 +1263,48 @@ public partial class QuestSystem
     /// Used in MUD/online mode where multiple players share the static questDatabase.
     /// Removes any existing quests for this player, then adds back from save data.
     /// </summary>
+    /// <summary>
+    /// v0.65.0: remove every quest claimed by / offered to a player from the
+    /// shared questDatabase. Used at permadeath so a permadied character's
+    /// claimed quests don't linger in world_state["quests"] and re-attach by
+    /// Occupier name to a same-name recreation (the reported eldruin/Eldruin
+    /// quest carry-over). Match is case-insensitive on both Occupier and
+    /// OfferedTo, against any of the names the player may have been stored under.
+    /// </summary>
+    public static int RemovePlayerQuests(params string?[] playerNames)
+    {
+        var names = (playerNames ?? Array.Empty<string?>())
+            .Where(n => !string.IsNullOrWhiteSpace(n))
+            .ToList();
+        if (names.Count == 0) return 0;
+        bool Matches(string? field) =>
+            !string.IsNullOrEmpty(field) &&
+            names.Any(n => string.Equals(field, n, StringComparison.OrdinalIgnoreCase));
+        return questDatabase.RemoveAll(q => Matches(q.Occupier) || Matches(q.OfferedTo));
+    }
+
+    /// <summary>
+    /// v0.65.0: drop any quest claimed by / offered to playerName whose Id is NOT
+    /// in keepIds. Run AFTER MergeWorldQuests during load to close the
+    /// re-injection window: MergePlayerQuests purges the dead character's quests
+    /// from questDatabase, but MergeWorldQuests then re-adds claimed quests from a
+    /// possibly-stale world_state mirror (a permadied character's claimed quests
+    /// linger there until the permadeath push lands / for pre-fix permadeaths).
+    /// This reasserts that the loading player's claimed set equals exactly their
+    /// own save. Returns the number of stale quests removed.
+    /// </summary>
+    public static int ReconcilePlayerQuests(string playerName, HashSet<string> keepIds)
+    {
+        if (string.IsNullOrWhiteSpace(playerName)) return 0;
+        keepIds ??= new HashSet<string>();
+        bool MatchesName(string? field) =>
+            !string.IsNullOrEmpty(field) &&
+            string.Equals(field, playerName, StringComparison.OrdinalIgnoreCase);
+        return questDatabase.RemoveAll(q =>
+            (MatchesName(q.Occupier) || MatchesName(q.OfferedTo)) &&
+            !keepIds.Contains(q.Id));
+    }
+
     public static void MergePlayerQuests(string playerName, List<QuestData> savedQuests)
     {
         // Remove only THIS player's quests from the shared database

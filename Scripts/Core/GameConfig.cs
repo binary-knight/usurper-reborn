@@ -10,8 +10,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.64.1";
-    public const string VersionName = "The Brain";
+    public const string Version = "0.65.0";
+    public const string VersionName = "Countdown"; // the Beta -> 1.0 release-prep cycle
 
     // v0.57.12: Alignment scale cap. Character.Chivalry and Character.Darkness setters clamp to [0, AlignmentCap]
     // as defense in depth against direct-mutation bypass sites that don't route through AlignmentSystem.ChangeAlignment.
@@ -741,6 +741,15 @@ public static partial class GameConfig
     public const int MaxMurdersPerDay = 3;                    // v0.57.6: cap non-bounty NPC murders to prevent a dark-aligned player from wiping the town in a single play session.
     public const int MaxAlignedSparesPerDay = 3;              // v0.64.1: cap the +10 paired-good alignment reward from sparing beaten PvP NPCs (mirror of the murder cap; sparing itself is never blocked).
 
+    // v0.65.0 (1.0-prep B2): bounded monster accuracy. See
+    // TrainingSystem.RollMonsterAttack for the full rationale -- player AC
+    // growth outpaced monster accuracy so badly that floor-30+ monsters could
+    // only hit on natural 20s, flattening the longest stretch of the game.
+    public const int AtLevelAccuracyGap = 5;                  // monster within (playerLevel - gap) counts as an at-level threat
+    public const int MonsterAccuracyMinNeeded = 3;            // at-level monsters never hit on better than 90% of swings
+    public const int MonsterAccuracyMaxNeededAtLevel = 16;    // at-level monsters always land at least 25% of swings
+    public const int MonsterAccuracyMaxNeededWeak = 19;       // under-leveled monsters keep near-natural miss rates (>= 10% floor)
+
     // v0.62.x "Light and Dark" Phase 3 (Dread/Renown reward-loop content).
     // DREAD: Demand Tribute is the Dark/Evil "active income" verb. Capped to prevent infinite
     // gold extraction; success scales to NPC level (NOT player gold or wealth, so it can't
@@ -838,6 +847,11 @@ public static partial class GameConfig
     public const int MaxTeamWarsPerDay = 3;                   // Daily cap on team-war challenges per challenger.
     public const int TeamWarOpponentCooldownHours = 6;        // Per-opponent cooldown — can't re-challenge the same defender team within this window.
     public const float TeamWarRewardMultiplier = 1.5f;        // Reward = wager * this on victory (was 2.0). Net profit = (multiplier - 1) * wager = +50% of wager.
+
+    // Bank player-to-player wire transfer (v0.65.0). Sender pays the full amount from their
+    // bank balance; recipient receives amount minus this fee (auto-deposited to their bank on
+    // next login via pending_gold_transfers). The fee is removed from the economy (gold sink).
+    public const float BankTransferFeePercent = 0.02f;        // 2% bank cut on wire transfers.
 
     // Inn drinking game (v0.57.17 — anti-grind cap)
     // Player report: "drinking game at the inn has no limit per day and no carry over.
@@ -2204,6 +2218,21 @@ public static partial class GameConfig
         if (trimmed.Length > 0 && char.IsLower(trimmed[0]))
             trimmed = char.ToUpper(trimmed[0]) + trimmed.Substring(1);
         return trimmed;
+    }
+
+    /// <summary>
+    /// v0.65.0: safe capitalize-first-letter. Returns the input unchanged when
+    /// null or empty. Guards the pro-drop-language case: GetLocalizedSubjectPronoun
+    /// / GetLocalizedPossessivePronoun return "" for hu/es/it, so the manual
+    /// idioms `s.Substring(0,1).ToUpper() + s.Substring(1)` and
+    /// `s.ToUpperInvariant()[0] + s.Substring(1)` threw "Index and length must
+    /// refer to a location within the string" on the empty pronoun (reported via
+    /// the intimate-encounter flow in a Hungarian session).
+    /// </summary>
+    public static string CapitalizeFirst(string? s)
+    {
+        if (string.IsNullOrEmpty(s)) return s ?? "";
+        return char.ToUpperInvariant(s[0]) + s.Substring(1);
     }
 
     /// <summary>

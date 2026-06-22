@@ -1776,6 +1776,71 @@ async function handleBalanceRequest(req, res) {
     return true;
   }
 
+  // GET /api/balance/onboarding -- v1.0 release prep (B1a): the new-account
+  // funnel. Five milestones per account (account_created -> character_created
+  // -> reached_town -> first_kill -> second_login), cohorted by account-
+  // creation window and split by connection type, so the bounce cliff is
+  // finally measurable.
+  if (method === 'GET' && url === '/api/balance/onboarding') {
+    try {
+      const tableCheck = db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='onboarding_events'`).get();
+      if (!tableCheck) {
+        sendJson(res, 200, {
+          tableExists: false,
+          message: 'onboarding_events table not yet created (game binary < v1.0 prep build)'
+        });
+        return true;
+      }
+
+      const STAGES = ['account_created', 'character_created', 'reached_town', 'first_kill', 'second_login'];
+
+      function funnelSince(interval) {
+        // Cohort = accounts CREATED in the window; count how many of that
+        // cohort reached each later stage (whenever they reached it).
+        const cohort = db.prepare(`
+          SELECT username FROM onboarding_events
+          WHERE event = 'account_created' AND created_at >= datetime('now', ?)
+        `).all(interval).map(r => r.username);
+        if (cohort.length === 0) return { cohortSize: 0, stages: {} };
+        const placeholders = cohort.map(() => '?').join(',');
+        const stages = {};
+        for (const stage of STAGES) {
+          const row = db.prepare(`
+            SELECT COUNT(DISTINCT username) AS n FROM onboarding_events
+            WHERE event = ? AND username IN (${placeholders})
+          `).get(stage, ...cohort);
+          stages[stage] = row.n;
+        }
+        return { cohortSize: cohort.length, stages };
+      }
+
+      // Per-connection-type split for the 7-day cohort (Web drive-bys vs
+      // Steam/SSH buyers are different populations).
+      const byType = db.prepare(`
+        SELECT COALESCE(a.connection_type, 'Unknown') AS ctype,
+               COUNT(DISTINCT a.username) AS created,
+               COUNT(DISTINCT k.username) AS killed
+        FROM onboarding_events a
+        LEFT JOIN onboarding_events k
+          ON k.username = a.username AND k.event = 'first_kill'
+        WHERE a.event = 'account_created'
+          AND a.created_at >= datetime('now', '-7 days')
+        GROUP BY COALESCE(a.connection_type, 'Unknown')
+        ORDER BY created DESC
+      `).all();
+
+      sendJson(res, 200, {
+        tableExists: true,
+        last7d: funnelSince('-7 days'),
+        last30d: funnelSince('-30 days'),
+        byConnectionType7d: byType,
+      });
+    } catch (e) {
+      sendJson(res, 500, { error: 'onboarding query failed: ' + e.message });
+    }
+    return true;
+  }
+
   // GET /api/balance/llm-stats
   // v0.64.0 Brain v2 Slice 10 LLM telemetry surface. Returns aggregates from
   // the llm_usage table for the balance dashboard's LLM card -- success rate,

@@ -55,6 +55,63 @@ public class MudServer
     /// <summary>All currently active player sessions, keyed by lowercase username.</summary>
     public ConcurrentDictionary<string, PlayerSession> ActiveSessions { get; } = new();
 
+    // v0.65.0 (1.0-prep SR): per-IP failed-login throttle. The per-CONNECTION
+    // 5-attempt cap reset on every reconnect, so password guessing ran at
+    // TCP-reconnect speed. This tracks failures per effectiveIp (X-IP honored,
+    // same identity the ban system uses): after FailedLoginThreshold failures
+    // the IP is locked out with exponential backoff (60s doubling, capped at
+    // 15 min). Successful login clears the record; entries decay after an
+    // hour idle. In-memory only -- a restart clears it, which is acceptable
+    // (the attacker also loses their session churn).
+    private static readonly ConcurrentDictionary<string, (int Fails, DateTime LastFail, DateTime LockUntil)> _failedLogins = new();
+    private const int FailedLoginThreshold = 10;
+    private const int FailedLoginBaseLockSeconds = 60;
+    private const int FailedLoginMaxLockSeconds = 900;
+
+    private static bool IsLoginThrottled(string? ip, out int waitSeconds)
+    {
+        waitSeconds = 0;
+        if (string.IsNullOrWhiteSpace(ip) || ip == "127.0.0.1" || ip == "::1") return false;
+        if (!_failedLogins.TryGetValue(ip, out var rec)) return false;
+        // Decay: an hour of quiet forgives the record entirely.
+        if (DateTime.UtcNow - rec.LastFail > TimeSpan.FromHours(1))
+        {
+            _failedLogins.TryRemove(ip, out _);
+            return false;
+        }
+        if (DateTime.UtcNow < rec.LockUntil)
+        {
+            waitSeconds = (int)Math.Ceiling((rec.LockUntil - DateTime.UtcNow).TotalSeconds);
+            return true;
+        }
+        return false;
+    }
+
+    private static void RecordFailedLogin(string? ip)
+    {
+        if (string.IsNullOrWhiteSpace(ip) || ip == "127.0.0.1" || ip == "::1") return;
+        _failedLogins.AddOrUpdate(ip,
+            _ => (1, DateTime.UtcNow, DateTime.MinValue),
+            (_, rec) =>
+            {
+                int fails = rec.Fails + 1;
+                DateTime lockUntil = rec.LockUntil;
+                if (fails >= FailedLoginThreshold)
+                {
+                    int lockSecs = Math.Min(FailedLoginMaxLockSeconds,
+                        FailedLoginBaseLockSeconds * (1 << Math.Min(10, fails - FailedLoginThreshold)));
+                    lockUntil = DateTime.UtcNow.AddSeconds(lockSecs);
+                    Console.Error.WriteLine($"[MUD] SECURITY: login throttle engaged for {ip} ({fails} failures, locked {lockSecs}s)");
+                }
+                return (fails, DateTime.UtcNow, lockUntil);
+            });
+    }
+
+    private static void ClearFailedLogins(string? ip)
+    {
+        if (!string.IsNullOrWhiteSpace(ip)) _failedLogins.TryRemove(ip, out _);
+    }
+
     /// <summary>Singleton for easy access from game code (e.g. chat broadcasts).</summary>
     private static MudServer? _instance;
     public static MudServer? Instance => _instance;
@@ -85,6 +142,10 @@ public class MudServer
         SaveSystem.InitializeWithBackend(sqlBackend);
         Console.Error.WriteLine($"[MUD] SQLite backend initialized: {_databasePath}");
 
+        // v0.65.0 (1.0-prep SR): rehydrate the LLM daily token budget from
+        // the llm_usage telemetry so deploy-restarts no longer reset the cap.
+        UsurperRemake.Systems.LLMBudget.RehydrateFromBackend(sqlBackend);
+
         // v0.60.5: wire SqlSaveBackend's kick hook so BanPlayer can drop the
         // target's TCP session immediately. Lookup is by lowercased username
         // (matches ActiveSessions key convention).
@@ -111,19 +172,39 @@ public class MudServer
         // still, actually still worshiping the same god." DB tables are handled
         // by PurgePlayerWorldState; this hook clears the per-process state that
         // doesn't live in SQLite -- god worship dict, relationship cache, etc.
-        SqlSaveBackend.PermadeathPurgeHook = (username) =>
+        SqlSaveBackend.PermadeathPurgeHook = (username, displayName) =>
         {
             try
             {
                 if (string.IsNullOrWhiteSpace(username)) return;
+                // v0.65.0: GodSystem.SetPlayerGod and RelationshipSystem are keyed
+                // by the character DISPLAY NAME (Name2) at every gameplay call site
+                // (TempleLocation etc.), not the account username. Pre-fix this hook
+                // passed the username, so when the two differed the worship +
+                // relationship state was never actually cleared and re-bound to a
+                // same-name recreation (the reported eldruin/Eldruin cross-link).
+                // Clear by display name when available; also clear by username as a
+                // belt-and-suspenders for any legacy data keyed by account.
+                string primaryKey = !string.IsNullOrWhiteSpace(displayName) ? displayName! : username;
+
                 // God worship: clears the player's entry AND decrements the
                 // god's believer count atomically.
-                try { GodSystemSingleton.Instance.SetPlayerGod(username, ""); }
-                catch (Exception gex) { Console.Error.WriteLine($"[MUD] PurgeHook god clear failed for '{username}': {gex.Message}"); }
+                try
+                {
+                    GodSystemSingleton.Instance.SetPlayerGod(primaryKey, "");
+                    if (!string.Equals(primaryKey, username, StringComparison.OrdinalIgnoreCase))
+                        GodSystemSingleton.Instance.SetPlayerGod(username, "");
+                }
+                catch (Exception gex) { Console.Error.WriteLine($"[MUD] PurgeHook god clear failed for '{primaryKey}': {gex.Message}"); }
 
                 // Relationship cache: drop all per-player relationship entries.
-                try { RelationshipSystem.Instance?.ResetPlayerRelationships(username); }
-                catch (Exception rex) { Console.Error.WriteLine($"[MUD] PurgeHook relationships clear failed for '{username}': {rex.Message}"); }
+                try
+                {
+                    RelationshipSystem.Instance?.ResetPlayerRelationships(primaryKey);
+                    if (!string.Equals(primaryKey, username, StringComparison.OrdinalIgnoreCase))
+                        RelationshipSystem.Instance?.ResetPlayerRelationships(username);
+                }
+                catch (Exception rex) { Console.Error.WriteLine($"[MUD] PurgeHook relationships clear failed for '{primaryKey}': {rex.Message}"); }
             }
             catch (Exception ex)
             {
@@ -551,14 +632,25 @@ public class MudServer
                 // If password was provided, verify it against the database
                 if (password != null)
                 {
+                    // v0.65.0: per-IP brute-force throttle (see _failedLogins)
+                    if (IsLoginThrottled(effectiveIp, out int throttleWait))
+                    {
+                        Console.Error.WriteLine($"[MUD] SECURITY: throttled AUTH attempt from {effectiveIp} ({throttleWait}s remaining)");
+                        await WriteLineAsync(stream, $"ERR:Too many failed logins. Try again in {throttleWait} seconds.");
+                        client.Close();
+                        return;
+                    }
+
                     var (success, displayName, message, screenReader, language) = await sqlBackend.AuthenticatePlayer(username, password, effectiveIp);
                     if (!success)
                     {
+                        RecordFailedLogin(effectiveIp);
                         Console.Error.WriteLine($"[MUD] Auth failed for '{username}': {message}");
                         await WriteLineAsync(stream, $"ERR:{message}");
                         client.Close();
                         return;
                     }
+                    ClearFailedLogins(effectiveIp);
                     // Account-level preferences (screenReader, language) are loaded by PlayerSession
                     // directly from DB after SessionContext is created (per-session AsyncLocal).
                     // Do NOT replace username with displayName — displayName is a cosmetic
@@ -817,9 +909,23 @@ public class MudServer
             }
 
             // Authenticate
+            // v0.65.0: per-IP brute-force throttle (see _failedLogins). The
+            // per-connection 5-attempt loop alone reset on reconnect.
+            if (IsLoginThrottled(effectiveIp, out int interactiveWait))
+            {
+                Console.Error.WriteLine($"[MUD] SECURITY: throttled interactive login from {effectiveIp} ({interactiveWait}s remaining)");
+                string throttleMsg = $"Too many failed logins. Try again in {interactiveWait} seconds.";
+                if (isPlainText)
+                    await WriteAnsiAsync(stream, $"Error: {throttleMsg}\r\n\r\n", isCp437);
+                else
+                    await WriteAnsiAsync(stream, $"\r\n\u001b[1;31m  {throttleMsg}\u001b[0m\r\n\r\n", isCp437);
+                break; // end the attempt loop; connection closes below
+            }
+
             var (success, displayName, message, screenReader, language) = await sqlBackend.AuthenticatePlayer(username!, password!, effectiveIp);
             if (!success)
             {
+                RecordFailedLogin(effectiveIp);
                 Console.Error.WriteLine($"[MUD] Auth failed for '{username}': {message}");
                 if (isPlainText)
                     await WriteAnsiAsync(stream, $"Error: {message}\r\n\r\n", isCp437);
@@ -834,6 +940,8 @@ public class MudServer
 
             // Do NOT replace username with displayName — displayName is cosmetic.
             // The session identity must always be the login key (account name).
+
+            ClearFailedLogins(effectiveIp); // v0.65.0: successful login forgives the IP
 
             // Kick existing session if duplicate (reconnect takes priority)
             var interactiveKey = username!.ToLowerInvariant();

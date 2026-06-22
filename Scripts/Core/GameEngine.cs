@@ -2756,6 +2756,38 @@ public partial class GameEngine
             // NOTE: Player quests are already merged in RestorePlayerFromSaveData via MergePlayerQuests.
             // A second merge here would create duplicate Quest objects, orphaning the ones in player.ActiveQuests.
 
+            // v0.65.0 (eldruin/Eldruin report): RestoreWorldState -> MergeWorldQuests
+            // (above) re-adds claimed quests from the shared world_state mirror,
+            // which can re-inject a permadied character's claimed quests under a
+            // same-name recreation (the mirror lingers until permadeath's push
+            // lands, and is already stale for pre-fix permadeaths). Reassert that
+            // this player's claimed set equals exactly their own save: drop any
+            // quest claimed under their name whose Id isn't in their save, then
+            // re-sync ActiveQuests. Push the cleaned list to world_state so the
+            // removal is durable rather than racing the next world-sim save.
+            if (currentPlayer != null)
+            {
+                var pname = currentPlayer.Name2 ?? currentPlayer.Name1 ?? "";
+                var keepIds = new HashSet<string>(
+                    (saveData.Player?.ActiveQuests ?? new List<QuestData>())
+                        .Select(q => q.Id).Where(id => !string.IsNullOrEmpty(id)));
+                int staleRemoved = QuestSystem.ReconcilePlayerQuests(pname, keepIds);
+                if (staleRemoved > 0)
+                {
+                    DebugLogger.Instance.LogWarning("LOAD",
+                        $"Reconciled {staleRemoved} stale shared quest(s) for '{pname}' (likely a prior same-name character). Re-syncing.");
+                    currentPlayer.ActiveQuests.Clear();
+                    foreach (var q in QuestSystem.GetPlayerQuests(pname))
+                        if (!currentPlayer.ActiveQuests.Contains(q))
+                            currentPlayer.ActiveQuests.Add(q);
+                    if (UsurperRemake.BBS.DoorMode.IsOnlineMode && OnlineStateManager.IsActive)
+                    {
+                        try { await OnlineStateManager.Instance!.SaveSharedQuestsNow(); }
+                        catch (Exception qx) { DebugLogger.Instance.LogWarning("LOAD", $"Post-reconcile quest push failed: {qx.Message}"); }
+                    }
+                }
+            }
+
             // Check for quests targeting permadead NPCs — auto-complete with rewards
             if (currentPlayer.ActiveQuests.Count > 0 && NPCSpawnSystem.Instance?.ActiveNPCs.Count > 0)
             {
@@ -2921,6 +2953,13 @@ public partial class GameEngine
                 // Inventory cap is the 50-item soft limit; overflow stays queued
                 // so the player can free up space and re-trigger delivery.
                 await DeliverPendingInheritance(sqlBackend);
+
+                // v0.65.0: deliver any player-to-player bank wire transfers queued
+                // while this player was offline. The net amount (already minus the
+                // bank fee) is auto-deposited into their bank account. The recipient's
+                // own session applies the credit here, so there is no cross-session
+                // save write (the dangerous path we avoid for cross-player gold).
+                await DeliverPendingGoldTransfers(sqlBackend);
             }
 
             // Ensure quests are regenerated with corrected data
@@ -3636,6 +3675,22 @@ public partial class GameEngine
         if (player.LastLoginDate == today)
             return; // Already logged in today
 
+        // v1.0 release prep (B1a): funnel milestone 5 of 5 -- the player came
+        // BACK on a later calendar day. LastLoginDate is non-empty and not
+        // today here, which is exactly "returned after day 1". Idempotent
+        // write (INSERT OR IGNORE), online-only.
+        if (!string.IsNullOrEmpty(player.LastLoginDate) && UsurperRemake.BBS.DoorMode.IsOnlineMode)
+        {
+            try
+            {
+                (SaveSystem.Instance?.Backend as SqlSaveBackend)?.RecordOnboardingEvent(
+                    UsurperRemake.Server.SessionContext.Current?.Username ?? player.Name2 ?? "",
+                    "second_login",
+                    UsurperRemake.Server.SessionContext.Current?.ConnectionType);
+            }
+            catch { /* telemetry is decoration */ }
+        }
+
         if (player.LastLoginDate == yesterday)
         {
             // Consecutive day — increment streak
@@ -4149,6 +4204,64 @@ public partial class GameEngine
         catch (Exception ex)
         {
             DebugLogger.Instance.LogError("INHERITANCE", $"Failed to deliver pending inheritance: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// v0.65.0: deliver pending player-to-player bank wire transfers on login.
+    /// Each row's amount is already net of the bank fee; it is credited to the
+    /// recipient's BANK balance (a bank wire lands in the account). Mirrors
+    /// DeliverPendingInheritance: credit the in-memory Character, then clear the
+    /// rows. A crash before clear re-delivers next login; a crash after clear but
+    /// before the normal session save persists the credit loses the gold to the
+    /// sink rather than duplicating it.
+    /// </summary>
+    private async Task DeliverPendingGoldTransfers(SqlSaveBackend backend)
+    {
+        if (currentPlayer == null) return;
+        var username = UsurperRemake.Server.SessionContext.Current?.Username
+            ?? UsurperRemake.BBS.DoorMode.GetPlayerName()?.ToLowerInvariant()
+            ?? currentPlayer.Name2?.ToLowerInvariant()
+            ?? "";
+        if (string.IsNullOrEmpty(username)) return;
+
+        try
+        {
+            var pending = backend.GetPendingGoldTransfers(username);
+            if (pending.Count == 0) return;
+
+            var deliveredIds = new List<long>();
+            long totalReceived = 0;
+
+            terminal.WriteLine("");
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine(Loc.Get("engine.wire_header"));
+            terminal.WriteLine("");
+
+            foreach (var row in pending)
+            {
+                if (row.Amount > 0)
+                {
+                    currentPlayer.BankGold += row.Amount;
+                    totalReceived += row.Amount;
+                    terminal.SetColor("white");
+                    terminal.WriteLine(Loc.Get("engine.wire_from", row.Sender, $"{row.Amount:N0}"));
+                }
+                deliveredIds.Add(row.Id);
+            }
+
+            terminal.WriteLine("");
+            terminal.SetColor("bright_green");
+            terminal.WriteLine(Loc.Get("engine.wire_total", $"{totalReceived:N0}"));
+            terminal.WriteLine("");
+
+            backend.ClearGoldTransfers(deliveredIds);
+            DebugLogger.Instance.LogInfo("GOLD", $"WIRE DELIVERY: '{username}' received {totalReceived:N0}g to bank from {pending.Count} transfer(s)");
+            await Task.Delay(1500);
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("WIRE", $"Failed to deliver pending gold transfers: {ex.Message}");
         }
     }
 
@@ -4766,6 +4879,21 @@ public partial class GameEngine
         if (success)
         {
             terminal.WriteLine(Loc.Get("engine.new_game_saved"), "green");
+
+            // v1.0 release prep (B1a): funnel milestone 2 of 5 -- a character
+            // finished creation and produced its first save. Online-only;
+            // idempotent (NG+ re-creates also fire, INSERT OR IGNORE eats them).
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+            {
+                try
+                {
+                    (SaveSystem.Instance?.Backend as UsurperRemake.Systems.SqlSaveBackend)?.RecordOnboardingEvent(
+                        UsurperRemake.Server.SessionContext.Current?.Username ?? savePlayerName,
+                        "character_created",
+                        UsurperRemake.Server.SessionContext.Current?.ConnectionType);
+                }
+                catch { /* telemetry is decoration */ }
+            }
         }
         else
         {
@@ -5914,11 +6042,18 @@ public partial class GameEngine
         // This runs BEFORE RestoreWorldState, so we merge player quests into the database here.
         // RestoreWorldState will then add unclaimed board quests. Both paths are needed because
         // PlayerData.ActiveQuests has claimed quests and WorldState.ActiveQuests has unclaimed ones.
-        if (playerData.ActiveQuests != null && playerData.ActiveQuests.Count > 0)
+        // v0.65.0 (eldruin/Eldruin report): run the merge UNCONDITIONALLY, even
+        // when the save has zero quests. MergePlayerQuests first removes every
+        // quest in the shared questDatabase whose Occupier/OfferedTo matches this
+        // name, then re-adds from the save. Gating on Count > 0 let a freshly
+        // created character that reused a permadied character's name skip the
+        // removal, so the dead character's lingering quests (still in
+        // world_state["quests"]) re-attached by Occupier name and showed up as
+        // "already active" without being picked up.
         {
             player.ActiveQuests.Clear();
             var playerName = player.Name2 ?? player.Name1 ?? "";
-            QuestSystem.MergePlayerQuests(playerName, playerData.ActiveQuests);
+            QuestSystem.MergePlayerQuests(playerName, playerData.ActiveQuests ?? new List<QuestData>());
             var dbQuests = QuestSystem.GetPlayerQuests(playerName);
             foreach (var q in dbQuests)
             {

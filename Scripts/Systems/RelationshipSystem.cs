@@ -942,7 +942,7 @@ public partial class RelationshipSystem
         {
             return $"{name} looks uncomfortable and steps back.\n" +
                    $"\"I... I'm sorry, but I'm not ready for that kind of commitment.\"\n" +
-                   $"{pronoun.Substring(0, 1).ToUpper() + pronoun.Substring(1)} needs more time.";
+                   $"{GameConfig.CapitalizeFirst(pronoun)} needs more time.";
         }
         // Medium acceptance = hesitant rejection
         else if (acceptanceChance < 50)

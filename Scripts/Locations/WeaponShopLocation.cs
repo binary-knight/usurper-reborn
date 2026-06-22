@@ -682,6 +682,7 @@ public class WeaponShopLocation : BaseLocation
 
             case "X":
             case "B":
+            case "Q": // v0.64.2: Q backs out one level everywhere (key-consistency feedback)
                 currentCategory = null;
                 currentPage = 0;
                 RequestRedisplay();

@@ -1484,13 +1484,19 @@ public partial class TerminalEmulator
         // MUD stream mode - use line input since we can't read single keys from TCP
         if (_streamWriter != null && _streamReader != null)
         {
-            var input = await GetInput("");
+            // v0.65.0 (Darowin report): Trim before taking input[0]. A single-key
+            // read must ignore any leading/trailing whitespace or stray CR a
+            // MUD/relay client may prepend; otherwise input[0] can be the stray
+            // byte instead of the key the player pressed -- the only viable cause
+            // of ">" failing to cycle loot-compare members while "<" worked
+            // (the two branches are otherwise byte-for-byte symmetric).
+            var input = (await GetInput("")).Trim();
             return string.IsNullOrEmpty(input) ? "" : input[0].ToString();
         }
         // If display/inputLine are set, use line input and take first char
         else if (inputLine != null && display != null)
         {
-            var input = await GetInput("");
+            var input = (await GetInput("")).Trim();
             return string.IsNullOrEmpty(input) ? "" : input[0].ToString();
         }
         else if (ShouldUseBBSAdapter())
@@ -1501,7 +1507,7 @@ public partial class TerminalEmulator
         else if (DoorMode.ShouldUseAnsiOutput)
         {
             // Door/online mode (stdio) - use line input since ReadKey doesn't work with redirected I/O
-            var input = await GetInput("");
+            var input = (await GetInput("")).Trim();
             return string.IsNullOrEmpty(input) ? "" : input[0].ToString();
         }
         else
@@ -1517,7 +1523,7 @@ public partial class TerminalEmulator
             catch (System.InvalidOperationException)
             {
                 // Fallback for redirected I/O
-                var input = await GetInput("");
+                var input = (await GetInput("")).Trim();
                 return string.IsNullOrEmpty(input) ? "" : input[0].ToString();
             }
         }

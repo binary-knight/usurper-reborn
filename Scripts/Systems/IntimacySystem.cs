@@ -261,7 +261,7 @@ namespace UsurperRemake.Systems
             if (isFirstTime)
             {
                 terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.fade_first_time", partner.Name2))}");
-                terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.fade_first_time2", their.Substring(0, 1).ToUpper() + their.Substring(1)))}");
+                terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.fade_first_time2", GameConfig.CapitalizeFirst(their)))}");
             }
             else
             {
@@ -673,7 +673,7 @@ namespace UsurperRemake.Systems
             terminal.ClearScreen();
             await ShowSceneHeader(partner, mood);
 
-            string theirCap = their.Substring(0, 1).ToUpper() + their.Substring(1);
+            string theirCap = GameConfig.CapitalizeFirst(their);
             switch (choice)
             {
                 case "1":
@@ -730,7 +730,7 @@ namespace UsurperRemake.Systems
             string their = GameConfig.GetLocalizedPossessivePronoun(partner.Sex);
             string them = partner.Sex == CharacterSex.Female ? "her" : "him";
 
-            string theirCap = their.Substring(0, 1).ToUpper() + their.Substring(1);
+            string theirCap = GameConfig.CapitalizeFirst(their);
 
             // The kiss
             terminal.SetColor("white");

@@ -326,7 +326,27 @@ namespace UsurperRemake.Systems
                 case DiscEffectType.Status:
                     if (Enum.TryParse<StatusEffect>(e.Arg, true, out var status))
                     {
-                        player.ApplyStatus(status, e.B > 0 ? e.B : 2);
+                        int statusDur = e.B > 0 ? e.B : 2;
+                        // v0.65.0 (Darowin report): route a discovery-applied Poisoned status to the
+                        // canonical out-of-combat poison field (Poison/PoisonTurns) -- exactly like the
+                        // dungeon poison-dart trap -- INSTEAD OF ApplyStatus(Poisoned), not in addition.
+                        // The antidote/healer cures all read Character.Poison, so the old ApplyStatus-only
+                        // path showed the affliction on /health yet every cure reported "you are not
+                        // poisoned". Crucially, combat ticks Character.Poison and ActiveStatuses[Poisoned]
+                        // as SEPARATE DoT sources (the CombatEngine poison-counter tick is explicitly
+                        // "separate from StatusEffect.Poisoned"), so setting BOTH would double-tick poison
+                        // in combat. One canonical representation = cured by every antidote, shown on
+                        // /health, ticked once. Other statuses (Frozen/Stunned/Bleeding/...) have no
+                        // canonical field, so they keep going through ApplyStatus.
+                        if (status == StatusEffect.Poisoned)
+                        {
+                            player.Poison = Math.Max(player.Poison, 1);
+                            player.PoisonTurns = Math.Max(player.PoisonTurns, statusDur);
+                        }
+                        else
+                        {
+                            player.ApplyStatus(status, statusDur);
+                        }
                         Msg(terminal, "magenta", Loc.Get("discovery.effect.status", LocStatusName(status)));
                     }
                     break;

@@ -440,9 +440,21 @@ namespace UsurperRemake.Systems
                         }
                     }
 
-                    // Reload royal court too (NPC changes often accompany king changes)
-                    LoadRoyalCourtFromWorldState();
+                    // Reload royal court too (NPC changes often accompany king changes).
+                    // Read the version BEFORE loading: if a player writes in
+                    // between, our baseline is older than the content, which
+                    // costs one spurious reload next cycle (fail-safe) instead
+                    // of letting a guarded write pass against unseen content.
                     lastRoyalCourtVersion = sqlBackend.GetWorldStateVersion("royal_court");
+                    LoadRoyalCourtFromWorldState();
+
+                    // v0.65.0 (CAS): adopt the reloaded version as our baseline.
+                    // Pre-CAS this didn't matter (the write was blind); with the
+                    // version-guarded write below, failing to advance here would
+                    // make every post-reload save fail its guard forever (the DB
+                    // is at currentNpcVersion, our expected stayed at the old
+                    // value) -- an infinite reload/skip loop.
+                    lastNpcVersion = currentNpcVersion;
                 }
 
                 // Check if royal court was modified by a player session since our last save.
@@ -474,22 +486,56 @@ namespace UsurperRemake.Systems
 
                 if (jsonHash != _lastNpcJsonHash)
                 {
-                    await sqlBackend.SaveWorldState(OnlineStateManager.KEY_NPCS, json);
-                    _lastNpcJsonHash = jsonHash;
+                    // v0.65.0 (1.0-prep SR): version-guarded write (CAS). The
+                    // version check at the top of this method and this write
+                    // are separated by the whole capture/reload/merge/serialize
+                    // block -- hundreds of ms on an ~18 MB blob. A player
+                    // session's SaveAllSharedState landing in that window used
+                    // to be silently clobbered by our stale snapshot (the
+                    // v0.61.2 race class). The guard turns that clobber into a
+                    // skipped cycle: the conflict bumps the stored version, so
+                    // the NEXT SaveWorldState's version check triggers the
+                    // existing reload+merge machinery (pregnancies, equipment,
+                    // engaged-protection) and saves the reconciled state.
+                    bool wrote = await sqlBackend.SaveWorldStateIfVersion(
+                        OnlineStateManager.KEY_NPCS, json, lastNpcVersion);
+                    if (wrote)
+                    {
+                        _lastNpcJsonHash = jsonHash;
+                        // CAS guarantees expected -> expected+1 (insert path is
+                        // 0 -> 1, same shape). Compute locally instead of
+                        // re-reading: a non-transactional re-read could adopt a
+                        // concurrent player write's version, making next
+                        // cycle's reload check see "nothing new" and skip the
+                        // merge that write was owed.
+                        lastNpcVersion = lastNpcVersion + 1;
+                        DebugLogger.Instance.LogInfo("WORLDSIM", $"State saved (v{lastNpcVersion}): {aliveCount} alive NPCs at {DateTime.UtcNow:HH:mm:ss}");
+                    }
+                    else
+                    {
+                        // Edge: lastNpcVersion == 0 means the row didn't exist at
+                        // startup but another writer created it before our first
+                        // save. The reload trigger requires lastNpcVersion > 0,
+                        // so without adopting a baseline we'd skip forever. The
+                        // writer shares our in-process object graph (MUD mode is
+                        // single-process), so adopting its row as baseline is
+                        // safe; our pending state saves next cycle.
+                        if (lastNpcVersion == 0)
+                            lastNpcVersion = sqlBackend.GetWorldStateVersion(OnlineStateManager.KEY_NPCS);
 
-                    // Track our save's version for the next cycle's comparison
-                    lastNpcVersion = sqlBackend.GetWorldStateVersion(OnlineStateManager.KEY_NPCS);
-
-                    DebugLogger.Instance.LogInfo("WORLDSIM", $"State saved (v{lastNpcVersion}): {aliveCount} alive NPCs at {DateTime.UtcNow:HH:mm:ss}");
+                        DebugLogger.Instance.LogInfo("WORLDSIM",
+                            $"NPC save skipped: version conflict or write error (likely a player write during our save window). Will reload+merge next cycle.");
+                    }
                 }
                 else
                 {
                     DebugLogger.Instance.LogDebug("WORLDSIM", $"NPC state unchanged, skipping write: {aliveCount} alive NPCs at {DateTime.UtcNow:HH:mm:ss}");
                 }
 
-                // Save royal court to world_state (authoritative - world sim maintains this)
+                // Save royal court to world_state (authoritative - world sim maintains this).
+                // Version tracking happens inside (CAS local increment); re-reading
+                // here would reintroduce the concurrent-version-adoption race.
                 await SaveRoyalCourtToWorldState();
-                lastRoyalCourtVersion = sqlBackend.GetWorldStateVersion("royal_court");
 
                 // Save economy summary for the dashboard
                 await SaveEconomyState();
@@ -863,7 +909,34 @@ namespace UsurperRemake.Systems
                 };
 
                 var json = JsonSerializer.Serialize(data, jsonOptions);
-                await sqlBackend.SaveWorldState("royal_court", json);
+
+                // v0.65.0 (CAS): the royal_court version check at the top of
+                // SaveWorldState and this write are separated by the entire
+                // ~18 MB NPC capture/serialize block, so a player session's
+                // PersistRoyalCourtToWorldState (treasury, taxes, throne)
+                // landing in that window used to be clobbered here. Same guard
+                // pattern as the NPC write: conflict -> skip -> next cycle's
+                // version check reloads before re-saving.
+                bool wrote = await sqlBackend.SaveWorldStateIfVersion("royal_court", json, lastRoyalCourtVersion);
+                if (wrote)
+                {
+                    // CAS guarantees expected -> expected+1; compute locally
+                    // (a re-read could adopt a concurrent player write's
+                    // version and skip the reload it was owed).
+                    lastRoyalCourtVersion = lastRoyalCourtVersion + 1;
+                }
+                else
+                {
+                    // Zero-edge: row created by another writer between startup
+                    // and our first save. The reload trigger requires
+                    // lastRoyalCourtVersion > 0, so adopt a baseline (shared
+                    // in-process object graph makes the content equivalent).
+                    if (lastRoyalCourtVersion == 0)
+                        lastRoyalCourtVersion = sqlBackend.GetWorldStateVersion("royal_court");
+
+                    DebugLogger.Instance.LogInfo("WORLDSIM",
+                        "Royal court save skipped: version conflict or write error (likely a player write during our save window). Will reload next cycle.");
+                }
             }
             catch (Exception ex)
             {
@@ -2027,6 +2100,11 @@ namespace UsurperRemake.Systems
                 // per world-daily reset (cheap single DELETE on an indexed
                 // column).
                 _ = sqlBackend.PruneOldNPCDecisionLog(daysToKeep: 30);
+
+                // v1.0 release prep (B5): llm_usage claimed 30-day pruning in
+                // its table comment since v0.64.0 but no prune ever ran --
+                // unbounded growth on the production DB.
+                _ = sqlBackend.PruneOldLLMUsage(daysToKeep: 30);
 
                 NewsSystem.Instance?.Newsy(false, "A new day dawns in the realm...");
             }

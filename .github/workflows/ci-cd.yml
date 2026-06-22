@@ -99,6 +99,20 @@ jobs:
           echo -n "$VER" > build/version.txt
           echo "Version: $VER"
 
+          # v1.0 release prep: tag <-> GameConfig.Version consistency gate.
+          # Release zips, the Steam vdf, and the server version.txt all derive
+          # from the GIT TAG, while the binary self-reports GameConfig.Version
+          # -- a mismatched tag would ship binaries reporting the wrong
+          # version and break the auto-updater's IsNewerVersion comparison.
+          if [ "${{ github.event_name }}" = "release" ]; then
+            TAG="${{ github.event.release.tag_name }}"
+            TAG="${TAG#v}"
+            if [ "$TAG" != "$VER" ]; then
+              echo "::error::Release tag '$TAG' does not match GameConfig.Version '$VER'. Fix the tag or bump GameConfig before publishing."
+              exit 1
+            fi
+          fi
+
       - name: Add launchers (Windows)
         if: matrix.platform == 'windows'
         run: |
@@ -164,7 +178,11 @@ jobs:
           # file database (sysop request). Standard 10-line, ~45-char,
           # CRLF-terminated description. Lives in dist/ alongside the other
           # compliance files and gets bundled into every platform zip.
-          cp dist/FILE_ID.DIZ build/
+          # v1.0 release prep (B5): the version line is templated ({VERSION})
+          # and substituted from GameConfig at build time -- the static file
+          # had drifted 4 versions behind (said v0.60.8 at v0.64.2).
+          VER=$(grep 'public const string Version =' Scripts/Core/GameConfig.cs | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          sed "s/{VERSION}/$VER/" dist/FILE_ID.DIZ > build/FILE_ID.DIZ
 
       - uses: actions/upload-artifact@v4
         with:

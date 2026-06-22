@@ -148,7 +148,7 @@ public class FeatureInteractionSystem
 
         foreach (var line in lore.Text)
         {
-            terminal.WriteLine($"  {line}");
+            terminal.WriteLine($"  {ResolveLoreLine(line)}");
             await Task.Delay(400);
         }
 
@@ -167,7 +167,7 @@ public class FeatureInteractionSystem
 
         if (lore.AffectsAlignment)
         {
-            // v0.57.12: paired movement — lore events nudge you toward light/dark AND away from the opposite
+            // v0.57.12: paired movement -- lore events nudge you toward light/dark AND away from the opposite
             int amount = Math.Abs(lore.AlignmentShift);
             if (lore.AlignmentShift > 0)
             {
@@ -206,6 +206,26 @@ public class FeatureInteractionSystem
         outcome.Success = true;
 
         await terminal.PressAnyKey();
+    }
+
+    // v0.65.0 (druidah report: dungeon feature epitaph / "I've lived before" lore not
+    // translated). The LoreFragment.Text arrays (theme lore, per-Old-God lore, generic
+    // lore, memory + ocean-insight fragments) are hardcoded English picked at random, so
+    // there's no stable per-fragment key. Resolve each displayed line by a content hash:
+    // feature.lore.<sha256(line)[:12]>. en.json carries the English under those hashed
+    // keys; translations override per language; a missing key falls back to the English
+    // line. The same hash is computed by the generator that seeds en.json, so they match.
+    private static string ResolveLoreLine(string line)
+    {
+        if (string.IsNullOrEmpty(line)) return line;
+        string key = "feature.lore." + LoreLineKey(line);
+        return Loc.Has(key) ? Loc.Get(key) : line;
+    }
+
+    private static string LoreLineKey(string line)
+    {
+        var hash = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(line));
+        return Convert.ToHexString(hash).Substring(0, 12).ToLowerInvariant();
     }
 
     private LoreFragment GetLoreForLevel(int level, DungeonTheme theme, RoomFeature feature)
@@ -362,7 +382,7 @@ public class FeatureInteractionSystem
                 {
                     "Dark petals are pressed between the pages of an old journal:",
                     "\"She watched him from the shadows, her brother,",
-                    "  the Light — and felt something a sister should not.\"",
+                    "  the Light -- and felt something a sister should not.\"",
                     "\"When he chose another, the shadows grew teeth.\""
                 },
                 GrantsExperience = true,
@@ -396,7 +416,7 @@ public class FeatureInteractionSystem
             {
                 Text = new[]
                 {
-                    "A faded mural shows two figures — one radiant, one gentle.",
+                    "A faded mural shows two figures -- one radiant, one gentle.",
                     "Beneath it, barely legible:",
                     "\"Alethia was his light. His grace. His reason.\"",
                     "\"When she was taken, his light began to dim.\""
@@ -514,7 +534,7 @@ public class FeatureInteractionSystem
                     {
                         "An old prospector's last entry, carved into bedrock:",
                         "\"I dug too deep and found the Ocean.\"",
-                        "\"Not water — something older. Something that knows my name.\""
+                        "\"Not water -- something older. Something that knows my name.\""
                     },
                     GrantsExperience = true
                 }
@@ -552,7 +572,7 @@ public class FeatureInteractionSystem
                     {
                         "Words burned into the stone floor, still smoldering:",
                         "\"We were not always demons.\"",
-                        "\"We were the first to remember — and the gods punished us for it.\""
+                        "\"We were the first to remember -- and the gods punished us for it.\""
                     },
                     GrantsExperience = true
                 },
@@ -680,7 +700,7 @@ public class FeatureInteractionSystem
         // v0.57.9 (Lumina report: Int 967 capped to +20, feature check failed at floor 94):
         // previous cap of 20 meant every stat over 200 contributed nothing to the check,
         // which defeated the whole point of a Magician building Intelligence. The comment
-        // about "trivializing checks at endgame" was also backwards — capping at 20 makes
+        // about "trivializing checks at endgame" was also backwards -- capping at 20 makes
         // floor-94 checks feel random for a committed caster, where they should feel like
         // confident wins. Raised the cap to 40. Stat 400+ now caps out, which at the
         // maximum DC of 33 means auto-pass for a committed specialist; mid-stat (100-300)
@@ -881,7 +901,7 @@ public class FeatureInteractionSystem
         // Apply alignment shift to Chivalry/Darkness
         if (option.AlignmentShift != 0)
         {
-            // v0.57.12: paired movement — soul-path choices also cleanse the opposite scale
+            // v0.57.12: paired movement -- soul-path choices also cleanse the opposite scale
             int amount = Math.Abs(option.AlignmentShift);
             if (option.AlignmentShift > 0)
             {
@@ -1120,7 +1140,7 @@ public class FeatureInteractionSystem
                     }
                     if (healedCount == 0 && teammates.Any(t => t != null && t.IsAlive))
                     {
-                        // Everyone else is already at full HP — keep the radiance flavor
+                        // Everyone else is already at full HP -- keep the radiance flavor
                         // line so the party-wide effect is visible even when there's nothing
                         // to mend.
                         terminal.WriteLine(Loc.Get("feature.divine_heal_all_full"));
@@ -1287,7 +1307,7 @@ public class FeatureInteractionSystem
 
         foreach (var line in memory.Text)
         {
-            terminal.WriteLine($"  \"{line}\"");
+            terminal.WriteLine($"  \"{ResolveLoreLine(line)}\"");
             await Task.Delay(500);
         }
 
@@ -1396,7 +1416,7 @@ public class FeatureInteractionSystem
         terminal.SetColor("bright_cyan");
         foreach (var line in insight.Text)
         {
-            terminal.WriteLine($"  {line}");
+            terminal.WriteLine($"  {ResolveLoreLine(line)}");
             await Task.Delay(600);
         }
 

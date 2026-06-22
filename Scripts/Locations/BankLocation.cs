@@ -662,11 +662,25 @@ public class BankLocation : BaseLocation
         await terminal.PressAnyKey();
     }
 
+    // v0.65.0: bank player-to-player wire transfer. Replaces the old NPC-targeted
+    // transfer (which credited an NPC's cash -- useless). Sender pays the full amount
+    // from their bank balance; recipient receives amount minus a 2% fee, auto-deposited
+    // into their bank on next login via pending_gold_transfers. The fee is a gold sink.
+    // Online-only (no other players exist single-player). The recipient's own session
+    // applies the credit, so there is no cross-session save write.
     private async Task TransferGold()
     {
         terminal.ClearScreen();
         WriteSectionHeader(Loc.Get("bank.transfer_gold"), "bright_cyan");
         terminal.WriteLine("");
+
+        if (!DoorMode.IsOnlineMode || SaveSystem.Instance?.Backend is not SqlSaveBackend backend)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine(Loc.Get("bank.transfer_online_only", BankerName));
+            await terminal.PressAnyKey();
+            return;
+        }
 
         if (currentPlayer.BankGold <= 0)
         {
@@ -679,26 +693,12 @@ public class BankLocation : BaseLocation
 
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("bank.transfer_ledger", BankerName));
-        terminal.WriteLine(Loc.Get("bank.whose_account"));
-        terminal.WriteLine("");
-
-        // Show list of players/NPCs
-        var allNPCs = NPCSpawnSystem.Instance.ActiveNPCs ?? new List<NPC>();
-        var validTargets = allNPCs.Where(n => n.IsAlive && !n.IsDead).Take(10).ToList();
-
-        terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("bank.account_holders"));
-        for (int i = 0; i < validTargets.Count; i++)
-        {
-            terminal.WriteLine($"  {i + 1}. {validTargets[i].Name}");
-        }
-        terminal.WriteLine("");
-
+        terminal.WriteLine(Loc.Get("bank.wire_recipient_prompt"));
         terminal.SetColor("gray");
-        terminal.WriteLine(Loc.Get("bank.select_recipient"));
-        string recipientInput = await terminal.GetInput("> ");
+        terminal.WriteLine(Loc.Get("bank.wire_cancel_hint"));
+        string recipientInput = (await terminal.GetInput("> ")).Trim();
 
-        if (recipientInput == "0")
+        if (string.IsNullOrEmpty(recipientInput) || recipientInput == "0")
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("bank.transfer_cancelled"));
@@ -706,33 +706,37 @@ public class BankLocation : BaseLocation
             return;
         }
 
-        NPC? recipient = null;
-        if (int.TryParse(recipientInput, out int index) && index > 0 && index <= validTargets.Count)
-        {
-            recipient = validTargets[index - 1];
-        }
-        else
-        {
-            recipient = validTargets.FirstOrDefault(n =>
-                n.Name.Contains(recipientInput, StringComparison.OrdinalIgnoreCase));
-        }
-
-        if (recipient == null)
+        // Resolve the typed name to a real registered player (canonical username).
+        string? recipientKey = backend.ResolvePlayerUsername(recipientInput);
+        if (string.IsNullOrEmpty(recipientKey))
         {
             terminal.SetColor("red");
-            terminal.WriteLine(Loc.Get("bank.cant_find_account", BankerName));
+            terminal.WriteLine(Loc.Get("bank.wire_no_such_player", recipientInput));
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        // No self-transfer.
+        string senderKey = (UsurperRemake.Server.SessionContext.Current?.CharacterKey
+            ?? UsurperRemake.Server.SessionContext.Current?.Username
+            ?? DoorMode.GetPlayerName()
+            ?? currentPlayer.Name2 ?? "").ToLowerInvariant();
+        if (string.Equals(recipientKey, senderKey, StringComparison.OrdinalIgnoreCase))
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine(Loc.Get("bank.wire_self"));
             await terminal.PressAnyKey();
             return;
         }
 
         terminal.WriteLine("");
         terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("bank.transfer_to", recipient.Name));
+        terminal.WriteLine(Loc.Get("bank.transfer_to", recipientInput));
         terminal.WriteLine(Loc.Get("bank.transfer_your_balance", $"{currentPlayer.BankGold:N0}"));
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("bank.transfer_amount_prompt"));
 
-        string amountInput = await terminal.GetInput("> ");
+        string amountInput = (await terminal.GetInput("> ")).Trim();
         if (!long.TryParse(amountInput, out long amount) || amount <= 0)
         {
             terminal.SetColor("red");
@@ -749,28 +753,79 @@ public class BankLocation : BaseLocation
             return;
         }
 
-        // Process transfer
-        long bankBeforeT = currentPlayer.BankGold;
+        // 2% bank fee (gold sink). Sender pays the gross; recipient gets the net.
+        long fee = (long)Math.Ceiling(amount * GameConfig.BankTransferFeePercent);
+        if (fee < 1) fee = 1;
+        long net = amount - fee;
+        if (net <= 0)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine(Loc.Get("bank.wire_amount_too_small"));
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        // Confirmation showing the full breakdown.
+        terminal.WriteLine("");
+        terminal.SetColor("cyan");
+        terminal.WriteLine(Loc.Get("bank.wire_confirm_send", $"{amount:N0}", recipientInput));
+        terminal.WriteLine(Loc.Get("bank.wire_confirm_fee", $"{fee:N0}", (GameConfig.BankTransferFeePercent * 100).ToString("0.#")));
+        terminal.WriteLine(Loc.Get("bank.wire_confirm_net", $"{net:N0}"));
+        terminal.SetColor("white");
+        string confirm = (await terminal.GetInput(Loc.Get("bank.wire_confirm_prompt"))).Trim().ToUpper();
+        if (confirm != "Y")
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine(Loc.Get("bank.transfer_cancelled"));
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        // Anti-dupe ordering: debit the sender and PERSIST it BEFORE queuing the credit.
+        // If the durable save fails, abort without queuing (in-memory debit rolled back),
+        // so we never queue a credit that the sender wasn't actually charged for. The only
+        // residual crash window (after the saved debit, before the queue) loses the gold to
+        // the sink rather than duplicating it.
+        long bankBefore = currentPlayer.BankGold;
         currentPlayer.BankGold -= amount;
-        recipient.Gold += amount; // NPCs get it as cash
-        DebugLogger.Instance.LogInfo("GOLD", $"BANK TRANSFER: {currentPlayer.DisplayName} transferred {amount:N0}g to {recipient.Name} (bank {bankBeforeT:N0}->{currentPlayer.BankGold:N0})");
+        bool debitSaved = false;
+        try { await GameEngine.Instance.SaveCurrentGame(); debitSaved = true; }
+        catch (Exception ex) { DebugLogger.Instance.LogWarning("GOLD", $"Wire pre-queue save failed: {ex.Message}"); }
+
+        if (!debitSaved)
+        {
+            currentPlayer.BankGold = bankBefore;
+            terminal.SetColor("red");
+            terminal.WriteLine(Loc.Get("bank.wire_failed"));
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        bool queued = backend.QueueGoldTransfer(recipientKey, currentPlayer.DisplayName, net, "Bank wire");
+        if (!queued)
+        {
+            currentPlayer.BankGold = bankBefore;
+            try { await GameEngine.Instance.SaveCurrentGame(); } catch { }
+            terminal.SetColor("red");
+            terminal.WriteLine(Loc.Get("bank.wire_failed"));
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        DebugLogger.Instance.LogInfo("GOLD", $"BANK WIRE: {currentPlayer.DisplayName} sent {net:N0}g (fee {fee:N0}) to '{recipientKey}' (bank {bankBefore:N0}->{currentPlayer.BankGold:N0})");
 
         terminal.SetColor("bright_green");
         terminal.WriteLine("");
-        terminal.WriteLine(Loc.Get("bank.transfer_complete", $"{amount:N0}", recipient.Name));
-        terminal.WriteLine("");
-
+        terminal.WriteLine(Loc.Get("bank.wire_success", $"{net:N0}", recipientInput));
+        terminal.SetColor("gray");
+        terminal.WriteLine(Loc.Get("bank.wire_success_fee", $"{fee:N0}"));
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("bank.stamps_transfer", BankerName));
-        terminal.WriteLine(Loc.Get("bank.recipient_notified"));
 
-        // Improve relationship with recipient
-        RelationshipSystem.UpdateRelationship(currentPlayer, recipient, 5, 3, false, false);
-
-        // News for large transfers
-        if (amount >= 10000)
+        // News for large transfers (use the typed display name; recipient is remote).
+        if (net >= 10000)
         {
-            NewsSystem.Instance.Newsy(false, $"{currentPlayer.DisplayName} made a generous transfer to {recipient.Name}.");
+            NewsSystem.Instance.Newsy(false, $"{currentPlayer.DisplayName} wired a generous sum to {recipientInput}.");
         }
 
         await terminal.PressAnyKey();

@@ -84,6 +84,23 @@ public class MainStreetLocation : BaseLocation
     {
         terminal.ClearScreen();
 
+        // v1.0 release prep (B1a): funnel milestone 3 of 5 -- the player
+        // reached Main Street (survived auth + character creation). Session-
+        // gated so this fires one DB write per session at most; the table's
+        // UNIQUE constraint dedups across sessions. Online-only.
+        var funnelCtx = UsurperRemake.Server.SessionContext.Current;
+        if (funnelCtx != null && !funnelCtx.OnboardingTownRecorded
+            && UsurperRemake.BBS.DoorMode.IsOnlineMode)
+        {
+            funnelCtx.OnboardingTownRecorded = true;
+            try
+            {
+                (SaveSystem.Instance?.Backend as UsurperRemake.Systems.SqlSaveBackend)?.RecordOnboardingEvent(
+                    funnelCtx.Username ?? "", "reached_town", funnelCtx.ConnectionType);
+            }
+            catch { /* telemetry is decoration */ }
+        }
+
         if (IsBBSSession)
         {
             DisplayLocationBBS();
@@ -264,6 +281,25 @@ public class MainStreetLocation : BaseLocation
                 terminal.SetColor("white");
             }
         }
+
+        // v1.0 release prep (B1c) / Journal Slice 2: the next-step ticker.
+        // The /journal command is pull-based -- a new player doesn't know it
+        // exists. This one-liner pushes the journal's NEXT STEP onto the
+        // first screen every player sees. Suppressed when the next step is
+        // the default "go delve" (signal, not wallpaper) -- veterans with
+        // nothing pending see nothing. Zero DB cost: pure in-memory ladder.
+        try
+        {
+            var tickerStep = UsurperRemake.Systems.JournalSystem.GetNextStep(currentPlayer);
+            if (tickerStep.LocKey != "journal.next_delve"
+                && tickerStep.LocKey != "journal.next_delve_resume")
+            {
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine($"  {Loc.Get("journal.ticker", Loc.Get(tickerStep.LocKey, tickerStep.Args))}");
+                terminal.SetColor("white");
+            }
+        }
+        catch { /* ticker is decoration; never break Main Street */ }
 
         // Companion teasers — one-time early sightings before recruitment level (v0.49.6)
         if (currentPlayer.Level >= 4 && CompanionSystem.Instance != null

@@ -3828,7 +3828,7 @@ public class InnLocation : BaseLocation
                     await CompanionTakeAllEquipment(target);
                     break;
                 case "B":
-                    await CompanionEquipBestGear(target);
+                    await RunEquipBestGear(target); // v0.64.2: promoted to BaseLocation, shared across Inn/Home/TeamCorner/Dungeon
                     break;
                 case "Q":
                 case "":
@@ -3929,159 +3929,167 @@ public class InnLocation : BaseLocation
 
     private async Task CompanionEquipItemToCharacter(Character target)
     {
-        terminal.ClearScreen();
-        WriteSectionHeader($"EQUIP ITEM TO {target.DisplayName.ToUpper()}", "bright_cyan");
-        terminal.WriteLine("");
-
-        // Step 1: Pick a slot
-        var selectedSlot = await PromptForEquipmentSlot(target);
-        if (selectedSlot == null) return;
-
-        // Step 2: Get items that match this slot
-        var equipmentItems = GetItemsForSlot(selectedSlot.Value);
-
-        if (equipmentItems.Count == 0)
+        // v0.64.2 (player request): loop back to the SLOT PICKER after each
+        // equip instead of kicking out to the parent menu -- outfitting a
+        // naked recruit means many equips in a row. Cancel at the slot picker
+        // (Q / 0 / invalid) exits the whole flow.
+        while (true)
         {
+
+            terminal.ClearScreen();
+            WriteSectionHeader($"EQUIP ITEM TO {target.DisplayName.ToUpper()}", "bright_cyan");
             terminal.WriteLine("");
-            terminal.SetColor("yellow");
-            terminal.WriteLine("  No items available for this slot.");
-            await Task.Delay(2000);
-            return;
-        }
 
-        // Step 3: Show current item in slot
-        terminal.WriteLine("");
-        var currentItem = target.GetEquipment(selectedSlot.Value);
-        terminal.SetColor("white");
-        terminal.Write($"  Current: ");
-        if (currentItem != null)
-        {
-            if (!currentItem.IsIdentified)
+            // Step 1: Pick a slot
+            var selectedSlot = await PromptForEquipmentSlot(target);
+            if (selectedSlot == null) return; // exit: cancel at slot picker
+
+            // Step 2: Get items that match this slot
+            var equipmentItems = GetItemsForSlot(selectedSlot.Value);
+
+            if (equipmentItems.Count == 0)
             {
-                terminal.SetColor("magenta");
-                terminal.WriteLine(GetEquipmentDisplayName(currentItem));
-            }
-            else
-            {
-                terminal.SetColor(currentItem.GetRarityColor());
-                terminal.Write(currentItem.Name);
-                WriteEquipmentStatSummary(currentItem);
                 terminal.WriteLine("");
-            }
-        }
-        else
-        {
-            terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("inn.slot_empty"));
-        }
-        terminal.WriteLine("");
-
-        // Step 4: Display matching items with full stats
-        terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("inn.available_equipment"));
-        terminal.WriteLine("");
-        DisplayEquipmentItemList(equipmentItems, target);
-
-        terminal.WriteLine("");
-        terminal.SetColor("cyan");
-        terminal.Write(Loc.Get("inn.select_item"));
-        terminal.SetColor("white");
-
-        var input = await terminal.ReadLineAsync();
-        if (!int.TryParse(input, out int itemIdx) || itemIdx < 1 || itemIdx > equipmentItems.Count)
-        {
-            terminal.SetColor("gray");
-            terminal.WriteLine(Loc.Get("ui.cancelled"));
-            await Task.Delay(1000);
-            return;
-        }
-
-        var (selectedItem, wasEquipped, sourceSlot) = equipmentItems[itemIdx - 1];
-
-        // Block unidentified items
-        if (!selectedItem.IsIdentified)
-        {
-            terminal.SetColor("yellow");
-            terminal.WriteLine(Loc.Get("inn.must_identify"));
-            await Task.Delay(2000);
-            return;
-        }
-
-        // Check if target can equip
-        if (!selectedItem.CanEquip(target, out string equipReason))
-        {
-            terminal.SetColor("red");
-            terminal.WriteLine(Loc.Get("inn.cannot_use", target.DisplayName, equipReason));
-            await Task.Delay(2000);
-            return;
-        }
-
-        // Use the slot the player already picked (no need to ask which hand)
-        EquipmentSlot? targetSlot = selectedSlot.Value;
-
-        // Track items in target's inventory BEFORE equipping, so we can move displaced items to player
-        var targetInventoryBefore = target.Inventory.Count;
-
-        // Equip to target FIRST - EquipItem adds displaced items to target's inventory
-        var result = target.EquipItem(selectedItem, targetSlot, out string message);
-        target.RecalculateStats();
-
-        if (result)
-        {
-            // Equip succeeded — NOW remove the source item from player
-            if (wasEquipped && sourceSlot.HasValue)
-            {
-                currentPlayer.UnequipSlot(sourceSlot.Value);
-                currentPlayer.RecalculateStats();
-            }
-            else
-            {
-                // Remove from inventory by reference (not name — avoids wrong-item removal with duplicates)
-                // Find the matching Item by name, value, attack — use best match
-                var invItem = currentPlayer.Inventory.FirstOrDefault(i =>
-                    i.Name == selectedItem.Name && i.Attack == selectedItem.WeaponPower && i.Armor == selectedItem.ArmorClass);
-                if (invItem == null)
-                    invItem = currentPlayer.Inventory.FirstOrDefault(i => i.Name == selectedItem.Name);
-                if (invItem != null)
-                    currentPlayer.Inventory.Remove(invItem);
+                terminal.SetColor("yellow");
+                terminal.WriteLine("  No items available for this slot.");
+                await Task.Delay(2000);
+                continue;
             }
 
-            // Move any items that were added to target's inventory (displaced equipment) to player's inventory
-            if (target.Inventory.Count > targetInventoryBefore)
+            // Step 3: Show current item in slot
+            terminal.WriteLine("");
+            var currentItem = target.GetEquipment(selectedSlot.Value);
+            terminal.SetColor("white");
+            terminal.Write($"  Current: ");
+            if (currentItem != null)
             {
-                var displacedItems = target.Inventory.Skip(targetInventoryBefore).ToList();
-                foreach (var displaced in displacedItems)
+                if (!currentItem.IsIdentified)
                 {
-                    target.Inventory.Remove(displaced);
-                    currentPlayer.Inventory.Add(displaced);
+                    terminal.SetColor("magenta");
+                    terminal.WriteLine(GetEquipmentDisplayName(currentItem));
+                }
+                else
+                {
+                    terminal.SetColor(currentItem.GetRarityColor());
+                    terminal.Write(currentItem.Name);
+                    WriteEquipmentStatSummary(currentItem);
+                    terminal.WriteLine("");
                 }
             }
+            else
+            {
+                terminal.SetColor("darkgray");
+                terminal.WriteLine(Loc.Get("inn.slot_empty"));
+            }
+            terminal.WriteLine("");
 
-            // v0.57.7 (Hesperos report): `target` is a WRAPPER Character built fresh by
-            // CompanionSystem.GetCompanionsAsCharacters() — edits to wrapper.EquippedItems
-            // don't mutate the underlying Companion unless we explicitly sync. Without this
-            // call Lyris reverted to her EquipStartingGear set on next wrapper regeneration.
-            // Safe no-op for non-companion targets (spouse/lover/child/team NPC).
-            if (target.IsCompanion)
-                CompanionSystem.Instance?.SyncCompanionEquipment(target);
+            // Step 4: Display matching items with full stats
+            terminal.SetColor("white");
+            terminal.WriteLine(Loc.Get("inn.available_equipment"));
+            terminal.WriteLine("");
+            DisplayEquipmentItemList(equipmentItems, target);
 
             terminal.WriteLine("");
-            terminal.SetColor("bright_green");
-            terminal.WriteLine(Loc.Get("inn.equipped_item", target.DisplayName, selectedItem.Name));
-            if (!string.IsNullOrEmpty(message))
+            terminal.SetColor("cyan");
+            terminal.Write(Loc.Get("inn.select_item"));
+            terminal.SetColor("white");
+
+            var input = await terminal.ReadLineAsync();
+            if (!int.TryParse(input, out int itemIdx) || itemIdx < 1 || itemIdx > equipmentItems.Count)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine(Loc.Get("ui.cancelled"));
+                await Task.Delay(1000);
+                continue;
+            }
+
+            var (selectedItem, wasEquipped, sourceSlot) = equipmentItems[itemIdx - 1];
+
+            // Block unidentified items
+            if (!selectedItem.IsIdentified)
             {
                 terminal.SetColor("yellow");
-                terminal.WriteLine(message);
+                terminal.WriteLine(Loc.Get("inn.must_identify"));
+                await Task.Delay(2000);
+                continue;
             }
-        }
-        else
-        {
-            // Failed - item was never removed from player, just show error
-            terminal.SetColor("red");
-            terminal.WriteLine(Loc.Get("inn.failed_equip", message));
-        }
 
-        await Task.Delay(2000);
+            // Check if target can equip
+            if (!selectedItem.CanEquip(target, out string equipReason))
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine(Loc.Get("inn.cannot_use", target.DisplayName, equipReason));
+                await Task.Delay(2000);
+                continue;
+            }
+
+            // Use the slot the player already picked (no need to ask which hand)
+            EquipmentSlot? targetSlot = selectedSlot.Value;
+
+            // Track items in target's inventory BEFORE equipping, so we can move displaced items to player
+            var targetInventoryBefore = target.Inventory.Count;
+
+            // Equip to target FIRST - EquipItem adds displaced items to target's inventory
+            var result = target.EquipItem(selectedItem, targetSlot, out string message);
+            target.RecalculateStats();
+
+            if (result)
+            {
+                // Equip succeeded — NOW remove the source item from player
+                if (wasEquipped && sourceSlot.HasValue)
+                {
+                    currentPlayer.UnequipSlot(sourceSlot.Value);
+                    currentPlayer.RecalculateStats();
+                }
+                else
+                {
+                    // Remove from inventory by reference (not name — avoids wrong-item removal with duplicates)
+                    // Find the matching Item by name, value, attack — use best match
+                    var invItem = currentPlayer.Inventory.FirstOrDefault(i =>
+                        i.Name == selectedItem.Name && i.Attack == selectedItem.WeaponPower && i.Armor == selectedItem.ArmorClass);
+                    if (invItem == null)
+                        invItem = currentPlayer.Inventory.FirstOrDefault(i => i.Name == selectedItem.Name);
+                    if (invItem != null)
+                        currentPlayer.Inventory.Remove(invItem);
+                }
+
+                // Move any items that were added to target's inventory (displaced equipment) to player's inventory
+                if (target.Inventory.Count > targetInventoryBefore)
+                {
+                    var displacedItems = target.Inventory.Skip(targetInventoryBefore).ToList();
+                    foreach (var displaced in displacedItems)
+                    {
+                        target.Inventory.Remove(displaced);
+                        currentPlayer.Inventory.Add(displaced);
+                    }
+                }
+
+                // v0.57.7 (Hesperos report): `target` is a WRAPPER Character built fresh by
+                // CompanionSystem.GetCompanionsAsCharacters() — edits to wrapper.EquippedItems
+                // don't mutate the underlying Companion unless we explicitly sync. Without this
+                // call Lyris reverted to her EquipStartingGear set on next wrapper regeneration.
+                // Safe no-op for non-companion targets (spouse/lover/child/team NPC).
+                if (target.IsCompanion)
+                    CompanionSystem.Instance?.SyncCompanionEquipment(target);
+
+                terminal.WriteLine("");
+                terminal.SetColor("bright_green");
+                terminal.WriteLine(Loc.Get("inn.equipped_item", target.DisplayName, selectedItem.Name));
+                if (!string.IsNullOrEmpty(message))
+                {
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine(message);
+                }
+            }
+            else
+            {
+                // Failed - item was never removed from player, just show error
+                terminal.SetColor("red");
+                terminal.WriteLine(Loc.Get("inn.failed_equip", message));
+            }
+
+            await Task.Delay(2000);
+        }
     }
 
     private async Task CompanionUnequipItemFromCharacter(Character target)
@@ -4250,280 +4258,11 @@ public class InnLocation : BaseLocation
         await Task.Delay(2000);
     }
 
-    /// <summary>
-    /// Auto-equip the best available items from player inventory across all slots for a companion.
-    /// Scores items by primary stat (weapon power for weapons, armor class for armor, stat total for accessories).
-    /// </summary>
-    private async Task CompanionEquipBestGear(Character target)
-    {
-        terminal.ClearScreen();
-        WriteBoxHeader($"{Loc.Get("inn.equip_best")}: {target.DisplayName.ToUpper()}", "bright_cyan");
-        terminal.WriteLine("");
 
-        terminal.SetColor("white");
-        terminal.Write(Loc.Get("inn.equip_best_confirm", target.DisplayName));
-        var confirm = (await terminal.ReadLineAsync()).ToUpper().Trim();
-        if (confirm != "Y")
-        {
-            terminal.SetColor("gray");
-            terminal.WriteLine(Loc.Get("ui.cancelled"));
-            await Task.Delay(1000);
-            return;
-        }
 
-        terminal.WriteLine("");
-        terminal.SetColor("cyan");
-        terminal.WriteLine(Loc.Get("inn.equip_best_scanning", target.DisplayName));
-        terminal.WriteLine("");
 
-        int equippedCount = 0;
 
-        // Process each equipment slot
-        var slotsToCheck = new[] {
-            EquipmentSlot.MainHand, EquipmentSlot.OffHand,
-            EquipmentSlot.Head, EquipmentSlot.Body, EquipmentSlot.Arms,
-            EquipmentSlot.Hands, EquipmentSlot.Legs, EquipmentSlot.Feet,
-            EquipmentSlot.Waist, EquipmentSlot.Face, EquipmentSlot.Cloak,
-            EquipmentSlot.Neck, EquipmentSlot.LFinger, EquipmentSlot.RFinger
-        };
 
-        foreach (var slot in slotsToCheck)
-        {
-            // Skip off-hand if companion is using a two-handed weapon
-            if (slot == EquipmentSlot.OffHand && target.IsTwoHanding)
-            {
-                terminal.SetColor("darkgray");
-                terminal.WriteLine($"  {slot.GetDisplayName()}: Using two-handed weapon");
-                continue;
-            }
-
-            // Get all matching items from player inventory for this slot
-            var candidates = GetItemsForSlot(slot)
-                .Where(x => !x.isEquipped && x.item.IsIdentified && !x.item.IsCursed)
-                .Where(x => x.item.CanEquip(target, out _))
-                .ToList();
-
-            if (candidates.Count == 0)
-            {
-                terminal.SetColor("darkgray");
-                terminal.WriteLine(Loc.Get("inn.equip_best_no_upgrade", slot.GetDisplayName()));
-                continue;
-            }
-
-            // Score each candidate by primary stat value (class-aware — see ScoreEquipment)
-            var bestCandidate = candidates
-                .OrderByDescending(x => ScoreEquipment(x.item, slot, target))
-                .First();
-
-            var currentItem = target.GetEquipment(slot);
-            int currentScore = currentItem != null ? ScoreEquipment(currentItem, slot, target) : 0;
-            int newScore = ScoreEquipment(bestCandidate.item, slot, target);
-
-            // Only equip if it's an upgrade (or slot is empty)
-            if (newScore <= currentScore && currentItem != null)
-            {
-                terminal.SetColor("darkgray");
-                terminal.WriteLine(Loc.Get("inn.equip_best_no_upgrade", slot.GetDisplayName()));
-                continue;
-            }
-
-            // Remove from player inventory (find by name match)
-            var invItem = currentPlayer.Inventory.FirstOrDefault(i => i.Name == bestCandidate.item.Name);
-            if (invItem == null) continue;
-            currentPlayer.Inventory.Remove(invItem);
-
-            // Track items before equipping so displaced items go to player
-            var targetInventoryBefore = target.Inventory.Count;
-
-            // Equip to target
-            if (target.EquipItem(bestCandidate.item, slot, out string message))
-            {
-                // Move displaced items back to player inventory
-                if (target.Inventory.Count > targetInventoryBefore)
-                {
-                    var displacedItems = target.Inventory.Skip(targetInventoryBefore).ToList();
-                    foreach (var displaced in displacedItems)
-                    {
-                        target.Inventory.Remove(displaced);
-                        currentPlayer.Inventory.Add(displaced);
-                    }
-                }
-
-                equippedCount++;
-                terminal.SetColor("bright_green");
-                if (currentItem != null)
-                    terminal.WriteLine(Loc.Get("inn.equip_best_upgraded", slot.GetDisplayName(), currentItem.Name, bestCandidate.item.Name));
-                else
-                    terminal.WriteLine(Loc.Get("inn.equip_best_equipped", slot.GetDisplayName(), bestCandidate.item.Name));
-            }
-            else
-            {
-                // Failed - return item to player
-                currentPlayer.Inventory.Add(invItem);
-            }
-        }
-
-        target.RecalculateStats();
-        terminal.WriteLine("");
-
-        if (equippedCount > 0)
-        {
-            terminal.SetColor("bright_green");
-            terminal.WriteLine(Loc.Get("inn.equip_best_done", equippedCount, target.DisplayName));
-            // Sync wrapper equipment back to companion BEFORE saving
-            CompanionSystem.Instance?.SyncCompanionEquipment(target);
-            SaveSystem.Instance.ResetAutoSaveThrottle();
-            await SaveSystem.Instance.AutoSave(currentPlayer);
-
-            // Online mode: persist companion equipment to shared state
-            if (UsurperRemake.BBS.DoorMode.IsOnlineMode && OnlineStateManager.Instance != null)
-            {
-                try { await OnlineStateManager.Instance.SaveAllSharedState(); }
-                catch (Exception ex) { DebugLogger.Instance.LogError("INN", $"SaveAllSharedState failed after EquipBest: {ex.Message}"); }
-            }
-        }
-        else
-        {
-            terminal.SetColor("yellow");
-            terminal.WriteLine(Loc.Get("inn.equip_best_none", target.DisplayName));
-        }
-
-        await Task.Delay(2000);
-    }
-
-    /// <summary>
-    /// Score an equipment item for auto-equip comparison.
-    /// Weapons scored by weapon power, armor by AC, accessories by total stat bonuses.
-    /// </summary>
-    private static int ScoreEquipment(Equipment item, EquipmentSlot slot, Character? target = null)
-    {
-        // Base score from primary stat
-        int score = 0;
-
-        if (slot == EquipmentSlot.MainHand || slot == EquipmentSlot.OffHand)
-        {
-            score = item.WeaponPower * 10 + item.ShieldBonus * 8;
-        }
-        else if (slot == EquipmentSlot.LFinger || slot == EquipmentSlot.RFinger ||
-                 slot == EquipmentSlot.Neck)
-        {
-            // Accessories: score by total stat bonuses
-            score = 0;
-        }
-        else
-        {
-            // Armor slots
-            score = item.ArmorClass * 10;
-        }
-
-        // Add stat bonuses (weighted equally)
-        score += (item.StrengthBonus + item.DexterityBonus + item.AgilityBonus +
-                  item.ConstitutionBonus + item.IntelligenceBonus + item.WisdomBonus +
-                  item.CharismaBonus) * 3;
-        score += item.MaxHPBonus * 2;
-        score += item.MaxManaBonus * 2;
-        score += item.DefenceBonus * 3;
-        score += item.MagicResistance * 2;
-        score += item.CriticalChanceBonus * 2;
-        score += item.LifeSteal * 2;
-        score += item.StaminaBonus * 2;
-
-        // v0.57.2 — class-aware weapon preference. Without this, auto-equip just picks the highest
-        // raw-stat weapon and ignores class fantasy: Warriors got 1H weapons in off-hand instead of
-        // shields, Assassins got swords instead of daggers, Clerics got 2H staves instead of
-        // mace+shield. Lumina reported all three.
-        if (target != null && (slot == EquipmentSlot.MainHand || slot == EquipmentSlot.OffHand))
-        {
-            score = ApplyClassWeaponPreference(score, item, slot, target);
-        }
-
-        return score;
-    }
-
-    /// <summary>
-    /// v0.57.2 — adjust a weapon/shield score by class-role preference. Multipliers are applied
-    /// AFTER the raw stat score so they amplify whichever item already looked best within the
-    /// class's preferred category, instead of letting raw stats dominate role fantasy.
-    /// </summary>
-    private static int ApplyClassWeaponPreference(int score, Equipment item, EquipmentSlot slot, Character target)
-    {
-        var cls = target.Class;
-        bool isShield = item.WeaponType == WeaponType.Shield
-                     || item.WeaponType == WeaponType.Buckler
-                     || item.WeaponType == WeaponType.TowerShield;
-        bool isOneHandedWeapon = item.Slot == EquipmentSlot.MainHand
-                              && item.Handedness == WeaponHandedness.OneHanded;
-
-        switch (cls)
-        {
-            case CharacterClass.Warrior:
-            case CharacterClass.Paladin:
-            case CharacterClass.Tidesworn:
-                // Tank classes: strongly prefer shields in off-hand; de-prioritize 1H weapons there
-                if (slot == EquipmentSlot.OffHand)
-                {
-                    if (isShield) return (int)(score * 3.0);
-                    if (isOneHandedWeapon) return (int)(score * 0.3);
-                }
-                break;
-
-            case CharacterClass.Cleric:
-                // Cleric fantasy is mace + shield. A 2H staff overrides that, so penalize 2H
-                // main-hand weapons and boost mace/flail + shield.
-                if (slot == EquipmentSlot.MainHand)
-                {
-                    if (item.Handedness == WeaponHandedness.TwoHanded) return (int)(score * 0.5);
-                    if (item.WeaponType == WeaponType.Mace || item.WeaponType == WeaponType.Flail) return (int)(score * 1.4);
-                }
-                else if (slot == EquipmentSlot.OffHand)
-                {
-                    if (isShield) return (int)(score * 2.5);
-                    if (isOneHandedWeapon) return (int)(score * 0.4);
-                }
-                break;
-
-            case CharacterClass.Assassin:
-            case CharacterClass.Abysswarden:
-                // Assassins + Abysswardens scale off daggers (Backstab, Lethal Precision, Umbral Step). Prefer them in both hands.
-                if (item.WeaponType == WeaponType.Dagger) return (int)(score * 1.5);
-                if (slot == EquipmentSlot.MainHand || slot == EquipmentSlot.OffHand)
-                    return (int)(score * 0.7);
-                break;
-
-            case CharacterClass.Ranger:
-                if (slot == EquipmentSlot.MainHand && item.WeaponType == WeaponType.Bow)
-                    return (int)(score * 1.5);
-                break;
-
-            case CharacterClass.Barbarian:
-                // Barbarians favor big 2H weapons.
-                if (slot == EquipmentSlot.MainHand && item.Handedness == WeaponHandedness.TwoHanded)
-                    return (int)(score * 1.3);
-                break;
-
-            case CharacterClass.Magician:
-            case CharacterClass.Sage:
-            case CharacterClass.MysticShaman:
-            case CharacterClass.Wavecaller:
-                // Full casters: staves boost spell power.
-                if (slot == EquipmentSlot.MainHand && item.WeaponType == WeaponType.Staff)
-                    return (int)(score * 1.4);
-                break;
-
-            case CharacterClass.Bard:
-                // Bard songs require instruments; prefer them over regular weapons.
-                if (item.WeaponType == WeaponType.Instrument) return (int)(score * 1.5);
-                break;
-
-            case CharacterClass.Alchemist:
-                // Alchemist is INT-scaling but not a pure caster — mild staff preference.
-                if (slot == EquipmentSlot.MainHand && item.WeaponType == WeaponType.Staff)
-                    return (int)(score * 1.2);
-                break;
-        }
-
-        return score;
-    }
 
     private Item CompanionConvertEquipmentToItem(Equipment equipment)
     {

@@ -89,6 +89,38 @@ public static class LLMBudget
     }
 
     /// <summary>
+    /// v0.65.0 (1.0-prep SR): rehydrate today's counter from the llm_usage
+    /// telemetry table at server startup. Pre-fix, every deploy-restart
+    /// zeroed the in-memory counter, making the daily cap soft -- the
+    /// telemetry table has carried the true per-call token totals since
+    /// v0.64.0, so the authoritative number was already on disk. Called once
+    /// from MudServer startup after the backend initializes. Best-effort:
+    /// failure leaves the counter at zero (the pre-fix behavior).
+    /// </summary>
+    public static void RehydrateFromBackend(SqlSaveBackend? backend)
+    {
+        if (backend == null) return;
+        try
+        {
+            long usedToday = backend.GetLLMTokensUsedTodayUtc();
+            if (usedToday > 0)
+            {
+                lock (_lock)
+                {
+                    _currentDayUtc = DateTime.UtcNow.Date;
+                    Interlocked.Exchange(ref _tokensUsedToday, usedToday);
+                }
+                DebugLogger.Instance.LogInfo("LLM",
+                    $"Budget rehydrated from llm_usage: {usedToday:N0} tokens already spent today (cap {DailyTokenCap:N0})");
+            }
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogWarning("LLM", $"Budget rehydration failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
     /// Roll the counter to zero if the UTC day has changed since the last
     /// call. Cheap (date comparison) for most calls; locks only on the
     /// rare rollover event.

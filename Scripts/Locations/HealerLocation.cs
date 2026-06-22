@@ -884,7 +884,7 @@ public class HealerLocation : BaseLocation
 
         await Task.Delay(1000);
 
-        if (!player.Poisoned)
+        if (!player.Poisoned && !player.HasStatus(StatusEffect.Poisoned))
         {
             terminal.WriteLine(Loc.Get("healer.not_poisoned"), "green");
             await terminal.PressAnyKey();
@@ -922,6 +922,7 @@ public class HealerLocation : BaseLocation
         CityControlSystem.Instance.ProcessSaleTax(cost);
         player.Poison = 0;
         player.PoisonTurns = 0;
+        player.RemoveStatus(StatusEffect.Poisoned);
 
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("healer.mixing_antidote", Manager), "gray");

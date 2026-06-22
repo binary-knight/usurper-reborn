@@ -773,29 +773,59 @@ rd /S /Q ""{tempDir}"" 2>nul
             // which causes "bad interpreter" errors when bash tries to run the script on Linux.
             var logFile = Path.Combine(appDir, "update.log");
 
+            // v1.0 release prep (B3): the original wait loop was
+            //   while pgrep -f "UsurperReborn" ...
+            // pgrep -f matches the pattern against the FULL COMMAND LINE of
+            // every process on the box -- so a second BBS node in the door, a
+            // --mud-relay process, or even an unrelated process whose argv
+            // contains the install path kept the loop spinning forever. The
+            // cp never ran, and because LaunchUpdater discarded all script
+            // output, the failure was invisible: "auto-update appears to work
+            // but never applies" (the long-standing Linux BBS symptom).
+            // Fix: (1) wait on the LAUNCHING game's actual PID, then (2) give
+            // other instances (exact process-name match via pgrep -x, no
+            // command-line false positives) a bounded 120s grace window and
+            // proceed regardless, (3) log every step, (4) verify version.txt
+            // after the copy.
+            int gamePid = Environment.ProcessId;
+
             var lines = new List<string>
             {
                 "#!/bin/bash",
                 $"LOGFILE=\"{logFile}\"",
+                $"GAMEPID={gamePid}",
                 "echo \"Usurper Reborn Auto-Updater\"",
                 "echo \"===========================\"",
                 "echo \"\"",
                 "echo \"Waiting for game to close...\"",
-                "echo \"[$(date)] Updater started\" > \"$LOGFILE\"",
+                "echo \"[$(date)] Updater started (waiting on PID $GAMEPID)\" > \"$LOGFILE\"",
                 $"echo \"[$(date)] Source: {extractDir}\" >> \"$LOGFILE\"",
                 $"echo \"[$(date)] Target: {appDir}\" >> \"$LOGFILE\"",
                 "sleep 3",
                 "",
-                "# Wait for any running instances to close",
-                $"while pgrep -f \"{exeName}\" > /dev/null 2>&1; do",
+                "# Wait for the launching game instance (by PID) to exit",
+                "while kill -0 \"$GAMEPID\" 2>/dev/null; do",
                 "    sleep 1",
                 "done",
+                "echo \"[$(date)] Launching game process exited\" >> \"$LOGFILE\"",
                 "",
-                "echo \"[$(date)] Game process exited\" >> \"$LOGFILE\"",
+                "# Grace window for OTHER instances (multi-node BBS): exact",
+                "# process-name match only, bounded at 120s, proceed regardless.",
+                "TRIES=0",
+                $"while pgrep -x \"{exeName}\" > /dev/null 2>&1 && [ $TRIES -lt 120 ]; do",
+                "    sleep 1",
+                "    TRIES=$((TRIES+1))",
+                "done",
+                $"if pgrep -x \"{exeName}\" > /dev/null 2>&1; then",
+                "    echo \"[$(date)] WARNING: other instances still running after 120s; applying update anyway\" >> \"$LOGFILE\"",
+                "fi",
+                "",
+                "echo \"[$(date)] Installing update...\" >> \"$LOGFILE\"",
                 "echo \"\"",
                 "echo \"Installing update...\"",
-                $"cp -rf \"{extractDir}/\". \"{appDir}/\"",
+                $"cp -rf \"{extractDir}/\". \"{appDir}/\" >> \"$LOGFILE\" 2>&1",
                 "if [ $? -ne 0 ]; then",
+                "    echo \"[$(date)] ERROR: copy failed\" >> \"$LOGFILE\"",
                 "    echo \"\"",
                 "    echo \"ERROR: Failed to copy update files.\"",
                 "    echo \"Please download the update manually from:\"",
@@ -807,6 +837,14 @@ rd /S /Q ""{tempDir}"" 2>nul
                 "",
                 "# Make the executable runnable",
                 $"chmod +x \"{exePath}\"",
+                "",
+                "# Verify: log the version the install directory now reports",
+                $"if [ -f \"{appDir}/version.txt\" ]; then",
+                $"    NEWVER=$(cat \"{appDir}/version.txt\")",
+                "    echo \"[$(date)] Update applied; version.txt now: $NEWVER\" >> \"$LOGFILE\"",
+                "else",
+                "    echo \"[$(date)] Update applied (no version.txt in package)\" >> \"$LOGFILE\"",
+                "fi",
                 "",
             };
 
@@ -864,11 +902,18 @@ rd /S /Q ""{tempDir}"" 2>nul
                     // When sshd terminates the session, it sends SIGHUP to all processes in the
                     // process group. Use nohup + background (&) to detach the updater so it
                     // keeps running after the game exits and the SSH session closes.
+                    // v1.0 release prep (B3): capture bash-level launch errors (bad
+                    // interpreter, permission denied) into a sidecar log instead of
+                    // /dev/null -- discarding them is how the Linux updater failed
+                    // silently for months. The script's own steps log to update.log
+                    // in the app dir; this sidecar only catches pre-script failures.
                     var escapedPath = updaterPath.Replace("'", "'\\''");
+                    var launchLog = updaterPath + ".launch.log";
+                    var escapedLog = launchLog.Replace("'", "'\\''");
                     System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
                     {
                         FileName = "/bin/bash",
-                        Arguments = $"-c \"nohup /bin/bash '{escapedPath}' > /dev/null 2>&1 &\"",
+                        Arguments = $"-c \"nohup /bin/bash '{escapedPath}' >> '{escapedLog}' 2>&1 &\"",
                         UseShellExecute = false,
                         CreateNoWindow = true
                     });

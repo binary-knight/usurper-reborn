@@ -7381,7 +7381,7 @@ public class DungeonLocation : BaseLocation
                 await Task.Delay(1000);
 
                 var undead = Monster.CreateMonster(
-                    currentDungeonLevel, $"Undead {adventurerClass.Substring(0,1).ToUpper() + adventurerClass.Substring(1)}",
+                    currentDungeonLevel, $"Undead {GameConfig.CapitalizeFirst(adventurerClass)}",
                     currentDungeonLevel * 12, currentDungeonLevel * 3, 0,
                     "You will join me...", false, false, "Rusty Blade", "Tattered Armor",
                     false, false, currentDungeonLevel * 4, currentDungeonLevel * 2, currentDungeonLevel * 2
@@ -10382,7 +10382,7 @@ public class DungeonLocation : BaseLocation
 
             // Options
             terminal.SetColor("cyan");
-            terminal.WriteLine($"  [E] {Loc.Get("dungeon.equip_item")}  [U] {Loc.Get("dungeon.unequip_item")}  [Q] {Loc.Get("dungeon.back")}");
+            terminal.WriteLine($"  [E] {Loc.Get("dungeon.equip_item")}  [B] {Loc.Get("inn.equip_best")}  [U] {Loc.Get("dungeon.unequip_item")}  [Q] {Loc.Get("dungeon.back")}");
             terminal.WriteLine("");
             terminal.SetColor("cyan");
             terminal.Write(Loc.Get("ui.choice"));
@@ -10394,6 +10394,10 @@ public class DungeonLocation : BaseLocation
             {
                 case "E":
                     await DungeonEquipItemToMember(target);
+                    break;
+                case "B":
+                    // v0.64.2 (player request): auto-equip best from backpack
+                    await RunEquipBestGear(target);
                     break;
                 case "U":
                     await DungeonUnequipItemFromMember(target);
@@ -10410,150 +10414,158 @@ public class DungeonLocation : BaseLocation
     /// </summary>
     private async Task DungeonEquipItemToMember(Character target)
     {
-        terminal.ClearScreen();
-        WriteBoxHeader($"{Loc.Get("dungeon.equip_to_header")} {target.DisplayName.ToUpper()}", "bright_cyan", 57);
-        terminal.WriteLine("");
-
-        // Step 1: Pick a slot
-        var selectedSlot = await PromptForEquipmentSlot(target);
-        if (selectedSlot == null) return;
-
-        // Step 2: Get items that match this slot
-        var equipmentItems = GetItemsForSlot(selectedSlot.Value);
-
-        if (equipmentItems.Count == 0)
+        // v0.64.2 (player request): loop back to the SLOT PICKER after each
+        // equip instead of kicking out to the parent menu -- outfitting a
+        // naked recruit means many equips in a row. Cancel at the slot picker
+        // (Q / 0 / invalid) exits the whole flow.
+        while (true)
         {
+
+            terminal.ClearScreen();
+            WriteBoxHeader($"{Loc.Get("dungeon.equip_to_header")} {target.DisplayName.ToUpper()}", "bright_cyan", 57);
             terminal.WriteLine("");
-            terminal.SetColor("yellow");
-            terminal.WriteLine(Loc.Get("dungeon.no_items_for_slot"));
-            await Task.Delay(2000);
-            return;
-        }
 
-        // Step 3: Show current item in slot
-        terminal.WriteLine("");
-        var currentItem = target.GetEquipment(selectedSlot.Value);
-        terminal.SetColor("white");
-        terminal.Write($"  {Loc.Get("dungeon.current_label")}: ");
-        if (currentItem != null)
-        {
-            terminal.SetColor(currentItem.IsIdentified ? currentItem.GetRarityColor() : "magenta");
-            terminal.Write(currentItem.IsIdentified ? currentItem.Name : Loc.Get("dungeon.unidentified"));
-            if (currentItem.IsIdentified) WriteEquipmentStatSummary(currentItem);
-            terminal.WriteLine("");
-        }
-        else
-        {
-            terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("dungeon.empty"));
-        }
-        terminal.WriteLine("");
+            // Step 1: Pick a slot
+            var selectedSlot = await PromptForEquipmentSlot(target);
+            if (selectedSlot == null) return; // exit: cancel at slot picker
 
-        // Step 4: Display matching items with full stats
-        terminal.SetColor("white");
-        terminal.WriteLine($"  {Loc.Get("dungeon.available_items")}:");
-        terminal.WriteLine("");
-        DisplayEquipmentItemList(equipmentItems, target);
+            // Step 2: Get items that match this slot
+            var equipmentItems = GetItemsForSlot(selectedSlot.Value);
 
-        terminal.WriteLine("");
-        terminal.SetColor("cyan");
-        terminal.Write($"  {Loc.Get("dungeon.item_number_prompt")}: ");
-        terminal.SetColor("white");
-
-        var input = await terminal.ReadLineAsync();
-        if (!int.TryParse(input, out int itemIdx) || itemIdx < 1 || itemIdx > equipmentItems.Count)
-        {
-            terminal.SetColor("gray");
-            terminal.WriteLine(Loc.Get("ui.cancelled"));
-            await Task.Delay(1000);
-            return;
-        }
-
-        var (selectedItem, wasEquipped, sourceSlot) = equipmentItems[itemIdx - 1];
-
-        // Block unidentified items
-        if (!selectedItem.IsIdentified)
-        {
-            terminal.SetColor("yellow");
-            terminal.WriteLine(Loc.Get("dungeon.must_identify_first"));
-            await Task.Delay(2000);
-            return;
-        }
-
-        // Check if target can equip
-        if (!selectedItem.CanEquip(target, out string equipReason))
-        {
-            terminal.SetColor("red");
-            terminal.WriteLine($"  {Loc.Get("dungeon.cannot_use_item", target.DisplayName, equipReason)}");
-            await Task.Delay(2000);
-            return;
-        }
-
-        EquipmentSlot? targetSlot = selectedSlot.Value;
-
-        // Track displaced items
-        var targetInventoryBefore = target.Inventory.Count;
-
-        // Equip first, then remove from player on success (prevents item loss if equip fails)
-        var result = target.EquipItem(selectedItem, targetSlot, out string message);
-        target.RecalculateStats();
-
-        if (result)
-        {
-            // Remove from player AFTER successful equip
-            if (wasEquipped && sourceSlot.HasValue)
+            if (equipmentItems.Count == 0)
             {
-                currentPlayer.UnequipSlot(sourceSlot.Value);
-                currentPlayer.RecalculateStats();
+                terminal.WriteLine("");
+                terminal.SetColor("yellow");
+                terminal.WriteLine(Loc.Get("dungeon.no_items_for_slot"));
+                await Task.Delay(2000);
+                continue;
+            }
+
+            // Step 3: Show current item in slot
+            terminal.WriteLine("");
+            var currentItem = target.GetEquipment(selectedSlot.Value);
+            terminal.SetColor("white");
+            terminal.Write($"  {Loc.Get("dungeon.current_label")}: ");
+            if (currentItem != null)
+            {
+                terminal.SetColor(currentItem.IsIdentified ? currentItem.GetRarityColor() : "magenta");
+                terminal.Write(currentItem.IsIdentified ? currentItem.Name : Loc.Get("dungeon.unidentified"));
+                if (currentItem.IsIdentified) WriteEquipmentStatSummary(currentItem);
+                terminal.WriteLine("");
             }
             else
             {
-                var invItem = currentPlayer.Inventory.FirstOrDefault(i => i.Name == selectedItem.Name);
-                if (invItem != null)
-                    currentPlayer.Inventory.Remove(invItem);
+                terminal.SetColor("darkgray");
+                terminal.WriteLine(Loc.Get("dungeon.empty"));
             }
+            terminal.WriteLine("");
 
-            // Move displaced items to player inventory
-            if (target.Inventory.Count > targetInventoryBefore)
-            {
-                var displacedItems = target.Inventory.Skip(targetInventoryBefore).ToList();
-                foreach (var displaced in displacedItems)
-                {
-                    target.Inventory.Remove(displaced);
-                    currentPlayer.Inventory.Add(displaced);
-                }
-            }
+            // Step 4: Display matching items with full stats
+            terminal.SetColor("white");
+            terminal.WriteLine($"  {Loc.Get("dungeon.available_items")}:");
+            terminal.WriteLine("");
+            DisplayEquipmentItemList(equipmentItems, target);
 
             terminal.WriteLine("");
-            terminal.SetColor("bright_green");
-            terminal.WriteLine($"  {Loc.Get("dungeon.equipped_item", target.DisplayName, selectedItem.Name)}");
-            if (!string.IsNullOrEmpty(message))
+            terminal.SetColor("cyan");
+            terminal.Write($"  {Loc.Get("dungeon.item_number_prompt")}: ");
+            terminal.SetColor("white");
+
+            var input = await terminal.ReadLineAsync();
+            if (!int.TryParse(input, out int itemIdx) || itemIdx < 1 || itemIdx > equipmentItems.Count)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine(Loc.Get("ui.cancelled"));
+                await Task.Delay(1000);
+                continue;
+            }
+
+            var (selectedItem, wasEquipped, sourceSlot) = equipmentItems[itemIdx - 1];
+
+            // Block unidentified items
+            if (!selectedItem.IsIdentified)
             {
                 terminal.SetColor("yellow");
-                terminal.WriteLine($"  {message}");
+                terminal.WriteLine(Loc.Get("dungeon.must_identify_first"));
+                await Task.Delay(2000);
+                continue;
             }
 
-            // Sync equipment and save — prevents item loss on disconnect
-            if (target.IsCompanion)
-                CompanionSystem.Instance?.SyncCompanionEquipment(target);
-            else
-                CombatEngine.SyncNPCTeammateToActiveNPCs(target);
-            SaveSystem.Instance.ResetAutoSaveThrottle();
-            await SaveSystem.Instance.AutoSave(currentPlayer);
-            if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+            // Check if target can equip
+            if (!selectedItem.CanEquip(target, out string equipReason))
             {
-                try { await OnlineStateManager.Instance.SaveAllSharedState(); }
-                catch (Exception ex) { DebugLogger.Instance.LogError("DUNGEON", $"[ManagePartyMemberEquipment] SaveAllSharedState failed after equip: {ex.Message}"); }
+                terminal.SetColor("red");
+                terminal.WriteLine($"  {Loc.Get("dungeon.cannot_use_item", target.DisplayName, equipReason)}");
+                await Task.Delay(2000);
+                continue;
             }
-        }
-        else
-        {
-            // Failed - item was never removed from player, nothing to return
-            terminal.SetColor("red");
-            terminal.WriteLine($"  {Loc.Get("dungeon.equip_failed", message)}");
-        }
 
-        await Task.Delay(2000);
+            EquipmentSlot? targetSlot = selectedSlot.Value;
+
+            // Track displaced items
+            var targetInventoryBefore = target.Inventory.Count;
+
+            // Equip first, then remove from player on success (prevents item loss if equip fails)
+            var result = target.EquipItem(selectedItem, targetSlot, out string message);
+            target.RecalculateStats();
+
+            if (result)
+            {
+                // Remove from player AFTER successful equip
+                if (wasEquipped && sourceSlot.HasValue)
+                {
+                    currentPlayer.UnequipSlot(sourceSlot.Value);
+                    currentPlayer.RecalculateStats();
+                }
+                else
+                {
+                    var invItem = currentPlayer.Inventory.FirstOrDefault(i => i.Name == selectedItem.Name);
+                    if (invItem != null)
+                        currentPlayer.Inventory.Remove(invItem);
+                }
+
+                // Move displaced items to player inventory
+                if (target.Inventory.Count > targetInventoryBefore)
+                {
+                    var displacedItems = target.Inventory.Skip(targetInventoryBefore).ToList();
+                    foreach (var displaced in displacedItems)
+                    {
+                        target.Inventory.Remove(displaced);
+                        currentPlayer.Inventory.Add(displaced);
+                    }
+                }
+
+                terminal.WriteLine("");
+                terminal.SetColor("bright_green");
+                terminal.WriteLine($"  {Loc.Get("dungeon.equipped_item", target.DisplayName, selectedItem.Name)}");
+                if (!string.IsNullOrEmpty(message))
+                {
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine($"  {message}");
+                }
+
+                // Sync equipment and save — prevents item loss on disconnect
+                if (target.IsCompanion)
+                    CompanionSystem.Instance?.SyncCompanionEquipment(target);
+                else
+                    CombatEngine.SyncNPCTeammateToActiveNPCs(target);
+                SaveSystem.Instance.ResetAutoSaveThrottle();
+                await SaveSystem.Instance.AutoSave(currentPlayer);
+                if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                {
+                    try { await OnlineStateManager.Instance.SaveAllSharedState(); }
+                    catch (Exception ex) { DebugLogger.Instance.LogError("DUNGEON", $"[ManagePartyMemberEquipment] SaveAllSharedState failed after equip: {ex.Message}"); }
+                }
+            }
+            else
+            {
+                // Failed - item was never removed from player, nothing to return
+                terminal.SetColor("red");
+                terminal.WriteLine($"  {Loc.Get("dungeon.equip_failed", message)}");
+            }
+
+            await Task.Delay(2000);
+        }
     }
 
     /// <summary>
@@ -11492,11 +11504,12 @@ public class DungeonLocation : BaseLocation
                     break;
 
                 case "D":
-                    if (player.Antidotes > 0 && player.Poison > 0)
+                    if (player.Antidotes > 0 && (player.Poison > 0 || player.HasStatus(StatusEffect.Poisoned)))
                     {
                         player.Antidotes--;
                         player.Poison = 0;
                         player.PoisonTurns = 0;
+                        player.RemoveStatus(StatusEffect.Poisoned);
                         terminal.SetColor("bright_green");
                         terminal.WriteLine(Loc.Get("dungeon.antidote_cure_poison"));
                         await Task.Delay(1500);

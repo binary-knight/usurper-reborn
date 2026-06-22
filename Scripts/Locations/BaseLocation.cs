@@ -1148,34 +1148,50 @@ public abstract class BaseLocation
     private async Task DisplayScriptedStrangerEncounter(ScriptedStrangerEncounter encounter)
     {
         terminal.ClearScreen();
-        WriteBoxHeader(encounter.Title, "dark_magenta");
+
+        // v0.65.0 (frida report): the scripted stranger encounters (THE RETURN crone
+        // on death, THE EMPTY CHAIR, etc.) were hardcoded English. Resolve each line
+        // through stranger.scripted.{type}.* loc keys, falling back to the literal in
+        // the data block when a key is absent (so English always renders). Index keys
+        // are 1-based; blank dialogue spacers carry no key and fall back to "".
+        string sType = encounter.Type.ToString();
+        string SLoc(string suffix, string fallback)
+        {
+            string key = $"stranger.scripted.{sType}.{suffix}";
+            return Loc.Has(key) ? Loc.Get(key) : fallback;
+        }
+
+        WriteBoxHeader(SLoc("title", encounter.Title), "dark_magenta");
         terminal.WriteLine("");
 
         // Intro narration (atmospheric, gray)
-        foreach (var line in encounter.IntroNarration)
+        for (int i = 0; i < encounter.IntroNarration.Length; i++)
         {
             terminal.SetColor("gray");
-            terminal.WriteLine($"  {line}");
+            terminal.WriteLine($"  {SLoc($"intro.{i + 1}", encounter.IntroNarration[i])}");
             await Task.Delay(1200);
         }
         terminal.WriteLine("");
         await Task.Delay(500);
 
-        // Disguise name
+        // Disguise name (reuses the existing stranger.disguise.{enum}.* keys, fallback to data)
         var disguiseData = StrangerEncounterSystem.Disguises.GetValueOrDefault(encounter.Disguise);
         if (disguiseData != null)
         {
+            string dnKey = $"stranger.disguise.{encounter.Disguise}.name";
+            string ddKey = $"stranger.disguise.{encounter.Disguise}.desc";
             terminal.SetColor("white");
-            terminal.WriteLine($"  {disguiseData.Name}");
+            terminal.WriteLine($"  {(Loc.Has(dnKey) ? Loc.Get(dnKey) : disguiseData.Name)}");
             terminal.SetColor("darkgray");
-            terminal.WriteLine($"  {disguiseData.Description}");
+            terminal.WriteLine($"  {(Loc.Has(ddKey) ? Loc.Get(ddKey) : disguiseData.Description)}");
             terminal.WriteLine("");
             await Task.Delay(800);
         }
 
         // Main dialogue (bright magenta, spoken lines)
-        foreach (var line in encounter.Dialogue)
+        for (int i = 0; i < encounter.Dialogue.Length; i++)
         {
+            var line = encounter.Dialogue[i];
             if (string.IsNullOrEmpty(line))
             {
                 terminal.WriteLine("");
@@ -1183,7 +1199,7 @@ public abstract class BaseLocation
                 continue;
             }
             terminal.SetColor("bright_magenta");
-            terminal.WriteLine($"  {line}");
+            terminal.WriteLine($"  {SLoc($"dialogue.{i + 1}", line)}");
             await Task.Delay(1000);
         }
         terminal.WriteLine("");
@@ -1208,7 +1224,7 @@ public abstract class BaseLocation
                 terminal.SetColor("white");
                 terminal.Write("] ");
                 terminal.SetColor("white");
-                terminal.WriteLine(opt.Text);
+                terminal.WriteLine(SLoc($"response.{opt.Key}.text", opt.Text));
             }
 
             terminal.WriteLine("");
@@ -1223,10 +1239,10 @@ public abstract class BaseLocation
                 receptivityChange = selectedOpt.ReceptivityChange;
 
                 terminal.WriteLine("");
-                foreach (var replyLine in selectedOpt.StrangerReply)
+                for (int i = 0; i < selectedOpt.StrangerReply.Length; i++)
                 {
                     terminal.SetColor("magenta");
-                    terminal.WriteLine($"  {replyLine}");
+                    terminal.WriteLine($"  {SLoc($"response.{selectedOpt.Key}.reply.{i + 1}", selectedOpt.StrangerReply[i])}");
                     await Task.Delay(1000);
                 }
                 terminal.WriteLine("");
@@ -1238,10 +1254,10 @@ public abstract class BaseLocation
         if (encounter.ClosingNarration.Length > 0)
         {
             terminal.WriteLine("");
-            foreach (var line in encounter.ClosingNarration)
+            for (int i = 0; i < encounter.ClosingNarration.Length; i++)
             {
                 terminal.SetColor("gray");
-                terminal.WriteLine($"  {line}");
+                terminal.WriteLine($"  {SLoc($"closing.{i + 1}", encounter.ClosingNarration[i])}");
                 await Task.Delay(1200);
             }
             terminal.WriteLine("");
@@ -2562,9 +2578,10 @@ public abstract class BaseLocation
             }
             var promptName = GetMudPromptName();
             terminal.Write($"{promptName}", "bright_white");
-            terminal.Write(" | ", "darkgray");
-            terminal.Write("look", "bright_yellow");
-            terminal.Write($" {Loc.Get("base.mud_to_redraw")}", "darkgray");
+            // v0.64.2: "| look to redraw" hint removed from the prompt --
+            // screens auto-redraw now (AutoLook), so the hint was noise on
+            // every single prompt line. The `look` command itself still works
+            // for anyone who wants a manual redraw.
             terminal.Write(" > ", "bright_white");
             return await terminal.GetInput("");
         }
@@ -2724,6 +2741,14 @@ public abstract class BaseLocation
                 await ShowActiveQuests();
                 return (true, false);
 
+            case "journal":
+            case "jo":
+            case "next":
+            case "todo":
+                // v0.64.2: The Adventurer's Journal -- "what should I do now?"
+                await ShowJournal();
+                return (true, false);
+
             case "g":
             case "gold":
                 await ShowGoldStatus();
@@ -2760,11 +2785,12 @@ public abstract class BaseLocation
                 return (true, false);
 
             case "antidote":
-                if (currentPlayer.Antidotes > 0 && currentPlayer.Poison > 0)
+                if (currentPlayer.Antidotes > 0 && (currentPlayer.Poison > 0 || currentPlayer.HasStatus(StatusEffect.Poisoned)))
                 {
                     currentPlayer.Antidotes--;
                     currentPlayer.Poison = 0;
                     currentPlayer.PoisonTurns = 0;
+                    currentPlayer.RemoveStatus(StatusEffect.Poisoned);
                     terminal.SetColor("bright_green");
                     terminal.WriteLine(Loc.Get("base.antidote_used"));
                     terminal.SetColor("gray");
@@ -2998,6 +3024,9 @@ public abstract class BaseLocation
         WriteCmdAlias("/stats", "%", Loc.Get("base.help_stats"));
         WriteCmdAlias("/inventory", "*", Loc.Get("base.help_inventory"));
         WriteCmdAlias("/quests", "/q", Loc.Get("base.help_quests"));
+        WriteCmdAlias("/journal", "/next", Loc.Get("journal.help")); // v0.64.2
+        if (UsurperRemake.BBS.DoorMode.IsMudServerMode)
+            WriteCmd("look", Loc.Get("base.help_look")); // v0.64.2: prompt hint removed; documented here instead
         WriteCmdAlias("/gold", "/g", Loc.Get("base.help_gold"));
         WriteCmdAlias("/health", "/hp", Loc.Get("base.help_health"));
         WriteCmdAlias("/gear", "/eq", Loc.Get("base.help_gear"));
@@ -3106,6 +3135,9 @@ public abstract class BaseLocation
         terminal.WriteLine($"/stats or % {Loc.Get("base.help_stats")}");
         terminal.WriteLine($"/inventory or * {Loc.Get("base.help_inventory")}");
         terminal.WriteLine($"/quests or /q {Loc.Get("base.help_quests")}");
+        terminal.WriteLine($"/journal or /next {Loc.Get("journal.help")}");
+        if (UsurperRemake.BBS.DoorMode.IsMudServerMode)
+            terminal.WriteLine($"look {Loc.Get("base.help_look")}");
         terminal.WriteLine($"/gold or /g {Loc.Get("base.help_gold")}");
         terminal.WriteLine($"/health or /hp {Loc.Get("base.help_health")}");
         terminal.WriteLine($"/gear or /eq {Loc.Get("base.help_gear")}");
@@ -3240,6 +3272,96 @@ public abstract class BaseLocation
             }
         }
 
+        terminal.WriteLine("");
+        await terminal.PressAnyKey();
+    }
+
+    /// <summary>
+    /// v0.64.2: The Adventurer's Journal (/journal, /next, /todo) -- one
+    /// screen that answers "what should I do now?". Four priority-ordered
+    /// sections: NEXT STEP (recommendation ladder), IN PROGRESS (quests /
+    /// contracts / companion quests), READY TO SPEND (training points,
+    /// banked level-ups, claimable blessing), THE WORLD (seals, next Old
+    /// God, remembered dungeon floor). Pure read over existing state via
+    /// JournalSystem -- zero save fields, no LLM, works in single-player /
+    /// online / BBS / screen reader.
+    /// </summary>
+    protected virtual async Task ShowJournal()
+    {
+        bool sr = GameConfig.ScreenReaderMode;
+        var player = currentPlayer;
+        if (player == null) return;
+
+        terminal.WriteLine("");
+        if (sr)
+        {
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine(Loc.Get("journal.title"));
+        }
+        else
+        {
+            WriteBoxHeader(Loc.Get("journal.title"), "bright_cyan");
+        }
+        terminal.WriteLine("");
+
+        // NEXT STEP (always shown)
+        var next = JournalSystem.GetNextStep(player);
+        string nextText = Loc.Get(next.LocKey, next.Args);
+        terminal.SetColor("bright_yellow");
+        if (sr)
+            terminal.WriteLine($"{Loc.Get("journal.section_next")}: {nextText}");
+        else
+        {
+            terminal.WriteLine($"  > {Loc.Get("journal.section_next")}");
+            terminal.SetColor("bright_white");
+            terminal.WriteLine($"    {nextText}");
+        }
+        terminal.WriteLine("");
+
+        // IN PROGRESS
+        var progress = JournalSystem.BuildInProgressLines(player);
+        if (progress.Count > 0)
+        {
+            terminal.SetColor("cyan");
+            terminal.WriteLine(sr ? Loc.Get("journal.section_progress") : $"  {Loc.Get("journal.section_progress")}");
+            foreach (var (text, color) in progress)
+            {
+                terminal.SetColor(sr ? "white" : color);
+                terminal.WriteLine(sr ? text.TrimStart() : $"    {text}");
+            }
+            terminal.WriteLine("");
+        }
+
+        // READY TO SPEND / CLAIM
+        var claims = JournalSystem.BuildClaimLines(player);
+        if (claims.Count > 0)
+        {
+            terminal.SetColor("cyan");
+            terminal.WriteLine(sr ? Loc.Get("journal.section_claim") : $"  {Loc.Get("journal.section_claim")}");
+            foreach (var (text, color) in claims)
+            {
+                terminal.SetColor(sr ? "white" : color);
+                terminal.WriteLine(sr ? text : $"    {text}");
+            }
+            terminal.WriteLine("");
+        }
+
+        // THE WORLD
+        var world = JournalSystem.BuildWorldLines(player);
+        if (world.Count > 0)
+        {
+            terminal.SetColor("cyan");
+            terminal.WriteLine(sr ? Loc.Get("journal.section_world") : $"  {Loc.Get("journal.section_world")}");
+            foreach (var (text, color) in world)
+            {
+                terminal.SetColor(sr ? "white" : color);
+                terminal.WriteLine(sr ? text : $"    {text}");
+            }
+            terminal.WriteLine("");
+        }
+
+        terminal.SetColor("darkgray");
+        terminal.WriteLine(sr ? Loc.Get("journal.footer") : $"  {Loc.Get("journal.footer")}");
         terminal.WriteLine("");
         await terminal.PressAnyKey();
     }
@@ -10020,6 +10142,289 @@ public abstract class BaseLocation
             return slots[slotIdx - 1].slot;
 
         return null;
+    }
+
+
+    // v0.64.2: promoted from InnLocation so Home / Team Corner / Dungeon
+    // party menus can offer the same auto-equip-best flow (player request:
+    // outfitting a naked recruit slot-by-slot was painful).
+    /// <summary>
+    /// Auto-equip the best available items from player inventory across all slots for a companion.
+    /// Scores items by primary stat (weapon power for weapons, armor class for armor, stat total for accessories).
+    /// </summary>
+    protected async Task RunEquipBestGear(Character target)
+    {
+        terminal.ClearScreen();
+        WriteBoxHeader($"{Loc.Get("inn.equip_best")}: {target.DisplayName.ToUpper()}", "bright_cyan");
+        terminal.WriteLine("");
+
+        terminal.SetColor("white");
+        terminal.Write(Loc.Get("inn.equip_best_confirm", target.DisplayName));
+        var confirm = (await terminal.ReadLineAsync()).ToUpper().Trim();
+        if (confirm != "Y")
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine(Loc.Get("ui.cancelled"));
+            await Task.Delay(1000);
+            return;
+        }
+
+        terminal.WriteLine("");
+        terminal.SetColor("cyan");
+        terminal.WriteLine(Loc.Get("inn.equip_best_scanning", target.DisplayName));
+        terminal.WriteLine("");
+
+        int equippedCount = 0;
+
+        // Process each equipment slot
+        var slotsToCheck = new[] {
+            EquipmentSlot.MainHand, EquipmentSlot.OffHand,
+            EquipmentSlot.Head, EquipmentSlot.Body, EquipmentSlot.Arms,
+            EquipmentSlot.Hands, EquipmentSlot.Legs, EquipmentSlot.Feet,
+            EquipmentSlot.Waist, EquipmentSlot.Face, EquipmentSlot.Cloak,
+            EquipmentSlot.Neck, EquipmentSlot.LFinger, EquipmentSlot.RFinger
+        };
+
+        foreach (var slot in slotsToCheck)
+        {
+            // Skip off-hand if companion is using a two-handed weapon
+            if (slot == EquipmentSlot.OffHand && target.IsTwoHanding)
+            {
+                terminal.SetColor("darkgray");
+                terminal.WriteLine($"  {slot.GetDisplayName()}: Using two-handed weapon");
+                continue;
+            }
+
+            // Get all matching items from player inventory for this slot
+            var candidates = GetItemsForSlot(slot)
+                .Where(x => !x.isEquipped && x.item.IsIdentified && !x.item.IsCursed)
+                .Where(x => x.item.CanEquip(target, out _))
+                .ToList();
+
+            if (candidates.Count == 0)
+            {
+                terminal.SetColor("darkgray");
+                terminal.WriteLine(Loc.Get("inn.equip_best_no_upgrade", slot.GetDisplayName()));
+                continue;
+            }
+
+            // Score each candidate by primary stat value (class-aware — see ScoreEquipment)
+            var bestCandidate = candidates
+                .OrderByDescending(x => ScoreEquipment(x.item, slot, target))
+                .First();
+
+            var currentItem = target.GetEquipment(slot);
+            int currentScore = currentItem != null ? ScoreEquipment(currentItem, slot, target) : 0;
+            int newScore = ScoreEquipment(bestCandidate.item, slot, target);
+
+            // Only equip if it's an upgrade (or slot is empty)
+            if (newScore <= currentScore && currentItem != null)
+            {
+                terminal.SetColor("darkgray");
+                terminal.WriteLine(Loc.Get("inn.equip_best_no_upgrade", slot.GetDisplayName()));
+                continue;
+            }
+
+            // Remove from player inventory (find by name match)
+            var invItem = currentPlayer.Inventory.FirstOrDefault(i => i.Name == bestCandidate.item.Name);
+            if (invItem == null) continue;
+            currentPlayer.Inventory.Remove(invItem);
+
+            // Track items before equipping so displaced items go to player
+            var targetInventoryBefore = target.Inventory.Count;
+
+            // Equip to target
+            if (target.EquipItem(bestCandidate.item, slot, out string message))
+            {
+                // Move displaced items back to player inventory
+                if (target.Inventory.Count > targetInventoryBefore)
+                {
+                    var displacedItems = target.Inventory.Skip(targetInventoryBefore).ToList();
+                    foreach (var displaced in displacedItems)
+                    {
+                        target.Inventory.Remove(displaced);
+                        currentPlayer.Inventory.Add(displaced);
+                    }
+                }
+
+                equippedCount++;
+                terminal.SetColor("bright_green");
+                if (currentItem != null)
+                    terminal.WriteLine(Loc.Get("inn.equip_best_upgraded", slot.GetDisplayName(), currentItem.Name, bestCandidate.item.Name));
+                else
+                    terminal.WriteLine(Loc.Get("inn.equip_best_equipped", slot.GetDisplayName(), bestCandidate.item.Name));
+            }
+            else
+            {
+                // Failed - return item to player
+                currentPlayer.Inventory.Add(invItem);
+            }
+        }
+
+        target.RecalculateStats();
+        terminal.WriteLine("");
+
+        if (equippedCount > 0)
+        {
+            terminal.SetColor("bright_green");
+            terminal.WriteLine(Loc.Get("inn.equip_best_done", equippedCount, target.DisplayName));
+            // Sync wrapper equipment back to companion BEFORE saving.
+            // v0.64.2: gated on IsCompanion -- team NPC targets are live
+            // ActiveNPCs references, no wrapper sync needed (SaveAllSharedState
+            // below persists them).
+            if (target.IsCompanion)
+                UsurperRemake.Systems.CompanionSystem.Instance?.SyncCompanionEquipment(target);
+            UsurperRemake.Systems.SaveSystem.Instance.ResetAutoSaveThrottle();
+            await UsurperRemake.Systems.SaveSystem.Instance.AutoSave(currentPlayer);
+
+            // Online mode: persist companion equipment to shared state
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode && UsurperRemake.Systems.OnlineStateManager.Instance != null)
+            {
+                try { await UsurperRemake.Systems.OnlineStateManager.Instance.SaveAllSharedState(); }
+                catch (Exception ex) { UsurperRemake.Systems.DebugLogger.Instance.LogError("EQUIP", $"SaveAllSharedState failed after EquipBest: {ex.Message}"); }
+            }
+        }
+        else
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine(Loc.Get("inn.equip_best_none", target.DisplayName));
+        }
+
+        await Task.Delay(2000);
+    }
+
+    /// <summary>
+    /// Score an equipment item for auto-equip comparison.
+    /// Weapons scored by weapon power, armor by AC, accessories by total stat bonuses.
+    /// </summary>
+    protected static int ScoreEquipment(Equipment item, EquipmentSlot slot, Character? target = null)
+    {
+        // Base score from primary stat
+        int score = 0;
+
+        if (slot == EquipmentSlot.MainHand || slot == EquipmentSlot.OffHand)
+        {
+            score = item.WeaponPower * 10 + item.ShieldBonus * 8;
+        }
+        else if (slot == EquipmentSlot.LFinger || slot == EquipmentSlot.RFinger ||
+                 slot == EquipmentSlot.Neck)
+        {
+            // Accessories: score by total stat bonuses
+            score = 0;
+        }
+        else
+        {
+            // Armor slots
+            score = item.ArmorClass * 10;
+        }
+
+        // Add stat bonuses (weighted equally)
+        score += (item.StrengthBonus + item.DexterityBonus + item.AgilityBonus +
+                  item.ConstitutionBonus + item.IntelligenceBonus + item.WisdomBonus +
+                  item.CharismaBonus) * 3;
+        score += item.MaxHPBonus * 2;
+        score += item.MaxManaBonus * 2;
+        score += item.DefenceBonus * 3;
+        score += item.MagicResistance * 2;
+        score += item.CriticalChanceBonus * 2;
+        score += item.LifeSteal * 2;
+        score += item.StaminaBonus * 2;
+
+        // v0.57.2 — class-aware weapon preference. Without this, auto-equip just picks the highest
+        // raw-stat weapon and ignores class fantasy: Warriors got 1H weapons in off-hand instead of
+        // shields, Assassins got swords instead of daggers, Clerics got 2H staves instead of
+        // mace+shield. Lumina reported all three.
+        if (target != null && (slot == EquipmentSlot.MainHand || slot == EquipmentSlot.OffHand))
+        {
+            score = ApplyClassWeaponPreference(score, item, slot, target);
+        }
+
+        return score;
+    }
+
+    /// <summary>
+    /// v0.57.2 — adjust a weapon/shield score by class-role preference. Multipliers are applied
+    /// AFTER the raw stat score so they amplify whichever item already looked best within the
+    /// class's preferred category, instead of letting raw stats dominate role fantasy.
+    /// </summary>
+    protected static int ApplyClassWeaponPreference(int score, Equipment item, EquipmentSlot slot, Character target)
+    {
+        var cls = target.Class;
+        bool isShield = item.WeaponType == WeaponType.Shield
+                     || item.WeaponType == WeaponType.Buckler
+                     || item.WeaponType == WeaponType.TowerShield;
+        bool isOneHandedWeapon = item.Slot == EquipmentSlot.MainHand
+                              && item.Handedness == WeaponHandedness.OneHanded;
+
+        switch (cls)
+        {
+            case CharacterClass.Warrior:
+            case CharacterClass.Paladin:
+            case CharacterClass.Tidesworn:
+                // Tank classes: strongly prefer shields in off-hand; de-prioritize 1H weapons there
+                if (slot == EquipmentSlot.OffHand)
+                {
+                    if (isShield) return (int)(score * 3.0);
+                    if (isOneHandedWeapon) return (int)(score * 0.3);
+                }
+                break;
+
+            case CharacterClass.Cleric:
+                // Cleric fantasy is mace + shield. A 2H staff overrides that, so penalize 2H
+                // main-hand weapons and boost mace/flail + shield.
+                if (slot == EquipmentSlot.MainHand)
+                {
+                    if (item.Handedness == WeaponHandedness.TwoHanded) return (int)(score * 0.5);
+                    if (item.WeaponType == WeaponType.Mace || item.WeaponType == WeaponType.Flail) return (int)(score * 1.4);
+                }
+                else if (slot == EquipmentSlot.OffHand)
+                {
+                    if (isShield) return (int)(score * 2.5);
+                    if (isOneHandedWeapon) return (int)(score * 0.4);
+                }
+                break;
+
+            case CharacterClass.Assassin:
+            case CharacterClass.Abysswarden:
+                // Assassins + Abysswardens scale off daggers (Backstab, Lethal Precision, Umbral Step). Prefer them in both hands.
+                if (item.WeaponType == WeaponType.Dagger) return (int)(score * 1.5);
+                if (slot == EquipmentSlot.MainHand || slot == EquipmentSlot.OffHand)
+                    return (int)(score * 0.7);
+                break;
+
+            case CharacterClass.Ranger:
+                if (slot == EquipmentSlot.MainHand && item.WeaponType == WeaponType.Bow)
+                    return (int)(score * 1.5);
+                break;
+
+            case CharacterClass.Barbarian:
+                // Barbarians favor big 2H weapons.
+                if (slot == EquipmentSlot.MainHand && item.Handedness == WeaponHandedness.TwoHanded)
+                    return (int)(score * 1.3);
+                break;
+
+            case CharacterClass.Magician:
+            case CharacterClass.Sage:
+            case CharacterClass.MysticShaman:
+            case CharacterClass.Wavecaller:
+                // Full casters: staves boost spell power.
+                if (slot == EquipmentSlot.MainHand && item.WeaponType == WeaponType.Staff)
+                    return (int)(score * 1.4);
+                break;
+
+            case CharacterClass.Bard:
+                // Bard songs require instruments; prefer them over regular weapons.
+                if (item.WeaponType == WeaponType.Instrument) return (int)(score * 1.5);
+                break;
+
+            case CharacterClass.Alchemist:
+                // Alchemist is INT-scaling but not a pure caster — mild staff preference.
+                if (slot == EquipmentSlot.MainHand && item.WeaponType == WeaponType.Staff)
+                    return (int)(score * 1.2);
+                break;
+        }
+
+        return score;
     }
 
     /// <summary>
