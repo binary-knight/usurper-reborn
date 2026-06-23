@@ -919,7 +919,7 @@ public class AnchorRoadLocation : BaseLocation
         terminal.SetColor("white");
         string response = await terminal.ReadLineAsync();
 
-        if (response?.ToUpper().StartsWith("Y") != true)
+        if (!GameConfig.IsAffirmative(response))
         {
             terminal.SetColor("white");
             terminal.WriteLine(Loc.Get("anchor_road.come_back_later"));
@@ -1401,7 +1401,7 @@ public class AnchorRoadLocation : BaseLocation
         terminal.SetColor("white");
         terminal.Write(Loc.Get("anchor_road.surrender_prompt_question"));
         string? response = await terminal.ReadLineAsync();
-        return response != null && response.Trim().StartsWith("y", StringComparison.OrdinalIgnoreCase);
+        return response != null && GameConfig.IsAffirmative(response);
     }
 
     /// <summary>Generate and award the champion's themed equipment drop. Stats scale to
@@ -1607,7 +1607,7 @@ public class AnchorRoadLocation : BaseLocation
             terminal.SetColor("white");
             string claimResponse = await terminal.ReadLineAsync();
 
-            if (claimResponse?.ToUpper().StartsWith("Y") == true)
+            if (GameConfig.IsAffirmative(claimResponse))
             {
                 currentPlayer.CTurf = true;
                 currentPlayer.TeamRec = 0;
@@ -1669,7 +1669,7 @@ public class AnchorRoadLocation : BaseLocation
         terminal.SetColor("white");
         string response = await terminal.ReadLineAsync();
 
-        if (response?.ToUpper().StartsWith("Y") == true)
+        if (GameConfig.IsAffirmative(response))
         {
             // Remove turf control from all team members
             currentPlayer.CTurf = false;
@@ -1766,7 +1766,7 @@ public class AnchorRoadLocation : BaseLocation
         terminal.SetColor("white");
         string response = await terminal.ReadLineAsync();
 
-        if (response?.ToUpper().StartsWith("Y") == true)
+        if (GameConfig.IsAffirmative(response))
         {
             int successChance = 30 + currentPlayer.Level + (int)(currentPlayer.Agility / 5);
             bool success = random.Next(100) < successChance;
@@ -2043,7 +2043,7 @@ public class AnchorRoadLocation : BaseLocation
 
         terminal.SetColor("white");
         string choice = (await terminal.GetInput(Loc.Get("merc.contract_claim_prompt"))).Trim().ToUpperInvariant();
-        if (choice == "Y" || choice == "S" || choice == "O" || choice == "I")
+        if (GameConfig.IsAffirmative(choice))
         {
             quest.Occupier = currentPlayer.Name2;
             quest.OccupierRace = currentPlayer.Race;

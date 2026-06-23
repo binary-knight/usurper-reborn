@@ -76,7 +76,7 @@ public static class HagglingEngine
         terminal.WriteLine(Loc.Get("haggle.got_deal", player.DisplayName));
         
         var confirm = await terminal.GetInput(Loc.Get("haggle.accept_price"));
-        if (confirm.ToUpper() == "Y")
+        if (GameConfig.IsAffirmative(confirm))
         {
             return offer;
         }
@@ -176,7 +176,7 @@ public static class HagglingEngine
 
         var choice = await terminal.GetInput(Loc.Get("haggle.insist_prompt"));
         
-        if (choice.ToUpper() == "Y")
+        if (GameConfig.IsAffirmative(choice))
         {
             // Player gets kicked out!
             terminal.SetColor("bright_red");

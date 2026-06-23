@@ -1486,7 +1486,7 @@ public class CastleLocation : BaseLocation
         terminal.SetColor("white");
         string confirm = await terminal.ReadLineAsync();
 
-        if (confirm?.ToUpper() == "Y")
+        if (GameConfig.IsAffirmative(confirm))
         {
             currentKing.Prisoners.Remove(name);
             AlignmentSystem.Instance.ChangeAlignment(currentPlayer, 100, isGood: false, "castle.execute_prisoner"); // v0.57.12: paired movement
@@ -2655,7 +2655,7 @@ public class CastleLocation : BaseLocation
         terminal.SetColor("white");
         string confirm = await terminal.ReadLineAsync();
 
-        if (confirm?.ToUpper() == "Y")
+        if (GameConfig.IsAffirmative(confirm))
         {
             CharacterSex sex = guardName.StartsWith("Lady") || guardName.StartsWith("Dame") ? CharacterSex.Female : CharacterSex.Male;
             // Scale guard salary with king level (guards hired by stronger kings demand more pay)
@@ -4367,7 +4367,7 @@ public class CastleLocation : BaseLocation
         terminal.SetColor("white");
         string confirm = await terminal.ReadLineAsync();
 
-        if (confirm?.ToUpper() == "Y")
+        if (GameConfig.IsAffirmative(confirm))
         {
             var faction = currentKing.Spouse.OriginalFaction;
             var spouseName = currentKing.Spouse.Name;
@@ -5693,7 +5693,7 @@ public class CastleLocation : BaseLocation
             terminal.SetColor("white");
             string leaveConfirm = await terminal.ReadLineAsync();
 
-            if (leaveConfirm?.ToUpper() != "Y")
+            if (!GameConfig.IsAffirmative(leaveConfirm))
             {
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("castle.remain_loyal_team"));
@@ -5739,7 +5739,7 @@ public class CastleLocation : BaseLocation
         terminal.SetColor("white");
         string confirm = await terminal.ReadLineAsync();
 
-        if (confirm?.ToUpper() != "Y")
+        if (!GameConfig.IsAffirmative(confirm))
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("castle.reconsider"));
@@ -6157,7 +6157,7 @@ public class CastleLocation : BaseLocation
             terminal.SetColor("white");
             string leaveConfirm = await terminal.ReadLineAsync();
 
-            if (leaveConfirm?.ToUpper() != "Y")
+            if (!GameConfig.IsAffirmative(leaveConfirm))
             {
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("castle.remain_loyal_team"));
@@ -6180,7 +6180,7 @@ public class CastleLocation : BaseLocation
         terminal.SetColor("white");
         string confirm = await terminal.ReadLineAsync();
 
-        if (confirm?.ToUpper() != "Y")
+        if (!GameConfig.IsAffirmative(confirm))
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("castle.decide_not_claim"));
@@ -6612,7 +6612,7 @@ public class CastleLocation : BaseLocation
                 terminal.Write(Loc.Get("castle.quest_accept_yn"));
                 string response = await terminal.ReadLineAsync();
 
-                if (response?.ToUpper() == "Y")
+                if (GameConfig.IsAffirmative(response))
                 {
                     // Create the actual quest in the QuestSystem
                     var quest = QuestSystem.CreateRoyalAudienceQuest(
@@ -6907,7 +6907,7 @@ public class CastleLocation : BaseLocation
                     terminal.Write(Loc.Get("castle.pardon_partial_yn", partialReduction, partialCost));
                     string partial = await terminal.ReadLineAsync();
 
-                    if (partial?.ToUpper() == "Y")
+                    if (GameConfig.IsAffirmative(partial))
                     {
                         currentPlayer.Gold -= partialCost;
                         currentPlayer.Darkness -= partialReduction;
@@ -6926,7 +6926,7 @@ public class CastleLocation : BaseLocation
                 terminal.Write(Loc.Get("castle.pardon_full_yn", pardonCost));
                 string response = await terminal.ReadLineAsync();
 
-                if (response?.ToUpper() == "Y")
+                if (GameConfig.IsAffirmative(response))
                 {
                     currentPlayer.Gold -= pardonCost;
                     long oldDarkness = currentPlayer.Darkness;
@@ -6992,7 +6992,7 @@ public class CastleLocation : BaseLocation
                 terminal.Write(Loc.Get("castle.loan_repay_yn", totalOwed));
                 string response = await terminal.ReadLineAsync();
 
-                if (response?.ToUpper() == "Y")
+                if (GameConfig.IsAffirmative(response))
                 {
                     currentPlayer.Gold -= totalOwed;
                     currentKing.Treasury += totalOwed;
@@ -7155,7 +7155,7 @@ public class CastleLocation : BaseLocation
                     terminal.Write(Loc.Get("castle.crime_pay_bounty_yn", bountyCost));
                     string confirm = await terminal.ReadLineAsync();
 
-                    if (confirm?.ToUpper() == "Y")
+                    if (GameConfig.IsAffirmative(confirm))
                     {
                         currentPlayer.Gold -= bountyCost;
                         currentKing.Treasury += bountyCost / 2; // Half goes to treasury
@@ -7262,7 +7262,7 @@ public class CastleLocation : BaseLocation
                 terminal.Write(prompt);
                 string response = await terminal.ReadLineAsync();
 
-                if (response?.ToUpper() == "Y")
+                if (GameConfig.IsAffirmative(response))
                 {
                     if (blessingCost > 0)
                     {
@@ -7359,7 +7359,7 @@ public class CastleLocation : BaseLocation
                 terminal.Write(Loc.Get("castle.tax_pay_yn", petitionCost));
                 string response = await terminal.ReadLineAsync();
 
-                if (response?.ToUpper() == "Y")
+                if (GameConfig.IsAffirmative(response))
                 {
                     currentPlayer.Gold -= petitionCost;
                     currentKing.Treasury += petitionCost;
@@ -7561,7 +7561,7 @@ public class CastleLocation : BaseLocation
         terminal.SetColor("white");
         string response = await terminal.ReadLineAsync();
 
-        if (response?.ToUpper() == "Y")
+        if (GameConfig.IsAffirmative(response))
         {
             // Add player as a guard
             var guard = new RoyalGuard
@@ -8343,7 +8343,7 @@ public class CastleLocation : BaseLocation
 
         var choice = await terminal.GetInputAsync("Join The Crown? (Y/N) ");
 
-        if (choice.ToUpper() == "Y")
+        if (GameConfig.IsAffirmative(choice))
         {
             await PerformCrownOath(factionSystem);
         }
@@ -8532,7 +8532,7 @@ public class CastleLocation : BaseLocation
         terminal.SetColor("white");
         string confirm = await terminal.ReadLineAsync();
 
-        if (confirm?.ToUpper() != "Y")
+        if (!GameConfig.IsAffirmative(confirm))
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("castle.siege_stands_down"));
@@ -8772,7 +8772,7 @@ public class CastleLocation : BaseLocation
         terminal.SetColor("white");
         string faceKing = await terminal.ReadLineAsync();
 
-        if (faceKing?.ToUpper() != "Y")
+        if (!GameConfig.IsAffirmative(faceKing))
         {
             await backend.CompleteSiege(siegeId, "retreated");
             terminal.SetColor("gray");

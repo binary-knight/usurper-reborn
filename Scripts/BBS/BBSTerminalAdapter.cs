@@ -398,7 +398,7 @@ namespace UsurperRemake.BBS
             if (string.IsNullOrEmpty(input))
                 return defaultValue;
 
-            return input == "Y" || input == "YES";
+            return GameConfig.IsAffirmative(input) || input == "YES";
         }
 
         public async Task<int> GetNumberInput(string prompt = "", int min = 0, int max = int.MaxValue)

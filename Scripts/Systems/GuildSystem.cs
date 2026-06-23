@@ -14,7 +14,7 @@ namespace UsurperRemake.Systems;
 ///
 /// Ranks (highest to lowest):
 ///   Leader  — full control (invite, kick, promote/demote, withdraw gold/items, set ranks)
-///   Officer — can invite, withdraw items, withdraw gold (up to 50k per withdrawal)
+///   Officer — can invite, withdraw items, withdraw gold (up to 10m per withdrawal)
 ///   Member  — deposit gold/items only, no withdrawals
 ///
 /// Chat commands:
@@ -51,7 +51,7 @@ public class GuildSystem
     public const int MaxGuildMembers = 20;
     public const double GuildXPBonusPerMember = 0.02; // 2% per member
     public const double MaxGuildXPBonus = 0.10; // 10% cap
-    public const long OfficerGoldWithdrawLimit = 50000; // Officers can withdraw up to 50k per transaction
+    public const long OfficerGoldWithdrawLimit = 10000000; // v0.65.1: 50k -> 10m so Officers can reclaim large dumped stashes after respawn (player request); the bank-balance check is the real guard, and there is no daily cap
     public const int MaxBankItems = 50; // Maximum items in guild bank
 
     // Rank hierarchy: Leader > Officer > Member

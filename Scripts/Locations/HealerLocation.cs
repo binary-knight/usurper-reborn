@@ -623,7 +623,7 @@ public class HealerLocation : BaseLocation
 
         var confirm = await terminal.GetInput(Loc.Get("healer.proceed_full_heal"));
 
-        if (confirm.ToUpper() != "Y")
+        if (!GameConfig.IsAffirmative(confirm))
         {
             terminal.WriteLine(Loc.Get("healer.as_you_wish"), "cyan");
             await Task.Delay(1000);
@@ -902,7 +902,7 @@ public class HealerLocation : BaseLocation
 
         var confirm = await terminal.GetInput(Loc.Get("healer.cure_poison_prompt"));
 
-        if (confirm.ToUpper() != "Y")
+        if (!GameConfig.IsAffirmative(confirm))
         {
             terminal.WriteLine(Loc.Get("healer.careful_poison"), "yellow");
             await Task.Delay(1500);
@@ -1010,7 +1010,7 @@ public class HealerLocation : BaseLocation
             CityControlSystem.Instance.DisplayTaxBreakdown(terminal, Loc.Get("healer.tax_disease_cures"), totalCost);
 
             var confirm = await terminal.GetInput(Loc.Get("healer.go_ahead_pay"));
-            if (confirm.ToUpper() != "Y")
+            if (!GameConfig.IsAffirmative(confirm))
             {
                 return;
             }
@@ -1045,7 +1045,7 @@ public class HealerLocation : BaseLocation
             CityControlSystem.Instance.DisplayTaxBreakdown(terminal, Loc.Get("healer.tax_disease_cure"), disease.Cost);
 
             var confirm = await terminal.GetInput(Loc.Get("healer.go_ahead_pay"));
-            if (confirm.ToUpper() != "Y")
+            if (!GameConfig.IsAffirmative(confirm))
             {
                 return;
             }
@@ -1192,7 +1192,7 @@ public class HealerLocation : BaseLocation
 
             var confirm = await terminal.GetInput(Loc.Get("healer.remove_curse_prompt"));
 
-            if (confirm.ToUpper() == "Y")
+            if (GameConfig.IsAffirmative(confirm))
             {
                 if (player.Gold < curseTotalWithTax)
                 {
@@ -1397,7 +1397,7 @@ public class HealerLocation : BaseLocation
 
         var confirm = await terminal.GetInput(Loc.Get("healer.proceed_rehab"));
 
-        if (confirm.ToUpper() != "Y")
+        if (!GameConfig.IsAffirmative(confirm))
         {
             terminal.WriteLine(Loc.Get("healer.door_open", player.Name2), "cyan");
             await Task.Delay(1000);

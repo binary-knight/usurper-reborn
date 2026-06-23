@@ -576,7 +576,7 @@ namespace UsurperRemake.Systems
 
             terminal.SetColor("bright_red");
             var confirm = await terminal.GetInputAsync($" Ban '{target.DisplayName}'? (Y/N): ");
-            if (confirm.ToUpper() != "Y") return;
+            if (!GameConfig.IsAffirmative(confirm)) return;
 
             await sqlBackend.BanPlayer(target.Username, reason);
             terminal.SetColor("green");
@@ -627,7 +627,7 @@ namespace UsurperRemake.Systems
             var target = banned[sel - 1];
             terminal.SetColor("yellow");
             var confirm = await terminal.GetInputAsync($" Unban '{target.displayName}'? (Y/N): ");
-            if (confirm.ToUpper() != "Y") return;
+            if (!GameConfig.IsAffirmative(confirm)) return;
 
             await sqlBackend.UnbanPlayer(target.username);
             terminal.SetColor("green");
@@ -1664,7 +1664,7 @@ namespace UsurperRemake.Systems
                     terminal.SetColor("bright_yellow");
                     terminal.WriteLine($"  Kick {target.DisplayName}?");
                     var confirm = await terminal.GetInputAsync("  Type Y to confirm: ");
-                    if (confirm.Equals("Y", StringComparison.OrdinalIgnoreCase))
+                    if (GameConfig.IsAffirmative(confirm))
                     {
                         await sqlBackend.UnregisterOnline(target.Username);
                         terminal.SetColor("bright_green");
@@ -2089,7 +2089,7 @@ namespace UsurperRemake.Systems
                     terminal.Write("Open download page in browser? (Y/N): ");
                     var response = await terminal.GetInputAsync("");
 
-                    if (response.Trim().ToUpper() == "Y")
+                    if (GameConfig.IsAffirmative(response))
                     {
                         checker.OpenDownloadPage();
                         terminal.SetColor("green");
@@ -2162,7 +2162,7 @@ namespace UsurperRemake.Systems
                 terminal.Write("Would you like to open the download page instead? (Y/N): ");
                 var response = await terminal.GetInputAsync("");
 
-                if (response.Trim().ToUpper() == "Y")
+                if (GameConfig.IsAffirmative(response))
                 {
                     checker.OpenDownloadPage();
                     terminal.SetColor("green");

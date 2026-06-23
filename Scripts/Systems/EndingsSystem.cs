@@ -1393,7 +1393,7 @@ namespace UsurperRemake.Systems
             while (true)
             {
                 response = (await terminal.GetInputAsync(Loc.Get("ending.immortal_ascend_prompt"))).Trim().ToUpper();
-                if (response == "Y" || response == "YES") break;
+                if (GameConfig.IsAffirmative(response) || response == "YES") break;
                 if (response == "N" || response == "NO") return false;
                 terminal.WriteLine("  Please enter Y or N.", "gray");
             }
@@ -1647,11 +1647,12 @@ namespace UsurperRemake.Systems
             while (true)
             {
                 response = (await terminal.GetInputAsync($"  {Loc.Get("ending.ngplus_begin_prompt")} ")).Trim().ToUpper();
-                if (response == "Y" || response == "YES" || response == "N" || response == "NO") break;
+                // Accept any localized yes (Y/S/O/I/...) or no (N is "no" in all 5 langs).
+                if (GameConfig.IsAffirmative(response) || response == "N" || response == "NO") break;
                 terminal.WriteLine("  Please enter Y or N.", "gray");
             }
 
-            if (response == "Y" || response == "YES")
+            if (GameConfig.IsAffirmative(response))
             {
                 await CycleSystem.Instance.StartNewCycle(player, ending, terminal);
                 // Signal the game to restart with a new character

@@ -515,7 +515,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("");
             terminal.SetColor("bright_red");
             var confirm = await ReadInput($"Ban '{target.DisplayName}'? (Y/N): ");
-            if (confirm.ToUpper() != "Y")
+            if (!GameConfig.IsAffirmative(confirm))
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine("Ban cancelled.");
@@ -581,7 +581,7 @@ namespace UsurperRemake.Systems
             var target = banned[selection - 1];
             terminal.SetColor("yellow");
             var confirm = await ReadInput($"Unban '{target.displayName}'? (Y/N): ");
-            if (confirm.ToUpper() != "Y")
+            if (!GameConfig.IsAffirmative(confirm))
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine("Unban cancelled.");
@@ -886,7 +886,7 @@ namespace UsurperRemake.Systems
                         {
                             terminal.SetColor("yellow");
                             var discard = await ReadInput("Discard unsaved changes? (Y/N): ");
-                            if (discard.ToUpper() != "Y")
+                            if (!GameConfig.IsAffirmative(discard))
                                 break;
                         }
                         return;
@@ -1865,7 +1865,7 @@ namespace UsurperRemake.Systems
 
             terminal.SetColor("white");
             var confirm = await ReadInput(Loc.Get("ui.confirm"));
-            if (confirm.ToUpper() != "Y")
+            if (!GameConfig.IsAffirmative(confirm))
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine(Loc.Get("ui.cancelled"));
@@ -1919,7 +1919,7 @@ namespace UsurperRemake.Systems
             terminal.SetColor("yellow");
             terminal.WriteLine($"Message: *** {message} ***");
             var confirm = await ReadInput("Set as persistent broadcast? (Y/N): ");
-            if (confirm.ToUpper() != "Y")
+            if (!GameConfig.IsAffirmative(confirm))
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine("Broadcast cancelled.");

@@ -2998,9 +2998,10 @@ public partial class CombatEngine
                 break;
                 
             case CombatActionType.Heal:
-                await ExecuteHeal(player, result, false);
+                // v0.65.1: grouped followers have no interactive prompt channel -> quick.
+                await ExecuteHeal(player, result, player.IsGroupedPlayer);
                 break;
-                
+
             case CombatActionType.QuickHeal:
                 await ExecuteHeal(player, result, true);
                 break;
@@ -3893,7 +3894,7 @@ public partial class CombatEngine
             terminal.WriteLine(Loc.Get("combat.poison_already_coated", $"{PoisonData.GetName(player.ActivePoisonType)} ({player.PoisonCoatingCombats} combats remaining)"));
             terminal.Write(Loc.Get("combat.replace_yn"));
             var confirm = await terminal.GetInput("");
-            if (!confirm.Trim().Equals("Y", StringComparison.OrdinalIgnoreCase))
+            if (!GameConfig.IsAffirmative(confirm))
             {
                 terminal.WriteLine(Loc.Get("combat.poison_keep_current"), "gray");
                 await Task.Delay(GetCombatDelay(500));
@@ -6161,7 +6162,7 @@ public partial class CombatEngine
                     string response = (await terminal.GetKeyInput()).ToUpperInvariant();
                     terminal.WriteLine("");
 
-                    if (response == "Y")
+                    if (GameConfig.IsAffirmative(response))
                     {
                         // Peaceful resolution — mark as spared
                         terminal.WriteLine($"  {Loc.Get("combat.manwe_lower_weapon")}", "bright_cyan");
@@ -6777,7 +6778,7 @@ public partial class CombatEngine
         {
             terminal.WriteLine(Loc.Get("combat.pickup_weapon", result.Monster.Weapon), "yellow");
             var input = await terminal.GetInput("> ");
-            if (input.Trim().ToUpper().StartsWith("Y"))
+            if (GameConfig.IsAffirmative(input))
             {
                 Item lootItem;
                 var baseWeapon = ItemManager.GetClassicWeapon((int)result.Monster.WeapNr);
@@ -6820,7 +6821,7 @@ public partial class CombatEngine
         {
             terminal.WriteLine(Loc.Get("combat.pickup_armor", result.Monster.Armor), "yellow");
             var input = await terminal.GetInput("> ");
-            if (input.Trim().ToUpper().StartsWith("Y"))
+            if (GameConfig.IsAffirmative(input))
             {
                 Item lootItem;
                 var baseArmor = ItemManager.GetClassicArmor((int)result.Monster.ArmNr);
@@ -9143,6 +9144,22 @@ public partial class CombatEngine
                 lootBroadcastSb.AppendLine($"\u001b[36m  {Loc.Get("combat.loot_bonuses", string.Join(", ", bonuses))}\u001b[0m");
             }
 
+            // v0.65.1: weapon-class tag (One-Handed / Two-Handed / Shield / Buckler...)
+            // so the player can tell a weapon's handedness, and spot a shield, WITHOUT
+            // equipping it. Robust shield detection catches a buckler mis-typed as a 1H
+            // weapon. InferWeaponType only runs for actual weapons (it defaults to Sword).
+            var lootClassTag = GameConfig.GetWeaponClassTag(
+                lootItem.Name,
+                lootItem.Type == global::ObjType.Weapon ? ShopItemGenerator.InferWeaponType(lootItem.Name) : WeaponType.None,
+                WeaponHandedness.None,
+                lootItem.ShieldBonus,
+                lootItem.BlockChance);
+            if (!string.IsNullOrEmpty(lootClassTag))
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine(Loc.Get("equip.weapon_class_line", lootClassTag));
+            }
+
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("combat.loot_value", $"{lootItem.Value:N0}"));
 
@@ -10156,7 +10173,7 @@ public partial class CombatEngine
         string ch = (await terminal.GetKeyInput()).Trim().ToUpper();
         // Accept affirmative first-letter across supported languages: English Y, Spanish S (Sí),
         // French O (Oui), Italian S (Sì), Hungarian I (Igen). Falls through to N otherwise.
-        bool approved = ch == "Y" || ch == "S" || ch == "O" || ch == "I";
+        bool approved = GameConfig.IsAffirmative(ch);
 
         // v0.57.8: only print the declined message here. The "approved" line
         // ("You nod. Aldric gears up.") is printed by the caller AFTER EquipItem
@@ -10617,6 +10634,15 @@ public partial class CombatEngine
         {
             terminal.SetColor("cyan");
             terminal.WriteLine(Loc.Get("combat.currently_equipped", currentEquip.Name));
+
+            // v0.65.1: show the equipped item's class too, so the player sees the
+            // handedness tradeoff (e.g. a dropped 2H sword vs your current 1H + shield).
+            var curClassTag = GameConfig.GetWeaponClassTag(currentEquip.Name, currentEquip.WeaponType, currentEquip.Handedness, currentEquip.ShieldBonus, currentEquip.BlockChance);
+            if (!string.IsNullOrEmpty(curClassTag))
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine(Loc.Get("equip.weapon_class_line", curClassTag));
+            }
 
             // Compare primary stat (Attack for weapons, Armor for armor, stat value for accessories)
             if (lootItem.Type == global::ObjType.Weapon)
@@ -12706,7 +12732,10 @@ public partial class CombatEngine
                 break;
 
             case CombatActionType.Heal:
-                await ExecuteHeal(player, result, false);
+                // v0.65.1: grouped followers have no interactive prompt channel, so the potion
+                // path must be quick -- non-quick routes to ExecuteUseItem's GetInput submenu,
+                // which would hang the follower until the combat-input timeout.
+                await ExecuteHeal(player, result, player.IsGroupedPlayer);
                 break;
 
             case CombatActionType.QuickHeal:
@@ -13655,7 +13684,9 @@ public partial class CombatEngine
                         {
                             string hpColor = pct > 0.5 ? "bright_green" : pct > 0.25 ? "yellow" : "red";
                             terminal.SetColor(hpColor);
-                            terminal.WriteLine(Loc.Get("combat.heal_target_option", idx, idx == 0 ? Loc.Get("combat.yourself") : c.DisplayName, c.HP, c.MaxHP));
+                            // v0.65.1: show HP% here too, matching the spell heal-target menu
+                            // (SelectHealTarget) -- player asked for the at-a-glance percentage.
+                            terminal.WriteLine(Loc.Get("combat.heal_target_option", idx, idx == 0 ? Loc.Get("combat.yourself") : c.DisplayName, c.HP, c.MaxHP, (int)(pct * 100)));
                         }
                         terminal.SetColor("gray");
                         string targetInput = await terminal.GetInput("  Target (ENTER=self): ");
@@ -15931,7 +15962,9 @@ public partial class CombatEngine
         // When targeting an ally, strip the spell effect portion from the message
         // (caster-named heal/buff text) since the correct target messages are shown by ApplySpellEffects
         var displayMsg = spellResult.Message;
-        if (action.AllyTargetIndex.HasValue && (spellInfo.SpellType == "Heal" || spellInfo.SpellType == "Buff"))
+        if ((action.AllyTargetIndex.HasValue
+                || (action.HealTargetOverride != null && action.HealTargetOverride != player))
+            && (spellInfo.SpellType == "Heal" || spellInfo.SpellType == "Buff"))
         {
             // Keep incantation + CRITICAL CAST, strip spell-specific effect message
             int critIdx = displayMsg.IndexOf("CRITICAL CAST!");
@@ -15967,8 +16000,54 @@ public partial class CombatEngine
         // AllyTargetIndex is a stable index into currentTeammates (not a filtered list)
         if (spellInfo.SpellType == "Buff" || spellInfo.SpellType == "Heal")
         {
+            // v0.65.1: shared single-target apply helpers, used by BOTH the new group-follower
+            // override branch and the leader's existing AllyTargetIndex branch.
+            void ApplyHealTo(Character tgt)
+            {
+                if (spellResult.Healing > 0)
+                {
+                    spellResult.Healing = ApplyHealerSpecBonus(player, spellResult.Healing);
+                    long oldHP = tgt.HP;
+                    tgt.HP = Math.Min(tgt.MaxHP, tgt.HP + spellResult.Healing);
+                    long actualHeal = tgt.HP - oldHP;
+                    terminal.SetColor("bright_green");
+                    terminal.WriteLine(Loc.Get("combat.aid_recover_hp", tgt.DisplayName, actualHeal));
+                    if (tgt.IsCompanion && tgt.CompanionId.HasValue)
+                        CompanionSystem.Instance.SyncCompanionHP(tgt);
+                }
+                if (spellResult.ProtectionBonus > 0)
+                {
+                    int dur = spellResult.Duration > 0 ? spellResult.Duration : 999;
+                    tgt.MagicACBonus = spellResult.ProtectionBonus;
+                    tgt.ApplyStatus(StatusEffect.Blessed, dur);
+                    terminal.SetColor("blue");
+                    terminal.WriteLine(Loc.Get("combat.magically_protected", tgt.DisplayName, spellResult.ProtectionBonus));
+                }
+                result.CombatLog.Add($"{player.DisplayName} casts {spellInfo.Name} on {tgt.DisplayName}.");
+            }
+            void ApplyBuffTo(Character tgt)
+            {
+                ApplySpellEffects(tgt, null, spellResult);
+                result.CombatLog.Add($"{player.DisplayName} casts {spellInfo.Name} on {tgt.DisplayName}.");
+            }
+
+            // v0.65.1: group-follower direct heal/buff target. Reaches the leader (who is NOT in
+            // currentTeammates) and self/any teammate. Highest precedence; only set on the
+            // follower path so the leader's own combat is unaffected.
+            if (action.HealTargetOverride != null && !spellInfo.IsMultiTarget)
+            {
+                var overrideTgt = action.HealTargetOverride;
+                if (!overrideTgt.IsAlive || overrideTgt == player)
+                {
+                    // Dead target or self -> apply to caster (matches the dead-ally fallback).
+                    ApplySpellEffects(player, null, spellResult);
+                    result.CombatLog.Add($"{player.DisplayName} casts {spellInfo.Name}.");
+                }
+                else if (spellInfo.SpellType == "Heal") ApplyHealTo(overrideTgt);
+                else ApplyBuffTo(overrideTgt);
+            }
             // Multi-target buff (e.g. Covenant of the Deep, Symphony of the Depths) — buff caster AND all teammates
-            if (spellInfo.IsMultiTarget && spellInfo.SpellType == "Buff")
+            else if (spellInfo.IsMultiTarget && spellInfo.SpellType == "Buff")
             {
                 // Apply buffs to caster
                 ApplySpellEffects(player, null, spellResult);
@@ -16009,6 +16088,31 @@ public partial class CombatEngine
                     }
                 }
 
+                // v0.65.1: include the LEADER (combat owner = result.Player, not in
+                // currentTeammates) in a follower's party-wide buff. No-op for the leader's
+                // own / single-player cast (result.Player == player).
+                if (result.Player != null && result.Player != player && result.Player.IsAlive
+                    && (currentTeammates == null || !currentTeammates.Contains(result.Player)))
+                {
+                    var lead = result.Player;
+                    if (spellResult.ProtectionBonus > 0)
+                    {
+                        int dur = spellResult.Duration > 0 ? spellResult.Duration : 999;
+                        lead.MagicACBonus = spellResult.ProtectionBonus;
+                        lead.ApplyStatus(StatusEffect.Blessed, dur);
+                        terminal.WriteLine(Loc.Get("combat.magically_protected", lead.DisplayName, spellResult.ProtectionBonus), "blue");
+                    }
+                    if (spellResult.AttackBonus > 0)
+                    {
+                        int dur = spellResult.Duration > 0 ? spellResult.Duration : 3;
+                        lead.TempAttackBonus += spellResult.AttackBonus;
+                        lead.TempAttackBonusDuration = Math.Max(lead.TempAttackBonusDuration, dur);
+                        terminal.WriteLine(Loc.Get("combat.power_surges", lead.DisplayName, spellResult.AttackBonus), "red");
+                    }
+                    if (player.HasStatus(StatusEffect.Hidden) && !lead.HasStatus(StatusEffect.Hidden))
+                        lead.ApplyStatus(StatusEffect.Hidden, 2);
+                }
+
                 result.CombatLog.Add($"{player.DisplayName} casts {spellInfo.Name} on the whole party.");
             }
             // Multi-target heal (e.g. Mass Cure) — heal caster AND all living teammates
@@ -16047,6 +16151,22 @@ public partial class CombatEngine
                     }
                 }
 
+                // v0.65.1: a follower's party-wide heal must also reach the LEADER (combat
+                // owner = result.Player), who is not in currentTeammates. No-op for the
+                // leader's own / single-player cast (result.Player == player).
+                if (result.Player != null && result.Player != player && result.Player.IsAlive
+                    && (currentTeammates == null || !currentTeammates.Contains(result.Player)))
+                {
+                    long oldLeaderHP = result.Player.HP;
+                    result.Player.HP = Math.Min(result.Player.MaxHP, result.Player.HP + spellResult.Healing);
+                    long leaderHeal = result.Player.HP - oldLeaderHP;
+                    if (leaderHeal > 0)
+                    {
+                        terminal.SetColor("bright_green");
+                        terminal.WriteLine(Loc.Get("combat.aid_recover_hp", result.Player.DisplayName, leaderHeal));
+                    }
+                }
+
                 // Apply any protection/buff bonus from the spell to entire party
                 if (spellResult.ProtectionBonus > 0)
                 {
@@ -16064,6 +16184,14 @@ public partial class CombatEngine
                             terminal.WriteLine(Loc.Get("combat.magically_protected", tm.DisplayName, spellResult.ProtectionBonus), "blue");
                         }
                     }
+                    // v0.65.1: leader inclusion (see above).
+                    if (result.Player != null && result.Player != player && result.Player.IsAlive
+                        && (currentTeammates == null || !currentTeammates.Contains(result.Player)))
+                    {
+                        result.Player.MagicACBonus = spellResult.ProtectionBonus;
+                        result.Player.ApplyStatus(StatusEffect.Blessed, dur);
+                        terminal.WriteLine(Loc.Get("combat.magically_protected", result.Player.DisplayName, spellResult.ProtectionBonus), "blue");
+                    }
                 }
 
                 result.CombatLog.Add($"{player.DisplayName} casts {spellInfo.Name} on the whole party.");
@@ -16079,43 +16207,8 @@ public partial class CombatEngine
                     ApplySpellEffects(player, null, spellResult);
                     result.CombatLog.Add($"{player.DisplayName} casts {spellInfo.Name}.");
                 }
-                else if (spellInfo.SpellType == "Heal")
-                {
-                    // Heal ally
-                    if (spellResult.Healing > 0)
-                    {
-                        // v0.56.0 healer spec bonus applies to ally-targeted spell heals
-                        spellResult.Healing = ApplyHealerSpecBonus(player, spellResult.Healing);
-                        long oldHP = allyTarget.HP;
-                        allyTarget.HP = Math.Min(allyTarget.MaxHP, allyTarget.HP + spellResult.Healing);
-                        long actualHeal = allyTarget.HP - oldHP;
-
-                        terminal.SetColor("bright_green");
-                        terminal.WriteLine(Loc.Get("combat.aid_recover_hp", allyTarget.DisplayName, actualHeal));
-
-                        // Sync companion HP
-                        if (allyTarget.IsCompanion && allyTarget.CompanionId.HasValue)
-                        {
-                            CompanionSystem.Instance.SyncCompanionHP(allyTarget);
-                        }
-                    }
-                    // Also apply protection if the heal spell has a protection bonus
-                    if (spellResult.ProtectionBonus > 0)
-                    {
-                        int dur = spellResult.Duration > 0 ? spellResult.Duration : 999;
-                        allyTarget.MagicACBonus = spellResult.ProtectionBonus;
-                        allyTarget.ApplyStatus(StatusEffect.Blessed, dur);
-                        terminal.SetColor("blue");
-                        terminal.WriteLine(Loc.Get("combat.magically_protected", allyTarget.DisplayName, spellResult.ProtectionBonus));
-                    }
-                    result.CombatLog.Add($"{player.DisplayName} casts {spellInfo.Name} on {allyTarget.DisplayName}.");
-                }
-                else // Buff targeting ally
-                {
-                    // Apply all buff effects (protection, attack, special) to the ally
-                    ApplySpellEffects(allyTarget, null, spellResult);
-                    result.CombatLog.Add($"{player.DisplayName} casts {spellInfo.Name} on {allyTarget.DisplayName}.");
-                }
+                else if (spellInfo.SpellType == "Heal") ApplyHealTo(allyTarget);
+                else ApplyBuffTo(allyTarget); // Buff targeting ally
             }
             else
             {
@@ -17660,14 +17753,20 @@ public partial class CombatEngine
     /// Looks at `Character.IsCompanion` + `CompanionId` (the enum) rather than
     /// NPC type, because companion wrappers during combat are Character-typed.
     /// </summary>
-    private static HashSet<string> GetDisabledSpellsFor(Character caster)
+    private HashSet<string> GetDisabledSpellsFor(Character caster)
     {
         if (caster.IsCompanion && caster.CompanionId.HasValue && CompanionSystem.Instance != null)
         {
             var companion = CompanionSystem.Instance.GetCompanion(caster.CompanionId.Value);
             if (companion?.DisabledSpells != null && companion.DisabledSpells.Count > 0)
                 return companion.DisabledSpells;
+            return new HashSet<string>();
         }
+        // v0.65.1: non-companion teammates read the controlling player's spell toggles.
+        if (currentPlayer != null
+            && currentPlayer.TeammateDisabledSpells.TryGetValue(caster.GetSkillToggleKey(), out var disabledSpells)
+            && disabledSpells.Count > 0)
+            return new HashSet<string>(disabledSpells);
         return new HashSet<string>();
     }
 
@@ -17876,6 +17975,17 @@ public partial class CombatEngine
                     .ToList();
                 if (availableAbilities.Count == 0) return false;
             }
+        }
+        // v0.65.1: non-companion teammates (Team Corner NPCs / spouses / echoes) read the
+        // controlling player's per-teammate skill toggles, so they stop using "trash" moves.
+        else if (currentPlayer != null
+            && currentPlayer.TeammateDisabledAbilities.TryGetValue(teammate.GetSkillToggleKey(), out var disabledTeammateAbilities)
+            && disabledTeammateAbilities.Count > 0)
+        {
+            availableAbilities = availableAbilities
+                .Where(a => !disabledTeammateAbilities.Contains(a.Id))
+                .ToList();
+            if (availableAbilities.Count == 0) return false;
         }
 
         // Apply specialization-based ability filtering (NPC teammates only)
@@ -21062,8 +21172,11 @@ public partial class CombatEngine
         bool hasHealing = player.Healing > 0 && player.HP < player.MaxHP;
         bool hasMana = player.ManaPotions > 0 && player.Mana < player.MaxMana;
 
-        // If player has both types, let them choose
-        if (hasHealing && hasMana)
+        // If player has both types, let them choose. v0.65.1: grouped followers have no
+        // interactive prompt channel (GroupFollowerLoop is the live reader on their stream),
+        // so prompting here would hang them -- auto-default to the healing potion (HP is the
+        // more urgent need) instead.
+        if (hasHealing && hasMana && !player.IsGroupedPlayer)
         {
             terminal.WriteLine(Loc.Get("combat.which_potion"), "cyan");
             terminal.WriteLine(Loc.Get("combat.potion_choice_heal", player.Healing, player.MaxPotions), "green");
@@ -28219,8 +28332,12 @@ public partial class CombatEngine
 
             // Show the full combat display — same as what the leader sees
             DisplayCombatStatus(monsters, teammate);
-            bool hasInjuredTeammates = currentTeammates?.Any(t => t.IsAlive && t.HP < t.MaxHP) ?? false;
-            bool hasManaNeededTeammates = currentTeammates?.Any(t => t.IsAlive && t.MaxMana > 0 && t.Mana < t.MaxMana) ?? false;
+            // v0.65.1: include the LEADER (not in currentTeammates) so [H] shows when only the
+            // leader is hurt -- a follower healer's most common target.
+            bool hasInjuredTeammates = (leader != null && leader.IsAlive && leader.HP < leader.MaxHP)
+                || (currentTeammates?.Any(t => t.IsAlive && t.HP < t.MaxHP) ?? false);
+            bool hasManaNeededTeammates = (leader != null && leader.IsAlive && leader.MaxMana > 0 && leader.Mana < leader.MaxMana)
+                || (currentTeammates?.Any(t => t.IsAlive && t.MaxMana > 0 && t.Mana < t.MaxMana) ?? false);
             bool hasTeammatesNeedingAid = hasInjuredTeammates || hasManaNeededTeammates;
             bool canHealAlly = hasTeammatesNeedingAid && (teammate.Healing > 0 || teammate.ManaPotions > 0 ||
                 (ClassAbilitySystem.IsSpellcaster(teammate.Class) && teammate.Mana > 0));
@@ -28261,6 +28378,31 @@ public partial class CombatEngine
                 }
             }
 
+            // v0.65.1: show the heal-target numbers (T#) so a healer follower can aim a heal/buff
+            // with C#T#. Same BuildFollowerHealTargets ordering the parser uses, so numbers match.
+            if (ClassAbilitySystem.IsSpellcaster(teammate.Class) && teammate.Mana > 0
+                && SpellSystem.GetAvailableSpells(teammate).Any(s =>
+                    (s.SpellType == "Heal" || s.SpellType == "Buff")
+                    && teammate.Mana >= SpellSystem.CalculateManaCost(s, teammate)))
+            {
+                var healTargets = BuildFollowerHealTargets(teammate, leader);
+                terminal.SetColor("darkgray");
+                terminal.Write($" {Loc.Get("combat.follower_heal_targets_label")} ");
+                for (int ti = 0; ti < healTargets.Count; ti++)
+                {
+                    var tgt = healTargets[ti];
+                    int hpPct = tgt.MaxHP > 0 ? (int)(100 * tgt.HP / tgt.MaxHP) : 100;
+                    string label = ti == 0 ? Loc.Get("combat.follower_heal_target_self") : tgt.DisplayName;
+                    terminal.SetColor("bright_yellow");
+                    terminal.Write($"T{ti + 1}");
+                    terminal.SetColor("darkgray");
+                    terminal.Write($"={label}({hpPct}%) ");
+                }
+                terminal.WriteLine("");
+                terminal.SetColor("darkgray");
+                terminal.WriteLine($"  {Loc.Get("combat.follower_heal_target_hint")}");
+            }
+
             // Signal the follower loop that we need combat input
             teammate.IsAwaitingCombatInput = true;
 
@@ -28290,7 +28432,7 @@ public partial class CombatEngine
                     input = "A";
                 }
 
-                action = ParseGroupCombatInput(input, teammate, monsters, result);
+                action = ParseGroupCombatInput(input, teammate, leader, monsters, result);
             }
             finally
             {
@@ -28392,12 +28534,50 @@ public partial class CombatEngine
     }
 
     /// <summary>
+    /// v0.65.1: the ordered heal/buff target list a group FOLLOWER can reference with T#:
+    /// T1 = self, T2 = leader (who is NOT in currentTeammates), T3+ = other living teammates.
+    /// Used by BOTH the parser and the follower's on-screen heal-target list so the numbers
+    /// shown always equal the numbers parsed.
+    /// </summary>
+    private List<Character> BuildFollowerHealTargets(Character teammate, Character leader)
+    {
+        var list = new List<Character> { teammate }; // T1 = self
+        if (leader != null && leader != teammate && leader.IsAlive)
+            list.Add(leader);                          // T2 = leader
+        if (currentTeammates != null)
+        {
+            foreach (var t in currentTeammates)
+                if (t != null && t != teammate && t != leader && t.IsAlive && !list.Contains(t))
+                    list.Add(t);                       // T3+ = other living teammates
+        }
+        return list;
+    }
+
+    /// <summary>
+    /// v0.65.1: default heal/buff target when a follower gives no explicit T#: the most-injured
+    /// for a heal (falls back to self), or self for a buff. The list always contains self (T1).
+    /// </summary>
+    private Character? PickDefaultHealTarget(List<Character> healTargets, bool isHeal)
+    {
+        if (isHeal)
+        {
+            var injured = healTargets
+                .Where(t => t.IsAlive && t.HP < t.MaxHP)
+                .OrderBy(t => t.MaxHP > 0 ? (double)t.HP / t.MaxHP : 1.0)
+                .FirstOrDefault();
+            return injured ?? healTargets.FirstOrDefault();
+        }
+        return healTargets.FirstOrDefault(); // buff -> self
+    }
+
+    /// <summary>
     /// Parse a grouped player's single-line combat input into a CombatAction.
     /// Supports the full combat action set: A (attack), C (cast spell), I (use potion),
     /// D (defend), H (heal ally), R (retreat), 1-9 (quickbar), AUTO, SPD,
-    /// and all class-specific abilities.
+    /// and all class-specific abilities. v0.65.1: heal/buff spells can target an ally
+    /// (incl. the leader) via C#T#, and bare C / H pick a heal for healer classes.
     /// </summary>
-    private CombatAction ParseGroupCombatInput(string input, Character teammate,
+    private CombatAction ParseGroupCombatInput(string input, Character teammate, Character leader,
         List<Monster> monsters, CombatResult result)
     {
         var trimmed = input.Trim().ToUpperInvariant();
@@ -28458,7 +28638,16 @@ public partial class CombatEngine
                     if (spell.IsMultiTarget)
                         action.TargetAllMonsters = true;
                     else if (spell.SpellType == "Buff" || spell.SpellType == "Heal")
+                    {
+                        // v0.65.1: heal/buff an ALLY via T# (T1=self, T2=leader, T3+=teammates).
+                        // No/invalid T# -> most-injured (heal) or self (buff).
+                        var healTargets = BuildFollowerHealTargets(teammate, leader);
+                        if (targetNum >= 1 && targetNum <= healTargets.Count)
+                            action.HealTargetOverride = healTargets[targetNum - 1];
+                        else
+                            action.HealTargetOverride = PickDefaultHealTarget(healTargets, spell.SpellType == "Heal");
                         action.TargetIndex = null;
+                    }
                     else if (targetNum >= 1 && targetNum <= monsters.Count && monsters[targetNum - 1].IsAlive)
                         action.TargetIndex = targetNum - 1;
                     else
@@ -28485,6 +28674,26 @@ public partial class CombatEngine
                 if (bestSpell.IsMultiTarget) action.TargetAllMonsters = true;
                 return action;
             }
+
+            // v0.65.1: a pure healer (no Attack spell) pressing bare C casts their best heal
+            // on the most-injured party member -- so "C = cast best spell" is true for healers.
+            var bestHeal = spells
+                .Where(s => s.SpellType == "Heal")
+                .OrderByDescending(s => s.Level)
+                .FirstOrDefault();
+            if (bestHeal != null)
+            {
+                var healTargets = BuildFollowerHealTargets(teammate, leader);
+                if (healTargets.Any(t => t.IsAlive && t.HP < t.MaxHP))
+                {
+                    action.Type = CombatActionType.CastSpell;
+                    action.SpellIndex = bestHeal.Level;
+                    if (bestHeal.IsMultiTarget) action.TargetAllMonsters = true;
+                    else action.HealTargetOverride = PickDefaultHealTarget(healTargets, true);
+                    return action;
+                }
+            }
+
             action.Type = CombatActionType.Attack;
             return action;
         }
@@ -28510,15 +28719,34 @@ public partial class CombatEngine
             return action;
         }
 
-        // Heal ally (potion or heal spell on teammate)
+        // Heal ally -- v0.65.1: cast a heal spell on an ally if able (incl. the leader),
+        // otherwise fall back to a self potion (quick mode, never blocks on a prompt).
         if (trimmed == "H")
         {
-            bool hasInjuredTeammates = currentTeammates?.Any(t => t.IsAlive && t.HP < t.MaxHP) ?? false;
-            bool hasManaNeededTeammates = currentTeammates?.Any(t => t.IsAlive && t.MaxMana > 0 && t.Mana < t.MaxMana) ?? false;
-            bool hasTeammatesNeedingAid = hasInjuredTeammates || hasManaNeededTeammates;
-            bool canHealAlly = hasTeammatesNeedingAid && (teammate.Healing > 0 || teammate.ManaPotions > 0 ||
-                (ClassAbilitySystem.IsSpellcaster(teammate.Class) && teammate.Mana > 0));
-            if (canHealAlly)
+            // Target list includes the leader, so [H] fires even when only the leader is hurt.
+            var healTargets = BuildFollowerHealTargets(teammate, leader);
+            bool anyInjured = healTargets.Any(t => t.IsAlive && t.HP < t.MaxHP);
+
+            if (anyInjured && ClassAbilitySystem.IsSpellcaster(teammate.Class) && teammate.Mana > 0)
+            {
+                var castableHeal = SpellSystem.GetAvailableSpells(teammate)
+                    .Where(s => s.SpellType == "Heal" && teammate.Mana >= SpellSystem.CalculateManaCost(s, teammate))
+                    .OrderByDescending(s => s.Level)
+                    .FirstOrDefault();
+                if (castableHeal != null)
+                {
+                    action.Type = CombatActionType.CastSpell;
+                    action.SpellIndex = castableHeal.Level;
+                    if (castableHeal.IsMultiTarget) action.TargetAllMonsters = true;
+                    else action.HealTargetOverride = PickDefaultHealTarget(healTargets, true);
+                    return action;
+                }
+            }
+
+            // No heal spell -> use a potion on self (only useful if the follower is hurt and
+            // carries potions). CombatActionType.Heal uses quick mode for followers (no prompt).
+            if ((teammate.HP < teammate.MaxHP && teammate.Healing > 0)
+                || (teammate.Mana < teammate.MaxMana && teammate.ManaPotions > 0))
             {
                 action.Type = CombatActionType.Heal;
                 return action;
@@ -29069,6 +29297,12 @@ public class CombatAction
 
     // Ally targeting for heal spells
     public int? AllyTargetIndex { get; set; }     // Which teammate to heal (null = self)
+
+    // v0.65.1: group-FOLLOWER heal/buff direct target (self / leader / any teammate). Set ONLY
+    // by ParseGroupCombatInput and checked at highest precedence in ExecuteSpellMultiMonster.
+    // The leader is NOT in currentTeammates during a follower's turn, so an index can't reach
+    // them; a direct Character reference can, and is stable if HP changes between select and apply.
+    public Character? HealTargetOverride { get; set; }
 }
 
 /// <summary>

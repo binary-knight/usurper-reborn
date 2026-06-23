@@ -829,7 +829,7 @@ public class WeaponShopLocation : BaseLocation
         terminal.Write(Loc.Get("weapon_shop.gold_prompt"));
 
         var confirm = await terminal.GetInput("");
-        if (confirm.ToUpper() != "Y")
+        if (!GameConfig.IsAffirmative(confirm))
         {
             return;
         }
@@ -1039,7 +1039,7 @@ public class WeaponShopLocation : BaseLocation
             terminal.WriteLine(Loc.Get("weapon_shop.bulk_sell_confirm", sellable.Count, FormatNumber(totalGold)));
             var bulkConfirm = (await terminal.GetInput("")).Trim().ToUpper();
 
-            if (bulkConfirm == "Y")
+            if (GameConfig.IsAffirmative(bulkConfirm))
             {
                 foreach (var item in sellable)
                     currentPlayer.Inventory.Remove(item);
@@ -1084,7 +1084,7 @@ public class WeaponShopLocation : BaseLocation
         terminal.Write(Loc.Get("weapon_shop.sell_confirm", selected.name, FormatNumber(price)));
 
         var confirm = await terminal.GetInput("");
-        if (confirm.ToUpper() == "Y")
+        if (GameConfig.IsAffirmative(confirm))
         {
             if (selected.isEquipped && selected.slot.HasValue)
             {
@@ -1170,7 +1170,7 @@ public class WeaponShopLocation : BaseLocation
         terminal.WriteLine("");
 
         var confirm = await terminal.GetInput(Loc.Get("weapon_shop.reforge_confirm"));
-        if (confirm?.Trim().ToUpper() != "Y")
+        if (!GameConfig.IsAffirmative(confirm))
         {
             terminal.WriteLine(Loc.Get("ui.cancelled"), "gray");
             await terminal.PressAnyKey();

@@ -1103,7 +1103,7 @@ public class SysOpLocation : BaseLocation
                 terminal.Write(Loc.Get("sysop_location.open_browser_yn"));
                 var response = await terminal.GetInputAsync("");
 
-                if (response.Trim().ToUpper() == "Y")
+                if (GameConfig.IsAffirmative(response))
                 {
                     checker.OpenDownloadPage();
                     terminal.SetColor("green");
@@ -1183,7 +1183,7 @@ public class SysOpLocation : BaseLocation
             terminal.Write(Loc.Get("sysop_location.open_download_yn"));
             var response = await terminal.GetInputAsync("");
 
-            if (response.Trim().ToUpper() == "Y")
+            if (GameConfig.IsAffirmative(response))
             {
                 checker.OpenDownloadPage();
                 terminal.SetColor("green");

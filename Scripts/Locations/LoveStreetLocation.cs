@@ -473,7 +473,7 @@ public class LoveStreetLocation : BaseLocation
         terminal.WriteLine("");
 
         var confirm = await terminal.GetInput(Loc.Get("love_street.pay_confirm", courtesan.Name, $"{courtesan.Price:N0}"));
-        if (string.IsNullOrEmpty(confirm) || confirm.ToUpper() != "Y")
+        if (string.IsNullOrEmpty(confirm) || !GameConfig.IsAffirmative(confirm))
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("love_street.shrug_loss", courtesan.Name));
@@ -611,7 +611,7 @@ public class LoveStreetLocation : BaseLocation
         terminal.WriteLine("");
 
         var confirm = await terminal.GetInput(Loc.Get("love_street.pay_confirm", gigolo.Name, $"{gigolo.Price:N0}"));
-        if (string.IsNullOrEmpty(confirm) || confirm.ToUpper() != "Y")
+        if (string.IsNullOrEmpty(confirm) || !GameConfig.IsAffirmative(confirm))
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("love_street.gigolo_bow", gigolo.Name));
@@ -1600,7 +1600,7 @@ public class LoveStreetLocation : BaseLocation
             terminal.WriteLine("");
 
             var response = await terminal.GetKeyInput();
-            if (response.ToUpper() == "Y")
+            if (GameConfig.IsAffirmative(response))
             {
                 await IntimacySystem.Instance.StartIntimateScene(
                     currentPlayer,
@@ -1746,7 +1746,7 @@ public class LoveStreetLocation : BaseLocation
 
         terminal.WriteLine("");
         var confirm = await terminal.GetInput(Loc.Get("love_street.gift_buy_confirm", giftName, recipient.Name, $"{giftCost:N0}"));
-        if (string.IsNullOrEmpty(confirm) || confirm.ToUpper() != "Y")
+        if (string.IsNullOrEmpty(confirm) || !GameConfig.IsAffirmative(confirm))
         {
             terminal.WriteLine(Loc.Get("love_street.maybe_next_time"), "gray");
             await terminal.WaitForKey();

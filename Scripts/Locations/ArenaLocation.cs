@@ -303,7 +303,7 @@ public class ArenaLocation : BaseLocation
         terminal.WriteLine("");
         var confirm = await terminal.GetInput($"  {Loc.Get("arena.confirm_prompt")}");
 
-        if (confirm?.Trim().ToUpper() != "Y")
+        if (!GameConfig.IsAffirmative(confirm))
         {
             terminal.SetColor("gray");
             terminal.WriteLine($"  {Loc.Get("arena.step_back")}");

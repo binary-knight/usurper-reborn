@@ -668,14 +668,14 @@ public class WildernessLocation : BaseLocation
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine(Loc.Get("wilderness.traveler_buy_or_decline"));
                 var buy = await GetChoice();
-                if (buy.ToUpper() == "Y" && currentPlayer.Gold >= cost)
+                if (GameConfig.IsAffirmative(buy) && currentPlayer.Gold >= cost)
                 {
                     currentPlayer.Gold -= cost;
                     currentPlayer.Healing = Math.Min(currentPlayer.Healing + 1, currentPlayer.MaxPotions);
                     terminal.SetColor("green");
                     terminal.WriteLine(Loc.Get("wilderness.traveler_purchased"));
                 }
-                else if (buy.ToUpper() == "Y")
+                else if (GameConfig.IsAffirmative(buy))
                 {
                     terminal.SetColor("red");
                     terminal.WriteLine(Loc.Get("ui.not_enough_gold_plain"));
@@ -901,7 +901,7 @@ public class WildernessLocation : BaseLocation
         }
         terminal.WriteLine("");
         var confirm = await terminal.GetInput(Loc.Get("wilderness.pilgrimage_confirm"));
-        if (confirm?.ToUpper() != "Y")
+        if (!GameConfig.IsAffirmative(confirm))
             return;
 
         // Apply attunement. Two timers set so the right one fires per game mode:

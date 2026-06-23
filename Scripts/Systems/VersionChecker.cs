@@ -400,7 +400,7 @@ namespace UsurperRemake.Systems
             terminal.SetColor("white");
 
             var response = await terminal.ReadLineAsync();
-            return response?.Trim().ToUpper() == "Y";
+            return GameConfig.IsAffirmative(response);
         }
 
         /// <summary>
@@ -957,14 +957,14 @@ rd /S /Q ""{tempDir}"" 2>nul
             terminal.SetColor("white");
 
             var response = await terminal.ReadLineAsync();
-            if (response?.Trim().ToUpper() != "Y")
+            if (!GameConfig.IsAffirmative(response))
             {
                 // Offer manual download as fallback
                 terminal.SetColor("gray");
                 terminal.Write($"  {Loc.Get("version.manual_download_prompt")}");
                 terminal.SetColor("white");
                 response = await terminal.ReadLineAsync();
-                if (response?.Trim().ToUpper() == "Y")
+                if (GameConfig.IsAffirmative(response))
                 {
                     OpenDownloadPage();
                 }
@@ -1010,7 +1010,7 @@ rd /S /Q ""{tempDir}"" 2>nul
                 terminal.Write($"  {Loc.Get("version.manual_download_prompt")}");
                 terminal.SetColor("white");
                 response = await terminal.ReadLineAsync();
-                if (response?.Trim().ToUpper() == "Y")
+                if (GameConfig.IsAffirmative(response))
                 {
                     OpenDownloadPage();
                 }

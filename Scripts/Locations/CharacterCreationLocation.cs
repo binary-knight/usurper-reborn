@@ -62,7 +62,7 @@ public class CharacterCreationLocation : BaseLocation
                 terminal.WriteLine("");
 
                 var retry = await terminal.GetInputAsync(Loc.Get("creation.try_again_prompt"));
-                if (retry.ToUpper() == "Y")
+                if (GameConfig.IsAffirmative(retry))
                 {
                     await HandleCharacterCreation(player);
                     return;

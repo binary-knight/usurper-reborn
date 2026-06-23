@@ -330,7 +330,7 @@ namespace UsurperRemake.Locations
 
             // Confirm
             string confirm = (await terminal.GetInput(Loc.Get("sanctum.alms_confirm", cost))).Trim().ToUpperInvariant();
-            if (!(confirm == "Y" || confirm == "S" || confirm == "O" || confirm == "I"))
+            if (!(GameConfig.IsAffirmative(confirm)))
             {
                 return;
             }
@@ -370,7 +370,7 @@ namespace UsurperRemake.Locations
             }
 
             string confirm = (await terminal.GetInput(Loc.Get("sanctum.orphanage_confirm", cost))).Trim().ToUpperInvariant();
-            if (!(confirm == "Y" || confirm == "S" || confirm == "O" || confirm == "I"))
+            if (!(GameConfig.IsAffirmative(confirm)))
             {
                 return;
             }
@@ -410,7 +410,7 @@ namespace UsurperRemake.Locations
             }
 
             string confirm = (await terminal.GetInput(Loc.Get("sanctum.hospice_confirm", cost))).Trim().ToUpperInvariant();
-            if (!(confirm == "Y" || confirm == "S" || confirm == "O" || confirm == "I"))
+            if (!(GameConfig.IsAffirmative(confirm)))
             {
                 return;
             }
@@ -565,7 +565,7 @@ namespace UsurperRemake.Locations
 
             terminal.SetColor("cyan");
             string confirm = (await terminal.GetInput(Loc.Get("tournament.enter_prompt", $"{entryFee:N0}"))).Trim().ToUpperInvariant();
-            if (!(confirm == "Y" || confirm == "S" || confirm == "O" || confirm == "I"))
+            if (!(GameConfig.IsAffirmative(confirm)))
             {
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("tournament.cancelled"));

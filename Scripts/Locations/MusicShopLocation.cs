@@ -15,7 +15,7 @@ public class MusicShopLocation : BaseLocation
     private int currentPage = 0;
     private const int ItemsPerPage = 15;
 
-    // Melodia state helpers — determines shop dialogue and who's running things
+    // Melodia state helpers -- determines shop dialogue and who's running things
     private enum MelodiaState { InShop, Adventuring, Dead }
     private MelodiaState GetMelodiaState()
     {
@@ -35,14 +35,14 @@ public class MusicShopLocation : BaseLocation
             "His blade rang true for justice and for right.",
             "But when corruption's whisper found him willing,",
             "The War God's steel turned black as endless night.",
-            "Now rage is all he knows, and blood his anthem —",
+            "Now rage is all he knows, and blood his anthem --",
             "A warrior who forgot what he once fought."
         }),
         (OldGodType.Veloura, "Whispers of the Veil", "magenta", new[]
         {
             "She wove the threads that bound all hearts together,",
             "The goddess born of love's eternal flame.",
-            "Yet love, when twisted, turns to thorns and poison —",
+            "Yet love, when twisted, turns to thorns and poison --",
             "And Veloura forgot her very name.",
             "Behind the veil she fades, a ghost of passion,",
             "Still reaching for a warmth she cannot claim."
@@ -51,7 +51,7 @@ public class MusicShopLocation : BaseLocation
         {
             "His laws were carved in stone before the mountains,",
             "His judgment absolute, his verdict fair.",
-            "But justice without mercy breeds a tyrant —",
+            "But justice without mercy breeds a tyrant --",
             "And Thorgrim's hammer fell beyond repair.",
             "Now every soul is guilty in his courtroom,",
             "And innocence a word he will not spare."
@@ -60,7 +60,7 @@ public class MusicShopLocation : BaseLocation
         {
             "She walks between the spaces, never resting,",
             "The shadow that remembers every light.",
-            "Not evil, not benevolent — just watching,",
+            "Not evil, not benevolent -- just watching,",
             "A witness to the endless dance of night.",
             "Perhaps she is the wisest of the seven,",
             "For she alone still questions wrong and right."
@@ -69,7 +69,7 @@ public class MusicShopLocation : BaseLocation
         {
             "He was the morning star, the hope of heaven,",
             "His light could heal the wounds that darkness made.",
-            "But even suns must dim when left unaided —",
+            "But even suns must dim when left unaided --",
             "And Aurelion's dawn began to fade.",
             "He dreams of sunrise still, though bound in twilight,",
             "A dying god who prays he might be saved."
@@ -78,20 +78,20 @@ public class MusicShopLocation : BaseLocation
         {
             "He held the world upon his ancient shoulders,",
             "The bedrock underneath all living things.",
-            "When mountains crumble, even gods grow weary —",
+            "When mountains crumble, even gods grow weary --",
             "And Terravok forgot what silence brings.",
             "He sleeps beneath the stone, a dormant giant,",
             "Still dreaming of the songs the deep earth sings."
         }),
         (OldGodType.Manwe, "The Ocean's Dream", "bright_cyan", new[]
         {
-            "Before the seven, there was only Ocean —",
+            "Before the seven, there was only Ocean --",
             "One vast and endless sea without a shore.",
             "He dreamed of waves, of separateness, of longing,",
             "And from that dream came everything and more.",
             "The Creator weeps for children he imprisoned,",
             "The dreamer who forgot what dreams are for.",
-            "But every wave returns unto the Ocean —",
+            "But every wave returns unto the Ocean --",
             "And every song must end where it began."
         }),
     };
@@ -129,11 +129,11 @@ public class MusicShopLocation : BaseLocation
 
         var state = GetMelodiaState();
 
-        // Header box — matches Weapon/Armor/Healer pattern
+        // Header box -- matches Weapon/Armor/Healer pattern
         WriteBoxHeader(Loc.Get("music_shop.header"), "bright_cyan");
         terminal.WriteLine("");
 
-        // Room description — changes based on Melodia's state
+        // Room description -- changes based on Melodia's state
         terminal.SetColor("gray");
         terminal.WriteLine(Loc.Get("music_shop.atmo1"));
         terminal.WriteLine(Loc.Get("music_shop.atmo2"));
@@ -171,7 +171,7 @@ public class MusicShopLocation : BaseLocation
 
         ShowNPCsInLocation();
 
-        // Gold display — matches other shops
+        // Gold display -- matches other shops
         terminal.SetColor("white");
         terminal.Write(Loc.Get("music_shop.you_have"));
         terminal.SetColor("yellow");
@@ -214,7 +214,7 @@ public class MusicShopLocation : BaseLocation
         terminal.SetColor("gray");
         terminal.WriteLine(Loc.Get("music_shop.performance_desc"));
 
-        // Talk to Melodia — only visible when she's physically in the shop
+        // Talk to Melodia -- only visible when she's physically in the shop
         if (state == MelodiaState.InShop)
         {
             terminal.SetColor("darkgray");
@@ -245,7 +245,7 @@ public class MusicShopLocation : BaseLocation
         terminal.SetColor("magenta");
         terminal.Write(Loc.Get("music_shop.lore_songs"));
         terminal.SetColor("gray");
-        terminal.WriteLine($"  — {Loc.Get("music_shop.lore_songs_ancient")}");
+        terminal.WriteLine($"  -- {Loc.Get("music_shop.lore_songs_ancient")}");
 
         // Return
         terminal.SetColor("darkgray");
@@ -261,7 +261,7 @@ public class MusicShopLocation : BaseLocation
     }
 
     /// <summary>
-    /// Screen reader accessible layout — plain text, no box-drawing.
+    /// Screen reader accessible layout -- plain text, no box-drawing.
     /// </summary>
     private void DisplayLocationSR()
     {
@@ -398,11 +398,11 @@ public class MusicShopLocation : BaseLocation
             .ThenBy(i => i.Value)
             .ToList();
 
-        // v0.57.13 (Lumina report — Lv.100 trying to buy an Old Lute for Melodia):
+        // v0.57.13 (Lumina report -- Lv.100 trying to buy an Old Lute for Melodia):
         // previous filter `MinLevel <= playerLevel + 30 && MinLevel >= playerLevel - 20`
         // hid every low-level instrument from a high-level player, so a Lv.100 player
         // shopping for a low-level companion literally couldn't browse to the instrument
-        // they wanted. Weapon shop shows everything from level 1 on — matching that.
+        // they wanted. Weapon shop shows everything from level 1 on -- matching that.
         // Display still greys out items the player can't equip / can't afford, and
         // PurchaseInstrument enforces class + level at the point of sale.
 
@@ -466,7 +466,7 @@ public class MusicShopLocation : BaseLocation
             else
             {
                 terminal.SetColor(canBuy ? "bright_cyan" : "darkgray");
-                terminal.Write($"{"—",3}  ");
+                terminal.Write($"{"--",3}  ");
             }
 
             terminal.SetColor(canBuy ? "bright_cyan" : "darkgray");
@@ -500,7 +500,7 @@ public class MusicShopLocation : BaseLocation
 
         string input = await GetChoice();
 
-        // v0.57.13 (Lumina report — "list just returns to the shop without any
+        // v0.57.13 (Lumina report -- "list just returns to the shop without any
         // announcement"): previously, pressing P on page 1 or N on the last page fell
         // through to int.TryParse, failed to match, reset currentPage and exited to
         // the main shop menu silently. Now boundary presses and unknown input stay on
@@ -542,7 +542,7 @@ public class MusicShopLocation : BaseLocation
             return;
         }
 
-        // Unknown input — stay on current page
+        // Unknown input -- stay on current page
         await BuyInstruments();
     }
 
@@ -562,7 +562,7 @@ public class MusicShopLocation : BaseLocation
 
     private async Task PurchaseInstrument(Equipment item)
     {
-        // Instruments are bought for companions (Melodia) — don't restrict by player level
+        // Instruments are bought for companions (Melodia) -- don't restrict by player level
         // The companion's level is what matters, and the shop already filters display by level range
 
         // Calculate tax
@@ -587,7 +587,7 @@ public class MusicShopLocation : BaseLocation
         }
         terminal.WriteLine(Loc.Get("music_shop.gold_yn"));
         string confirm = await GetChoice();
-        if (confirm?.ToUpper() != "Y") return;
+        if (!GameConfig.IsAffirmative(confirm)) return;
 
         currentPlayer.Gold -= totalCost;
         currentPlayer.Statistics?.RecordPurchase(totalCost);
@@ -621,7 +621,7 @@ public class MusicShopLocation : BaseLocation
         }
         else
         {
-            // Non-Bards can buy but not equip — goes to inventory
+            // Non-Bards can buy but not equip -- goes to inventory
             currentPlayer.Inventory.Add(new global::Item
             {
                 Name = item.Name,
@@ -648,41 +648,41 @@ public class MusicShopLocation : BaseLocation
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // HIRE A PERFORMANCE (All players — combat buffs)
+    // HIRE A PERFORMANCE (All players -- combat buffs)
     // ═══════════════════════════════════════════════════════════════
 
-    // Performance song lyrics — a mix of funny tavern songs and dramatic lore ballads.
+    // Performance song lyrics -- a mix of funny tavern songs and dramatic lore ballads.
     // Each song type has multiple possible performances chosen at random.
-    // Intro text uses {PERFORMER} placeholder — replaced at runtime with "Melodia" or "Cadence".
+    // Intro text uses {PERFORMER} placeholder -- replaced at runtime with "Melodia" or "Cadence".
     private static readonly (string Title, string Intro, string Color, string[] Verses)[] WarMarchSongs = new[]
     {
         ("The Ballad of Tully's Anvil", "{PERFORMER} grins and strikes a thundering chord.", "red", new[]
         {
             "Old Tully swung his hammer down upon the goblin's head,",
-            "The goblin said, 'That's rather rude!' — and then the goblin's dead.",
+            "The goblin said, 'That's rather rude!' -- and then the goblin's dead.",
             "He forged a sword so sharp it cut the wind clean in two,",
             "And sold it for a pittance to a hero just like you!",
-            "So lift your blade and steady now, remember Tully's art —",
+            "So lift your blade and steady now, remember Tully's art --",
             "A good smith makes the weapon, but the fighter makes the heart."
         }),
         ("The March of the Last Legion", "{PERFORMER}'s voice drops low and the room grows still.", "red", new[]
         {
             "They marched at dawn, five hundred strong, through Maelketh's burning gate,",
-            "No prayers upon their lips — just steel, and the refusal to be late.",
+            "No prayers upon their lips -- just steel, and the refusal to be late.",
             "The War God's horde outnumbered them a dozen men to one,",
             "But not a single soldier turned to face the rising sun.",
             "They held the line until the dusk, and when the field was clear,",
-            "Just thirty stood — but thirty was enough to break the fear.",
+            "Just thirty stood -- but thirty was enough to break the fear.",
             "So when the darkness presses close and courage starts to fade,",
             "Remember those who held the line and were not afraid."
         }),
         ("The Orc Who Couldn't Count", "{PERFORMER} stifles a laugh before even starting.", "red", new[]
         {
             "An orc walked into battle with his club raised way up high,",
-            "He counted all his enemies — there were two! (There were five.)",
+            "He counted all his enemies -- there were two! (There were five.)",
             "'I'll smash the first!' he bellowed. 'Then I'll smash the other one!'",
             "The three he didn't count for had already turned to run.",
-            "The moral of this story? Doesn't matter if you're thick —",
+            "The moral of this story? Doesn't matter if you're thick --",
             "Just hit hard enough and fast enough, and arithmetic won't stick!"
         }),
     };
@@ -693,7 +693,7 @@ public class MusicShopLocation : BaseLocation
         {
             "Before you were a warrior, before you held a sword,",
             "Someone stood between you and the world you can't afford.",
-            "A mother, or a stranger, or a wall of ancient stone —",
+            "A mother, or a stranger, or a wall of ancient stone --",
             "Something said, 'Not yet. Not here. You will not fall alone.'",
             "That promise lives inside your skin, beneath your blood and bone.",
             "So let the monsters come. You carry iron you have always known."
@@ -710,7 +710,7 @@ public class MusicShopLocation : BaseLocation
         ("The Wall That Would Not Break", "{PERFORMER} closes her eyes and plays from memory.", "bright_cyan", new[]
         {
             "They built a wall before the pass when Thorgrim's army came,",
-            "Not stone — just farmers, merchants, and a blacksmith who was lame.",
+            "Not stone -- just farmers, merchants, and a blacksmith who was lame.",
             "No shields, no proper armor, just their bodies and their will.",
             "The army hit like thunder, but the wall was standing still.",
             "Three days they held with bleeding hands and backs against the rock.",
@@ -726,7 +726,7 @@ public class MusicShopLocation : BaseLocation
         {
             "There once was a man on Anchor Road who sold you what you've got,",
             "He'd buy it back for half the price and sell it for a lot.",
-            "His pockets clinked, his coffers sang, his vault was never bare —",
+            "His pockets clinked, his coffers sang, his vault was never bare --",
             "He even charged the king a fee for breathing castle air!",
             "\"The secret,\" said the merchant prince, \"is simple as can be:",
             "Find what people think they need, and charge a modest fee.",
@@ -739,14 +739,14 @@ public class MusicShopLocation : BaseLocation
             "He sorted them by vintage, weight, and kingdom of their join.",
             "A thief crept in at midnight with a sack and trembling nerve,",
             "The dragon said, 'You're off by three. Sit down. I'll teach you curves.'",
-            "By morning light the thief was gone — with more gold than he'd planned.",
+            "By morning light the thief was gone -- with more gold than he'd planned.",
             "It turns out dragons tip quite well when someone understands."
         }),
         ("Gold Remembers", "{PERFORMER}'s voice takes on an ancient, knowing tone.", "bright_green", new[]
         {
             "Every coin you find was lost by someone, once upon a time.",
             "A soldier's final payment, or a bribe, or wedding chime.",
-            "Gold remembers every hand that held it, spent it, stole —",
+            "Gold remembers every hand that held it, spent it, stole --",
             "It carries all their stories pressed into its little soul.",
             "So when you loot the fallen, spare a moment if you can.",
             "That gold served someone else before it came to serve your plan."
@@ -759,10 +759,10 @@ public class MusicShopLocation : BaseLocation
         {
             "Before the Old Gods fell, before the dreaming and the dark,",
             "Seven heroes stood before Manwe's gate and left their mark.",
-            "Not warriors all — a baker's son, a priest who'd lost her faith,",
+            "Not warriors all -- a baker's son, a priest who'd lost her faith,",
             "A thief who'd sworn off stealing, and a knight who'd seen a wraith.",
             "A farmer with a pitchfork and a scholar with a pen,",
-            "And one whose name is lost to us — they say she'll come again.",
+            "And one whose name is lost to us -- they say she'll come again.",
             "They didn't win. They couldn't win. The Ocean swallowed all.",
             "But they stood there. That's what matters.",
             "They stood there, and stood tall."
@@ -771,12 +771,12 @@ public class MusicShopLocation : BaseLocation
         {
             "We were young and very stupid and we thought we'd never die,",
             "We laughed at every warning sign and never wondered why.",
-            "The dungeon took them one by one — first Gareth, then the rest.",
+            "The dungeon took them one by one -- first Gareth, then the rest.",
             "Only one made it out alive. The one most blessed.",
             "Or cursed. She was never sure which.",
             "",
             "She kept their swords. She kept this shop. She played so she'd remember.",
-            "And every hero who walked through that door — she'd see them there.",
+            "And every hero who walked through that door -- she'd see them there.",
             "Still laughing. Still not knowing what's ahead.",
             "Be better than they were."
         }),
@@ -784,7 +784,7 @@ public class MusicShopLocation : BaseLocation
         {
             "Terravok sleeps beneath the mountain, dreaming slow and deep,",
             "His heartbeat is the earthquake, and his breath the caverns' keep.",
-            "They say if all the Old Gods fall, the mountain falls as well —",
+            "They say if all the Old Gods fall, the mountain falls as well --",
             "And everything we've built on top goes tumbling down to hell.",
             "But I don't think that's true. I think the mountain holds because",
             "We stand on it. We fight on it. We give the bedrock cause.",
@@ -952,10 +952,16 @@ public class MusicShopLocation : BaseLocation
 
         // Pick a random performance from the pool
         var rng = Random.Shared;
-        var song = songPool[rng.Next(songPool.Length)];
+        int songIdx = rng.Next(songPool.Length);
+        var song = songPool[songIdx];
+        // Localized song text. en.json carries the authoritative English (and the
+        // other languages); the C# array is the fallback for any missing key.
+        string poolKey = songType switch { 1 => "war_march", 2 => "iron", 3 => "fortune", 4 => "hymn", _ => "war_march" };
+        string keyPre = $"music.song.{poolKey}.{songIdx}";
 
-        // Resolve the intro text — replace performer name and handle special cases
-        string introText = song.Intro.Replace("{PERFORMER}", performer);
+        // Resolve the intro text: replace performer name and handle special cases
+        string introRaw = song.Intro == "{MELODIA_OWN_INTRO}" ? song.Intro : LocOr($"{keyPre}.intro", song.Intro);
+        string introText = introRaw.Replace("{PERFORMER}", performer);
         if (introText == "{MELODIA_OWN_INTRO}")
         {
             introText = state == MelodiaState.InShop
@@ -971,14 +977,15 @@ public class MusicShopLocation : BaseLocation
         terminal.WriteLine(introText);
         await Task.Delay(600);
         terminal.SetColor("bright_cyan");
-        terminal.WriteLine($"\n  \"{song.Title}\"");
+        terminal.WriteLine($"\n  \"{LocOr($"{keyPre}.title", song.Title)}\"");
         await Task.Delay(400);
         terminal.WriteLine("");
 
         // Sing the verses with atmospheric pacing
         terminal.SetColor(song.Color);
-        foreach (var verse in song.Verses)
+        for (int vi = 0; vi < song.Verses.Length; vi++)
         {
+            var verse = song.Verses[vi];
             if (string.IsNullOrEmpty(verse))
             {
                 terminal.WriteLine("");
@@ -986,7 +993,7 @@ public class MusicShopLocation : BaseLocation
             }
             else
             {
-                terminal.WriteLine($"  {verse}");
+                terminal.WriteLine($"  {LocOr($"{keyPre}.verse.{vi}", verse)}");
                 await Task.Delay(350);
             }
         }
@@ -1108,7 +1115,7 @@ public class MusicShopLocation : BaseLocation
         terminal.WriteLine($"\n{Loc.Get("music_shop.recruit_join_prompt")}");
         string input = await GetChoice();
 
-        if (input?.ToUpper() == "Y")
+        if (GameConfig.IsAffirmative(input))
         {
             bool success = await CompanionSystem.Instance.RecruitCompanion(CompanionId.Melodia, currentPlayer, terminal);
             if (success)
@@ -1170,7 +1177,7 @@ public class MusicShopLocation : BaseLocation
             if (unlocked)
             {
                 terminal.SetColor(color);
-                terminal.Write(title);
+                terminal.Write(LocOr($"music.lore.{god.ToString().ToLowerInvariant()}.title", title));
                 bool heard = currentPlayer.HeardLoreSongs.Contains((int)god);
                 if (!heard)
                 {
@@ -1227,14 +1234,15 @@ public class MusicShopLocation : BaseLocation
     private async Task PlayLoreSong(OldGodType god, string title, string color, string[] verses)
     {
         terminal.WriteLine("");
-        WriteSectionHeader(title, color);
+        string lkey = $"music.lore.{god.ToString().ToLowerInvariant()}";
+        WriteSectionHeader(LocOr($"{lkey}.title", title), color);
         terminal.SetColor("gray");
         terminal.WriteLine("");
 
-        foreach (var verse in verses)
+        for (int vi = 0; vi < verses.Length; vi++)
         {
             terminal.SetColor(color);
-            terminal.WriteLine($"  {verse}");
+            terminal.WriteLine($"  {LocOr($"{lkey}.verse.{vi}", verses[vi])}");
             await Task.Delay(600);
         }
 
@@ -1258,6 +1266,14 @@ public class MusicShopLocation : BaseLocation
         }
 
         await terminal.PressAnyKey();
+    }
+
+    // Resolve a loc key, falling back to the hardcoded English when the key is
+    // absent from every language file (e.g. a future song without keys yet).
+    private static string LocOr(string key, string fallback)
+    {
+        var v = Loc.Get(key);
+        return string.IsNullOrEmpty(v) || v == key ? fallback : v;
     }
 
     private string FormatNumber(long value)

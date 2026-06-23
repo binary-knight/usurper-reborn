@@ -390,6 +390,13 @@ namespace UsurperRemake.Systems
         public string? NobleTitle { get; set; }
         public bool IsKnighted { get; set; }
 
+        // v0.65.1: family surname chosen at marriage (display-only; Name2 stays the key)
+        public string FamilySurname { get; set; } = "";
+
+        // v0.65.1: per-teammate AI combat-skill toggles (non-companion dungeon teammates)
+        public Dictionary<string, List<string>> TeammateDisabledAbilities { get; set; } = new();
+        public Dictionary<string, List<string>> TeammateDisabledSpells { get; set; } = new();
+
         // v0.60.11: Anchor Road Gauntlet champion tier (0=None .. 5=GrandChampion).
         public int ArenaChampionTier { get; set; }
 

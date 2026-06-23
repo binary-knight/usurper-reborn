@@ -1890,6 +1890,32 @@ public class Character
     public int DaysInPower { get; set; } = 0; // Days as king/ruler
     public int Fame { get; set; } = 0; // Fame/reputation level
     public string? NobleTitle { get; set; } = null; // Noble title (Sir, Dame, Lord, Lady, etc.)
+
+    // v0.65.1: optional family surname chosen at marriage (adopt spouse's surname or a
+    // new family name). DISPLAY ONLY -- it rides on DisplayName so the player shows as
+    // "Hera Ashwick" everywhere, while the identity key (Name2) stays "Hera" so NOTHING
+    // that keys on the player's name (children/parent matching, quests, worship,
+    // relationships) is disturbed. Only ever set on the human player; NPCs leave it "".
+    public string FamilySurname { get; set; } = "";
+
+    // v0.65.1: per-teammate AI combat-skill toggles for the player's NON-companion dungeon
+    // teammates (Team Corner NPCs, spouses, echoes), so they stop using "trash" moves --
+    // the same control companions already have at the Inn. Stored on the PLAYER (keyed by
+    // the teammate's GetSkillToggleKey) rather than on each NPC, so it covers transient
+    // echoes too and needs no NPC save round-trip. Companions keep their own
+    // Companion.DisabledAbilities/DisabledSpells (edited at the Inn). Combat reads these
+    // live via the controlling player. Values are disabled ability ids / spell names.
+    public Dictionary<string, List<string>> TeammateDisabledAbilities { get; set; } = new();
+    public Dictionary<string, List<string>> TeammateDisabledSpells { get; set; } = new();
+
+    /// <summary>
+    /// v0.65.1: stable key for the owner's per-teammate skill-toggle dicts. Prefers the
+    /// stable Character.ID (NPCs/spouses), falls back to Name2 (echoes carry the source
+    /// player's name). Lowercased for case-insensitive lookup. If the key ever drifts the
+    /// player just re-sets the toggle -- it's a cosmetic AI preference, no data at risk.
+    /// </summary>
+    public string GetSkillToggleKey()
+        => (!string.IsNullOrEmpty(ID) ? ID : (Name2 ?? Name1 ?? "")).ToLowerInvariant();
     public bool IsKnighted { get; set; } // True only when knighted at the Castle by the King
     // v0.60.11: Anchor Road Gauntlet completion tier. Set when the player full-clears the
     // 10-fight Gauntlet (3 warmup + 7 Old God champions). Tier is gated on player level at
@@ -2246,7 +2272,11 @@ public class Character
     public bool IsAlive => HP > 0;
     public bool IsPlayer => AI == CharacterAI.Human;
     public bool IsNPC => AI == CharacterAI.Computer;
-    public string DisplayName => !string.IsNullOrEmpty(Name2) ? Name2 : Name1;
+    // v0.65.1: append the optional family surname (set only on the player, via the
+    // marriage ceremony). Name2 stays the stable identity key; this is the display layer.
+    public string DisplayName => string.IsNullOrEmpty(FamilySurname)
+        ? (!string.IsNullOrEmpty(Name2) ? Name2 : Name1)
+        : $"{(!string.IsNullOrEmpty(Name2) ? Name2 : Name1)} {FamilySurname}";
 
     // TurnsLeft - now just returns TurnCount for backward compatibility (no limits in single-player)
     public int TurnsLeft => TurnCount;

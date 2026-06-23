@@ -349,7 +349,7 @@ public class LoveCornerLocation : BaseLocation
         terminal.WriteLine();
 
         string confirm = await terminal.GetInput(Loc.Get("love_corner.proceed_ceremony"));
-        if (confirm?.ToUpper() != "Y")
+        if (!GameConfig.IsAffirmative(confirm))
         {
             terminal.WriteLine(Loc.Get("love_corner.wedding_cancelled"));
             await terminal.PressAnyKey();
@@ -380,6 +380,9 @@ public class LoveCornerLocation : BaseLocation
             terminal.WriteLine(Loc.Get("love_corner.wedding_ceremony"), TerminalEmulator.ColorYellow);
             terminal.WriteLine();
             terminal.WriteLine(message, TerminalEmulator.ColorGreen);
+
+            // v0.65.1: offer the player a family surname (spouse's or a new one).
+            await MarriageSurnameHelper.OfferAsync(terminal, player, targetNPC.DisplayName);
         }
         else
         {
@@ -427,7 +430,7 @@ public class LoveCornerLocation : BaseLocation
         }
 
         string confirm1 = await terminal.GetInput(Loc.Get("ui.confirm_divorce"));
-        if (confirm1?.ToUpper() != "Y")
+        if (!GameConfig.IsAffirmative(confirm1))
         {
             terminal.WriteLine(Loc.Get("love_corner.divorce_cancelled"));
             await terminal.PressAnyKey();
@@ -435,7 +438,7 @@ public class LoveCornerLocation : BaseLocation
         }
 
         string confirm2 = await terminal.GetInput(Loc.Get("love_corner.confirm_custody"));
-        if (confirm2?.ToUpper() != "Y")
+        if (!GameConfig.IsAffirmative(confirm2))
         {
             terminal.WriteLine(Loc.Get("love_corner.divorce_cancelled"));
             await terminal.PressAnyKey();

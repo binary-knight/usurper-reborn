@@ -649,6 +649,9 @@ namespace UsurperRemake.Systems
                 // Noble Title
                 NobleTitle = player.NobleTitle,
                 IsKnighted = player.IsKnighted,
+                FamilySurname = player.FamilySurname, // v0.65.1 marriage surname
+                TeammateDisabledAbilities = player.TeammateDisabledAbilities, // v0.65.1 team skill toggles
+                TeammateDisabledSpells = player.TeammateDisabledSpells,
 
                 // v0.60.11: Anchor Road Gauntlet champion tier.
                 ArenaChampionTier = player.ArenaChampionTier,

@@ -632,6 +632,20 @@ namespace UsurperRemake.Systems
                         terminal.SetColor("darkgray");
                         terminal.Write($" ({string.Join(", ", stats.Take(4))})");
                     }
+
+                    // v0.65.1: weapon-class tag (1H/2H/Shield) for weapons & shields in the
+                    // backpack. InferWeaponType only runs for actual weapons (defaults to Sword).
+                    string bpWeaponClassTag = GameConfig.GetWeaponClassTag(
+                        item.Name,
+                        item.Type == ObjType.Weapon ? ShopItemGenerator.InferWeaponType(item.Name) : WeaponType.None,
+                        WeaponHandedness.None,
+                        item.ShieldBonus,
+                        item.BlockChance);
+                    if (!string.IsNullOrEmpty(bpWeaponClassTag))
+                    {
+                        terminal.SetColor("darkgray");
+                        terminal.Write($" [{bpWeaponClassTag}]");
+                    }
                 }
                 else
                 {
@@ -687,6 +701,19 @@ namespace UsurperRemake.Systems
                 {
                     terminal.SetColor(item.WeightClass.GetWeightColor());
                     terminal.Write($" [{item.WeightClass}]");
+                }
+
+                // v0.65.1: weapon-class tag (1H/2H/Shield) for the weapon slots, parallel
+                // to the armor weight-class tag above -- so the player can see handedness
+                // and shields at a glance without equipping.
+                if (slot == EquipmentSlot.MainHand || slot == EquipmentSlot.OffHand)
+                {
+                    string weaponClassTag = GameConfig.GetWeaponClassTag(item.Name, item.WeaponType, item.Handedness, item.ShieldBonus, item.BlockChance);
+                    if (!string.IsNullOrEmpty(weaponClassTag))
+                    {
+                        terminal.SetColor("darkgray");
+                        terminal.Write($" [{weaponClassTag}]");
+                    }
                 }
                 terminal.WriteLine("");
             }
@@ -1330,7 +1357,7 @@ namespace UsurperRemake.Systems
                 terminal.SetColor("white");
                 terminal.Write(Loc.Get("inventory.equip_confirm"));
                 var confirm = await terminal.GetInput("");
-                if (confirm.ToUpper() != "Y")
+                if (!GameConfig.IsAffirmative(confirm))
                 {
                     terminal.SetColor("gray");
                     terminal.WriteLine(Loc.Get("ui.cancelled"));

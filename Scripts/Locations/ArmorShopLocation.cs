@@ -735,7 +735,7 @@ public class ArmorShopLocation : BaseLocation
         terminal.Write(Loc.Get("armor_shop.gold_yn"));
 
         var confirm = await terminal.GetInput("");
-        if (confirm.ToUpper() != "Y")
+        if (!GameConfig.IsAffirmative(confirm))
         {
             return;
         }
@@ -918,7 +918,7 @@ public class ArmorShopLocation : BaseLocation
             terminal.WriteLine(Loc.Get("armor_shop.bulk_sell_confirm", sellable.Count, FormatNumber(totalGold)));
             var bulkConfirm = (await terminal.GetInput("")).Trim().ToUpper();
 
-            if (bulkConfirm == "Y")
+            if (GameConfig.IsAffirmative(bulkConfirm))
             {
                 foreach (var item in sellable)
                     currentPlayer.Inventory.Remove(item);
@@ -966,7 +966,7 @@ public class ArmorShopLocation : BaseLocation
         terminal.Write(Loc.Get("armor_shop.sell_confirm", selected.name, FormatNumber(price)));
 
         var confirm = await terminal.GetInput("");
-        if (confirm.ToUpper() == "Y")
+        if (GameConfig.IsAffirmative(confirm))
         {
             if (selected.isEquipped && selected.slot.HasValue)
             {

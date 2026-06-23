@@ -2017,7 +2017,7 @@ public class MainStreetLocation : BaseLocation
 
             string confirm = (await terminal.GetKeyInput()).ToUpperInvariant();
 
-            if (confirm == "Y")
+            if (GameConfig.IsAffirmative(confirm))
             {
                 // Attack!
                 var encounterResult = await StreetEncounterSystem.Instance.AttackCharacter(
@@ -2426,7 +2426,7 @@ public class MainStreetLocation : BaseLocation
         
         var confirm = await terminal.GetInput(Loc.Get("main_street.combat_test_confirm"));
         
-        if (confirm.ToUpper() == "Y")
+        if (GameConfig.IsAffirmative(confirm))
         {
             // Initialize combat engine
             var combatEngine = new CombatEngine(terminal);

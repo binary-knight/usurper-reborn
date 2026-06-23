@@ -679,7 +679,7 @@ namespace UsurperRemake.Systems
                         terminal.Write(Loc.Get("online.authenticated_prompt"));
                         terminal.SetColor("gray");
                         var save = (await terminal.GetInput(Loc.Get("online.save_credentials_prompt"))).Trim().ToUpper();
-                        if (save == "Y")
+                        if (GameConfig.IsAffirmative(save))
                         {
                             SaveCredentials(server, port, username!, password!);
                             terminal.SetColor("green");

@@ -418,6 +418,16 @@ namespace UsurperRemake.Systems
             var child = Child.CreateChild(mother, father, isBastard);
             child.GenerateNewbornName();
 
+            // v0.65.1: a player who took a family surname at marriage passes it to their
+            // newborns. Display only -- child.Mother/Father store the parent's stable Name2
+            // for matching, and the child's Name already round-trips; we only append the
+            // surname when the auto-generated name doesn't already carry one.
+            if (player != null && !string.IsNullOrEmpty(player.FamilySurname)
+                && !string.IsNullOrEmpty(child.Name) && !child.Name.Contains(' '))
+            {
+                child.Name = $"{child.Name} {player.FamilySurname}";
+            }
+
             // Register child with the family system so they can age and become NPCs
             FamilySystem.Instance.RegisterChild(child);
 

@@ -1697,7 +1697,7 @@ public partial class TerminalEmulator
             var input = await GetInput();
             var response = input.ToUpper().Trim();
             
-            if (response == "Y" || response == "YES")
+            if (GameConfig.IsAffirmative(input) || response == "YES")
                 return true;
             if (response == "N" || response == "NO")
                 return false;
@@ -1719,7 +1719,7 @@ public partial class TerminalEmulator
             if (string.IsNullOrEmpty(response))
                 return defaultValue;
             
-            if (response == "Y" || response == "YES")
+            if (GameConfig.IsAffirmative(input) || response == "YES")
                 return true;
             if (response == "N" || response == "NO")
                 return false;

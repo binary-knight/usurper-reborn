@@ -2707,7 +2707,7 @@ public class HomeLocation : BaseLocation
         terminal.WriteLine();
 
         var input = await terminal.GetInput(Loc.Get("ui.choice"));
-        if (input.Trim().ToUpperInvariant() != "Y")
+        if (!GameConfig.IsAffirmative(input))
         {
             terminal.WriteLine();
             terminal.SetColor("bright_cyan");
@@ -3168,7 +3168,7 @@ public class HomeLocation : BaseLocation
             terminal.WriteLine();
 
             var input = await terminal.GetInput(Loc.Get("ui.choice"));
-            if (input.Trim().ToUpperInvariant() == "Y")
+            if (GameConfig.IsAffirmative(input))
             {
                 await PlayHotwifingScene(spouse, spouseData);
             }
@@ -3386,7 +3386,7 @@ public class HomeLocation : BaseLocation
             terminal.WriteLine();
 
             var input = await terminal.GetInput(Loc.Get("ui.choice"));
-            if (input.Trim().ToUpperInvariant() == "Y")
+            if (GameConfig.IsAffirmative(input))
             {
                 await PlayCuckoldingScene(spouse, spouseData);
             }
@@ -4273,7 +4273,7 @@ public class HomeLocation : BaseLocation
         terminal.WriteLine(Loc.Get("home.upgrade_confirm", name, $"{cost:N0}"));
         var confirm = await terminal.GetInput("(Y/N): ");
 
-        if (confirm.Trim().ToUpperInvariant() == "Y")
+        if (GameConfig.IsAffirmative(confirm))
         {
             currentPlayer.Gold -= cost;
             currentPlayer.Statistics.RecordGoldSpent(cost);
@@ -5070,7 +5070,7 @@ public class HomeLocation : BaseLocation
         terminal.SetColor("white");
 
         var confirm = await terminal.ReadLineAsync();
-        if (!confirm.ToUpper().StartsWith("Y"))
+        if (!GameConfig.IsAffirmative(confirm))
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("ui.cancelled"));

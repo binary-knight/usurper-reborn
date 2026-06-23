@@ -2987,7 +2987,8 @@ public partial class GameEngine
             // so players sitting at the main menu don't appear as "in the game"
             if (OnlineStateManager.IsActive)
             {
-                var displayName = currentPlayer?.Name2 ?? currentPlayer?.Name1 ?? UsurperRemake.BBS.DoorMode.GetPlayerName() ?? "Unknown";
+                // v0.65.1: use DisplayName so /who reflects a married family surname.
+                var displayName = currentPlayer?.DisplayName ?? UsurperRemake.BBS.DoorMode.GetPlayerName() ?? "Unknown";
                 var connType = OnlineStateManager.Instance!.DeferredConnectionType;
                 await OnlineStateManager.Instance!.StartOnlineTracking(displayName, connType);
 
@@ -4993,7 +4994,7 @@ public partial class GameEngine
         // Register online presence and broadcast login now that character is created
         if (OnlineStateManager.IsActive)
         {
-            var ngDisplayName = currentPlayer.Name2 ?? currentPlayer.Name1 ?? UsurperRemake.BBS.DoorMode.GetPlayerName() ?? "Unknown";
+            var ngDisplayName = currentPlayer.DisplayName ?? UsurperRemake.BBS.DoorMode.GetPlayerName() ?? "Unknown";
             var ngConnType = OnlineStateManager.Instance!.DeferredConnectionType;
             await OnlineStateManager.Instance!.StartOnlineTracking(ngDisplayName, ngConnType);
 
@@ -5264,6 +5265,9 @@ public partial class GameEngine
 
             // Noble Title
             NobleTitle = playerData.NobleTitle,
+            FamilySurname = playerData.FamilySurname ?? "", // v0.65.1 marriage surname
+            TeammateDisabledAbilities = playerData.TeammateDisabledAbilities ?? new(), // v0.65.1 team skill toggles
+            TeammateDisabledSpells = playerData.TeammateDisabledSpells ?? new(),
             // Migration: pre-0.54.6 saves stored IsKnighted as a computed property.
             // If player has Sir/Dame title but IsKnighted is false, they were knighted before the flag existed.
             IsKnighted = playerData.IsKnighted || playerData.NobleTitle == "Sir" || playerData.NobleTitle == "Dame",
@@ -7225,7 +7229,7 @@ public partial class GameEngine
                 terminal.WriteLine(Loc.Get("engine.must_create"), "white");
 
                 var retry = await terminal.GetInputAsync(Loc.Get("engine.retry_prompt"));
-                if (retry.ToUpper() == "Y")
+                if (GameConfig.IsAffirmative(retry))
                 {
                     return await CreateNewPlayer(playerName); // Retry
                 }
@@ -7248,7 +7252,7 @@ public partial class GameEngine
 
             terminal.WriteLine(Loc.Get("engine.please_try_again"), "yellow");
             var retry = await terminal.GetInputAsync(Loc.Get("engine.retry_prompt"));
-            if (retry.ToUpper() == "Y")
+            if (GameConfig.IsAffirmative(retry))
             {
                 return await CreateNewPlayer(playerName); // Retry
             }
@@ -7369,7 +7373,7 @@ public partial class GameEngine
             terminal.WriteLine("");
             var resurrect = await terminal.GetInput(Loc.Get("engine.use_resurrection_prompt"));
 
-            if (resurrect.ToUpper().StartsWith("Y"))
+            if (GameConfig.IsAffirmative(resurrect))
             {
                 currentPlayer.Resurrections--;
                 currentPlayer.Statistics.RecordResurrection();

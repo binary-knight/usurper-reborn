@@ -179,7 +179,7 @@ public class CharacterCreationSystem
             await ShowCharacterSummary(character);
             
             var confirm = await terminal.GetInputAsync(Loc.Get("creation.confirm"));
-            if (!string.IsNullOrEmpty(confirm) && confirm.ToUpper() != "Y")
+            if (!string.IsNullOrEmpty(confirm) && !GameConfig.IsAffirmative(confirm))
             {
                 terminal.WriteLine(Loc.Get("creation.aborted"), "red");
                 return null;
@@ -555,7 +555,7 @@ public class CharacterCreationSystem
             terminal.WriteLine(Loc.Get("creation.name_confirm", name), "yellow");
             var confirm = await terminal.GetInputAsync("");
 
-            if (string.IsNullOrEmpty(confirm) || confirm.ToUpper() == "Y")
+            if (string.IsNullOrEmpty(confirm) || GameConfig.IsAffirmative(confirm))
             {
                 validName = true;
             }
@@ -735,7 +735,7 @@ public class CharacterCreationSystem
                     terminal.WriteLine(Loc.Get("creation.difficulty.nightmare_desc3"), "red");
                     terminal.WriteLine("");
                     var confirm = await terminal.GetInputAsync(Loc.Get("creation.difficulty.nightmare_confirm"));
-                    if (confirm.ToUpper() == "Y")
+                    if (GameConfig.IsAffirmative(confirm))
                     {
                         terminal.WriteLine(Loc.Get("creation.difficulty.nightmare_sealed"), "bright_red");
                         await Task.Delay(1500);
@@ -1136,7 +1136,7 @@ public class CharacterCreationSystem
         var response = await terminal.GetInputAsync("");
 
         return !string.IsNullOrEmpty(response) &&
-               (response.ToUpper() == "Y" || response.ToUpper() == "YES");
+               (GameConfig.IsAffirmative(response) || response.ToUpper() == "YES");
     }
 
     /// <summary>
@@ -1413,7 +1413,7 @@ public class CharacterCreationSystem
         var response = await terminal.GetInputAsync($"{pad} {Loc.Get("creation.preview.be_race_yn", raceDesc)}");
 
         return !string.IsNullOrEmpty(response) &&
-               (response.ToUpper() == "Y" || response.ToUpper() == "YES");
+               (GameConfig.IsAffirmative(response) || response.ToUpper() == "YES");
     }
 
     /// <summary>
@@ -1674,7 +1674,7 @@ public class CharacterCreationSystem
         var response = await terminal.GetInputAsync("");
 
         return !string.IsNullOrEmpty(response) &&
-               (response.ToUpper() == "Y" || response.ToUpper() == "YES");
+               (GameConfig.IsAffirmative(response) || response.ToUpper() == "YES");
     }
 
     /// <summary>
@@ -1914,7 +1914,7 @@ public class CharacterCreationSystem
         var response = await terminal.GetInputAsync($"{pad} {Loc.Get("creation.preview.be_class_yn", article, className)}");
 
         return !string.IsNullOrEmpty(response) &&
-               (response.ToUpper() == "Y" || response.ToUpper() == "YES");
+               (GameConfig.IsAffirmative(response) || response.ToUpper() == "YES");
     }
 
     /// <summary>Screen reader race preview: plain text, no boxes or stat bars.</summary>
@@ -1975,7 +1975,7 @@ public class CharacterCreationSystem
         var response = await terminal.GetInputAsync(Loc.Get("creation.preview.be_race_yn", raceDesc));
 
         return !string.IsNullOrEmpty(response) &&
-               (response.ToUpper() == "Y" || response.ToUpper() == "YES");
+               (GameConfig.IsAffirmative(response) || response.ToUpper() == "YES");
     }
 
     /// <summary>Screen reader class preview: plain text, no boxes or stat bars.</summary>
@@ -2021,7 +2021,7 @@ public class CharacterCreationSystem
         var response = await terminal.GetInputAsync(Loc.Get("creation.preview.be_class_yn", article, className));
 
         return !string.IsNullOrEmpty(response) &&
-               (response.ToUpper() == "Y" || response.ToUpper() == "YES");
+               (GameConfig.IsAffirmative(response) || response.ToUpper() == "YES");
     }
 
     private static string GetClassDescription(CharacterClass cls) => cls switch
@@ -2912,7 +2912,7 @@ public class CharacterCreationSystem
             return defaultYes;
         }
 
-        return response.ToUpper() == "Y";
+        return GameConfig.IsAffirmative(response);
     }
     
     /// <summary>

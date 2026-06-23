@@ -318,7 +318,7 @@ public class QuestHallLocation : BaseLocation
             }
 
             var confirm = await terminal.GetInput(Loc.Get("quest_hall.accept_prompt"));
-            if (confirm.ToUpper().StartsWith("Y"))
+            if (GameConfig.IsAffirmative(confirm))
             {
                 // Cast to Player for ClaimQuest - if not a Player, create one with proper stats
                 Player playerForQuest;
@@ -474,7 +474,7 @@ public class QuestHallLocation : BaseLocation
             terminal.WriteLine(Loc.Get("quest_hall.progress_lost"), "gray");
             var confirm = await terminal.GetInput(Loc.Get("ui.confirm"));
 
-            if (confirm.Trim().ToUpper() == "Y")
+            if (GameConfig.IsAffirmative(confirm))
             {
                 QuestSystem.AbandonQuest(currentPlayer, quest.Id);
                 terminal.WriteLine(Loc.Get("quest_hall.quest_abandoned"), "yellow");

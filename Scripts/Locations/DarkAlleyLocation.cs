@@ -730,7 +730,7 @@ namespace UsurperRemake.Locations
             terminal.WriteLine(Loc.Get("dark_alley.drug_buy_confirm", selected.name, finalPrice), "yellow");
             var confirm = await terminal.GetInput("> ");
 
-            if (confirm.ToUpper() != "Y")
+            if (!GameConfig.IsAffirmative(confirm))
             {
                 terminal.WriteLine(Loc.Get("dark_alley.drug_back_away"), "gray");
                 await Task.Delay(1500);
@@ -803,7 +803,7 @@ namespace UsurperRemake.Locations
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("dark_alley.steroid_purchases", currentPlayer.SteroidShopPurchases, GameConfig.MaxSteroidShopPurchases));
             var ans = await terminal.GetInput(Loc.Get("dark_alley.steroid_inject_prompt"));
-            if (ans.ToUpper() != "Y") return;
+            if (!GameConfig.IsAffirmative(ans)) return;
 
             if (currentPlayer.Gold < price)
             {
@@ -832,7 +832,7 @@ namespace UsurperRemake.Locations
             long price = GetAdjustedPrice(currentPlayer.Level * 50 + 100);
             terminal.WriteLine(Loc.Get("dark_alley.orbs_cost", price, GameConfig.MoneyType), "cyan");
             var ans = await terminal.GetInput(Loc.Get("dark_alley.orbs_pay_prompt"));
-            if (ans.ToUpper() != "Y") return;
+            if (!GameConfig.IsAffirmative(ans)) return;
 
             if (currentPlayer.Gold < price)
             {
@@ -941,7 +941,7 @@ namespace UsurperRemake.Locations
             terminal.WriteLine(Loc.Get("dark_alley.bob_price", price), "yellow");
 
             var ans = await terminal.GetInput(Loc.Get("dark_alley.bob_drink_prompt"));
-            if (ans.ToUpper() != "Y") return;
+            if (!GameConfig.IsAffirmative(ans)) return;
 
             if (currentPlayer.Gold < price)
             {
@@ -980,7 +980,7 @@ namespace UsurperRemake.Locations
             long price = GetAdjustedPrice(300);
             terminal.WriteLine(Loc.Get("dark_alley.alchemist_price", price, GameConfig.MoneyType), "cyan");
             var ans = await terminal.GetInput(Loc.Get("dark_alley.alchemist_buy_prompt"));
-            if (ans.ToUpper() != "Y") return;
+            if (!GameConfig.IsAffirmative(ans)) return;
 
             if (currentPlayer.Gold < price)
             {
@@ -1099,8 +1099,7 @@ namespace UsurperRemake.Locations
                 terminal.WriteLine("");
                 var leaveChoice = (await terminal.GetInputAsync(Loc.Get("dark_alley.faction_leave_prompt", facName)) ?? "").Trim().ToUpperInvariant();
                 // Accept localized affirmatives: Yes / Igen (hu) / Si (es,it) / Oui (fr)
-                bool confirmLeave = leaveChoice.StartsWith("Y") || leaveChoice.StartsWith("I")
-                    || leaveChoice.StartsWith("S") || leaveChoice.StartsWith("O");
+                bool confirmLeave = GameConfig.IsAffirmative(leaveChoice);
                 if (confirmLeave)
                 {
                     factionSystem.LeaveFaction();
@@ -1186,7 +1185,7 @@ namespace UsurperRemake.Locations
 
             var choice = await terminal.GetInputAsync(Loc.Get("dark_alley.shadows_join_prompt"));
 
-            if (choice.ToUpper() == "Y")
+            if (GameConfig.IsAffirmative(choice))
             {
                 await PerformShadowsInitiation(factionSystem);
             }
@@ -1637,7 +1636,7 @@ namespace UsurperRemake.Locations
             terminal.WriteLine("");
 
             var input = await terminal.GetInput(Loc.Get("dark_alley.informant_pay_prompt"));
-            if (input.Trim().ToUpper() != "Y")
+            if (!GameConfig.IsAffirmative(input))
                 return;
 
             if (currentPlayer.Gold < GameConfig.InformantCost)
@@ -2790,7 +2789,7 @@ namespace UsurperRemake.Locations
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("dark_alley.fence_confirm", selected.name, selected.value));
             var confirm = await terminal.GetInput("> ");
-            if (confirm.ToUpper() != "Y") return;
+            if (!GameConfig.IsAffirmative(confirm)) return;
 
             // Remove item from inventory
             currentPlayer.Item.RemoveAt(selected.index);
@@ -2848,7 +2847,7 @@ namespace UsurperRemake.Locations
             terminal.WriteLine("");
 
             var ans = await terminal.GetInput(Loc.Get("dark_alley.safe_rest_prompt"));
-            if (ans.ToUpper() != "Y") return;
+            if (!GameConfig.IsAffirmative(ans)) return;
 
             if (currentPlayer.Gold < cost)
             {
@@ -2964,7 +2963,7 @@ namespace UsurperRemake.Locations
             terminal.WriteLine("");
 
             var ans = await terminal.GetInput(Loc.Get("dark_alley.tribute_pay_prompt"));
-            if (ans?.Trim().ToUpper() != "Y") return;
+            if (!GameConfig.IsAffirmative(ans)) return;
 
             if (currentPlayer.Gold < tributeCost)
             {
@@ -3138,14 +3137,14 @@ namespace UsurperRemake.Locations
                     WriteSRMenuOption("N", Loc.Get("dark_alley.enc_merchant_pass"));
                     term.WriteLine("");
                     var ans = await term.GetInput("> ");
-                    if (ans.ToUpper() == "Y" && player.Gold >= potionPrice)
+                    if (GameConfig.IsAffirmative(ans) && player.Gold >= potionPrice)
                     {
                         player.Gold -= potionPrice;
                         player.Healing = Math.Min(player.MaxPotions, player.Healing + 1);
                         term.SetColor("bright_green");
                         term.WriteLine(Loc.Get("dark_alley.enc_merchant_pocket"));
                     }
-                    else if (ans.ToUpper() == "Y")
+                    else if (GameConfig.IsAffirmative(ans))
                     {
                         term.SetColor("red");
                         term.WriteLine(Loc.Get("dark_alley.enc_merchant_no_gold"));
@@ -3161,7 +3160,7 @@ namespace UsurperRemake.Locations
                     WriteSRMenuOption("N", Loc.Get("dark_alley.enc_merchant_pass"));
                     term.WriteLine("");
                     var ans = await term.GetInput("> ");
-                    if (ans.ToUpper() == "Y" && player.Gold >= price)
+                    if (GameConfig.IsAffirmative(ans) && player.Gold >= price)
                     {
                         player.Gold -= price;
                         int stat = Random.Shared.Next(1, 4);
@@ -3184,7 +3183,7 @@ namespace UsurperRemake.Locations
                                 break;
                         }
                     }
-                    else if (ans.ToUpper() == "Y")
+                    else if (GameConfig.IsAffirmative(ans))
                     {
                         term.SetColor("red");
                         term.WriteLine(Loc.Get("dark_alley.enc_merchant_no_gold2"));
@@ -3548,7 +3547,7 @@ namespace UsurperRemake.Locations
             terminal.WriteLine("");
 
             var confirm = await terminal.GetInput(Loc.Get("dark_alley.evil_commit_prompt"));
-            if (!confirm.Equals("Y", StringComparison.OrdinalIgnoreCase))
+            if (!GameConfig.IsAffirmative(confirm))
                 return;
 
             terminal.WriteLine("");

@@ -511,7 +511,7 @@ public partial class MagicShopLocation : BaseLocation
             var confirm = terminal.GetInputSync("").ToUpper();
             DisplayMessage("");
 
-            if (confirm == "Y")
+            if (GameConfig.IsAffirmative(confirm))
             {
                 player.Gold -= idTotalWithTax;
                 CityControlSystem.Instance.ProcessSaleTax(identifyCost);
@@ -817,7 +817,7 @@ public partial class MagicShopLocation : BaseLocation
         CityControlSystem.Instance.DisplayTaxBreakdown(terminal, Loc.Get("magic_shop.curse_removal"), cost);
         var confirm = await terminal.GetInput(Loc.Get("magic_shop.curse_confirm", targetItem.Name, $"{curseTotalWithTax:N0}"));
 
-        if (confirm.ToUpper() == "Y")
+        if (GameConfig.IsAffirmative(confirm))
         {
             player.Gold -= curseTotalWithTax;
             CityControlSystem.Instance.ProcessSaleTax(cost);
@@ -920,7 +920,7 @@ public partial class MagicShopLocation : BaseLocation
         CityControlSystem.Instance.DisplayTaxBreakdown(terminal, Loc.Get("magic_shop.curse_removal"), cost);
         var confirm = await terminal.GetInput($"Remove curse from {ownerName}'s {targetEquip.Name} for {curseTotalWithTax:N0} gold? (Y/N) ");
 
-        if (confirm.ToUpper() == "Y")
+        if (GameConfig.IsAffirmative(confirm))
         {
             player.Gold -= curseTotalWithTax;
             CityControlSystem.Instance.ProcessSaleTax(cost);
@@ -1144,7 +1144,7 @@ public partial class MagicShopLocation : BaseLocation
         CityControlSystem.Instance.DisplayTaxBreakdown(terminal, "Enchantment", cost);
         var confirm = await terminal.GetInput(Loc.Get("magic_shop.old_enchant_confirm", targetItem.Name, $"{enchTotalWithTax:N0}"));
 
-        if (confirm.ToUpper() != "Y")
+        if (!GameConfig.IsAffirmative(confirm))
             return;
 
         player.Gold -= enchTotalWithTax;
@@ -1376,7 +1376,7 @@ public partial class MagicShopLocation : BaseLocation
         DisplayMessage(Loc.Get("magic_shop.reset_scroll_confirm", selectedFloor.Key.ToString(), scrollTotalWithTax.ToString("N0")), "yellow", false);
         var confirm = (await terminal.GetInput("")).ToUpper();
 
-        if (confirm == "Y")
+        if (GameConfig.IsAffirmative(confirm))
         {
             player.Gold -= scrollTotalWithTax;
             CityControlSystem.Instance.ProcessSaleTax(scrollPrice);
@@ -2098,7 +2098,7 @@ public partial class MagicShopLocation : BaseLocation
 
         terminal.WriteLine("");
         var confirm = await terminal.GetInput($"  {Loc.Get("magic_shop.proceed_yn")}");
-        if (confirm.ToUpper() != "Y")
+        if (!GameConfig.IsAffirmative(confirm))
             return;
 
         // Execute enchantment
@@ -2379,7 +2379,7 @@ public partial class MagicShopLocation : BaseLocation
 
         var (rmSlot, rmEquip) = enchantedItems[choice - 1];
         var confirmInput = await terminal.GetInput(Loc.Get("magic_shop.remove_enchant_confirm", rmEquip.Name));
-        if (confirmInput.ToUpper() != "Y")
+        if (!GameConfig.IsAffirmative(confirmInput))
         {
             await terminal.WaitForKey();
             return;
@@ -2738,7 +2738,7 @@ public partial class MagicShopLocation : BaseLocation
 
         CityControlSystem.Instance.DisplayTaxBreakdown(terminal, item.Name, price);
         var buyConfirm = await terminal.GetInput($"  {Loc.Get("magic_shop.buy_confirm", $"{totalWithTax:N0}")}");
-        if (buyConfirm.Trim().ToUpper() != "Y") return;
+        if (!GameConfig.IsAffirmative(buyConfirm)) return;
 
         player.Gold -= totalWithTax;
 
@@ -2887,7 +2887,7 @@ public partial class MagicShopLocation : BaseLocation
         if (fenceModifier > 1.0f)
         {
             terminal.SetColor("bright_green");
-            terminal.WriteLine($"  Shadows Fence Bonus: {(int)((fenceModifier - 1.0f) * 100)}% better prices!");
+            terminal.WriteLine($"  {Loc.Get("magic_shop.fence_bonus", (int)((fenceModifier - 1.0f) * 100))}");
             terminal.WriteLine("");
         }
 
@@ -2899,24 +2899,12 @@ public partial class MagicShopLocation : BaseLocation
             terminal.SetColor("white");
             terminal.Write($"{item.Name,-30}");
             terminal.SetColor("yellow");
-            terminal.WriteLine($" - Sell for {sellPrice:N0} gold");
+            terminal.WriteLine(Loc.Get("magic_shop.sell_for_gold", sellPrice.ToString("N0")));
         }
 
         terminal.WriteLine("");
         terminal.SetColor("gray");
-        terminal.Write("  Sell which piece? (");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("[A]");
-        terminal.SetColor("gray");
-        terminal.Write("ll, ");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("[F]");
-        terminal.SetColor("gray");
-        terminal.Write("iltered, ");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("0");
-        terminal.SetColor("gray");
-        terminal.WriteLine(" to cancel): ");
+        terminal.WriteLine($"  {Loc.Get("magic_shop.sell_prompt")}");
 
         var input = await terminal.GetInput("  > ");
         var upper = input.Trim().ToUpper();
@@ -2935,13 +2923,9 @@ public partial class MagicShopLocation : BaseLocation
         {
             long totalGold = sellable.Sum(s => s.sellPrice);
             terminal.SetColor("yellow");
-            terminal.Write($"  Sell {sellable.Count} item{(sellable.Count > 1 ? "s" : "")} for ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write($"{totalGold:N0}");
-            terminal.SetColor("yellow");
-            terminal.Write(" gold? (Y/N): ");
+            terminal.Write($"  {Loc.Get("magic_shop.bulk_sell_confirm", sellable.Count, totalGold.ToString("N0"))}");
             var confirm = await terminal.GetInput("");
-            if (confirm.Trim().ToUpper() == "Y")
+            if (GameConfig.IsAffirmative(confirm))
             {
                 // Remove all sold items from inventory (reverse to preserve indices)
                 int soldCount = 0;
@@ -3431,7 +3415,7 @@ public partial class MagicShopLocation : BaseLocation
         terminal.WriteLine("");
 
         var confirm = await terminal.GetInput($"  {Loc.Get("magic_shop.proceed_yn")}");
-        if (confirm.ToUpper() != "Y")
+        if (!GameConfig.IsAffirmative(confirm))
             return;
 
         // Deduct costs
@@ -3648,7 +3632,7 @@ public partial class MagicShopLocation : BaseLocation
             terminal.SetColor("blue");
             terminal.WriteLine("  Your noble heart resists this dark path.");
             var warnConfirm = await terminal.GetInput("  Are you sure you want to proceed? (Y/N): ");
-            if (warnConfirm.ToUpper() != "Y") return;
+            if (!GameConfig.IsAffirmative(warnConfirm)) return;
         }
 
         // Build target list: exclude protected NPCs, spouse, and current King
@@ -3709,7 +3693,7 @@ public partial class MagicShopLocation : BaseLocation
         terminal.WriteLine("");
 
         var confirm = await terminal.GetInput($"  {Loc.Get("magic_shop.dark_proceed")}");
-        if (confirm.ToUpper() != "Y") return;
+        if (!GameConfig.IsAffirmative(confirm)) return;
 
         // Deduct costs
         player.Gold -= deathTotalWithTax;

@@ -464,7 +464,7 @@ namespace UsurperRemake.Systems
         private static bool IsYes(string input)
         {
             var v = input?.Trim().ToUpperInvariant();
-            return v == "Y" || v == "S" || v == "O" || v == "1";
+            return GameConfig.IsAffirmative(input) || v == "1";
         }
 
         private static void Msg(TerminalEmulator terminal, string color, string text)

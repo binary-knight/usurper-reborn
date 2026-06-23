@@ -10,7 +10,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.65.0";
+    public const string Version = "0.65.1";
     public const string VersionName = "Countdown"; // the Beta -> 1.0 release-prep cycle
 
     // v0.57.12: Alignment scale cap. Character.Chivalry and Character.Darkness setters clamp to [0, AlignmentCap]
@@ -2166,6 +2166,77 @@ public static partial class GameConfig
     public static string GetLocalizedSlotName(EquipmentSlot slot)
     {
         return Loc.Get($"equip.slot.{slot}");
+    }
+
+    /// <summary>
+    /// v0.65.1: Centralized localized yes/no test. Returns true when the player's
+    /// input is an affirmative in ANY supported language: Y (English Yes), S
+    /// (Spanish "Si" / Italian "Si"), O (French "Oui"), I (Hungarian "Igen").
+    /// Many confirm prompts display a localized "(S/N)" / "(O/N)" / "(I/N)" but the
+    /// handlers historically only matched the literal "Y", so a Spanish/Italian
+    /// player typing the letter they were SHOWN (S) failed. Route every yes/no
+    /// confirm through this so the displayed accept key actually works. Null-safe
+    /// and idempotent on case/whitespace (accepts already-trimmed/uppercased input),
+    /// so callers can pass the raw input directly. Only use where S/O/I are NOT a
+    /// distinct menu option meaning something else.
+    /// </summary>
+    public static bool IsAffirmative(string? input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return false;
+        var c = input.Trim().ToUpperInvariant();
+        // Single-letter accept keys (Y=Yes, S=Si/Si, O=Oui, I=Igen) AND the full words,
+        // so this is a strict superset of every existing affirmative check it replaces
+        // (== "Y", StartsWith("Y"), and the hand-rolled Y/S/O/I/SI/IGEN chains) -- no
+        // conversion can regress full-word "Yes"/"Si"/"Oui"/"Igen" input.
+        return c == "Y" || c == "S" || c == "O" || c == "I"
+            || c == "YES" || c == "SI" || c == "S\u00CC" || c == "OUI" || c == "IGEN";
+    }
+
+    /// <summary>
+    /// v0.65.1: Short human-readable weapon-class tag (One-Handed / Two-Handed /
+    /// Shield / Buckler / Tower Shield / Off-Hand) for item displays, so players
+    /// can tell a weapon's handedness and spot shields WITHOUT equipping it
+    /// (player request: "impossible to find out if it's 1H or 2H without trying
+    /// it on"). Shield detection is robust -- WeaponType OR shield stats OR name,
+    /// mirroring the combat-side HasShieldEquipped logic -- so a buckler that an
+    /// older buggy load mis-typed as a 1H weapon still reads as a shield here.
+    /// Returns "" for non-weapon items (armor / accessories), so callers can
+    /// invoke it unconditionally. For loot Items (no WeaponType field), the caller
+    /// resolves weaponType via InferWeaponType ONLY when Type == Weapon (that
+    /// inferer defaults to Sword on unknown names, so it must not run on armor).
+    /// </summary>
+    public static string GetWeaponClassTag(string name, WeaponType weaponType, WeaponHandedness handedness, int shieldBonus, int blockChance)
+    {
+        name ??= "";
+
+        bool isShield = weaponType == WeaponType.Shield
+            || weaponType == WeaponType.Buckler
+            || weaponType == WeaponType.TowerShield
+            || shieldBonus > 0 || blockChance > 0
+            || ShopItemGenerator.LooksLikeShieldByName(name);
+        if (isShield)
+        {
+            return ShopItemGenerator.InferShieldType(name) switch
+            {
+                WeaponType.Buckler => Loc.Get("equip.class_buckler"),
+                WeaponType.TowerShield => Loc.Get("equip.class_tower_shield"),
+                _ => Loc.Get("equip.class_shield"),
+            };
+        }
+
+        WeaponHandedness eff = handedness;
+        if (eff == WeaponHandedness.None)
+        {
+            if (weaponType == WeaponType.None) return ""; // not a weapon
+            eff = ShopItemGenerator.InferHandedness(weaponType);
+        }
+        return eff switch
+        {
+            WeaponHandedness.TwoHanded => Loc.Get("equip.class_two_handed"),
+            WeaponHandedness.OneHanded => Loc.Get("equip.class_one_handed"),
+            WeaponHandedness.OffHandOnly => Loc.Get("equip.class_off_hand"),
+            _ => "",
+        };
     }
 
     /// <summary>

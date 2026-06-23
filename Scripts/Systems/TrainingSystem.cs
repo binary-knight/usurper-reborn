@@ -821,7 +821,7 @@ public static class TrainingSystem
             terminal.WriteLine(Loc.Get("training.reset_refund", pointsInvested), "bright_green");
             terminal.WriteLine("");
             var confirm = await terminal.GetInput(Loc.Get("training.confirm_prompt"));
-            if (confirm?.Trim().ToUpper() != "Y")
+            if (!GameConfig.IsAffirmative(confirm))
                 return;
 
             // Execute reset with lore flavor
@@ -909,7 +909,7 @@ public static class TrainingSystem
         terminal.WriteLine(Loc.Get("ui.confirm_cannot_undo"), "red");
 
         var confirm = await terminal.GetInput(Loc.Get("training.confirm_prompt"));
-        if (confirm?.Trim().ToUpper() != "Y")
+        if (!GameConfig.IsAffirmative(confirm))
             return;
 
         // Execute reset with lore flavor

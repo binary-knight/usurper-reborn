@@ -1124,7 +1124,7 @@ public class TeamCornerLocation : BaseLocation
         terminal.Write(Loc.Get("team.confirm_quit", currentPlayer.Team));
         string response = await terminal.ReadLineAsync();
 
-        if (response?.ToUpper().StartsWith("Y") == true)
+        if (GameConfig.IsAffirmative(response))
         {
             string oldTeam = currentPlayer.Team;
             currentPlayer.Team = "";
@@ -1642,7 +1642,7 @@ public class TeamCornerLocation : BaseLocation
         terminal.Write(Loc.Get("team.recruit_confirm_prompt", recruit.DisplayName, $"{cost:N0}"));
         terminal.SetColor("white");
         string response = (await terminal.ReadLineAsync())?.Trim().ToUpperInvariant() ?? "";
-        if (response != "Y" && response != "YES")
+        if (!GameConfig.IsAffirmative(response) && response != "YES")
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("team.recruit_cancelled"));
@@ -2195,7 +2195,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.Write(Loc.Get("team.confirm_sack", member.DisplayName));
             string response = await terminal.ReadLineAsync();
 
-            if (response?.ToUpper().StartsWith("Y") == true)
+            if (GameConfig.IsAffirmative(response))
             {
                 member.Team = "";
                 member.TeamPW = "";
@@ -2972,7 +2972,7 @@ public class TeamCornerLocation : BaseLocation
         terminal.SetColor("white");
 
         var confirm = await terminal.ReadLineAsync();
-        if (!confirm.ToUpper().StartsWith("Y"))
+        if (!GameConfig.IsAffirmative(confirm))
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("ui.cancelled"));
@@ -3194,7 +3194,7 @@ public class TeamCornerLocation : BaseLocation
         terminal.SetColor("yellow");
         terminal.Write(Loc.Get("team.confirm_war", enemyTeam.TeamName));
         string confirm = (await terminal.ReadLineAsync())?.Trim().ToUpper() ?? "";
-        if (confirm != "Y") return;
+        if (!GameConfig.IsAffirmative(confirm)) return;
 
         if (currentPlayer.Gold < wager)
         {

@@ -894,7 +894,7 @@ public class StreetEncounterSystem
 
         string choice = (await terminal.GetKeyInput()).ToUpperInvariant();
 
-        if (choice == "Y" || choice == "F")
+        if (GameConfig.IsAffirmative(choice) || choice == "F")
         {
             terminal.SetColor("magenta");
             terminal.WriteLine(Loc.Get("street_encounter.romance.pleasant_time"));
@@ -978,10 +978,10 @@ public class StreetEncounterSystem
         {
             terminal.Write("  [", "white");
             terminal.Write($"{i + 1}", "bright_yellow");
-            terminal.Write($"] {items[i].Name}", "white");
-            terminal.WriteLine($" - {items[i].Price} gold", "yellow");
-            if (!string.IsNullOrEmpty(items[i].Description))
-                terminal.WriteLine($"      {items[i].Description}", "gray");
+            terminal.Write($"] {Loc.Get(items[i].DisplayKey)}", "white");
+            terminal.WriteLine(Loc.Get("street_encounter.merchant.price_line", items[i].Price), "yellow");
+            if (!string.IsNullOrEmpty(items[i].DescKey))
+                terminal.WriteLine($"      {Loc.Get(items[i].DescKey, items[i].DescArg)}", "gray");
         }
         terminal.Write("  [", "white");
         terminal.Write("0", "bright_yellow");
@@ -1002,11 +1002,11 @@ public class StreetEncounterSystem
                 ApplyMerchantItem(player, item);
 
                 terminal.SetColor("green");
-                terminal.WriteLine(Loc.Get("street_encounter.merchant.purchased", item.Name));
-                if (!string.IsNullOrEmpty(item.Description))
-                    terminal.WriteLine($"  {item.Description}", "cyan");
+                terminal.WriteLine(Loc.Get("street_encounter.merchant.purchased", Loc.Get(item.DisplayKey)));
+                if (!string.IsNullOrEmpty(item.DescKey))
+                    terminal.WriteLine($"  {Loc.Get(item.DescKey, item.DescArg)}", "cyan");
                 result.GoldLost = item.Price;
-                result.Message = Loc.Get("street_encounter.merchant.msg_bought", item.Name);
+                result.Message = Loc.Get("street_encounter.merchant.msg_bought", Loc.Get(item.DisplayKey));
             }
             else
             {
@@ -1741,7 +1741,7 @@ public class StreetEncounterSystem
 
         string choice = (await terminal.GetKeyInput()).ToUpperInvariant();
 
-        if (choice == "Y")
+        if (GameConfig.IsAffirmative(choice))
         {
             int bribeChance = 50 + (int)(player.Charisma - 10) * 3;
             if (_random.Next(100) < bribeChance)
@@ -2042,29 +2042,31 @@ public class StreetEncounterSystem
         var items = new List<MerchantItem>();
         int potionPrice = 40 + playerLevel * 3;
 
+        // v0.65.1: Name stays the English logic key (ApplyMerchantItem switch); DisplayKey/DescKey
+        // are localized for display. Player report: town merchant item names rendered in English.
         if (shady)
         {
             // Shady merchant sells useful but morally questionable items
             items.Add(new MerchantItem { Name = "Poison Vial", Price = 80 + playerLevel * 5, Type = "consumable",
-                Description = "Poisons your weapon for your next dungeon fight" });
+                DisplayKey = "street_encounter.merchant.item.poison_vial", DescKey = "street_encounter.merchant.item.poison_vial_desc" });
             items.Add(new MerchantItem { Name = "Smoke Bomb", Price = 60 + playerLevel * 4, Type = "consumable",
-                Description = "Guaranteed escape from your next combat" });
+                DisplayKey = "street_encounter.merchant.item.smoke_bomb", DescKey = "street_encounter.merchant.item.smoke_bomb_desc" });
             items.Add(new MerchantItem { Name = "Healing Potions (x3)", Price = potionPrice * 3, Type = "consumable",
-                Description = "Three healing potions at a discount" });
+                DisplayKey = "street_encounter.merchant.item.healing_potions_x3", DescKey = "street_encounter.merchant.item.healing_potions_x3_desc" });
             items.Add(new MerchantItem { Name = "Dark Tonic", Price = 200 + playerLevel * 10, Type = "consumable",
-                Description = $"Restores {30 + playerLevel}% of your max HP right now" });
+                DisplayKey = "street_encounter.merchant.item.dark_tonic", DescKey = "street_encounter.merchant.item.restore_hp_desc", DescArg = 30 + playerLevel });
         }
         else
         {
-            // Normal traveling merchant — useful consumables
+            // Normal traveling merchant -- useful consumables
             items.Add(new MerchantItem { Name = "Healing Potion", Price = potionPrice, Type = "consumable",
-                Description = "+1 healing potion" });
+                DisplayKey = "street_encounter.merchant.item.healing_potion", DescKey = "street_encounter.merchant.item.healing_potion_desc" });
             items.Add(new MerchantItem { Name = "Healing Potions (x5)", Price = (long)(potionPrice * 4.5), Type = "consumable",
-                Description = "Five potions — buy in bulk and save!" });
+                DisplayKey = "street_encounter.merchant.item.healing_potions_x5", DescKey = "street_encounter.merchant.item.healing_potions_x5_desc" });
             items.Add(new MerchantItem { Name = "Antidote", Price = 50 + playerLevel * 2, Type = "consumable",
-                Description = "Cures poison immediately" });
+                DisplayKey = "street_encounter.merchant.item.antidote", DescKey = "street_encounter.merchant.item.antidote_desc" });
             items.Add(new MerchantItem { Name = "Fortifying Elixir", Price = 150 + playerLevel * 8, Type = "consumable",
-                Description = $"Restores {20 + playerLevel / 2}% of your max HP right now" });
+                DisplayKey = "street_encounter.merchant.item.fortifying_elixir", DescKey = "street_encounter.merchant.item.restore_hp_desc", DescArg = 20 + playerLevel / 2 });
         }
 
         return items;
@@ -2116,10 +2118,12 @@ public class StreetEncounterSystem
 
     private struct MerchantItem
     {
-        public string Name;
+        public string Name;        // English logic key for ApplyMerchantItem's switch -- NEVER displayed
         public long Price;
         public string Type;
-        public string Description;
+        public string DisplayKey;  // v0.65.1: loc key for the displayed item name
+        public string DescKey;     // v0.65.1: loc key for the description (may take a {0} arg)
+        public int DescArg;        // {0} arg for descriptions that need it (percent); else unused
     }
 
     /// <summary>

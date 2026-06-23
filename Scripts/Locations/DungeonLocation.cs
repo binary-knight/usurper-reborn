@@ -419,7 +419,7 @@ public class DungeonLocation : BaseLocation
         // Mark as seen regardless of choice so we never ask again
         player.HintsShown.Add(DUNGEON_TUTORIAL_FLAG);
 
-        if (ans != "Y")
+        if (!GameConfig.IsAffirmative(ans))
         {
             term.WriteLine("Alright — good luck down there!", "gray");
             await Task.Delay(1200);
@@ -976,7 +976,7 @@ public class DungeonLocation : BaseLocation
 
                     term.WriteLine(Loc.Get("dungeon.face_maelketh"), "yellow");
                     var response = await term.GetInput("> ");
-                    if (response.Trim().ToUpper().StartsWith("Y"))
+                    if (GameConfig.IsAffirmative(response))
                     {
                         var result = await OldGodBossSystem.Instance.StartBossEncounter(player, OldGodType.Maelketh, term, teammates);
                         await HandleGodEncounterResult(result, player, term);
@@ -1641,7 +1641,7 @@ public class DungeonLocation : BaseLocation
                 term.SetColor("cyan");
                 var payChoice = await term.GetInput(Loc.Get("dungeon.pay_affordable", affordableFee.ToString("N0")));
 
-                if (payChoice.ToUpper().StartsWith("Y"))
+                if (GameConfig.IsAffirmative(payChoice))
                 {
                     player.Gold -= affordableFee;
                     term.SetColor("green");
@@ -1687,7 +1687,7 @@ public class DungeonLocation : BaseLocation
         term.SetColor("cyan");
         var confirm = await term.GetInput(Loc.Get("dungeon.pay_all_allies", totalFee.ToString("N0")));
 
-        if (confirm.ToUpper().StartsWith("Y"))
+        if (GameConfig.IsAffirmative(confirm))
         {
             player.Gold -= totalFee;
             term.SetColor("green");
@@ -2418,6 +2418,11 @@ public class DungeonLocation : BaseLocation
     /// </summary>
     private void DisplayRoomView(DungeonRoom room)
     {
+        // v0.65.1: keep grouped followers' screens in sync with the leader. This fires on
+        // every room render -- including the redraw the moment the dungeon loop resumes after
+        // combat -- which fixes followers being stuck on the combat screen until they move.
+        // PushRoomToFollowers self-guards (no-op for solo players / non-leaders / no followers).
+        PushRoomToFollowers(room);
         if (IsBBSSession) { DisplayRoomViewBBS(room); return; }
 
         var player = GetCurrentPlayer();
@@ -3888,7 +3893,7 @@ public class DungeonLocation : BaseLocation
                 terminal.Write(Loc.Get("dungeon.confirm_leave"));
                 terminal.SetColor("white");
                 string exitConfirm = (await terminal.GetInput("")).Trim().ToUpper();
-                if (exitConfirm == "Y" || exitConfirm == "YES")
+                if (GameConfig.IsAffirmative(exitConfirm))
                 {
                     await NavigateToLocation(GameLocation.MainStreet);
                     return true;
@@ -5459,7 +5464,7 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine(Loc.Get("dungeon.face_god_prompt", godName));
         var response = await terminal.GetInput("> ");
 
-        if (response.Trim().ToUpper().StartsWith("Y"))
+        if (GameConfig.IsAffirmative(response))
         {
             var result = await OldGodBossSystem.Instance.StartBossEncounter(player, godType.Value, terminal, teammates);
             await HandleGodEncounterResult(result, player, terminal);
@@ -7126,7 +7131,7 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine("");
         var recite = await terminal.GetInput(Loc.Get("dungeon.recite_scroll_prompt"));
         
-        if (recite.ToUpper() == "Y")
+        if (GameConfig.IsAffirmative(recite))
         {
             await ExecuteScrollMagic(scrollType, currentPlayer);
         }
@@ -8686,7 +8691,7 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine("");
 
                 var followUp = await terminal.GetInput(Loc.Get("quest.lyris_shrine.ask_join_yn"));
-                if (followUp.ToUpper() == "Y")
+                if (GameConfig.IsAffirmative(followUp))
                 {
                     await TryRecruitCompanionInDungeon(
                         UsurperRemake.Systems.CompanionId.Lyris, player);
@@ -9526,7 +9531,7 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine(Loc.Get("dungeon.merchant_purchase_confirm", item.Name, item.Price));
         var confirm = (await terminal.GetInput("")).Trim().ToUpper();
 
-        if (confirm == "Y")
+        if (GameConfig.IsAffirmative(confirm))
         {
             player.Gold -= item.Price;
             item.Sold = true;
@@ -10084,6 +10089,16 @@ public class DungeonLocation : BaseLocation
             terminal.SetColor("white");
             terminal.WriteLine(Loc.Get("dungeon.remove_ally"));
         }
+        if (teammates.Count > 0)
+        {
+            // Literal [S] label (not the first-letter-as-hotkey pattern) so the loc
+            // string is the same in every language and not coupled to the letter S.
+            terminal.Write("  [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("S");
+            terminal.SetColor("white");
+            terminal.WriteLine($"] {Loc.Get("dungeon.skills_member_option")}");
+        }
         // XP distribution percentages (only count non-grouped, non-echo teammates)
         int xpEligibleCount = teammates.Count(t => t != null && !t.IsGroupedPlayer && !t.IsEcho);
         int totalPct = player.TeamXPPercent.Take(1 + xpEligibleCount).Sum();
@@ -10155,6 +10170,16 @@ public class DungeonLocation : BaseLocation
                     await Task.Delay(1500);
                 }
                 break;
+
+            case "S":
+                if (teammates.Count > 0)
+                    await PromptManageTeammateSkills();
+                else
+                {
+                    terminal.WriteLine(Loc.Get("dungeon.no_teammates_skills"), "gray");
+                    await Task.Delay(1500);
+                }
+                return;
 
             case "X":
                 await ShowXPDistributionMenu();
@@ -10281,7 +10306,7 @@ public class DungeonLocation : BaseLocation
 
             terminal.WriteLine("");
             terminal.SetColor("cyan");
-            terminal.WriteLine($"  [#] {Loc.Get("dungeon.view_equip_member")}  [I] {Loc.Get("party_inv.menu_dungeon")}  [Q] {Loc.Get("dungeon.back")}");
+            terminal.WriteLine($"  [#] {Loc.Get("dungeon.view_equip_member")}  [S] {Loc.Get("dungeon.skills_member_option")}  [I] {Loc.Get("party_inv.menu_dungeon")}  [Q] {Loc.Get("dungeon.back")}");
             terminal.WriteLine("");
             terminal.SetColor("cyan");
             terminal.Write(Loc.Get("ui.choice"));
@@ -10295,6 +10320,12 @@ public class DungeonLocation : BaseLocation
             if (choice == "I")
             {
                 await ShowPartyInventoryViewer(teammates.ToList());
+                continue;
+            }
+
+            if (choice == "S")
+            {
+                await PromptManageTeammateSkills();
                 continue;
             }
 
@@ -10328,6 +10359,161 @@ public class DungeonLocation : BaseLocation
                 await ManagePartyMemberEquipment(selectedMember);
             }
         }
+    }
+
+    /// <summary>
+    /// v0.65.1: pick a party member and edit which combat skills they may use. Works for
+    /// companions (edits the Companion, consistent with the Inn) and for Team Corner NPCs,
+    /// spouses, and echoes (edits the player's per-teammate toggles). Grouped live players
+    /// are excluded -- they control their own skills.
+    /// </summary>
+    private async Task PromptManageTeammateSkills()
+    {
+        // Grouped LIVE players control their own skills; non-companions need a stable
+        // toggle key (companions persist via the Companion object regardless).
+        var eligible = teammates.Where(t => t != null && !t.IsGroupedPlayer
+            && (t.IsCompanion || !string.IsNullOrEmpty(t.GetSkillToggleKey()))).ToList();
+        if (eligible.Count == 0)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine(Loc.Get("dungeon.skills_no_members"));
+            await Task.Delay(1500);
+            return;
+        }
+
+        terminal.ClearScreen();
+        WriteBoxHeader(Loc.Get("dungeon.skills_pick_header"), "bright_cyan", 51);
+        terminal.WriteLine("");
+        for (int i = 0; i < eligible.Count; i++)
+        {
+            var t = eligible[i];
+            terminal.SetColor("bright_yellow"); terminal.Write($"  [{i + 1}] ");
+            terminal.SetColor("white");
+            terminal.WriteLine($"{t.DisplayName} - {Loc.Get("dungeon.level_label")} {t.Level} {t.ClassName}");
+        }
+        terminal.WriteLine("");
+        terminal.SetColor("cyan");
+        var input = (await terminal.GetInput(Loc.Get("ui.choice"))).Trim();
+        if (int.TryParse(input, out int idx) && idx >= 1 && idx <= eligible.Count)
+            await ManageTeammateSkills(eligible[idx - 1]);
+    }
+
+    /// <summary>
+    /// v0.65.1: per-teammate combat-skill editor. Toggling a skill OFF stops the teammate's
+    /// AI from using it (it falls back to other skills / basic attacks). Companion edits go
+    /// to the Companion object (same store the Inn uses); non-companion edits live on the
+    /// player keyed by GetSkillToggleKey. A single AutoSave persists both.
+    /// </summary>
+    private async Task ManageTeammateSkills(Character teammate)
+    {
+        var owner = GetCurrentPlayer();
+        bool isCompanion = teammate.IsCompanion && teammate.CompanionId.HasValue;
+        var companion = isCompanion
+            ? UsurperRemake.Systems.CompanionSystem.Instance?.GetCompanion(teammate.CompanionId!.Value)
+            : null;
+        isCompanion = companion != null;
+        string key = teammate.GetSkillToggleKey();
+
+        // Working sets. For a companion these reference the live Companion sets (mutated in
+        // place, like the Inn). For non-companions they are copies of the player's stored
+        // lists, written back on exit.
+        var disabledAbilities = isCompanion
+            ? companion!.DisabledAbilities
+            : new HashSet<string>(owner.TeammateDisabledAbilities.TryGetValue(key, out var savedA) ? savedA : new List<string>());
+        var disabledSpells = isCompanion
+            ? companion!.DisabledSpells
+            : new HashSet<string>(owner.TeammateDisabledSpells.TryGetValue(key, out var savedS) ? savedS : new List<string>());
+
+        var abilities = ClassAbilitySystem.GetAvailableAbilities(teammate) ?? new();
+        var spells = SpellSystem.GetAllSpellsForClass(teammate.Class)
+            ?.Where(s => teammate.Level >= SpellSystem.GetLevelRequired(teammate.Class, s.Level))
+            .OrderBy(s => s.Level).ToList() ?? new List<SpellSystem.SpellInfo>();
+
+        if (abilities.Count == 0 && spells.Count == 0)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine(Loc.Get("dungeon.skills_none", teammate.DisplayName));
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        while (true)
+        {
+            terminal.ClearScreen();
+            WriteBoxHeader(Loc.Get("dungeon.skills_header", teammate.DisplayName.ToUpper()), "bright_cyan", 57);
+            terminal.SetColor("gray");
+            terminal.WriteLine($"  {Loc.Get("dungeon.skills_hint")}");
+            terminal.WriteLine("");
+
+            int row = 0;
+            if (abilities.Count > 0)
+            {
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine($"  {Loc.Get("inn.skills_abilities_header")}");
+                foreach (var ab in abilities)
+                {
+                    row++;
+                    WriteSkillToggleRow(row, ab.Name, ab.Description, disabledAbilities.Contains(ab.Id));
+                }
+            }
+            if (spells.Count > 0)
+            {
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine($"  {Loc.Get("inn.skills_spells_header")}");
+                foreach (var sp in spells)
+                {
+                    row++;
+                    WriteSkillToggleRow(row, sp.Name, sp.Description, disabledSpells.Contains(sp.Name));
+                }
+            }
+
+            terminal.WriteLine("");
+            terminal.SetColor("yellow");
+            terminal.WriteLine($"  {Loc.Get("dungeon.skills_options")}");
+            var input = (await terminal.GetInput(Loc.Get("ui.choice"))).Trim().ToUpperInvariant();
+
+            if (input == "" || input == "Q" || input == "B" || input == "0") break;
+            if (input == "A") { disabledAbilities.Clear(); disabledSpells.Clear(); continue; }
+
+            if (int.TryParse(input, out int pick) && pick >= 1 && pick <= abilities.Count + spells.Count)
+            {
+                if (pick <= abilities.Count)
+                {
+                    var id = abilities[pick - 1].Id;
+                    if (!disabledAbilities.Remove(id)) disabledAbilities.Add(id);
+                }
+                else
+                {
+                    var nm = spells[pick - 1 - abilities.Count].Name;
+                    if (!disabledSpells.Remove(nm)) disabledSpells.Add(nm);
+                }
+            }
+        }
+
+        if (!isCompanion)
+        {
+            // Write the copies back to the owner dicts; prune empties to keep them tidy.
+            if (disabledAbilities.Count > 0) owner.TeammateDisabledAbilities[key] = disabledAbilities.ToList();
+            else owner.TeammateDisabledAbilities.Remove(key);
+            if (disabledSpells.Count > 0) owner.TeammateDisabledSpells[key] = disabledSpells.ToList();
+            else owner.TeammateDisabledSpells.Remove(key);
+        }
+        // One AutoSave persists companion edits (CompanionSaveData) AND the player dicts.
+        try { await SaveSystem.Instance.AutoSave(owner); } catch { /* best-effort */ }
+    }
+
+    private void WriteSkillToggleRow(int n, string name, string desc, bool off)
+    {
+        terminal.SetColor("bright_yellow");
+        terminal.Write($"  [{n,2}] ");
+        terminal.SetColor(off ? "darkgray" : "bright_green");
+        terminal.Write(off ? "[OFF] " : "[ON]  ");
+        terminal.SetColor(off ? "gray" : "white");
+        terminal.Write($"{name,-22}");
+        terminal.SetColor("darkgray");
+        string d = desc ?? "";
+        if (!IsScreenReader && d.Length > 34) d = d.Substring(0, 34);
+        terminal.WriteLine($" {d}");
     }
 
     /// <summary>
@@ -10686,7 +10872,7 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine("");
                 terminal.SetColor("cyan");
                 var confirm = await terminal.GetInput(Loc.Get("dungeon.pay_fee_confirm", fee));
-                if (!confirm.ToUpper().StartsWith("Y"))
+                if (!GameConfig.IsAffirmative(confirm))
                 {
                     terminal.SetColor("gray");
                     terminal.WriteLine(Loc.Get("dungeon.npc_shrugs", npc.DisplayName));
@@ -12061,7 +12247,7 @@ public class DungeonLocation : BaseLocation
         terminal.Write(Loc.Get("ui.choice"));
         var choice = (await terminal.GetInput("")).Trim().ToUpper();
 
-        if (choice != "Y")
+        if (!GameConfig.IsAffirmative(choice))
         {
             return;
         }
@@ -12200,7 +12386,7 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine(Loc.Get("dungeon.will_use_potions", potionsToUse));
         string confirm = (await terminal.GetInput("")).Trim().ToUpper();
 
-        if (confirm != "Y")
+        if (!GameConfig.IsAffirmative(confirm))
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("ui.cancelled"));
@@ -17098,7 +17284,7 @@ public class DungeonLocation : BaseLocation
                 // Slash commands — both chat and game commands
                 if (trimmed.StartsWith("/"))
                 {
-                    bool handled = await ProcessFollowerSlashCommand(trimmed, player, term);
+                    bool handled = await ProcessFollowerSlashCommand(trimmed, player, term, leaderDungeon);
                     if (!handled)
                         await MudChatSystem.TryProcessCommand(trimmed, term);
                     continue;
@@ -17156,10 +17342,58 @@ public class DungeonLocation : BaseLocation
     }
 
     /// <summary>
+    /// v0.65.1: render a live party HP/MP panel -- the leader plus every combat teammate
+    /// (grouped players + the leader's NPC/companion/pet allies). Used by the group /party
+    /// command so a healer can see who needs healing. `viewer` is tagged "(you)".
+    /// </summary>
+    private static void RenderPartyStatus(TerminalEmulator term, Character? leader, List<Character>? teammates, Character? viewer)
+    {
+        if (GameConfig.ScreenReaderMode)
+            term.WriteLine(Loc.Get("party.status_header"), "bright_cyan");
+        else
+            term.WriteLine($"=== {Loc.Get("party.status_header")} ===", "bright_cyan");
+
+        void Row(Character c, bool isLeader)
+        {
+            int hpPct = c.MaxHP > 0 ? (int)(c.HP * 100 / c.MaxHP) : 0;
+            string hpColor = hpPct > 50 ? "green" : hpPct > 25 ? "yellow" : "red";
+            term.SetColor("gray");
+            term.Write("  ");
+            term.SetColor(hpColor);
+            term.Write(c.DisplayName);
+            string tag = isLeader ? $" {Loc.Get("party.tag_leader")}"
+                : (!c.IsGroupedPlayer ? $" {Loc.Get("party.tag_ally")}" : "");
+            if (viewer != null && c == viewer) tag += $" {Loc.Get("party.tag_you")}";
+            term.SetColor("darkgray");
+            if (!string.IsNullOrEmpty(tag)) term.Write(tag);
+            if (!c.IsAlive)
+            {
+                term.SetColor("red");
+                term.WriteLine($"  {Loc.Get("party.member_down")}");
+            }
+            else
+            {
+                string mp = c.IsManaClass ? $"  {Loc.Get("dungeon.mp_label")}:{c.Mana}/{c.MaxMana}" : "";
+                term.SetColor("gray");
+                term.WriteLine($"  {Loc.Get("dungeon.hp_label")}:{c.HP}/{c.MaxHP} ({hpPct}%){mp}");
+            }
+        }
+
+        if (leader != null) Row(leader, true);
+        if (teammates != null)
+        {
+            List<Character> snap;
+            lock (teammates) { snap = new List<Character>(teammates); }
+            foreach (var t in snap)
+                if (t != null && t != leader) Row(t, false);
+        }
+    }
+
+    /// <summary>
     /// Process game-specific slash commands for a group follower.
     /// Returns true if the command was handled, false to fall through to MudChatSystem.
     /// </summary>
-    private static async Task<bool> ProcessFollowerSlashCommand(string input, Character player, TerminalEmulator term)
+    private static async Task<bool> ProcessFollowerSlashCommand(string input, Character player, TerminalEmulator term, DungeonLocation leaderDungeon)
     {
         var command = input.Substring(1).ToLower().Trim();
         switch (command)
@@ -17199,7 +17433,7 @@ public class DungeonLocation : BaseLocation
                 term.SetColor("yellow");
                 term.Write("    C");
                 term.SetColor("gray");
-                term.WriteLine("  - Cast best spell");
+                term.WriteLine($"  - {Loc.Get("dungeon.follower_help_cast")}");
                 term.SetColor("yellow");
                 term.Write("    D");
                 term.SetColor("gray");
@@ -17211,7 +17445,7 @@ public class DungeonLocation : BaseLocation
                 term.SetColor("yellow");
                 term.Write("    H");
                 term.SetColor("gray");
-                term.WriteLine("  - Heal ally");
+                term.WriteLine($"  - {Loc.Get("dungeon.follower_help_heal")}");
                 term.SetColor("yellow");
                 term.Write("    R");
                 term.SetColor("gray");
@@ -17220,6 +17454,8 @@ public class DungeonLocation : BaseLocation
                 term.Write("    1-9");
                 term.SetColor("gray");
                 term.WriteLine(" - Quickbar (spells/abilities)");
+                term.SetColor("darkgray");
+                term.WriteLine($"  {Loc.Get("dungeon.follower_help_heal_targets")}");
                 term.SetColor("white");
                 term.WriteLine($"  {Loc.Get("dungeon.follower_slash_commands")}:");
                 term.SetColor("gray");
@@ -17268,38 +17504,10 @@ public class DungeonLocation : BaseLocation
             case "party":
             case "group":
             {
-                var partyGroup = GroupSystem.Instance?.GetGroupFor(player.GroupPlayerUsername ?? player.DisplayName);
-                if (partyGroup == null)
-                {
-                    term.SetColor("gray");
-                    term.WriteLine("  You are not in a group.");
-                    return true;
-                }
-                if (GameConfig.ScreenReaderMode)
-                    term.WriteLine("GROUP STATUS", "bright_cyan");
-                else
-                    term.WriteLine("═══ GROUP STATUS ═══", "bright_cyan");
-                // Show all members (snapshot list to avoid lock issues)
-                List<string> memberSnapshot;
-                lock (partyGroup.MemberUsernames)
-                    memberSnapshot = new List<string>(partyGroup.MemberUsernames);
-                foreach (var memberName in memberSnapshot)
-                {
-                    bool isLeader = string.Equals(memberName, partyGroup.LeaderUsername, StringComparison.OrdinalIgnoreCase);
-                    bool isMe = string.Equals(memberName, player.GroupPlayerUsername ?? player.DisplayName, StringComparison.OrdinalIgnoreCase);
-                    var memberSession = GroupSystem.GetSession(memberName);
-                    var memberPlayer = memberSession?.Context?.Engine?.CurrentPlayer;
-                    if (memberPlayer != null)
-                    {
-                        int mhpPct = memberPlayer.MaxHP > 0 ? (int)(memberPlayer.HP * 100 / memberPlayer.MaxHP) : 0;
-                        string mhpColor = mhpPct > 50 ? "32" : mhpPct > 25 ? "33" : "31";
-                        string prefix = isLeader
-                            ? (GameConfig.ScreenReaderMode ? "*" : "\u001b[1;33m★\u001b[0m")
-                            : (GameConfig.ScreenReaderMode ? "-" : "·");
-                        string suffix = isMe ? " \u001b[36m(you)\u001b[0m" : "";
-                        term.WriteLine($"  {prefix} \u001b[{mhpColor}m{memberPlayer.DisplayName}\u001b[0m {Loc.Get("dungeon.lv_label")}{memberPlayer.Level} {memberPlayer.ClassName} — {Loc.Get("dungeon.hp_label")}:{memberPlayer.HP}/{memberPlayer.MaxHP} ({mhpPct}%) {Loc.Get("dungeon.mp_label")}:{memberPlayer.Mana}/{memberPlayer.MaxMana}{suffix}");
-                    }
-                }
+                // v0.65.1: live party HP panel -- the whole combat party (leader + grouped
+                // players + the leader's NPC/companion/pet allies), each with HP/MP, so a
+                // healer always knows who needs healing. Reads the leader's live teammates.
+                RenderPartyStatus(term, leaderDungeon.currentPlayer, leaderDungeon.teammates, player);
                 return true;
             }
 

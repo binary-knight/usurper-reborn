@@ -2279,7 +2279,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("");
 
                 string confirm = await terminal.GetInput("  ");
-                if (confirm.ToUpper() == "Y")
+                if (GameConfig.IsAffirmative(confirm))
                 {
                     // Trigger intimacy system with full scene
                     await IntimacySystem.Instance.StartIntimateScene(player!, npc, terminal);
@@ -2812,7 +2812,7 @@ namespace UsurperRemake.Systems
             terminal.SetColor("gray");
             terminal.WriteLine($"  {Loc.Get("dialogue.npc_quest_accept_options")}");
             string choice = (await terminal.GetInput("  > "))?.Trim().ToUpperInvariant() ?? "";
-            bool accepted = choice == "Y" || choice == "1" || choice == "S" || choice == "O" || choice == "I";
+            bool accepted = GameConfig.IsAffirmative(choice) || choice == "1";
 
             if (!accepted)
             {
@@ -3022,6 +3022,9 @@ namespace UsurperRemake.Systems
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine($"  ({Loc.Get("dialogue.try_for_children")})");
             }
+
+            // v0.65.1: offer the player a family surname (spouse's or a new one).
+            await MarriageSurnameHelper.OfferAsync(terminal, player, npc.DisplayName ?? npc.Name2);
 
             terminal.WriteLine("");
             await terminal.GetInput($"  {Loc.Get("dialogue.press_enter_new_life")}");

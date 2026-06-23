@@ -403,7 +403,7 @@ namespace UsurperRemake.Locations
 
             // Confirm donation
             var confirm = await terminal.GetInput(Loc.Get("church.donate_confirm", amount.ToString("N0"), GameConfig.MoneyType));
-            if (confirm.ToUpper() != "Y")
+            if (!GameConfig.IsAffirmative(confirm))
             {
                 terminal.WriteLine(Loc.Get("church.donate_cancelled"), "gray");
                 await Task.Delay(1500);
@@ -546,7 +546,7 @@ namespace UsurperRemake.Locations
 
             // Confirm blessing purchase
             var confirm = await terminal.GetInput(Loc.Get("church.blessing_confirm", amount.ToString("N0"), GameConfig.MoneyType));
-            if (confirm.ToUpper() != "Y")
+            if (!GameConfig.IsAffirmative(confirm))
             {
                 terminal.WriteLine(Loc.Get("church.blessing_cancelled"), "gray");
                 await Task.Delay(1500);
@@ -776,7 +776,7 @@ namespace UsurperRemake.Locations
             }
 
             var confirm = await terminal.GetInput(Loc.Get("church.heal_pay_confirm", cost.ToString("N0"), GameConfig.MoneyType, service));
-            if (confirm.ToUpper() != "Y")
+            if (!GameConfig.IsAffirmative(confirm))
             {
                 terminal.WriteLine(Loc.Get("church.heal_cancelled"), "gray");
                 await Task.Delay(1500);
@@ -1016,7 +1016,7 @@ namespace UsurperRemake.Locations
             }
 
             var confirm = await terminal.GetInput(Loc.Get("church.marriage_proceed", targetNPC.Name2, ceremonyCost.ToString("N0"), GameConfig.MoneyType));
-            if (confirm.ToUpper() != "Y")
+            if (!GameConfig.IsAffirmative(confirm))
             {
                 terminal.WriteLine(Loc.Get("church.marriage_more_certain"), "gray");
                 await Task.Delay(1500);
@@ -1073,6 +1073,9 @@ namespace UsurperRemake.Locations
 
             terminal.WriteLine(Loc.Get("church.wedding_chivalry"), "cyan");
             terminal.WriteLine(Loc.Get("church.wedding_charm"), "cyan");
+
+            // v0.65.1: offer the player a family surname (spouse's or a new one).
+            await MarriageSurnameHelper.OfferAsync(terminal, currentPlayer, targetNPC.DisplayName);
 
             // Inform about children possibility
             if (currentPlayer.Sex != targetNPC.Sex)
@@ -1170,7 +1173,7 @@ namespace UsurperRemake.Locations
             terminal.WriteLine("");
 
             var confess = await terminal.GetInput(Loc.Get("church.confess_prompt"));
-            if (confess.ToUpper() != "Y")
+            if (!GameConfig.IsAffirmative(confess))
             {
                 terminal.WriteLine(Loc.Get("church.confess_return"), "gray");
                 await Task.Delay(1500);
@@ -1236,7 +1239,7 @@ namespace UsurperRemake.Locations
                 terminal.WriteLine("");
 
                 var absolve = await terminal.GetInput(Loc.Get("church.blood_accept"));
-                if (absolve.Trim().ToUpper() == "Y")
+                if (GameConfig.IsAffirmative(absolve))
                 {
                     if (currentPlayer.Gold >= absolveCost)
                     {
@@ -1350,7 +1353,7 @@ namespace UsurperRemake.Locations
                     terminal.WriteLine("");
                     terminal.WriteLine(Loc.Get("church.bishop_insist"), "bright_red");
                     var forceConfess = await terminal.GetInput(Loc.Get("church.bishop_force_confess"));
-                    if (forceConfess.ToUpper() == "Y")
+                    if (GameConfig.IsAffirmative(forceConfess))
                     {
                         await ProcessConfession();
                         return;

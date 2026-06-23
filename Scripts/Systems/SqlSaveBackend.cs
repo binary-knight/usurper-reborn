@@ -879,7 +879,14 @@ namespace UsurperRemake.Systems
                 }
 
                 var json = JsonSerializer.Serialize(data, jsonOptions);
-                var displayName = data.Player?.Name2 ?? data.Player?.Name1 ?? playerName;
+                // v0.65.1: compose the DB display_name with the optional family surname
+                // (chosen at marriage) so the leaderboard / character-select show the
+                // married name, matching the in-game Character.DisplayName. Name2 stays
+                // the identity key; this column is cosmetic.
+                var baseDisplayName = data.Player?.Name2 ?? data.Player?.Name1 ?? playerName;
+                var displayName = string.IsNullOrEmpty(data.Player?.FamilySurname)
+                    ? baseDisplayName
+                    : $"{baseDisplayName} {data.Player!.FamilySurname}";
                 var normalizedUsername = playerName.ToLower();
 
                 using var connection = OpenConnection();
@@ -3917,6 +3924,24 @@ namespace UsurperRemake.Systems
                 cmd.Parameters.AddWithValue("@event", eventName);
                 cmd.Parameters.AddWithValue("@ctype", (object?)connectionType ?? DBNull.Value);
                 cmd.ExecuteNonQuery();
+
+                // v0.65.1 (B1a fix): account_created fires inside RegisterPlayer, before
+                // PlayerSession builds SessionContext.Current, so its connection_type writes
+                // NULL -- the Web-vs-Steam funnel split was blank for every cohort. Every
+                // LATER milestone (character_created/reached_town/...) carries the real type,
+                // so backfill the still-blank account_created row from the first such event.
+                // Same session for a new account, so this is the correct attribution.
+                if (!string.IsNullOrWhiteSpace(connectionType) && eventName != "account_created")
+                {
+                    using var fill = connection.CreateCommand();
+                    fill.CommandText = @"
+                        UPDATE onboarding_events SET connection_type = @ctype
+                        WHERE username = @username AND event = 'account_created'
+                          AND (connection_type IS NULL OR connection_type = '');";
+                    fill.Parameters.AddWithValue("@username", username.ToLowerInvariant());
+                    fill.Parameters.AddWithValue("@ctype", connectionType);
+                    fill.ExecuteNonQuery();
+                }
             }
             catch (Exception ex)
             {
