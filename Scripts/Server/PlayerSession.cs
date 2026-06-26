@@ -386,7 +386,7 @@ public class PlayerSession : IDisposable
                 if (!IsWizInvisible)
                 {
                     _server.BroadcastToAll(
-                        $"\u001b[1;33m  {Username} has left the realm.\u001b[0m",
+                        $"\u001b[1;33m  {(Context?.Engine?.CurrentPlayer?.DisplayName ?? Username)} has left the realm.\u001b[0m",
                         excludeUsername: Username);
                 }
             }

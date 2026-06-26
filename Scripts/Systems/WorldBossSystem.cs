@@ -403,6 +403,30 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  {Loc.Get("world_boss.phase_label", bossData.CurrentPhase, 3)} -- {Loc.Get("world_boss.prepare_yourself")}\n");
             await Task.Delay(1000);
 
+            // Non-lethal "downed" outcome shared by the status-DoT path and the boss-damage
+            // path. A world boss fight never consumes a resurrection: dropping to 0 HP ends the
+            // session with the healers dragging the player to safety (revive to 25% HP plus a
+            // re-entry cooldown). issue #110: this previously lived only on the boss-damage path,
+            // so a death from a burn/poison DoT tick (processed at the top of the round) fell
+            // through to the normal death flow and triggered a real death / divine intervention.
+            void ApplyHealersSafety()
+            {
+                state.Died = true;
+                terminal.SetColor("bright_red");
+                terminal.WriteLine($"\n  {Loc.Get("world_boss.struck_you_down", bossDef.Name)}");
+                terminal.SetColor("gray");
+                terminal.WriteLine($"  {Loc.Get("world_boss.total_damage_before_fall", $"{state.SessionDamage:N0}")}");
+
+                // Revive with 25% HP, apply cooldown -- no resurrection consumed.
+                player.HP = Math.Max(1, player.MaxHP / 4);
+                _deathCooldowns[playerKey] = DateTime.UtcNow.AddSeconds(GameConfig.WorldBossDeathCooldownSeconds);
+
+                terminal.SetColor("cyan");
+                terminal.WriteLine($"  {Loc.Get("world_boss.healers_safety", player.HP, player.MaxHP)}");
+                terminal.SetColor("yellow");
+                terminal.WriteLine($"  {Loc.Get("world_boss.must_wait", GameConfig.WorldBossDeathCooldownSeconds)}");
+            }
+
             while (state.Round < GameConfig.WorldBossMaxRoundsPerSession && player.HP > 0 && !state.Retreated)
             {
                 state.Round++;
@@ -464,8 +488,11 @@ namespace UsurperRemake.Systems
                     terminal.WriteLine($"  {msg}");
                 }
 
-                // Check if player can act after status processing
-                if (player.HP <= 0) break;
+                // Check if player can act after status processing. issue #110: a DoT tick
+                // (burn/poison) that drops the player to 0 must take the same non-lethal
+                // "healers dragged you to safety" outcome as boss-dealt damage below, not fall
+                // through to the normal death flow (which consumed a resurrection).
+                if (player.HP <= 0) { ApplyHealersSafety(); break; }
 
                 bool canAct = player.CanAct();
                 if (!canAct)
@@ -599,23 +626,11 @@ namespace UsurperRemake.Systems
                         state.AbilityCooldowns.Remove(key);
                 }
 
-                // Player death check
+                // Player death check (boss-dealt damage). Same non-lethal outcome as the
+                // status-DoT path above, via the shared helper (issue #110).
                 if (player.HP <= 0)
                 {
-                    state.Died = true;
-                    terminal.SetColor("bright_red");
-                    terminal.WriteLine($"\n  {Loc.Get("world_boss.struck_you_down", bossDef.Name)}");
-                    terminal.SetColor("gray");
-                    terminal.WriteLine($"  {Loc.Get("world_boss.total_damage_before_fall", $"{state.SessionDamage:N0}")}");
-
-                    // Revive with 25% HP, apply cooldown
-                    player.HP = Math.Max(1, player.MaxHP / 4);
-                    _deathCooldowns[playerKey] = DateTime.UtcNow.AddSeconds(GameConfig.WorldBossDeathCooldownSeconds);
-
-                    terminal.SetColor("cyan");
-                    terminal.WriteLine($"  {Loc.Get("world_boss.healers_safety", player.HP, player.MaxHP)}");
-                    terminal.SetColor("yellow");
-                    terminal.WriteLine($"  {Loc.Get("world_boss.must_wait", GameConfig.WorldBossDeathCooldownSeconds)}");
+                    ApplyHealersSafety();
                     break;
                 }
 

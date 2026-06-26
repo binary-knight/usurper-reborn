@@ -185,6 +185,12 @@ namespace UsurperRemake.Systems
                 }
                 tx.Commit();
             }
+            catch (ObjectDisposedException)
+            {
+                // The SQLite connection was disposed mid-drain (server shutting down, or the
+                // connection was closed under us). Benign shutdown race -- don't page the
+                // server-monitor Discord for it.
+            }
             catch (Exception ex)
             {
                 DebugLogger.Instance.LogError("SERVER_CONFIG", $"Drain queue failed: {ex.Message}");
@@ -4050,6 +4056,16 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex)
             {
+                // A UNIQUE-constraint failure means the chosen name (or its display name) is
+                // already taken. That is a normal user-facing outcome, not a server error: give
+                // the player a clear message and log it quietly so it does not page the
+                // server-monitor Discord (previously it logged at Error and showed a useless
+                // "try again").
+                if (ex.Message.Contains("UNIQUE constraint failed"))
+                {
+                    DebugLogger.Instance.LogInfo("SQL", $"Registration rejected (name already taken): {ex.Message}");
+                    return (false, "That name is already taken. Please choose a different name.");
+                }
                 DebugLogger.Instance.LogError("SQL", $"Failed to register player: {ex.Message}");
                 return (false, "Registration failed. Please try again.");
             }

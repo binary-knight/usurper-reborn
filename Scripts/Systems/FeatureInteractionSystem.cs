@@ -952,22 +952,22 @@ public class FeatureInteractionSystem
             {
                 Situation = new[]
                 {
-                    "Inside, you find a dying creature - neither monster nor man.",
-                    "It begs for mercy, but its kind has slaughtered many innocents.",
-                    "Its eyes hold genuine fear... and perhaps regret."
+                    Loc.Get("dungeon.moral.dying_creature.sit.0"),
+                    Loc.Get("dungeon.moral.dying_creature.sit.1"),
+                    Loc.Get("dungeon.moral.dying_creature.sit.2")
                 },
                 Option1 = new MoralOption
                 {
-                    Description = "End its suffering quickly",
-                    ResultText = "You grant it a swift death. It thanks you with its last breath.",
+                    Description = Loc.Get("dungeon.moral.dying_creature.opt1_desc"),
+                    ResultText = Loc.Get("dungeon.moral.dying_creature.opt1_result"),
                     AlignmentShift = 5,
                     ExperienceReward = 30,
                     IsLight = true
                 },
                 Option2 = new MoralOption
                 {
-                    Description = "Let it suffer for its crimes",
-                    ResultText = "You leave it to die slowly. Justice? Or cruelty? The line blurs.",
+                    Description = Loc.Get("dungeon.moral.dying_creature.opt2_desc"),
+                    ResultText = Loc.Get("dungeon.moral.dying_creature.opt2_result"),
                     AlignmentShift = -10,
                     GoldReward = 50,
                     IsLight = false
@@ -977,23 +977,23 @@ public class FeatureInteractionSystem
             {
                 Situation = new[]
                 {
-                    "A chest filled with gold coins... and a note.",
-                    "\"This was stolen from orphans. I hid it here in shame.\"",
-                    "\"If you find this, return it to the Temple of Light.\"",
-                    "No one would ever know if you kept it."
+                    Loc.Get("dungeon.moral.stolen_gold.sit.0"),
+                    Loc.Get("dungeon.moral.stolen_gold.sit.1"),
+                    Loc.Get("dungeon.moral.stolen_gold.sit.2"),
+                    Loc.Get("dungeon.moral.stolen_gold.sit.3")
                 },
                 Option1 = new MoralOption
                 {
-                    Description = "Take only what you need",
-                    ResultText = "You take a small portion. Survival requires compromise.",
+                    Description = Loc.Get("dungeon.moral.stolen_gold.opt1_desc"),
+                    ResultText = Loc.Get("dungeon.moral.stolen_gold.opt1_result"),
                     AlignmentShift = -3,
                     GoldReward = 100,
                     IsLight = false
                 },
                 Option2 = new MoralOption
                 {
-                    Description = "Leave it for the rightful owners",
-                    ResultText = "You leave the gold untouched. Your conscience is worth more.",
+                    Description = Loc.Get("dungeon.moral.stolen_gold.opt2_desc"),
+                    ResultText = Loc.Get("dungeon.moral.stolen_gold.opt2_result"),
                     AlignmentShift = 15,
                     ExperienceReward = 50,
                     IsLight = true
@@ -1003,22 +1003,22 @@ public class FeatureInteractionSystem
             {
                 Situation = new[]
                 {
-                    "A magical trap guards this passage. You could disarm it...",
-                    "Or leave it active to harm whatever follows you.",
-                    "You hear distant footsteps. Something is tracking you."
+                    Loc.Get("dungeon.moral.magical_trap.sit.0"),
+                    Loc.Get("dungeon.moral.magical_trap.sit.1"),
+                    Loc.Get("dungeon.moral.magical_trap.sit.2")
                 },
                 Option1 = new MoralOption
                 {
-                    Description = "Disarm it - traps are dishonorable",
-                    ResultText = "You carefully disable the mechanism. Honor matters, even here.",
+                    Description = Loc.Get("dungeon.moral.magical_trap.opt1_desc"),
+                    ResultText = Loc.Get("dungeon.moral.magical_trap.opt1_result"),
                     AlignmentShift = 10,
                     ExperienceReward = 40,
                     IsLight = true
                 },
                 Option2 = new MoralOption
                 {
-                    Description = "Leave it armed - survival first",
-                    ResultText = "You slip past carefully. What follows you deserves no mercy.",
+                    Description = Loc.Get("dungeon.moral.magical_trap.opt2_desc"),
+                    ResultText = Loc.Get("dungeon.moral.magical_trap.opt2_result"),
                     AlignmentShift = -5,
                     HealthChange = 20, // Easier path forward
                     IsLight = false
@@ -1028,15 +1028,15 @@ public class FeatureInteractionSystem
             {
                 Situation = new[]
                 {
-                    "A spirit appears - the ghost of a fallen adventurer.",
-                    "\"I cannot rest until my family knows my fate.\"",
-                    "\"Carry my ring to them... but the depths are dangerous.\"",
-                    "The ring is worth a fortune. No one would know."
+                    Loc.Get("dungeon.moral.fallen_spirit.sit.0"),
+                    Loc.Get("dungeon.moral.fallen_spirit.sit.1"),
+                    Loc.Get("dungeon.moral.fallen_spirit.sit.2"),
+                    Loc.Get("dungeon.moral.fallen_spirit.sit.3")
                 },
                 Option1 = new MoralOption
                 {
-                    Description = "Swear to deliver the ring",
-                    ResultText = "The spirit blesses you and fades peacefully.",
+                    Description = Loc.Get("dungeon.moral.fallen_spirit.opt1_desc"),
+                    ResultText = Loc.Get("dungeon.moral.fallen_spirit.opt1_result"),
                     AlignmentShift = 20,
                     ExperienceReward = 75,
                     HealthChange = 50, // Blessing
@@ -1044,8 +1044,8 @@ public class FeatureInteractionSystem
                 },
                 Option2 = new MoralOption
                 {
-                    Description = "Take the ring, ignore the plea",
-                    ResultText = "The spirit wails and vanishes. The ring feels cold.",
+                    Description = Loc.Get("dungeon.moral.fallen_spirit.opt2_desc"),
+                    ResultText = Loc.Get("dungeon.moral.fallen_spirit.opt2_result"),
                     AlignmentShift = -20,
                     GoldReward = 300,
                     IsLight = false

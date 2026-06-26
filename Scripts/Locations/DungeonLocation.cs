@@ -175,7 +175,26 @@ public class DungeonLocation : BaseLocation
         // This handles the case where DungeonFloorStates was reset on game load but
         // currentFloor instance still exists from the previous session
         bool hasNoSavedState = !player.DungeonFloorStates.ContainsKey(currentDungeonLevel);
-        bool isNewFloor = currentFloor == null || currentFloor.Level != currentDungeonLevel || hasNoSavedState;
+
+        // issue #108: a cached currentFloor can outlive a change made to the PERSISTED floor
+        // state while the player was out of the dungeon. The Dungeon Reset Scroll (Magic Shop)
+        // back-dates LastVisitedAt and clears RoomStates so monsters respawn, but it only
+        // touches DungeonFloorStates, not this in-memory cache. Reusing the stale cache here
+        // would leave isNewFloor=false, skip GenerateOrRestoreFloor, and silently ignore the
+        // reset on re-entry (and a later SaveFloorState could overwrite the reset from the
+        // stale, still-cleared cache, losing it permanently even across a relog). When the
+        // persisted state says this floor should respawn, force a regenerate so the reset (or
+        // a natural 24h respawn that elapsed mid-session) actually takes effect. This is
+        // narrower than nulling the cache on every dungeon exit: a plain town-and-back trip
+        // with no pending respawn still resumes silently without replaying the entry screen.
+        bool respawnPendingForCachedFloor = currentFloor != null
+            && currentFloor.Level == currentDungeonLevel
+            && !hasNoSavedState
+            && player.DungeonFloorStates.TryGetValue(currentDungeonLevel, out var cachedFloorState)
+            && !cachedFloorState.IsPermanentlyClear
+            && cachedFloorState.ShouldRespawn();
+
+        bool isNewFloor = currentFloor == null || currentFloor.Level != currentDungeonLevel || hasNoSavedState || respawnPendingForCachedFloor;
         if (isNewFloor)
         {
             // Check if we have saved state for this floor
@@ -1315,8 +1334,20 @@ public class DungeonLocation : BaseLocation
 
             try
             {
-                // Load player's save data from database
+                // Load player's save data from database. The recruit list stores the
+                // player's DISPLAY name, which since v0.65.1 can include a family
+                // surname (e.g. "Imperius Ashwick"), but saves are keyed by account
+                // username (e.g. "imperius") -- so a surnamed character's echo failed
+                // to load with "save data cannot be found". If the direct lookup misses,
+                // resolve the display name to the canonical username and retry. This
+                // also self-heals echoes that were already stuck from earlier sessions.
                 var saveData = await backend.ReadGameData(name.ToLower());
+                if (saveData?.Player == null)
+                {
+                    var resolvedUser = backend.ResolvePlayerUsername(name);
+                    if (!string.IsNullOrEmpty(resolvedUser) && !resolvedUser.Equals(name, StringComparison.OrdinalIgnoreCase))
+                        saveData = await backend.ReadGameData(resolvedUser.ToLower());
+                }
                 if (saveData?.Player == null)
                 {
                     term.SetColor("yellow");
@@ -11956,15 +11987,25 @@ public class DungeonLocation : BaseLocation
         if (give <= 0) return;
 
         // Step 4: execute the transfer.
+        // Base the teammate's new total on the AUTHORITATIVE stash (stashHas came from
+        // GetStashState, which reads the real Companion.HealingPotions/ManaPotions for
+        // companions), NOT on the wrapper's own Healing/ManaPotions field. The dungeon keeps a
+        // long-lived party wrapper per companion, and its potion fields can drift from the
+        // companion (e.g. after an out-of-combat refill that updated the Companion but not this
+        // wrapper). With `+= give` on a stale wrapper, SyncCompanionPotions then wrote the wrong
+        // total back, clobbering the companion's real count down to roughly `give` (reported: a
+        // companion holding 11, given 4, ended at 4/15 instead of 15). Writing `stashHas + give`
+        // keeps the transfer consistent with what the player was shown and re-syncs the wrapper
+        // to the companion's true count. `give` is already capped so this never exceeds the cap.
         if (givingMana)
         {
             player.ManaPotions -= give;
-            target.ManaPotions += give;
+            target.ManaPotions = stashHas + give;
         }
         else
         {
             player.Healing -= give;
-            target.Healing += give;
+            target.Healing = stashHas + give;
         }
 
         // Step 5: persist. Companions need explicit sync (the wrapper's
@@ -14469,11 +14510,20 @@ public class DungeonLocation : BaseLocation
                     terminal.WriteLine(Loc.Get("dungeon.fatigue_reduced", oldFatigue - player.Fatigue), "bright_green");
             }
 
-            // Share rest healing with grouped players
+            // Share rest healing with the WHOLE party -- companions, NPC teammates, AND grouped
+            // players. Bug (player report): this used to heal only grouped human followers
+            // (`t.IsGroupedPlayer`), so a solo player's companions / NPC teammates never recovered
+            // at a rest spot. The camp action (RestInRoom) already heals everyone; match it here.
             if (teammates != null)
             {
-                foreach (var mate in teammates.Where(t => t != null && t.IsAlive && t.IsGroupedPlayer))
+                List<Character> teamSnap;
+                lock (teammates) { teamSnap = new List<Character>(teammates); }
+
+                bool anyTeammateHealed = false;
+                foreach (var mate in teamSnap)
                 {
+                    if (mate == null || !mate.IsAlive) continue;
+
                     long mateHeal = mate.MaxHP / 3;
                     mate.HP = Math.Min(mate.MaxHP, mate.HP + mateHeal);
                     long mateMana = mate.MaxMana / 3;
@@ -14481,14 +14531,24 @@ public class DungeonLocation : BaseLocation
                     long mateSta = mate.MaxCombatStamina / 3;
                     mate.CurrentCombatStamina = Math.Min(mate.MaxCombatStamina, mate.CurrentCombatStamina + mateSta);
                     if (mate.Poison > 0) { mate.Poison = 0; mate.PoisonTurns = 0; }
+                    anyTeammateHealed = true;
 
-                    var session = GroupSystem.GetSession(mate.GroupPlayerUsername ?? "");
-                    session?.EnqueueMessage(
-                        $"\u001b[32m  ═══ Safe Haven Camp ═══\u001b[0m\n" +
-                        $"\u001b[32m  +{mateHeal} HP" +
-                        (mateMana > 0 ? $"  +{mateMana} MP" : "") +
-                        (mateSta > 0 ? $"  +{mateSta} STA" : "") + "\u001b[0m");
+                    // Companions / NPC teammates have no session of their own; only grouped human
+                    // players get the recovery message in their own terminal.
+                    if (mate.IsGroupedPlayer)
+                    {
+                        var session = GroupSystem.GetSession(mate.GroupPlayerUsername ?? "");
+                        session?.EnqueueMessage(
+                            $"\u001b[32m  ═══ Safe Haven Camp ═══\u001b[0m\n" +
+                            $"\u001b[32m  +{mateHeal} HP" +
+                            (mateMana > 0 ? $"  +{mateMana} MP" : "") +
+                            (mateSta > 0 ? $"  +{mateSta} STA" : "") + "\u001b[0m");
+                    }
                 }
+
+                // Let the resting player know their party recovered too.
+                if (anyTeammateHealed)
+                    terminal.WriteLine(Loc.Get("dungeon.sanctuary_party_recovers"), "green");
             }
             BroadcastDungeonEvent($"\u001b[32m  The party rests in a safe haven and recovers their strength.\u001b[0m");
 
@@ -16898,7 +16958,9 @@ public class DungeonLocation : BaseLocation
         foreach (var mate in teamSnap)
         {
             if (mate == null || !mate.IsGroupedPlayer) continue;
-            PushRoomToSingleFollower(mate, roomAnsi, ctx.Username);
+            // Show the leader's CHARACTER name in the follower footer, not the raw
+            // account username (privacy: account names are not meant to be public).
+            PushRoomToSingleFollower(mate, roomAnsi, currentPlayer?.DisplayName ?? ctx.Username);
         }
     }
 
@@ -17258,7 +17320,20 @@ public class DungeonLocation : BaseLocation
                 }
                 catch (Exception ex)
                 {
-                    DebugLogger.Instance.LogError("DUNGEON", $"[GroupFollowerLoop] Follower input stream error: {ex.Message}");
+                    // A follower disconnecting mid-loop throws an IOException (broken pipe /
+                    // connection reset). That is a normal disconnect, not a server error, so log
+                    // it quietly -- previously it was logged at Error level and paged the
+                    // server-monitor Discord on every dropped follower. Real stream errors still
+                    // log at Error.
+                    bool benignDisconnect = ex is System.IO.IOException
+                        || ex is System.Net.Sockets.SocketException
+                        || ex.Message.Contains("Broken pipe")
+                        || ex.Message.Contains("Connection reset")
+                        || ex.Message.Contains("transport connection");
+                    if (benignDisconnect)
+                        DebugLogger.Instance.LogInfo("DUNGEON", $"[GroupFollowerLoop] Follower disconnected: {ex.Message}");
+                    else
+                        DebugLogger.Instance.LogError("DUNGEON", $"[GroupFollowerLoop] Follower input stream error: {ex.Message}");
                     break; // disconnect or stream error
                 }
 
@@ -17902,7 +17977,7 @@ public class DungeonLocation : BaseLocation
 
         // Notify leader (follower left the dungeon, not necessarily the group)
         leaderSession.EnqueueMessage(
-            $"\u001b[1;33m  * {mySession.Username} has left the dungeon.\u001b[0m");
+            $"\u001b[1;33m  * {player.DisplayName} has left the dungeon.\u001b[0m");
     }
 
     /// <summary>
@@ -17944,7 +18019,7 @@ public class DungeonLocation : BaseLocation
 
             // Notify group (including non-dungeon members)
             GroupSystem.Instance?.NotifyGroup(group,
-                $"\u001b[1;33m  * {ctx.Username} has left the dungeon. The dungeon run is over.\u001b[0m",
+                $"\u001b[1;33m  * {player.DisplayName} has left the dungeon. The dungeon run is over.\u001b[0m",
                 excludeUsername: ctx.Username);
         }
     }

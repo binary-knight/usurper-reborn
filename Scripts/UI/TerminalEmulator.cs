@@ -1140,6 +1140,67 @@ public partial class TerminalEmulator
     }
 
     /// <summary>
+    /// Read a SINGLE keypress from redirected/stdio input (BBS door, --stdio, online relay)
+    /// without waiting for Enter. "Press any key..." prompts used ReadLineWithBackspace, which
+    /// loops until a newline and therefore ignores every key except Enter (issue #103: in a
+    /// stdio door, "Press any key" really meant "Press Enter"). The BBS forwards each keystroke,
+    /// so Console.In.Read() returns on the first key. A CR/LF pair is coalesced and a full escape
+    /// sequence (arrow/function keys) is consumed so no stray bytes leak into the next prompt.
+    /// </summary>
+    internal static void ReadSingleKeyRedirected()
+    {
+        // Real console without redirected stdin (e.g. --local on a terminal that still routes
+        // through door/ANSI output): ReadKey gives a true single keypress. Console.In.Read()
+        // would block until Enter there because the console is in cooked/line mode.
+        if (!Console.IsInputRedirected)
+        {
+            try
+            {
+                Console.ReadKey(intercept: true);
+                Console.Out.Write("\r\n");
+                Console.Out.Flush();
+                return;
+            }
+            catch
+            {
+                // ReadKey unavailable (no attached console) — fall through to the stream read.
+            }
+        }
+
+        int ch = Console.In.Read();
+        if (ch == -1)
+        {
+            DoorMode.IsDisconnected = true;
+            return;
+        }
+
+        // Enter arrives as CR, CRLF, or LF; swallow the trailing LF of a CRLF pair so it does
+        // not get read as a phantom empty line by the next prompt.
+        if (ch == '\r' && Console.In.Peek() == '\n')
+        {
+            Console.In.Read();
+        }
+        // Arrow/function keys arrive as ESC [ ... <final byte>. Consume the whole sequence
+        // (mirrors ReadLineWithBackspace) so its tail does not corrupt the next read.
+        else if (ch == 0x1B && Console.In.Peek() == '[')
+        {
+            Console.In.Read(); // consume '['
+            while (true)
+            {
+                int next = Console.In.Peek();
+                if (next == -1) break;
+                Console.In.Read();
+                if ((next >= 'A' && next <= 'Z') || (next >= 'a' && next <= 'z') || next == '~')
+                    break;
+            }
+        }
+
+        // Advance to a fresh line after the prompt: a non-Enter key produces no newline echo.
+        Console.Out.Write("\r\n");
+        Console.Out.Flush();
+    }
+
+    /// <summary>
     /// Read a line with manual backspace handling. Works on redirected stdin, PTY, and console.
     /// Handles DEL (0x7F), BS (0x08), ConsoleKey.Backspace, and ANSI escape sequences.
     /// Used for all online/door mode input where Console.ReadLine() may not handle backspace.
@@ -1441,9 +1502,11 @@ public partial class TerminalEmulator
         }
         else
         {
-            // Redirected stdin (door/online stdio) — line input only
+            // Redirected stdin (door/online stdio) — read ONE key, Enter not required (issue #103).
+            // This path used ReadLineWithBackspace, which loops until a newline, so "Press any key"
+            // only advanced on Enter. ReadSingleKeyRedirected returns on the first key the BBS sends.
             if (DoorMode.ShouldUseAnsiOutput || Console.IsInputRedirected)
-                ReadLineWithBackspace();
+                ReadSingleKeyRedirected();
             else
                 Console.ReadLine();
         }
@@ -2230,6 +2293,34 @@ public partial class TerminalEmulator
             }
         }
         catch (OperationCanceledException) { /* Normal cancellation when input received */ }
+    }
+
+    /// <summary>
+    /// v0.65.2: synchronously drain any queued incoming messages (group/co-op
+    /// broadcasts) and write them to the stream NOW, instead of waiting for the next
+    /// GetInput to pump them. Used right before a blocking summary screen so queued
+    /// co-op events (e.g. the final round's follower actions) appear in order BEFORE
+    /// the summary rather than after it. No-op when there is no message source
+    /// (single-player) or no stream. No prompt redraw.
+    /// </summary>
+    public void FlushIncomingMessages()
+    {
+        if (MessageSource == null || _streamWriter == null) return;
+        try
+        {
+            string? msg;
+            while ((msg = MessageSource()) != null)
+            {
+                lock (_streamWriterLock)
+                {
+                    _streamWriter.Write("\r\n");
+                    _streamWriter.Write(msg);
+                    _streamWriter.Write("\r\n\x1b[0m");
+                }
+            }
+            lock (_streamWriterLock) { _streamWriter.Flush(); }
+        }
+        catch { }
     }
 
     // ═══════════════════════════════════════════════════════════════════

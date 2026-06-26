@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace UsurperRemake.Systems
 {
@@ -1000,6 +1001,82 @@ namespace UsurperRemake.Systems
         public bool Dungeon { get; set; }
         public List<string> Description { get; set; } = new();
         public List<LootEffectData>? LootEffects { get; set; }
+
+        /// <summary>
+        /// Full Item -> DTO conversion: every stat field, MinLevel, the cursed/identified flags,
+        /// and LootEffects (enchants, procs, and the negative cursed-stat entries). Single source
+        /// of truth so trades carry an item exactly as it is.
+        /// issue #111: the trade flow used a hand-built 10-field subset that dropped
+        /// Wisdom/Charisma/Agility/Stamina/ShieldBonus/BlockChance/MinLevel, the cursed/identified
+        /// flags, and all LootEffects, so traded items arrived with missing stats (including the
+        /// negative cursed-stat entries, which is why a cursed item kept its name but lost its bite).
+        /// </summary>
+        public static InventoryItemData FromItem(Item item) => new InventoryItemData
+        {
+            Name = item.Name,
+            Value = item.Value,
+            Type = item.Type,
+            Attack = item.Attack,
+            Armor = item.Armor,
+            Strength = item.Strength,
+            Dexterity = item.Dexterity,
+            Wisdom = item.Wisdom,
+            Defence = item.Defence,
+            BlockChance = item.BlockChance,
+            ShieldBonus = item.ShieldBonus,
+            HP = item.HP,
+            Mana = item.Mana,
+            Charisma = item.Charisma,
+            Agility = item.Agility,
+            Stamina = item.Stamina,
+            MinLevel = item.MinLevel,
+            // IsCursed (the flag decurse/warnings/loot checks read) is authoritative; Item also
+            // carries a legacy Cursed bool, so OR them to never drop a curse in transit.
+            IsCursed = item.IsCursed || item.Cursed,
+            IsIdentified = item.IsIdentified,
+            Shop = item.Shop,
+            Dungeon = item.Dungeon,
+            Description = item.Description?.ToList() ?? new List<string>(),
+            LootEffects = item.LootEffects?.Count > 0
+                ? item.LootEffects.Select(e => new LootEffectData { EffectType = e.EffectType, Value = e.Value }).ToList()
+                : null
+        };
+
+        /// <summary>
+        /// Full DTO -> Item reconstruction, the inverse of <see cref="FromItem"/>.
+        /// </summary>
+        public Item ToItem()
+        {
+            var item = new Item
+            {
+                Name = Name ?? "Unknown",
+                Value = Value,
+                Type = Type,
+                Attack = Attack,
+                Armor = Armor,
+                Strength = Strength,
+                Dexterity = Dexterity,
+                Wisdom = Wisdom,
+                Defence = Defence,
+                BlockChance = BlockChance,
+                ShieldBonus = ShieldBonus,
+                HP = HP,
+                Mana = Mana,
+                Charisma = Charisma,
+                Agility = Agility,
+                Stamina = Stamina,
+                MinLevel = MinLevel,
+                IsCursed = IsCursed,
+                Cursed = IsCursed, // keep Item's legacy curse bool consistent with IsCursed
+                IsIdentified = IsIdentified,
+                Shop = Shop,
+                Dungeon = Dungeon,
+                Description = Description?.ToList() ?? new List<string>()
+            };
+            if (LootEffects != null && LootEffects.Count > 0)
+                item.LootEffects = LootEffects.Select(e => (e.EffectType, e.Value)).ToList();
+            return item;
+        }
     }
 
     /// <summary>

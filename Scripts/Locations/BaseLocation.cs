@@ -8512,19 +8512,9 @@ public abstract class BaseLocation
                 {
                     foreach (var itemData in items)
                     {
-                        currentPlayer.Inventory.Add(new Item
-                        {
-                            Name = itemData.Name ?? "Unknown",
-                            Type = itemData.Type,
-                            Value = itemData.Value,
-                            Attack = itemData.Attack,
-                            Armor = itemData.Armor,
-                            HP = itemData.HP,
-                            Mana = itemData.Mana,
-                            Strength = itemData.Strength,
-                            Defence = itemData.Defence,
-                            Dexterity = itemData.Dexterity
-                        });
+                        // issue #111: reconstruct the full item (rarity, all stats, flags, LootEffects)
+                        // via the shared converter instead of a 10-field subset that dropped most of it.
+                        currentPlayer.Inventory.Add(itemData.ToItem());
                     }
                 }
             }
@@ -8617,19 +8607,9 @@ public abstract class BaseLocation
                 {
                     foreach (var itemData in items)
                     {
-                        currentPlayer.Inventory.Add(new Item
-                        {
-                            Name = itemData.Name ?? "Unknown",
-                            Type = itemData.Type,
-                            Value = itemData.Value,
-                            Attack = itemData.Attack,
-                            Armor = itemData.Armor,
-                            HP = itemData.HP,
-                            Mana = itemData.Mana,
-                            Strength = itemData.Strength,
-                            Defence = itemData.Defence,
-                            Dexterity = itemData.Dexterity
-                        });
+                        // issue #111: reconstruct the full item (rarity, all stats, flags, LootEffects)
+                        // via the shared converter instead of a 10-field subset that dropped most of it.
+                        currentPlayer.Inventory.Add(itemData.ToItem());
                     }
                     terminal.SetColor("bright_green");
                     terminal.WriteLine($"  {items.Count} item(s) returned to your inventory.");
@@ -8788,19 +8768,9 @@ public abstract class BaseLocation
         string itemsJson = "[]";
         if (selectedItems.Count > 0)
         {
-            var itemDataList = selectedItems.Select(i => new UsurperRemake.Systems.InventoryItemData
-            {
-                Name = i.Name,
-                Type = i.Type,
-                Value = i.Value,
-                Attack = i.Attack,
-                Armor = i.Armor,
-                HP = i.HP,
-                Mana = i.Mana,
-                Strength = i.Strength,
-                Defence = i.Defence,
-                Dexterity = i.Dexterity
-            }).ToList();
+            // issue #111: carry each item exactly as it is (all stats, rarity, flags, LootEffects)
+            // via the shared full conversion, not a hand-built subset that dropped most fields.
+            var itemDataList = selectedItems.Select(UsurperRemake.Systems.InventoryItemData.FromItem).ToList();
             itemsJson = System.Text.Json.JsonSerializer.Serialize(itemDataList,
                 new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
         }

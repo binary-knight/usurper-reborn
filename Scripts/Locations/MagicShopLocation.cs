@@ -1398,6 +1398,12 @@ public partial class MagicShopLocation : BaseLocation
             DisplayMessage(Loc.Get("magic_shop.reset_scroll_success", selectedFloor.Key.ToString()), "bright_green");
             DisplayMessage(Loc.Get("magic_shop.reset_scroll_success_desc"), "cyan");
             DisplayMessage(Loc.Get("magic_shop.reset_scroll_success_flavor"), "gray");
+
+            // Persist the reset (and the gold spent) immediately so it survives an
+            // unexpected disconnect before the shop loop's next autosave (issue #108).
+            // DungeonFloorStates rides the player save blob; SaveCurrentGame is the
+            // online-aware persistence path used elsewhere for important state changes.
+            await GameEngine.Instance.SaveCurrentGame();
         }
         else
         {

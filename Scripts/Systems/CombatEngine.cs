@@ -8401,7 +8401,11 @@ public partial class CombatEngine
     {
         // Ask player what to do — loop until we get valid E/T/P input
         string choice;
-        List<Character> party = [currentPlayer, .. (this.currentTeammates ?? [])];
+        // Echoes (issue #109) are read-only snapshots of a real character's save, so any gear
+        // handed to one during the run is lost on reload. Exclude them from the loot recipient
+        // cycler so </> can never land on an echo (mirrors the auto-pickup skip in
+        // TryTeammatePickupItem and the party-equipment manager's existing echo block).
+        List<Character> party = [currentPlayer, .. (this.currentTeammates ?? []).Where(t => !t.IsEcho)];
         // Reset index to 0 (player) at start of each loot drop to avoid stale/out-of-bounds index
         _droppedEquipmentPartyIdx = 0;
         Character selectedCharacter = party[_droppedEquipmentPartyIdx];
@@ -9208,15 +9212,33 @@ public partial class CombatEngine
         var lootBroadcastSb = new System.Text.StringBuilder();
         var rarity = LootGenerator.GetItemRarity(lootItem);
         string rarityColor = LootGenerator.GetRarityColor(rarity);
+
+        // v0.65.2 (co-op feedback): make it unmistakable WHO earns a group drop. A
+        // follower reported it "wasn't clear if loot was earned by the follower" and
+        // that "the leader was also receiving the same loot" -- the leader sees the full
+        // item render (it goes to whoever has first claim), so it reads like their own
+        // find. Frame the leader's view up front when the drop belongs to a follower.
+        bool isGroupDrop = player.IsGroupedPlayer && player.RemoteTerminal != null;
+        string recipientName = player.DisplayName ?? player.Name2 ?? "Unknown";
+        if (isGroupDrop)
+        {
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine(Loc.Get("combat.loot_group_drop_for", recipientName));
+        }
+
         await RenderEquipment(lootItem, monster, player, lootBroadcastSb);
 
-        // Broadcast loot details to group followers (in-dungeon only — town members skip)
+        // Broadcast loot details to group followers (in-dungeon only — town members skip),
+        // labeled with the recipient so OTHER followers know whose drop it is, not theirs.
         {
             var ctx = SessionContext.Current;
             var lootGroup = ctx != null ? GroupSystem.Instance?.GetGroupFor(ctx.Username) : null;
             if (lootGroup != null)
+            {
+                string framed = Loc.Get("combat.loot_broadcast_for", recipientName) + "\r\n" + lootBroadcastSb.ToString();
                 GroupSystem.Instance!.BroadcastToAllGroupSessions(lootGroup,
-                    lootBroadcastSb.ToString(), excludeUsername: ctx!.Username, inDungeonOnly: true);
+                    framed, excludeUsername: ctx!.Username, inDungeonOnly: true);
+            }
         }
 
         // GROUP LOOT: Round-robin — primary recipient gets first dibs
@@ -9224,8 +9246,8 @@ public partial class CombatEngine
         // If they pass, cascade to other players, then companions
         if (player.IsGroupedPlayer && player.RemoteTerminal != null)
         {
-            // This recipient is a grouped follower — prompt them via their RemoteTerminal
-            string recipientName = player.DisplayName ?? player.Name2 ?? "Unknown";
+            // This recipient is a grouped follower — prompt them via their RemoteTerminal.
+            // (recipientName computed at the top of the method.)
 
             // Notify leader's terminal who has first dibs
             terminal.SetColor("bright_yellow");
@@ -9236,6 +9258,9 @@ public partial class CombatEngine
             followerTerm.SetColor("bright_yellow");
             followerTerm.WriteLine("");
             followerTerm.WriteLine(GameConfig.ScreenReaderMode ? Loc.Get("combat.loot_drop_from_sr", monster.Name) : Loc.Get("combat.loot_drop_from", monster.Name));
+            // Reassure the follower this drop is theirs to earn (co-op feedback).
+            followerTerm.SetColor("bright_green");
+            followerTerm.WriteLine(Loc.Get("combat.loot_yours_to_claim"));
             if (lootItem.IsIdentified)
             {
                 followerTerm.SetColor(rarityColor);
@@ -9306,6 +9331,11 @@ public partial class CombatEngine
                 // Use the combat input channel so GroupFollowerLoop forwards input to us
                 if (player.CombatInputChannel != null)
                 {
+                    // v0.65.2: drain stale buffered input first so this read matches THIS
+                    // loot prompt, not a leftover keypress from a previous prompt (the
+                    // shift bug that made loot claims intermittently "not recognized" and
+                    // auto-pass). Safe -- the real response cannot have arrived yet.
+                    while (player.CombatInputChannel.Reader.TryRead(out _)) { }
                     player.IsAwaitingCombatInput = true;
                     using var cts = new System.Threading.CancellationTokenSource(30000);
                     try
@@ -9843,6 +9873,11 @@ public partial class CombatEngine
 
             // Skip grouped players — they already had their chance in the pass-down chain
             if (teammate.IsGroupedPlayer) continue;
+
+            // Skip player echoes (issue #109). An echo is a read-only snapshot loaded from a
+            // real character's save; gear equipped onto it during the run is never persisted,
+            // so the item would be silently lost. Echoes are never eligible loot recipients.
+            if (teammate.IsEcho) continue;
 
             // Skip mercenaries (royal bodyguards) — they use baked-in stats, no equipment
             if (teammate.IsMercenary) continue;
@@ -11807,9 +11842,13 @@ public partial class CombatEngine
     /// of the magical one. Callers sending holy/spell damage (Soul Strike, spell cast path) set
     /// this to true so the magical-immunity reduction fires instead.
     /// </summary>
-    private async Task ApplySingleMonsterDamage(Monster target, long damage, CombatResult result, string damageSource = "attack", Character? attacker = null, bool isSpellDamage = false)
+    // Returns true if the attack landed (damage applied), false if it was evaded or the target
+    // was invalid/dead. Callers MUST skip post-hit effects (lifesteal and other enchant procs,
+    // weapon-enchant riders, on-hit heals) when this returns false -- an evaded swing passes
+    // through for 0 damage and must not trigger those (issue: lifesteal fired on an evaded hit).
+    private async Task<bool> ApplySingleMonsterDamage(Monster target, long damage, CombatResult result, string damageSource = "attack", Character? attacker = null, bool isSpellDamage = false)
     {
-        if (target == null || !target.IsAlive) return;
+        if (target == null || !target.IsAlive) return false;
 
         // v0.61.2 (player report: "The monster becoming incorporeal combat ability
         // doesn't really have any effect"). When a monster has an active evasion
@@ -11824,7 +11863,7 @@ public partial class CombatEngine
         {
             terminal.SetColor("bright_cyan");
             terminal.WriteLine(Loc.Get("combat.evasion_miss", target.Name));
-            return;
+            return false; // evaded -- caller must skip post-hit enchantments (lifesteal etc.)
         }
 
         // Boss phase immunity — apply only the matching type. Previously this hardcoded
@@ -11992,6 +12031,268 @@ public partial class CombatEngine
         }
 
         result.CombatLog.Add($"{target.Name} took {actualDamage} damage from {damageSource}");
+        return true; // attack landed -- caller may apply post-hit effects
+    }
+
+    // Unified player melee swing damage. Extracted verbatim from the multi-monster basic-attack
+    // path so the dual-wield off-hand follow-up after an ability uses the EXACT same formula as a
+    // normal off-hand swing (player report: off-hand damage differed between a skill follow-up and
+    // a normal attack -- the follow-up used a crippled STR+WeapPow+random formula missing
+    // proficiency, level/weapon scaling, crit, and every buff). Synchronous: the block contains no
+    // awaits. `s`/`swings` are passed through only for the diagnostic COMBAT_ATTACK log line.
+    private long ComputePlayerSwingDamage(Character player, Monster target, bool isOffHandAttack, int s, int swings)
+    {
+                        // Calculate player attack damage (unified with single-combat formula)
+                        // Bard/Jester use CHA (performance-based combat), others use STR
+                        long attackPower;
+                        if (player.Class == CharacterClass.Bard || player.Class == CharacterClass.Jester)
+                        {
+                            attackPower = player.Charisma;
+                            attackPower += player.Charisma / 4;
+                        }
+                        else
+                        {
+                            attackPower = player.Strength;
+                            attackPower += StatEffectsSystem.GetStrengthDamageBonus(player.Strength); // STR/4
+                        }
+                        attackPower += player.Level;
+
+                        // Status modifiers
+                        if (player.IsRaging)
+                            attackPower = (long)(attackPower * 1.5);
+                        if (player.HasStatus(StatusEffect.PowerStance))
+                            attackPower = (long)(attackPower * 1.5);
+                        if (player.HasStatus(StatusEffect.Blessed))
+                            attackPower += player.Level / 5 + 2;
+                        if (player.HasStatus(StatusEffect.RoyalBlessing))
+                            attackPower = (long)(attackPower * 1.10);
+                        if (player.HasStatus(StatusEffect.Weakened))
+                            attackPower = Math.Max(1, attackPower - player.Level / 10 - 4);
+
+                        // Weapon power with level scaling and random (soft cap prevents extreme stacking)
+                        if (player.WeapPow > 0)
+                        {
+                            long effectiveWeap = GetEffectiveWeapPow(player.WeapPow);
+                            long weaponBonus = effectiveWeap + (player.Level / 10);
+                            attackPower += weaponBonus + random.Next(0, (int)Math.Min(int.MaxValue, weaponBonus + 1));
+                        }
+
+                        // Random attack variation
+                        int variationMax = Math.Max(21, player.Level / 2);
+                        attackPower += random.Next(1, variationMax);
+
+                        // Temporary attack bonus from abilities
+                        attackPower += player.TempAttackBonus;
+
+                        // Weapon configuration modifier (2H bonus, dual-wield off-hand penalty)
+                        double damageModifier = GetWeaponConfigDamageModifier(player, isOffHandAttack);
+                        attackPower = (long)(attackPower * damageModifier);
+
+                        // Proficiency multiplier
+                        var basicProf = TrainingSystem.GetSkillProficiency(player, "basic_attack");
+                        float profMult = TrainingSystem.GetEffectMultiplier(basicProf);
+                        attackPower = (long)(attackPower * profMult);
+
+                        // Critical hit chance
+                        float rollMult = 1.0f;
+
+                        // v0.60.11 (Zen Lv.9 Cyclebreaker report): Hidden status grants
+                        // a guaranteed crit on the next attack -- it's how every auto-crit-
+                        // setup ability delivers its payoff (Cyclebreaker Temporal Feint,
+                        // Abysswarden Umbral Step, Assassin shadow / vanish, basic [H]ide).
+                        // Power Strike and class abilities already consume Hidden (see
+                        // ~12327 and ~12842), but the basic [A]ttack path never checked
+                        // it. Net effect: every auto-crit-setup ability worked when
+                        // followed by Power Strike or an ability, but silently dropped the
+                        // crit when followed by a plain swing. Mirror the Power-Strike
+                        // pattern: stealth crit short-circuits the natural-20 / dex-crit
+                        // rolls so we don't accidentally double-apply.
+                        bool stealthCrit = player.HasStatus(StatusEffect.Hidden);
+                        if (stealthCrit)
+                        {
+                            player.RemoveStatus(StatusEffect.Hidden);
+                            rollMult = StatEffectsSystem.GetCriticalDamageMultiplier(player.Dexterity, player.GetEquipmentCritDamageBonus());
+                            terminal.WriteLine(Loc.Get("combat.stealth_crit"), "bright_yellow");
+                        }
+                        bool isCrit = !stealthCrit && random.Next(1, 21) == 20; // natural 20
+                        bool dexCrit = !stealthCrit && !isCrit && StatEffectsSystem.RollCriticalHit(player);
+                        if (isCrit)
+                        {
+                            rollMult = 1.5f + (float)(random.NextDouble() * 0.5); // 1.5-2.0
+                            terminal.WriteLine(Loc.Get("combat.critical_hit"), "bright_red");
+                        }
+                        else if (dexCrit)
+                        {
+                            rollMult = StatEffectsSystem.GetCriticalDamageMultiplier(player.Dexterity, player.GetEquipmentCritDamageBonus());
+                            terminal.WriteLine(Loc.Get("combat.precision_strike"), "bright_yellow");
+                        }
+
+                        // Wavecaller Ocean's Voice: +20% bonus crit chance when buff active
+                        if (!stealthCrit && !isCrit && !dexCrit && player.Class == CharacterClass.Wavecaller
+                            && player.TempAttackBonus > 0 && player.TempAttackBonusDuration > 0)
+                        {
+                            if (random.Next(100) < (int)(GameConfig.WavecallerOceansVoiceCritBonus * 100))
+                            {
+                                rollMult = StatEffectsSystem.GetCriticalDamageMultiplier(player.Dexterity, player.GetEquipmentCritDamageBonus());
+                                terminal.WriteLine(Loc.Get("combat.oceans_voice_crit"), "bright_magenta");
+                            }
+                        }
+
+                        long preRollAttack = attackPower;
+                        attackPower = (long)(attackPower * rollMult);
+
+                        // Difficulty modifier
+                        long preDiffAttack = attackPower;
+                        attackPower = DifficultySystem.ApplyPlayerDamageMultiplier(attackPower);
+
+                        // Grief effects
+                        var griefFx = GriefSystem.Instance.GetCurrentEffects();
+                        long preGriefAttack = attackPower;
+                        if (griefFx.DamageModifier != 0 || griefFx.CombatModifier != 0 || griefFx.AllStatModifier != 0)
+                        {
+                            float totalGriefMod = 1.0f + griefFx.DamageModifier + griefFx.CombatModifier + griefFx.AllStatModifier;
+                            attackPower = (long)(attackPower * totalGriefMod);
+                            DebugLogger.Instance.LogInfo("COMBAT_GRIEF",
+                                $"player={player.Name} griefDmg={griefFx.DamageModifier:F2} griefCombat={griefFx.CombatModifier:F2} " +
+                                $"griefAllStat={griefFx.AllStatModifier:F2} totalGriefMod={totalGriefMod:F2} " +
+                                $"preGrief={preGriefAttack} postGrief={attackPower}");
+                        }
+
+                        // Log intermediate values to find where attackPower drops to 0
+                        if (attackPower <= 0)
+                        {
+                            DebugLogger.Instance.LogInfo("COMBAT_ZERO",
+                                $"player={player.Name} attackPower=0! preRoll={preRollAttack} postRoll={(long)(preRollAttack * rollMult)} " +
+                                $"preDiff={preDiffAttack} postDiff={preGriefAttack} preGrief={preGriefAttack} postGrief={attackPower} " +
+                                $"griefDmg={griefFx.DamageModifier:F2} griefCombat={griefFx.CombatModifier:F2} griefAllStat={griefFx.AllStatModifier:F2}");
+                        }
+
+                        // Royal Authority bonus
+                        if (player is Player attackingKing && attackingKing.King)
+                            attackPower = (long)(attackPower * GameConfig.KingCombatStrengthBonus);
+
+                        // Buff bonuses (well-rested, god slayer, lover's bliss, divine blessing, poison coating, herbs)
+                        if (player.WellRestedCombats > 0 && player.WellRestedBonus > 0f)
+                            attackPower += (long)(attackPower * player.WellRestedBonus);
+                        if (player.HasGodSlayerBuff)
+                            attackPower += (long)(attackPower * player.GodSlayerDamageBonus);
+                        if (player.HasDarkPactBuff)
+                            attackPower += (long)(attackPower * player.DarkPactDamageBonus);
+                        // Fatigue damage penalty (single-player only, multi-monster path)
+                        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && player.Fatigue >= GameConfig.FatigueTiredThreshold)
+                        {
+                            float fatigueDmgPenaltyMM = player.Fatigue >= GameConfig.FatigueExhaustedThreshold
+                                ? GameConfig.FatigueExhaustedDamagePenalty
+                                : GameConfig.FatigueTiredDamagePenalty;
+                            attackPower += (long)(attackPower * fatigueDmgPenaltyMM);
+                        }
+                        if (player.LoversBlissCombats > 0 && player.LoversBlissBonus > 0f)
+                            attackPower += (long)(attackPower * player.LoversBlissBonus);
+                        if (player.HerbBuffType == (int)HerbType.FirebloomPetal && player.HerbBuffCombats > 0)
+                            attackPower += (long)(attackPower * player.HerbBuffValue);
+                        if (player.FoodBuffCombats > 0 && (player.FoodBuffType == 1 || player.FoodBuffType == 5))
+                            attackPower += (long)(attackPower * player.FoodBuffValue);
+                        if (player.SongBuffCombats > 0 && (player.SongBuffType == 1 || player.SongBuffType == 4))
+                            attackPower += (long)(attackPower * player.SongBuffValue);
+                        if (player.DivineBlessingCombats > 0 && player.DivineBlessingBonus > 0f)
+                            attackPower += (long)(attackPower * player.DivineBlessingBonus);
+                        if (player.PoisonCoatingCombats > 0 && PoisonData.HasDamageBonus(player.ActivePoisonType))
+                            attackPower += (long)(attackPower * PoisonData.GetDamageBonus(player.ActivePoisonType));
+                        else if (player.PoisonCoatingCombats > 0 && player.ActivePoisonType == PoisonType.None)
+                            attackPower += (long)(attackPower * GameConfig.PoisonCoatingDamageBonus);
+                        if (player.PermanentDamageBonus > 0)
+                            attackPower += (long)(attackPower * (player.PermanentDamageBonus / 100.0));
+                        if (player.HQArmoryLevel > 0)
+                            attackPower += (long)(attackPower * (player.HQArmoryLevel * 0.05));
+                        if (player.IsKnighted)
+                            attackPower += (long)(attackPower * GameConfig.KnightDamageBonus);
+                        // v0.60.11: Grand Champion +3% damage stacks with knighthood.
+                        if (player.ArenaChampionTier >= (int)UsurperRemake.Data.GauntletChampionData.ArenaTier.GrandChampion)
+                            attackPower += (long)(attackPower * GameConfig.GrandChampionDamageBonus);
+                        // v0.61.0 Druid's Shrines: Maelketh attunement = +8% melee damage.
+                        if (player.IsAttunedTo("maelketh"))
+                            attackPower += (long)(attackPower * GameConfig.ShrineMaelkethMeleeBonus);
+
+                        // Divine boon damage bonus (multi-monster path)
+                        var mmBoons = player.CachedBoonEffects;
+                        if (mmBoons != null && (mmBoons.DamagePercent > 0 || mmBoons.FlatAttack > 0))
+                        {
+                            attackPower += (long)(attackPower * mmBoons.DamagePercent);
+                            attackPower += mmBoons.FlatAttack;
+                        }
+
+                        // Sunforged Blade vs undead/demons
+                        if (ArtifactSystem.Instance.HasSunforgedBlade() && target is Monster multiTarget &&
+                            (multiTarget.MonsterClass == MonsterClass.Undead || multiTarget.MonsterClass == MonsterClass.Demon || multiTarget.Undead > 0))
+                        {
+                            float holyMult = IsManweBattle && ArtifactSystem.Instance.HasVoidKey() ? 3.0f : 2.0f;
+                            attackPower = (long)(attackPower * holyMult);
+                            terminal.WriteLine(Loc.Get("combat.sunforged_blazes"), "bright_yellow");
+                        }
+
+                        // Paladin Divine Resolve: +10% damage vs undead/demons
+                        if (player.Class == CharacterClass.Paladin && target is Monster multiTargetPal &&
+                            (multiTargetPal.MonsterClass == MonsterClass.Undead || multiTargetPal.MonsterClass == MonsterClass.Demon || multiTargetPal.Undead > 0))
+                        {
+                            attackPower = (long)(attackPower * (1.0 + GameConfig.PaladinDivineResolveDamageBonus));
+                        }
+
+                        // Jester Trickster's Luck: random beneficial proc on basic attacks
+                        if (player.Class == CharacterClass.Jester && random.Next(100) < GameConfig.JesterTrickstersLuckChance)
+                        {
+                            int luckRoll = random.Next(3);
+                            if (luckRoll == 0)
+                            {
+                                // Bonus damage
+                                long bonusDmg = (long)(attackPower * GameConfig.JesterLuckBonusDamage);
+                                attackPower += bonusDmg;
+                                terminal.WriteLine($"  {Loc.Get("combat.trickster_lucky_hit")}", "bright_magenta");
+                            }
+                            else if (luckRoll == 1)
+                            {
+                                // Dodge next attack
+                                player.DodgeNextAttack = true;
+                                terminal.WriteLine($"  {Loc.Get("combat.trickster_dodge")}", "bright_magenta");
+                            }
+                            else
+                            {
+                                // Stamina refund
+                                player.CurrentCombatStamina = Math.Min(player.MaxCombatStamina,
+                                    player.CurrentCombatStamina + GameConfig.JesterLuckStaminaRefund);
+                                terminal.WriteLine($"  {Loc.Get("combat.trickster_stamina", GameConfig.JesterLuckStaminaRefund)}", "bright_magenta");
+                            }
+                        }
+
+                        // Assassin Lethal Precision: +25% crit damage with dagger, +10% damage vs poisoned targets
+                        if (player.Class == CharacterClass.Assassin)
+                        {
+                            if ((isCrit || dexCrit) && player.GetEquipment(EquipmentSlot.MainHand)?.WeaponType == WeaponType.Dagger)
+                            {
+                                long critBonusMM = (long)(attackPower * GameConfig.AssassinLethalPrecisionCritBonus);
+                                attackPower += critBonusMM;
+                                terminal.WriteLine(Loc.Get("combat.lethal_precision_crit", critBonusMM), "bright_red");
+                            }
+                            if (target.Poisoned)
+                            {
+                                long poisonBonusMM = (long)(attackPower * GameConfig.AssassinLethalPrecisionPoisonBonus);
+                                attackPower += poisonBonusMM;
+                                terminal.WriteLine(Loc.Get("combat.lethal_precision_poison", target.Name, poisonBonusMM), "dark_green");
+                            }
+                        }
+
+                        long damage = Math.Max(1, attackPower);
+
+                        // Comprehensive combat logging for every player attack
+                        DebugLogger.Instance.LogInfo("COMBAT_ATTACK",
+                            $"player={player.Name} lv={player.Level} class={player.Class} swing={s+1}/{swings} offhand={isOffHandAttack} " +
+                            $"STR={player.Strength} baseSTR={player.BaseStrength} WeapPow={player.WeapPow} " +
+                            $"finalAttackPower={attackPower} finalDamage={damage} " +
+                            $"profMult={profMult:F2} dmgMod={damageModifier:F2} rollMult={rollMult:F2} isCrit={isCrit} dexCrit={dexCrit} " +
+                            $"TempAtkBonus={player.TempAttackBonus} isRaging={player.IsRaging} " +
+                            $"target={target.Name} targetLv={target.Level} targetArmPow={target.ArmPow} targetDef={target.Defence} " +
+                            $"equippedSlots=[{string.Join(",", player.EquippedItems.Select(kvp => $"{kvp.Key}:{kvp.Value}"))}]");
+
+        return damage;
     }
 
     // ==================== MULTI-MONSTER ACTION PROCESSING ====================
@@ -12391,257 +12692,18 @@ public partial class CombatEngine
                         }
                         await Task.Delay(GetCombatDelay(500));
 
-                        // Calculate player attack damage (unified with single-combat formula)
-                        // Bard/Jester use CHA (performance-based combat), others use STR
-                        long attackPower;
-                        if (player.Class == CharacterClass.Bard || player.Class == CharacterClass.Jester)
-                        {
-                            attackPower = player.Charisma;
-                            attackPower += player.Charisma / 4;
-                        }
-                        else
-                        {
-                            attackPower = player.Strength;
-                            attackPower += StatEffectsSystem.GetStrengthDamageBonus(player.Strength); // STR/4
-                        }
-                        attackPower += player.Level;
+                        long damage = ComputePlayerSwingDamage(player, target, isOffHandAttack, s, swings);
 
-                        // Status modifiers
-                        if (player.IsRaging)
-                            attackPower = (long)(attackPower * 1.5);
-                        if (player.HasStatus(StatusEffect.PowerStance))
-                            attackPower = (long)(attackPower * 1.5);
-                        if (player.HasStatus(StatusEffect.Blessed))
-                            attackPower += player.Level / 5 + 2;
-                        if (player.HasStatus(StatusEffect.RoyalBlessing))
-                            attackPower = (long)(attackPower * 1.10);
-                        if (player.HasStatus(StatusEffect.Weakened))
-                            attackPower = Math.Max(1, attackPower - player.Level / 10 - 4);
+                        bool swingLanded = await ApplySingleMonsterDamage(target, damage, result, isOffHandAttack ? "off-hand strike" : "your attack", player);
 
-                        // Weapon power with level scaling and random (soft cap prevents extreme stacking)
-                        if (player.WeapPow > 0)
-                        {
-                            long effectiveWeap = GetEffectiveWeapPow(player.WeapPow);
-                            long weaponBonus = effectiveWeap + (player.Level / 10);
-                            attackPower += weaponBonus + random.Next(0, (int)Math.Min(int.MaxValue, weaponBonus + 1));
-                        }
-
-                        // Random attack variation
-                        int variationMax = Math.Max(21, player.Level / 2);
-                        attackPower += random.Next(1, variationMax);
-
-                        // Temporary attack bonus from abilities
-                        attackPower += player.TempAttackBonus;
-
-                        // Weapon configuration modifier (2H bonus, dual-wield off-hand penalty)
-                        double damageModifier = GetWeaponConfigDamageModifier(player, isOffHandAttack);
-                        attackPower = (long)(attackPower * damageModifier);
-
-                        // Proficiency multiplier
-                        var basicProf = TrainingSystem.GetSkillProficiency(player, "basic_attack");
-                        float profMult = TrainingSystem.GetEffectMultiplier(basicProf);
-                        attackPower = (long)(attackPower * profMult);
-
-                        // Critical hit chance
-                        float rollMult = 1.0f;
-
-                        // v0.60.11 (Zen Lv.9 Cyclebreaker report): Hidden status grants
-                        // a guaranteed crit on the next attack -- it's how every auto-crit-
-                        // setup ability delivers its payoff (Cyclebreaker Temporal Feint,
-                        // Abysswarden Umbral Step, Assassin shadow / vanish, basic [H]ide).
-                        // Power Strike and class abilities already consume Hidden (see
-                        // ~12327 and ~12842), but the basic [A]ttack path never checked
-                        // it. Net effect: every auto-crit-setup ability worked when
-                        // followed by Power Strike or an ability, but silently dropped the
-                        // crit when followed by a plain swing. Mirror the Power-Strike
-                        // pattern: stealth crit short-circuits the natural-20 / dex-crit
-                        // rolls so we don't accidentally double-apply.
-                        bool stealthCrit = player.HasStatus(StatusEffect.Hidden);
-                        if (stealthCrit)
-                        {
-                            player.RemoveStatus(StatusEffect.Hidden);
-                            rollMult = StatEffectsSystem.GetCriticalDamageMultiplier(player.Dexterity, player.GetEquipmentCritDamageBonus());
-                            terminal.WriteLine(Loc.Get("combat.stealth_crit"), "bright_yellow");
-                        }
-                        bool isCrit = !stealthCrit && random.Next(1, 21) == 20; // natural 20
-                        bool dexCrit = !stealthCrit && !isCrit && StatEffectsSystem.RollCriticalHit(player);
-                        if (isCrit)
-                        {
-                            rollMult = 1.5f + (float)(random.NextDouble() * 0.5); // 1.5-2.0
-                            terminal.WriteLine(Loc.Get("combat.critical_hit"), "bright_red");
-                        }
-                        else if (dexCrit)
-                        {
-                            rollMult = StatEffectsSystem.GetCriticalDamageMultiplier(player.Dexterity, player.GetEquipmentCritDamageBonus());
-                            terminal.WriteLine(Loc.Get("combat.precision_strike"), "bright_yellow");
-                        }
-
-                        // Wavecaller Ocean's Voice: +20% bonus crit chance when buff active
-                        if (!stealthCrit && !isCrit && !dexCrit && player.Class == CharacterClass.Wavecaller
-                            && player.TempAttackBonus > 0 && player.TempAttackBonusDuration > 0)
-                        {
-                            if (random.Next(100) < (int)(GameConfig.WavecallerOceansVoiceCritBonus * 100))
-                            {
-                                rollMult = StatEffectsSystem.GetCriticalDamageMultiplier(player.Dexterity, player.GetEquipmentCritDamageBonus());
-                                terminal.WriteLine(Loc.Get("combat.oceans_voice_crit"), "bright_magenta");
-                            }
-                        }
-
-                        long preRollAttack = attackPower;
-                        attackPower = (long)(attackPower * rollMult);
-
-                        // Difficulty modifier
-                        long preDiffAttack = attackPower;
-                        attackPower = DifficultySystem.ApplyPlayerDamageMultiplier(attackPower);
-
-                        // Grief effects
-                        var griefFx = GriefSystem.Instance.GetCurrentEffects();
-                        long preGriefAttack = attackPower;
-                        if (griefFx.DamageModifier != 0 || griefFx.CombatModifier != 0 || griefFx.AllStatModifier != 0)
-                        {
-                            float totalGriefMod = 1.0f + griefFx.DamageModifier + griefFx.CombatModifier + griefFx.AllStatModifier;
-                            attackPower = (long)(attackPower * totalGriefMod);
-                            DebugLogger.Instance.LogInfo("COMBAT_GRIEF",
-                                $"player={player.Name} griefDmg={griefFx.DamageModifier:F2} griefCombat={griefFx.CombatModifier:F2} " +
-                                $"griefAllStat={griefFx.AllStatModifier:F2} totalGriefMod={totalGriefMod:F2} " +
-                                $"preGrief={preGriefAttack} postGrief={attackPower}");
-                        }
-
-                        // Log intermediate values to find where attackPower drops to 0
-                        if (attackPower <= 0)
-                        {
-                            DebugLogger.Instance.LogInfo("COMBAT_ZERO",
-                                $"player={player.Name} attackPower=0! preRoll={preRollAttack} postRoll={(long)(preRollAttack * rollMult)} " +
-                                $"preDiff={preDiffAttack} postDiff={preGriefAttack} preGrief={preGriefAttack} postGrief={attackPower} " +
-                                $"griefDmg={griefFx.DamageModifier:F2} griefCombat={griefFx.CombatModifier:F2} griefAllStat={griefFx.AllStatModifier:F2}");
-                        }
-
-                        // Royal Authority bonus
-                        if (player is Player attackingKing && attackingKing.King)
-                            attackPower = (long)(attackPower * GameConfig.KingCombatStrengthBonus);
-
-                        // Buff bonuses (well-rested, god slayer, lover's bliss, divine blessing, poison coating, herbs)
-                        if (player.WellRestedCombats > 0 && player.WellRestedBonus > 0f)
-                            attackPower += (long)(attackPower * player.WellRestedBonus);
-                        if (player.HasGodSlayerBuff)
-                            attackPower += (long)(attackPower * player.GodSlayerDamageBonus);
-                        if (player.HasDarkPactBuff)
-                            attackPower += (long)(attackPower * player.DarkPactDamageBonus);
-                        // Fatigue damage penalty (single-player only, multi-monster path)
-                        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && player.Fatigue >= GameConfig.FatigueTiredThreshold)
-                        {
-                            float fatigueDmgPenaltyMM = player.Fatigue >= GameConfig.FatigueExhaustedThreshold
-                                ? GameConfig.FatigueExhaustedDamagePenalty
-                                : GameConfig.FatigueTiredDamagePenalty;
-                            attackPower += (long)(attackPower * fatigueDmgPenaltyMM);
-                        }
-                        if (player.LoversBlissCombats > 0 && player.LoversBlissBonus > 0f)
-                            attackPower += (long)(attackPower * player.LoversBlissBonus);
-                        if (player.HerbBuffType == (int)HerbType.FirebloomPetal && player.HerbBuffCombats > 0)
-                            attackPower += (long)(attackPower * player.HerbBuffValue);
-                        if (player.FoodBuffCombats > 0 && (player.FoodBuffType == 1 || player.FoodBuffType == 5))
-                            attackPower += (long)(attackPower * player.FoodBuffValue);
-                        if (player.SongBuffCombats > 0 && (player.SongBuffType == 1 || player.SongBuffType == 4))
-                            attackPower += (long)(attackPower * player.SongBuffValue);
-                        if (player.DivineBlessingCombats > 0 && player.DivineBlessingBonus > 0f)
-                            attackPower += (long)(attackPower * player.DivineBlessingBonus);
-                        if (player.PoisonCoatingCombats > 0 && PoisonData.HasDamageBonus(player.ActivePoisonType))
-                            attackPower += (long)(attackPower * PoisonData.GetDamageBonus(player.ActivePoisonType));
-                        else if (player.PoisonCoatingCombats > 0 && player.ActivePoisonType == PoisonType.None)
-                            attackPower += (long)(attackPower * GameConfig.PoisonCoatingDamageBonus);
-                        if (player.PermanentDamageBonus > 0)
-                            attackPower += (long)(attackPower * (player.PermanentDamageBonus / 100.0));
-                        if (player.HQArmoryLevel > 0)
-                            attackPower += (long)(attackPower * (player.HQArmoryLevel * 0.05));
-                        if (player.IsKnighted)
-                            attackPower += (long)(attackPower * GameConfig.KnightDamageBonus);
-                        // v0.60.11: Grand Champion +3% damage stacks with knighthood.
-                        if (player.ArenaChampionTier >= (int)UsurperRemake.Data.GauntletChampionData.ArenaTier.GrandChampion)
-                            attackPower += (long)(attackPower * GameConfig.GrandChampionDamageBonus);
-                        // v0.61.0 Druid's Shrines: Maelketh attunement = +8% melee damage.
-                        if (player.IsAttunedTo("maelketh"))
-                            attackPower += (long)(attackPower * GameConfig.ShrineMaelkethMeleeBonus);
-
-                        // Divine boon damage bonus (multi-monster path)
-                        var mmBoons = player.CachedBoonEffects;
-                        if (mmBoons != null && (mmBoons.DamagePercent > 0 || mmBoons.FlatAttack > 0))
-                        {
-                            attackPower += (long)(attackPower * mmBoons.DamagePercent);
-                            attackPower += mmBoons.FlatAttack;
-                        }
-
-                        // Sunforged Blade vs undead/demons
-                        if (ArtifactSystem.Instance.HasSunforgedBlade() && target is Monster multiTarget &&
-                            (multiTarget.MonsterClass == MonsterClass.Undead || multiTarget.MonsterClass == MonsterClass.Demon || multiTarget.Undead > 0))
-                        {
-                            float holyMult = IsManweBattle && ArtifactSystem.Instance.HasVoidKey() ? 3.0f : 2.0f;
-                            attackPower = (long)(attackPower * holyMult);
-                            terminal.WriteLine(Loc.Get("combat.sunforged_blazes"), "bright_yellow");
-                        }
-
-                        // Paladin Divine Resolve: +10% damage vs undead/demons
-                        if (player.Class == CharacterClass.Paladin && target is Monster multiTargetPal &&
-                            (multiTargetPal.MonsterClass == MonsterClass.Undead || multiTargetPal.MonsterClass == MonsterClass.Demon || multiTargetPal.Undead > 0))
-                        {
-                            attackPower = (long)(attackPower * (1.0 + GameConfig.PaladinDivineResolveDamageBonus));
-                        }
-
-                        // Jester Trickster's Luck: random beneficial proc on basic attacks
-                        if (player.Class == CharacterClass.Jester && random.Next(100) < GameConfig.JesterTrickstersLuckChance)
-                        {
-                            int luckRoll = random.Next(3);
-                            if (luckRoll == 0)
-                            {
-                                // Bonus damage
-                                long bonusDmg = (long)(attackPower * GameConfig.JesterLuckBonusDamage);
-                                attackPower += bonusDmg;
-                                terminal.WriteLine($"  {Loc.Get("combat.trickster_lucky_hit")}", "bright_magenta");
-                            }
-                            else if (luckRoll == 1)
-                            {
-                                // Dodge next attack
-                                player.DodgeNextAttack = true;
-                                terminal.WriteLine($"  {Loc.Get("combat.trickster_dodge")}", "bright_magenta");
-                            }
-                            else
-                            {
-                                // Stamina refund
-                                player.CurrentCombatStamina = Math.Min(player.MaxCombatStamina,
-                                    player.CurrentCombatStamina + GameConfig.JesterLuckStaminaRefund);
-                                terminal.WriteLine($"  {Loc.Get("combat.trickster_stamina", GameConfig.JesterLuckStaminaRefund)}", "bright_magenta");
-                            }
-                        }
-
-                        // Assassin Lethal Precision: +25% crit damage with dagger, +10% damage vs poisoned targets
-                        if (player.Class == CharacterClass.Assassin)
-                        {
-                            if ((isCrit || dexCrit) && player.GetEquipment(EquipmentSlot.MainHand)?.WeaponType == WeaponType.Dagger)
-                            {
-                                long critBonusMM = (long)(attackPower * GameConfig.AssassinLethalPrecisionCritBonus);
-                                attackPower += critBonusMM;
-                                terminal.WriteLine(Loc.Get("combat.lethal_precision_crit", critBonusMM), "bright_red");
-                            }
-                            if (target.Poisoned)
-                            {
-                                long poisonBonusMM = (long)(attackPower * GameConfig.AssassinLethalPrecisionPoisonBonus);
-                                attackPower += poisonBonusMM;
-                                terminal.WriteLine(Loc.Get("combat.lethal_precision_poison", target.Name, poisonBonusMM), "dark_green");
-                            }
-                        }
-
-                        long damage = Math.Max(1, attackPower);
-
-                        // Comprehensive combat logging for every player attack
-                        DebugLogger.Instance.LogInfo("COMBAT_ATTACK",
-                            $"player={player.Name} lv={player.Level} class={player.Class} swing={s+1}/{swings} offhand={isOffHandAttack} " +
-                            $"STR={player.Strength} baseSTR={player.BaseStrength} WeapPow={player.WeapPow} " +
-                            $"finalAttackPower={attackPower} finalDamage={damage} " +
-                            $"profMult={profMult:F2} dmgMod={damageModifier:F2} rollMult={rollMult:F2} isCrit={isCrit} dexCrit={dexCrit} " +
-                            $"TempAtkBonus={player.TempAttackBonus} isRaging={player.IsRaging} " +
-                            $"target={target.Name} targetLv={target.Level} targetArmPow={target.ArmPow} targetDef={target.Defence} " +
-                            $"equippedSlots=[{string.Join(",", player.EquippedItems.Select(kvp => $"{kvp.Key}:{kvp.Value}"))}]");
-
-                        await ApplySingleMonsterDamage(target, damage, result, isOffHandAttack ? "off-hand strike" : "your attack", player);
+                        // If the swing was evaded (Incorporeal / Phase / etc. -- the attack passes
+                        // through for 0 damage), skip EVERY on-hit effect for this swing: lifesteal
+                        // and the other post-hit enchant procs, the Shaman weapon-enchant bonus
+                        // damage/procs, and the Ancestral Guidance heal below. Player report: life
+                        // steal still triggered when the attack passed through the enemy. The evasion
+                        // flavor line was already printed inside ApplySingleMonsterDamage.
+                        if (!swingLanded)
+                            continue;
 
                         // Apply all post-hit enchantment effects (lifesteal, elemental procs, sunforged, poison)
                         ApplyPostHitEnchantments(player, target, damage, result, weaponSlot: isOffHandAttack ? EquipmentSlot.OffHand : EquipmentSlot.MainHand);
@@ -13034,10 +13096,12 @@ public partial class CombatEngine
                 terminal.WriteLine(Loc.Get("combat.off_hand_strike_at", offHandTarget.Name));
                 await Task.Delay(GetCombatDelay(500));
 
-                long ohDamage = player.Strength + GetEffectiveWeapPow(player.WeapPow) + random.Next(1, 15);
-                double ohMod = GetWeaponConfigDamageModifier(player, isOffHandAttack: true);
-                ohDamage = (long)(ohDamage * ohMod);
-                ohDamage = DifficultySystem.ApplyPlayerDamageMultiplier(ohDamage);
+                // Off-hand follow-up does a FULL off-hand swing using the same formula as a normal
+                // off-hand basic attack (ComputePlayerSwingDamage), so a skill's off-hand strike no
+                // longer deals different damage than a normal off-hand attack (player report). The
+                // old bespoke STR + WeapPow + random(1,15) formula dropped proficiency, level/weapon
+                // scaling, crit, and all buffs, making it far weaker than a real off-hand swing.
+                long ohDamage = ComputePlayerSwingDamage(player, offHandTarget, isOffHandAttack: true, 1, 1);
 
                 await ApplySingleMonsterDamage(offHandTarget, ohDamage, result, "off-hand strike", player);
             }
@@ -13645,13 +13709,30 @@ public partial class CombatEngine
                     terminal.WriteLine(Loc.Get("combat.off_hand_strike_npc", actorName, offHandTarget.Name));
                 await Task.Delay(GetCombatDelay(500));
 
-                long ohDamage = player.Strength + GetEffectiveWeapPow(player.WeapPow) + random.Next(1, 15);
-                double ohMod = GetWeaponConfigDamageModifier(player, isOffHandAttack: true);
-                ohDamage = (long)(ohDamage * ohMod);
-                ohDamage = DifficultySystem.ApplyPlayerDamageMultiplier(ohDamage);
+                // Off-hand follow-up does a FULL off-hand swing. For the PLAYER, use the same
+                // formula as a normal off-hand basic attack (ComputePlayerSwingDamage) so a skill's
+                // off-hand strike no longer deals different damage than a normal off-hand attack
+                // (player report). ApplyAbilityEffectsMultiMonster ALSO runs for AI teammates, so a
+                // dual-wielding NPC keeps the lightweight off-hand formula: ComputePlayerSwingDamage
+                // emits player-perspective ("You") crit/proc lines and folds in player-only buffs,
+                // which must not fire for a teammate's swing (player/teammate attribution).
+                long ohDamage;
+                if (isPlayer)
+                {
+                    ohDamage = ComputePlayerSwingDamage(player, offHandTarget, isOffHandAttack: true, 1, 1);
+                }
+                else
+                {
+                    ohDamage = player.Strength + GetEffectiveWeapPow(player.WeapPow) + random.Next(1, 15);
+                    double ohMod = GetWeaponConfigDamageModifier(player, isOffHandAttack: true);
+                    ohDamage = (long)(ohDamage * ohMod);
+                    ohDamage = DifficultySystem.ApplyPlayerDamageMultiplier(ohDamage);
+                }
 
-                await ApplySingleMonsterDamage(offHandTarget, ohDamage, result, "off-hand strike", player);
-                ApplyPostHitEnchantments(player, offHandTarget, ohDamage, result, weaponSlot: EquipmentSlot.OffHand);
+                // Off-hand follow-up only procs its enchants if it actually connected; an evaded
+                // swing (Incorporeal/Phase) passes through for 0 damage and must not lifesteal.
+                if (await ApplySingleMonsterDamage(offHandTarget, ohDamage, result, "off-hand strike", player))
+                    ApplyPostHitEnchantments(player, offHandTarget, ohDamage, result, weaponSlot: EquipmentSlot.OffHand);
             }
         }
 
@@ -17428,10 +17509,12 @@ public partial class CombatEngine
 
                 long damage = Math.Max(1, attackPower);
                 damage = DifficultySystem.ApplyPlayerDamageMultiplier(damage);
-                await ApplySingleMonsterDamage(target, damage, result, isOffHandAttack ? $"{teammate.DisplayName}'s off-hand strike" : $"{teammate.DisplayName}'s attack", teammate);
+                bool tmLanded = await ApplySingleMonsterDamage(target, damage, result, isOffHandAttack ? $"{teammate.DisplayName}'s off-hand strike" : $"{teammate.DisplayName}'s attack", teammate);
 
-                // Apply post-hit enchantment effects
-                ApplyPostHitEnchantments(teammate, target, damage, result, weaponSlot: isOffHandAttack ? EquipmentSlot.OffHand : EquipmentSlot.MainHand);
+                // Apply post-hit enchantment effects only if the attack landed -- an evaded swing
+                // (Incorporeal/Phase) must not proc the teammate's lifesteal/enchants either.
+                if (tmLanded)
+                    ApplyPostHitEnchantments(teammate, target, damage, result, weaponSlot: isOffHandAttack ? EquipmentSlot.OffHand : EquipmentSlot.MainHand);
 
                 // If target died, retarget to next weakest
                 if (!target.IsAlive)
@@ -19772,6 +19855,13 @@ public partial class CombatEngine
         string className = player.Class.ToString();
         int rounds = Math.Max(1, result.CurrentRound);
 
+        // v0.65.2 (co-op feedback): flush any queued group broadcasts (e.g. the final
+        // round's follower actions) to the leader's screen BEFORE the summary, so they
+        // appear in order instead of after it. The leader drains its incoming-message
+        // queue only at the next input -- which is the post-summary key press -- so
+        // without this the last follower actions print below the summary.
+        terminal.FlushIncomingMessages();
+
         // Count companion blocks/assists
         int teammateCount = result.Teammates?.Count(t => t != null && t.IsAlive) ?? 0;
 
@@ -19823,6 +19913,15 @@ public partial class CombatEngine
             : $"{playerName} the {className} (Lv{player.Level}) defeated {monster.Name} in {rounds} rounds! [{result.TotalDamageDealt:N0} dmg] #UsurperReborn";
         terminal.WriteLine($"  Share: {shareLine}");
         terminal.WriteLine("");
+
+        // v0.65.2 (co-op feedback): followers never saw the boss-kill summary (it rendered
+        // to the leader only). Broadcast a compact version so grouped players see the
+        // outcome too, ordered after the action broadcasts in their stream.
+        if (result.Teammates?.Any(t => t != null && t.IsGroupedPlayer) == true)
+        {
+            string bcast = $"[1;33m  *** {playerName} defeated {monster.Name} in {rounds} round{(rounds != 1 ? "s" : "")}! ***[0m";
+            BroadcastGroupCombatEvent(result, bcast);
+        }
 
         await terminal.PressAnyKey();
     }
@@ -28305,6 +28404,43 @@ public partial class CombatEngine
     /// and current player to route I/O to the follower's RemoteTerminal.
     /// Uses the same GetPlayerActionMultiMonster + ProcessPlayerActionMultiMonster flow.
     /// </summary>
+    // v0.65.2: compact one-line party-HP readout for a follower's combat HUD. Includes
+    // the leader (the combat owner, who is not in currentTeammates) plus every teammate
+    // and the follower themselves, color-coded by HP%, so a healer always sees the
+    // whole party's health during combat (not just in the post-turn summary line).
+    private void RenderFollowerPartyLine(TerminalEmulator term, Character self, Character? leader, List<Character>? teammates)
+    {
+        if (term == null) return;
+        var members = new List<Character>();
+        if (self != null) members.Add(self);
+        if (leader != null && leader != self) members.Add(leader);
+        if (teammates != null)
+            foreach (var t in teammates)
+                if (t != null && t != self && t != leader) members.Add(t);
+        if (members.Count <= 1) return; // nothing beyond the follower to show
+
+        term.SetColor("gray");
+        term.Write("  Party: ");
+        for (int i = 0; i < members.Count; i++)
+        {
+            var m = members[i];
+            if (i > 0) { term.SetColor("gray"); term.Write(" | "); }
+            string tag = m == self ? "You" : (m == leader ? $"{m.DisplayName} (leader)" : m.DisplayName);
+            if (!m.IsAlive || m.HP <= 0)
+            {
+                term.SetColor("darkgray");
+                term.Write($"{tag} DOWN");
+            }
+            else
+            {
+                int pct = m.MaxHP > 0 ? (int)(100.0 * m.HP / m.MaxHP) : 0;
+                term.SetColor(pct >= 60 ? "bright_green" : pct >= 30 ? "yellow" : "red");
+                term.Write($"{tag} {m.HP}/{m.MaxHP} ({pct}%)");
+            }
+        }
+        term.WriteLine("");
+    }
+
     private async Task ProcessGroupedPlayerTurn(Character teammate, Character leader, List<Monster> monsters, CombatResult result)
     {
         var remoteTerminal = teammate.RemoteTerminal;
@@ -28332,6 +28468,10 @@ public partial class CombatEngine
 
             // Show the full combat display — same as what the leader sees
             DisplayCombatStatus(monsters, teammate);
+            // v0.65.2 (co-op feedback): the follower's combat HUD omitted the LEADER's HP
+            // (the leader is the combat owner, not in currentTeammates). Show a compact
+            // party-HP line every turn so a follower healer always sees who needs healing.
+            RenderFollowerPartyLine(remoteTerminal, teammate, leader, currentTeammates);
             // v0.65.1: include the LEADER (not in currentTeammates) so [H] shows when only the
             // leader is hurt -- a follower healer's most common target.
             bool hasInjuredTeammates = (leader != null && leader.IsAlive && leader.HP < leader.MaxHP)
@@ -28403,6 +28543,13 @@ public partial class CombatEngine
                 terminal.WriteLine($"  {Loc.Get("combat.follower_heal_target_hint")}");
             }
 
+            // v0.65.2: drain any stale buffered input so this read matches THIS prompt.
+            // The bounded(1) channel plus the per-prompt flag could otherwise leave a
+            // leftover keypress that gets consumed first, shifting every later read by
+            // one (the intermittent "command not recognized" / loot-auto-passed bug).
+            // The follower's real response cannot have arrived in the microseconds since
+            // the menu was written, so this only discards genuinely stale input.
+            while (channel.Reader.TryRead(out _)) { }
             // Signal the follower loop that we need combat input
             teammate.IsAwaitingCombatInput = true;
 
@@ -29089,8 +29236,14 @@ public partial class CombatEngine
             groupedPlayer.Experience += playerExp;
             groupedPlayer.Gold += playerGold;
 
-            // Check for level up — uses proper class-based stat increases (same as Level Master)
-            LevelMasterLocation.CheckAutoLevelUp(groupedPlayer);
+            // Check for level up — uses proper class-based stat increases (same as Level Master).
+            // Respect the grouped player's auto-level preference. Bug: followers in a multiplayer
+            // group leveled up regardless of the toggle, because CheckAutoLevelUp does not self-gate
+            // (it levels whenever XP allows; the caller must check AutoLevelUp, as the solo/leader
+            // path does in BaseLocation.LocationLoop). When off, the follower banks XP and levels up
+            // manually at the Level Master, exactly like a solo player.
+            if (groupedPlayer.AutoLevelUp)
+                LevelMasterLocation.CheckAutoLevelUp(groupedPlayer);
 
             // Track monster kills on the grouped player
             foreach (var monster in result.DefeatedMonsters)

@@ -3172,6 +3172,13 @@ public partial class GameEngine
 
             await locationManager.EnterLocation(startLocation, currentPlayer);
         }
+        catch (GameExitException)
+        {
+            // Clean control-flow exit: the player chose to quit / log out (e.g. from prison or the
+            // quit menu). This is NOT an error -- the old catch-all logged it as "[CRASH] Failed to
+            // load save" (a false alarm that paged the server-monitor Discord) and flashed an
+            // "error loading" screen for 3 seconds. Let the session end normally and silently.
+        }
         catch (Exception ex)
         {
             terminal.WriteLine(Loc.Get("engine.error_loading", ex.Message), "red");

@@ -70,3 +70,4 @@ nul
 # Dev/localization tooling scripts (not part of the game)
 tools/
 DOCS/FEEDBACK_PLAN_0.56.0.md
+AGENTS.md

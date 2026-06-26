@@ -45,12 +45,19 @@ public static class ShopItemGenerator
         var weaponTemplates = LootGenerator.GetWeaponTemplates();
         int twoHandedStart = LootGenerator.TwoHandedWeaponStartIndex;
 
-        // One-handed weapons
+        // One-handed weapon templates. Most are one-handed, but a few (magic staves) are
+        // two-handed by design: the hand-crafted staff items and InferHandedness both say
+        // Staff = TwoHanded, and loot staves come out 2H. Derive handedness from the weapon type
+        // (the same canonical source loot uses) instead of assuming this whole range is 1H, so
+        // shop staves are two-handed and match loot (player report: shop staves were 1H while
+        // loot staves were 2H). Genuine one-handed weapons here are unaffected -- InferHandedness
+        // returns OneHanded for them.
         int id = OneHandedWeaponStart;
         for (int i = 0; i < twoHandedStart && i < weaponTemplates.Count; i++)
         {
+            var handed = InferHandedness(InferWeaponType(weaponTemplates[i].Name));
             items.AddRange(GenerateWeaponItems(weaponTemplates[i], ref id,
-                WeaponHandedness.OneHanded, EquipmentSlot.MainHand));
+                handed, EquipmentSlot.MainHand));
         }
 
         // Two-handed melee weapons (skip bows — they get their own ID range)

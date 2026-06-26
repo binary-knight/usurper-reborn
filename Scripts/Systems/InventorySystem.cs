@@ -1638,10 +1638,13 @@ namespace UsurperRemake.Systems
                 case "Q":
                     return;
                 default:
-                    // Check for B# format (backpack item)
-                    if (choice.StartsWith("B") && int.TryParse(choice.Substring(1), out int backpackIndex))
+                    // Check for B# format (backpack item). Guard the dictionary lookup: the player
+                    // can type any number (e.g. B27 when no item #27 is on the current page/slot),
+                    // and an unchecked filteredInventoryMap[backpackIndex] threw KeyNotFoundException
+                    // that crashed the whole session (logged misleadingly as "Failed to load save").
+                    if (choice.StartsWith("B") && int.TryParse(choice.Substring(1), out int backpackIndex)
+                        && filteredInventoryMap.TryGetValue(backpackIndex, out int index))
                     {
-                        int index = filteredInventoryMap[backpackIndex];
                         await ManageBackpackItem(index, slot);
                     }
                     else
