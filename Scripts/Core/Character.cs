@@ -1334,7 +1334,8 @@ public class Character
             Defence = equipment.DefenceBonus,
             IsCursed = equipment.IsCursed,
             Cursed = equipment.IsCursed,
-            MinLevel = equipment.MinLevel
+            MinLevel = equipment.MinLevel,
+            Rarity = equipment.Rarity // issue #112: carry rarity so re-equip doesn't reset reforged quality
         };
 
         // Preserve CON/INT as LootEffects for re-equip
@@ -1384,6 +1385,96 @@ public class Character
             item.LootEffects.Add(((int)LootGenerator.SpecialEffect.TitanResolve, 5));
 
         return item;
+    }
+
+    /// <summary>
+    /// Inverse of <see cref="ConvertEquipmentToItem"/>: build an Equipment from a backpack Item.
+    /// SINGLE SOURCE OF TRUTH for every "put an item back on" path (player inventory equip, Home,
+    /// Magic Shop enchant view, the shared location equip helper) so the field map + LootEffects
+    /// transfer cannot drift between copies. Three separate field-loss bugs landed because this
+    /// logic was duplicated: v0.57.7 (enchants dropped on re-equip), #112 (BlockChance / Stamina /
+    /// Rarity dropped), and #112 (a shield's block value read from the wrong field). This helper
+    /// exists so the next field added to Item is carried everywhere automatically.
+    /// Callers determine slot / handedness / weaponType / weightClass for their UI context and pass
+    /// them in, then register the result via EquipmentDatabase.RegisterDynamic when an ID is needed.
+    /// </summary>
+    public static Equipment BuildEquipmentFromItem(global::Item item, EquipmentSlot slot,
+        WeaponHandedness handedness, WeaponType weaponType, ArmorWeightClass weightClass = ArmorWeightClass.None)
+    {
+        bool isShield = item.Type == global::ObjType.Shield;
+        var equipment = new Equipment
+        {
+            Name = item.Name,
+            Slot = slot,
+            Handedness = handedness,
+            WeaponType = weaponType,
+            WeightClass = weightClass,
+            WeaponPower = item.Attack,
+            // A shield's defensive value lives in ShieldBonus (Armor stays 0). Math.Max also recovers
+            // legacy saves that stored it in item.Armor. Non-shields keep ArmorClass = item.Armor.
+            ArmorClass = isShield ? 0 : item.Armor,
+            ShieldBonus = isShield ? Math.Max(item.ShieldBonus, item.Armor) : 0,
+            BlockChance = item.BlockChance,
+            DefenceBonus = item.Defence,
+            StrengthBonus = item.Strength,
+            DexterityBonus = item.Dexterity,
+            AgilityBonus = item.Agility,
+            StaminaBonus = item.Stamina,
+            WisdomBonus = item.Wisdom,
+            CharismaBonus = item.Charisma,
+            MaxHPBonus = item.HP,
+            MaxManaBonus = item.Mana,
+            Value = item.Value,
+            IsCursed = item.IsCursed,
+            IsIdentified = item.IsIdentified,
+            MinLevel = item.MinLevel,
+            Rarity = item.Rarity
+        };
+        ApplyItemLootEffectsToEquipment(item, equipment);
+        return equipment;
+    }
+
+    /// <summary>
+    /// Transfer an Item's LootEffects (enchants, procs, bonus stats, world-boss flags) onto an Equipment.
+    /// Public so the CombatEngine loot-equip paths share this one switch instead of keeping their own
+    /// copies (two of which had drifted to drop the BossSlayer / TitanResolve world-boss flags).
+    /// </summary>
+    public static void ApplyItemLootEffectsToEquipment(global::Item item, Equipment equipment)
+    {
+        if (item.LootEffects == null) return;
+        foreach (var (effectType, value) in item.LootEffects)
+        {
+            switch ((LootGenerator.SpecialEffect)effectType)
+            {
+                case LootGenerator.SpecialEffect.FireDamage: equipment.HasFireEnchant = true; break;
+                case LootGenerator.SpecialEffect.IceDamage: equipment.HasFrostEnchant = true; break;
+                case LootGenerator.SpecialEffect.LightningDamage: equipment.HasLightningEnchant = true; break;
+                case LootGenerator.SpecialEffect.PoisonDamage:
+                    equipment.HasPoisonEnchant = true;
+                    equipment.PoisonDamage = Math.Max(equipment.PoisonDamage, value);
+                    break;
+                case LootGenerator.SpecialEffect.HolyDamage: equipment.HasHolyEnchant = true; break;
+                case LootGenerator.SpecialEffect.ShadowDamage: equipment.HasShadowEnchant = true; break;
+                case LootGenerator.SpecialEffect.LifeSteal: equipment.LifeSteal = Math.Max(equipment.LifeSteal, Math.Max(5, value / 2)); break;
+                case LootGenerator.SpecialEffect.ManaSteal: equipment.ManaSteal = Math.Max(equipment.ManaSteal, Math.Max(5, value / 2)); break;
+                case LootGenerator.SpecialEffect.CriticalStrike: equipment.CriticalChanceBonus = Math.Max(equipment.CriticalChanceBonus, value); break;
+                case LootGenerator.SpecialEffect.CriticalDamage: equipment.CriticalDamageBonus = Math.Max(equipment.CriticalDamageBonus, value); break;
+                case LootGenerator.SpecialEffect.ArmorPiercing: equipment.ArmorPiercing = Math.Max(equipment.ArmorPiercing, value); break;
+                case LootGenerator.SpecialEffect.Thorns: equipment.Thorns = Math.Max(equipment.Thorns, value); break;
+                case LootGenerator.SpecialEffect.Regeneration: equipment.HPRegen = Math.Max(equipment.HPRegen, value); break;
+                case LootGenerator.SpecialEffect.ManaRegen: equipment.ManaRegen = Math.Max(equipment.ManaRegen, value); break;
+                case LootGenerator.SpecialEffect.MagicResist: equipment.MagicResistance = Math.Max(equipment.MagicResistance, value); break;
+                case LootGenerator.SpecialEffect.Constitution: equipment.ConstitutionBonus += value; break;
+                case LootGenerator.SpecialEffect.Intelligence: equipment.IntelligenceBonus += value; break;
+                case LootGenerator.SpecialEffect.AllStats:
+                    equipment.ConstitutionBonus += value;
+                    equipment.IntelligenceBonus += value;
+                    equipment.CharismaBonus += value;
+                    break;
+                case LootGenerator.SpecialEffect.BossSlayer: equipment.HasBossSlayer = true; break;
+                case LootGenerator.SpecialEffect.TitanResolve: equipment.HasTitanResolve = true; break;
+            }
+        }
     }
 
     /// <summary>

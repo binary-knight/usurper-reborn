@@ -427,7 +427,14 @@ namespace UsurperRemake.Systems
         private static List<RoomFeature> GenerateRoomFeatures(DungeonTheme theme, RoomType type, int level)
         {
             var features = new List<RoomFeature>();
-            int featureCount = random.Next(1, 4);
+
+            // v0.65.3: dungeon-feature density cut (player feedback: examining a feature on nearly
+            // every room turned into "X, 1, X, 1" busywork). Most rooms now have nothing to examine;
+            // a minority have one feature, and only occasionally two -- roughly a two-thirds cut from
+            // the old 1-3-per-room. Rewards are bumped to compensate (DungeonFeatureRewardMultiplier),
+            // so the features you do find feel worth the press instead of being a chore.
+            int densityRoll = random.Next(100);
+            int featureCount = densityRoll < 50 ? 0 : densityRoll < 87 ? 1 : 2;
 
             // v0.62.0: prefer bespoke catalog Discoveries (theme + floor gated, weighted). Fall back
             // to the legacy generic theme features as filler when no discovery fits or the slot

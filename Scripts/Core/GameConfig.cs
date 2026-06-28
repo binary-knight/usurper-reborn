@@ -10,7 +10,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.65.2";
+    public const string Version = "0.65.3";
     public const string VersionName = "Countdown"; // the Beta -> 1.0 release-prep cycle
 
     // v0.57.12: Alignment scale cap. Character.Chivalry and Character.Darkness setters clamp to [0, AlignmentCap]
@@ -79,7 +79,12 @@ public static partial class GameConfig
     public const double BossChannelInterruptChance = 0.60;  // Base chance to interrupt a channel
     public const double BossDivineArmorArtifactBypass = 1.0; // Artifact weapons fully bypass divine armor
     public const double BossDivineArmorEnchantedBypass = 0.5; // Enchanted weapons bypass 50% of divine armor (not 100%)
-    
+
+    // Two-handed weapons hit harder per swing. Applied to basic attacks (GetWeaponConfigDamageModifier)
+    // AND to physical weapon-strike abilities so a 2H Power Strike isn't weaker than a free swing
+    // (player report: 2H Power Strike did less damage than auto-attack even with points specced in).
+    public const double TwoHandedDamageBonus = 1.45;
+
     // Color constants for compatibility
     public const string HPColor = "`C";              // Bright red for HP display
     
@@ -1004,8 +1009,24 @@ public static partial class GameConfig
     public const float GodSlayerDamageBonus = 0.20f;     // +20% damage while active
     public const float GodSlayerDefenseBonus = 0.10f;    // +10% defense while active
 
-    // Floor 1 Difficulty (v0.49.3) — make first dungeon floor easier for new players
-    public const float Floor1MonsterStatMultiplier = 0.5f; // 50% stats on floor 1
+    // Early-floor difficulty ramp (v0.49.3 floor-1 step -> v0.65.3 graduated). Telemetry showed
+    // new-player permadeaths clustering at character level 1-3 because floor 2 snapped back to full
+    // strength after the softened floor 1. Floors 1-3 now ramp instead of cliff.
+    public const float Floor1MonsterStatMultiplier = 0.5f;  // floor 1: 50% stats (unchanged)
+    public const float Floor2MonsterStatMultiplier = 0.65f; // floor 2: 65% (was a 100% cliff)
+    public const float Floor3MonsterStatMultiplier = 0.8f;  // floor 3: 80%
+    public const int EarlyFloorSofteningMaxFloor = 3;
+
+    // Barbarian innate early sustain (v0.65.3). Barbarian had the most deaths of any class (avg
+    // ~lvl 13) because its only self-heal, Bloodlust (heal-on-kill), is gated at level 36 -- so the
+    // class is companion-dependent and has zero sustain through the entire window where it dies. A
+    // small heal-on-kill below the Bloodlust unlock gives the class its own identity early; it fades
+    // out at L36 so it never stacks with the real ability. Heal = base + level, capped, clamped to
+    // missing HP. Only heals on an actual kill (can't save a losing fight).
+    public const int BarbarianInnateBloodlustMaxLevel = 35;     // active only below the Bloodlust ability's level
+    public const int BarbarianInnateBloodlustHealBase = 4;      // flat HP per kill
+    public const int BarbarianInnateBloodlustHealPerLevel = 1;  // +1 HP per character level
+    public const int BarbarianInnateBloodlustHealCap = 25;      // hard per-kill cap
 
     // Straggler Encounters (v0.49.3) — occasional easy fights for power fantasy
     public const float StragglerEncounterChance = 0.15f; // 15% chance of weaker monster
@@ -1317,6 +1338,13 @@ public static partial class GameConfig
     public const float OldGodSoloPlayerDamageReduction = 0.20f;         // Solo Old God fight: player takes -20% damage
     public const float BossFirstRoundsDamageCapPercent = 0.15f;        // First 3 rounds of boss fight: cap hit at 15% MaxHP
     public const int BossFirstRoundsDamageCapRounds = 3;
+
+    // v0.65.3: dungeon examinable-feature ("[X] Examine") density was cut ~2/3 in
+    // DungeonGenerator.GenerateRoomFeatures (player feedback: examining a feature on nearly every
+    // room was "X, 1, X, 1" busywork). This multiplier bumps each feature's gold/xp/heal reward so
+    // the rarer features feel worth the press. Applied to Discovery gold/xp and the legacy
+    // FeatureInteractionSystem.CalculateScaledReward; NOT to permanent stat/potion/alignment grants.
+    public const double DungeonFeatureRewardMultiplier = 2.0;
 
     // v0.57.15: minimum incoming damage as fraction of player MaxHP. Prevents
     // extreme ArmPow stacking from reducing every monster hit to 1 dmg even when

@@ -2443,28 +2443,44 @@ namespace UsurperRemake.Systems
             }
         }
 
-        /// <summary>Prune combat_events older than the specified number of days, keeping at most maxRows.</summary>
-        public async Task PruneCombatEvents(int daysToKeep = 7, int maxRows = 1000)
+        /// <summary>
+        /// Prune combat_events. v0.65.3: deaths are rare (~0.3% of combats) but the most important
+        /// row for balance analysis, and the old prune (7 days / 1000 rows, row cap applied to ALL
+        /// outcomes) let the flood of victories evict deaths almost immediately -- the live table
+        /// showed 3 deaths when saves recorded 63. Fix: the row cap now applies ONLY to non-death
+        /// outcomes (victory/fled), so deaths are never crowded out; deaths are kept for a long
+        /// window (deathDaysToKeep) and non-deaths for a shorter one. Net table size stays tiny.
+        /// </summary>
+        public async Task PruneCombatEvents(int daysToKeep = 14, int maxRows = 5000, int deathDaysToKeep = 90)
         {
             try
             {
                 using var conn = new SqliteConnection(connectionString);
                 await conn.OpenAsync();
 
-                // Delete old events by age
+                // Age out non-death events on the short window.
                 using (var cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = "DELETE FROM combat_events WHERE created_at < datetime('now', '-' || @days || ' days');";
+                    cmd.CommandText = "DELETE FROM combat_events WHERE outcome != 'death' AND created_at < datetime('now', '-' || @days || ' days');";
                     cmd.Parameters.AddWithValue("@days", daysToKeep);
                     await cmd.ExecuteNonQueryAsync();
                 }
 
-                // Cap total rows (keep newest)
+                // Age out deaths only on the much longer window (they're rare + high-value).
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "DELETE FROM combat_events WHERE outcome = 'death' AND created_at < datetime('now', '-' || @days || ' days');";
+                    cmd.Parameters.AddWithValue("@days", deathDaysToKeep);
+                    await cmd.ExecuteNonQueryAsync();
+                }
+
+                // Row cap applies ONLY to non-death outcomes so a flood of victories can never
+                // evict the rare death rows (the bug that made the table lie about deaths).
                 using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = @"
-                        DELETE FROM combat_events WHERE id NOT IN (
-                            SELECT id FROM combat_events ORDER BY created_at DESC LIMIT @maxRows
+                        DELETE FROM combat_events WHERE outcome != 'death' AND id NOT IN (
+                            SELECT id FROM combat_events WHERE outcome != 'death' ORDER BY created_at DESC LIMIT @maxRows
                         );";
                     cmd.Parameters.AddWithValue("@maxRows", maxRows);
                     await cmd.ExecuteNonQueryAsync();

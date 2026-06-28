@@ -33,6 +33,13 @@ public class Item
     public bool Cursed { get; set; }                    // is the item cursed?
     public int MinLevel { get; set; }                   // min level to be found in dungeons
     public int MaxLevel { get; set; }                   // max level to be found in dungeons
+
+    // issue #112: rarity must survive the equip <-> unequip round trip. Before this, the only
+    // place rarity lived was Equipment.Rarity; unequipping produced an Item (no rarity), so
+    // re-equipping reconstructed it as Common. That reset re-enabled the reforge rarity-upgrade
+    // boost every cycle (reforge -> unequip -> re-equip -> reforge...), letting weapon power and
+    // value compound into the billions. Carrying rarity here closes that loop.
+    public EquipmentRarity Rarity { get; set; } = EquipmentRarity.Common;
     
     // Descriptions (from Pascal: array[1..5] of s70)
     public List<string> Description { get; set; }       // normal description

@@ -11042,6 +11042,11 @@ public class DungeonLocation : BaseLocation
     {
         var player = GetCurrentPlayer();
 
+        // Self-heal an orphaned slot (a teammate died/left, leaving their share stranded) the moment
+        // the screen opens, honoring the [R] auto-redistribute-on-death toggle, so the player never
+        // sees XP silently stuck on an empty slot or runs around losing it before the next fight.
+        CombatEngine.ReclaimOrphanedTeamXP(player, teammates);
+
         while (true)
         {
             // Build list of XP-eligible teammates (skip grouped players and echoes — they have their own XP)

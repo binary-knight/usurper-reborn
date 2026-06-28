@@ -989,6 +989,7 @@ namespace UsurperRemake.Systems
         public int Agility { get; set; }
         public int Stamina { get; set; }
         public int MinLevel { get; set; }
+        public int Rarity { get; set; }  // EquipmentRarity enum as int (issue #112: carry rarity through save/load + trades)
         public bool IsCursed { get; set; }
         // Cursed is now an alias for IsCursed for backwards compatibility
         public bool Cursed
@@ -1030,6 +1031,7 @@ namespace UsurperRemake.Systems
             Agility = item.Agility,
             Stamina = item.Stamina,
             MinLevel = item.MinLevel,
+            Rarity = (int)item.Rarity, // issue #112
             // IsCursed (the flag decurse/warnings/loot checks read) is authoritative; Item also
             // carries a legacy Cursed bool, so OR them to never drop a curse in transit.
             IsCursed = item.IsCursed || item.Cursed,
@@ -1066,6 +1068,7 @@ namespace UsurperRemake.Systems
                 Agility = Agility,
                 Stamina = Stamina,
                 MinLevel = MinLevel,
+                Rarity = (EquipmentRarity)Rarity, // issue #112
                 IsCursed = IsCursed,
                 Cursed = IsCursed, // keep Item's legacy curse bool consistent with IsCursed
                 IsIdentified = IsIdentified,

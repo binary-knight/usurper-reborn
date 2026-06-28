@@ -2255,6 +2255,51 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
+        /// Restore the player's whole party (active companions + NPC teammates on the player's team
+        /// or in their dungeon party) to full HP/Mana. v0.65.3: player report -- companions and team
+        /// NPCs never healed in town (a night at the Inn / rest at Home topped up the player but left
+        /// the party wounded), forcing a dungeon trip just to hand them potions. Returns the number of
+        /// party members that were healed so the caller can confirm it to the player. Mirrors
+        /// RefillAllPartyPotions' party enumeration.
+        /// </summary>
+        public int RestoreAllPartyHP(global::Character player)
+        {
+            int healed = 0;
+
+            // Companions: restore tracked current HP to full.
+            foreach (var companion in GetActiveCompanions())
+            {
+                if (companion == null || companion.IsDead) continue;
+                companionCurrentHP[companion.Id] = GetCompanionMaxHP(companion);
+                healed++;
+            }
+
+            if (player == null) return healed;
+
+            var npcSystem = global::UsurperRemake.Systems.NPCSpawnSystem.Instance;
+            if (npcSystem == null) return healed;
+
+            var partyNpcIds = global::GameEngine.Instance?.DungeonPartyNPCIds
+                ?? new System.Collections.Generic.List<string>();
+
+            foreach (var npc in npcSystem.ActiveNPCs)
+            {
+                if (npc == null || npc.IsDead) continue;
+
+                bool onPlayerTeam = !string.IsNullOrEmpty(player.Team) && !string.IsNullOrEmpty(npc.Team)
+                    && string.Equals(player.Team, npc.Team, System.StringComparison.OrdinalIgnoreCase);
+                bool inPartyList = !string.IsNullOrEmpty(npc.ID) && partyNpcIds.Contains(npc.ID);
+                if (!onPlayerTeam && !inPartyList) continue;
+
+                npc.HP = npc.MaxHP;
+                if (npc.MaxMana > 0) npc.Mana = npc.MaxMana;
+                healed++;
+            }
+
+            return healed;
+        }
+
+        /// <summary>
         /// Scale companion base stats based on their current level
         /// </summary>
         private void ScaleCompanionStatsToLevel(Companion companion)
@@ -2626,71 +2671,13 @@ namespace UsurperRemake.Systems
         /// Convert in-memory Item to serializable InventoryItemData (same shape the player
         /// uses, so companion bags round-trip through JSON like the player's does).
         /// </summary>
-        private static InventoryItemData ItemToData(Item item)
-        {
-            return new InventoryItemData
-            {
-                Name = item.Name,
-                Value = item.Value,
-                Type = item.Type,
-                Attack = item.Attack,
-                Armor = item.Armor,
-                Strength = item.Strength,
-                Dexterity = item.Dexterity,
-                Wisdom = item.Wisdom,
-                Defence = item.Defence,
-                BlockChance = item.BlockChance,
-                ShieldBonus = item.ShieldBonus,
-                HP = item.HP,
-                Mana = item.Mana,
-                Charisma = item.Charisma,
-                Agility = item.Agility,
-                Stamina = item.Stamina,
-                MinLevel = item.MinLevel,
-                IsCursed = item.IsCursed,
-                Cursed = item.Cursed,
-                IsIdentified = item.IsIdentified,
-                Shop = item.Shop,
-                Dungeon = item.Dungeon,
-                Description = item.Description?.ToList() ?? new List<string>(),
-                LootEffects = item.LootEffects?.Count > 0
-                    ? item.LootEffects.Select(e => new LootEffectData { EffectType = e.EffectType, Value = e.Value }).ToList()
-                    : null
-            };
-        }
+        // issue #112: delegate to the single full-fidelity converter so companion-bag items carry
+        // Rarity (and every stat/effect), matching the player/chest/NPC-bag paths and closing the
+        // "give a reforged item to a companion, relog, take it back as Common" laundering vector.
+        private static InventoryItemData ItemToData(Item item) => InventoryItemData.FromItem(item);
 
-        private static Item DataToItem(InventoryItemData d)
-        {
-            var item = new Item
-            {
-                Name = d.Name,
-                Value = d.Value,
-                Type = d.Type,
-                Attack = d.Attack,
-                Armor = d.Armor,
-                Strength = d.Strength,
-                Dexterity = d.Dexterity,
-                Wisdom = d.Wisdom,
-                Defence = d.Defence,
-                BlockChance = d.BlockChance,
-                ShieldBonus = d.ShieldBonus,
-                HP = d.HP,
-                Mana = d.Mana,
-                Charisma = d.Charisma,
-                Agility = d.Agility,
-                Stamina = d.Stamina,
-                MinLevel = d.MinLevel,
-                IsCursed = d.IsCursed,
-                Cursed = d.Cursed,
-                IsIdentified = d.IsIdentified,
-                Shop = d.Shop,
-                Dungeon = d.Dungeon,
-                Description = d.Description?.ToList() ?? new List<string>()
-            };
-            if (d.LootEffects != null)
-                item.LootEffects = d.LootEffects.Select(e => (e.EffectType, e.Value)).ToList();
-            return item;
-        }
+        // issue #112: inverse of ItemToData; delegates to the canonical converter so Rarity round-trips.
+        private static Item DataToItem(InventoryItemData d) => d.ToItem();
 
         private int GetPlayerLevel()
         {

@@ -200,71 +200,8 @@ namespace UsurperRemake.Systems
                                 {
                                     // Convert Item → Equipment with full metadata
                                     GetHandedness(item, out var handedness, out var weaponType);
-                                    var equipment = new Equipment
-                                    {
-                                        Name = item.Name,
-                                        Slot = targetSlot,
-                                        Handedness = handedness,
-                                        WeaponType = weaponType,
-                                        WeaponPower = item.Attack,
-                                        ArmorClass = item.Armor,
-                                        ShieldBonus = item.Type == ObjType.Shield ? item.Armor : 0,
-                                        BlockChance = item.BlockChance,
-                                        DefenceBonus = item.Defence,
-                                        StrengthBonus = item.Strength,
-                                        DexterityBonus = item.Dexterity,
-                                        AgilityBonus = item.Agility,
-                                        WisdomBonus = item.Wisdom,
-                                        CharismaBonus = item.Charisma,
-                                        MaxHPBonus = item.HP,
-                                        MaxManaBonus = item.Mana,
-                                        Value = item.Value,
-                                        IsCursed = item.IsCursed,
-                                        MinLevel = item.MinLevel,
-                                        Rarity = EquipmentRarity.Common
-                                    };
-
-                                    // Transfer every LootEffect (enchants, procs, stat bonuses, flags).
-                                    // Matches the dungeon-loot equip flow in CombatEngine — any subset dropped
-                                    // here means items lose enchantments on re-equip (v0.57.7 Lumina report:
-                                    // Siphoning staff silently lost its ManaSteal proc on inventory re-equip).
-                                    if (item.LootEffects != null)
-                                    {
-                                        foreach (var (effectType, value) in item.LootEffects)
-                                        {
-                                            var effect = (LootGenerator.SpecialEffect)effectType;
-                                            switch (effect)
-                                            {
-                                                case LootGenerator.SpecialEffect.FireDamage: equipment.HasFireEnchant = true; break;
-                                                case LootGenerator.SpecialEffect.IceDamage: equipment.HasFrostEnchant = true; break;
-                                                case LootGenerator.SpecialEffect.LightningDamage: equipment.HasLightningEnchant = true; break;
-                                                case LootGenerator.SpecialEffect.PoisonDamage:
-                                                    equipment.HasPoisonEnchant = true;
-                                                    equipment.PoisonDamage = Math.Max(equipment.PoisonDamage, value);
-                                                    break;
-                                                case LootGenerator.SpecialEffect.HolyDamage: equipment.HasHolyEnchant = true; break;
-                                                case LootGenerator.SpecialEffect.ShadowDamage: equipment.HasShadowEnchant = true; break;
-                                                case LootGenerator.SpecialEffect.LifeSteal: equipment.LifeSteal = Math.Max(equipment.LifeSteal, Math.Max(5, value / 2)); break;
-                                                case LootGenerator.SpecialEffect.ManaSteal: equipment.ManaSteal = Math.Max(equipment.ManaSteal, Math.Max(5, value / 2)); break;
-                                                case LootGenerator.SpecialEffect.CriticalStrike: equipment.CriticalChanceBonus = Math.Max(equipment.CriticalChanceBonus, value); break;
-                                                case LootGenerator.SpecialEffect.CriticalDamage: equipment.CriticalDamageBonus = Math.Max(equipment.CriticalDamageBonus, value); break;
-                                                case LootGenerator.SpecialEffect.ArmorPiercing: equipment.ArmorPiercing = Math.Max(equipment.ArmorPiercing, value); break;
-                                                case LootGenerator.SpecialEffect.Thorns: equipment.Thorns = Math.Max(equipment.Thorns, value); break;
-                                                case LootGenerator.SpecialEffect.Regeneration: equipment.HPRegen = Math.Max(equipment.HPRegen, value); break;
-                                                case LootGenerator.SpecialEffect.ManaRegen: equipment.ManaRegen = Math.Max(equipment.ManaRegen, value); break;
-                                                case LootGenerator.SpecialEffect.MagicResist: equipment.MagicResistance = Math.Max(equipment.MagicResistance, value); break;
-                                                case LootGenerator.SpecialEffect.Constitution: equipment.ConstitutionBonus += value; break;
-                                                case LootGenerator.SpecialEffect.Intelligence: equipment.IntelligenceBonus += value; break;
-                                                case LootGenerator.SpecialEffect.AllStats:
-                                                    equipment.ConstitutionBonus += value;
-                                                    equipment.IntelligenceBonus += value;
-                                                    equipment.CharismaBonus += value;
-                                                    break;
-                                                case LootGenerator.SpecialEffect.BossSlayer: equipment.HasBossSlayer = true; break;
-                                                case LootGenerator.SpecialEffect.TitanResolve: equipment.HasTitanResolve = true; break;
-                                            }
-                                        }
-                                    }
+                                    // Shared builder (single source of truth; carries every stat + LootEffects -- issue #112).
+                                    var equipment = Character.BuildEquipmentFromItem(item, targetSlot, handedness, weaponType);
 
                                     // Check if this needs slot selection (1H weapon or ring)
                                     bool needsSlotPick = parts.Length <= 1 &&
@@ -1154,71 +1091,9 @@ namespace UsurperRemake.Systems
                 }
             }
 
-            // Convert Item to Equipment and register in database
-            var equipment = new Equipment
-            {
-                Name = item.Name,
-                Slot = targetSlot,
-                Handedness = handedness,
-                WeaponType = weaponType,
-                WeaponPower = item.Attack,
-                ArmorClass = item.Armor,
-                ShieldBonus = item.Type == ObjType.Shield ? item.Armor : 0,
-                DefenceBonus = item.Defence,
-                StrengthBonus = item.Strength,
-                DexterityBonus = item.Dexterity,
-                AgilityBonus = item.Agility,
-                WisdomBonus = item.Wisdom,
-                CharismaBonus = item.Charisma,
-                MaxHPBonus = item.HP,
-                MaxManaBonus = item.Mana,
-                Value = item.Value,
-                IsCursed = item.IsCursed,
-                MinLevel = item.MinLevel,
-                Rarity = EquipmentRarity.Common
-            };
-
-            // Transfer every LootEffect (enchants, procs, stat bonuses, flags).
-            // Matches the dungeon-loot equip flow in CombatEngine — any subset dropped
-            // here means items lose enchantments on re-equip (v0.57.7 Lumina report:
-            // Siphoning staff silently lost its ManaSteal proc on inventory re-equip).
-            if (item.LootEffects != null)
-            {
-                foreach (var (effectType, value) in item.LootEffects)
-                {
-                    var effect = (LootGenerator.SpecialEffect)effectType;
-                    switch (effect)
-                    {
-                        case LootGenerator.SpecialEffect.FireDamage: equipment.HasFireEnchant = true; break;
-                        case LootGenerator.SpecialEffect.IceDamage: equipment.HasFrostEnchant = true; break;
-                        case LootGenerator.SpecialEffect.LightningDamage: equipment.HasLightningEnchant = true; break;
-                        case LootGenerator.SpecialEffect.PoisonDamage:
-                            equipment.HasPoisonEnchant = true;
-                            equipment.PoisonDamage = Math.Max(equipment.PoisonDamage, value);
-                            break;
-                        case LootGenerator.SpecialEffect.HolyDamage: equipment.HasHolyEnchant = true; break;
-                        case LootGenerator.SpecialEffect.ShadowDamage: equipment.HasShadowEnchant = true; break;
-                        case LootGenerator.SpecialEffect.LifeSteal: equipment.LifeSteal = Math.Max(equipment.LifeSteal, Math.Max(5, value / 2)); break;
-                        case LootGenerator.SpecialEffect.ManaSteal: equipment.ManaSteal = Math.Max(equipment.ManaSteal, Math.Max(5, value / 2)); break;
-                        case LootGenerator.SpecialEffect.CriticalStrike: equipment.CriticalChanceBonus = Math.Max(equipment.CriticalChanceBonus, value); break;
-                        case LootGenerator.SpecialEffect.CriticalDamage: equipment.CriticalDamageBonus = Math.Max(equipment.CriticalDamageBonus, value); break;
-                        case LootGenerator.SpecialEffect.ArmorPiercing: equipment.ArmorPiercing = Math.Max(equipment.ArmorPiercing, value); break;
-                        case LootGenerator.SpecialEffect.Thorns: equipment.Thorns = Math.Max(equipment.Thorns, value); break;
-                        case LootGenerator.SpecialEffect.Regeneration: equipment.HPRegen = Math.Max(equipment.HPRegen, value); break;
-                        case LootGenerator.SpecialEffect.ManaRegen: equipment.ManaRegen = Math.Max(equipment.ManaRegen, value); break;
-                        case LootGenerator.SpecialEffect.MagicResist: equipment.MagicResistance = Math.Max(equipment.MagicResistance, value); break;
-                        case LootGenerator.SpecialEffect.Constitution: equipment.ConstitutionBonus += value; break;
-                        case LootGenerator.SpecialEffect.Intelligence: equipment.IntelligenceBonus += value; break;
-                        case LootGenerator.SpecialEffect.AllStats:
-                            equipment.ConstitutionBonus += value;
-                            equipment.IntelligenceBonus += value;
-                            equipment.CharismaBonus += value;
-                            break;
-                        case LootGenerator.SpecialEffect.BossSlayer: equipment.HasBossSlayer = true; break;
-                        case LootGenerator.SpecialEffect.TitanResolve: equipment.HasTitanResolve = true; break;
-                    }
-                }
-            }
+            // Convert Item to Equipment via the shared builder (single source of truth: carries every
+            // stat, BlockChance, MinLevel, Rarity, and all LootEffects -- issue #112).
+            var equipment = Character.BuildEquipmentFromItem(item, targetSlot, handedness, weaponType);
 
             // Register in database to get an ID
             EquipmentDatabase.RegisterDynamic(equipment);
@@ -1568,37 +1443,12 @@ namespace UsurperRemake.Systems
             var unequipped = player.UnequipSlot(slot);
             if (unequipped != null)
             {
-                // Convert equipment to legacy Item and add to backpack
-                var legacyItem = new global::Item
-                {
-                    Name = unequipped.Name,
-                    Type = unequipped.Slot switch
-                    {
-                        EquipmentSlot.MainHand or EquipmentSlot.OffHand => ObjType.Weapon,
-                        EquipmentSlot.Body => ObjType.Body,
-                        EquipmentSlot.Head => ObjType.Head,
-                        EquipmentSlot.Arms => ObjType.Arms,
-                        EquipmentSlot.Legs => ObjType.Legs,
-                        EquipmentSlot.Hands => ObjType.Hands,
-                        EquipmentSlot.Feet => ObjType.Feet,
-                        EquipmentSlot.LFinger or EquipmentSlot.RFinger => ObjType.Fingers,
-                        EquipmentSlot.Neck or EquipmentSlot.Neck2 => ObjType.Neck,
-                        EquipmentSlot.Cloak => ObjType.Abody,
-                        EquipmentSlot.Waist => ObjType.Waist,
-                        EquipmentSlot.Face => ObjType.Face,
-                        _ => ObjType.Body
-                    },
-                    Attack = unequipped.WeaponPower,
-                    Armor = unequipped.ArmorClass + unequipped.ShieldBonus,
-                    Defence = unequipped.DefenceBonus,
-                    Strength = unequipped.StrengthBonus,
-                    Dexterity = unequipped.DexterityBonus,
-                    Wisdom = unequipped.WisdomBonus,
-                    HP = unequipped.MaxHPBonus,
-                    Mana = unequipped.MaxManaBonus,
-                    Value = unequipped.Value,
-                    IsCursed = unequipped.IsCursed
-                };
+                // issue #112: use the complete Equipment->Item converter, not a hand-rolled subset.
+                // The old inline map dropped Agility, Charisma, Stamina, BlockChance, MinLevel, the
+                // rarity, and the entire LootEffects list (Con/Int + every enchant and proc), so
+                // unequipping silently stripped stats (player report: shield lost Con/Block, gear
+                // lost Agility) and reset reforged quality.
+                var legacyItem = player.ConvertEquipmentToLegacyItem(unequipped);
                 player.Inventory.Add(legacyItem);
                 player.RecalculateStats();
 
@@ -1801,37 +1651,8 @@ namespace UsurperRemake.Systems
                 var equipment = player.UnequipSlot(slot);
                 if (equipment != null)
                 {
-                    // Convert equipment to legacy Item and add to backpack
-                    var item = new global::Item
-                    {
-                        Name = equipment.Name,
-                        Type = equipment.Slot switch
-                        {
-                            EquipmentSlot.MainHand or EquipmentSlot.OffHand => ObjType.Weapon,
-                            EquipmentSlot.Body => ObjType.Body,
-                            EquipmentSlot.Head => ObjType.Head,
-                            EquipmentSlot.Arms => ObjType.Arms,
-                            EquipmentSlot.Legs => ObjType.Legs,
-                            EquipmentSlot.Hands => ObjType.Hands,
-                            EquipmentSlot.Feet => ObjType.Feet,
-                            EquipmentSlot.LFinger or EquipmentSlot.RFinger => ObjType.Fingers,
-                            EquipmentSlot.Neck or EquipmentSlot.Neck2 => ObjType.Neck,
-                            EquipmentSlot.Cloak => ObjType.Abody,
-                            EquipmentSlot.Waist => ObjType.Waist,
-                            EquipmentSlot.Face => ObjType.Face,
-                            _ => ObjType.Body
-                        },
-                        Attack = equipment.WeaponPower,
-                        Armor = equipment.ArmorClass + equipment.ShieldBonus,
-                        Defence = equipment.DefenceBonus,
-                        Strength = equipment.StrengthBonus,
-                        Dexterity = equipment.DexterityBonus,
-                        Wisdom = equipment.WisdomBonus,
-                        HP = equipment.MaxHPBonus,
-                        Mana = equipment.MaxManaBonus,
-                        Value = equipment.Value,
-                        IsCursed = equipment.IsCursed
-                    };
+                    // issue #112: complete converter (see HandleUnequipItem) instead of a lossy subset.
+                    var item = player.ConvertEquipmentToLegacyItem(equipment);
                     player.Inventory.Add(item);
                     count++;
                 }

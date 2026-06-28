@@ -291,15 +291,25 @@ public static class MonsterGenerator
         // Apply difficulty-based HP multiplier
         hp = DifficultySystem.ApplyMonsterHPMultiplier(hp);
 
-        // Floor 1 reduction: make first dungeon floor easier for new players (v0.49.3)
-        if (level == 1)
+        // Early-floor reduction (v0.49.3 floor-1 step -> v0.65.3 graduated ramp). Telemetry showed
+        // permadeaths clustering at character level 1-3: clearing floor 1 then hitting a full-strength
+        // floor 2 was a difficulty cliff. Floors 1-3 now ramp 0.5x / 0.65x / 0.8x. Keyed on the
+        // absolute dungeon floor (not a player-vs-floor gap), so a high-level player replaying low
+        // floors gets no new advantage -- those fights were already trivial and the loot/XP is
+        // negligible and floored by Math.Max below.
+        if (level >= 1 && level <= GameConfig.EarlyFloorSofteningMaxFloor)
         {
-            float f1m = GameConfig.Floor1MonsterStatMultiplier;
-            hp = (long)(hp * f1m);
-            strength = (long)(strength * f1m);
-            defence = (long)(defence * f1m);
-            punch = (long)(punch * f1m);
-            weaponPower = (long)(weaponPower * f1m);
+            float fm = level switch
+            {
+                1 => GameConfig.Floor1MonsterStatMultiplier,
+                2 => GameConfig.Floor2MonsterStatMultiplier,
+                _ => GameConfig.Floor3MonsterStatMultiplier,
+            };
+            hp = (long)(hp * fm);
+            strength = (long)(strength * fm);
+            defence = (long)(defence * fm);
+            punch = (long)(punch * fm);
+            weaponPower = (long)(weaponPower * fm);
         }
 
         return new MonsterStats

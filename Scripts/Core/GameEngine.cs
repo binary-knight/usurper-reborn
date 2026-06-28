@@ -5581,38 +5581,9 @@ public partial class GameEngine
         // Restore player inventory (dungeon loot items)
         if (playerData.Inventory != null && playerData.Inventory.Count > 0)
         {
-            player.Inventory = playerData.Inventory.Select(itemData =>
-            {
-                var item = new Item
-                {
-                    Name = itemData.Name,
-                    Value = itemData.Value,
-                    Type = itemData.Type,
-                    Attack = itemData.Attack,
-                    Armor = itemData.Armor,
-                    Strength = itemData.Strength,
-                    Dexterity = itemData.Dexterity,
-                    Wisdom = itemData.Wisdom,
-                    Defence = itemData.Defence,
-                    BlockChance = itemData.BlockChance,
-                    ShieldBonus = itemData.ShieldBonus,
-                    HP = itemData.HP,
-                    Mana = itemData.Mana,
-                    Charisma = itemData.Charisma,
-                    Agility = itemData.Agility,
-                    Stamina = itemData.Stamina,
-                    MinLevel = itemData.MinLevel,
-                    IsCursed = itemData.IsCursed,
-                    Cursed = itemData.Cursed,
-                    IsIdentified = itemData.IsIdentified,
-                    Shop = itemData.Shop,
-                    Dungeon = itemData.Dungeon,
-                    Description = itemData.Description?.ToList() ?? new List<string>()
-                };
-                if (itemData.LootEffects != null)
-                    item.LootEffects = itemData.LootEffects.Select(e => (e.EffectType, e.Value)).ToList();
-                return item;
-            }).ToList();
+            // issue #112/#111: single source of truth (InventoryItemData.ToItem) so every stat,
+            // the cursed/identified flags, MinLevel, Rarity, and all LootEffects round-trip on load.
+            player.Inventory = playerData.Inventory.Select(itemData => itemData.ToItem()).ToList();
         }
 
         // Restore base stats
@@ -5864,37 +5835,8 @@ public partial class GameEngine
         var playerKey = (player is Player pp ? pp.RealName : player.Name2) ?? player.Name2;
         if (playerData.ChestContents != null && playerData.ChestContents.Count > 0)
         {
-            var chestItems = playerData.ChestContents.Select(data =>
-            {
-                var chestItem = new global::Item
-                {
-                    Name = data.Name,
-                    Value = data.Value,
-                    Type = data.Type,
-                    Attack = data.Attack,
-                    Armor = data.Armor,
-                    Strength = data.Strength,
-                    Dexterity = data.Dexterity,
-                    Wisdom = data.Wisdom,
-                    Defence = data.Defence,
-                    BlockChance = data.BlockChance,
-                    ShieldBonus = data.ShieldBonus,
-                    HP = data.HP,
-                    Mana = data.Mana,
-                    Charisma = data.Charisma,
-                    Agility = data.Agility,
-                    Stamina = data.Stamina,
-                    MinLevel = data.MinLevel,
-                    IsCursed = data.IsCursed,
-                    IsIdentified = data.IsIdentified,
-                    Shop = data.Shop,
-                    Dungeon = data.Dungeon,
-                    Description = data.Description?.ToList() ?? new List<string>()
-                };
-                if (data.LootEffects != null)
-                    chestItem.LootEffects = data.LootEffects.Select(e => (e.EffectType, e.Value)).ToList();
-                return chestItem;
-            }).ToList();
+            // issue #112: same full-fidelity converter as player inventory (carries rarity + all stats).
+            var chestItems = playerData.ChestContents.Select(data => data.ToItem()).ToList();
             UsurperRemake.Locations.HomeLocation.PlayerChests[playerKey] = chestItems;
         }
         else
@@ -6495,35 +6437,10 @@ public partial class GameEngine
                 npc.Inventory ??= new List<Item>();
                 foreach (var itemData in data.Inventory)
                 {
-                    var item = new global::Item
-                    {
-                        Name = itemData.Name,
-                        Value = itemData.Value,
-                        Type = itemData.Type,
-                        Attack = itemData.Attack,
-                        Armor = itemData.Armor,
-                        Strength = itemData.Strength,
-                        Dexterity = itemData.Dexterity,
-                        Wisdom = itemData.Wisdom,
-                        Defence = itemData.Defence,
-                        BlockChance = itemData.BlockChance,
-                        ShieldBonus = itemData.ShieldBonus,
-                        HP = itemData.HP,
-                        Mana = itemData.Mana,
-                        Charisma = itemData.Charisma,
-                        Agility = itemData.Agility,
-                        Stamina = itemData.Stamina,
-                        MinLevel = itemData.MinLevel,
-                        IsCursed = itemData.IsCursed,
-                        Cursed = itemData.Cursed,
-                        IsIdentified = itemData.IsIdentified,
-                        Shop = itemData.Shop,
-                        Dungeon = itemData.Dungeon,
-                        Description = itemData.Description?.ToList() ?? new List<string>(),
-                    };
-                    if (itemData.LootEffects != null && itemData.LootEffects.Count > 0)
-                        item.LootEffects = itemData.LootEffects.Select(e => (e.EffectType, e.Value)).ToList();
-                    npc.Inventory.Add(item);
+                    // issue #112: single source of truth (ToItem) so NPC-bag items round-trip rarity
+                    // and every stat -- closes the "stash a reforged item in an NPC bag, relog, take
+                    // it back as Common to re-arm the reforge boost" laundering vector.
+                    npc.Inventory.Add(itemData.ToItem());
                 }
             }
 

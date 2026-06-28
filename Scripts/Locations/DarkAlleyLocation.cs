@@ -1359,6 +1359,10 @@ namespace UsurperRemake.Locations
                 currentPlayer.LastBlackMarketRefreshUtc = DateTime.UtcNow;
             }
 
+            // v0.65.3: loop so [X#] inspect (and repeat purchases) keep the player in the market
+            // until they choose to leave, instead of dropping back to the Dark Alley after one action.
+            while (true)
+            {
             terminal.ClearScreen();
             WriteBoxHeader(Loc.Get("dark_alley.black_market_header"), "bright_magenta", 66);
             terminal.WriteLine("");
@@ -1415,6 +1419,11 @@ namespace UsurperRemake.Locations
                 terminal.WriteLine("");
             }
 
+            if (stock.Count > 0)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine(Loc.Get("dark_alley.bm_inspect_hint"));
+            }
             WriteSRMenuOption("0", Loc.Get("ui.leave"));
             terminal.WriteLine("");
 
@@ -1438,6 +1447,21 @@ namespace UsurperRemake.Locations
             terminal.WriteLine("");
 
             var input = (await terminal.GetInput(Loc.Get("dark_alley.bm_purchase_prompt"))).Trim();
+
+            if (input == "0" || string.IsNullOrEmpty(input))
+                return;
+
+            // v0.65.3: [X#] / [I#] inspect a rotating-gear slot before buying (player feedback: no
+            // way to see what a Black Market item actually does). Returns to the market afterward.
+            if (input.Length >= 2 && (input[0] == 'X' || input[0] == 'x' || input[0] == 'I' || input[0] == 'i')
+                && int.TryParse(input.Substring(1).Trim(), out int inspectNum)
+                && inspectNum >= 4 && inspectNum <= 3 + stock.Count)
+            {
+                int idx = inspectNum - 4;
+                await ShowBlackMarketItemDetail(stock[idx], ComputeBlackMarketGearPrice(stock[idx], rankDiscount, isFreelance));
+                continue;
+            }
+
             switch (input)
             {
                 case "1": // Forged Papers
@@ -1461,6 +1485,78 @@ namespace UsurperRemake.Locations
             }
 
             await Task.Delay(2000);
+            } // end while -- redisplay the market after each action until the player leaves
+        }
+
+        /// <summary>
+        /// v0.65.3: show a Black Market gear item's full stats before purchase (player feedback:
+        /// the rotating gear had no way to inspect what it actually does, especially its enchants).
+        /// </summary>
+        private async Task ShowBlackMarketItemDetail(Item item, long price)
+        {
+            terminal.ClearScreen();
+            WriteBoxHeader(Loc.Get("dark_alley.bm_inspect_header"), "bright_magenta", 66);
+            terminal.WriteLine("");
+
+            string rarityColor = item.Rarity switch
+            {
+                EquipmentRarity.Uncommon => "green",
+                EquipmentRarity.Rare => "cyan",
+                EquipmentRarity.Epic => "magenta",
+                EquipmentRarity.Legendary => "yellow",
+                EquipmentRarity.Artifact => "bright_yellow",
+                _ => "bright_magenta"
+            };
+            terminal.SetColor(rarityColor);
+            terminal.WriteLine($"  {item.Name}");
+            terminal.WriteLine("");
+
+            terminal.SetColor("gray");
+            terminal.WriteLine($"  {Loc.Get("ui.stat_type")}: {item.Type}");
+
+            // Core combat stats
+            if (item.Attack != 0) terminal.WriteLine($"  {Loc.Get("ui.stat_pow")}: {item.Attack}", "white");
+            if (item.Armor != 0) terminal.WriteLine($"  {Loc.Get("ui.stat_ac")}: {item.Armor}", "white");
+            if (item.ShieldBonus != 0) terminal.WriteLine($"  {Loc.Get("ui.stat_block")}: +{item.ShieldBonus}", "white");
+
+            // Attribute bonuses
+            var bonuses = new List<string>();
+            if (item.Strength != 0) bonuses.Add($"{Loc.Get("ui.stat_str")}: {item.Strength:+#;-#;0}");
+            if (item.Dexterity != 0) bonuses.Add($"{Loc.Get("ui.stat_dex")}: {item.Dexterity:+#;-#;0}");
+            if (item.Agility != 0) bonuses.Add($"{Loc.Get("ui.stat_agi")}: {item.Agility:+#;-#;0}");
+            if (item.Wisdom != 0) bonuses.Add($"{Loc.Get("ui.stat_wis")}: {item.Wisdom:+#;-#;0}");
+            if (item.Charisma != 0) bonuses.Add($"{Loc.Get("ui.stat_cha")}: {item.Charisma:+#;-#;0}");
+            if (item.Defence != 0) bonuses.Add($"{Loc.Get("ui.stat_def")}: {item.Defence:+#;-#;0}");
+            if (item.HP != 0) bonuses.Add($"{Loc.Get("ui.stat_hp")}: {item.HP:+#;-#;0}");
+            if (item.Mana != 0) bonuses.Add($"{Loc.Get("ui.stat_mana")}: {item.Mana:+#;-#;0}");
+            if (item.Stamina != 0) bonuses.Add($"{Loc.Get("ui.stat_sta")}: {item.Stamina:+#;-#;0}");
+            if (bonuses.Count > 0)
+            {
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine($"  {string.Join(", ", bonuses)}");
+            }
+
+            // Enchantments / procs (the "what does it actually do" the player wanted)
+            if (item.LootEffects != null && item.LootEffects.Count > 0)
+            {
+                terminal.SetColor("bright_magenta");
+                terminal.WriteLine($"  {Loc.Get("dark_alley.bm_inspect_enchants")}");
+                foreach (var (effectType, value) in item.LootEffects)
+                {
+                    string effName = ((LootGenerator.SpecialEffect)effectType).ToString();
+                    terminal.SetColor("magenta");
+                    terminal.WriteLine($"    - {effName}{(value != 0 ? $" ({value})" : "")}");
+                }
+            }
+
+            if (item.MinLevel > 1)
+                terminal.WriteLine($"  {Loc.Get("ui.requires_level", item.MinLevel)}", "yellow");
+
+            terminal.WriteLine("");
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine($"  {Loc.Get("dark_alley.bm_inspect_price", price, GameConfig.MoneyType)}");
+            terminal.WriteLine("");
+            await terminal.PressAnyKey();
         }
 
         /// <summary>

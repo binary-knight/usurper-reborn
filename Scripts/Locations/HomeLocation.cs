@@ -685,6 +685,13 @@ public class HomeLocation : BaseLocation
         // v0.61.3: refill companion + NPC-teammate potion stashes when resting at Home.
         CompanionSystem.Instance?.RefillAllPartyPotions(currentPlayer);
 
+        // v0.65.3: resting at Home also heals the party to full (see Inn parity).
+        int partyHealedHome = CompanionSystem.Instance?.RestoreAllPartyHP(currentPlayer) ?? 0;
+        if (partyHealedHome > 0)
+        {
+            terminal.WriteLine(Loc.Get("companion.party_rested"), "green");
+        }
+
         if (currentPlayer.MurderWeight >= 3f)
         {
             terminal.WriteLine(Loc.Get("home.rest_grief"), "dark_red");
@@ -1520,69 +1527,8 @@ public class HomeLocation : BaseLocation
 
         // Convert Item to Equipment
         var weaponType = item.Type == ObjType.Weapon ? ShopItemGenerator.InferWeaponType(item.Name) : WeaponType.None;
-        var equipment = new Equipment
-        {
-            Name = item.Name,
-            Slot = targetSlot,
-            Handedness = handedness,
-            WeaponType = weaponType,
-            WeaponPower = item.Attack,
-            ArmorClass = item.Armor,
-            ShieldBonus = item.Type == ObjType.Shield ? item.Armor : 0,
-            DefenceBonus = item.Defence,
-            StrengthBonus = item.Strength,
-            DexterityBonus = item.Dexterity,
-            AgilityBonus = item.Agility,
-            StaminaBonus = item.Stamina,
-            WisdomBonus = item.Wisdom,
-            CharismaBonus = item.Charisma,
-            MaxHPBonus = item.HP,
-            MaxManaBonus = item.Mana,
-            Value = item.Value,
-            IsCursed = item.IsCursed,
-            IsIdentified = item.IsIdentified,
-            MinLevel = item.MinLevel,
-            Rarity = EquipmentRarity.Common
-        };
-
-        // Transfer all LootEffects (enchantments, stat bonuses, special properties)
-        if (item.LootEffects != null)
-        {
-            foreach (var (effectType, value) in item.LootEffects)
-            {
-                var effect = (LootGenerator.SpecialEffect)effectType;
-                switch (effect)
-                {
-                    case LootGenerator.SpecialEffect.FireDamage: equipment.HasFireEnchant = true; break;
-                    case LootGenerator.SpecialEffect.IceDamage: equipment.HasFrostEnchant = true; break;
-                    case LootGenerator.SpecialEffect.LightningDamage: equipment.HasLightningEnchant = true; break;
-                    case LootGenerator.SpecialEffect.PoisonDamage:
-                        equipment.HasPoisonEnchant = true;
-                        equipment.PoisonDamage = Math.Max(equipment.PoisonDamage, value);
-                        break;
-                    case LootGenerator.SpecialEffect.HolyDamage: equipment.HasHolyEnchant = true; break;
-                    case LootGenerator.SpecialEffect.ShadowDamage: equipment.HasShadowEnchant = true; break;
-                    case LootGenerator.SpecialEffect.LifeSteal: equipment.LifeSteal = Math.Max(equipment.LifeSteal, Math.Max(5, value / 2)); break;
-                    case LootGenerator.SpecialEffect.ManaSteal: equipment.ManaSteal = Math.Max(equipment.ManaSteal, Math.Max(5, value / 2)); break;
-                    case LootGenerator.SpecialEffect.CriticalStrike: equipment.CriticalChanceBonus = Math.Max(equipment.CriticalChanceBonus, value); break;
-                    case LootGenerator.SpecialEffect.CriticalDamage: equipment.CriticalDamageBonus = Math.Max(equipment.CriticalDamageBonus, value); break;
-                    case LootGenerator.SpecialEffect.ArmorPiercing: equipment.ArmorPiercing = Math.Max(equipment.ArmorPiercing, value); break;
-                    case LootGenerator.SpecialEffect.Thorns: equipment.Thorns = Math.Max(equipment.Thorns, value); break;
-                    case LootGenerator.SpecialEffect.Regeneration: equipment.HPRegen = Math.Max(equipment.HPRegen, value); break;
-                    case LootGenerator.SpecialEffect.ManaRegen: equipment.ManaRegen = Math.Max(equipment.ManaRegen, value); break;
-                    case LootGenerator.SpecialEffect.MagicResist: equipment.MagicResistance = Math.Max(equipment.MagicResistance, value); break;
-                    case LootGenerator.SpecialEffect.Constitution: equipment.ConstitutionBonus += value; break;
-                    case LootGenerator.SpecialEffect.Intelligence: equipment.IntelligenceBonus += value; break;
-                    case LootGenerator.SpecialEffect.AllStats:
-                        equipment.ConstitutionBonus += value;
-                        equipment.IntelligenceBonus += value;
-                        equipment.CharismaBonus += value;
-                        break;
-                    case LootGenerator.SpecialEffect.BossSlayer: equipment.HasBossSlayer = true; break;
-                    case LootGenerator.SpecialEffect.TitanResolve: equipment.HasTitanResolve = true; break;
-                }
-            }
-        }
+        // Shared builder (single source of truth; carries every stat + LootEffects -- issue #112).
+        var equipment = Character.BuildEquipmentFromItem(item, targetSlot, handedness, weaponType);
 
         // Register in database to get an ID
         EquipmentDatabase.RegisterDynamic(equipment);

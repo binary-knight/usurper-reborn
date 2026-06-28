@@ -1570,67 +1570,9 @@ public partial class MagicShopLocation : BaseLocation
             _ => EquipmentSlot.MainHand
         };
 
-        var equip = new Equipment
-        {
-            Name = item.Name,
-            Slot = slot,
-            WeaponPower = item.Attack,
-            ArmorClass = item.Type == ObjType.Shield ? 0 : item.Armor,
-            ShieldBonus = item.Type == ObjType.Shield ? item.Armor : item.ShieldBonus,
-            BlockChance = item.BlockChance,
-            DefenceBonus = item.Defence,
-            StrengthBonus = item.Strength,
-            DexterityBonus = item.Dexterity,
-            AgilityBonus = item.Agility,
-            WisdomBonus = item.Wisdom,
-            CharismaBonus = item.Charisma,
-            StaminaBonus = item.Stamina,
-            MaxHPBonus = item.HP,
-            MaxManaBonus = item.Mana,
-            Value = item.Value,
-            IsCursed = item.IsCursed,
-            MinLevel = item.MinLevel,
-            Rarity = EquipmentRarity.Common
-        };
-
-        // Preserve enchantment markers and procs the item carries via LootEffects.
-        if (item.LootEffects != null)
-        {
-            foreach (var (effectType, value) in item.LootEffects)
-            {
-                var effect = (LootGenerator.SpecialEffect)effectType;
-                switch (effect)
-                {
-                    case LootGenerator.SpecialEffect.FireDamage: equip.HasFireEnchant = true; break;
-                    case LootGenerator.SpecialEffect.IceDamage: equip.HasFrostEnchant = true; break;
-                    case LootGenerator.SpecialEffect.LightningDamage: equip.HasLightningEnchant = true; break;
-                    case LootGenerator.SpecialEffect.PoisonDamage:
-                        equip.HasPoisonEnchant = true;
-                        equip.PoisonDamage = Math.Max(equip.PoisonDamage, value);
-                        break;
-                    case LootGenerator.SpecialEffect.HolyDamage: equip.HasHolyEnchant = true; break;
-                    case LootGenerator.SpecialEffect.ShadowDamage: equip.HasShadowEnchant = true; break;
-                    case LootGenerator.SpecialEffect.LifeSteal: equip.LifeSteal = Math.Max(equip.LifeSteal, Math.Max(5, value / 2)); break;
-                    case LootGenerator.SpecialEffect.ManaSteal: equip.ManaSteal = Math.Max(equip.ManaSteal, Math.Max(5, value / 2)); break;
-                    case LootGenerator.SpecialEffect.CriticalStrike: equip.CriticalChanceBonus = Math.Max(equip.CriticalChanceBonus, value); break;
-                    case LootGenerator.SpecialEffect.CriticalDamage: equip.CriticalDamageBonus = Math.Max(equip.CriticalDamageBonus, value); break;
-                    case LootGenerator.SpecialEffect.ArmorPiercing: equip.ArmorPiercing = Math.Max(equip.ArmorPiercing, value); break;
-                    case LootGenerator.SpecialEffect.Thorns: equip.Thorns = Math.Max(equip.Thorns, value); break;
-                    case LootGenerator.SpecialEffect.Regeneration: equip.HPRegen = Math.Max(equip.HPRegen, value); break;
-                    case LootGenerator.SpecialEffect.ManaRegen: equip.ManaRegen = Math.Max(equip.ManaRegen, value); break;
-                    case LootGenerator.SpecialEffect.MagicResist: equip.MagicResistance = Math.Max(equip.MagicResistance, value); break;
-                    case LootGenerator.SpecialEffect.Constitution: equip.ConstitutionBonus += value; break;
-                    case LootGenerator.SpecialEffect.Intelligence: equip.IntelligenceBonus += value; break;
-                    case LootGenerator.SpecialEffect.AllStats:
-                        equip.ConstitutionBonus += value;
-                        equip.IntelligenceBonus += value;
-                        equip.CharismaBonus += value;
-                        break;
-                    case LootGenerator.SpecialEffect.BossSlayer: equip.HasBossSlayer = true; break;
-                    case LootGenerator.SpecialEffect.TitanResolve: equip.HasTitanResolve = true; break;
-                }
-            }
-        }
+        // Shared builder (single source of truth; carries every stat + LootEffects -- issue #112).
+        // This is a transient enchant view, so handedness/weaponType stay None as before.
+        var equip = Character.BuildEquipmentFromItem(item, slot, WeaponHandedness.None, WeaponType.None);
 
         return equip;
     }

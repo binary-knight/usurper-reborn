@@ -1002,7 +1002,7 @@ public partial class CombatEngine
                 terminal.ClearScreen();
 
             // Display combat status at start of each round
-            DisplayCombatStatus(monsters, player);
+            DisplayCombatStatus(monsters, player, roundNumber);
 
             // Check if group has real players (for output capture/broadcasting)
             // (declared early so boss phase transitions can broadcast)
@@ -8640,81 +8640,8 @@ public partial class CombatEngine
                 if (lootItem.Stamina != 0) equipment.StaminaBonus += lootItem.Stamina;
                 if (lootItem.IsCursed) equipment.IsCursed = true;
 
-                // Transfer loot enchantment effects to Equipment properties (v0.40.5)
-                if (lootItem.LootEffects != null && lootItem.LootEffects.Count > 0)
-                {
-                    foreach (var (effectType, value) in lootItem.LootEffects)
-                    {
-                        var effect = (LootGenerator.SpecialEffect)effectType;
-                        switch (effect)
-                        {
-                            case LootGenerator.SpecialEffect.FireDamage:
-                                equipment.HasFireEnchant = true;
-                                break;
-                            case LootGenerator.SpecialEffect.IceDamage:
-                                equipment.HasFrostEnchant = true;
-                                break;
-                            case LootGenerator.SpecialEffect.LightningDamage:
-                                equipment.HasLightningEnchant = true;
-                                break;
-                            case LootGenerator.SpecialEffect.PoisonDamage:
-                                equipment.HasPoisonEnchant = true;
-                                equipment.PoisonDamage = Math.Max(equipment.PoisonDamage, value);
-                                break;
-                            case LootGenerator.SpecialEffect.HolyDamage:
-                                equipment.HasHolyEnchant = true;
-                                break;
-                            case LootGenerator.SpecialEffect.ShadowDamage:
-                                equipment.HasShadowEnchant = true;
-                                break;
-                            case LootGenerator.SpecialEffect.LifeSteal:
-                                equipment.LifeSteal = Math.Max(equipment.LifeSteal, Math.Max(5, value / 2));
-                                break;
-                            case LootGenerator.SpecialEffect.ManaSteal:
-                                equipment.ManaSteal = Math.Max(equipment.ManaSteal, Math.Max(5, value / 2));
-                                break;
-                            case LootGenerator.SpecialEffect.CriticalStrike:
-                                equipment.CriticalChanceBonus = Math.Max(equipment.CriticalChanceBonus, value);
-                                break;
-                            case LootGenerator.SpecialEffect.CriticalDamage:
-                                equipment.CriticalDamageBonus = Math.Max(equipment.CriticalDamageBonus, value);
-                                break;
-                            case LootGenerator.SpecialEffect.ArmorPiercing:
-                                equipment.ArmorPiercing = Math.Max(equipment.ArmorPiercing, value);
-                                break;
-                            case LootGenerator.SpecialEffect.Thorns:
-                                equipment.Thorns = Math.Max(equipment.Thorns, value);
-                                break;
-                            case LootGenerator.SpecialEffect.Regeneration:
-                                equipment.HPRegen = Math.Max(equipment.HPRegen, value);
-                                break;
-                            case LootGenerator.SpecialEffect.ManaRegen:
-                                equipment.ManaRegen = Math.Max(equipment.ManaRegen, value);
-                                break;
-                            case LootGenerator.SpecialEffect.MagicResist:
-                                equipment.MagicResistance = Math.Max(equipment.MagicResistance, value);
-                                break;
-                            // Stat bonuses — STR/DEX/WIS already transferred from Item fields above,
-                            // but CON/INT have no Item field so only come through LootEffects
-                            case LootGenerator.SpecialEffect.Constitution:
-                                equipment.ConstitutionBonus += value; break;
-                            case LootGenerator.SpecialEffect.Intelligence:
-                                equipment.IntelligenceBonus += value; break;
-                            case LootGenerator.SpecialEffect.AllStats:
-                                // STR/DEX/WIS already applied from Item fields; add CON/INT/CHA
-                                equipment.ConstitutionBonus += value;
-                                equipment.IntelligenceBonus += value;
-                                equipment.CharismaBonus += value;
-                                break;
-                            case LootGenerator.SpecialEffect.BossSlayer:
-                                equipment.HasBossSlayer = true;
-                                break;
-                            case LootGenerator.SpecialEffect.TitanResolve:
-                                equipment.HasTitanResolve = true;
-                                break;
-                        }
-                    }
-                }
+                // Transfer loot enchantment effects to Equipment properties (shared switch -- issue #112).
+                Character.ApplyItemLootEffectsToEquipment(lootItem, equipment);
 
                 // Register the equipment in the database so it can be looked up later
                 EquipmentDatabase.RegisterDynamic(equipment);
@@ -9684,36 +9611,8 @@ public partial class CombatEngine
                 if (lootItem.Stamina != 0) equipment.StaminaBonus += lootItem.Stamina;
                 if (lootItem.IsCursed) equipment.IsCursed = true;
 
-                if (lootItem.LootEffects != null)
-                {
-                    foreach (var (effectType, value) in lootItem.LootEffects)
-                    {
-                        var effect = (LootGenerator.SpecialEffect)effectType;
-                        switch (effect)
-                        {
-                            case LootGenerator.SpecialEffect.FireDamage: equipment.HasFireEnchant = true; break;
-                            case LootGenerator.SpecialEffect.IceDamage: equipment.HasFrostEnchant = true; break;
-                            case LootGenerator.SpecialEffect.LightningDamage: equipment.HasLightningEnchant = true; break;
-                            case LootGenerator.SpecialEffect.PoisonDamage: equipment.HasPoisonEnchant = true; equipment.PoisonDamage = Math.Max(equipment.PoisonDamage, value); break;
-                            case LootGenerator.SpecialEffect.HolyDamage: equipment.HasHolyEnchant = true; break;
-                            case LootGenerator.SpecialEffect.ShadowDamage: equipment.HasShadowEnchant = true; break;
-                            case LootGenerator.SpecialEffect.LifeSteal: equipment.LifeSteal = Math.Max(equipment.LifeSteal, Math.Max(5, value / 2)); break;
-                            case LootGenerator.SpecialEffect.ManaSteal: equipment.ManaSteal = Math.Max(equipment.ManaSteal, Math.Max(5, value / 2)); break;
-                            case LootGenerator.SpecialEffect.CriticalStrike: equipment.CriticalChanceBonus = Math.Max(equipment.CriticalChanceBonus, value); break;
-                            case LootGenerator.SpecialEffect.CriticalDamage: equipment.CriticalDamageBonus = Math.Max(equipment.CriticalDamageBonus, value); break;
-                            case LootGenerator.SpecialEffect.ArmorPiercing: equipment.ArmorPiercing = Math.Max(equipment.ArmorPiercing, value); break;
-                            case LootGenerator.SpecialEffect.Thorns: equipment.Thorns = Math.Max(equipment.Thorns, value); break;
-                            case LootGenerator.SpecialEffect.Regeneration: equipment.HPRegen = Math.Max(equipment.HPRegen, value); break;
-                            case LootGenerator.SpecialEffect.ManaRegen: equipment.ManaRegen = Math.Max(equipment.ManaRegen, value); break;
-                            case LootGenerator.SpecialEffect.MagicResist: equipment.MagicResistance = Math.Max(equipment.MagicResistance, value); break;
-                            case LootGenerator.SpecialEffect.Constitution: equipment.ConstitutionBonus += value; break;
-                            case LootGenerator.SpecialEffect.Intelligence: equipment.IntelligenceBonus += value; break;
-                            case LootGenerator.SpecialEffect.AllStats:
-                                equipment.ConstitutionBonus += value; equipment.IntelligenceBonus += value;
-                                equipment.CharismaBonus += value; break;
-                        }
-                    }
-                }
+                // Shared LootEffects switch (issue #112: this copy had dropped BossSlayer/TitanResolve).
+                Character.ApplyItemLootEffectsToEquipment(lootItem, equipment);
 
                 equipment.EnforceMinLevelFromPower();
                 EquipmentDatabase.RegisterDynamic(equipment);
@@ -10524,49 +10423,9 @@ public partial class CombatEngine
         if (lootItem.Stamina != 0) equipment.StaminaBonus += lootItem.Stamina;
         if (lootItem.IsCursed) equipment.IsCursed = true;
 
-        // Transfer enchantment effects
-        if (lootItem.LootEffects != null && lootItem.LootEffects.Count > 0)
-        {
-            foreach (var (effectType, value) in lootItem.LootEffects)
-            {
-                var effect = (LootGenerator.SpecialEffect)effectType;
-                switch (effect)
-                {
-                    case LootGenerator.SpecialEffect.FireDamage: equipment.HasFireEnchant = true; break;
-                    case LootGenerator.SpecialEffect.IceDamage: equipment.HasFrostEnchant = true; break;
-                    case LootGenerator.SpecialEffect.LightningDamage: equipment.HasLightningEnchant = true; break;
-                    case LootGenerator.SpecialEffect.PoisonDamage:
-                        equipment.HasPoisonEnchant = true;
-                        equipment.PoisonDamage = Math.Max(equipment.PoisonDamage, value);
-                        break;
-                    case LootGenerator.SpecialEffect.HolyDamage: equipment.HasHolyEnchant = true; break;
-                    case LootGenerator.SpecialEffect.ShadowDamage: equipment.HasShadowEnchant = true; break;
-                    case LootGenerator.SpecialEffect.LifeSteal:
-                        equipment.LifeSteal = Math.Max(equipment.LifeSteal, Math.Max(5, value / 2)); break;
-                    case LootGenerator.SpecialEffect.ManaSteal:
-                        equipment.ManaSteal = Math.Max(equipment.ManaSteal, Math.Max(5, value / 2)); break;
-                    case LootGenerator.SpecialEffect.CriticalStrike:
-                        equipment.CriticalChanceBonus = Math.Max(equipment.CriticalChanceBonus, value); break;
-                    case LootGenerator.SpecialEffect.CriticalDamage:
-                        equipment.CriticalDamageBonus = Math.Max(equipment.CriticalDamageBonus, value); break;
-                    case LootGenerator.SpecialEffect.ArmorPiercing:
-                        equipment.ArmorPiercing = Math.Max(equipment.ArmorPiercing, value); break;
-                    case LootGenerator.SpecialEffect.Thorns:
-                        equipment.Thorns = Math.Max(equipment.Thorns, value); break;
-                    case LootGenerator.SpecialEffect.Regeneration:
-                        equipment.HPRegen = Math.Max(equipment.HPRegen, value); break;
-                    case LootGenerator.SpecialEffect.ManaRegen:
-                        equipment.ManaRegen = Math.Max(equipment.ManaRegen, value); break;
-                    case LootGenerator.SpecialEffect.MagicResist:
-                        equipment.MagicResistance = Math.Max(equipment.MagicResistance, value); break;
-                    case LootGenerator.SpecialEffect.Constitution: equipment.ConstitutionBonus += value; break;
-                    case LootGenerator.SpecialEffect.Intelligence: equipment.IntelligenceBonus += value; break;
-                    case LootGenerator.SpecialEffect.AllStats:
-                        equipment.ConstitutionBonus += value; equipment.IntelligenceBonus += value;
-                        equipment.CharismaBonus += value; break;
-                }
-            }
-        }
+        // Transfer enchantment effects via the shared switch (issue #112: this copy had dropped the
+        // BossSlayer / TitanResolve world-boss flags -- routing through the helper restores them).
+        Character.ApplyItemLootEffectsToEquipment(lootItem, equipment);
 
         equipment.EnforceMinLevelFromPower();
         return equipment;
@@ -11017,7 +10876,7 @@ public partial class CombatEngine
     /// <summary>
     /// Display current combat status with all monsters and status effects
     /// </summary>
-    private void DisplayCombatStatus(List<Monster> monsters, Character player)
+    private void DisplayCombatStatus(List<Monster> monsters, Character player, int round = 0)
     {
         // Electron graphical client — emit combat state
         if (GameConfig.ElectronMode)
@@ -11044,7 +10903,7 @@ public partial class CombatEngine
 
             ElectronBridge.Emit("combat_status", new
             {
-                round = 0,
+                round = round,
                 playerHp = player.HP,
                 playerMaxHp = player.MaxHP,
                 playerMana = player.Mana,
@@ -11062,18 +10921,23 @@ public partial class CombatEngine
         // Check for screen reader mode
         if (player is Player p && p.ScreenReaderMode)
         {
-            DisplayCombatStatusScreenReader(monsters, player);
+            DisplayCombatStatusScreenReader(monsters, player, round);
             return;
         }
 
         // BBS/compact — compact status that leaves room for action menu on same page
         if (DoorMode.IsInDoorMode || GameConfig.CompactMode)
         {
-            DisplayCombatStatusBBS(monsters, player);
+            DisplayCombatStatusBBS(monsters, player, round);
             return;
         }
 
         terminal.WriteLine("");
+        if (round > 0)
+        {
+            terminal.SetColor("darkgray");
+            terminal.WriteLine($"  {Loc.Get("combat.round_label", round)}");
+        }
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════╗");
         terminal.WriteLine("║                    COMBAT STATUS                         ║");
@@ -11214,6 +11078,20 @@ public partial class CombatEngine
             terminal.WriteLine("");
         }
 
+        // v0.65.3: timed-buff line (Bard Inspiring Tune, songs, Well-Rested, food, etc.) that
+        // otherwise only fold silently into the ATK/DEF numbers. Player feedback: "no info shown
+        // for combat buffs, obvious on a Bard."
+        string buffSummary = BuildPlayerBuffSummary(player);
+        if (!string.IsNullOrEmpty(buffSummary))
+        {
+            terminal.SetColor("bright_cyan");
+            terminal.Write($"║ ");
+            terminal.SetColor("bright_green");
+            terminal.Write($"{Loc.Get("combat.buffs_label")} ");
+            terminal.SetColor("green");
+            terminal.WriteLine(buffSummary);
+        }
+
         // Combat stats line
         terminal.SetColor("bright_cyan");
         terminal.Write($"║ ");
@@ -11295,11 +11173,14 @@ public partial class CombatEngine
     /// Compact combat status for BBS 80x25 terminals.
     /// Displays monsters and player on minimal lines to leave room for the action menu.
     /// </summary>
-    private void DisplayCombatStatusBBS(List<Monster> monsters, Character player)
+    private void DisplayCombatStatusBBS(List<Monster> monsters, Character player, int round = 0)
     {
-        // Line 1: Header
+        // Line 1: Header (with round counter when available)
         terminal.SetColor("bright_cyan");
-        terminal.WriteLine("═══════════════════════════════ COMBAT ═══════════════════════════════════════");
+        if (round > 0)
+            terminal.WriteLine($"══════════════════════ COMBAT - {Loc.Get("combat.round_label", round)} ══════════════════════");
+        else
+            terminal.WriteLine("═══════════════════════════════ COMBAT ═══════════════════════════════════════");
 
         // Lines 2+: Monsters (two per line to save space)
         var aliveMonsters = monsters.Where(m => m.IsAlive).ToList();
@@ -11417,6 +11298,16 @@ public partial class CombatEngine
         }
         terminal.WriteLine("");
 
+        // v0.65.3: timed-buff line (compact)
+        string bbsBuffs = BuildPlayerBuffSummary(player);
+        if (!string.IsNullOrEmpty(bbsBuffs))
+        {
+            terminal.SetColor("bright_green");
+            terminal.Write($" {Loc.Get("combat.buffs_label")} ");
+            terminal.SetColor("green");
+            terminal.WriteLine(bbsBuffs);
+        }
+
         // Show teammate status (one line each, compact)
         if (currentTeammates != null && currentTeammates.Count > 0)
         {
@@ -11460,11 +11351,16 @@ public partial class CombatEngine
     /// Screen reader friendly version of combat status display.
     /// Uses plain text instead of box-drawing characters and visual bars.
     /// </summary>
-    private void DisplayCombatStatusScreenReader(List<Monster> monsters, Character player)
+    private void DisplayCombatStatusScreenReader(List<Monster> monsters, Character player, int round = 0)
     {
         terminal.WriteLine("");
         terminal.SetColor("bright_cyan");
         terminal.WriteLine(Loc.Get("combat.sr_combat_status_header"));
+        if (round > 0)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine(Loc.Get("combat.round_label", round));
+        }
         terminal.WriteLine("");
 
         // Show all living monsters
@@ -11546,6 +11442,14 @@ public partial class CombatEngine
             terminal.WriteLine("");
         }
 
+        // v0.65.3: timed-buff line
+        string srBuffs = BuildPlayerBuffSummary(player);
+        if (!string.IsNullOrEmpty(srBuffs))
+        {
+            terminal.SetColor("green");
+            terminal.WriteLine($"  {Loc.Get("combat.buffs_label")} {srBuffs}");
+        }
+
         // Teammates
         if (currentTeammates != null && currentTeammates.Count > 0)
         {
@@ -11625,6 +11529,39 @@ public partial class CombatEngine
     /// <summary>
     /// Display player status effects with colors
     /// </summary>
+    /// <summary>
+    /// v0.65.3: Compact one-line summary of the player's active TIMED buffs that are NOT already
+    /// visible elsewhere in the combat HUD. ActiveStatuses (Blessed/Protected/Haste/Hidden/DoTs)
+    /// render on their own line; MagicACBonus + DamageAbsorptionPool fold into the DEF/Shield
+    /// numbers. This surfaces the numeric/charge buffs from a Bard's Inspiring Tune, music-shop
+    /// songs, Well-Rested, food, Bloodlust, and status immunity. Returns "" when nothing is active.
+    /// </summary>
+    private static string BuildPlayerBuffSummary(Character p)
+    {
+        var b = new List<string>();
+        if (p.TempAttackBonusDuration > 0 && p.TempAttackBonus != 0)
+            b.Add($"ATK+{p.TempAttackBonus}({p.TempAttackBonusDuration})");
+        if (p.TempDefenseBonusDuration > 0 && p.TempDefenseBonus != 0)
+            b.Add($"DEF+{p.TempDefenseBonus}({p.TempDefenseBonusDuration})");
+        if (p.TempDamageReductionPercent > 0)
+            b.Add($"DR{p.TempDamageReductionPercent}%");
+        if (p.HasActiveSongBuff)
+            b.Add(Loc.Get("combat.buff_song", p.SongBuffCombats));
+        if (p.FoodBuffType > 0 && p.FoodBuffCombats > 0)
+            b.Add(Loc.Get("combat.buff_meal", p.FoodBuffCombats));
+        if (p.WellRestedCombats > 0)
+            b.Add(Loc.Get("combat.buff_rested", p.WellRestedCombats));
+        if (p.HasBloodlust)
+            b.Add(Loc.Get("combat.buff_bloodlust"));
+        if (p.HasStatusImmunity && p.StatusImmunityDuration > 0)
+            b.Add(Loc.Get("combat.buff_immune", p.StatusImmunityDuration));
+        else if (p.HasStatusImmunity)
+            b.Add(Loc.Get("combat.buff_immune_perm"));
+        if (p.DodgeNextAttack)
+            b.Add(Loc.Get("combat.buff_dodge"));
+        return string.Join("  ", b);
+    }
+
     private void DisplayPlayerStatusEffects(Character player)
     {
         bool first = true;
@@ -11824,6 +11761,26 @@ public partial class CombatEngine
                         result.Player.HP += bloodlustHeal;
                         terminal.SetColor("bright_red");
                         terminal.WriteLine(Loc.Get("combat.bloodlust_heal", bloodlustHeal));
+                    }
+                }
+                // v0.65.3: Barbarian innate early heal-on-kill (pre-Bloodlust L36). else-if so it
+                // never stacks with a real Bloodlust cast; fades out at L36 when the ability exists.
+                // attacker gate (matches the single-target site) so a future teammate-AoE route can't
+                // heal a Barbarian player off a teammate's kill; attacker==null = player's own AoE/spell.
+                else if (result.Player != null
+                         && (attacker == null || attacker == result.Player)
+                         && result.Player.Class == CharacterClass.Barbarian
+                         && result.Player.Level <= GameConfig.BarbarianInnateBloodlustMaxLevel)
+                {
+                    long innateHeal = Math.Min(
+                        GameConfig.BarbarianInnateBloodlustHealBase + result.Player.Level * GameConfig.BarbarianInnateBloodlustHealPerLevel,
+                        GameConfig.BarbarianInnateBloodlustHealCap);
+                    innateHeal = Math.Min(innateHeal, result.Player.MaxHP - result.Player.HP);
+                    if (innateHeal > 0)
+                    {
+                        result.Player.HP += innateHeal;
+                        terminal.SetColor("red");
+                        terminal.WriteLine(Loc.Get("combat.barbarian_innate_bloodlust", innateHeal));
                     }
                 }
             }
@@ -12026,12 +11983,112 @@ public partial class CombatEngine
                     terminal.WriteLine(Loc.Get("combat.bloodlust_trigger", bloodlustHeal));
                 }
             }
+            // v0.65.3: Barbarian innate early heal-on-kill (pre-Bloodlust L36). Gated to the player's
+            // own kill (attacker == player) so a teammate's kill doesn't heal a Barbarian player.
+            else if (result.Player != null
+                     && (attacker == null || attacker == result.Player)
+                     && result.Player.Class == CharacterClass.Barbarian
+                     && result.Player.Level <= GameConfig.BarbarianInnateBloodlustMaxLevel)
+            {
+                long innateHeal = Math.Min(
+                    GameConfig.BarbarianInnateBloodlustHealBase + result.Player.Level * GameConfig.BarbarianInnateBloodlustHealPerLevel,
+                    GameConfig.BarbarianInnateBloodlustHealCap);
+                innateHeal = Math.Min(innateHeal, result.Player.MaxHP - result.Player.HP);
+                if (innateHeal > 0)
+                {
+                    result.Player.HP += innateHeal;
+                    terminal.SetColor("red");
+                    terminal.WriteLine(Loc.Get("combat.barbarian_innate_bloodlust", innateHeal));
+                }
+            }
 
             await Task.Delay(GetCombatDelay(800));
         }
 
         result.CombatLog.Add($"{target.Name} took {actualDamage} damage from {damageSource}");
         return true; // attack landed -- caller may apply post-hit effects
+    }
+
+    // Unified post-hit on-hit effects for a landed player melee swing. Extracted verbatim from the
+    // multi-monster basic-attack path so EVERY landed player swing (basic attack main/off-hand AND
+    // the [P] Power Attack main/off-hand) runs the identical enchant pipeline. Player report: the
+    // [P] Power Attack silently dropped all weapon enchants -- lifesteal, elemental procs, Sunforged,
+    // poison coating, and the Mystic Shaman weapon-enchant rider -- because the fix had only landed
+    // on the basic-attack path (and the dead single-monster ExecutePowerAttack), never the live
+    // multi-monster Power Attack. Centralizing here makes a future one-path-only drift impossible.
+    // Callers MUST gate this on the swing actually landing (ApplySingleMonsterDamage returning true);
+    // an evaded swing (Incorporeal/Phase) passes through for 0 damage and must not proc anything.
+    // Synchronous: the block contains no awaits.
+    private void ApplyPlayerSwingOnHitEffects(Character player, Monster target, long damage, bool isOffHandAttack, CombatResult result)
+    {
+        // Apply all post-hit enchantment effects (lifesteal, elemental procs, sunforged, poison)
+        ApplyPostHitEnchantments(player, target, damage, result, weaponSlot: isOffHandAttack ? EquipmentSlot.OffHand : EquipmentSlot.MainHand);
+
+        // Mystic Shaman weapon enchantment bonus damage
+        // v0.57.13: same fix as single-monster path at ~line 3299 — scale off raw
+        // weapon power of the hitting hand, not the final post-multiplier damage,
+        // so "+3% per INT" produces a rider bonus instead of a 30× attack multiplier.
+        if (player.ShamanEnchantType > 0 && player.ShamanEnchantRounds > 0)
+        {
+            var shamanWeaponMM = player.GetEquipment(isOffHandAttack ? EquipmentSlot.OffHand : EquipmentSlot.MainHand);
+            long shamanWeapPowMM = shamanWeaponMM?.WeaponPower ?? 0;
+            long enchantDamage = (long)(shamanWeapPowMM * player.ShamanEnchantPower / 100.0);
+            enchantDamage = Math.Max(1, enchantDamage);
+            target.HP -= (int)enchantDamage;
+            result.TotalDamageDealt += enchantDamage;
+
+            string enchantMsg = player.ShamanEnchantType switch
+            {
+                1 => Loc.Get("combat.shaman_enchant_fire_hit", enchantDamage),
+                2 => Loc.Get("combat.shaman_enchant_frost_hit", enchantDamage),
+                3 => Loc.Get("combat.shaman_enchant_earth_hit", enchantDamage),
+                4 => Loc.Get("combat.shaman_enchant_storm_hit", enchantDamage),
+                _ => ""
+            };
+            if (!string.IsNullOrEmpty(enchantMsg))
+                terminal.WriteLine($"  {enchantMsg}", player.ShamanEnchantType == 1 ? "bright_red" : player.ShamanEnchantType == 2 ? "bright_cyan" : player.ShamanEnchantType == 3 ? "bright_green" : "bright_yellow");
+
+            // Stormstrike: restore mana on hit
+            if (player.ShamanEnchantType == 4)
+            {
+                long manaRestore = Math.Min(5 + player.Intelligence / 10, player.MaxMana - player.Mana);
+                if (manaRestore > 0)
+                {
+                    player.Mana += manaRestore;
+                    terminal.WriteLine(Loc.Get("combat.shaman_enchant_storm_mana", manaRestore), "cyan");
+                }
+            }
+
+            // Frostbrand: slow the enemy. v0.60.10 (Coosh report): see twin
+            // in ApplyPostHitEnchantments single-monster path; was Defence shave,
+            // now real Slow status.
+            if (player.ShamanEnchantType == 2 && target.IsAlive)
+            {
+                target.IsSlowed = true;
+                target.SlowDuration = Math.Max(target.SlowDuration, GameConfig.FrostEnchantDuration);
+            }
+
+            // Ancestral Guidance: 25% of damage dealt heals the party
+            if (player.ActiveTotemType == 6 && player.ActiveTotemRounds > 0)
+            {
+                long ancestralHeal = (long)(enchantDamage * player.ActiveTotemPower / 100.0);
+                ApplyAncestralGuidanceHealing(player, ancestralHeal, result);
+            }
+
+            if (target.HP <= 0)
+            {
+                target.HP = 0;
+                if (!result.DefeatedMonsters.Contains(target))
+                    result.DefeatedMonsters.Add(target);
+            }
+        }
+
+        // Ancestral Guidance: 25% of base damage dealt heals the party
+        if (player.ActiveTotemType == 6 && player.ActiveTotemRounds > 0 && player.ShamanEnchantType == 0 && damage > 0)
+        {
+            long ancestralHeal = (long)(damage * player.ActiveTotemPower / 100.0);
+            ApplyAncestralGuidanceHealing(player, ancestralHeal, result);
+        }
     }
 
     // Unified player melee swing damage. Extracted verbatim from the multi-monster basic-attack
@@ -12705,74 +12762,10 @@ public partial class CombatEngine
                         if (!swingLanded)
                             continue;
 
-                        // Apply all post-hit enchantment effects (lifesteal, elemental procs, sunforged, poison)
-                        ApplyPostHitEnchantments(player, target, damage, result, weaponSlot: isOffHandAttack ? EquipmentSlot.OffHand : EquipmentSlot.MainHand);
-
-                        // Mystic Shaman weapon enchantment bonus damage
-                        // v0.57.13: same fix as single-monster path at ~line 3299 — scale off raw
-                        // weapon power of the hitting hand, not the final post-multiplier damage,
-                        // so "+3% per INT" produces a rider bonus instead of a 30× attack multiplier.
-                        if (player.ShamanEnchantType > 0 && player.ShamanEnchantRounds > 0)
-                        {
-                            var shamanWeaponMM = player.GetEquipment(isOffHandAttack ? EquipmentSlot.OffHand : EquipmentSlot.MainHand);
-                            long shamanWeapPowMM = shamanWeaponMM?.WeaponPower ?? 0;
-                            long enchantDamage = (long)(shamanWeapPowMM * player.ShamanEnchantPower / 100.0);
-                            enchantDamage = Math.Max(1, enchantDamage);
-                            target.HP -= (int)enchantDamage;
-                            result.TotalDamageDealt += enchantDamage;
-
-                            string enchantMsg = player.ShamanEnchantType switch
-                            {
-                                1 => Loc.Get("combat.shaman_enchant_fire_hit", enchantDamage),
-                                2 => Loc.Get("combat.shaman_enchant_frost_hit", enchantDamage),
-                                3 => Loc.Get("combat.shaman_enchant_earth_hit", enchantDamage),
-                                4 => Loc.Get("combat.shaman_enchant_storm_hit", enchantDamage),
-                                _ => ""
-                            };
-                            if (!string.IsNullOrEmpty(enchantMsg))
-                                terminal.WriteLine($"  {enchantMsg}", player.ShamanEnchantType == 1 ? "bright_red" : player.ShamanEnchantType == 2 ? "bright_cyan" : player.ShamanEnchantType == 3 ? "bright_green" : "bright_yellow");
-
-                            // Stormstrike: restore mana on hit
-                            if (player.ShamanEnchantType == 4)
-                            {
-                                long manaRestore = Math.Min(5 + player.Intelligence / 10, player.MaxMana - player.Mana);
-                                if (manaRestore > 0)
-                                {
-                                    player.Mana += manaRestore;
-                                    terminal.WriteLine(Loc.Get("combat.shaman_enchant_storm_mana", manaRestore), "cyan");
-                                }
-                            }
-
-                            // Frostbrand: slow the enemy. v0.60.10 (Coosh report): see twin
-                            // in ApplyPostHitEnchantments single-monster path; was Defence shave,
-                            // now real Slow status.
-                            if (player.ShamanEnchantType == 2 && target.IsAlive)
-                            {
-                                target.IsSlowed = true;
-                                target.SlowDuration = Math.Max(target.SlowDuration, GameConfig.FrostEnchantDuration);
-                            }
-
-                            // Ancestral Guidance: 25% of damage dealt heals the party
-                            if (player.ActiveTotemType == 6 && player.ActiveTotemRounds > 0)
-                            {
-                                long ancestralHeal = (long)(enchantDamage * player.ActiveTotemPower / 100.0);
-                                ApplyAncestralGuidanceHealing(player, ancestralHeal, result);
-                            }
-
-                            if (target.HP <= 0)
-                            {
-                                target.HP = 0;
-                                if (!result.DefeatedMonsters.Contains(target))
-                                    result.DefeatedMonsters.Add(target);
-                            }
-                        }
-
-                        // Ancestral Guidance: 25% of base damage dealt heals the party
-                        if (player.ActiveTotemType == 6 && player.ActiveTotemRounds > 0 && player.ShamanEnchantType == 0 && damage > 0)
-                        {
-                            long ancestralHeal = (long)(damage * player.ActiveTotemPower / 100.0);
-                            ApplyAncestralGuidanceHealing(player, ancestralHeal, result);
-                        }
+                        // All landed-swing on-hit effects (post-hit enchants + Shaman weapon-enchant
+                        // rider + Ancestral Guidance) run through the shared helper so the [P] Power
+                        // Attack fires the identical pipeline.
+                        ApplyPlayerSwingOnHitEffects(player, target, damage, isOffHandAttack, result);
                     }
                 }
                 break;
@@ -13083,7 +13076,11 @@ public partial class CombatEngine
         terminal.SetColor("bright_red");
         terminal.WriteLine(Loc.Get("combat.power_attack_hit", target.Name, powerDamage));
 
-        await ApplySingleMonsterDamage(target, powerDamage, result, "power attack", player);
+        // Power Attack runs the same on-hit enchant pipeline as a basic swing (lifesteal, elemental
+        // procs, Sunforged, poison, Shaman rider). Gated on the swing landing so an evaded swing
+        // (Incorporeal/Phase, ApplySingleMonsterDamage returns false) procs nothing.
+        if (await ApplySingleMonsterDamage(target, powerDamage, result, "power attack", player))
+            ApplyPlayerSwingOnHitEffects(player, target, powerDamage, isOffHandAttack: false, result);
 
         // Follow up with off-hand attack if dual-wielding
         if (player.IsDualWielding)
@@ -13103,7 +13100,10 @@ public partial class CombatEngine
                 // scaling, crit, and all buffs, making it far weaker than a real off-hand swing.
                 long ohDamage = ComputePlayerSwingDamage(player, offHandTarget, isOffHandAttack: true, 1, 1);
 
-                await ApplySingleMonsterDamage(offHandTarget, ohDamage, result, "off-hand strike", player);
+                // Off-hand follow-up procs its enchants only if it actually connected (same evade
+                // gate + shared on-hit pipeline as the basic-attack off-hand swing).
+                if (await ApplySingleMonsterDamage(offHandTarget, ohDamage, result, "off-hand strike", player))
+                    ApplyPlayerSwingOnHitEffects(player, offHandTarget, ohDamage, isOffHandAttack: true, result);
             }
         }
     }
@@ -13479,6 +13479,15 @@ public partial class CombatEngine
         {
             long actualDamage = abilityResult.Damage;
             bool abilityAlreadyCrit = false; // Guaranteed-crit abilities skip the follow-up crit roll
+
+            // Two-handed weapons hit harder per swing. The basic attack gets this via
+            // GetWeaponConfigDamageModifier, but the ability damage from UseAbility does not, so a
+            // physical weapon-strike ability (e.g. Power Strike) was weaker than a free swing for 2H
+            // builds even with points specced in (player report). Give physical (non-magical) abilities
+            // the same 2H bonus. Magical abilities (Holy Smite, Lightning Bolt, etc.) scale off the
+            // caster stat, not weapon power, so they are excluded.
+            if (player.IsTwoHanding && !IsMagicalAbilityEffect(abilityResult.SpecialEffect))
+                actualDamage = (long)(actualDamage * GameConfig.TwoHandedDamageBonus);
 
             // Tidesworn weaken synergy (v0.56.0): Riptide Strike deals +40% damage vs already-weakened targets
             if (player.Class == CharacterClass.Tidesworn && target != null && target.WeakenRounds > 0
@@ -21572,6 +21581,12 @@ public partial class CombatEngine
             long actualDamage = abilityResult.Damage;
             bool abilityAlreadyCrit = false; // Guaranteed-crit abilities skip the follow-up crit roll
 
+            // Two-handed weapons hit harder per swing -- give physical abilities the same 2H bonus the
+            // basic attack gets (parity with the multi-monster path; player report: 2H Power Strike <
+            // basic attack). Magical abilities scale off the caster stat, not weapon power, so excluded.
+            if (player.IsTwoHanding && !IsMagicalAbilityEffect(abilityResult.SpecialEffect))
+                actualDamage = (long)(actualDamage * GameConfig.TwoHandedDamageBonus);
+
             // Tidesworn weaken synergy (v0.56.0): Riptide Strike +40% vs weakened
             if (player.Class == CharacterClass.Tidesworn && monster.WeakenRounds > 0
                 && abilityResult.SpecialEffect == "riptide")
@@ -24496,6 +24511,11 @@ public partial class CombatEngine
         {
             long actualDamage = abilityResult.Damage;
 
+            // Two-handed weapons hit harder per swing -- PvP basic attacks already get this via
+            // GetWeaponConfigDamageModifier, so give physical PvP abilities the same 2H bonus for parity.
+            if (attacker.IsTwoHanding && !IsMagicalAbilityEffect(abilityResult.SpecialEffect))
+                actualDamage = (long)(actualDamage * GameConfig.TwoHandedDamageBonus);
+
             // Special effects
             if (abilityResult.SpecialEffect == "execute" && defender.HP < defender.MaxHP * 0.3)
             {
@@ -26179,95 +26199,91 @@ public partial class CombatEngine
     }
 
     /// <summary>
-    /// Auto-distribute XP evenly when teammates exist but all teammate slots are at 0%.
-    /// Prevents new players from unknowingly starving their teammates of XP.
+    /// Build the slot->liveness map using the SAME walk DistributeTeamSlotXP uses to pay teammates:
+    /// skip echoes / grouped players, increment the XP slot (1..4) for every remaining teammate
+    /// (alive or dead), and mark a slot "live" only if its owning teammate is alive and below the
+    /// level cap. Slot 0 (the player) is always live. Slots with no owning teammate stay false
+    /// (orphaned — the teammate left the party). This single mapping keeps reclaim, payout, and the
+    /// Party Management screen from ever disagreeing about which slot belongs to whom.
     /// </summary>
+    private static bool[] BuildSlotLiveMap(Character player, List<Character>? teammates)
+    {
+        var slotLive = new bool[player.TeamXPPercent.Length];
+        slotLive[0] = true; // player
+        if (teammates == null) return slotLive;
+
+        int xpSlot = 0;
+        foreach (var tm in teammates)
+        {
+            if (tm == null || tm.IsEcho || tm.IsGroupedPlayer) continue;
+            xpSlot++;
+            if (xpSlot >= slotLive.Length) break;
+            slotLive[xpSlot] = tm.IsAlive && tm.HP > 0 && tm.Level < 100;
+        }
+        return slotLive;
+    }
+
     /// <summary>
-    /// Redistribute dead/max-level teammates' XP percentage to surviving members.
-    /// Dead teammates' shares are split evenly among the player and living teammates.
+    /// Reclaim XP percentage sitting on any slot not backed by a living teammate (dead, max-level,
+    /// or orphaned because the teammate left the party) so it is never silently lost. When
+    /// <paramref name="redistribute"/> is true (the player's [R] auto-redistribute-on-death toggle),
+    /// the reclaimed share is split evenly among the player and surviving teammates; when false, the
+    /// player banks all of it (no loss, manual reallocation preserved).
+    /// </summary>
+    private static void ReclaimOrphanedXP(Character player, bool[] slotLive, bool redistribute)
+    {
+        int reclaimed = 0;
+        for (int s = 1; s < player.TeamXPPercent.Length; s++)
+        {
+            if (!slotLive[s] && player.TeamXPPercent[s] > 0)
+            {
+                reclaimed += player.TeamXPPercent[s];
+                player.TeamXPPercent[s] = 0;
+            }
+        }
+        if (reclaimed <= 0) return;
+
+        if (!redistribute)
+        {
+            player.TeamXPPercent[0] += reclaimed; // bank it on the player; no even split
+            return;
+        }
+
+        int liveTeammateSlots = 0;
+        for (int s = 1; s < slotLive.Length; s++)
+            if (slotLive[s]) liveTeammateSlots++;
+
+        int recipients = 1 + liveTeammateSlots; // player + living teammates
+        int shareEach = reclaimed / recipients;
+        int remainder = reclaimed - (shareEach * recipients);
+
+        player.TeamXPPercent[0] += shareEach + remainder; // player gets the remainder
+        for (int s = 1; s < player.TeamXPPercent.Length; s++)
+            if (slotLive[s]) player.TeamXPPercent[s] += shareEach;
+    }
+
+    /// <summary>
+    /// Public entry point so the Party Management screen can self-heal an orphaned XP slot the
+    /// instant it is opened (honoring the auto-redistribute-on-death toggle), instead of leaving the
+    /// dead member's share stranded on an empty slot until the next combat victory.
+    /// </summary>
+    public static void ReclaimOrphanedTeamXP(Character player, List<Character>? teammates)
+    {
+        if (player == null) return;
+        var slotLive = BuildSlotLiveMap(player, teammates);
+        ReclaimOrphanedXP(player, slotLive, player.AutoRedistributeXP);
+    }
+
+    /// <summary>
+    /// Defensive net inside the payout path. AutoDistributeTeamXP already normalizes before the
+    /// player's share is computed, so this is normally a no-op; it guarantees no orphaned slot
+    /// survives into the actual teammate payout.
     /// </summary>
     private static void RedistributeDeadTeammateXP(Character player, List<Character>? teammates)
     {
         if (teammates == null) return;
-
-        // Count living XP-eligible teammates (already removed dead ones from list during combat)
-        int livingTeammates = 0;
-        foreach (var tm in teammates)
-        {
-            if (tm == null || tm.IsEcho || tm.IsGroupedPlayer) continue;
-            if (tm.IsAlive && tm.Level < 100) livingTeammates++;
-        }
-
-        // Count how many slots have XP allocated (slots 1+)
-        int allocatedSlots = 0;
-        int orphanedXP = 0;
-        for (int s = 1; s < player.TeamXPPercent.Length; s++)
-        {
-            if (player.TeamXPPercent[s] > 0)
-                allocatedSlots++;
-        }
-
-        // If more slots have XP than we have living teammates, some slots are orphaned
-        // (the teammate died and was removed from the list during combat)
-        if (allocatedSlots <= livingTeammates) return; // All slots map to living teammates
-
-        // Collect XP from orphaned slots (slots beyond what living teammates can fill)
-        // We reclaim from the highest-numbered slots first since dead teammates
-        // were removed from the list, shifting survivors to lower slot positions
-        int slotsToKeep = livingTeammates;
-        for (int s = player.TeamXPPercent.Length - 1; s >= 1; s--)
-        {
-            if (player.TeamXPPercent[s] <= 0) continue;
-
-            if (slotsToKeep > 0)
-            {
-                slotsToKeep--;
-                continue; // This slot maps to a living teammate
-            }
-
-            // Orphaned slot — reclaim its XP
-            orphanedXP += player.TeamXPPercent[s];
-            player.TeamXPPercent[s] = 0;
-        }
-
-        // Also check for still-present but dead/max-level teammates in the list
-        int xpSlot = 0;
-        var slotAlive = new bool[player.TeamXPPercent.Length];
-        slotAlive[0] = true;
-        int aliveSlotCount = 0;
-
-        for (int i = 0; i < teammates.Count; i++)
-        {
-            var tm = teammates[i];
-            if (tm == null || tm.IsEcho || tm.IsGroupedPlayer) continue;
-            xpSlot++;
-            if (xpSlot >= player.TeamXPPercent.Length) break;
-
-            if (!tm.IsAlive || tm.Level >= 100)
-            {
-                orphanedXP += player.TeamXPPercent[xpSlot];
-                player.TeamXPPercent[xpSlot] = 0;
-            }
-            else
-            {
-                slotAlive[xpSlot] = true;
-                aliveSlotCount++;
-            }
-        }
-
-        if (orphanedXP <= 0) return;
-
-        // Distribute orphaned XP evenly among player + living teammates
-        int totalRecipients = 1 + aliveSlotCount; // player + living teammates
-        int shareEach = orphanedXP / totalRecipients;
-        int remainder = orphanedXP - (shareEach * totalRecipients);
-
-        player.TeamXPPercent[0] += shareEach + remainder; // Player gets the remainder
-        for (int s = 1; s < player.TeamXPPercent.Length; s++)
-        {
-            if (slotAlive[s])
-                player.TeamXPPercent[s] += shareEach;
-        }
+        var slotLive = BuildSlotLiveMap(player, teammates);
+        ReclaimOrphanedXP(player, slotLive, player.AutoRedistributeXP);
     }
 
     /// <summary>
@@ -26309,16 +26325,15 @@ public partial class CombatEngine
     {
         if (teammates == null || teammates.Count == 0) return;
 
-        // Count XP-eligible teammate slots (alive, not grouped players, not echoes)
+        // Canonical slot->teammate mapping (matches DistributeTeamSlotXP's payout walk).
+        var slotLive = BuildSlotLiveMap(player, teammates);
         int eligibleSlots = 0;
-        foreach (var t in teammates)
-        {
-            if (t != null && !t.IsGroupedPlayer && !t.IsEcho && t.IsAlive && t.HP > 0)
-                eligibleSlots++;
-        }
+        for (int s = 1; s < slotLive.Length; s++)
+            if (slotLive[s]) eligibleSlots++;
+
         if (eligibleSlots == 0)
         {
-            // All teammates dead — player gets 100%
+            // All teammates dead/gone — player gets 100%
             player.TeamXPPercent[0] = 100;
             for (int s = 1; s < player.TeamXPPercent.Length; s++)
                 player.TeamXPPercent[s] = 0;
@@ -26331,77 +26346,29 @@ public partial class CombatEngine
         // of the XP even with teammates" from "stale solo-mode default", so it always overrode
         // to 50/50. With the explicit flag, first-time-with-teammate still gets the friendly
         // auto-distribute, and deliberate settings stick.
-        if (player.TeamXPIsExplicit)
-        {
-            // Only zero out dead teammate slots and redistribute their share to the player
-            for (int s = 1; s < player.TeamXPPercent.Length; s++)
-            {
-                if (s - 1 < teammates.Count)
-                {
-                    var t = teammates[s - 1];
-                    bool isAlive = t != null && !t.IsGroupedPlayer && !t.IsEcho && t.IsAlive && t.HP > 0;
-                    if (!isAlive && player.TeamXPPercent[s] > 0)
-                    {
-                        player.TeamXPPercent[0] += player.TeamXPPercent[s];
-                        player.TeamXPPercent[s] = 0;
-                    }
-                }
-            }
-            return;
-        }
-
-        // Check if the player has a custom XP distribution set (any teammate slot > 0%).
-        // Legacy pre-flag path: if an older save has a custom-looking distribution, also honor it.
         bool hasCustomDistribution = false;
         for (int s = 1; s < player.TeamXPPercent.Length; s++)
         {
-            if (player.TeamXPPercent[s] > 0)
-            {
-                hasCustomDistribution = true;
-                break;
-            }
+            if (player.TeamXPPercent[s] > 0) { hasCustomDistribution = true; break; }
         }
 
-        if (hasCustomDistribution)
+        if (player.TeamXPIsExplicit || hasCustomDistribution)
         {
-            // Player set custom XP distribution — only zero out dead teammate slots
-            // and redistribute their share to the player
-            for (int s = 1; s < player.TeamXPPercent.Length; s++)
-            {
-                if (s - 1 < teammates.Count)
-                {
-                    var t = teammates[s - 1];
-                    bool isAlive = t != null && !t.IsGroupedPlayer && !t.IsEcho && t.IsAlive && t.HP > 0;
-                    if (!isAlive && player.TeamXPPercent[s] > 0)
-                    {
-                        // Dead teammate — give their share to the player
-                        player.TeamXPPercent[0] += player.TeamXPPercent[s];
-                        player.TeamXPPercent[s] = 0;
-                    }
-                }
-            }
+            // Reclaim any slot not backed by a living teammate (dead, max-level, or orphaned
+            // because the teammate left the party). Honors the player's [R] auto-redistribute-on-
+            // death toggle: ON -> dead share split among player + survivors; OFF -> player banks it.
+            // Either way nothing strands on an empty slot, which was the reported silent-XP-loss bug.
+            ReclaimOrphanedXP(player, slotLive, player.AutoRedistributeXP);
             return;
         }
 
-        // No custom distribution — auto-distribute evenly among surviving members
-        int totalSlots = 1 + eligibleSlots; // player + alive teammates
+        // No custom distribution — friendly first-time auto even split among player + living teammates
+        int totalSlots = 1 + eligibleSlots; // player + living teammates
         int evenShare = 100 / totalSlots;
         int remainder = 100 - (evenShare * totalSlots);
-        player.TeamXPPercent[0] = evenShare + remainder; // Player gets remainder
-
+        player.TeamXPPercent[0] = evenShare + remainder; // player gets remainder
         for (int s = 1; s < player.TeamXPPercent.Length; s++)
-        {
-            if (s - 1 < teammates.Count)
-            {
-                var t = teammates[s - 1];
-                bool isAlive = t != null && !t.IsGroupedPlayer && !t.IsEcho && t.IsAlive && t.HP > 0;
-                player.TeamXPPercent[s] = isAlive ? evenShare : 0;
-            }
-            else
-            {
-                player.TeamXPPercent[s] = 0;
-            }
-        }
+            player.TeamXPPercent[s] = slotLive[s] ? evenShare : 0;
     }
 
     /// <summary>
@@ -26824,7 +26791,7 @@ public partial class CombatEngine
 
         // Two-handed weapons get 45% damage bonus (compensates for no off-hand/shield)
         if (attacker.IsTwoHanding)
-            modifier = 1.45;
+            modifier = GameConfig.TwoHandedDamageBonus;
 
         // Off-hand attacks in dual-wield do 50% damage
         if (isOffHandAttack && attacker.IsDualWielding)

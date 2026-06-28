@@ -246,14 +246,16 @@ namespace UsurperRemake.Systems
             {
                 case DiscEffectType.Gold:
                 {
-                    long amt = Scaled(floor, e.A, e.B);
+                    // v0.65.3: dungeon features are now much rarer (see DungeonGenerator), so each
+                    // gold/xp payout is bumped to make the ones you do find feel worth examining.
+                    long amt = (long)(Scaled(floor, e.A, e.B) * GameConfig.DungeonFeatureRewardMultiplier);
                     player.Gold += amt; outcome.GoldGained += amt;
                     Msg(terminal, "bright_yellow", Loc.Get("discovery.effect.gold", amt));
                     break;
                 }
                 case DiscEffectType.Xp:
                 {
-                    long amt = Scaled(floor, e.A, e.B);
+                    long amt = (long)(Scaled(floor, e.A, e.B) * GameConfig.DungeonFeatureRewardMultiplier);
                     player.Experience += amt; outcome.ExperienceGained += amt;
                     Msg(terminal, "yellow", Loc.Get("discovery.effect.xp", amt));
                     break;

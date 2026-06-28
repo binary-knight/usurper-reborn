@@ -2309,25 +2309,35 @@ public static class LootGenerator
             string fine = Loc.Get("item.rarity.fine");
             string cursed = Loc.Get("item.rarity.cursed");
 
+            ItemRarity derived;
             if (item.Name.StartsWith(mythic + " ") || item.Name.Contains("Artifact"))
-                return ItemRarity.Artifact;
-            if (item.Name.StartsWith(legendary + " "))
-                return ItemRarity.Legendary;
-            if (item.Name.StartsWith(exquisite + " ") || item.Name.StartsWith(cursed + " "))
-                return ItemRarity.Epic;
-            if (item.Name.StartsWith(superior + " "))
-                return ItemRarity.Rare;
-            if (item.Name.StartsWith(fine + " "))
-                return ItemRarity.Uncommon;
+                derived = ItemRarity.Artifact;
+            else if (item.Name.StartsWith(legendary + " "))
+                derived = ItemRarity.Legendary;
+            else if (item.Name.StartsWith(exquisite + " ") || item.Name.StartsWith(cursed + " "))
+                derived = ItemRarity.Epic;
+            else if (item.Name.StartsWith(superior + " "))
+                derived = ItemRarity.Rare;
+            else if (item.Name.StartsWith(fine + " "))
+                derived = ItemRarity.Uncommon;
+            else
+            {
+                // Check by power level
+                int power = Math.Max(item.Attack, item.Armor);
+                if (power > 200) derived = ItemRarity.Legendary;
+                else if (power > 100) derived = ItemRarity.Epic;
+                else if (power > 50) derived = ItemRarity.Rare;
+                else if (power > 25) derived = ItemRarity.Uncommon;
+                else derived = ItemRarity.Common;
+            }
 
-            // Check by power level
-            int power = Math.Max(item.Attack, item.Armor);
-            if (power > 200) return ItemRarity.Legendary;
-            if (power > 100) return ItemRarity.Epic;
-            if (power > 50) return ItemRarity.Rare;
-            if (power > 25) return ItemRarity.Uncommon;
-
-            return ItemRarity.Common;
+            // issue #112: respect the rarity stored on the item (EquipmentRarity and ItemRarity share
+            // the same ordering Common=0..Artifact=5). A reforged Epic weapon with low base power used
+            // to show Common in the backpack (name/power-derived) even though it was Epic equipped --
+            // the visible "quality reset." Take the higher of stored vs derived so a stored rarity is
+            // honored while loot items that never set one still fall back to the name/power heuristic.
+            var stored = (ItemRarity)(int)item.Rarity;
+            return (ItemRarity)Math.Max((int)derived, (int)stored);
         }
 
         /// <summary>

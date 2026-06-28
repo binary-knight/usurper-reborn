@@ -555,8 +555,10 @@ namespace UsurperRemake.Systems
                 // Prune old news with per-category caps (NPC news doesn't evict player news)
                 await sqlBackend.PruneAllNews(hoursToKeep: 48, maxNpcNews: 500, maxPlayerNews: 200);
 
-                // Prune combat telemetry (keep 7 days, max 1000 rows)
-                await sqlBackend.PruneCombatEvents(daysToKeep: 7, maxRows: 1000);
+                // Prune combat telemetry. v0.65.3: non-deaths kept 14 days / 5000 rows; deaths kept
+                // 90 days and exempt from the row cap so victories can't evict them (the bug that
+                // made the table report 3 deaths when saves had 63).
+                await sqlBackend.PruneCombatEvents(daysToKeep: 14, maxRows: 5000, deathDaysToKeep: 90);
 
                 // Clean up orphaned data from deleted players
                 await sqlBackend.PruneOrphanedPlayerData();
@@ -1557,35 +1559,8 @@ namespace UsurperRemake.Systems
                     npc.Inventory ??= new List<global::Item>();
                     foreach (var itemData in data.Inventory)
                     {
-                        var item = new global::Item
-                        {
-                            Name = itemData.Name,
-                            Value = itemData.Value,
-                            Type = itemData.Type,
-                            Attack = itemData.Attack,
-                            Armor = itemData.Armor,
-                            Strength = itemData.Strength,
-                            Dexterity = itemData.Dexterity,
-                            Wisdom = itemData.Wisdom,
-                            Defence = itemData.Defence,
-                            BlockChance = itemData.BlockChance,
-                            ShieldBonus = itemData.ShieldBonus,
-                            HP = itemData.HP,
-                            Mana = itemData.Mana,
-                            Charisma = itemData.Charisma,
-                            Agility = itemData.Agility,
-                            Stamina = itemData.Stamina,
-                            MinLevel = itemData.MinLevel,
-                            IsCursed = itemData.IsCursed,
-                            Cursed = itemData.Cursed,
-                            IsIdentified = itemData.IsIdentified,
-                            Shop = itemData.Shop,
-                            Dungeon = itemData.Dungeon,
-                            Description = itemData.Description?.ToList() ?? new List<string>(),
-                        };
-                        if (itemData.LootEffects != null && itemData.LootEffects.Count > 0)
-                            item.LootEffects = itemData.LootEffects.Select(e => (e.EffectType, e.Value)).ToList();
-                        npc.Inventory.Add(item);
+                        // issue #112: single source of truth (ToItem) so NPC-bag items round-trip rarity + all stats.
+                        npc.Inventory.Add(itemData.ToItem());
                     }
                 }
 

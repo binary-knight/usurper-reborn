@@ -2738,6 +2738,8 @@ public abstract class BaseLocation
             case "q":
             case "quest":
             case "quests":
+            case "contract":
+            case "contracts": // v0.65.3: players looked for a /contracts command for Sellsword Hall merc contracts; they live in the quest list
                 await ShowActiveQuests();
                 return (true, false);
 
@@ -3203,23 +3205,40 @@ public abstract class BaseLocation
     /// </summary>
     protected virtual async Task ShowActiveQuests()
     {
-        terminal.WriteLine("");
-        WriteBoxHeader(Loc.Get("base.active_quests"), "bright_magenta");
-
         var playerName = currentPlayer?.Name2 ?? currentPlayer?.DisplayName ?? "";
         var activeQuests = QuestSystem.GetActiveQuestsForPlayer(playerName);
 
         if (activeQuests == null || activeQuests.Count == 0)
         {
+            terminal.WriteLine("");
+            WriteBoxHeader(Loc.Get("base.active_quests"), "bright_magenta");
             terminal.SetColor("gray");
             terminal.WriteLine($"  {Loc.Get("base.no_active_quests")}");
+            terminal.WriteLine("");
+            await terminal.PressAnyKey();
+            return;
         }
-        else
+
+        // v0.65.3: paginate so every quest/contract is viewable. The old display truncated at 8
+        // with an "and N more" line the player couldn't scroll past (the only key wiped + redrew).
+        const int perPage = 4;
+        int totalPages = (activeQuests.Count + perPage - 1) / perPage;
+        int page = 0;
+
+        while (true)
         {
-            foreach (var quest in activeQuests.Take(8))
+            terminal.ClearScreen();
+            terminal.WriteLine("");
+            string header = totalPages > 1
+                ? $"{Loc.Get("base.active_quests")}  ({Loc.Get("ui.page", page + 1, totalPages)})"
+                : Loc.Get("base.active_quests");
+            WriteBoxHeader(header, "bright_magenta");
+
+            foreach (var quest in activeQuests.Skip(page * perPage).Take(perPage))
             {
                 terminal.SetColor("bright_yellow");
-                terminal.WriteLine($"  {quest.GetDisplayTitle()}");
+                string tag = quest.IsMercContract ? $" {Loc.Get("base.quest_contract_tag")}" : "";
+                terminal.WriteLine($"  {quest.GetDisplayTitle()}{tag}");
                 terminal.SetColor("gray");
                 terminal.WriteLine($"    {Loc.Get("base.quest_type")}: {quest.GetTargetDescription()}  |  {quest.GetDifficultyString()}  |  {Loc.Get("base.quest_days_left", quest.DaysRemaining)}");
 
@@ -3265,15 +3284,19 @@ public abstract class BaseLocation
                 terminal.WriteLine("");
             }
 
-            if (activeQuests.Count > 8)
+            if (totalPages <= 1)
             {
-                terminal.SetColor("gray");
-                terminal.WriteLine($"  {Loc.Get("base.more_quests", activeQuests.Count - 8)}");
+                await terminal.PressAnyKey();
+                return;
             }
-        }
 
-        terminal.WriteLine("");
-        await terminal.PressAnyKey();
+            terminal.SetColor("gray");
+            terminal.WriteLine($"  {Loc.Get("base.quest_pager_nav")}");
+            var nav = (await terminal.GetInput("")).Trim().ToUpper();
+            if (nav == "N" && page < totalPages - 1) page++;
+            else if (nav == "P" && page > 0) page--;
+            else if (nav == "B" || nav == "Q" || string.IsNullOrEmpty(nav)) return;
+        }
     }
 
     /// <summary>
@@ -10593,71 +10616,8 @@ public abstract class BaseLocation
             weaponType = ShopItemGenerator.InferShieldType(invItem.Name);
         }
 
-        var equipment = new Equipment
-        {
-            Name = invItem.Name,
-            Slot = slot,
-            Handedness = handedness,
-            WeaponType = weaponType,
-            WeaponPower = invItem.Attack,
-            ArmorClass = invItem.Type == ObjType.Shield ? 0 : invItem.Armor,
-            WeightClass = weightClass,
-            ShieldBonus = invItem.Type == ObjType.Shield ? invItem.ShieldBonus : 0,
-            BlockChance = invItem.Type == ObjType.Shield ? invItem.BlockChance : 0,
-            DefenceBonus = invItem.Defence,
-            StrengthBonus = invItem.Strength,
-            DexterityBonus = invItem.Dexterity,
-            AgilityBonus = invItem.Agility,
-            StaminaBonus = invItem.Stamina,
-            WisdomBonus = invItem.Wisdom,
-            CharismaBonus = invItem.Charisma,
-            MaxHPBonus = invItem.HP,
-            MaxManaBonus = invItem.Mana,
-            Value = invItem.Value,
-            IsCursed = invItem.IsCursed,
-            IsIdentified = invItem.IsIdentified,
-            MinLevel = invItem.MinLevel,
-            Rarity = EquipmentRarity.Common
-        };
-
-        // Transfer all LootEffects (enchantments, stat bonuses, special properties)
-        if (invItem.LootEffects != null)
-        {
-            foreach (var (effectType, value) in invItem.LootEffects)
-            {
-                var effect = (LootGenerator.SpecialEffect)effectType;
-                switch (effect)
-                {
-                    case LootGenerator.SpecialEffect.FireDamage: equipment.HasFireEnchant = true; break;
-                    case LootGenerator.SpecialEffect.IceDamage: equipment.HasFrostEnchant = true; break;
-                    case LootGenerator.SpecialEffect.LightningDamage: equipment.HasLightningEnchant = true; break;
-                    case LootGenerator.SpecialEffect.PoisonDamage:
-                        equipment.HasPoisonEnchant = true;
-                        equipment.PoisonDamage = Math.Max(equipment.PoisonDamage, value);
-                        break;
-                    case LootGenerator.SpecialEffect.HolyDamage: equipment.HasHolyEnchant = true; break;
-                    case LootGenerator.SpecialEffect.ShadowDamage: equipment.HasShadowEnchant = true; break;
-                    case LootGenerator.SpecialEffect.LifeSteal: equipment.LifeSteal = Math.Max(equipment.LifeSteal, Math.Max(5, value / 2)); break;
-                    case LootGenerator.SpecialEffect.ManaSteal: equipment.ManaSteal = Math.Max(equipment.ManaSteal, Math.Max(5, value / 2)); break;
-                    case LootGenerator.SpecialEffect.CriticalStrike: equipment.CriticalChanceBonus = Math.Max(equipment.CriticalChanceBonus, value); break;
-                    case LootGenerator.SpecialEffect.CriticalDamage: equipment.CriticalDamageBonus = Math.Max(equipment.CriticalDamageBonus, value); break;
-                    case LootGenerator.SpecialEffect.ArmorPiercing: equipment.ArmorPiercing = Math.Max(equipment.ArmorPiercing, value); break;
-                    case LootGenerator.SpecialEffect.Thorns: equipment.Thorns = Math.Max(equipment.Thorns, value); break;
-                    case LootGenerator.SpecialEffect.Regeneration: equipment.HPRegen = Math.Max(equipment.HPRegen, value); break;
-                    case LootGenerator.SpecialEffect.ManaRegen: equipment.ManaRegen = Math.Max(equipment.ManaRegen, value); break;
-                    case LootGenerator.SpecialEffect.MagicResist: equipment.MagicResistance = Math.Max(equipment.MagicResistance, value); break;
-                    case LootGenerator.SpecialEffect.Constitution: equipment.ConstitutionBonus += value; break;
-                    case LootGenerator.SpecialEffect.Intelligence: equipment.IntelligenceBonus += value; break;
-                    case LootGenerator.SpecialEffect.AllStats:
-                        equipment.ConstitutionBonus += value;
-                        equipment.IntelligenceBonus += value;
-                        equipment.CharismaBonus += value;
-                        break;
-                    case LootGenerator.SpecialEffect.BossSlayer: equipment.HasBossSlayer = true; break;
-                    case LootGenerator.SpecialEffect.TitanResolve: equipment.HasTitanResolve = true; break;
-                }
-            }
-        }
+        // Shared builder (single source of truth; carries every stat + LootEffects -- issue #112).
+        var equipment = Character.BuildEquipmentFromItem(invItem, slot, handedness, weaponType, weightClass);
 
         EquipmentDatabase.RegisterDynamic(equipment);
         return equipment;

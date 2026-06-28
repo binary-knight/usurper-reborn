@@ -488,35 +488,9 @@ namespace UsurperRemake.Systems
                 ShieldCursed = player.ShieldCursed,
 
                 // Player inventory (dungeon loot items)
-                Inventory = player.Inventory?.Select(item => new InventoryItemData
-                {
-                    Name = item.Name,
-                    Value = item.Value,
-                    Type = item.Type,
-                    Attack = item.Attack,
-                    Armor = item.Armor,
-                    Strength = item.Strength,
-                    Dexterity = item.Dexterity,
-                    Wisdom = item.Wisdom,
-                    Defence = item.Defence,
-                    BlockChance = item.BlockChance,
-                    ShieldBonus = item.ShieldBonus,
-                    HP = item.HP,
-                    Mana = item.Mana,
-                    Charisma = item.Charisma,
-                    Agility = item.Agility,
-                    Stamina = item.Stamina,
-                    MinLevel = item.MinLevel,
-                    IsCursed = item.IsCursed,
-                    Cursed = item.Cursed,
-                    IsIdentified = item.IsIdentified,
-                    Shop = item.Shop,
-                    Dungeon = item.Dungeon,
-                    Description = item.Description?.ToList() ?? new List<string>(),
-                    LootEffects = item.LootEffects?.Count > 0
-                        ? item.LootEffects.Select(e => new LootEffectData { EffectType = e.EffectType, Value = e.Value }).ToList()
-                        : null
-                }).ToList() ?? new List<InventoryItemData>(),
+                // issue #112/#111: single source of truth (InventoryItemData.FromItem) so every stat,
+                // the cursed/identified flags, MinLevel, Rarity, and all LootEffects round-trip.
+                Inventory = player.Inventory?.Select(InventoryItemData.FromItem).ToList() ?? new List<InventoryItemData>(),
 
                 // Dynamic equipment (items equipped from dungeon loot that need definitions saved)
                 // Must include dynamic IDs from BOTH player's equipped items AND companion equipped items,
@@ -1103,34 +1077,9 @@ namespace UsurperRemake.Systems
             if (!UsurperRemake.Locations.HomeLocation.PlayerChests.TryGetValue(playerKey, out var chest) || chest.Count == 0)
                 return null;
 
-            return chest.Select(item => new InventoryItemData
-            {
-                Name = item.Name,
-                Value = item.Value,
-                Type = item.Type,
-                Attack = item.Attack,
-                Armor = item.Armor,
-                Strength = item.Strength,
-                Dexterity = item.Dexterity,
-                Wisdom = item.Wisdom,
-                Defence = item.Defence,
-                BlockChance = item.BlockChance,
-                ShieldBonus = item.ShieldBonus,
-                HP = item.HP,
-                Mana = item.Mana,
-                Charisma = item.Charisma,
-                Agility = item.Agility,
-                Stamina = item.Stamina,
-                MinLevel = item.MinLevel,
-                IsCursed = item.IsCursed,
-                IsIdentified = item.IsIdentified,
-                Shop = item.Shop,
-                Dungeon = item.Dungeon,
-                Description = item.Description?.ToList() ?? new List<string>(),
-                LootEffects = item.LootEffects?.Count > 0
-                    ? item.LootEffects.Select(e => new LootEffectData { EffectType = e.EffectType, Value = e.Value }).ToList()
-                    : null
-            }).ToList();
+            // issue #112: same full-fidelity converter the player inventory uses, so chest-stored
+            // reforged gear keeps its rarity (and all stats/effects) across save/load.
+            return chest.Select(InventoryItemData.FromItem).ToList();
         }
 
         private PlayerAchievementsData SerializeAchievements(Character player)
@@ -1335,35 +1284,8 @@ namespace UsurperRemake.Systems
                     // v0.57.4: personal bag (items players transferred to this NPC
                     // teammate via combat [T] / Home / Team Corner / dungeon viewer).
                     // Same Item ↔ InventoryItemData round-trip the player uses.
-                    Inventory = npc.Inventory?.Where(i => i != null).Select(item => new InventoryItemData
-                    {
-                        Name = item.Name,
-                        Value = item.Value,
-                        Type = item.Type,
-                        Attack = item.Attack,
-                        Armor = item.Armor,
-                        Strength = item.Strength,
-                        Dexterity = item.Dexterity,
-                        Wisdom = item.Wisdom,
-                        Defence = item.Defence,
-                        BlockChance = item.BlockChance,
-                        ShieldBonus = item.ShieldBonus,
-                        HP = item.HP,
-                        Mana = item.Mana,
-                        Charisma = item.Charisma,
-                        Agility = item.Agility,
-                        Stamina = item.Stamina,
-                        MinLevel = item.MinLevel,
-                        IsCursed = item.IsCursed,
-                        Cursed = item.Cursed,
-                        IsIdentified = item.IsIdentified,
-                        Shop = item.Shop,
-                        Dungeon = item.Dungeon,
-                        Description = item.Description?.ToList() ?? new List<string>(),
-                        LootEffects = item.LootEffects?.Count > 0
-                            ? item.LootEffects.Select(e => new LootEffectData { EffectType = e.EffectType, Value = e.Value }).ToList()
-                            : null,
-                    }).ToList() ?? new List<InventoryItemData>(),
+                    // issue #112: full-fidelity converter (carries rarity + all stats) so NPC-bag items round-trip.
+                    Inventory = npc.Inventory?.Where(i => i != null).Select(InventoryItemData.FromItem).ToList() ?? new List<InventoryItemData>(),
 
                     // Modern RPG Equipment System - save equipped items
                     EquippedItems = npc.EquippedItems?.ToDictionary(

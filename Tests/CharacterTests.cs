@@ -1,3 +1,4 @@
+using System.Linq;
 using Xunit;
 using FluentAssertions;
 
@@ -152,6 +153,56 @@ public class CharacterTests
         var character = new Character { Sex = sex };
 
         character.Sex.Should().Be(sex);
+    }
+
+    // v0.65.3: a teammate who died/left leaves an orphaned XP slot. With auto-redistribute ON,
+    // its share splits among the player and surviving teammates; nothing strands on the empty slot.
+    [Fact]
+    public void ReclaimOrphanedTeamXP_RedistributeOn_SplitsDeadShareAndStrandsNothing()
+    {
+        var player = new Character
+        {
+            HP = 100,
+            AutoRedistributeXP = true,
+            // player 34, teammate-slot-1 33, teammate-slot-2 33 (the slot-2 teammate has since died/left)
+            TeamXPPercent = new[] { 34, 33, 33, 0, 0 }
+        };
+        // Only the surviving teammate remains in the party list (the dead one was removed).
+        var teammates = new System.Collections.Generic.List<Character>
+        {
+            new Character { HP = 100, Level = 10 }
+        };
+
+        CombatEngine.ReclaimOrphanedTeamXP(player, teammates);
+
+        player.TeamXPPercent[2].Should().Be(0, "the orphaned slot's share must be reclaimed, not stranded");
+        player.TeamXPPercent.Sum().Should().Be(100, "no XP percentage may be lost");
+        player.TeamXPPercent[0].Should().BeGreaterThan(34, "player shares in the redistributed amount");
+        player.TeamXPPercent[1].Should().BeGreaterThan(33, "the surviving teammate shares in the redistributed amount");
+    }
+
+    // v0.65.3: with auto-redistribute OFF the orphaned share is banked entirely on the player
+    // (still no silent loss), and the surviving teammate's deliberate split is preserved.
+    [Fact]
+    public void ReclaimOrphanedTeamXP_RedistributeOff_BanksOnPlayer()
+    {
+        var player = new Character
+        {
+            HP = 100,
+            AutoRedistributeXP = false,
+            TeamXPPercent = new[] { 34, 33, 33, 0, 0 }
+        };
+        var teammates = new System.Collections.Generic.List<Character>
+        {
+            new Character { HP = 100, Level = 10 }
+        };
+
+        CombatEngine.ReclaimOrphanedTeamXP(player, teammates);
+
+        player.TeamXPPercent[2].Should().Be(0, "the orphaned slot must be cleared");
+        player.TeamXPPercent[0].Should().Be(67, "player banks the dead slot's share when auto-redistribute is off");
+        player.TeamXPPercent[1].Should().Be(33, "the surviving teammate's share is untouched when off");
+        player.TeamXPPercent.Sum().Should().Be(100);
     }
 
     [Fact]

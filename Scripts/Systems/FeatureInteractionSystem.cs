@@ -1583,7 +1583,9 @@ public class FeatureInteractionSystem
         multiplier = Math.Max(1.0, multiplier);
 
         int baseReward = random.Next(baseMin, baseMax + 1);
-        return (long)(baseReward * multiplier);
+        // v0.65.3: dungeon features are much rarer now (see DungeonGenerator.GenerateRoomFeatures),
+        // so each reward is bumped to compensate -- the ones you find should feel worth it.
+        return (long)(baseReward * multiplier * GameConfig.DungeonFeatureRewardMultiplier);
     }
 
     #endregion

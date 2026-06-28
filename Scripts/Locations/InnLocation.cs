@@ -2433,6 +2433,15 @@ public class InnLocation : BaseLocation
         // monotonically decreased over a character's lifetime once burned.
         CompanionSystem.Instance?.RefillAllPartyPotions(currentPlayer);
 
+        // v0.65.3: a night's sleep also heals the party to full (player report: companions/team NPCs
+        // never recovered HP in town, forcing dungeon trips just to hand them potions).
+        int partyHealed = CompanionSystem.Instance?.RestoreAllPartyHP(currentPlayer) ?? 0;
+        if (partyHealed > 0)
+        {
+            terminal.SetColor("green");
+            terminal.WriteLine(Loc.Get("companion.party_rested"));
+        }
+
         if (currentPlayer.MurderWeight >= 3f)
         {
             terminal.WriteLine(Loc.Get("inn.sleep_dark_memories"), "dark_red");
@@ -4753,8 +4762,6 @@ public class InnLocation : BaseLocation
 
     #region Gambling Den
 
-    private int _armWrestlesToday = 0;
-
     private async Task HandleGamblingDen()
     {
         terminal.ClearScreen();
@@ -4770,7 +4777,7 @@ public class InnLocation : BaseLocation
         terminal.WriteLine(Loc.Get("inn.your_gold", currentPlayer.Gold.ToString("N0")));
         terminal.WriteLine("");
 
-        var armWrestles = DoorMode.IsOnlineMode ? currentPlayer.ArmWrestlesToday : _armWrestlesToday;
+        var armWrestles = currentPlayer.ArmWrestlesToday;
 
         if (IsScreenReader)
         {
@@ -5164,7 +5171,7 @@ public class InnLocation : BaseLocation
         WriteSectionHeader(Loc.Get("inn.arm_wrestling"), "bright_red");
         terminal.WriteLine("");
 
-        var armWrestles = DoorMode.IsOnlineMode ? currentPlayer.ArmWrestlesToday : _armWrestlesToday;
+        var armWrestles = currentPlayer.ArmWrestlesToday;
         if (armWrestles >= GameConfig.MaxArmWrestlesPerDay)
         {
             terminal.SetColor("yellow");
@@ -5233,10 +5240,11 @@ public class InnLocation : BaseLocation
             return;
         }
 
-        if (DoorMode.IsOnlineMode)
-            currentPlayer.ArmWrestlesToday++;
-        else
-            _armWrestlesToday++;
+        // v0.65.3: single-player previously tracked this in a transient InnLocation field
+        // (_armWrestlesToday) that the daily reset never cleared, so the cap stuck at 3/3 after
+        // sleeping until the location object was recreated on reload. Now both modes use the
+        // persisted, daily-reset Character counter.
+        currentPlayer.ArmWrestlesToday++;
 
         terminal.WriteLine("");
         terminal.SetColor("white");
@@ -5289,7 +5297,7 @@ public class InnLocation : BaseLocation
         terminal.SetColor("bright_yellow");
         terminal.WriteLine(Loc.Get("inn.gold_remaining", currentPlayer.Gold.ToString("N0")));
         terminal.SetColor("darkgray");
-        var armWrestlesDone = DoorMode.IsOnlineMode ? currentPlayer.ArmWrestlesToday : _armWrestlesToday;
+        var armWrestlesDone = currentPlayer.ArmWrestlesToday;
         terminal.WriteLine(Loc.Get("inn.aw_matches_today", armWrestlesDone, GameConfig.MaxArmWrestlesPerDay));
         await terminal.PressAnyKey();
     }

@@ -1758,4 +1758,114 @@ public class SaveRoundTripTests
     }
 
     #endregion
+
+    #region Item Rarity + Full-Fidelity Round Trip (issue #112 / #111)
+
+    [Fact]
+    public void Item_RoundTrip_PreservesRarityAndStats()
+    {
+        // issue #112: unequipping a reforged item must not reset its rarity (which re-armed the
+        // reforge upgrade boost) or drop stats. The Item <-> InventoryItemData round trip (used by
+        // save/load, the home chest, trades, and NPC bags) must carry rarity + every stat that the
+        // old hand-rolled subset maps dropped: Agility, Charisma, Stamina, BlockChance, MinLevel,
+        // and the LootEffects list (Constitution here).
+        var original = new global::Item
+        {
+            Name = "Reforged Greatsword",
+            Type = global::ObjType.Weapon,
+            Attack = 30,                 // low base power: name/power heuristic alone would read Common
+            Rarity = EquipmentRarity.Epic,
+            Strength = 12,
+            Agility = 7,
+            Charisma = 4,
+            Stamina = 9,
+            BlockChance = 15,
+            Defence = 6,
+            MinLevel = 40,
+            IsCursed = false
+        };
+        original.LootEffects.Add(((int)LootGenerator.SpecialEffect.Constitution, 5));
+
+        var dto = InventoryItemData.FromItem(original);
+        var json = JsonSerializer.Serialize(dto, _jsonOptions);
+        var restoredDto = JsonSerializer.Deserialize<InventoryItemData>(json, _jsonOptions);
+        var restored = restoredDto!.ToItem();
+
+        restored.Rarity.Should().Be(EquipmentRarity.Epic, "rarity must survive the round trip so unequip/re-equip cannot reset reforged quality");
+        restored.Agility.Should().Be(7, "Agility must not be dropped on unequip/save");
+        restored.Charisma.Should().Be(4, "Charisma must not be dropped");
+        restored.Stamina.Should().Be(9, "Stamina must not be dropped");
+        restored.BlockChance.Should().Be(15, "BlockChance must not be dropped");
+        restored.MinLevel.Should().Be(40, "MinLevel must survive");
+        restored.Strength.Should().Be(12);
+        restored.LootEffects.Should().ContainSingle(e => e.EffectType == (int)LootGenerator.SpecialEffect.Constitution && e.Value == 5,
+            "the Constitution LootEffect must survive (the shield Con loss in the report)");
+    }
+
+    [Fact]
+    public void Item_RoundTrip_DefaultsRarityToCommonForLegacySaves()
+    {
+        // A pre-#112 save has no `rarity` key on inventory entries; it must deserialize to Common
+        // (no crash, no false high-rarity). The cosmetic display still falls back to the name/power
+        // heuristic via GetItemRarity, so a high-power legacy item is not visually downgraded.
+        var legacyJson = "{\"name\":\"Old Blade\",\"attack\":120,\"type\":0}";
+        var dto = JsonSerializer.Deserialize<InventoryItemData>(legacyJson, _jsonOptions);
+        var item = dto!.ToItem();
+
+        item.Rarity.Should().Be(EquipmentRarity.Common, "a save with no rarity field defaults to Common (safe direction)");
+        // The name/power heuristic still surfaces a sensible rarity for display.
+        LootGenerator.GetItemRarity(item).Should().Be(LootGenerator.ItemRarity.Epic, "power 120 derives Epic even with stored Common");
+    }
+
+    [Fact]
+    public void BuildEquipmentFromItem_PreservesShieldBlockRarityAndEffects()
+    {
+        // issue #112: the shared Item->Equipment builder (single source of truth for every re-equip
+        // path) must restore a shield's block value from item.ShieldBonus (NOT item.Armor, which is 0
+        // for a canonical shield), carry the stored Rarity, and transfer LootEffects.
+        var shieldItem = new global::Item
+        {
+            Name = "Reforged Tower Shield",
+            Type = global::ObjType.Shield,
+            Armor = 0,            // canonical shield: value lives in ShieldBonus, Armor stays 0
+            ShieldBonus = 18,
+            BlockChance = 25,
+            Rarity = EquipmentRarity.Epic,
+            Defence = 6,
+            MinLevel = 40
+        };
+        shieldItem.LootEffects.Add(((int)LootGenerator.SpecialEffect.Constitution, 5));
+
+        var equip = Character.BuildEquipmentFromItem(shieldItem, EquipmentSlot.OffHand, WeaponHandedness.OffHandOnly, WeaponType.Shield);
+
+        equip.ShieldBonus.Should().Be(18, "shield block value must be restored from item.ShieldBonus");
+        equip.ArmorClass.Should().Be(0, "a shield's ArmorClass stays 0 (value is in ShieldBonus)");
+        equip.BlockChance.Should().Be(25);
+        equip.Rarity.Should().Be(EquipmentRarity.Epic, "rarity must survive re-equip so reforged quality cannot reset");
+        equip.DefenceBonus.Should().Be(6);
+        equip.MinLevel.Should().Be(40);
+        equip.ConstitutionBonus.Should().Be(5, "the Constitution LootEffect must transfer onto the Equipment");
+    }
+
+    [Fact]
+    public void BuildEquipmentFromItem_RecoversLegacyShieldBlockFromArmor()
+    {
+        // Legacy pre-#112 saves stored a shield's block value in item.Armor (ShieldBonus=0).
+        // Math.Max recovers it, and ArmorClass stays 0 so there is no ArmPow double-count.
+        var legacyShield = new global::Item
+        {
+            Name = "Old Iron Shield",
+            Type = global::ObjType.Shield,
+            Armor = 12,           // legacy: value in Armor
+            ShieldBonus = 0,
+            Rarity = EquipmentRarity.Common
+        };
+
+        var equip = Character.BuildEquipmentFromItem(legacyShield, EquipmentSlot.OffHand, WeaponHandedness.OffHandOnly, WeaponType.Shield);
+
+        equip.ShieldBonus.Should().Be(12, "legacy shield block value stored in item.Armor must be recovered");
+        equip.ArmorClass.Should().Be(0, "shield ArmorClass stays 0 -- no double-count with ShieldBonus");
+    }
+
+    #endregion
 }
