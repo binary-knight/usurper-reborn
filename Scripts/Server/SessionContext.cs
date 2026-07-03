@@ -82,6 +82,11 @@ public class SessionContext : IDisposable
     // every visit. Cross-session dedup is the table's UNIQUE constraint.
     public bool OnboardingTownRecorded { get; set; } = false;
 
+    // v0.65.4: once-per-session gate for the entered_dungeon onboarding event.
+    // Splits the create->first_kill funnel gap so we can tell whether lost
+    // players never entered the dungeon vs entered and wandered/quit.
+    public bool OnboardingDungeonRecorded { get; set; } = false;
+
     /// <summary>
     /// v0.60.3: consecutive emit failure counter. Reset to 0 on every successful
     /// emit; after GmcpBridge.MaxConsecutiveErrors failures in a row the bridge

@@ -1060,6 +1060,19 @@ public static class TrainingSystem
         terminal.WriteLine(Loc.Get("training.training_skill", skillName, GetProficiencyName(proficiency)), "cyan");
         terminal.WriteLine($"{Loc.Get("training.progress_toward", currentProgress, progressNeeded, $"[{nextLevelColor}]{nextLevelName}[/]")}", "white");
         terminal.WriteLine(Loc.Get("training.cost_per_point", costPerPoint), "gray");
+
+        // v0.65.4: show what training actually buys -- effect multiplier, hit modifier, and fizzle
+        // chance for the current tier and the next tier. The auto-attack-vs-abilities tension is good
+        // design; it only read as a trap because every number was invisible (and v0.49.9 hid the
+        // fizzle chance entirely, making ability misfires feel like bugs).
+        terminal.SetColor("gray");
+        terminal.WriteLine($"  {Loc.Get("training.tier_effect_now", GetProficiencyName(proficiency), $"{GetEffectMultiplier(proficiency):0.00}", GetRollModifier(proficiency).ToString("+0;-0;0"), GetFailureChance(proficiency))}");
+        if ((int)nextLevel <= (int)ProficiencyLevel.Legendary)
+        {
+            terminal.SetColor("bright_green");
+            terminal.WriteLine($"  {Loc.Get("training.tier_effect_next", nextLevelName, $"{GetEffectMultiplier(nextLevel):0.00}", GetRollModifier(nextLevel).ToString("+0;-0;0"), GetFailureChance(nextLevel))}");
+        }
+        terminal.SetColor("white");
         terminal.WriteLine("");
 
         // Always show option to train 1 point

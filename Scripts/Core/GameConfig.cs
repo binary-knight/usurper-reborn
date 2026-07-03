@@ -10,7 +10,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.65.3";
+    public const string Version = "0.65.4";
     public const string VersionName = "Countdown"; // the Beta -> 1.0 release-prep cycle
 
     // v0.57.12: Alignment scale cap. Character.Chivalry and Character.Darkness setters clamp to [0, AlignmentCap]
@@ -1027,6 +1027,12 @@ public static partial class GameConfig
     public const int BarbarianInnateBloodlustHealBase = 4;      // flat HP per kill
     public const int BarbarianInnateBloodlustHealPerLevel = 1;  // +1 HP per character level
     public const int BarbarianInnateBloodlustHealCap = 25;      // hard per-kill cap
+
+    // Player specializations (v0.65.4). Extends the NPC-only spec system to players: choose one of
+    // your class's two specs at the Level Master from level 25. Additive stat growth on FUTURE
+    // level-ups (no retro) + the spec's combat passives. Swappable for a gold respec.
+    public const int SpecializationUnlockLevel = 25;            // Maelketh floor -- "you survived the first god, choose who you are"
+    public const long SpecializationRespecCost = 25000;         // gold to change spec after the first (free) pick
 
     // Straggler Encounters (v0.49.3) — occasional easy fights for power fantasy
     public const float StragglerEncounterChance = 0.15f; // 15% chance of weaker monster

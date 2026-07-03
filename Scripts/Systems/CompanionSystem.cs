@@ -1523,6 +1523,7 @@ namespace UsurperRemake.Systems
                     PersonalQuestStarted = c.PersonalQuestStarted,
                     PersonalQuestCompleted = c.PersonalQuestCompleted,
                     PersonalQuestSuccess = c.PersonalQuestSuccess,
+                    PersonalQuestBeat = c.PersonalQuestBeat,
                     RecruitedDay = c.RecruitedDay,
                     RecruitedDate = c.RecruitedDate,
                     DeathType = c.DeathType,
@@ -1594,6 +1595,7 @@ namespace UsurperRemake.Systems
                 companion.PersonalQuestStarted = false;
                 companion.PersonalQuestCompleted = false;
                 companion.PersonalQuestSuccess = false;
+                companion.PersonalQuestBeat = 0;
                 companion.RecruitedDay = 0;
                 companion.History.Clear();
                 companion.EquippedItems.Clear();
@@ -1650,6 +1652,7 @@ namespace UsurperRemake.Systems
                     companion.PersonalQuestStarted = save.PersonalQuestStarted;
                     companion.PersonalQuestCompleted = save.PersonalQuestCompleted;
                     companion.PersonalQuestSuccess = save.PersonalQuestSuccess;
+                    companion.PersonalQuestBeat = save.PersonalQuestBeat;
                     companion.RecruitedDay = save.RecruitedDay;
                     companion.RecruitedDate = save.RecruitedDate != DateTime.MinValue ? save.RecruitedDate : DateTime.UtcNow;
                     companion.DeathType = save.DeathType;
@@ -2476,6 +2479,38 @@ namespace UsurperRemake.Systems
         /// Get a context-sensitive idle comment from a companion, or null if nothing to say.
         /// Returns null ~85% of the time (15% trigger rate is handled by caller).
         /// </summary>
+        /// <summary>
+        /// v0.65.4 companion quest chains ("The Long Road"): minimum dungeon floor at which a chain
+        /// beat becomes eligible. No upper bound -- a player who out-levels a band still gets the
+        /// beat on any deeper floor, in order (anti-miss rule). Bands respect actual recruit levels
+        /// (Aldric 10, Lyris 15, Mira/Melodia 20, Vex 25) and lead into the untouched final quests.
+        /// Returns 0 for unknown combinations (beat never fires).
+        /// </summary>
+        public static int GetChainBeatMinFloor(CompanionId id, int beat) => (id, beat) switch
+        {
+            (CompanionId.Aldric, 1) => 10,
+            (CompanionId.Aldric, 2) => 30,
+            (CompanionId.Vex, 1) => 25,
+            (CompanionId.Vex, 2) => 45,
+            (CompanionId.Lyris, 1) => 15,
+            (CompanionId.Lyris, 2) => 45,
+            (CompanionId.Mira, 1) => 20,
+            (CompanionId.Mira, 2) => 32,
+            (CompanionId.Melodia, 1) => 20,
+            (CompanionId.Melodia, 2) => 38,
+            _ => 0
+        };
+
+        /// <summary>
+        /// v0.65.4: town breadcrumb after a chain beat completes -- queued through the existing
+        /// pendingNotifications channel so players who park companions still learn the story moved.
+        /// </summary>
+        public void QueueChainNotification(Companion companion)
+        {
+            if (companion == null) return;
+            pendingNotifications.Enqueue(Loc.Get("cbeat.town_notice", companion.Name));
+        }
+
         public static string? GetCompanionIdleComment(CompanionId id, int dungeonLevel, Character player, bool afterCombat)
         {
             _recentIdleComments ??= new HashSet<string>();
@@ -2545,6 +2580,28 @@ namespace UsurperRemake.Systems
                     if (dungeonLevel >= 50) pool.Add(Loc.Get("companion.idle.melodia.opus50"));
                     if (dungeonLevel >= 70) pool.Add(Loc.Get("companion.idle.melodia.gods70"));
                     break;
+            }
+
+            // v0.65.4 companion chains: echo lines keep completed beats present between beats, and a
+            // double-weighted nudge line telegraphs that the next beat's floor band has been reached.
+            // Skipped on Old God floors (keeps Mira's floor-40 Veloura-only pool pure, and god floors
+            // shouldn't carry side-story chatter).
+            if (!UsurperRemake.Systems.ProgressionRoadmap.OldGodFloors.Contains(dungeonLevel))
+            {
+                var chainComp = Instance?.GetActiveCompanions()?.FirstOrDefault(c => c.Id == id);
+                if (chainComp != null)
+                {
+                    string ck = id.ToString().ToLowerInvariant();
+                    if (chainComp.PersonalQuestBeat >= 1) pool.Add(Loc.Get($"companion.idle.{ck}.chain1_echo"));
+                    if (chainComp.PersonalQuestBeat >= 2) pool.Add(Loc.Get($"companion.idle.{ck}.chain2_echo"));
+                    if (!chainComp.PersonalQuestCompleted && chainComp.PersonalQuestBeat < 2
+                        && dungeonLevel >= GetChainBeatMinFloor(id, chainComp.PersonalQuestBeat + 1))
+                    {
+                        string nudge = Loc.Get($"companion.idle.{ck}.chain_nudge");
+                        pool.Add(nudge);
+                        pool.Add(nudge); // double weight so anticipation surfaces sooner
+                    }
+                }
             }
 
             if (pool.Count == 0) return null;
@@ -2766,6 +2823,13 @@ namespace UsurperRemake.Systems
         public bool PersonalQuestSuccess { get; set; }
         public string PersonalQuestLocationHint { get; set; } = ""; // Where to complete
 
+        // v0.65.4: personal quest CHAIN progress. The final quest used to be the companion's only
+        // story content (firing 40-80 floors after recruitment -- "a whole lot of nothing until
+        // then"). Each companion now has two earlier beats that foreshadow the final quest.
+        // 0 = no beats seen; 1 = beat 1 done; 2 = beat 2 done (final quest is tracked separately
+        // by the existing PersonalQuest* flags). Beats fire once, in order, in the dungeon.
+        public int PersonalQuestBeat { get; set; } = 0;
+
         public bool RomanceAvailable { get; set; }
         public bool CanDiePermanently { get; set; }
 
@@ -2900,6 +2964,7 @@ namespace UsurperRemake.Systems
         public bool PersonalQuestStarted { get; set; }
         public bool PersonalQuestCompleted { get; set; }
         public bool PersonalQuestSuccess { get; set; }
+        public int PersonalQuestBeat { get; set; }  // v0.65.4: chain beat progress (0-2)
         public int RecruitedDay { get; set; }
         public DateTime RecruitedDate { get; set; }
         public DeathType? DeathType { get; set; }

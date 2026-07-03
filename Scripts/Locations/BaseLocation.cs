@@ -715,6 +715,24 @@ public abstract class BaseLocation
                     terminal.WriteLine("");
                     terminal.SetColor("bright_green");
                     terminal.WriteLine($"  {Loc.Get("base.level_up", currentPlayer.Level)}");
+
+                    // v0.65.4: announce what unlocked and what's next, so progression is visible
+                    // instead of new abilities silently appearing in the quickbar.
+                    int fromLevel = currentPlayer.Level - levelsGained + 1;
+                    var justUnlocked = UsurperRemake.Systems.ProgressionRoadmap.GetAllUnlocks(currentPlayer)
+                        .Where(u => u.Level >= fromLevel && u.Level <= currentPlayer.Level).ToList();
+                    foreach (var u in justUnlocked)
+                    {
+                        terminal.SetColor("bright_cyan");
+                        terminal.WriteLine($"  {Loc.Get(u.IsSpell ? "base.new_spell_unlocked" : "base.new_ability_unlocked", u.Name)}");
+                    }
+                    var nextUnlock = UsurperRemake.Systems.ProgressionRoadmap.GetNextUnlocks(currentPlayer, 1);
+                    if (nextUnlock.Count > 0)
+                    {
+                        terminal.SetColor("gray");
+                        terminal.WriteLine($"  {Loc.Get("base.next_unlock", nextUnlock[0].Name, nextUnlock[0].Level)}");
+                    }
+
                     terminal.SetColor("yellow");
                     if (currentPlayer.TrainingPoints > 0)
                         terminal.WriteLine($"  {Loc.Get("base.training_points_hint")}");
@@ -2751,6 +2769,12 @@ public abstract class BaseLocation
                 await ShowJournal();
                 return (true, false);
 
+            case "path":
+            case "roadmap":
+                // v0.65.4: The Path Ahead -- next ability/spell unlocks + next story gate.
+                await ShowProgressionRoadmap();
+                return (true, false);
+
             case "g":
             case "gold":
                 await ShowGoldStatus();
@@ -3197,6 +3221,70 @@ public abstract class BaseLocation
             terminal.WriteLine($"/deny - {Loc.Get("base.help_deny")}");
         }
 
+        terminal.WriteLine("");
+        await terminal.PressAnyKey();
+    }
+
+    /// <summary>
+    /// v0.65.4: "The Path Ahead" -- the class progression ladder made visible. Shows current level +
+    /// XP to next, the next 3 ability/spell unlocks, and the next story gate. Reframes every mid-game
+    /// "dead zone" as a countdown. Reachable via /path, /roadmap, and [P] Path at the Level Master.
+    /// </summary>
+    protected async Task ShowProgressionRoadmap()
+    {
+        var player = currentPlayer;
+        if (player == null) return;
+
+        terminal.WriteLine("");
+        WriteBoxHeader(Loc.Get("path.header"), "bright_cyan");
+        terminal.WriteLine("");
+
+        terminal.SetColor("white");
+        terminal.WriteLine($"  {Loc.Get("path.level_line", player.ClassName, player.Level)}");
+        if (player.Level < 100)
+        {
+            long nextXp = GameConfig.GetExperienceForLevel(player.Level + 1);
+            long remaining = Math.Max(0, nextXp - player.Experience);
+            terminal.SetColor("gray");
+            terminal.WriteLine($"  {Loc.Get("path.xp_to_next", player.Experience, nextXp, remaining)}");
+        }
+        terminal.WriteLine("");
+
+        // Next ability/spell unlocks
+        var upcoming = UsurperRemake.Systems.ProgressionRoadmap.GetNextUnlocks(player, 3);
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine($"  {Loc.Get("path.next_unlocks")}");
+        if (upcoming.Count == 0)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine($"    {Loc.Get("path.no_more_unlocks")}");
+        }
+        else
+        {
+            foreach (var u in upcoming)
+            {
+                terminal.SetColor("cyan");
+                string kind = Loc.Get(u.IsSpell ? "path.kind_spell" : "path.kind_ability");
+                terminal.WriteLine($"    {Loc.Get("path.unlock_line", u.Level, u.Name, kind)}");
+            }
+        }
+        terminal.WriteLine("");
+
+        // Next story gate (Old God boss floor or seal floor)
+        var gate = UsurperRemake.Systems.ProgressionRoadmap.GetNextStoryGate(player);
+        terminal.SetColor("bright_magenta");
+        terminal.WriteLine($"  {Loc.Get("path.next_story")}");
+        if (gate == null)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine($"    {Loc.Get("path.no_more_story")}");
+        }
+        else
+        {
+            terminal.SetColor("magenta");
+            string label = gate.Value.isOldGod ? Loc.Get("path.gate_old_god") : Loc.Get("path.gate_seal");
+            terminal.WriteLine($"    {Loc.Get("path.gate_line", gate.Value.floor, label)}");
+        }
         terminal.WriteLine("");
         await terminal.PressAnyKey();
     }

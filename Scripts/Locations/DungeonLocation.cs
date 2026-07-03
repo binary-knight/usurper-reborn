@@ -312,6 +312,9 @@ public class DungeonLocation : BaseLocation
         // Defensive deduplication after all team restoration methods
         DeduplicateTeammates();
 
+        // v0.65.4 companion chains: reset the one-beat-per-companion-per-visit pacing guard
+        chainBeatsFiredThisVisit.Clear();
+
         // Check for dungeon entry fees for overleveled teammates
         // Player can always enter - unaffordable allies simply stay behind
         await CheckAndPayEntryFees(player, term);
@@ -319,13 +322,33 @@ public class DungeonLocation : BaseLocation
         // Setup group dungeon mode: notify followers, mark group in-dungeon
         await SetupGroupDungeon(player, term);
 
-        // Show contextual hint for new players on their first dungeon entry
-        HintSystem.Instance.TryShowHint(HintSystem.HINT_FIRST_DUNGEON, term, player.HintsShown);
+        // v0.65.4: entered_dungeon onboarding event (session-gated, online-only). Splits the
+        // character_created -> first_kill funnel gap so we can measure where players are lost.
+        var dungeonFunnelCtx = UsurperRemake.Server.SessionContext.Current;
+        if (dungeonFunnelCtx != null && !dungeonFunnelCtx.OnboardingDungeonRecorded
+            && UsurperRemake.BBS.DoorMode.IsOnlineMode)
+        {
+            dungeonFunnelCtx.OnboardingDungeonRecorded = true;
+            try
+            {
+                (SaveSystem.Instance?.Backend as UsurperRemake.Systems.SqlSaveBackend)?.RecordOnboardingEvent(
+                    dungeonFunnelCtx.Username ?? "", "entered_dungeon", dungeonFunnelCtx.ConnectionType);
+            }
+            catch { /* telemetry is decoration */ }
+        }
 
-        // Show guided tutorial for first-time dungeon visitors on floor 1
-        if (currentDungeonLevel == 1 && !player.HintsShown.Contains(DUNGEON_TUTORIAL_FLAG))
+        // v0.65.4: the first-dungeon hint used to print here and then get wiped by the tutorial's
+        // ClearScreen on the exact entry it displays. Only show the hint when the tutorial is NOT
+        // about to run (later floor-1 re-entries, after the tutorial is done); first-timers get the
+        // comprehensive tutorial instead.
+        bool willRunTutorial = currentDungeonLevel == 1 && !player.HintsShown.Contains(DUNGEON_TUTORIAL_FLAG);
+        if (willRunTutorial)
         {
             await RunDungeonTutorial(player, term);
+        }
+        else
+        {
+            HintSystem.Instance.TryShowHint(HintSystem.HINT_FIRST_DUNGEON, term, player.HintsShown);
         }
 
         // Captain Aldric's Mission — dungeon entry objective
@@ -2532,6 +2555,9 @@ public class DungeonLocation : BaseLocation
         // Show exits
         ShowExits(room);
 
+        // v0.65.4: point a brand-new zero-kill player at their first fight (no-op otherwise).
+        ShowFirstFightGuidance(room, player);
+
         // Show room actions
         ShowRoomActions(room);
 
@@ -2641,6 +2667,9 @@ public class DungeonLocation : BaseLocation
             terminal.SetColor("white");
             terminal.WriteLine(string.Join(", ", teammates.Select(t => t.Name2)));
         }
+
+        // v0.65.4: first-fight guidance for brand-new zero-kill players (no-op otherwise).
+        ShowFirstFightGuidance(room, player);
 
         terminal.WriteLine("");
 
@@ -3349,6 +3378,20 @@ public class DungeonLocation : BaseLocation
         // Gold
         terminal.SetColor("yellow");
         terminal.Write($"{Loc.Get("status.gold_label")}: {player.Gold:N0}");
+
+        // v0.65.4: ambient XP progress -- makes every fight visibly count toward the next level,
+        // the cheapest lever on the "one more fight before I log off" impulse (and the L1-3 stall).
+        terminal.Write("  ");
+        terminal.SetColor("bright_cyan");
+        if (player.Level < 100)
+        {
+            long nextXp = GameConfig.GetExperienceForLevel(player.Level + 1);
+            terminal.Write(Loc.Get("status.xp_compact", player.Level, player.Experience, nextXp));
+        }
+        else
+        {
+            terminal.Write(Loc.Get("status.xp_max", player.Level));
+        }
 
         // Fatigue indicator (only when Tired or Exhausted)
         var (fatigueLabel, fatigueColor) = player.GetFatigueTier();
@@ -4688,7 +4731,11 @@ public class DungeonLocation : BaseLocation
             // Vex is unaffected (no floor range, can trigger anywhere).
             if (player != null)
             {
-                await CheckCompanionQuestEncounters(player, targetRoom);
+                // v0.65.4 companion chains: earlier story beats fire BEFORE the final-quest check so
+                // a beat and a final never stack in one room (the beat returns true when it played).
+                bool beatPlayed = await CheckCompanionChainBeats(player, targetRoom);
+                if (!beatPlayed)
+                    await CheckCompanionQuestEncounters(player, targetRoom);
             }
 
             // 15% chance: companion idle comment while exploring
@@ -12875,6 +12922,77 @@ public class DungeonLocation : BaseLocation
         await ShowDungeonNavigator();
     }
 
+    /// <summary>
+    /// v0.65.4: BFS from the current room to the nearest room that still has monsters (explored or
+    /// not -- a first-time player "hears" it through the walls), returning the first-step direction
+    /// and the distance in rooms. Used to point brand-new zero-kill players at their first fight,
+    /// since all the Main Street onboarding guidance stops at the dungeon door.
+    /// </summary>
+    private bool TryFindNearestFightDirection(out Direction firstStep, out int distance)
+    {
+        firstStep = default;
+        distance = 0;
+        if (currentFloor == null) return false;
+        var current = currentFloor.GetCurrentRoom();
+        if (current == null) return false;
+
+        var parent = new Dictionary<string, (string parentId, Direction dir)>();
+        var visited = new HashSet<string> { current.Id };
+        var queue = new Queue<string>();
+        queue.Enqueue(current.Id);
+        string? foundId = null;
+        while (queue.Count > 0 && foundId == null)
+        {
+            var roomId = queue.Dequeue();
+            var room = currentFloor.Rooms.FirstOrDefault(r => r.Id == roomId);
+            if (room == null) continue;
+            foreach (var kvp in room.Exits.OrderBy(e => e.Key))
+            {
+                var targetId = kvp.Value.TargetRoomId;
+                if (visited.Contains(targetId)) continue;
+                var target = currentFloor.Rooms.FirstOrDefault(r => r.Id == targetId);
+                if (target == null) continue;
+                visited.Add(targetId);
+                parent[targetId] = (roomId, kvp.Key);
+                if (target.HasMonsters && !target.IsCleared) { foundId = targetId; break; }
+                queue.Enqueue(targetId);
+            }
+        }
+        if (foundId == null) return false;
+
+        var steps = new List<Direction>();
+        string cursor = foundId;
+        while (cursor != current.Id && parent.ContainsKey(cursor))
+        {
+            var (pid, dir) = parent[cursor];
+            steps.Add(dir);
+            cursor = pid;
+        }
+        if (steps.Count == 0) return false;
+        steps.Reverse();
+        firstStep = steps[0];
+        distance = steps.Count;
+        return true;
+    }
+
+    /// <summary>
+    /// v0.65.4: one diegetic line pointing a brand-new zero-kill player at their first fight. Only
+    /// fires for a level-1 player with no kills on floor 1, and only when the current room isn't
+    /// already a fight (if it is, the fight is right here). Kept aesthetic-friendly: a sound in the
+    /// dark, not a tutorial arrow.
+    /// </summary>
+    private void ShowFirstFightGuidance(DungeonRoom room, Character? player)
+    {
+        if (player == null || player.MKills > 0 || player.Level > 1 || currentDungeonLevel != 1) return;
+        if (room.HasMonsters && !room.IsCleared) return;
+        if (!TryFindNearestFightDirection(out var dir, out int dist)) return;
+
+        string dirName = Loc.Get($"dungeon.dir_{dir.ToString().ToLowerInvariant()}");
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine($"  {Loc.Get("dungeon.first_fight_guidance", dirName, dist)}");
+        terminal.SetColor("white");
+    }
+
     private async Task ShowDungeonNavigator()
     {
         if (currentFloor == null)
@@ -15503,6 +15621,205 @@ public class DungeonLocation : BaseLocation
         await terminal.PressAnyKey();
     }
 
+    #region Companion Quest Chain Beats (v0.65.4 "The Long Road")
+
+    // At most one chain beat per companion per dungeon visit -- a floor-70 catch-up player gets one
+    // beat per delve (reads as pacing) instead of Beat 1 and Beat 2 two rooms apart. Transient.
+    private readonly HashSet<UsurperRemake.Systems.CompanionId> chainBeatsFiredThisVisit = new();
+
+    /// <summary>
+    /// Chain beat definition: line counts drive the loc-keyed scene renderer (cbeat.{comp}{beat}.*),
+    /// HasFight inserts a real CombatEngine fight after the intro (fled/died = beat defers to a
+    /// later roll), ChoiceLoyalty is the per-choice loyalty delta.
+    /// </summary>
+    private readonly struct ChainBeatDef
+    {
+        public int IntroLines { get; init; }
+        public bool HasFight { get; init; }
+        public int PostLines { get; init; }
+        public int[] ChoiceLoyalty { get; init; }
+    }
+
+    private static readonly Dictionary<(UsurperRemake.Systems.CompanionId id, int beat), ChainBeatDef> ChainBeats = new()
+    {
+        [(UsurperRemake.Systems.CompanionId.Aldric, 1)] = new ChainBeatDef { IntroLines = 4, HasFight = true, PostLines = 6, ChoiceLoyalty = new[] { 10, 6, 2 } },
+        [(UsurperRemake.Systems.CompanionId.Aldric, 2)] = new ChainBeatDef { IntroLines = 5, HasFight = false, PostLines = 6, ChoiceLoyalty = new[] { 12, 8, 4 } },
+        [(UsurperRemake.Systems.CompanionId.Vex, 1)] = new ChainBeatDef { IntroLines = 5, HasFight = false, PostLines = 6, ChoiceLoyalty = new[] { 10, 6, 4 } },
+        [(UsurperRemake.Systems.CompanionId.Vex, 2)] = new ChainBeatDef { IntroLines = 4, HasFight = true, PostLines = 6, ChoiceLoyalty = new[] { 12, 5, 10 } },
+        [(UsurperRemake.Systems.CompanionId.Lyris, 1)] = new ChainBeatDef { IntroLines = 4, HasFight = true, PostLines = 6, ChoiceLoyalty = new[] { 8, 8, 3 } },
+        [(UsurperRemake.Systems.CompanionId.Lyris, 2)] = new ChainBeatDef { IntroLines = 5, HasFight = false, PostLines = 6, ChoiceLoyalty = new[] { 12, 8, 4 } },
+        [(UsurperRemake.Systems.CompanionId.Mira, 1)] = new ChainBeatDef { IntroLines = 5, HasFight = false, PostLines = 6, ChoiceLoyalty = new[] { 10, 7, 8 } },
+        [(UsurperRemake.Systems.CompanionId.Mira, 2)] = new ChainBeatDef { IntroLines = 4, HasFight = true, PostLines = 6, ChoiceLoyalty = new[] { 12, 6, 9 } },
+        [(UsurperRemake.Systems.CompanionId.Melodia, 1)] = new ChainBeatDef { IntroLines = 5, HasFight = false, PostLines = 6, ChoiceLoyalty = new[] { 10, 8, 6 } },
+        [(UsurperRemake.Systems.CompanionId.Melodia, 2)] = new ChainBeatDef { IntroLines = 4, HasFight = true, PostLines = 6, ChoiceLoyalty = new[] { 12, 9, 8 } },
+    };
+
+    /// <summary>
+    /// v0.65.4: fire the next chain beat for an eligible active companion. Beats are the earlier
+    /// story episodes that lead into each companion's (untouched) final personal quest -- the fix for
+    /// "companions have nothing to say for 40+ floors after recruitment." Gating: previous beat done,
+    /// floor >= the beat's band start (no upper bound, so beats can't be missed by out-leveling),
+    /// final quest not yet completed (setup scenes after the payoff would read as bugs), not an Old
+    /// God floor, 12% per-room roll, one beat per companion per dungeon visit.
+    /// Returns true when a beat scene played (caller skips the final-quest check for this room).
+    /// </summary>
+    private async Task<bool> CheckCompanionChainBeats(Character player, DungeonRoom room)
+    {
+        if (UsurperRemake.Systems.ProgressionRoadmap.OldGodFloors.Contains(currentDungeonLevel))
+            return false;
+
+        var companionSystem = UsurperRemake.Systems.CompanionSystem.Instance;
+        foreach (var companion in companionSystem.GetActiveCompanions())
+        {
+            if (companion == null || companion.IsDead) continue;
+            if (companion.PersonalQuestCompleted) continue;      // deliberate cutoff after the final
+            if (companion.PersonalQuestBeat >= 2) continue;
+            if (chainBeatsFiredThisVisit.Contains(companion.Id)) continue;
+
+            int nextBeat = companion.PersonalQuestBeat + 1;
+            int minFloor = UsurperRemake.Systems.CompanionSystem.GetChainBeatMinFloor(companion.Id, nextBeat);
+            if (minFloor <= 0 || currentDungeonLevel < minFloor) continue;
+            if (!ChainBeats.ContainsKey((companion.Id, nextBeat))) continue;
+            if (Random.Shared.Next(100) >= 12) continue;
+
+            chainBeatsFiredThisVisit.Add(companion.Id);
+            await RunChainBeat(player, companion, nextBeat);
+            return true; // one scene per room, whether the beat completed or deferred (fled)
+        }
+        return false;
+    }
+
+    private async Task RunChainBeat(Character player, UsurperRemake.Systems.Companion companion, int beat)
+    {
+        var def = ChainBeats[(companion.Id, beat)];
+        string k = $"cbeat.{companion.Id.ToString().ToLowerInvariant()}{beat}";
+
+        terminal.WriteLine("");
+        WriteSectionHeader(Loc.Get($"{k}.title"), "bright_magenta");
+        terminal.WriteLine("");
+        terminal.SetColor("white");
+        for (int i = 0; i < def.IntroLines; i++)
+        {
+            terminal.WriteLine($"  {Loc.Get($"{k}.i{i}")}");
+            await Task.Delay(600);
+        }
+
+        if (def.HasFight)
+        {
+            string fightName = Loc.Get($"{k}.fight");
+            terminal.WriteLine("");
+            terminal.SetColor("red");
+            terminal.WriteLine($"  {Loc.Get("cbeat.fight_approaches", fightName)}");
+            terminal.SetColor("white");
+            await terminal.PressAnyKey();
+
+            // Plain level-appropriate monster (no champion/boss multipliers) -- the scene is the
+            // occasion, the fight is ordinary. Real CombatEngine combat per the v0.47.4 house rule.
+            var monster = MonsterGenerator.GenerateMonster(currentDungeonLevel);
+            monster.Name = fightName;
+            var beatCombatEngine = new CombatEngine(terminal);
+            var result = await beatCombatEngine.PlayerVsMonster(currentPlayer, monster, teammates);
+            if (result.Outcome != CombatOutcome.Victory)
+                return; // fled or died: the beat defers to a later roll, nothing is set
+            terminal.WriteLine("");
+        }
+
+        terminal.SetColor("white");
+        for (int i = 0; i < def.PostLines; i++)
+        {
+            string lineKey = $"{k}.p{i}";
+            // Mira Beat 2: Oralie's "Veloura weeps below" line goes stale if Veloura is already
+            // resolved -- swap in the past-tense variant for that one line.
+            if (companion.Id == UsurperRemake.Systems.CompanionId.Mira && beat == 2 && i == 4 && IsVelouraResolved())
+                lineKey = $"{k}.p4_alt";
+            terminal.WriteLine($"  {Loc.Get(lineKey)}");
+            await Task.Delay(600);
+        }
+
+        // Choice
+        terminal.WriteLine("");
+        for (int c = 1; c <= 3; c++)
+        {
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine($"  [{c}] {Loc.Get($"{k}.c{c}")}");
+        }
+        terminal.SetColor("white");
+        terminal.WriteLine("");
+        var input = (await terminal.GetInput(Loc.Get("cbeat.prompt"))).Trim();
+        int choice = input == "2" ? 2 : input == "3" ? 3 : 1;
+
+        terminal.WriteLine("");
+        terminal.SetColor("cyan");
+        terminal.WriteLine($"  {Loc.Get($"{k}.r{choice}a")}");
+        await Task.Delay(600);
+        terminal.WriteLine($"  {Loc.Get($"{k}.r{choice}b")}");
+        terminal.WriteLine("");
+
+        UsurperRemake.Systems.CompanionSystem.Instance.ModifyLoyalty(
+            companion.Id, def.ChoiceLoyalty[choice - 1], $"quest chain beat {beat}");
+        ApplyChainBeatReward(player, companion, beat);
+
+        terminal.SetColor("bright_green");
+        terminal.WriteLine($"  {Loc.Get($"{k}.reward")}");
+        terminal.SetColor("white");
+
+        companion.PersonalQuestBeat = beat;
+        UsurperRemake.Systems.CompanionSystem.Instance.QueueChainNotification(companion);
+        await terminal.PressAnyKey();
+    }
+
+    /// <summary>Per-beat tangible rewards. All one-shot (gated by the beat counter); none touch
+    /// player combat stats. Companion stat bumps mirror the finals' pattern at quarter scale.</summary>
+    private void ApplyChainBeatReward(Character player, UsurperRemake.Systems.Companion companion, int beat)
+    {
+        switch (companion.Id, beat)
+        {
+            case (UsurperRemake.Systems.CompanionId.Aldric, 2):
+                companion.BaseStats.Defense += 5;
+                break;
+            case (UsurperRemake.Systems.CompanionId.Vex, 1):
+                long gold = currentDungeonLevel * 40L;
+                player.Gold += gold;
+                player.Statistics?.RecordGoldChange(player.Gold);
+                break;
+            case (UsurperRemake.Systems.CompanionId.Vex, 2):
+                player.Healing = Math.Min(player.MaxPotions, player.Healing + 3);
+                break;
+            case (UsurperRemake.Systems.CompanionId.Lyris, 1):
+                player.HerbHealing += 2;
+                break;
+            case (UsurperRemake.Systems.CompanionId.Lyris, 2):
+                companion.BaseStats.Speed += 5;
+                break;
+            case (UsurperRemake.Systems.CompanionId.Mira, 1):
+                player.HP = player.MaxHP;
+                break;
+            case (UsurperRemake.Systems.CompanionId.Mira, 2):
+                companion.BaseStats.HealingPower += 5;
+                break;
+            case (UsurperRemake.Systems.CompanionId.Melodia, 1):
+                player.SongBuffType = 1; // War March
+                player.SongBuffCombats = GameConfig.SongBuffDuration;
+                player.SongBuffValue = GameConfig.SongWarMarchBonus;
+                break;
+            case (UsurperRemake.Systems.CompanionId.Melodia, 2):
+                companion.BaseStats.MagicPower += 5;
+                break;
+            // Aldric beat 1: the badge is flavor -- no tangible reward by design.
+        }
+    }
+
+    private static bool IsVelouraResolved()
+    {
+        var story = UsurperRemake.Systems.StoryProgressionSystem.Instance;
+        if (story == null) return false;
+        if (!story.OldGodStates.TryGetValue(OldGodType.Veloura, out var state)) return false;
+        return state.Status == GodStatus.Defeated || state.Status == GodStatus.Saved
+            || state.Status == GodStatus.Allied || state.Status == GodStatus.Consumed;
+    }
+
+    #endregion
+
     #region Companion Personal Quest Encounters
 
     /// <summary>
@@ -16177,7 +16494,11 @@ public class DungeonLocation : BaseLocation
         // advances cleanly).
         bool dayGateReady = daysWithVex >= 10;
         bool floorGateReady = currentDungeonLevel >= 70;
-        if (!dayGateReady && !floorGateReady)
+        // v0.65.4 chain gate: Beat 2 of Vex's chain ("The Last Cure") is narratively him DECIDING to
+        // start the bucket list, so completing it mechanically unlocks the list -- most players now
+        // reach the final via the chain instead of waiting for floor 70 or the unreliable day counter.
+        bool chainGateReady = vex.PersonalQuestBeat >= 2;
+        if (!dayGateReady && !floorGateReady && !chainGateReady)
             return false;
 
         // Check which bucket list items are done

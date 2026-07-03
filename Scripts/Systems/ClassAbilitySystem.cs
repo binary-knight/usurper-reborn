@@ -206,6 +206,21 @@ public static class ClassAbilitySystem
             SpecialEffect = "execute",
             AvailableToClasses = new[] { CharacterClass.Warrior, CharacterClass.Barbarian, CharacterClass.Assassin }
         },
+        // v0.65.4: fills the Warrior 28->40 ability drought (a 12-level toy gap). A heavy single
+        // hit -- no gimmick, just a reliable stamina-costed nuke between Execute and Last Stand.
+        ["crushing_blow"] = new ClassAbility
+        {
+            Id = "crushing_blow",
+            Name = "Crushing Blow",
+            Description = "A heavy overhead strike that lands with bone-breaking force.",
+            LevelRequired = 34,
+            StaminaCost = 30,
+            Cooldown = 3,
+            Type = AbilityType.Attack,
+            BaseDamage = 75,  // scales with STR
+            SpecialEffect = "",
+            AvailableToClasses = new[] { CharacterClass.Warrior }
+        },
         ["last_stand"] = new ClassAbility
         {
             Id = "last_stand",
@@ -244,6 +259,23 @@ public static class ClassAbilitySystem
             BaseDamage = 40,  // AoE — full damage to each target
             SpecialEffect = "aoe",
             AvailableToClasses = new[] { CharacterClass.Warrior, CharacterClass.Barbarian }
+        },
+        // v0.65.4: fills the Warrior 55->70 ability drought (a 15-level toy gap). A defensive stance
+        // -- raises defense for a few rounds. A generic DefenseBonus buff (Battle Cry pattern), no
+        // new combat handler needed.
+        ["bulwark"] = new ClassAbility
+        {
+            Id = "bulwark",
+            Name = "Bulwark",
+            Description = "Plant your feet and brace, sharply raising your defense for several rounds.",
+            LevelRequired = 62,
+            StaminaCost = 30,
+            Cooldown = 5,
+            Type = AbilityType.Buff,
+            DefenseBonus = 45,
+            Duration = 3,
+            SpecialEffect = "",
+            AvailableToClasses = new[] { CharacterClass.Warrior }
         },
         ["maelketh_fury"] = new ClassAbility
         {
@@ -293,6 +325,24 @@ public static class ClassAbilitySystem
         // BALANCE: Barbarians trade defense for offense. Stats scale well with abilities,
         // making a high-STR barbarian devastating. Rage provides attack bonus but costs defense.
         // ═══════════════════════════════════════════════════════════════════════════════
+        // v0.65.4: Barbarian was the only class with no level-1 active -- its first ability (Rage) is
+        // at 5, and its first sustain (Bloodlust heal-on-kill) at 36. A fresh Barbarian had a plain
+        // auto-attack and nothing else, and died more than any class (telemetry). Wild Swing gives it
+        // a button from level 1 that pairs with the 0.65.3 innate heal-on-kill (kill faster -> heal
+        // sooner). Stamina-gated, no downside, scales with STR.
+        ["wild_swing"] = new ClassAbility
+        {
+            Id = "wild_swing",
+            Name = "Wild Swing",
+            Description = "A furious wind-up blow. Hits harder than a normal swing at the cost of stamina.",
+            LevelRequired = 1,
+            StaminaCost = 12,
+            Cooldown = 0,
+            Type = AbilityType.Attack,
+            BaseDamage = 20,  // scales with STR
+            SpecialEffect = "",
+            AvailableToClasses = new[] { CharacterClass.Barbarian }
+        },
         ["rage"] = new ClassAbility
         {
             Id = "rage",
@@ -1041,7 +1091,11 @@ public static class ClassAbilitySystem
             Id = "song_of_rest",
             Name = "Song of Rest",
             Description = "A soothing melody that heals the entire party. Hummed if no instrument equipped.",
-            LevelRequired = 12,
+            // v0.65.4: 12 -> 18. Bard had a full party toolkit (Vicious Mockery + Inspiring Tune +
+            // party heal + armor shred) by level 14 while other classes were still finding their feet
+            // (0 Bard deaths in telemetry). Pushing the party heal later evens the early-game power
+            // curve without touching Bard's signature identity abilities.
+            LevelRequired = 18,
             StaminaCost = 30,
             Cooldown = 4,
             Type = AbilityType.Heal,
@@ -2657,9 +2711,10 @@ public static class ClassAbilitySystem
             // v0.57.0 spec tank shield damage bonus — Protection Warrior +20%, Guardian Paladin +15%
             // when shield is equipped. Applies to ALL class-ability damage (not just shield abilities)
             // so spec tanks get meaningfully better at everything they do while sword-and-board.
-            if (user is NPC specTankNpc && user.HasShieldEquipped)
+            // v0.65.4: applies to players too (Specialization moved to Character) -- full spec parity.
+            if (user.Specialization != ClassSpecialization.None && user.HasShieldEquipped)
             {
-                float bonus = UsurperRemake.Data.SpecializationData.GetShieldDamageBonus(specTankNpc.Specialization);
+                float bonus = UsurperRemake.Data.SpecializationData.GetShieldDamageBonus(user.Specialization);
                 if (bonus > 0f)
                     scaledDamage *= 1.0 + bonus;
             }
@@ -2680,9 +2735,10 @@ public static class ClassAbilitySystem
                 healingMultiplier += GameConfig.WavecallerHarmonicResonanceBonus; // Harmonic Resonance: +25% healing
 
             // v0.57.0 Guardian Paladin +15% heal while shield equipped
-            if (user is NPC specHealNpc && user.HasShieldEquipped)
+            // v0.65.4: applies to players too (Specialization moved to Character) -- full spec parity.
+            if (user.Specialization != ClassSpecialization.None && user.HasShieldEquipped)
             {
-                float bonus = UsurperRemake.Data.SpecializationData.GetShieldHealBonus(specHealNpc.Specialization);
+                float bonus = UsurperRemake.Data.SpecializationData.GetShieldHealBonus(user.Specialization);
                 if (bonus > 0f) healingMultiplier += bonus;
             }
 

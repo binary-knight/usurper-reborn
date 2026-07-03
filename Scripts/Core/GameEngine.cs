@@ -2947,6 +2947,24 @@ public partial class GameEngine
                 _sleepLocationOnLogin = await HandleSleepReport(sqlBackend);
                 await ShowWhileYouWereGone(sqlBackend);
 
+                // v0.65.4: re-orient a returning player right after the "while you were gone" news --
+                // 26% of character-creators never log in a second time, and those who do land in the
+                // news feed with no reminder of what THEY were doing. Push the journal's next step
+                // (the pull-based /journal is not discoverable to a returning player). Suppresses the
+                // default "go delve" rung so veterans with nothing pending see nothing.
+                try
+                {
+                    var loginStep = UsurperRemake.Systems.JournalSystem.GetNextStep(currentPlayer);
+                    if (loginStep.LocKey != "journal.next_delve" && loginStep.LocKey != "journal.next_delve_resume")
+                    {
+                        terminal.WriteLine("");
+                        terminal.SetColor("bright_yellow");
+                        terminal.WriteLine($"  {Loc.Get("journal.ticker", Loc.Get(loginStep.LocKey, loginStep.Args))}");
+                        terminal.SetColor("white");
+                    }
+                }
+                catch { /* re-orientation is decoration; never break login */ }
+
                 // v0.61.5: deliver any pending inheritance from team NPCs who
                 // died of old age while the player was offline. Belongings go
                 // into the player's inventory (or excess gold added directly).
@@ -4952,11 +4970,22 @@ public partial class GameEngine
             await openingSystem.PlayOpeningSequence(currentPlayer, terminal);
         }
 
-        // Show Getting Started summary for brand new characters
-        if (currentPlayer.Statistics.TotalMonstersKilled == 0)
+        // v0.65.4: cut a redundant key-press wall from the new-player onboarding. A brand-new
+        // character used to get a Getting Started screen AND the Captain Aldric quest screen back to
+        // back -- two "press a key" stops that both say "here's what to do." Non-NG+ new characters
+        // get the Aldric quest (which is more specific), so the generic Getting Started screen is
+        // suppressed for them (marked shown so it never fires later). NG+ characters, who skip the
+        // Aldric quest, still get the Getting Started summary.
+        bool isFreshChar = currentPlayer.Statistics.TotalMonstersKilled == 0;
+        bool getsAldricQuest = !isNgPlus && isFreshChar;
+        if (isFreshChar && !getsAldricQuest)
         {
             HintSystem.Instance.TryShowHint(HintSystem.HINT_GETTING_STARTED, terminal, currentPlayer.HintsShown);
             await terminal.PressAnyKey();
+        }
+        else if (getsAldricQuest && !currentPlayer.HintsShown.Contains(HintSystem.HINT_GETTING_STARTED))
+        {
+            currentPlayer.HintsShown.Add(HintSystem.HINT_GETTING_STARTED); // covered by the Aldric quest screen
         }
 
         // Captain Aldric's Mission — opening guided quest for new characters
@@ -5346,6 +5375,7 @@ public partial class GameEngine
             AutoEquipDisabled = playerData.AutoEquipDisabled,
             DateFormatPreference = playerData.DateFormatPreference,
             AutoRedistributeXP = playerData.AutoRedistributeXP,
+            Specialization = (ClassSpecialization)playerData.Specialization,
             TeamXPPercent = playerData.TeamXPPercent ?? TeamXPConfig.DefaultTeamXPPercent.ToArray(),
             TeamXPIsExplicit = playerData.TeamXPIsExplicit,
             Loyalty = playerData.Loyalty,

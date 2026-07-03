@@ -223,6 +223,30 @@ public class LevelMasterLocation : BaseLocation
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("level_master.menu_abilities", Loc.Get("level_master.abilities_desc")));
 
+        // Row 2b - The Path Ahead (v0.65.4)
+        terminal.SetColor("darkgray");
+        terminal.Write(" [");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("P");
+        terminal.SetColor("darkgray");
+        terminal.Write("]");
+        terminal.SetColor("white");
+        terminal.WriteLine(Loc.Get("level_master.menu_path", Loc.Get("level_master.path_desc")));
+
+        // Row 2c - Specialization (v0.65.4, unlocks at level 25 for classes that have specs)
+        if (currentPlayer.Level >= GameConfig.SpecializationUnlockLevel
+            && UsurperRemake.Data.SpecializationData.GetSpecsForClass(currentPlayer.Class).Count > 0)
+        {
+            terminal.SetColor("darkgray");
+            terminal.Write(" [");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("S");
+            terminal.SetColor("darkgray");
+            terminal.Write("]");
+            terminal.SetColor("white");
+            terminal.WriteLine(Loc.Get("level_master.menu_specialize", Loc.Get("level_master.specialize_desc")));
+        }
+
         // Row 3 - Training
         terminal.SetColor("darkgray");
         terminal.Write(" [");
@@ -360,6 +384,12 @@ public class LevelMasterLocation : BaseLocation
                 return false;
             case "A":
                 await ShowAbilitiesMenu();
+                return false;
+            case "P":
+                await ShowProgressionRoadmap();
+                return false;
+            case "S":
+                await ShowSpecializationMenu();
                 return false;
             case "T":
                 await ShowTrainingMenu();
@@ -547,6 +577,116 @@ public class LevelMasterLocation : BaseLocation
     /// <summary>
     /// Displays an elaborate level up celebration message
     /// </summary>
+    /// <summary>
+    /// v0.65.4: player specialization picker (unlocks at level 25). Lists the class's two specs with
+    /// role + description + per-level stat growth, and sets the player's spec. First pick is free;
+    /// changing it later costs a gold respec. Growth applies to future level-ups only (no retro).
+    /// </summary>
+    private async Task ShowSpecializationMenu()
+    {
+        var player = currentPlayer;
+        if (player.Level < GameConfig.SpecializationUnlockLevel)
+        {
+            terminal.WriteLine($"  {Loc.Get("spec.locked", GameConfig.SpecializationUnlockLevel)}", "gray");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        var specs = UsurperRemake.Data.SpecializationData.GetSpecsForClass(player.Class);
+        if (specs.Count == 0)
+        {
+            terminal.WriteLine($"  {Loc.Get("spec.none_for_class")}", "gray");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        terminal.ClearScreen();
+        WriteBoxHeader(Loc.Get("spec.header"), "bright_yellow");
+        terminal.WriteLine("");
+
+        bool hasSpec = player.Specialization != ClassSpecialization.None;
+        if (hasSpec)
+        {
+            var cur = UsurperRemake.Data.SpecializationData.GetSpec(player.Specialization);
+            terminal.SetColor("cyan");
+            terminal.WriteLine($"  {Loc.Get("spec.current", cur?.Name ?? player.Specialization.ToString())}");
+        }
+        else
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine($"  {Loc.Get("spec.intro")}");
+        }
+        terminal.WriteLine("");
+
+        for (int i = 0; i < specs.Count; i++)
+        {
+            var s = specs[i];
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine($"  [{i + 1}] {s.Name}  ({Loc.Get("spec.role_" + s.Role.ToString().ToLowerInvariant())})");
+            terminal.SetColor("gray");
+            terminal.WriteLine($"      {Loc.Get(s.DescriptionKey)}");
+            string growth = BuildSpecGrowthSummary(s);
+            if (!string.IsNullOrEmpty(growth))
+                terminal.WriteLine($"      {Loc.Get("spec.growth", growth)}");
+        }
+        terminal.WriteLine("");
+
+        long respecCost = hasSpec ? GameConfig.SpecializationRespecCost : 0;
+        if (hasSpec)
+            terminal.WriteLine($"  {Loc.Get("spec.respec_cost", $"{respecCost:N0}")}", "yellow");
+        terminal.WriteLine($"  {Loc.Get("spec.future_only")}", "darkgray");
+        terminal.WriteLine("");
+
+        var input = (await terminal.GetInput(Loc.Get("spec.choose_prompt"))).Trim();
+        if (!int.TryParse(input, out int pick) || pick < 1 || pick > specs.Count) return;
+
+        var chosen = specs[pick - 1];
+        if (chosen.Spec == player.Specialization)
+        {
+            terminal.WriteLine($"  {Loc.Get("spec.already_that")}", "gray");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        if (hasSpec)
+        {
+            if (player.Gold < respecCost)
+            {
+                terminal.WriteLine($"  {Loc.Get("spec.cant_afford", $"{respecCost:N0}")}", "red");
+                await terminal.PressAnyKey();
+                return;
+            }
+            var conf = (await terminal.GetInput(Loc.Get("spec.confirm_respec", chosen.Name, $"{respecCost:N0}"))).Trim();
+            if (!GameConfig.IsAffirmative(conf)) return;
+            player.Gold -= respecCost;
+        }
+
+        player.Specialization = chosen.Spec;
+        await GameEngine.Instance.SaveCurrentGame();
+
+        terminal.SetColor("bright_green");
+        terminal.WriteLine($"  {Loc.Get("spec.chosen", chosen.Name)}");
+        terminal.SetColor("white");
+        await terminal.PressAnyKey();
+    }
+
+    private static string BuildSpecGrowthSummary(UsurperRemake.Data.SpecDefinition s)
+    {
+        var parts = new List<string>();
+        if (s.BonusStrength != 0) parts.Add($"STR+{s.BonusStrength}");
+        if (s.BonusConstitution != 0) parts.Add($"CON+{s.BonusConstitution}");
+        if (s.BonusMaxHP != 0) parts.Add($"HP+{s.BonusMaxHP}");
+        if (s.BonusDefence != 0) parts.Add($"DEF+{s.BonusDefence}");
+        if (s.BonusIntelligence != 0) parts.Add($"INT+{s.BonusIntelligence}");
+        if (s.BonusWisdom != 0) parts.Add($"WIS+{s.BonusWisdom}");
+        if (s.BonusCharisma != 0) parts.Add($"CHA+{s.BonusCharisma}");
+        if (s.BonusMaxMana != 0) parts.Add($"MP+{s.BonusMaxMana}");
+        if (s.BonusDexterity != 0) parts.Add($"DEX+{s.BonusDexterity}");
+        if (s.BonusAgility != 0) parts.Add($"AGI+{s.BonusAgility}");
+        if (s.BonusStamina != 0) parts.Add($"STA+{s.BonusStamina}");
+        return string.Join(" ", parts);
+    }
+
     private async Task DisplayLevelUpCelebration(int levelsRaised, int startLevel, int trainingPointsEarned)
     {
         terminal.ClearScreen();
@@ -601,6 +741,22 @@ public class LevelMasterLocation : BaseLocation
         terminal.WriteLine(Loc.Get("level_master.power_surge"));
         terminal.WriteLine(Loc.Get("level_master.hp_mana_restored"));
         terminal.WriteLine("");
+
+        // v0.65.4: name the abilities/spells unlocked across the raised levels + what's next.
+        var justUnlocked = UsurperRemake.Systems.ProgressionRoadmap.GetAllUnlocks(currentPlayer)
+            .Where(u => u.Level > startLevel && u.Level <= currentPlayer.Level).ToList();
+        foreach (var u in justUnlocked)
+        {
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine(Loc.Get(u.IsSpell ? "base.new_spell_unlocked" : "base.new_ability_unlocked", u.Name));
+        }
+        var nextUnlock = UsurperRemake.Systems.ProgressionRoadmap.GetNextUnlocks(currentPlayer, 1);
+        if (nextUnlock.Count > 0)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine(Loc.Get("base.next_unlock", nextUnlock[0].Name, nextUnlock[0].Level));
+        }
+        if (justUnlocked.Count > 0 || nextUnlock.Count > 0) terminal.WriteLine("");
 
         // Show training points earned
         terminal.SetColor("bright_magenta");
@@ -853,10 +1009,12 @@ public class LevelMasterLocation : BaseLocation
                 break;
         }
 
-        // Apply specialization stat growth bonuses (NPC teammates only, additive)
-        if (player is NPC npc && npc.Specialization != ClassSpecialization.None)
+        // Apply specialization stat growth bonuses (additive per level-up). v0.65.4: players can now
+        // specialize too (Specialization moved to Character), so this applies to both. Future-only:
+        // choosing a spec does not retroactively grant past levels' bonuses.
+        if (player.Specialization != ClassSpecialization.None)
         {
-            var spec = UsurperRemake.Data.SpecializationData.GetSpec(npc.Specialization);
+            var spec = UsurperRemake.Data.SpecializationData.GetSpec(player.Specialization);
             if (spec != null)
             {
                 player.BaseStrength += spec.BonusStrength;
@@ -1038,10 +1196,10 @@ public class LevelMasterLocation : BaseLocation
                 break;
         }
 
-        // Reverse specialization stat growth bonuses (NPC teammates only)
-        if (player is NPC npc && npc.Specialization != ClassSpecialization.None)
+        // Reverse specialization stat growth bonuses (mirrors ApplyClassStatIncreases; players + NPCs)
+        if (player.Specialization != ClassSpecialization.None)
         {
-            var spec = UsurperRemake.Data.SpecializationData.GetSpec(npc.Specialization);
+            var spec = UsurperRemake.Data.SpecializationData.GetSpec(player.Specialization);
             if (spec != null)
             {
                 player.BaseStrength = Math.Max(1, player.BaseStrength - spec.BonusStrength);

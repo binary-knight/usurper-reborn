@@ -983,7 +983,8 @@ public class SaveRoundTripTests
             AutoLevelUp = false,
             AutoEquipDisabled = true,
             DateFormatPreference = 2,
-            AutoRedistributeXP = false
+            AutoRedistributeXP = false,
+            Specialization = 5  // v0.65.4: player class specialization (ClassSpecialization as int)
         };
 
         var json = JsonSerializer.Serialize(original, _jsonOptions);
@@ -1000,6 +1001,7 @@ public class SaveRoundTripTests
         restored.AutoEquipDisabled.Should().BeTrue();
         restored.DateFormatPreference.Should().Be(2);
         restored.AutoRedistributeXP.Should().BeFalse();
+        restored.Specialization.Should().Be(5, "player specialization must survive save/load (v0.65.4)");
     }
 
     [Fact]
@@ -1463,6 +1465,7 @@ public class SaveRoundTripTests
             IsRecruited = true,
             IsActive = true,
             Level = 25,
+            PersonalQuestBeat = 2,  // v0.65.4: quest-chain beat progress must survive save/load
             Inventory = new List<InventoryItemData>
             {
                 new InventoryItemData
@@ -1506,6 +1509,7 @@ public class SaveRoundTripTests
         restored.Inventory[1].Strength.Should().Be(8);
         restored.Inventory[2].Name.Should().Be("Unidentified Cloak");
         restored.Inventory[2].IsIdentified.Should().BeFalse();
+        restored.PersonalQuestBeat.Should().Be(2, "companion quest-chain beat progress must survive save/load (v0.65.4)");
     }
 
     [Fact]

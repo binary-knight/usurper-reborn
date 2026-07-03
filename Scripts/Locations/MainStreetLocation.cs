@@ -107,6 +107,8 @@ public class MainStreetLocation : BaseLocation
             return;
         }
 
+        // (Electron ticker: EmitElectronEvents below carries the next-step string; JS render deferred.)
+
         // Phase 2: Electron mode short-circuits to the graphical Main Street
         // renderer. EmitElectronEvents fires location/stats/menu/npcs events
         // that the JS side maps to the town dock + status pane. Skip the
@@ -282,24 +284,7 @@ public class MainStreetLocation : BaseLocation
             }
         }
 
-        // v1.0 release prep (B1c) / Journal Slice 2: the next-step ticker.
-        // The /journal command is pull-based -- a new player doesn't know it
-        // exists. This one-liner pushes the journal's NEXT STEP onto the
-        // first screen every player sees. Suppressed when the next step is
-        // the default "go delve" (signal, not wallpaper) -- veterans with
-        // nothing pending see nothing. Zero DB cost: pure in-memory ladder.
-        try
-        {
-            var tickerStep = UsurperRemake.Systems.JournalSystem.GetNextStep(currentPlayer);
-            if (tickerStep.LocKey != "journal.next_delve"
-                && tickerStep.LocKey != "journal.next_delve_resume")
-            {
-                terminal.SetColor("bright_yellow");
-                terminal.WriteLine($"  {Loc.Get("journal.ticker", Loc.Get(tickerStep.LocKey, tickerStep.Args))}");
-                terminal.SetColor("white");
-            }
-        }
-        catch { /* ticker is decoration; never break Main Street */ }
+        ShowNextStepTicker();
 
         // Companion teasers — one-time early sightings before recruitment level (v0.49.6)
         if (currentPlayer.Level >= 4 && CompanionSystem.Instance != null
@@ -338,6 +323,29 @@ public class MainStreetLocation : BaseLocation
     /// Compact Main Street display for BBS 80x25 terminals.
     /// Fits header, description, NPCs, menu, status, and prompt within 25 rows.
     /// </summary>
+    /// <summary>
+    /// v1.0 / Journal Slice 2 + v0.65.4 parity: the next-step ticker. /journal is pull-based -- a new
+    /// player doesn't know it exists. This one line pushes the journal's NEXT STEP onto the first
+    /// screen every player sees, on both the visual AND BBS/compact paths (it used to live only in the
+    /// visual body, past the BBS early return). Suppressed for the default "go delve" rung so veterans
+    /// with nothing pending see nothing. Zero DB cost: pure in-memory ladder.
+    /// </summary>
+    private void ShowNextStepTicker()
+    {
+        try
+        {
+            var tickerStep = UsurperRemake.Systems.JournalSystem.GetNextStep(currentPlayer);
+            if (tickerStep.LocKey != "journal.next_delve"
+                && tickerStep.LocKey != "journal.next_delve_resume")
+            {
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine($"  {Loc.Get("journal.ticker", Loc.Get(tickerStep.LocKey, tickerStep.Args))}");
+                terminal.SetColor("white");
+            }
+        }
+        catch { /* ticker is decoration; never break Main Street */ }
+    }
+
     private void DisplayLocationBBS()
     {
         // Line 1: Header
@@ -375,6 +383,10 @@ public class MainStreetLocation : BaseLocation
             }
             terminal.WriteLine("");
         }
+
+        // v0.65.4: next-step ticker parity -- BBS/compact players got no onboarding guidance because
+        // every hint lived in the visual body past the early return. Now they see it too.
+        ShowNextStepTicker();
 
         // Line 4: blank
         terminal.WriteLine("");

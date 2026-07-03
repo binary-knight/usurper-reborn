@@ -170,8 +170,7 @@ public partial class NPC : Character
     public EmotionalState? EmotionalState { get; set; }
     public GoalSystem? Goals { get; set; }
     
-    // Class specialization (NPC teammates only)
-    public ClassSpecialization Specialization { get; set; } = ClassSpecialization.None;
+    // Class specialization moved to Character base in v0.65.4 (players can specialize too).
 
     // NPC behavior settings
     public string Archetype { get; set; } = "citizen";        // thug, merchant, guard, priest, etc.

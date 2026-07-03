@@ -2023,6 +2023,10 @@ public partial class CombatEngine
                 continue; // Show menu again
             }
 
+            // v0.65.4: "?N" shows quickbar slot N's description without spending the turn.
+            if (TryShowQuickbarInfo(player, upperChoice))
+                continue;
+
             // Handle quickbar slots [1]-[9] for spells and abilities
             if (upperChoice.Length == 1 && upperChoice[0] >= '1' && upperChoice[0] <= '9')
             {
@@ -2109,6 +2113,9 @@ public partial class CombatEngine
                 else
                     terminal.WriteLine($"  {qKey} - {displayName} {Loc.Get("combat.menu_unavailable")}");
             }
+            terminal.SetColor("darkgray");
+            terminal.WriteLine($"  {Loc.Get("combat.quickbar_info_hint")}");
+            terminal.SetColor("white");
         }
         terminal.WriteLine("");
 
@@ -12520,6 +12527,10 @@ public partial class CombatEngine
             catch { /* never let instrumentation break combat */ }
             var action = new CombatAction();
 
+            // v0.65.4: "?N" shows quickbar slot N's description without spending the turn.
+            if (TryShowQuickbarInfo(player, input.Trim().ToUpper()))
+                continue;
+
             switch (input.Trim().ToUpper())
             {
                 case "A":
@@ -14058,21 +14069,22 @@ public partial class CombatEngine
                 break;
 
             case "shield_wall_formation":
-                // Warrior L40: AoE taunt + 30% incoming damage reduction (+10% for Protection spec)
+                // Warrior L40: AoE taunt + 30% incoming damage reduction (+10% for Protection spec).
+                // v0.65.4: spec bonus now applies to players too (Specialization moved to Character).
                 ApplyTankTauntAndBuff(player, monsters, abilityResult, terminal, isPlayer, actorName,
-                    damageReductionPercent: 30 + (player is NPC pn && pn.Specialization == ClassSpecialization.Protection ? 10 : 0));
+                    damageReductionPercent: 30 + (player.Specialization == ClassSpecialization.Protection ? 10 : 0));
                 break;
 
             case "divine_mandate":
                 // Paladin L40: AoE taunt + 15% thorn reflect (+5% for Guardian spec)
                 ApplyTankTauntAndBuff(player, monsters, abilityResult, terminal, isPlayer, actorName,
-                    thornReflectPercent: 15 + (player is NPC gn && gn.Specialization == ClassSpecialization.Guardian ? 5 : 0));
+                    thornReflectPercent: 15 + (player.Specialization == ClassSpecialization.Guardian ? 5 : 0));
                 break;
 
             case "rage_challenge":
                 // Barbarian L40: AoE taunt + 5% MaxHP regen per round (+3% for Juggernaut spec)
                 ApplyTankTauntAndBuff(player, monsters, abilityResult, terminal, isPlayer, actorName,
-                    percentRegenPerRound: 5 + (player is NPC jn && jn.Specialization == ClassSpecialization.Juggernaut ? 3 : 0));
+                    percentRegenPerRound: 5 + (player.Specialization == ClassSpecialization.Juggernaut ? 3 : 0));
                 break;
 
             // === DAMAGE ENHANCEMENT EFFECTS ===
@@ -19818,6 +19830,18 @@ public partial class CombatEngine
         long bonus = GameConfig.FirstKillGoldBonus;
         player.Gold += bonus;
 
+        // v0.65.4: guarantee the very first kill reaches level 2, so the whole progression loop
+        // (kill -> level up -> new ability -> next goal) is demonstrated in the first fight. Level 2
+        // needs only a small amount of XP; top it up if the kill left the player short. The canonical
+        // auto-level-up path (BaseLocation.LocationLoop) then fires on return and announces it.
+        bool firstKillLeveled = false;
+        long level2Xp = GameConfig.GetExperienceForLevel(2);
+        if (player.Level < 2 && player.Experience < level2Xp)
+        {
+            player.Experience = level2Xp;
+            firstKillLeveled = true;
+        }
+
         string bonusLine = $"  Bonus reward: {bonus} gold!";
         int boxWidth = 50; // inner width between ║ chars
         terminal.WriteLine("");
@@ -19844,6 +19868,14 @@ public partial class CombatEngine
         }
         terminal.SetColor("white");
         terminal.WriteLine("");
+
+        if (firstKillLeveled)
+        {
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine($"  {Loc.Get("combat.first_blood_level2")}");
+            terminal.SetColor("white");
+            terminal.WriteLine("");
+        }
 
         player.Statistics.RecordGoldChange(player.Gold);
 
@@ -22536,7 +22568,7 @@ public partial class CombatEngine
                 {
                     ApplyTankTauntAndBuff(player, new List<Monster> { monster }, abilityResult, terminal,
                         isPlayer: (player == currentPlayer), actorName: player.DisplayName,
-                        damageReductionPercent: 30 + (player is NPC pn && pn.Specialization == ClassSpecialization.Protection ? 10 : 0));
+                        damageReductionPercent: 30 + (player.Specialization == ClassSpecialization.Protection ? 10 : 0));
                 }
                 break;
 
@@ -22545,7 +22577,7 @@ public partial class CombatEngine
                 {
                     ApplyTankTauntAndBuff(player, new List<Monster> { monster }, abilityResult, terminal,
                         isPlayer: (player == currentPlayer), actorName: player.DisplayName,
-                        thornReflectPercent: 15 + (player is NPC gn && gn.Specialization == ClassSpecialization.Guardian ? 5 : 0));
+                        thornReflectPercent: 15 + (player.Specialization == ClassSpecialization.Guardian ? 5 : 0));
                 }
                 break;
 
@@ -22554,7 +22586,7 @@ public partial class CombatEngine
                 {
                     ApplyTankTauntAndBuff(player, new List<Monster> { monster }, abilityResult, terminal,
                         isPlayer: (player == currentPlayer), actorName: player.DisplayName,
-                        percentRegenPerRound: 5 + (player is NPC jn && jn.Specialization == ClassSpecialization.Juggernaut ? 3 : 0));
+                        percentRegenPerRound: 5 + (player.Specialization == ClassSpecialization.Juggernaut ? 3 : 0));
                 }
                 break;
 
@@ -27032,6 +27064,52 @@ public partial class CombatEngine
     /// Reads from player.Quickbar which contains both spell IDs ("spell:5") and ability IDs ("power_strike").
     /// Returns list of (hotkey, slotId, display name, is available)
     /// </summary>
+    /// <summary>
+    /// v0.65.4: "?N" combat command -- print the one-line description of quickbar slot N without
+    /// consuming the turn. Player feedback: the quickbar shows ability names + costs but not what they
+    /// DO, so a new player getting their first kit had to leave combat to find out. Shared by the
+    /// single- and multi-monster action prompts (parity). Returns true if it handled an info request
+    /// (the caller should re-show the menu without spending the turn).
+    /// </summary>
+    private bool TryShowQuickbarInfo(Character player, string upperChoice)
+    {
+        if (string.IsNullOrEmpty(upperChoice) || upperChoice[0] != '?') return false;
+        string rest = upperChoice.Substring(1).Trim();
+        if (rest.Length != 1 || rest[0] < '1' || rest[0] > '9') return false;
+
+        int slot = rest[0] - '1'; // 0-based
+        string? slotId = (player.Quickbar != null && slot < player.Quickbar.Count) ? player.Quickbar[slot] : null;
+        if (string.IsNullOrEmpty(slotId))
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine($"  {Loc.Get("combat.quickbar_info_empty", slot + 1)}");
+            terminal.SetColor("white");
+            return true;
+        }
+
+        string name, desc;
+        var spellLevel = SpellSystem.ParseQuickbarSpellLevel(slotId);
+        if (spellLevel.HasValue)
+        {
+            var spell = SpellSystem.GetSpellInfo(player.Class, spellLevel.Value);
+            if (spell == null) { terminal.WriteLine($"  {Loc.Get("combat.quickbar_info_empty", slot + 1)}", "gray"); return true; }
+            name = spell.Name; desc = spell.Description;
+        }
+        else
+        {
+            var ability = ClassAbilitySystem.GetAbility(slotId);
+            if (ability == null) { terminal.WriteLine($"  {Loc.Get("combat.quickbar_info_empty", slot + 1)}", "gray"); return true; }
+            name = ability.Name; desc = ability.Description;
+        }
+
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine($"  {name}");
+        terminal.SetColor("gray");
+        terminal.WriteLine($"  {desc}");
+        terminal.SetColor("white");
+        return true;
+    }
+
     private List<(string key, string slotId, string displayName, bool available)> GetQuickbarActions(Character player)
     {
         var actions = new List<(string, string, string, bool)>();
@@ -27909,8 +27987,9 @@ public partial class CombatEngine
     /// </summary>
     private static int ApplyHealerSpecBonus(Character caster, int baseHealing)
     {
-        if (baseHealing <= 0 || caster is not NPC npc) return baseHealing;
-        if (!UsurperRemake.Data.SpecializationData.IsHealerSpec(npc.Specialization)) return baseHealing;
+        // v0.65.4: works for players too (Specialization moved to Character), not just NPC healers.
+        if (baseHealing <= 0 || caster == null) return baseHealing;
+        if (!UsurperRemake.Data.SpecializationData.IsHealerSpec(caster.Specialization)) return baseHealing;
         return (int)(baseHealing * (1.0 + GameConfig.HealerSpecHealBonus));
     }
 
@@ -28004,8 +28083,8 @@ public partial class CombatEngine
     /// </summary>
     private static bool IsHealerClass(Character c)
     {
-        // Check spec-based healer role first (NPC teammates)
-        if (c is NPC specNpc && UsurperRemake.Data.SpecializationData.IsHealerSpec(specNpc.Specialization))
+        // Check spec-based healer role first (players + NPC teammates -- Specialization on Character)
+        if (c != null && UsurperRemake.Data.SpecializationData.IsHealerSpec(c.Specialization))
             return true;
 
         return c.Class == CharacterClass.Cleric || c.Class == CharacterClass.Paladin ||

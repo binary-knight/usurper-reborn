@@ -150,6 +150,12 @@ public class Character
     public bool TeamXPIsExplicit { get; set; } = false;  // v0.57.2: true once the player has manually set their XP split, so AutoDistributeTeamXP doesn't override intentional 100/0 (keep-all-xp) configs
     public CharacterClass Class { get; set; }       // class
 
+    // v0.65.4: class specialization moved from NPC to Character so PLAYERS can specialize too (was
+    // NPC-only). Chosen at the Level Master from level 25. Adds additive stat growth on future
+    // level-ups and enables the spec's combat passives. AI-behavior fields on the spec definition
+    // (HealThreshold, AbilityUseChance) are ignored for human players.
+    public ClassSpecialization Specialization { get; set; } = ClassSpecialization.None;
+
     /// <summary>Display-friendly class name, localized to current session language.
     /// Handles multi-word names like "Mystic Shaman" / "Misztikus Sámán".</summary>
     [System.Text.Json.Serialization.JsonIgnore]

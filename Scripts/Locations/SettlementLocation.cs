@@ -42,6 +42,19 @@ public class SettlementLocation : BaseLocation
         WriteBoxHeader(Loc.Get("settlement.header"), "bright_yellow", 70);
         terminal.WriteLine("");
 
+        // v0.65.4: one-time first-visit explainer. Player feedback: "why would I donate gold to
+        // something I don't understand?" The Outskirts never said what it was for. Shows once.
+        if (currentPlayer != null && !currentPlayer.HintsShown.Contains("settlement_explained"))
+        {
+            currentPlayer.HintsShown.Add("settlement_explained");
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine($"  {Loc.Get("settlement.explainer_1")}");
+            terminal.WriteLine($"  {Loc.Get("settlement.explainer_2")}");
+            terminal.WriteLine($"  {Loc.Get("settlement.explainer_3")}");
+            terminal.SetColor("white");
+            terminal.WriteLine("");
+        }
+
         // Dynamic description based on settlement size
         terminal.SetColor("white");
         if (settlers < 8)
@@ -362,6 +375,17 @@ public class SettlementLocation : BaseLocation
     private async Task ContributeGold()
     {
         terminal.WriteLine("");
+
+        // v0.65.4: state the payoff at the spend prompt -- show what the currently-funded building
+        // will give the player once finished, so donating isn't a leap of faith.
+        var activeBuilding = SettlementSystem.Instance.State.ActiveBuilding;
+        if (activeBuilding != null)
+        {
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine($"  {Loc.Get("settlement.contribute_building_payoff", SettlementSystem.GetBuildingDisplayName(activeBuilding.Value), SettlementSystem.GetBuildingDescription(activeBuilding.Value))}");
+            terminal.WriteLine("");
+        }
+
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("settlement.your_gold", $"{currentPlayer.Gold:N0}"));
 
