@@ -113,7 +113,7 @@
   "features.dungeon_title": "Mazmorra de 100 Pisos",
   "features.dungeon_desc": "Los pisos se generan de forma determinista, así que el diseño se mantiene igual en cada visita y realmente aprendes el mapa. Siete encuentros con dioses. Seis sellos por encontrar. Se pone genuinamente difícil a partir del piso 50+.",
   "features.rpg_title": "Lo de RPG",
-  "features.rpg_desc": "11 clases, 10 razas, 75 hechizos. Sistema de romance, matrimonio, hijos. Política cortesana y desafíos por el trono. Facciones a las que unirte o traicionar. 4 compañeros reclutables con sus propias líneas de misión. Una arena PvP. Básicamente todo lo que tenía el original, más mucho más encima.",
+  "features.rpg_desc": "12 clases, 10 razas, 75 hechizos. Sistema de romance, matrimonio, hijos. Política cortesana y desafíos por el trono. Facciones a las que unirte o traicionar. 5 compañeros reclutables con sus propias líneas de misión. Una arena PvP. Básicamente todo lo que tenía el original, más mucho más encima.",
 
   "sponsors.title": "// PATROCINADORES",
   "sponsors.subtitle": "Personas que ayudan a mantener vivo este proyecto. Gracias.",
@@ -171,7 +171,7 @@
   "gods.manwe_desc": "Lo creó todo. Está en el fondo de toda la mazmorra y no quiere pelear. Solo está cansado de existir y tiene una pregunta para ti. Tu respuesta es el final del juego. Este es el encuentro en el que más tiempo invertí escribiendo.",
 
   "classes.title": "// CLASES &amp; RAZAS",
-  "classes.subtitle": "11 clases + 5 clases de prestigio, 10 razas. Elige lo que suene divertido. Todas juegan diferente.",
+  "classes.subtitle": "12 clases + 5 clases de prestigio, 10 razas. Elige lo que suene divertido. Todas juegan diferente.",
   "classes.section_classes": "Clases de Personaje",
   "classes.section_prestige": "Clases de Prestigio",
   "classes.prestige_note": "(Solo NG+)",
@@ -201,7 +201,7 @@
   "classes.alchemist_desc": "Una especie de híbrido entre mago y científico. Alto INT y SAB. Las habilidades tienen un toque de artesanía.",
   "classes.magician_name": "Mago",
   "classes.magician_role": "Lanzador Arcano",
-  "classes.magician_desc": "El lanzador de hechizos completo. Acceso a los 75 hechizos. Destruirá cosas con magia, pero si un monstruo te alcanza en cuerpo a cuerpo estás en problemas.",
+  "classes.magician_desc": "El lanzador de hechizos completo. Acceso a los 25 hechizos arcanos. Destruirá cosas con magia, pero si un monstruo te alcanza en cuerpo a cuerpo estás en problemas.",
   "classes.cleric_name": "Clérigo",
   "classes.cleric_role": "Sanador Divino",
   "classes.cleric_desc": "Magia de curación y apoyo. También puede defenderse en combate. En multijugador, todos quieren un clérigo en el grupo.",
@@ -250,7 +250,7 @@
   "classes.mutant_desc": "El raro. Los bonos son algo aleatorios así que cada mutante juega un poco diferente. Elige este si te gustan las sorpresas.",
 
   "companions.title": "// COMPAÑEROS",
-  "companions.subtitle": "Cuatro NPCs reclutables con sus propias líneas de misión. Pelean contigo en la mazmorra y pueden morir permanentemente, lo cual importa más de lo que pensarías.",
+  "companions.subtitle": "Cinco NPCs reclutables con sus propias líneas de misión. Pelean contigo en la mazmorra y pueden morir permanentemente, lo cual importa más de lo que pensarías.",
   "companions.lyris_name": "Lyris",
   "companions.lyris_title": "La Estrella Errante",
   "companions.lyris_desc": "Sabe cosas que no debería saber. A veces habla en acertijos, lo cual es molesto hasta que te das cuenta de que normalmente tiene razón. Algo en ella no es del todo mortal.",

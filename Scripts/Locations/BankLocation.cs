@@ -805,7 +805,11 @@ public class BankLocation : BaseLocation
         if (!queued)
         {
             currentPlayer.BankGold = bankBefore;
-            try { await GameEngine.Instance.SaveCurrentGame(); } catch { }
+            // v0.65.5 (T1-5): log the rollback-save failure instead of swallowing it. If this save
+            // fails the in-memory BankGold rollback is correct but not persisted, so a crash before
+            // the next save could leave the debit applied with the transfer never queued.
+            try { await GameEngine.Instance.SaveCurrentGame(); }
+            catch (Exception saveEx) { DebugLogger.Instance.LogError("GOLD", $"Bank wire rollback-save failed for {currentPlayer.Name2}: {saveEx.Message}"); }
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("bank.wire_failed"));
             await terminal.PressAnyKey();

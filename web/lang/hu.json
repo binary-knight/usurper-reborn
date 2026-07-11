@@ -113,7 +113,7 @@
   "features.dungeon_title": "100 szintes kazamata",
   "features.dungeon_desc": "A szintek determinisztikusan generálódnak, így az elrendezés minden látogatáskor ugyanaz marad, és tényleg megtanulhatod a térképet. Hét istennel való találkozás. Hat pecsét, amit meg kell találnod. Az 50. szint után kezd igazán nehézzé válni.",
   "features.rpg_title": "Az RPG elemek",
-  "features.rpg_desc": "11 kaszt, 10 faj, 75 varázslat. Románc rendszer, házasság, gyerekek. Udvari politika és trónkövetelés. Frakciók, amikhez csatlakozhatsz vagy amiket elárulhatsz. 4 toborozható társ saját küldetésszálakkal. PvP aréna. Szinte minden, ami az eredetiben volt, és még rengeteg minden más.",
+  "features.rpg_desc": "12 kaszt, 10 faj, 75 varázslat. Románc rendszer, házasság, gyerekek. Udvari politika és trónkövetelés. Frakciók, amikhez csatlakozhatsz vagy amiket elárulhatsz. 5 toborozható társ saját küldetésszálakkal. PvP aréna. Szinte minden, ami az eredetiben volt, és még rengeteg minden más.",
 
   "sponsors.title": "// TÁMOGATÓK",
   "sponsors.subtitle": "Emberek, akik segítenek életben tartani ezt a projektet. Köszönöm.",
@@ -171,7 +171,7 @@
   "gods.manwe_desc": "Ő teremtett mindent. Ő van a legmélyén az egész kazamatának, és nem akar harcolni. Csak belefáradt a létezésbe, és van egy kérdése hozzád. A válaszod maga a játék befejezése. Ezt a találkozást írtam a legtovább.",
 
   "classes.title": "// KASZTOK ÉS FAJOK",
-  "classes.subtitle": "11 alapkaszt + 5 presztízs kaszt, 10 faj. Válaszd azt, ami szimpatikus. Mindegyik más játékstílust igényel.",
+  "classes.subtitle": "12 alapkaszt + 5 presztízs kaszt, 10 faj. Válaszd azt, ami szimpatikus. Mindegyik más játékstílust igényel.",
   "classes.section_classes": "Alapkasztok",
   "classes.section_prestige": "További Kasztok",
   "classes.prestige_note": "(csak NG+)",
@@ -201,7 +201,7 @@
   "classes.alchemist_desc": "Egyfajta varázsló-tudós hibrid. Magas intelligencia  és bölcsesség. A képességeinek barkácsolós íze van.",
   "classes.magician_name": "Mágus",
   "classes.magician_role": "Misztikus varázshasználó",
-  "classes.magician_desc": "A teljes értékű varázsló. Hozzáférése van mind a 75 varázslathoz. Mágiával mindent elpusztít, de ha egy szörny tényleg elér közelharcban, bajban vagy.",
+  "classes.magician_desc": "A teljes értékű varázsló. Hozzáférése van mind a 25 arkánus varázslathoz. Mágiával mindent elpusztít, de ha egy szörny tényleg elér közelharcban, bajban vagy.",
   "classes.cleric_name": "Pap",
   "classes.cleric_role": "Isteni gyógyító",
   "classes.cleric_desc": "Gyógyító és támogató mágus. Harcban is megállja a helyét. Többjátékos módban mindenki akar egy papot a csapatába.",
@@ -250,7 +250,7 @@
   "classes.mutant_desc": "A kakukktojás. A bónuszok nagyjából véletlenszerűek, így minden mutáns kicsit más. Válaszd ezt, ha szereted a meglepetéseket.",
 
   "companions.title": "// TÁRSAK",
-  "companions.subtitle": "Négy toborozható NPC saját küldetésszállal. Veled harcolnak a kazamatában, és véglegesen meghalhatnak, ami többet számít, mint gondolnád.",
+  "companions.subtitle": "Öt toborozható NPC saját küldetésszállal. Veled harcolnak a kazamatában, és véglegesen meghalhatnak, ami többet számít, mint gondolnád.",
   "companions.lyris_name": "Lyris",
   "companions.lyris_title": "A Vándorló Csillag",
   "companions.lyris_desc": "Olyan dolgokat tud, amiket nem kellene tudnia. Néha találós kérdésekben beszél, ami bosszantó, amíg rá nem jössz, hogy általában igaza van. Valami benne nem egészen halandó.",

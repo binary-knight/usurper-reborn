@@ -78,6 +78,32 @@ namespace UsurperRemake.Systems
         {
             try
             {
+                // v0.65.5 (T0-1): abort the save when the MULTI-SESSION MUD server has no SessionContext.
+                // The v0.60.10 audit logging (SUSPICIOUS_FALLBACK_SAVE, see SerializeStorySystems) proved
+                // this is the seal-loss path: on the MUD server, one process serves many players and each
+                // session's story/worship/companion/family state lives on its SessionContext. With no
+                // context, StoryProgressionSystem.Instance / GodSystem / CompanionSystem / FamilySystem
+                // all resolve to their process-wide _fallbackInstance singletons, so serializing them
+                // persists empty/other-player state over the real player's seals, worship, companions,
+                // and family. The `player` object passed in is correct, but we cannot trust ANY
+                // singleton-derived save section without a context, so we refuse the whole write and
+                // preserve the on-disk save. A null here on the MUD server is the anomaly, not a routine
+                // save (normal sessions set the AsyncLocal context, including the logout save).
+                //
+                // Gated on IsMudServerMode specifically, NOT IsOnlineMode: the per-process "Simple"
+                // deployment (--online --stdio, one process per player) also reports IsOnlineMode but
+                // NEVER sets SessionContext, and it CANNOT have this bug (single player per process, so
+                // the fallback singleton IS that player's data). Guarding on IsOnlineMode there would
+                // break saving entirely for that documented deployment. Single-player is unaffected.
+                if (UsurperRemake.BBS.DoorMode.IsMudServerMode && UsurperRemake.Server.SessionContext.Current == null)
+                {
+                    DebugLogger.Instance.LogWarning("SAVE_SEAL_AUDIT",
+                        $"ABORTED_FALLBACK_SAVE: refusing to persist '{playerName}' Lv{player.Level} with NO " +
+                        $"SessionContext on the MUD server (would clobber seals/worship/companions/family " +
+                        $"from fallback singletons). On-disk save preserved.");
+                    return false;
+                }
+
                 // Create backup of existing save before overwriting
                 backend.CreateBackup(playerName);
 
@@ -1198,6 +1224,7 @@ namespace UsurperRemake.Systems
                     BirthDate = npc.BirthDate,
                     IsAgedDeath = npc.IsAgedDeath,
                     IsPermaDead = npc.IsPermaDead,
+                    DeathDate = npc.DeathDate,
                     PregnancyDueDate = npc.PregnancyDueDate,
                     PregnancyFatherName = npc.PregnancyFatherName,
 
@@ -1269,8 +1296,11 @@ namespace UsurperRemake.Systems
                     BankGold = npc.BankGold,
                     Items = npc.Item?.ToArray() ?? new int[0],
 
-                    // Market inventory for NPC trading
-                    MarketInventory = npc.MarketInventory?.Select(item => new MarketItemData
+                    // Market inventory for NPC trading. v0.65.5: capped (was uncapped; the one
+                    // per-NPC collection with no serialize cap, a slow bloat vector x ~200 NPCs).
+                    MarketInventory = (npc.MarketInventory ?? new List<Item>())
+                        .Take(GameConfig.MaxSerializedNPCInventory)
+                        .Select(item => new MarketItemData
                     {
                         ItemName = item.Name,
                         ItemValue = item.Value,
@@ -1280,13 +1310,17 @@ namespace UsurperRemake.Systems
                         Strength = item.Strength,
                         Defence = item.Defence,
                         IsCursed = item.IsCursed
-                    }).ToList() ?? new List<MarketItemData>(),
+                    }).ToList(),
 
                     // v0.57.4: personal bag (items players transferred to this NPC
                     // teammate via combat [T] / Home / Team Corner / dungeon viewer).
                     // Same Item ↔ InventoryItemData round-trip the player uses.
                     // issue #112: full-fidelity converter (carries rarity + all stats) so NPC-bag items round-trip.
-                    Inventory = npc.Inventory?.Where(i => i != null).Select(InventoryItemData.FromItem).ToList() ?? new List<InventoryItemData>(),
+                    // v0.65.5: capped to the most recent N (TakeLast) -- keeps the items the player most
+                    // recently handed the NPC; was uncapped.
+                    Inventory = (npc.Inventory ?? new List<Item>()).Where(i => i != null)
+                        .TakeLast(GameConfig.MaxSerializedNPCInventory)
+                        .Select(InventoryItemData.FromItem).ToList(),
 
                     // Modern RPG Equipment System - save equipped items
                     EquippedItems = npc.EquippedItems?.ToDictionary(

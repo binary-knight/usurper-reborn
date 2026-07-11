@@ -11721,6 +11721,29 @@ public partial class CombatEngine
             };
             long damagePerMonster = Math.Max(1, (long)(totalDamage * diminish));
 
+            // v0.65.5: boss phase-immunity + divine-armor reduction, matching ApplySingleMonsterDamage.
+            // Pre-fix ApplyAoEDamage applied NEITHER, so AoE spells/abilities (Fireball, Chain Lightning,
+            // Maelstrom) full-damaged Old Gods during immune phases and ignored divine armor, while the
+            // single-target path on the same boss correctly reduced/absorbed. Order matches the single-
+            // target site: immunity first, then divine armor, then subtract the monster's armor below.
+            if (isSpellDamage && monster.IsMagicalImmune)
+            {
+                damagePerMonster = ApplyPhaseImmunityDamage(monster, damagePerMonster, isMagicalDamage: true);
+                terminal.SetColor("dark_magenta");
+                terminal.WriteLine(Loc.Get("combat.magical_immunity_absorbs", monster.Name));
+            }
+            else if (!isSpellDamage && monster.IsPhysicalImmune)
+            {
+                damagePerMonster = ApplyPhaseImmunityDamage(monster, damagePerMonster, isMagicalDamage: false);
+                terminal.SetColor("dark_magenta");
+                terminal.WriteLine(Loc.Get("combat.physical_immunity_absorbs", monster.Name));
+            }
+            if (BossContext != null && BossContext.DivineArmorReduction > 0 && damagePerMonster > 0)
+            {
+                damagePerMonster = (long)(damagePerMonster * (1.0 - BossContext.DivineArmorReduction));
+                damagePerMonster = Math.Max(1, damagePerMonster);
+            }
+
             long armor = monster.ArmPow;
             if (monster.IsCorroded) armor = Math.Max(0, (long)(armor * 0.6));
             long actualDamage = Math.Max(1, damagePerMonster - armor);
@@ -14707,7 +14730,9 @@ public partial class CombatEngine
                 // v0.56.0: AoE damage + auto-apply weaken to all hit for 2 rounds
                 if (monsters != null)
                 {
-                    await ApplyAoEDamage(monsters, abilityResult.Damage, result, abilityResult.AbilityUsed?.Name ?? "Maelstrom", attacker: player);
+                    // v0.65.5: Maelstrom of the Faithful is a magical faith ability, so it routes
+                    // through the magical-immunity branch (not physical) when it hits an Old God phase.
+                    await ApplyAoEDamage(monsters, abilityResult.Damage, result, abilityResult.AbilityUsed?.Name ?? "Maelstrom", isSpellDamage: true, attacker: player);
                     foreach (var m in monsters.Where(m => m.IsAlive))
                     {
                         m.WeakenRounds = Math.Max(m.WeakenRounds, 2);
@@ -19483,6 +19508,31 @@ public partial class CombatEngine
             adjustedGold = (long)(adjustedGold * GameConfig.GetNGPlusGoldMultiplier(ngCycleMulti));
         }
 
+        // v0.65.5 (T1-2): spouse + divine-blessing XP bonuses. These lived ONLY in HandleVictory,
+        // which is dead code (DetermineCombatOutcome has zero callers; PlayerVsMonster delegates
+        // 100% to PlayerVsMonsters -> this method). So the married-player and divine-blessing XP
+        // perks silently did nothing in live play. Ported here in the same position as the dead
+        // path (after NG+ gold, before child XP). The display lines below (spouse_bonus /
+        // divine_blessing_xp) fire off adjustedSpouseBonus / adjustedDivineXP.
+        long adjustedSpouseBonus = 0;
+        if (RomanceTracker.Instance.IsMarried && RomanceTracker.Instance.PrimarySpouse != null)
+        {
+            var spouseNpc = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == RomanceTracker.Instance.PrimarySpouse.NPCId);
+            if (spouseNpc != null && spouseNpc.IsAlive)
+            {
+                adjustedSpouseBonus = adjustedExp / 10; // 10% bonus
+                adjustedExp += adjustedSpouseBonus;
+            }
+        }
+
+        long adjustedDivineXP = 0;
+        int divineXPBonusMulti = DivineBlessingSystem.Instance.GetXPBonus(result.Player);
+        if (divineXPBonusMulti > 0)
+        {
+            adjustedDivineXP = (long)(adjustedExp * divineXPBonusMulti / 100f);
+            adjustedExp += adjustedDivineXP;
+        }
+
         // Apply child XP bonus
         float childXPMult = FamilySystem.Instance?.GetChildXPMultiplier(result.Player) ?? 1.0f;
         if (childXPMult > 1.0f)
@@ -19654,6 +19704,20 @@ public partial class CombatEngine
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("combat.defeated_count", result.DefeatedMonsters.Count.ToString()));
         terminal.WriteLine(Loc.Get("combat.xp_label", playerXPmm.ToString()));
+
+        // v0.65.5 (T1-2): surface the spouse + divine-blessing XP bonuses (ported from the dead
+        // HandleVictory path) so the married/blessed player sees the perk they are now actually getting.
+        if (adjustedSpouseBonus > 0)
+        {
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine($"  {Loc.Get("combat.spouse_bonus", adjustedSpouseBonus.ToString())}");
+        }
+        if (adjustedDivineXP > 0)
+        {
+            var blessingMm = DivineBlessingSystem.Instance.GetBlessings(result.Player);
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine($"  {Loc.Get("combat.divine_favor", blessingMm.GodName, adjustedDivineXP.ToString())}");
+        }
 
         // Show team balance XP penalty if applicable
         if (teamXPMult < 1.0f)
@@ -20084,6 +20148,19 @@ public partial class CombatEngine
         {
             adjustedGold = (long)(adjustedGold * GameConfig.GetNGPlusGoldMultiplier(ngCycleFled));
         }
+
+        // v0.65.5 (T1-2 parity): spouse + divine-blessing XP bonuses, same as HandleVictoryMultiMonster,
+        // so a married/blessed player who retreats after partial kills keeps those perks (on top of the
+        // intended half-XP retreat penalty) instead of silently losing them.
+        if (RomanceTracker.Instance.IsMarried && RomanceTracker.Instance.PrimarySpouse != null)
+        {
+            var spouseNpcFled = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == RomanceTracker.Instance.PrimarySpouse.NPCId);
+            if (spouseNpcFled != null && spouseNpcFled.IsAlive)
+                adjustedExp += adjustedExp / 10; // 10% bonus
+        }
+        int divineXPBonusFled = DivineBlessingSystem.Instance.GetXPBonus(result.Player);
+        if (divineXPBonusFled > 0)
+            adjustedExp += (long)(adjustedExp * divineXPBonusFled / 100f);
 
         // Apply child XP bonus
         float childXPMult = FamilySystem.Instance?.GetChildXPMultiplier(result.Player) ?? 1.0f;
@@ -29219,6 +29296,15 @@ public partial class CombatEngine
             float gpChildXPMult = FamilySystem.Instance?.GetChildXPMultiplier(groupedPlayer) ?? 1.0f;
             if (gpChildXPMult > 1.0f)
                 playerExp = (long)(playerExp * gpChildXPMult);
+
+            // v0.65.5 (T1-2) NOTE: the spouse and divine-blessing XP bonuses are deliberately NOT
+            // applied to grouped followers. Both systems are session-scoped (RomanceTracker.Instance
+            // and DivineBlessingSystem.Instance resolve through SessionContext.Current = the LEADER's
+            // session here), so the follower's marriage/prayer state is not reachable from this
+            // context -- a lookup would either credit the leader's state to the follower or silently
+            // return nothing. Followers get these bonuses on their own solo kills. Wiring them here
+            // needs a cross-session state lookup (post-1.0 work alongside the RelationshipSystem
+            // per-session-fragmentation design call).
 
             // Study/Library XP bonus (Home upgrade)
             if (groupedPlayer.HasStudy)

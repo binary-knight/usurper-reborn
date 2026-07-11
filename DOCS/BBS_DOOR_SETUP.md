@@ -56,6 +56,7 @@ UsurperReborn --doorsys <path>   # Explicitly load DOOR.SYS
 UsurperReborn --node <directory> # Search directory for drop files
 UsurperReborn --local            # Local testing mode (no BBS)
 UsurperReborn --stdio            # Force Standard I/O mode
+UsurperReborn --screen-reader    # Plain-text accessible mode (no box-drawing/color menus)
 UsurperReborn --verbose, -v      # Enable detailed debug output
 UsurperReborn --help             # Show help
 ```
@@ -65,7 +66,27 @@ UsurperReborn --help             # Show help
 | Flag | Description |
 |------|-------------|
 | `--stdio` | Forces Standard I/O mode. Usually not needed - game auto-detects. |
+| `--screen-reader` | Forces plain-text accessible mode: strips box-drawing, decorative Unicode, and color-bracketed menus. On Windows console launches the game also auto-detects a running screen reader (NVDA/JAWS/Narrator); auto-detect is skipped in door modes, so BBS/door sysops offering an accessible entry should pass this flag explicitly. |
 | `--verbose` or `-v` | Enables detailed debug output. Keeps console window visible on Windows. |
+
+### CP437 Encoding
+
+When BBS stdio mode is auto-detected, the game sets its console output encoding to CP437 so the
+box-drawing characters render correctly in SyncTERM / NetRunner and other CP437 terminals. Web
+terminal, SSH, and local modes are unaffected. No configuration needed.
+
+### Online-Mode Flags (for sysops running or bridging to an online server)
+
+| Flag | Description |
+|------|-------------|
+| `--auto-provision` | On a trusted (loopback) auth connection, auto-create the account for the given username instead of requiring a separate register step. Used by the local SSH relay / BBS gateway. |
+| `--online --stdio` | Run the game in per-process online mode over stdin/stdout (the "Simple" self-hosted server model; see `DOCS/SERVER_DEPLOYMENT.md`). |
+
+Note on the standalone world simulator: older guides describe running a separate `--worldsim`
+process (`usurper-worldsim.service`) to keep NPCs active while the Simple per-process model has no
+one online. That standalone mode still exists, but the production server no longer uses it: the MUD
+Server model integrates the world sim into the single `usurper-mud` process, so no separate service
+is needed there. Only reach for the standalone worldsim with the Simple per-process model.
 
 ---
 

@@ -22,7 +22,8 @@ run_in_terminal() {
     elif command -v terminator &> /dev/null; then
         terminator --title="Usurper Reborn" -e "$GAME_EXE"
     elif command -v xterm &> /dev/null; then
-        xterm -title "Usurper Reborn" -fa "Monospace" -fs 12 -e "$GAME_EXE"
+        # -bg/-fg: xterm defaults to black-on-white, which washes out the game's palette (v0.65.5)
+        xterm -title "Usurper Reborn" -bg black -fg white -fa "Monospace" -fs 12 -e "$GAME_EXE"
     elif command -v kitty &> /dev/null; then
         kitty --title "Usurper Reborn" "$GAME_EXE"
     elif command -v alacritty &> /dev/null; then

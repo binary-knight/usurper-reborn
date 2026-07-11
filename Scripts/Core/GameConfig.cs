@@ -10,7 +10,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.65.4";
+    public const string Version = "0.65.5";
     public const string VersionName = "Countdown"; // the Beta -> 1.0 release-prep cycle
 
     // v0.57.12: Alignment scale cap. Character.Chivalry and Character.Darkness setters clamp to [0, AlignmentCap]
@@ -28,6 +28,14 @@ public static partial class GameConfig
 
     // Electron graphical client mode — emits JSON events via OSC sequences
     public static bool ElectronMode { get; set; } = false;
+
+    // v0.65.5: true when startup painted the local terminal dark (OSC 11/10 emitted on an
+    // interactive Unix terminal). The game's palette assumes a dark background; xterm and
+    // macOS Terminal default to black-on-white, which rendered the game as a "white screen".
+    // When set, ClearScreen also prepends SGR 40 (black background-color-erase) as a fallback
+    // for terminals that ignore OSC 11. Never set on Windows, BBS door, MUD server/relay,
+    // Electron, worldsim, or redirected output. See Console/Bootstrap/Program.cs.
+    public static bool DarkTerminalPaint { get; set; } = false;
 
     // From Pascal global_maxXX constants
     public const int MaxPlayers = 400;           // global_maxplayers
@@ -910,6 +918,7 @@ public static partial class GameConfig
     // tracks every dialogue line + game event the player has triggered.
     public const int MaxSerializedEncounterHistory = 100;          // RomanceTracker.EncounterHistory (most recent)
     public const int MaxSerializedCompanionInventory = 30;         // per-companion bag cap on save
+    public const int MaxSerializedNPCInventory = 30;               // v0.65.5: per-NPC-teammate bag + market-stock cap on save (was uncapped)
     public const int MaxSerializedStrangerDialogueIds = 50;        // StrangerEncounter.UsedDialogueIds (most recent)
     public const int MaxSerializedStrangerRecentEvents = 20;       // StrangerEncounter.RecentGameEvents (most recent)
     // Third-round v0.57.18 audit: per-NPC conversation states + RoyalCourt collections

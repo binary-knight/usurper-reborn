@@ -899,14 +899,27 @@ public partial class TerminalEmulator
         else if (DoorMode.ShouldUseAnsiOutput)
         {
             // In door/online mode, use ANSI escape codes instead of Console.Clear()
-            // Console.Clear() throws when stdin/stdout are redirected pipes
-            Console.Write("\x1b[2J\x1b[H"); // Clear screen and move cursor to home
+            // Console.Clear() throws when stdin/stdout are redirected pipes.
+            // v0.65.5: when startup painted the terminal dark (DarkTerminalPaint, Unix local
+            // terminals only), set black background before the clear so background-color-erase
+            // fills the screen dark even on terminals that ignored the OSC 11 default-color set.
+            Console.Write(GameConfig.DarkTerminalPaint ? "\x1b[40m\x1b[2J\x1b[H" : "\x1b[2J\x1b[H");
         }
         else
         {
             try
             {
-                Console.Clear();
+                if (GameConfig.DarkTerminalPaint)
+                {
+                    // ANSI clear with black BCE. The flag is only ever set on interactive
+                    // Unix terminals, where raw ANSI is always safe; Console.Clear() would
+                    // clear using the terminal's default (possibly white) background.
+                    Console.Write("\x1b[40m\x1b[2J\x1b[H");
+                }
+                else
+                {
+                    Console.Clear();
+                }
             }
             catch (System.IO.IOException)
             {

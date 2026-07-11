@@ -3232,7 +3232,8 @@ public partial class GameEngine
 
         // Discover recovery files
         string saveDir = "";
-        try { saveDir = SaveSystem.Instance.GetSaveDirectory(); } catch { }
+        try { saveDir = SaveSystem.Instance.GetSaveDirectory(); }
+        catch (Exception saveDirEx) { DebugLogger.Instance.LogWarning("SAVE", $"Recovery: could not resolve save directory: {saveDirEx.Message}"); }
 
         string baseName = System.IO.Path.GetFileNameWithoutExtension(fileName);
         var recoveryOptions = new List<(string label, string path)>();
@@ -3515,7 +3516,7 @@ public partial class GameEngine
             foreach (var fi in autosaves)
                 candidates.Add(($"Autosave {fi.LastWriteTime:yyyy-MM-dd HH:mm}", fi.FullName));
         }
-        catch { }
+        catch (Exception autoEx) { DebugLogger.Instance.LogWarning("SAVE", $"Recovery: could not enumerate autosaves: {autoEx.Message}"); }
 
         try
         {
@@ -3526,7 +3527,7 @@ public partial class GameEngine
             foreach (var fi in emergencies)
                 candidates.Add(($"Emergency {fi.LastWriteTime:yyyy-MM-dd HH:mm}", fi.FullName));
         }
-        catch { }
+        catch (Exception emergEx) { DebugLogger.Instance.LogWarning("SAVE", $"Recovery: could not enumerate emergency saves: {emergEx.Message}"); }
 
         // Legacy single-file emergency fallback.
         string legacyEmergency = System.IO.Path.Combine(saveDir, "emergency_autosave.json");
@@ -6370,6 +6371,7 @@ public partial class GameEngine
                     : DateTime.Now.AddHours(-(data.Age > 0 ? data.Age : CapLegacyAge(data.Race, Random.Shared.Next(18, 50))) * GameConfig.NpcLifecycleHoursPerYear),
                 IsAgedDeath = data.IsAgedDeath,
                 IsPermaDead = data.IsPermaDead,
+                DeathDate = data.DeathDate,
                 PregnancyDueDate = data.PregnancyDueDate,
                 PregnancyFatherName = data.PregnancyFatherName,
 

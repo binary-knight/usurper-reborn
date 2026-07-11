@@ -487,8 +487,9 @@ public class PantheonLocation : BaseLocation
             NotifyOnlineFollowers(currentPlayer.DivineName, currentPlayer.DivineBoonConfig);
         }
 
-        // Auto-save
-        try { await SaveSystem.Instance.AutoSave(currentPlayer); } catch { }
+        // Auto-save. v0.65.5 (T1-5): log instead of swallowing so a failed favor-update save is visible.
+        try { await SaveSystem.Instance.AutoSave(currentPlayer); }
+        catch (Exception saveEx) { DebugLogger.Instance.LogError("SAVE", $"Pantheon favor autosave failed: {saveEx.Message}"); }
 
         terminal.SetColor("bright_yellow");
         terminal.WriteLine(Loc.Get("pantheon.favors_updated"));

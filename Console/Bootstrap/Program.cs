@@ -214,6 +214,45 @@ namespace UsurperConsole
                 Console.WriteLine();
             }
 
+            // v0.65.5: paint the local terminal dark on Unix. The game's palette (bright text,
+            // light grays, yellows) assumes a dark background, but xterm and macOS Terminal
+            // default to black-on-white — a Linux player whose bundled WezTerm failed to start
+            // fell back to a white xterm and reported the game as an all-white window. OSC 11/10
+            // set the terminal's DEFAULT background/foreground for the session, so every SGR
+            // reset ([0m) the game emits still lands on dark; terminals that don't support
+            // dynamic colors silently ignore the sequence (it's a well-formed OSC), and
+            // ClearScreen additionally prepends SGR 40 as a background-color-erase fallback
+            // when this flag is set. Restored on exit (OSC 111/110) so a player running in
+            // their own terminal gets their colors back.
+            // Gates: Unix only (Windows consoles are dark by default and legacy conhost VT
+            // handling is uneven); interactive output only (not piped stdio/relay); never for
+            // real BBS drop-file sessions (CP437 terminals), MUD server/relay/worldsim
+            // (headless or socket-owned output), Electron (owns its own OSC protocol), or
+            // WezTerm (the bundled launcher ships its own theme — don't stomp it).
+            try
+            {
+                bool paintDark = !OperatingSystem.IsWindows()
+                    && !Console.IsOutputRedirected
+                    && !isWezTerm
+                    && !DoorMode.IsInDoorMode
+                    && !DoorMode.IsMudServerMode
+                    && !DoorMode.IsMudRelayMode
+                    && !DoorMode.IsWorldSimMode
+                    && !GameConfig.ElectronMode;
+                if (paintDark)
+                {
+                    Console.Write("\x1b]11;#000000\x07\x1b]10;#C0C0C0\x07");
+                    GameConfig.DarkTerminalPaint = true;
+                    AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+                    {
+                        // Give the player's terminal its default colors back on any managed
+                        // exit (normal quit, Ctrl+C handler, Environment.Exit).
+                        try { Console.Write("\x1b[0m\x1b]111\x07\x1b]110\x07"); } catch { /* terminal gone */ }
+                    };
+                }
+            }
+            catch { /* Best effort. Never block startup on terminal cosmetics */ }
+
             if (useDoorMode)
             {
                 await RunDoorModeAsync();

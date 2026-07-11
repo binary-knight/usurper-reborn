@@ -1473,6 +1473,7 @@ namespace UsurperRemake.Systems
                         : DateTime.Now.AddHours(-(data.Age > 0 ? data.Age : CapLegacyAge(data.Race, Random.Shared.Next(18, 50))) * GameConfig.NpcLifecycleHoursPerYear),
                     IsAgedDeath = data.IsAgedDeath,
                     IsPermaDead = data.IsPermaDead,
+                    DeathDate = data.DeathDate,
                     PregnancyDueDate = data.PregnancyDueDate,
                     PregnancyFatherName = data.PregnancyFatherName,
 

@@ -117,7 +117,7 @@
   "features.dungeon_title": "Dungeon di 100 Piani",
   "features.dungeon_desc": "I piani sono generati in modo deterministico, quindi il layout resta uguale ad ogni visita e impari davvero la mappa. Sette incontri con gli dei. Sei sigilli da trovare. Diventa davvero tosto dal piano 50 in su.",
   "features.rpg_title": "Il Lato RPG",
-  "features.rpg_desc": "11 classi, 10 razze, 75 incantesimi. Sistema di romance, matrimonio, figli. Politica di corte e sfide per il trono. Fazioni a cui unirti o da tradire. 4 compagni reclutabili con le loro missioni. Un'arena PvP. Praticamente tutto quello che aveva l'originale, con molto di più in aggiunta.",
+  "features.rpg_desc": "12 classi, 10 razze, 75 incantesimi. Sistema di romance, matrimonio, figli. Politica di corte e sfide per il trono. Fazioni a cui unirti o da tradire. 5 compagni reclutabili con le loro missioni. Un'arena PvP. Praticamente tutto quello che aveva l'originale, con molto di più in aggiunta.",
 
   "sponsors.title": "// SPONSOR",
   "sponsors.subtitle": "Le persone che aiutano a mantenere vivo questo progetto. Grazie.",
@@ -175,7 +175,7 @@
   "gods.manwe_desc": "Ha creato tutto. È in fondo al dungeon e non vuole combattere. È solo stanco di esistere e ha una domanda per te. La tua risposta è il finale del gioco. Questo è l'incontro su cui ho passato più tempo a scrivere.",
 
   "classes.title": "// CLASSI &amp; RAZZE",
-  "classes.subtitle": "11 classi + 5 classi prestigio, 10 razze. Scegli quella che ti sembra divertente. Giocano tutte in modo diverso.",
+  "classes.subtitle": "12 classi + 5 classi prestigio, 10 razze. Scegli quella che ti sembra divertente. Giocano tutte in modo diverso.",
   "classes.section_classes": "Classi Personaggio",
   "classes.section_prestige": "Classi Prestigio",
   "classes.prestige_note": "(solo NG+)",
@@ -205,7 +205,7 @@
   "classes.alchemist_desc": "Una specie di ibrido mago-scienziato. INT e WIS alti. Le abilita' hanno un sapore da artigianato.",
   "classes.magician_name": "Magician",
   "classes.magician_role": "Incantatore Arcano",
-  "classes.magician_desc": "L'incantatore puro. Accesso a tutti i 75 incantesimi. Distruggera' tutto con la magia, ma se un mostro ti raggiunge in mischia sei nei guai.",
+  "classes.magician_desc": "L'incantatore puro. Accesso a tutti i 25 incantesimi arcani. Distruggera' tutto con la magia, ma se un mostro ti raggiunge in mischia sei nei guai.",
   "classes.cleric_name": "Cleric",
   "classes.cleric_role": "Guaritore Divino",
   "classes.cleric_desc": "Magia di cura e supporto. Se la cava bene anche in combattimento. Nel multiplayer, tutti vogliono un Cleric nel gruppo.",
@@ -254,7 +254,7 @@
   "classes.mutant_desc": "Quello strano. I bonus sono un po' casuali quindi ogni Mutant gioca in modo leggermente diverso. Sceglilo se ti piacciono le sorprese.",
 
   "companions.title": "// COMPAGNI",
-  "companions.subtitle": "Quattro NPC reclutabili con le loro missioni. Combattono con te nel dungeon e possono morire permanentemente, il che conta più di quanto pensi.",
+  "companions.subtitle": "Cinque NPC reclutabili con le loro missioni. Combattono con te nel dungeon e possono morire permanentemente, il che conta più di quanto pensi.",
   "companions.lyris_name": "Lyris",
   "companions.lyris_title": "La Stella Errante",
   "companions.lyris_desc": "Sa cose che non dovrebbe sapere. A volte parla per enigmi, il che è fastidioso finchè non ti rendi conto che di solito ha ragione. C'è qualcosa in lei che non è del tutto mortale.",

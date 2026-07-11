@@ -693,30 +693,44 @@ public class WorldSimulator
         bool permadeath = RollPermadeath(npc, basePermadeathChance);
         if (permadeath)
         {
-            // Permadeath is disabled — NPCs now respawn after death.
-            // npc.IsPermaDead = true;
-            // deadNPCRespawnTimers.Remove(npc.Id ?? npc.Name);
+            // v0.65.5 (T0-2): make the rolled permadeath ACTUALLY permanent so the cascade below
+            // is not phantom. Pre-fix `npc.IsPermaDead = true` was commented out (v0.53.11 blanket
+            // "permadeath disabled"), so the dead-NPC respawn tracker (which skips only
+            // IsAgedDeath/IsPermaDead corpses) brought the NPC back AFTER bereavement/orphan/grudge
+            // cascades had already fired -- a player's spouse got a "you are widowed" mail then
+            // respawned alive. RollPermadeath is deliberately rare and floor-gated (population +
+            // race floors, level reduction), and the rest of the permadeath infrastructure it feeds
+            // (PrunePermanentlyDeadNPCs grace window, IsPermaDead-aware alive counts) already expects
+            // this flag to be real. The common (non-rolled) death still respawns via the else branch.
+            npc.IsPermaDead = true;
+            npc.DeathDate = DateTime.UtcNow; // PrunePermanentlyDeadNPCs grace window
+            deadNPCRespawnTimers.Remove(npc.Id ?? npc.Name);
 
-            // Permadeath news and log suppressed because permadeath is disabled.
-            // NPCs will respawn, so "will not return" messages would be misleading.
-            // NewsSystem.Instance?.Newsy(
-            //     $"\u2620 {npc.Name} has been slain by {killerName} and will not return. The realm mourns.");
+            // v0.65.5 (T0-2): permadeath news + log re-enabled. These were suppressed while permadeath
+            // was disabled ("NPCs respawn, so 'will not return' would be misleading"); now that a rolled
+            // permadeath genuinely sticks (IsPermaDead set above, no respawn), the "will not return"
+            // line is accurate and the death should be visible in the feed and the log.
+            NewsSystem.Instance?.Newsy(
+                $"\u2620 {npc.Name} has been slain by {killerName} and will not return. The realm mourns.");
 
             // Witnesses record the permanent death
             SocialInfluenceSystem.RecordWitnesses(npcs, location,
                 killerName, npc.Name2 ?? npc.Name, WitnessEventType.SawMurder);
 
-            // DebugLogger.Instance.LogInfo("PERMADEATH", $"{npc.Name} permanently killed by {killerName} (chance was {basePermadeathChance:P0})");
+            DebugLogger.Instance.LogInfo("PERMADEATH", $"{npc.Name} permanently killed by {killerName} (chance was {basePermadeathChance:P0})");
 
-            // v0.63.0 slice 4 (audit npc-C7): pre-fix the gate read
-            // (npc.IsAgedDeath || npc.IsPermaDead) but `npc.IsPermaDead = true`
-            // is commented out at line 550 (permadeath disabled in v0.53.11),
-            // so the bereavement was unreachable from any combat-permadeath
-            // roll. Since we're inside `if (permadeath)`, the death IS
-            // permanent for bookkeeping purposes; drop the flag check so
-            // HandleSpouseBereavement fires regardless of whether the flag
-            // happens to be live. Aging-death path at line 896 still gates
-            // on its own IsAgedDeath check independently.
+            // v0.65.5 (T0-2): release the player's romance state on EVERY permanent death, not just
+            // marriages. The direct-player-combat kill path (CombatEngine.HandleNpcTeammateDeath) has
+            // called these two since v0.63.0 slice 4, but every BACKGROUND permanent death (this path:
+            // brawls, wars, Tier-A dungeon runs) skipped them, so a permadied LOVER or FWB stayed in
+            // CurrentLovers/FriendsWithBenefits forever, jealousy never closed out, and affair records
+            // keyed on the dead NPC persisted. Called unconditionally (not gated on Married) because
+            // HandleSpouseBereavement below only fires when married and only handles the spouse case.
+            // Keyed on npc.ID, matching the combat path + the affair keys ("marriedNpcId:seducerId").
+            // Idempotent for non-romance NPCs.
+            RomanceTracker.Instance?.OnNPCPermadied(npc.ID);
+            NPCMarriageRegistry.Instance.OnNPCPermadied(npc.ID);
+
             if (npc.Married || npc.IsMarried)
             {
                 // v0.64.1 audit fix: notify a player spouse BEFORE bereavement
@@ -1169,6 +1183,13 @@ public class WorldSimulator
 
                     // Remove from respawn queue if somehow queued
                     deadNPCRespawnTimers.Remove(npc.Id ?? npc.Name);
+
+                    // v0.65.5 (T0-2): aging death is permanent, so release the player's romance
+                    // state here too (lover/FWB/affair, not just spouse). Same unconditional call
+                    // as the MarkNPCDead permadeath branch -- aging does not route through
+                    // MarkNPCDead, so it needs its own hook. Idempotent for non-romance NPCs.
+                    RomanceTracker.Instance?.OnNPCPermadied(npc.ID);
+                    NPCMarriageRegistry.Instance.OnNPCPermadied(npc.ID);
 
                     // Handle marriage - widow the spouse
                     if (npc.Married || npc.IsMarried)
@@ -1687,6 +1708,24 @@ public class WorldSimulator
     /// </summary>
     private void ProcessOrphanComingOfAge(RoyalOrphan orphan, King king)
     {
+        // v0.65.5 (T1-6): check the LIVING-population cap BEFORE removing the orphan from the
+        // orphanage or marking the Child deleted. Pre-fix this mutated both up front, then
+        // OrphanBecomesNPC bailed at the cap (its own aliveCount >= MaxNPCPopulation guard) and
+        // created no NPC -- the orphan was gone from king.Orphans AND the Child registry with no
+        // NPC ever produced, i.e. silent data loss (worst case, since the world sits near cap most
+        // of the time). Regular children got an "away at school" park-and-retry in v0.64.0; orphans
+        // did not. Defer instead: leave the orphan in the orphanage and retry next ProcessOrphanAging
+        // tick, when aging death / immigration turnover frees a slot.
+        int aliveCount = npcs.Count(n => n.IsAlive && !n.IsDead && !n.IsAgedDeath && !n.IsPermaDead);
+        if (aliveCount >= GameConfig.MaxNPCPopulation)
+        {
+            // Debug level: ProcessOrphanAging runs every world-sim tick (~30s), so a long stretch
+            // at the population cap would spam Info-level logs for the same waiting orphan.
+            DebugLogger.Instance.LogDebug("ORPHANAGE",
+                $"Deferring {orphan.Name}'s coming-of-age -- population at cap ({aliveCount}/{GameConfig.MaxNPCPopulation}). Will retry next tick.");
+            return;
+        }
+
         // Remove from orphanage
         king.Orphans.Remove(orphan);
 

@@ -1,6 +1,8 @@
 # Usurper Reborn -- Architecture Document
 
-> A comprehensive technical reference for the Usurper Reborn codebase as of v0.60.7 (Beta).
+> A comprehensive technical reference for the Usurper Reborn codebase as of v0.65.5 (Beta). Section
+> version tags below (e.g. "v0.60.7") mark when a subsystem was introduced or last substantially
+> revised, not the document date.
 
 **Runtime**: .NET 8.0 LTS | **Language**: C# 12 | **License**: GPL v2
 
@@ -1571,11 +1573,20 @@ Database (table sizes, integrity), SSL cert info, recent logins, game news, serv
 Browser -> https://usurper-reborn.net (nginx, SSL via Let's Encrypt)
   ├── Static (web/index.html, dashboard.html, admin.html)
   ├── /api/* -> Node (port 3000) -> SQLite
-  └── /ws -> WebSocket -> SSH session -> game (port 4000 via sshd-usurper)
+  └── /ws  -> Node MUD proxy (port 3000, MUD_MODE=1)
+             -> TCP 127.0.0.1:4001 (MudServer direct, bypasses haproxy so the
+                X-IP forwarded header is honored end-to-end for real-IP visibility)
 
-sslh (port 4000) -> SSH to port 4022, raw TCP to port 4001
-sshd-usurper (port 4022) -> ForceCommand --mud-relay --mud-port 4001
-usurper-mud (port 4001) -> game server (multi-user, SQLite-backed)
+Direct SSH / Raw TCP / Telnet / BBS Online Play
+  -> play.usurper-reborn.net:4000 (haproxy multiplexer; replaced sslh in v0.64.0
+     because the packaged sslh lacked PROXY-protocol support)
+     ├── "SSH-..." version-line sniff -> 127.0.0.1:4022 (sshd-usurper)
+     │      -> ForceCommand --mud-relay --mud-port 4001 -> 127.0.0.1:4001 (MudServer)
+     └── default (raw TCP / telnet / MUD client) -> 127.0.0.1:4001 (MudServer)
+            WITH a PROXY v2 header prepended so MudServer records the real client IP
+            for ban enforcement (MudServer.TryReadProxyProtocolV2Async parses it)
+
+usurper-mud (port 4001) -> game server (multi-user, SQLite-backed, integrated world sim)
 ```
 
 ### Nginx
@@ -1584,10 +1595,11 @@ usurper-mud (port 4001) -> game server (multi-user, SQLite-backed)
 Static files from `/opt/usurper/web/`. `/api/*` -> `127.0.0.1:3000`. `/ws` -> WebSocket with 24-hour timeout. SSL via Let's Encrypt certbot (auto-renewing). `/api/` block tightened in v0.60.5 for SSE: `proxy_buffering off`, `proxy_cache off`, `proxy_http_version 1.1`, `proxy_read_timeout 600s`, `proxy_send_timeout 600s`. `/api/releases/latest` exempted from HTTPS redirect (Win7 TLS fallback path; v0.49.7).
 
 ### Systemd Services
+- **haproxy** -- port-4000 multiplexer; SSH-version-line sniff routes "SSH-..." to sshd-usurper:4022, everything else to MudServer:4001 with a PROXY v2 header prepended (replaced sslh in v0.64.0)
 - **usurper-web.service** -- Node web proxy (port 3000)
-- **usurper-mud.service** -- game server (port 4001), `HeapHardLimit=512MB` in `runtimeconfig.template.json`
+- **usurper-mud.service** -- game server (port 4001) with integrated world sim, `HeapHardLimit=512MB` in `runtimeconfig.template.json`
 - **sshd-usurper.service** -- SSH daemon on port 4022, ForceCommand to `--mud-relay`
-- **usurper-world.service** -- DEPRECATED (world sim folded into usurper-mud since v0.60.0)
+- (`usurper-world.service` was removed; the world sim folded into usurper-mud in v0.60.0)
 
 Discord bot env vars: `DISCORD_BOT_TOKEN`, `DISCORD_GOSSIP_CHANNEL_ID`, optional `DISCORD_STATS_CHANNEL_ID`. Stored in `/etc/systemd/system/usurper-web.service.d/discord.conf` (600 perms).
 
@@ -1962,7 +1974,7 @@ Scripts/
 │   └── PlayerSaveEditor.cs         Standalone game / save editor (--editor)
 │
 ├── UI/
-│   ├── TerminalEmulator.cs         Console / Godot / BBS abstraction (~2500 lines)
+│   ├── TerminalEmulator.cs         Console / BBS / Electron abstraction (~2500 lines)
 │   ├── UIHelper.cs                 80-char box drawing
 │   ├── ANSIArt.cs                  Race / class portraits, monster art
 │   ├── RacePortraits.cs            ANSI portrait registry

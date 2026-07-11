@@ -4,6 +4,15 @@
 
 Host your own Usurper Reborn online multiplayer server. Players connect via SSH to a shared game world with persistent characters, NPCs, economy, and inter-player chat.
 
+> DEPLOYMENT NOTE: the canonical production server (usurper-reborn.net) runs the **MUD Server** model
+> behind an haproxy multiplexer on port 4000 (SSH-version-line sniff routes "SSH-..." to sshd-usurper
+> on 4022, everything else to the MudServer on 4001 with a PROXY v2 header for real-IP visibility).
+> That live setup, including exact service names, ports, and deploy commands, is documented at the top
+> of `CLAUDE.md` and in `DOCS/ARCHITECTURE.md`; treat those as the source of truth for the recommended
+> topology. The **Simple (Per-Process)** model below is still fully supported for small self-hosted
+> communities (it runs one game process per SSH connection with `--online --stdio` and needs no
+> haproxy), but the MUD Server model is what the production server uses and what scales.
+
 There are two deployment models:
 
 | Model | Best For | RAM per Player | World Simulation |

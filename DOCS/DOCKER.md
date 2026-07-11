@@ -7,7 +7,7 @@ Host your own Usurper Reborn MUD server using Docker.
 ## Quick Start
 
 ```bash
-git clone https://github.com/jknight/usurper-reborn.git
+git clone https://github.com/binary-knight/usurper-reborn.git
 cd usurper-reborn
 
 # Edit docker-compose.yml — change "YourAdminName" and "changeme"

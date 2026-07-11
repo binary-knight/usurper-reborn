@@ -1660,7 +1660,10 @@ namespace UsurperRemake.Systems
 
                 // Mark the ending sequence as fully completed
                 StoryProgressionSystem.Instance.SetStoryFlag("ending_sequence_completed", true);
-                try { await SaveSystem.Instance.AutoSave(player); } catch { }
+                // v0.65.5 (T1-5): log instead of swallowing. This autosave persists the
+                // ending-completed flag; if it fails silently the player could replay the ending.
+                try { await SaveSystem.Instance.AutoSave(player); }
+                catch (Exception saveEx) { DebugLogger.Instance.LogError("SAVE", $"Ending-completion autosave failed: {saveEx.Message}"); }
                 return true;
             }
 

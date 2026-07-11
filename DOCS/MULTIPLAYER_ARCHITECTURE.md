@@ -1,5 +1,14 @@
 # Usurper Reborn - Online Multiplayer Architecture
 
+> HISTORICAL DESIGN NOTE (kept for reference). This document describes the ORIGINAL per-process,
+> SSH-client design from the early multiplayer phases. The production server has since moved to an
+> integrated MUD-server model: a single `usurper-mud` process serves all players over a haproxy
+> multiplexer on port 4000 (SSH-version-line sniff to sshd-usurper:4022, everything else to
+> MudServer:4001 with a PROXY v2 header), with the world sim folded in. For the current architecture
+> (MudServer / PlayerSession / SessionContext, GMCP, group play, world-state row-versioning CAS), see
+> `DOCS/ARCHITECTURE.md` and the top of `CLAUDE.md`. Treat the diagrams and the "SSH.NET client"
+> details below as history, not current deployment guidance.
+
 ## Overview
 
 Centralized multiplayer server where Steam, Local, and BBS users all connect via SSH to a shared game world. Characters exist only on the server - no local save crossover.
@@ -525,7 +534,7 @@ no AWS complexity. Upgrade to EC2 t3.small if you outgrow it.
 - Game binary runs as unprivileged `usurper` user
 - SQLite file permissions: 600 (owner only)
 - Rate limiting on SSH connections (fail2ban)
-- Player passwords hashed with bcrypt (if using in-game auth)
+- Player passwords hashed with PBKDF2 (SHA256, 100k iterations, per-user salt, constant-time compare)
 - No shell access - ForceCommand only runs the game
 - Input validation on all player commands (already exists)
 - SSH.NET handles host key verification to prevent MITM attacks

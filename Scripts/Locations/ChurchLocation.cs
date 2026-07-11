@@ -1300,12 +1300,19 @@ namespace UsurperRemake.Locations
             terminal.WriteLine(Loc.Get("church.records_alignment", GetAlignmentDescription(currentPlayer)));
             terminal.WriteLine("");
 
-            // Church statistics (placeholder for now)
+            // Church "this month" community figures. v0.65.5 (T1-7): pre-fix these were
+            // Random.Shared.Next per visit, so the numbers changed every time the player opened
+            // the records -- obviously fake on a second look. Seed a local RNG on the in-game
+            // month index so the figures hold steady within a month and roll over monthly. Not a
+            // real cross-player aggregate (that would need world-state tallies); this is stable,
+            // believable flavor. Player's own records above (donations/blessings/etc.) are real.
+            int churchMonthIndex = Math.Max(0, DailySystemManager.Instance.CurrentDay / 30);
+            var churchMonthRng = new Random(churchMonthIndex * 7919 + 13);
             terminal.WriteLine(Loc.Get("church.records_church_stats"), "cyan");
-            terminal.WriteLine(Loc.Get("church.records_month_donations", Random.Shared.Next(50000, 200001).ToString("N0"), GameConfig.MoneyType));
-            terminal.WriteLine(Loc.Get("church.records_month_marriages", Random.Shared.Next(5, 26)));
-            terminal.WriteLine(Loc.Get("church.records_month_blessings", Random.Shared.Next(100, 501)));
-            terminal.WriteLine(Loc.Get("church.records_month_souls", Random.Shared.Next(50, 201)));
+            terminal.WriteLine(Loc.Get("church.records_month_donations", churchMonthRng.Next(50000, 200001).ToString("N0"), GameConfig.MoneyType));
+            terminal.WriteLine(Loc.Get("church.records_month_marriages", churchMonthRng.Next(5, 26)));
+            terminal.WriteLine(Loc.Get("church.records_month_blessings", churchMonthRng.Next(100, 501)));
+            terminal.WriteLine(Loc.Get("church.records_month_souls", churchMonthRng.Next(50, 201)));
             terminal.WriteLine("");
             
             await terminal.PressAnyKey();

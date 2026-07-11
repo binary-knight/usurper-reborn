@@ -1349,8 +1349,11 @@ namespace UsurperRemake.Systems
                         .ToDictionary(kvp => kvp.Key, kvp => kvp.Value * 100f)
                         ?? new Dictionary<string, float>(),
 
-                    // Enemies
-                    Enemies = npc.Enemies?.ToList() ?? new List<string>(),
+                    // Enemies. v0.65.5: cap for parity with SaveSystem.SerializeNPCs (was uncapped
+                    // here, and world_state.npcs is rewritten frequently, so an NPC with a long-lived
+                    // grudge list bloated every save). TakeLast keeps the most recent grudges.
+                    Enemies = (npc.Enemies ?? new List<string>())
+                        .TakeLast(GameConfig.MaxSerializedEnemiesPerNpc).ToList(),
 
                     // Divine worship
                     WorshippedGod = npc.WorshippedGod ?? "",
@@ -1367,8 +1370,10 @@ namespace UsurperRemake.Systems
                         kvp => kvp.Key, kvp => (int)kvp.Value) ?? new Dictionary<string, int>(),
                     SkillTrainingProgress = npc.SkillTrainingProgress ?? new Dictionary<string, int>(),
 
-                    // Market inventory for NPC trading
-                    MarketInventory = npc.MarketInventory?.Select(item => new MarketItemData
+                    // Market inventory for NPC trading. v0.65.5: capped for parity with SaveSystem.
+                    MarketInventory = (npc.MarketInventory ?? new List<Item>())
+                        .Take(GameConfig.MaxSerializedNPCInventory)
+                        .Select(item => new MarketItemData
                     {
                         ItemName = item.Name,
                         ItemValue = item.Value,
@@ -1378,7 +1383,7 @@ namespace UsurperRemake.Systems
                         Strength = item.Strength,
                         Defence = item.Defence,
                         IsCursed = item.IsCursed
-                    }).ToList() ?? new List<MarketItemData>(),
+                    }).ToList(),
 
                     // v0.57.4: personal bag — items the player transferred to this
                     // NPC via combat [T] / Home / Team Corner / dungeon viewer.
@@ -1386,13 +1391,17 @@ namespace UsurperRemake.Systems
                     // server persists shared NPC state to world_state SQLite; no
                     // Inventory field = runtime items lost every tick).
                     // issue #112: full-fidelity converter (carries rarity + all stats) so NPC-bag items round-trip in world_state.
-                    Inventory = npc.Inventory?.Where(i => i != null).Select(InventoryItemData.FromItem).ToList() ?? new List<InventoryItemData>(),
+                    // v0.65.5: capped to the most recent N for parity with SaveSystem.
+                    Inventory = (npc.Inventory ?? new List<Item>()).Where(i => i != null)
+                        .TakeLast(GameConfig.MaxSerializedNPCInventory)
+                        .Select(InventoryItemData.FromItem).ToList(),
 
                     // Lifecycle
                     Age = npc.Age,
                     BirthDate = npc.BirthDate,
                     IsAgedDeath = npc.IsAgedDeath,
                     IsPermaDead = npc.IsPermaDead,
+                    DeathDate = npc.DeathDate,
                     PregnancyDueDate = npc.PregnancyDueDate,
                     PregnancyFatherName = npc.PregnancyFatherName,
 

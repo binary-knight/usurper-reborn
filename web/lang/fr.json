@@ -117,7 +117,7 @@
   "features.dungeon_title": "Donjon de 100 étages",
   "features.dungeon_desc": "Les étages sont générés de façon déterministe, donc la disposition reste la même à chaque visite et tu apprends vraiment la carte. Sept rencontres divines. Six sceaux à trouver. Ça devient vraiment difficile vers le 50e étage.",
   "features.rpg_title": "Le côté RPG",
-  "features.rpg_desc": "11 classes, 10 races, 75 sorts. Système de romance, mariage, enfants. Politique de cour et défis pour le trône. Des factions que tu peux rejoindre ou trahir. 4 compagnons recrutables avec leurs propres quêtes. Une arène PvP. En gros tout ce que l'original avait, plus pas mal de trucs en plus.",
+  "features.rpg_desc": "12 classes, 10 races, 75 sorts. Système de romance, mariage, enfants. Politique de cour et défis pour le trône. Des factions que tu peux rejoindre ou trahir. 5 compagnons recrutables avec leurs propres quêtes. Une arène PvP. En gros tout ce que l'original avait, plus pas mal de trucs en plus.",
 
   "sponsors.title": "// SPONSORS",
   "sponsors.subtitle": "Les gens qui aident à maintenir ce projet en vie. Merci.",
@@ -175,7 +175,7 @@
   "gods.manwe_desc": "Il a tout créé. Il est tout au fond du donjon et il ne veut pas se battre. Il est juste fatigué d'exister et il a une question pour toi. Ta réponse est la fin du jeu. C'est la rencontre sur laquelle j'ai passé le plus de temps à écrire.",
 
   "classes.title": "// CLASSES &amp; RACES",
-  "classes.subtitle": "11 classes + 5 classes de prestige, 10 races. Choisis ce qui te tente. Elles jouent toutes différemment.",
+  "classes.subtitle": "12 classes + 5 classes de prestige, 10 races. Choisis ce qui te tente. Elles jouent toutes différemment.",
   "classes.section_classes": "Classes de personnage",
   "classes.section_prestige": "Classes de prestige",
   "classes.prestige_note": "(NG+ uniquement)",
@@ -205,7 +205,7 @@
   "classes.alchemist_desc": "Un genre d'hybride magicien-scientifique. INT et WIS élevées. Les capacités ont un côté artisanal.",
   "classes.magician_name": "Magician",
   "classes.magician_role": "Lanceur de sorts arcaniques",
-  "classes.magician_desc": "Le lanceur de sorts complet. Accès aux 75 sorts. Va tout détruire avec la magie, mais si un monstre t'atteint en mêlée, t'as un problème.",
+  "classes.magician_desc": "Le lanceur de sorts complet. Accès aux 25 sorts arcaniques. Va tout détruire avec la magie, mais si un monstre t'atteint en mêlée, t'as un problème.",
   "classes.cleric_name": "Cleric",
   "classes.cleric_role": "Soigneur divin",
   "classes.cleric_desc": "Magie de soin et de soutien. Se défend bien en combat aussi. En multijoueur, tout le monde veut un Cleric dans le groupe.",
@@ -254,7 +254,7 @@
   "classes.mutant_desc": "Le choix bizarre. Les bonus sont un peu aléatoires donc chaque Mutant joue un peu différemment. Choisis ça si tu aimes les surprises.",
 
   "companions.title": "// COMPAGNONS",
-  "companions.subtitle": "Quatre PNJ recrutables avec leurs propres quêtes. Ils combattent avec toi dans le donjon et ils peuvent mourir définitivement, ce qui compte plus qu'on ne le pense.",
+  "companions.subtitle": "Cinq PNJ recrutables avec leurs propres quêtes. Ils combattent avec toi dans le donjon et ils peuvent mourir définitivement, ce qui compte plus qu'on ne le pense.",
   "companions.lyris_name": "Lyris",
   "companions.lyris_title": "L'Étoile Errante",
   "companions.lyris_desc": "Elle sait des choses qu'elle ne devrait pas savoir. Parle par énigmes parfois, ce qui est agaçant jusqu'à ce que tu réalises qu'elle a généralement raison. Quelque chose chez elle n'est pas tout à fait mortel.",

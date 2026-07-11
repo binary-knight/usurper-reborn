@@ -14,9 +14,9 @@ Drop any of these files into `GameData/` next to the game executable. Missing fi
 | File                     | What it controls                                                         |
 |--------------------------|--------------------------------------------------------------------------|
 | `npcs.json`              | 60 built-in town NPCs (classes, stats, personality, story role)          |
-| `monster_families.json`  | 16 monster families × 5 tiers each (HP/STR curves, abilities, loot)      |
-| `dreams.json`            | 50 narrative dreams and their trigger conditions                         |
-| `achievements.json`      | 75 achievements and their tier rewards                                   |
+| `monster_families.json`  | 15 monster families × 5 tiers each (HP/STR curves, abilities, loot)      |
+| `dreams.json`            | narrative dreams and their trigger conditions                            |
+| `achievements.json`      | 79 achievements and their tier rewards                                   |
 | `dialogue.json`          | ~500 lines of NPC dialogue keyed by personality                          |
 | `balance.json`           | ~30 game-balance constants (crit rate, boss scaling, daily limits…)      |
 | `equipment.json`         | **NEW in 0.57.3** — custom weapons, armor, shields, accessories          |
@@ -24,6 +24,8 @@ Drop any of these files into `GameData/` next to the game executable. Missing fi
 ## Starting a mod
 
 Run `UsurperReborn --export-data` once. This writes the current built-in content to `GameData/*.json` as a starting point. Edit what you like. The next time the game runs, your changes take effect.
+
+(For localizers: `UsurperReborn --export-discoveries [path]` emits the dungeon Discovery localization source keys in English, using the engine's exact key scheme, as a starting point for translating the ~600 `discovery.*` keys.)
 
 If you don't want to bother with every file, you can create just the ones you care about. The game loads each independently and falls back to built-ins for anything missing.
 

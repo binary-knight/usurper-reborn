@@ -863,6 +863,7 @@ namespace UsurperRemake.Systems
         public DateTime BirthDate { get; set; } = DateTime.MinValue;
         public bool IsAgedDeath { get; set; }
         public bool IsPermaDead { get; set; }  // Permanent combat death (v0.42.0)
+        public DateTime? DeathDate { get; set; }  // v0.65.5: prune grace window for permanent deaths
         public DateTime? PregnancyDueDate { get; set; }
         public string? PregnancyFatherName { get; set; }
 

@@ -845,7 +845,11 @@ public static class TrainingSystem
             terminal.WriteLine(Loc.Get("training.single_reset_lore_6", skillName.ToLower()), "bright_magenta");
             await Task.Delay(1500);
             terminal.WriteLine("");
-            terminal.WriteLine(Loc.Get("training.single_reset_lore_7"), "white");
+            // v0.65.5 (T1-3): pass skillName to lore_7 as well. EN keeps the skill name in lore_8
+            // ("training in {0} dissolve..."), but Hungarian word order moves it into lore_7
+            // ("...A(z) {0} területén..."), so lore_7's hu template references {0}. EN ignores the
+            // extra arg; without it the hu line threw FormatException and rendered the raw template.
+            terminal.WriteLine(Loc.Get("training.single_reset_lore_7", skillName), "white");
             terminal.WriteLine(Loc.Get("training.single_reset_lore_8", skillName), "white");
             terminal.WriteLine(Loc.Get("training.single_reset_lore_9"), "white");
             terminal.WriteLine(Loc.Get("training.single_reset_lore_10"), "white");

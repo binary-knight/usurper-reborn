@@ -17,7 +17,7 @@ for term_cmd in gnome-terminal konsole xfce4-terminal mate-terminal lxterminal a
             lxterminal)     exec lxterminal -e "./UsurperReborn --local --screen-reader" ;;
             alacritty)      exec alacritty -e ./UsurperReborn --local --screen-reader ;;
             kitty)          exec kitty ./UsurperReborn --local --screen-reader ;;
-            xterm)          exec xterm -e ./UsurperReborn --local --screen-reader ;;
+            xterm)          exec xterm -bg black -fg white -e ./UsurperReborn --local --screen-reader ;;
         esac
     fi
 done
