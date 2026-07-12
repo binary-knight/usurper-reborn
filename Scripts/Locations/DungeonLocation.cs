@@ -236,6 +236,29 @@ public class DungeonLocation : BaseLocation
             term.SetColor("gray");
             term.WriteLine($"  {GetThemeDescription(currentFloor.Theme)}");
 
+            // v0.65.6 floor danger rating: telegraph how far above the player's
+            // level this floor runs. Telemetry showed real deaths came from deep
+            // pushes (floor >= player level) the player had no warning about.
+            if (player != null)
+            {
+                int levelGap = currentDungeonLevel - player.Level;
+                if (levelGap >= 6)
+                {
+                    term.SetColor("bright_red");
+                    term.WriteLine($"  {Loc.Get("dungeon.danger_deadly", levelGap)}");
+                }
+                else if (levelGap >= 3)
+                {
+                    term.SetColor("red");
+                    term.WriteLine($"  {Loc.Get("dungeon.danger_dangerous", levelGap)}");
+                }
+                else if (levelGap >= 1)
+                {
+                    term.SetColor("yellow");
+                    term.WriteLine($"  {Loc.Get("dungeon.danger_risky", levelGap)}");
+                }
+            }
+
             // Show persistence status
             if (wasRestored && !didRespawn)
             {
@@ -3400,6 +3423,19 @@ public class DungeonLocation : BaseLocation
             terminal.Write("  ");
             terminal.SetColor(fatigueColor);
             terminal.Write(fatigueLabel);
+        }
+
+        // v0.65.6 compact floor danger tag: persistent room-bar reminder whenever
+        // the floor runs above the player's level (all floor-change paths -- entry,
+        // stairs, level select -- render through this bar, so no path is missed).
+        int dangerGap = currentDungeonLevel - player.Level;
+        if (dangerGap >= 1)
+        {
+            terminal.Write("  ");
+            terminal.SetColor(dangerGap >= 6 ? "bright_red" : dangerGap >= 3 ? "red" : "yellow");
+            terminal.Write(Loc.Get(dangerGap >= 6 ? "dungeon.danger_tag_deadly"
+                : dangerGap >= 3 ? "dungeon.danger_tag_dangerous"
+                : "dungeon.danger_tag_risky", dangerGap));
         }
 
         terminal.WriteLine("");

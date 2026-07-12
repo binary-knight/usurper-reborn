@@ -289,6 +289,23 @@ public class SaveRoundTripTests
     }
 
     [Fact]
+    public void PlayerData_RoundTrip_PreservesLastRiteOfReturnUtc()
+    {
+        // v0.65.6 renewable resurrections: the Temple's Rite of Return has a
+        // wall-clock cooldown stored in LastRiteOfReturnUtc. Must survive
+        // save/load or a relog resets the cooldown and the rite becomes a
+        // gold-only resurrection vending machine.
+        var stamp = new DateTime(2026, 7, 12, 8, 15, 0, DateTimeKind.Utc);
+        var original = new PlayerData { LastRiteOfReturnUtc = stamp };
+
+        var json = JsonSerializer.Serialize(original, _jsonOptions);
+        var restored = JsonSerializer.Deserialize<PlayerData>(json, _jsonOptions);
+
+        restored.Should().NotBeNull();
+        restored!.LastRiteOfReturnUtc.Should().Be(stamp, "LastRiteOfReturnUtc must survive save/load so the rite cooldown can't be relog-rerolled");
+    }
+
+    [Fact]
     public void PlayerData_RoundTrip_PreservesDailyCounters_KingdomAndPrison()
     {
         var original = new PlayerData

@@ -1492,7 +1492,11 @@ namespace UsurperRemake.Systems
                     WasRaisedByPlayer = data.WasRaisedByPlayer,
 
                     // v0.64.0 Brain v2 Slice 1 cohort flag (default false on legacy saves).
-                    IsAIDriven = data.IsAIDriven,
+                    // v0.65.6: whole-population Brain v2 -- forced true at restore (see
+                    // GameEngine.RestoreNPCs for the rationale). This site matters most:
+                    // the MUD server reloads NPCs from world_state on every version bump,
+                    // so any per-boot backfill elsewhere would be wiped right back here.
+                    IsAIDriven = true,
 
                     IsMarried = data.IsMarried,
                     Married = data.Married,

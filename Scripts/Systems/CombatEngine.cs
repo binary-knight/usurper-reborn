@@ -491,6 +491,10 @@ public partial class CombatEngine
         // Store player reference for combat speed setting
         currentPlayer = player;
 
+        // v0.65.6 Death's Door: once-per-combat burst rescue resets at combat start.
+        player.DeathsDoorUsedThisCombat = false;
+        player.DeathsDoorFiredThisRound = false;
+
         // v0.60.3: GMCP Char.Combat.Start with the enemy list so MUD client scripts
         // can flip into combat-mode triggers (status panes, sound effects, hotbar
         // expansion, etc.) without text-pattern matching the "you are attacked!" line.
@@ -1007,6 +1011,24 @@ public partial class CombatEngine
             // Check if group has real players (for output capture/broadcasting)
             // (declared early so boss phase transitions can broadcast)
             bool hasGroupEarly = result.Teammates?.Any(t => t.IsGroupedPlayer) == true;
+
+            // v0.65.6 boss burst telegraph: the first-3-rounds boss damage cap
+            // (v0.56.1) expires this round. Telemetry showed most real deaths were
+            // one-round boss bursts landing exactly after the cap window -- warn
+            // the player so the danger spike is visible instead of a surprise.
+            if (roundNumber == GameConfig.BossFirstRoundsDamageCapRounds + 1)
+            {
+                var rampedBoss = monsters.FirstOrDefault(m => m.IsAlive && m.IsBoss);
+                if (rampedBoss != null)
+                {
+                    terminal.SetColor("bright_red");
+                    terminal.WriteLine($"  {Loc.Get("combat.boss_unleashed", rampedBoss.Name)}");
+                    terminal.WriteLine("");
+                    if (hasGroupEarly)
+                        BroadcastGroupCombatEvent(result,
+                            $"\u001b[1;31m  {Loc.Get("combat.boss_unleashed", rampedBoss.Name)}\u001b[0m");
+                }
+            }
 
             // Broadcast round number and compact combat status to all followers
             if (hasGroupEarly)
@@ -20456,16 +20478,22 @@ public partial class CombatEngine
         // anything death-related runs (GMCP emit, arrest/exhibition short-
         // circuits, permadeath cinematic, resurrection deduction). If the
         // player started this round above 50% MaxHP, rescue them by setting
-        // HP=1 and rendering the flavor line. They get one more turn to react.
+        // HP=1 and rendering the flavor line. Combat ends with them alive at
+        // 1 HP (the Outcome rewrite below).
         // Bypassed for Nightmare difficulty. PvP combat doesn't route through
         // this method (it has its own death path), so PvP is naturally excluded.
         if (result.Player.LastStandCheckAndApply(isPvP: false))
         {
             // Render the flavor line in the player's local terminal. Group
             // followers see the broadcast version a few lines below.
-            terminal.SetColor("bright_yellow");
+            // v0.65.6: two rescue tiers share this branch -- Last Stand
+            // (round-start > 50% MaxHP, every round) and Death's Door
+            // (round-start > 25%, once per combat). Branch the flavor so the
+            // player knows which guarantee fired and that Death's Door is spent.
+            bool wasDeathsDoor = result.Player.DeathsDoorFiredThisRound;
+            terminal.SetColor(wasDeathsDoor ? "bright_red" : "bright_yellow");
             terminal.WriteLine("");
-            terminal.WriteLine($"  {Loc.Get("combat.last_stand")}");
+            terminal.WriteLine($"  {Loc.Get(wasDeathsDoor ? "combat.deaths_door" : "combat.last_stand")}");
             terminal.WriteLine("");
             await Task.Delay(GetCombatDelay(1500));
 
@@ -20474,7 +20502,7 @@ public partial class CombatEngine
             if (result.Teammates?.Any(t => t.IsGroupedPlayer) == true)
             {
                 BroadcastGroupCombatEvent(result,
-                    $"[1;33m  {Loc.Get("combat.last_stand_broadcast", result.Player.DisplayName)}[0m");
+                    $"{(wasDeathsDoor ? "\u001b[1;31m" : "\u001b[1;33m")}  {Loc.Get(wasDeathsDoor ? "combat.deaths_door_broadcast" : "combat.last_stand_broadcast", result.Player.DisplayName)}\u001b[0m");
             }
 
             // The caller set Outcome=PlayerDied before invoking HandlePlayerDeath
@@ -20735,6 +20763,10 @@ public partial class CombatEngine
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  Resurrections remaining: {rezLeft} of {max}");
             }
+            // v0.65.6: lives are renewable now -- say so at the moment the
+            // player is most afraid, or the countdown reads as a death spiral.
+            terminal.SetColor("gray");
+            terminal.WriteLine($"  {Loc.Get("death.lives_recover_hint")}");
             terminal.WriteLine("");
             await Task.Delay(2000);
 

@@ -209,23 +209,47 @@ public static class BrainV2Scorer
         // under-gearing and resolve it.
         if (verb == "shop")
         {
-            // Weapon gap. Target: ~Level*12 for a well-geared NPC (intrinsic
-            // ~Level*5 plus equipped weapon ~Level*7). Under-geared at < Level*7;
-            // critically under-geared at < Level*4.
-            long expectedWeapPow = npc.Level * 12;
-            if (npc.WeapPow < expectedWeapPow * 0.4 && npc.Gold > 100)
-                mult *= 1.8;  // critically under-geared and has gold to spend
-            else if (npc.WeapPow < expectedWeapPow * 0.7 && npc.Gold > 200)
-                mult *= 1.3;  // moderately under-geared
+            // v0.65.6: fruitless-shop cooldown. NPCGoShopping marks
+            // "shop_fruitless" when a visit ends with no purchase (nothing
+            // better in stock, or can't afford it). For the next 6 hours the
+            // whole shop verb is discounted -- the NPC already checked the
+            // shops and found nothing; going back every tick is the loop that
+            // produced 84k fruitless shop trips per fortnight in telemetry
+            // (98.2% of all shop visits bought nothing).
+            var fruitless = npc.Brain?.TimeSinceActivity("shop_fruitless");
+            if (fruitless.HasValue && fruitless.Value.TotalHours < 6)
+            {
+                mult *= 0.35;
+            }
+            else if (npc.Level <= 12)
+            {
+                // v0.65.6: gear-gap boosts only fire in the band where the shops
+                // can actually help. The built-in EquipmentDatabase tops out
+                // around 80 WeaponPower, so an NPC past ~Level 10-12 can NEVER
+                // close a Level*12 gap by shopping -- the boost used to flag
+                // every mid/high-level NPC as permanently under-geared and send
+                // them window-shopping forever. Above this band, gearing comes
+                // from dungeon loot (NPCItemGenerator) and the per-level
+                // BaseWeapPow/BaseArmPow bumps, not shops.
 
-            // Armor gap. Mirror shape. Target: ~Level*10 well-geared (intrinsic
-            // ~Level*4 plus equipped armor pieces ~Level*6).
-            long expectedArmPow = npc.Level * 10;
-            if (npc.ArmPow < expectedArmPow * 0.4 && npc.Gold > 100)
-                mult *= 1.5;  // smaller boost than weapon (weapon matters more
-                              // for win rate, armor for survival)
-            else if (npc.ArmPow < expectedArmPow * 0.7 && npc.Gold > 200)
-                mult *= 1.2;
+                // Weapon gap. Target: ~Level*12 for a well-geared NPC (intrinsic
+                // ~Level*5 plus equipped weapon ~Level*7). Under-geared at < Level*7;
+                // critically under-geared at < Level*4.
+                long expectedWeapPow = npc.Level * 12;
+                if (npc.WeapPow < expectedWeapPow * 0.4 && npc.Gold > 100)
+                    mult *= 1.8;  // critically under-geared and has gold to spend
+                else if (npc.WeapPow < expectedWeapPow * 0.7 && npc.Gold > 200)
+                    mult *= 1.3;  // moderately under-geared
+
+                // Armor gap. Mirror shape. Target: ~Level*10 well-geared (intrinsic
+                // ~Level*4 plus equipped armor pieces ~Level*6).
+                long expectedArmPow = npc.Level * 10;
+                if (npc.ArmPow < expectedArmPow * 0.4 && npc.Gold > 100)
+                    mult *= 1.5;  // smaller boost than weapon (weapon matters more
+                                  // for win rate, armor for survival)
+                else if (npc.ArmPow < expectedArmPow * 0.7 && npc.Gold > 200)
+                    mult *= 1.2;
+            }
         }
 
         // Bank withdrawal: NPC running low on cash with deposits available
@@ -268,7 +292,15 @@ public static class BrainV2Scorer
         var memory = npc.Brain?.Memory;
         if (memory == null) return 1.0;
 
+        // v0.65.6: also read SurvivedDanger -- the survival-lesson memories the
+        // world sim writes after a lethal or near-lethal MONSTER fight (dungeon
+        // died / fled below 35% HP). This finally closes the Slice 3 deferral:
+        // "dungeon-loss outcomes don't currently write Attacked memories."
+        // Monster lessons use their own type so they never feed the revenge-goal
+        // generators, but for THIS layer (should I walk into another fight?)
+        // they count exactly like being attacked by a person.
         var recent = memory.GetMemoriesOfType(MemoryType.Attacked)
+            .Concat(memory.GetMemoriesOfType(MemoryType.SurvivedDanger))
             .Where(m => m.IsRecent(4)) // past 4 hours
             .ToList();
         if (recent.Count == 0) return 1.0;

@@ -693,6 +693,7 @@ namespace UsurperRemake.Systems
         public List<PetSaveData> PetRoster { get; set; } = new();
         public string ActivePetId { get; set; } = "";
         public DateTime LastPartnerBondingUtc { get; set; }
+        public DateTime LastRiteOfReturnUtc { get; set; } // v0.65.6 Temple Rite of Return wall-clock cooldown
         public long LoanAmount { get; set; }
         public int LoanDaysRemaining { get; set; }
         public long LoanInterestAccrued { get; set; }

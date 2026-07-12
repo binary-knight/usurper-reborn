@@ -379,5 +379,16 @@ public enum MemoryType
     WitnessedAttack,      // Saw someone attack another
     WitnessedTheft,       // Saw someone steal
     WitnessedGenerosity,  // Saw someone give/help
-    SharedOpinion         // Shared own opinion with another NPC
-} 
+    SharedOpinion,        // Shared own opinion with another NPC
+
+    // v0.65.6: survival lesson from a lethal or near-lethal MONSTER fight.
+    // Deliberately distinct from Attacked: the Attacked type feeds the
+    // revenge-goal generators (GoalSystem.GenerateNewGoals,
+    // NPCBrain.ProcessRelationshipBehavior), which assume InvolvedCharacter is
+    // a real NPC/player name -- a monster name there would mint
+    // instantly-self-completing "Revenge against Golem" goals and spam the
+    // news feed. SurvivedDanger is read only by BrainV2Scorer's combat-caution
+    // layer (recency + importance), which is exactly what a monster near-death
+    // should influence. Serialized by name, so appending is save-compatible.
+    SurvivedDanger
+}

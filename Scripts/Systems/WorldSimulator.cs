@@ -302,6 +302,24 @@ public class WorldSimulator
         // Clean up orphaned marriages where one or both NPCs are permanently dead
         CleanUpDeadNPCMarriages();
 
+        // v0.65.6: Brain v2 cohort backfill. The goal-driven scorer (BrainV2Scorer,
+        // LLM strategic goals, target-steering) was gated on IsAIDriven, which only
+        // ever got set at NPC-creation sites (immigrants / graduating children /
+        // orphans) -- the original v0.64.0 A/B-cohort design. With ~91% of the
+        // population organically converted and the legacy picker adding nothing
+        // (both paths share BuildCandidateActivities; the scorer is strictly
+        // richer), promote the remaining legacy NPCs so the whole world runs the
+        // goal-aware brain. Idempotent per boot; IsAIDriven round-trips in saves.
+        int backfilled = 0;
+        foreach (var legacyNpc in npcs.Where(n => n != null && !n.IsAIDriven))
+        {
+            legacyNpc.IsAIDriven = true;
+            backfilled++;
+        }
+        if (backfilled > 0)
+            UsurperRemake.Systems.DebugLogger.Instance.LogInfo("BRAINV2",
+                $"Cohort backfill: {backfilled} legacy NPCs promoted to the Brain v2 goal-driven scorer.");
+
         UsurperRemake.Systems.DebugLogger.Instance.LogInfo("WORLD", $"WorldSimulator starting - NPCs available: {npcs?.Count ?? 0}");
 
         // Start a background task to periodically run simulation steps.
@@ -2703,7 +2721,15 @@ public class WorldSimulator
         // contribution 0.15 -> 0.08, paired with scorer + personality
         // reductions, should bring train share to ~20% -- still a top
         // activity, no longer eating half the world. Gold gate kept at 20.
-        if (npc.Gold > 20)
+        // v0.65.6: gate on the ACTUAL gym cost, not the old flat 20 gold.
+        // Pre-fix an NPC with 20 < gold < cost kept walking to the gym and
+        // bouncing off the price check inside NPCTrainAtGym -- telemetry
+        // showed 96.7% of train visits changed nothing (78k no-op gym trips
+        // per fortnight). Uses the same CalculateTaxedPrice call the gym
+        // itself uses (king + city tax can reach 35% combined, so a flat
+        // margin approximation could still let the no-op case through).
+        var (_, _, trainCostGate) = CityControlSystem.CalculateTaxedPrice(npc.Level * 10 + 50);
+        if (npc.Gold >= trainCostGate)
         {
             float trainWeight = 0.22f;
             if (npc.Brain?.Personality != null)
@@ -3730,6 +3756,13 @@ public class WorldSimulator
     {
         if (string.IsNullOrEmpty(npc.Team)) return;
         if (npc.IsInConversation) return;
+        // v0.65.6 defense-in-depth (npc-system-reviewer): player-team NPCs must
+        // never take autonomous dungeon runs. Both dispatchers already gate on
+        // IsPlayerTeam before dispatching any verb, and MarkNPCDead has its own
+        // heal-instead-of-kill guard, but this was the one dungeon entry point
+        // relying entirely on those upstream checks -- make it explicit so a
+        // future dispatcher change can't silently reopen it.
+        if (IsPlayerTeam(npc.Team)) return;
 
         // v0.61.2 Phase 1 telemetry: capture leader state for log row.
         string locationBefore = npc.CurrentLocation;
@@ -3951,6 +3984,8 @@ public class WorldSimulator
                 var killerName = monsters.FirstOrDefault()?.Name ?? "dungeon monsters";
                 foreach (var deadMember in dead)
                 {
+                    // v0.65.6: survival lesson before the death roll (Brain survives respawn).
+                    RecordSurvivalLesson(deadMember, killerName, died: true);
                     MarkNPCDead(deadMember, GameConfig.PermadeathChanceDungeonTeam, killerName, "the Dungeon");
                 }
             }
@@ -4017,6 +4052,17 @@ public class WorldSimulator
             // New: HP < 50% baseline (Courage-scaled like solo: 60% for low-
             // Courage members, 35% for brave), no rounds gate, base flee
             // chance bumped 55%->70% so successful flees actually stick.
+            // v0.65.6 (life preservation): the top-2 strongest alive monsters drive
+            // the per-member predictive-death check below. Monsters pick RANDOM
+            // targets each round, so in a group fight the same member can eat two
+            // hits in the round the single-strongest estimate called "survivable"
+            // (npc-system-reviewer finding); summing the top two models that
+            // concentrated-fire risk. Same per-hit formula as the monster attack
+            // later this round (base + half the average variance, halved, 15%
+            // team support), so the estimate matches real incoming damage.
+            var topMonsters = monsters.Where(m => m.IsAlive)
+                .OrderByDescending(m => m.Strength + m.WeapPow).Take(2).ToList();
+
             foreach (var member in team.Where(m => m.IsAlive).ToList())
             {
                 // v0.63.2 Fix A retune2: flee threshold dropped further to 20%
@@ -4033,12 +4079,35 @@ public class WorldSimulator
                     if (p.Courage < 0.3f) fleeThreshold = 0.30f;
                     else if (p.Courage > 0.7f) fleeThreshold = 0.10f;
                 }
-                if (member.HP >= member.MaxHP * fleeThreshold) continue;
 
-                int fleeChance = 70 + (int)(member.Agility / 3);
-                if (random.Next(100) < Math.Min(95, fleeChance))
+                // v0.65.6: predictive-death flee (see solo path for rationale).
+                // A member who cannot survive the top-2 monsters' expected hits
+                // (x1.5 margin) panic-flees at 95% regardless of Courage.
+                bool deathImminent = false;
+                if (topMonsters.Count > 0)
                 {
-                    // Flee — remove from combat but keep alive
+                    long estIncoming = 0;
+                    foreach (var m in topMonsters)
+                    {
+                        long hit = Math.Max(1, m.Strength + m.WeapPow - member.Defence - member.ArmPow)
+                            + Math.Max(1, m.WeapPow / 6);
+                        hit = (long)(hit * 0.50 * 0.85);
+                        if (member.Class == CharacterClass.Warrior)
+                            hit = (long)(hit * 0.85);
+                        estIncoming += hit;
+                    }
+                    deathImminent = member.HP <= estIncoming + estIncoming / 2;
+                }
+
+                if (!deathImminent && member.HP >= member.MaxHP * fleeThreshold) continue;
+
+                int fleeChance = deathImminent ? 95 : Math.Min(95, 70 + (int)(member.Agility / 3));
+                if (random.Next(100) < fleeChance)
+                {
+                    // Flee — remove from combat but keep alive.
+                    // v0.65.6: a near-death escape teaches combat caution for ~4h.
+                    if (member.HP < member.MaxHP * 0.35)
+                        RecordSurvivalLesson(member, topMonsters.FirstOrDefault()?.Name ?? "dungeon monsters", died: false);
                     member.UpdateLocation("Healer");
                 }
             }
@@ -4203,6 +4272,46 @@ public class WorldSimulator
     /// <summary>
     /// NPC explores the dungeon and fights monsters
     /// </summary>
+    /// <summary>
+    /// v0.65.6 (NPC behavior pass): write an Attacked-type memory after a lethal or
+    /// near-lethal monster fight. BrainV2Scorer.RecentCombatLossPenalty reads
+    /// MemoryType.Attacked from the past 4 hours and suppresses combat verbs
+    /// (dungeon / team_dungeon / dark_alley / castle) -- but dungeon losses never
+    /// wrote such a memory (explicitly deferred in v0.64.0 Slice 3 and never done),
+    /// so the "learned caution" layer never fired for the #1 NPC death source.
+    /// With this, an NPC that died (and later respawns -- the Brain survives
+    /// respawn) or barely escaped spends the next ~4 hours healing, shopping,
+    /// and socializing instead of walking straight back into the dungeon.
+    /// Importance drives the scorer's penalty tier: died = 0.9 (0.5x combat
+    /// verbs; two lessons stack to 0.3x), near-death flee = 0.6.
+    /// </summary>
+    private void RecordSurvivalLesson(NPC npc, string threatName, bool died)
+    {
+        try
+        {
+            // SurvivedDanger, NOT Attacked: the Attacked type feeds the revenge-goal
+            // generators, which assume InvolvedCharacter is a real NPC/player name.
+            // A monster name there would mint instantly-self-completing "Revenge
+            // against Golem" goals and spam the news feed (npc-system-reviewer).
+            npc.Brain?.Memory?.RecordEvent(new MemoryEvent
+            {
+                Type = MemoryType.SurvivedDanger,
+                Description = died
+                    ? $"I was slain by {threatName} in the dungeon. I will not court death again so soon."
+                    : $"I barely escaped {threatName} in the dungeon with my life.",
+                InvolvedCharacter = threatName ?? "a monster",
+                Location = "Dungeon",
+                // 0.55 (not 0.6) for the near-death case so recurring dungeon
+                // close-calls sit just below family-event memories (0.6+) in the
+                // 30-slot eviction ordering; the scorer's >=0.5 penalty tier is
+                // unaffected. Death stays 0.9 (a big deal by any measure).
+                Importance = died ? 0.9f : 0.55f,
+                EmotionalImpact = -0.8f
+            });
+        }
+        catch { /* caution memory is best-effort; never break the sim */ }
+    }
+
     private void NPCExploreDungeon(NPC npc)
     {
         // Don't send NPCs on dungeon runs if they're engaged with a player
@@ -4322,6 +4431,8 @@ public class WorldSimulator
             // Update location on death/flee to match abstract sim's behavior.
             if (simResult.Outcome == NPCCombatOutcome.Died)
             {
+                // v0.65.6: survival lesson before the death roll (Brain survives respawn).
+                RecordSurvivalLesson(npc, monster.Name, died: true);
                 // 5% permadeath chance from a dungeon-monster kill, matching
                 // the abstract sim's typical death pressure. MarkNPCDead
                 // respects player-team protection / race-floor / story NPC
@@ -4330,6 +4441,9 @@ public class WorldSimulator
             }
             else
             {
+                // v0.65.6: near-death flee is a lesson too (scorer combat caution).
+                if (simResult.Outcome == NPCCombatOutcome.Fled && npc.HP < npc.MaxHP * 0.35)
+                    RecordSurvivalLesson(npc, monster.Name, died: false);
                 npc.UpdateLocation(simResult.Outcome == NPCCombatOutcome.Won
                     ? "Main Street" : "Healer");
             }
@@ -4369,11 +4483,29 @@ public class WorldSimulator
                 npc.HP = Math.Min(npc.MaxHP, npc.HP + heal);
             }
 
-            if (npc.HP < npc.MaxHP * fleeThreshold)
+            // v0.65.6 (life preservation): predictive-death flee. The flat 20%
+            // flee threshold made NPCs stand and trade while one monster swing
+            // from death -- ~1,100 deaths per fortnight in telemetry, most of
+            // them "failed one flee roll at 15% HP." Estimate the monster's
+            // expected next hit using the SAME formula the monster attack below
+            // uses (base + half the average variance roll, halved, Warrior
+            // reduction); if the NPC couldn't survive ~1.5 such hits, panic-flee
+            // at a flat 95% regardless of Courage. Winnable fights above that
+            // line still run the normal threshold, so kill-completion (the
+            // reason v0.63.2 lowered the threshold to 20%) is preserved.
+            long estIncoming = Math.Max(1, monster.Strength + monster.WeapPow - npc.Defence - npc.ArmPow)
+                + Math.Max(1, monster.WeapPow / 4);
+            estIncoming = (long)(estIncoming * 0.50);
+            if (npc.Class == CharacterClass.Warrior)
+                estIncoming = (long)(estIncoming * 0.85);
+            bool deathImminent = npc.HP <= estIncoming + estIncoming / 2;
+
+            if (deathImminent || npc.HP < npc.MaxHP * fleeThreshold)
             {
-                // Higher AGI = better flee chance; base 70%.
-                int fleeChance = 70 + (int)(npc.Agility / 3);
-                if (random.Next(100) < Math.Min(95, fleeChance))
+                // Higher AGI = better flee chance; base 70%. Imminent death
+                // overrides personality: self-preservation wins at the brink.
+                int fleeChance = deathImminent ? 95 : Math.Min(95, 70 + (int)(npc.Agility / 3));
+                if (random.Next(100) < fleeChance)
                 {
                     fled = true;
                     break;
@@ -4458,7 +4590,10 @@ public class WorldSimulator
         }
         else if (!npc.IsAlive)
         {
-            // NPC died in solo dungeon crawl — permadeath roll
+            // NPC died in solo dungeon crawl — permadeath roll.
+            // v0.65.6: record the lesson BEFORE the death roll so a respawning
+            // NPC (the common case) carries 4 hours of combat-verb caution.
+            RecordSurvivalLesson(npc, monster.Name, died: true);
             MarkNPCDead(npc, GameConfig.PermadeathChanceDungeonSolo, monster.Name, "the Dungeon");
             LogDungeonDecision("died");
         }
@@ -4482,6 +4617,10 @@ public class WorldSimulator
                 if (partialXP > 0)
                     npc.GainExperience(partialXP);
             }
+            // v0.65.6: a flee that ends below 35% HP was a close call worth
+            // remembering -- feeds the scorer's 4-hour combat caution.
+            if (npc.HP < npc.MaxHP * 0.35)
+                RecordSurvivalLesson(npc, monster.Name, died: false);
             npc.UpdateLocation(npc.HP < npc.MaxHP * 0.5 ? "Healer" : "Main Street");
             LogDungeonDecision("fled");
         }
@@ -4510,8 +4649,17 @@ public class WorldSimulator
         // Determine how much gold the NPC is willing to spend (30-70% of their gold)
         long spendingBudget = (long)(npc.Gold * (0.3 + random.NextDouble() * 0.4));
 
-        // Try to upgrade weapon (50% of the time)
-        if (random.NextDouble() < 0.5)
+        // v0.65.6: try BOTH categories in one visit. Pre-fix this was a 50/50
+        // one-shot: an NPC driven to the shops by a weapon gap browsed armor
+        // half the time and went home. Now the coin flip only decides which
+        // shop they walk into FIRST; if it has nothing for them, they check
+        // the other one before giving up. Telemetry: 98.2% of shop visits
+        // ended with no purchase.
+        bool weaponFirst = random.NextDouble() < 0.5;
+        for (int attempt = 0; attempt < 2 && !boughtSomething; attempt++)
+        {
+        bool tryWeapon = (attempt == 0) == weaponFirst;
+        if (tryWeapon)
         {
             npc.UpdateLocation("Weapon Shop");
 
@@ -4559,6 +4707,7 @@ public class WorldSimulator
         {
             // Try to upgrade armor
             npc.UpdateLocation("Armor Shop");
+            // (second half of the v0.65.6 two-category visit loop)
 
             // Pick a random armor slot to try to upgrade
             var armorSlots = new[]
@@ -4600,11 +4749,18 @@ public class WorldSimulator
                 npc.RecalculateStats();
             }
         }
+        } // end v0.65.6 two-category visit loop
 
         if (boughtSomething && random.NextDouble() < 0.15)
         {
             NewsSystem.Instance.Newsy(true, $"{npc.Name} purchased {itemBought} from the shop.");
         }
+
+        // v0.65.6: a fruitless visit (checked both shops, bought nothing) marks
+        // a 6-hour cooldown that BrainV2Scorer reads to discount the shop verb.
+        // "I already checked the shops today" -- stops the window-shopping loop.
+        if (!boughtSomething)
+            npc.Brain?.MarkActivity("shop_fruitless");
 
         // GD.Print($"[WorldSim] {npc.Name} went shopping" + (boughtSomething ? $" and bought {itemBought}" : " but couldn't afford anything"));
     }

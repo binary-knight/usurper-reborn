@@ -10,7 +10,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.65.5";
+    public const string Version = "0.65.6";
     public const string VersionName = "Countdown"; // the Beta -> 1.0 release-prep cycle
 
     // v0.57.12: Alignment scale cap. Character.Chivalry and Character.Darkness setters clamp to [0, AlignmentCap]
@@ -180,6 +180,27 @@ public static partial class GameConfig
     /// `server_config` SQLite table.
     /// </summary>
     public static bool OnlinePermadeathEnabled { get; set; } = true;
+
+    // ============================================================
+    // v0.65.6 Renewable resurrections (player-experience analysis:
+    // 3 lifetime lives vs a ~900-fight 20->40 grind at ~1% death
+    // hazard per fight made reaching level 40 mathematically ruinous.
+    // Lives now regenerate two ways: +1 at every 10th level (see
+    // Character.RaiseLevel) and the Temple's Rite of Return below.)
+    // ============================================================
+
+    /// <summary>Flat base gold cost of the Temple's Rite of Return (restores one lost resurrection, online permadeath mode).</summary>
+    public const long RiteOfReturnBaseCost = 10000;
+
+    /// <summary>Per-level-squared component of the rite cost: total = base + level^2 * this. Lv 20 = 50k, Lv 30 = 100k, Lv 40 = 170k.</summary>
+    public const long RiteOfReturnCostPerLevelSquared = 100;
+
+    /// <summary>Wall-clock hours between rites (per character). 20h so a daily player can rite once per session.</summary>
+    public const int RiteOfReturnCooldownHours = 20;
+
+    /// <summary>Gold cost of the Rite of Return at a given level.</summary>
+    public static long GetRiteOfReturnCost(int level) =>
+        RiteOfReturnBaseCost + (long)level * level * RiteOfReturnCostPerLevelSquared;
 
     /// <summary>
     /// Online server address for the [O]nline Play connection.

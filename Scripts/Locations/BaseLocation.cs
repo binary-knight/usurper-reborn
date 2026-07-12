@@ -750,6 +750,20 @@ public abstract class BaseLocation
                 }
             }
 
+            // v0.65.6 renewable resurrections: announce any pending decade life
+            // grant. Checked OUTSIDE the levelsGained block because the level-up
+            // may have happened on another code path (Level Master manual raise,
+            // grouped dungeon combat) -- the grant itself was applied in
+            // Character.RaiseLevel; only the message waits for a clean boundary.
+            if (currentPlayer != null && currentPlayer.PendingResurrectionGrants > 0)
+            {
+                currentPlayer.PendingResurrectionGrants = 0;
+                terminal.SetColor("bright_magenta");
+                terminal.WriteLine($"  {Loc.Get("base.resurrection_granted", currentPlayer.Resurrections, Math.Max(1, currentPlayer.MaxResurrections))}");
+                terminal.SetColor("white");
+                terminal.WriteLine("");
+            }
+
             // Show deferred daily reset banner at a clean display boundary
             // (instead of mid-shop or mid-interaction where PeriodicUpdate fires)
             if (DailySystemManager.Instance.PendingDailyResetDisplay)
@@ -2235,8 +2249,13 @@ public abstract class BaseLocation
                 xpPercent = Math.Clamp(xpPercent, 0, 100);
                 xpInfo = $", {Loc.Get("status.xp_to_next", xpPercent)}";
             }
+            // v0.65.6: show remaining lives in online permadeath mode so the
+            // stake is always visible, not just on death screens.
+            string livesInfo = "";
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode && GameConfig.OnlinePermadeathEnabled)
+                livesInfo = $", {Loc.Get("status.lives")}: {Math.Max(0, currentPlayer.Resurrections)}/{Math.Max(1, currentPlayer.MaxResurrections)}";
             terminal.SetColor("white");
-            terminal.WriteLine($"{Loc.Get("status.hp")}: {currentPlayer.HP}/{currentPlayer.MaxHP}, {Loc.Get("status.gold_label")}: {currentPlayer.Gold:N0}, {resource}, {Loc.Get("ui.level")} {currentPlayer.Level}{xpInfo}");
+            terminal.WriteLine($"{Loc.Get("status.hp")}: {currentPlayer.HP}/{currentPlayer.MaxHP}, {Loc.Get("status.gold_label")}: {currentPlayer.Gold:N0}, {resource}, {Loc.Get("ui.level")} {currentPlayer.Level}{xpInfo}{livesInfo}");
             terminal.WriteLine("");
         }
         else
@@ -2285,6 +2304,21 @@ public abstract class BaseLocation
             terminal.Write($" | {Loc.Get("ui.level")} ");
             terminal.SetColor("cyan");
             terminal.Write($"{currentPlayer.Level}");
+
+            // v0.65.6: remaining lives, visible at all times in online permadeath
+            // mode. Color escalates as the counter drops -- informed risk feels
+            // fair; an invisible countdown feels like betrayal.
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode && GameConfig.OnlinePermadeathEnabled)
+            {
+                int livesLeft = Math.Max(0, currentPlayer.Resurrections);
+                int livesMax = Math.Max(1, currentPlayer.MaxResurrections);
+                terminal.SetColor("gray");
+                terminal.Write($" | {Loc.Get("status.lives")}: ");
+                terminal.SetColor(livesLeft == 0 ? "bright_red" : livesLeft == 1 ? "yellow" : "bright_green");
+                terminal.Write($"{livesLeft}");
+                terminal.SetColor("gray");
+                terminal.Write($"/{livesMax}");
+            }
 
             // XP progress to next level
             if (currentPlayer.Level < GameConfig.MaxLevel)

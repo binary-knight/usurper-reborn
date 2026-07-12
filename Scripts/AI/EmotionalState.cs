@@ -97,6 +97,8 @@ public partial class EmotionalState
             MemoryType.SawDeath => (EmotionType.Fear, 0.7f, 240), // 4 hours of fear
             MemoryType.MadeFriend => (EmotionType.Joy, 0.6f, 180), // 3 hours of joy
             MemoryType.MadeEnemy => (EmotionType.Anger, 0.5f, 150), // 2.5 hours of anger
+            // v0.65.6: near-death monster fight = fear, matching the scorer's 4-hour combat caution
+            MemoryType.SurvivedDanger => (EmotionType.Fear, 0.8f, 240),
             _ => null
         };
     }

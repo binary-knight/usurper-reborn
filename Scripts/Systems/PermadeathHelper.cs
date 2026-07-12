@@ -68,6 +68,10 @@ namespace UsurperRemake.Systems
                     int max = Math.Max(1, player.MaxResurrections);
                     terminal.WriteLine($"  Resurrections remaining: {rezLeft} of {max}");
                 }
+                // v0.65.6: lives are renewable now -- say so at the moment the
+                // player is most afraid, or the countdown reads as a death spiral.
+                terminal.SetColor("gray");
+                terminal.WriteLine($"  {UsurperRemake.Systems.Loc.Get("death.lives_recover_hint")}");
                 terminal.WriteLine("");
                 await Task.Delay(2000);
                 return true;

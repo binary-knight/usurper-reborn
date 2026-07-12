@@ -133,6 +133,10 @@ public partial class TempleLocation : BaseLocation
                     case GameConfig.TempleMenuConfess: // "O" — v0.57.0 confess sins (chivalry cleansing)
                         await ProcessConfession();
                         break;
+
+                    case "U": // v0.65.6 Rite of Return (resurrection refill, online permadeath mode)
+                        await ProcessRiteOfReturn();
+                        break;
                         
                     case GameConfig.TempleMenuStatus: // "S"
                         await DisplayPlayerStatus();
@@ -315,6 +319,8 @@ public partial class TempleLocation : BaseLocation
             terminal.WriteLine(Loc.Get("temple.sr_altars"));
             terminal.WriteLine(Loc.Get("temple.sr_contribute"));
             terminal.WriteLine(Loc.Get("temple.sr_confess"));
+            if (CanShowRiteOfReturn())
+                terminal.WriteLine(Loc.Get("temple.sr_rite", GameConfig.GetRiteOfReturnCost(currentPlayer.Level)));
             terminal.WriteLine(Loc.Get("temple.sr_item_sacrifice"));
             terminal.WriteLine(Loc.Get("temple.sr_status"));
             terminal.WriteLine(Loc.Get("temple.sr_god_ranking"));
@@ -512,6 +518,20 @@ public partial class TempleLocation : BaseLocation
             else
             {
                 terminal.WriteLine("");
+            }
+
+            // v0.65.6 Rite of Return: gold-priced resurrection refill, online
+            // permadeath mode only. Hidden while the player's lives are full.
+            if (CanShowRiteOfReturn())
+            {
+                terminal.SetColor("darkgray");
+                terminal.Write(" [");
+                terminal.SetColor("bright_yellow");
+                terminal.Write("U");
+                terminal.SetColor("darkgray");
+                terminal.Write("]");
+                terminal.SetColor("bright_magenta");
+                terminal.WriteLine(Loc.Get("temple.menu_rite", GameConfig.GetRiteOfReturnCost(currentPlayer.Level)));
             }
 
             // Ancient stones option - only show if Seal of Creation not collected
@@ -959,6 +979,103 @@ public partial class TempleLocation : BaseLocation
         terminal.WriteLine(Loc.Get("temple.confess_success", amount, cost), "bright_yellow");
         terminal.SetColor("gray");
         terminal.WriteLine(Loc.Get("temple.confess_flavor"));
+        await terminal.PressAnyKey();
+    }
+
+    /// <summary>
+    /// v0.65.6: whether the Rite of Return menu entry should render. Online
+    /// permadeath mode only (single-player death never consults Resurrections),
+    /// and hidden while the player's lives are full.
+    /// </summary>
+    private bool CanShowRiteOfReturn()
+    {
+        return DoorMode.IsOnlineMode
+            && GameConfig.OnlinePermadeathEnabled
+            && currentPlayer != null
+            && currentPlayer.Resurrections < Math.Max(1, currentPlayer.MaxResurrections);
+    }
+
+    /// <summary>
+    /// v0.65.6 Rite of Return: restore one lost resurrection for steep,
+    /// level-scaled gold (GameConfig.GetRiteOfReturnCost). One rite per
+    /// GameConfig.RiteOfReturnCooldownHours wall-clock hours per character.
+    /// Part of the renewable-resurrections pass -- converts the 3-lifetime-lives
+    /// absorbing chain into a renewal process without making death free
+    /// (a mid-30s rite costs roughly 45 fights of gold income).
+    /// </summary>
+    private async Task ProcessRiteOfReturn()
+    {
+        terminal.WriteLine("");
+
+        if (!DoorMode.IsOnlineMode || !GameConfig.OnlinePermadeathEnabled)
+        {
+            terminal.WriteLine(Loc.Get("temple.invalid_choice"), "red");
+            await Task.Delay(1000);
+            return;
+        }
+
+        int maxLives = Math.Max(1, currentPlayer.MaxResurrections);
+        if (currentPlayer.Resurrections >= maxLives)
+        {
+            terminal.WriteLine(Loc.Get("temple.rite_full", maxLives), "gray");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        // Wall-clock cooldown (v0.57.6 lesson: day-counters drift in MUD mode).
+        var elapsed = DateTime.UtcNow - currentPlayer.LastRiteOfReturnUtc;
+        var cooldown = TimeSpan.FromHours(GameConfig.RiteOfReturnCooldownHours);
+        if (currentPlayer.LastRiteOfReturnUtc != DateTime.MinValue && elapsed < cooldown)
+        {
+            int hoursLeft = (int)Math.Ceiling((cooldown - elapsed).TotalHours);
+            terminal.WriteLine(Loc.Get("temple.rite_cooldown", hoursLeft), "yellow");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        long cost = GameConfig.GetRiteOfReturnCost(currentPlayer.Level);
+
+        terminal.SetColor("bright_magenta");
+        terminal.WriteLine(Loc.Get("temple.rite_header"));
+        terminal.SetColor("gray");
+        terminal.WriteLine(Loc.Get("temple.rite_intro"));
+        terminal.WriteLine("");
+        terminal.SetColor("yellow");
+        terminal.WriteLine(Loc.Get("temple.rite_cost", cost, currentPlayer.Gold));
+        terminal.SetColor("gray");
+        terminal.WriteLine(Loc.Get("temple.rite_lives", Math.Max(0, currentPlayer.Resurrections), maxLives));
+        terminal.WriteLine("");
+
+        if (currentPlayer.Gold < cost)
+        {
+            terminal.WriteLine(Loc.Get("temple.rite_no_gold"), "red");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        terminal.SetColor("white");
+        var confirm = await terminal.GetInputAsync(Loc.Get("temple.rite_confirm", cost));
+        if (!GameConfig.IsAffirmative(confirm))
+        {
+            terminal.WriteLine(Loc.Get("temple.rite_cancel"), "gray");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        currentPlayer.Gold -= cost;
+        currentPlayer.Resurrections++;
+        currentPlayer.LastRiteOfReturnUtc = DateTime.UtcNow;
+        UsurperRemake.Systems.DebugLogger.Instance.LogInfo("LIVES",
+            $"{currentPlayer.Name2 ?? currentPlayer.Name1} performed the Rite of Return for {cost} gold ({currentPlayer.Resurrections}/{maxLives} lives).");
+
+        terminal.WriteLine("");
+        terminal.WriteLine(Loc.Get("temple.rite_success", Math.Max(0, currentPlayer.Resurrections), maxLives), "bright_yellow");
+
+        // Persist immediately -- a life purchased for six figures of gold must not
+        // be lost to a crash / unclean disconnect before the next autosave.
+        if (GameEngine.Instance != null)
+            await GameEngine.Instance.SaveCurrentGame();
+
         await terminal.PressAnyKey();
     }
 

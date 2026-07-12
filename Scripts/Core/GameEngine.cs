@@ -5954,6 +5954,7 @@ public partial class GameEngine
         }).ToList() ?? new List<UsurperRemake.Data.Pet>();
         player.ActivePetId = playerData.ActivePetId ?? "";
         player.LastPartnerBondingUtc = playerData.LastPartnerBondingUtc;
+        player.LastRiteOfReturnUtc = playerData.LastRiteOfReturnUtc;
         player.LoanAmount = playerData.LoanAmount;
         player.LoanDaysRemaining = playerData.LoanDaysRemaining;
         player.LoanInterestAccrued = playerData.LoanInterestAccrued;
@@ -6391,7 +6392,13 @@ public partial class GameEngine
                 WasRaisedByPlayer = data.WasRaisedByPlayer,
 
                 // v0.64.0 Brain v2 Slice 1 cohort flag (default false on legacy saves).
-                IsAIDriven = data.IsAIDriven,
+                // v0.65.6: whole-population Brain v2. Forced true at restore (not read from
+                // the save) because this is where the live roster is actually built --
+                // the StartSimulation backfill runs before RestoreNPCs rebuilds the list
+                // (and never runs at all on the MUD server, which drives the sim via
+                // WorldSimService.SetActive). The v0.64.0 A/B cohort served its purpose;
+                // the goal-driven scorer is strictly richer than the legacy picker.
+                IsAIDriven = true,
 
                 // Marriage status
                 IsMarried = data.IsMarried,

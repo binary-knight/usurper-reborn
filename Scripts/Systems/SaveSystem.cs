@@ -974,6 +974,7 @@ namespace UsurperRemake.Systems
                 }).ToList() ?? new List<PetSaveData>(),
                 ActivePetId = player.ActivePetId ?? "",
                 LastPartnerBondingUtc = player.LastPartnerBondingUtc,
+                LastRiteOfReturnUtc = player.LastRiteOfReturnUtc,
                 LoanAmount = player.LoanAmount,
                 LoanDaysRemaining = player.LoanDaysRemaining,
                 LoanInterestAccrued = player.LoanInterestAccrued,

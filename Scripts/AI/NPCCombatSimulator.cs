@@ -110,7 +110,7 @@ public static class NPCCombatSimulator
 
             // Pre-round: flee check for primary AND teammates.
             // (Each combatant decides independently whether to flee at low HP.)
-            if (ShouldFlee(primary, random))
+            if (ShouldFlee(primary, monsters, random))
             {
                 fled = true;
                 break;
@@ -120,7 +120,7 @@ public static class NPCCombatSimulator
             {
                 foreach (var t in teammates.Where(c => c.IsAlive).ToList())
                 {
-                    if (ShouldFlee(t, random))
+                    if (ShouldFlee(t, monsters, random))
                     {
                         // Tag teammate as fled by zeroing their participation.
                         // We use a sentinel by setting CurrentCombatStamina to -1
@@ -584,7 +584,7 @@ public static class NPCCombatSimulator
         target.HP = Math.Max(0, target.HP - Math.Max(1, damage));
     }
 
-    private static bool ShouldFlee(Character npc, Random random)
+    private static bool ShouldFlee(Character npc, List<Monster> monsters, Random random)
     {
         if (npc.MaxHP <= 0 || !npc.IsAlive) return false;
 
@@ -596,10 +596,43 @@ public static class NPCCombatSimulator
             else if (p.Courage > 0.7f) fleeThreshold = 0.10f;
         }
 
-        if (npc.HP >= npc.MaxHP * fleeThreshold) return false;
+        // v0.65.6 (life preservation): predictive-death flee, mirroring the
+        // abstract sim. Estimate the top-2 strongest alive monsters' expected
+        // hits using the same math as ApplyMonsterDamage (additive defence incl.
+        // active Defense buffs, average variance, halved baseline, Warrior
+        // reduction, percentage DR). Monsters pick random targets, so in a
+        // multi-monster fight the same combatant can be hit twice in one round;
+        // summing the top two models that concentrated-fire risk. If this
+        // combatant cannot survive ~1.5x that, flee at a flat 95% regardless of
+        // Courage. Otherwise the normal 20% threshold applies so winnable
+        // fights still finish.
+        bool deathImminent = false;
+        var topTwo = monsters?.Where(m => m.IsAlive)
+            .OrderByDescending(m => m.Strength + m.WeapPow).Take(2).ToList();
+        if (topTwo != null && topTwo.Count > 0)
+        {
+            long effDef = npc.Defence;
+            if (npc.TempDefenseBonusDuration > 0 && npc.TempDefenseBonus > 0)
+                effDef += npc.TempDefenseBonus;
+            long est = 0;
+            foreach (var m in topTwo)
+            {
+                long hit = Math.Max(1, m.Strength + m.WeapPow - effDef - npc.ArmPow)
+                    + Math.Max(1, m.WeapPow / 6);
+                hit = (long)(hit * 0.50);
+                if (npc.Class == CharacterClass.Warrior)
+                    hit = (long)(hit * 0.85);
+                if (npc.TempDefenseBonusDuration > 0 && npc.TempDamageReductionPercent > 0)
+                    hit = (long)(hit * (1.0 - npc.TempDamageReductionPercent / 100.0));
+                est += hit;
+            }
+            deathImminent = npc.HP <= est + est / 2;
+        }
 
-        int fleeChance = 70 + (int)(npc.Agility / 3);
-        return random.Next(100) < Math.Min(95, fleeChance);
+        if (!deathImminent && npc.HP >= npc.MaxHP * fleeThreshold) return false;
+
+        int fleeChance = deathImminent ? 95 : Math.Min(95, 70 + (int)(npc.Agility / 3));
+        return random.Next(100) < fleeChance;
     }
 
     private static double EstimateDamage(Character actor, ClassAbility ability)

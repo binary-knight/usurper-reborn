@@ -774,6 +774,20 @@ public class Character
     [System.Text.Json.Serialization.JsonIgnore] public long RoundStartHP { get; set; } = 0;
     [System.Text.Json.Serialization.JsonIgnore] public bool LastStandFiredThisRound { get; set; } = false;
 
+    // v0.65.6 "Death's Door": once per combat, a burst that would kill the player
+    // from above 25% round-start HP leaves them at 1 HP instead. Closes the
+    // 25-50% round-start window the Last-Stand cap leaves open -- telemetry showed
+    // real deaths were one-round 100%+ MaxHP bursts landing after attrition had
+    // pulled the player below the Last-Stand threshold. Transient combat state.
+    [System.Text.Json.Serialization.JsonIgnore] public bool DeathsDoorUsedThisCombat { get; set; } = false;
+    [System.Text.Json.Serialization.JsonIgnore] public bool DeathsDoorFiredThisRound { get; set; } = false;
+
+    // v0.65.6 renewable resurrections: +1 life granted at each 10th level in
+    // online permadeath mode (see RaiseLevel). Pending-announce counter lets the
+    // location loop render the grant message regardless of which code path
+    // performed the level-up (auto-level, Level Master, grouped combat). Transient.
+    [System.Text.Json.Serialization.JsonIgnore] public int PendingResurrectionGrants { get; set; } = 0;
+
     /// <summary>
     /// v0.61.2 Last-Stand cap. Call at the top of each combat round before any
     /// damage can land on the player. Captures the HP value the round-start
@@ -783,6 +797,7 @@ public class Character
     {
         RoundStartHP = HP;
         LastStandFiredThisRound = false;
+        DeathsDoorFiredThisRound = false;
     }
 
     /// <summary>
@@ -790,8 +805,9 @@ public class Character
     /// monster damage has landed and BEFORE the death check runs. If the
     /// player died this round but started above 50% MaxHP, rescue them by
     /// setting HP to 1 and flagging LastStandFiredThisRound so the combat
-    /// loop can render the flavor line. The player gets one more turn to
-    /// pot, retreat, ability, or pray. End-of-round check (rather than per-
+    /// loop can render the flavor line. Combat then ends with the player
+    /// alive at 1 HP (the caller rewrites the outcome to Victory or
+    /// PlayerEscaped). End-of-round check (rather than per-
     /// damage clamp) lets us cover all damage sources -- basic attacks,
     /// ability damage, multi-monster pile-on, DoT ticks, boss specials -- in
     /// one place without touching every damage application site.
@@ -809,11 +825,36 @@ public class Character
         if (isPvP) return false;
         if (DifficultySystem.IsPermadeath()) return false;
         if (HP > 0) return false;                 // Not dead; nothing to rescue.
-        if (RoundStartHP <= MaxHP / 2) return false; // Started wounded; player took the risk.
 
-        HP = 1;
-        LastStandFiredThisRound = true;
-        return true;
+        if (RoundStartHP > MaxHP / 2)
+        {
+            // Last Stand: started the round healthy; no single round may kill.
+            HP = 1;
+            LastStandFiredThisRound = true;
+            return true;
+        }
+
+        // v0.65.6 "Death's Door": once per combat, a killing burst against a
+        // player who started the round above 25% MaxHP leaves them at 1 HP;
+        // combat then ends with the player alive (the caller rewrites the
+        // outcome to an escape). A later fight can burst-kill for real if the
+        // guarantee was already spent. Skipped in exhibition combat (Gauntlet /
+        // Tournament of Honor / pit fights) and arrest combat -- exhibition
+        // waves are each a fresh combat, so an unguarded Death's Door would
+        // reset every wave and bypass the v0.60.11 death-roll / drag-out
+        // stakes entirely (combat-reviewer F1). Those surfaces never consume a
+        // resurrection anyway. Attrition difficulty is unchanged -- this only
+        // removes the no-counterplay one-round deletions.
+        if (RoundStartHP > MaxHP / 4 && !DeathsDoorUsedThisCombat
+            && !IsExhibitionCombat && !IsArrestCombat)
+        {
+            HP = 1;
+            DeathsDoorUsedThisCombat = true;
+            DeathsDoorFiredThisRound = true;
+            return true;
+        }
+
+        return false; // Started the round at or below 25%; the risk was taken.
     }
 
     // v0.61.0 Druid's Shrines. One shrine attunement at a time, 24h timer enforces
@@ -953,6 +994,7 @@ public class Character
         return Random.Shared.Next(100) < 25;
     }
     public DateTime LastPartnerBondingUtc { get; set; } = DateTime.MinValue;  // v0.57.7: Wall-clock gate on Home "quality time with partner" rewards (XP/HP/Mana). Shared across dinner/walk/cuddle — one bonding event per 20 real hours. Rage reported "romantic dinner is infinite XP" — was looping Level*50 with no cooldown.
+    public DateTime LastRiteOfReturnUtc { get; set; } = DateTime.MinValue;   // v0.65.6: Wall-clock gate on the Temple's Rite of Return (gold-priced resurrection refill, online permadeath mode). One rite per GameConfig.RiteOfReturnCooldownHours real hours. Wall-clock beats day-counter in MUD mode (v0.57.6 lesson).
     public long LoanAmount { get; set; } = 0;                   // Active loan balance (principal + interest)
     public int LoanDaysRemaining { get; set; } = 0;             // Days until enforcer attack
     public long LoanInterestAccrued { get; set; } = 0;          // Total interest accrued
@@ -2457,6 +2499,26 @@ public class Character
         if (newLevel > Level)
         {
             Level = newLevel;
+
+            // v0.65.6 renewable resurrections: every 10th level restores one lost
+            // life (capped at MaxResurrections). Online permadeath mode only --
+            // single-player death uses the Veil-of-Death penalty menu and never
+            // consults the Resurrections counter. Human players only; NPC teammate
+            // leveling goes through separate paths but the gate is defense in depth.
+            // RaiseLevel is the single Level++ chokepoint (Level Master manual +
+            // CheckAutoLevelUp), so every decade crossing lands here exactly once.
+            if (newLevel % 10 == 0
+                && AI == CharacterAI.Human
+                && UsurperRemake.BBS.DoorMode.IsOnlineMode
+                && GameConfig.OnlinePermadeathEnabled
+                && Resurrections < Math.Max(1, MaxResurrections))
+            {
+                Resurrections++;
+                PendingResurrectionGrants++;
+                UsurperRemake.Systems.DebugLogger.Instance.LogInfo("LIVES",
+                    $"{Name2 ?? Name1} regained a resurrection at level {newLevel} ({Resurrections}/{MaxResurrections}).");
+            }
+
             OnLevelUp?.Invoke(this);
         }
     }

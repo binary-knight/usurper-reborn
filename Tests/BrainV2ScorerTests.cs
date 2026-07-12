@@ -185,9 +185,10 @@ public class BrainV2ScorerTests
     {
         // v0.64.0 Slice 6: scorer reads live WeapPow (gear-influenced after
         // RecalculateStats), expected baseline is Level*12 (well-geared).
-        // Lv 20 NPC at WeapPow 30 is < 40% of expected 240 = critically
-        // under-geared. Should pick shop.
-        var npc = ConstructTestNPC(level: 20, baseWeapPow: 30, gold: 500);
+        // v0.65.6: gear-gap boosts only fire at Level <= 12 (the band where the
+        // built-in shop stock can actually close the gap), so this test uses a
+        // Lv 10 NPC. WeapPow 30 < 40% of expected 120 = critically under-geared.
+        var npc = ConstructTestNPC(level: 10, baseWeapPow: 30, gold: 500);
         var candidates = new List<(string, double)>
         {
             ("shop", 1.0),
@@ -196,6 +197,56 @@ public class BrainV2ScorerTests
         };
         var pick = BrainV2Scorer.PickAction(npc, candidates, TestRng());
         pick.Should().Be("shop", "critical gear gap + spending money should pick shop");
+    }
+
+    [Fact]
+    public void PickAction_GearGap_AboveShopBand_NoBoost()
+    {
+        // v0.65.6: the built-in shop DB tops out around 80 WeaponPower, so an
+        // NPC past Level 12 can never close a Level*12 gap by shopping. The
+        // gear-gap boost must NOT fire above the band -- pre-fix it flagged
+        // every mid-level NPC as permanently under-geared and produced the
+        // 84k-fruitless-shop-trips-per-fortnight telemetry loop.
+        //
+        // Differential proof (the Brain auto-seeds archetype goals, so we pin an
+        // explicit Economic goal whose name matches no nameBoost keyword and
+        // compare the SAME critical weapon gap at Lv 10 vs Lv 20): with inn at
+        // 2.0, shop only wins when the gear boost fires (1.0 x 1.5 goal x 1.8
+        // gear = 2.7 vs inn 2.0 x 0.8 = 1.6); without it, shop = 1.5 < 1.6.
+        var candidates = new List<(string, double)>
+        {
+            ("shop", 1.0),
+            ("inn", 2.0),
+            ("move", 0.5),
+        };
+
+        var inBand = ConstructTestNPC(level: 10, baseWeapPow: 30, gold: 500,
+            topGoal: new Goal("Amass Wealth", GoalType.Economic, 0.9f));
+        BrainV2Scorer.PickAction(inBand, candidates, TestRng())
+            .Should().Be("shop", "at Lv 10 the gear-gap boost fires and shopping can actually close the gap");
+
+        var aboveBand = ConstructTestNPC(level: 20, baseWeapPow: 30, gold: 500,
+            topGoal: new Goal("Amass Wealth", GoalType.Economic, 0.9f));
+        BrainV2Scorer.PickAction(aboveBand, candidates, TestRng())
+            .Should().Be("inn", "above Lv 12 the gear-gap boost must not fire (shops cannot help)");
+    }
+
+    [Fact]
+    public void PickAction_FruitlessShop_SuppressesShopping()
+    {
+        // v0.65.6: after a shop visit that bought nothing (NPCGoShopping marks
+        // "shop_fruitless"), the shop verb is discounted for 6 hours -- even for
+        // an under-geared NPC in the shop band. "I already checked the shops."
+        var npc = ConstructTestNPC(level: 10, baseWeapPow: 30, gold: 500);
+        npc.Brain!.MarkActivity("shop_fruitless");
+        var candidates = new List<(string, double)>
+        {
+            ("shop", 1.0),
+            ("inn", 1.0),
+            ("move", 0.5),
+        };
+        var pick = BrainV2Scorer.PickAction(npc, candidates, TestRng());
+        pick.Should().Be("inn", "a fresh fruitless-shop marker must suppress repeat shopping");
     }
 
     [Fact]
