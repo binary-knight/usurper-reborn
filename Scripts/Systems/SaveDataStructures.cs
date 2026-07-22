@@ -286,6 +286,7 @@ namespace UsurperRemake.Systems
         public int Orientation { get; set; } // SexualOrientation enum
         public int Age { get; set; }
         public DifficultyMode Difficulty { get; set; } = DifficultyMode.Normal;
+        public int NightmareStartLevel { get; set; } = 0; // v0.65.7 audit F1: Nightmare achievement anchor
         
         // Game state
         public string CurrentLocation { get; set; } = "";

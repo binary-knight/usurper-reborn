@@ -1342,9 +1342,16 @@ public static class AchievementSystem
         if (player.King) TryUnlock(player, "ruler");
 
         // Challenge achievements
-        if (player.Difficulty == DifficultyMode.Nightmare && player.Level >= 10)
+        // v0.65.7 audit F1: measured in levels GAINED on Nightmare, not raw level.
+        // Original semantics preserved for creation-borne Nightmare characters
+        // (start level 1 -> gained 9 == old "Level >= 10", gained 49 == old
+        // "Level >= 50"); a player who switches into Nightmare via Preferences at
+        // Lv 50 must genuinely climb 49 Nightmare levels for the Diamond.
+        if (player.Difficulty == DifficultyMode.Nightmare && player.NightmareStartLevel > 0
+            && player.Level - player.NightmareStartLevel >= 9)
             TryUnlock(player, "nightmare_survivor");
-        if (player.Difficulty == DifficultyMode.Nightmare && player.Level >= 50)
+        if (player.Difficulty == DifficultyMode.Nightmare && player.NightmareStartLevel > 0
+            && player.Level - player.NightmareStartLevel >= 49)
             TryUnlock(player, "nightmare_master");
         if (stats.CurrentStreak >= 7) TryUnlock(player, "persistent");
         if (stats.CurrentStreak >= 30) TryUnlock(player, "dedicated");

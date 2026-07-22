@@ -132,6 +132,9 @@ public class LevelMasterLocation : BaseLocation
         terminal.WriteLine(Loc.Get("level_master.services"), "cyan");
         WriteSRMenuOption("L", Loc.Get("level_master.level_raise"));
         WriteSRMenuOption("A", $"{Loc.Get("level_master.abilities")} - {Loc.Get("level_master.abilities_desc")}");
+        WriteSRMenuOption("P", $"{Loc.Get("level_master.path")} - {Loc.Get("level_master.path_desc")}");
+        if (HasSpecializationOption())
+            WriteSRMenuOption("S", $"{Loc.Get("level_master.specialize")} - {Loc.Get("level_master.specialize_desc")}");
         WriteSRMenuOption("T", $"{Loc.Get("level_master.training")} - {Loc.Get("level_master.training_desc", currentPlayer.TrainingPoints.ToString())}");
         WriteSRMenuOption("C", $"{Loc.Get("level_master.crystal_ball")} - {Loc.Get("level_master.crystal_desc")}");
         WriteSRMenuOption("H", $"{Loc.Get("level_master.help_team")} - {Loc.Get("level_master.help_desc")}");
@@ -209,7 +212,7 @@ public class LevelMasterLocation : BaseLocation
         terminal.SetColor("bright_yellow");
         terminal.Write("L");
         terminal.SetColor("darkgray");
-        terminal.Write("]");
+        terminal.Write("] ");
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("level_master.menu_level_raise"));
 
@@ -219,7 +222,7 @@ public class LevelMasterLocation : BaseLocation
         terminal.SetColor("bright_yellow");
         terminal.Write("A");
         terminal.SetColor("darkgray");
-        terminal.Write("]");
+        terminal.Write("] ");
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("level_master.menu_abilities", Loc.Get("level_master.abilities_desc")));
 
@@ -229,20 +232,19 @@ public class LevelMasterLocation : BaseLocation
         terminal.SetColor("bright_yellow");
         terminal.Write("P");
         terminal.SetColor("darkgray");
-        terminal.Write("]");
+        terminal.Write("] ");
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("level_master.menu_path", Loc.Get("level_master.path_desc")));
 
         // Row 2c - Specialization (v0.65.4, unlocks at level 25 for classes that have specs)
-        if (currentPlayer.Level >= GameConfig.SpecializationUnlockLevel
-            && UsurperRemake.Data.SpecializationData.GetSpecsForClass(currentPlayer.Class).Count > 0)
+        if (HasSpecializationOption())
         {
             terminal.SetColor("darkgray");
             terminal.Write(" [");
             terminal.SetColor("bright_yellow");
             terminal.Write("S");
             terminal.SetColor("darkgray");
-            terminal.Write("]");
+            terminal.Write("] ");
             terminal.SetColor("white");
             terminal.WriteLine(Loc.Get("level_master.menu_specialize", Loc.Get("level_master.specialize_desc")));
         }
@@ -253,7 +255,7 @@ public class LevelMasterLocation : BaseLocation
         terminal.SetColor("bright_yellow");
         terminal.Write("T");
         terminal.SetColor("darkgray");
-        terminal.Write("]");
+        terminal.Write("] ");
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("level_master.menu_training", Loc.Get("level_master.training_desc", currentPlayer.TrainingPoints.ToString())));
 
@@ -263,7 +265,7 @@ public class LevelMasterLocation : BaseLocation
         terminal.SetColor("bright_yellow");
         terminal.Write("C");
         terminal.SetColor("darkgray");
-        terminal.Write("]");
+        terminal.Write("] ");
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("level_master.menu_crystal", Loc.Get("level_master.crystal_desc")));
 
@@ -273,7 +275,7 @@ public class LevelMasterLocation : BaseLocation
         terminal.SetColor("bright_yellow");
         terminal.Write("H");
         terminal.SetColor("darkgray");
-        terminal.Write("]");
+        terminal.Write("] ");
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("level_master.menu_help_team", Loc.Get("level_master.help_desc")));
 
@@ -285,7 +287,7 @@ public class LevelMasterLocation : BaseLocation
         terminal.SetColor("bright_yellow");
         terminal.Write("R");
         terminal.SetColor("darkgray");
-        terminal.Write("]");
+        terminal.Write("] ");
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("level_master.menu_return"));
         terminal.WriteLine("");
@@ -365,10 +367,31 @@ public class LevelMasterLocation : BaseLocation
         terminal.Write(Loc.Get("level_master.bbs_pts", currentPlayer.TrainingPoints));
         terminal.WriteLine("");
         ShowBBSNPCs();
-        // Menu rows
-        ShowBBSMenuRow(("L", "bright_yellow", Loc.Get("level_master.bbs_level_raise")), ("A", "bright_yellow", Loc.Get("level_master.bbs_abilities")), ("T", "bright_yellow", Loc.Get("level_master.bbs_training")));
-        ShowBBSMenuRow(("C", "bright_yellow", Loc.Get("level_master.bbs_crystal_ball")), ("H", "bright_yellow", Loc.Get("level_master.bbs_help_team")), ("R", "bright_yellow", Loc.Get("level_master.bbs_return")));
+        // Menu rows (P always; S only when the class has specs and level allows)
+        ShowBBSMenuRow(("L", "bright_yellow", Loc.Get("level_master.bbs_level_raise")), ("A", "bright_yellow", Loc.Get("level_master.bbs_abilities")), ("P", "bright_yellow", Loc.Get("level_master.path")));
+        if (HasSpecializationOption())
+        {
+            ShowBBSMenuRow(("S", "bright_yellow", Loc.Get("level_master.specialize")), ("T", "bright_yellow", Loc.Get("level_master.bbs_training")), ("C", "bright_yellow", Loc.Get("level_master.bbs_crystal_ball")));
+            ShowBBSMenuRow(("H", "bright_yellow", Loc.Get("level_master.bbs_help_team")), ("R", "bright_yellow", Loc.Get("level_master.bbs_return")));
+        }
+        else
+        {
+            ShowBBSMenuRow(("T", "bright_yellow", Loc.Get("level_master.bbs_training")), ("C", "bright_yellow", Loc.Get("level_master.bbs_crystal_ball")), ("H", "bright_yellow", Loc.Get("level_master.bbs_help_team")));
+            ShowBBSMenuRow(("R", "bright_yellow", Loc.Get("level_master.bbs_return")));
+        }
         ShowBBSFooter();
+    }
+
+    /// <summary>
+    /// v0.65.7 audit: single source of truth for the [S] Specialize gate so the
+    /// visual, SR, BBS, and Electron menus can never disagree with each other
+    /// (or with ProcessChoice, which routes S unconditionally by design --
+    /// ShowSpecializationMenu has its own guard messages).
+    /// </summary>
+    private bool HasSpecializationOption()
+    {
+        return currentPlayer.Level >= GameConfig.SpecializationUnlockLevel
+            && UsurperRemake.Data.SpecializationData.GetSpecsForClass(currentPlayer.Class).Count > 0;
     }
 
     protected override async Task<bool> ProcessChoice(string choice)
@@ -2217,13 +2240,16 @@ public class LevelMasterLocation : BaseLocation
 
         var menu = new List<ElectronBridge.MenuItemData>
         {
-            new() { Key = "L", Label = Loc.Get("level_master.menu_level_raise"), Category = "core", Icon = "level-up" },
-            new() { Key = "A", Label = "Abilities", Category = "info", Icon = "abilities" },
-            new() { Key = "T", Label = $"Training ({currentPlayer.TrainingPoints} pts)", Category = "core", Icon = "training" },
-            new() { Key = "C", Label = "Crystal Ball", Category = "info", Icon = "crystal-ball" },
-            new() { Key = "H", Label = "Help Teammates", Category = "social", Icon = "team" },
-            new() { Key = "R", Label = Loc.Get("ui.return"), Category = "navigate", Icon = "back" },
+            new() { Key = "L", Label = Loc.Get("level_master.level_raise"), Category = "core", Icon = "level-up" },
+            new() { Key = "A", Label = Loc.Get("level_master.abilities"), Category = "info", Icon = "abilities" },
+            new() { Key = "P", Label = Loc.Get("level_master.path"), Category = "info", Icon = "map" },
         };
+        if (HasSpecializationOption())
+            menu.Add(new() { Key = "S", Label = Loc.Get("level_master.specialize"), Category = "core", Icon = "abilities" });
+        menu.Add(new() { Key = "T", Label = $"{Loc.Get("level_master.training")} ({currentPlayer.TrainingPoints})", Category = "core", Icon = "training" });
+        menu.Add(new() { Key = "C", Label = Loc.Get("level_master.bbs_crystal_ball"), Category = "info", Icon = "crystal-ball" });
+        menu.Add(new() { Key = "H", Label = Loc.Get("level_master.help_team"), Category = "social", Icon = "team" });
+        menu.Add(new() { Key = "R", Label = Loc.Get("ui.return"), Category = "navigate", Icon = "back" });
         ElectronBridge.EmitMenu(menu);
 
         EmitNPCsInLocationToElectron();

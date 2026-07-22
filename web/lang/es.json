@@ -379,6 +379,9 @@
   "credits.coosh_name": "Coosh",
   "credits.coosh_role": "Contribuciones al Código",
   "credits.coosh_desc": "Colaborador de la comunidad. Encontró y solucionó una regresión de desincronización en la fórmula de XP rastreando su propio personaje de Nv.73 atrapado hasta 12 copias duplicadas de la misma función en el código, y luego centralizándolas en una única implementación canónica.",
+  "credits.testingbytes_name": "TestingBytes",
+  "credits.testingbytes_role": "Contribuciones al Código",
+  "credits.testingbytes_desc": "Colaborador de la comunidad que ayuda a pulir los menús del juego.",
   "credits.thanks": "Gracias a cada SysOp que mantuvo un tablón activo, y a cada chaval que se conectó a explorar Durunghins.",
   "credits.discord": "Únete a nosotros en Discord",
 

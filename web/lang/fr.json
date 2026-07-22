@@ -383,6 +383,9 @@
   "credits.coosh_name": "Coosh",
   "credits.coosh_role": "Contributions au code",
   "credits.coosh_desc": "Contributeur de la communauté. A trouvé et corrigé une régression de désynchronisation de la formule d'XP en remontant depuis son propre personnage Nv.73 bloqué jusqu'à 12 copies dupliquées de la même fonction dans le code, puis en les centralisant en une seule implémentation canonique.",
+  "credits.testingbytes_name": "TestingBytes",
+  "credits.testingbytes_role": "Contributions au Code",
+  "credits.testingbytes_desc": "Contributeur de la communauté qui aide à peaufiner les menus du jeu.",
   "credits.thanks": "Merci à chaque SysOp qui a maintenu un board en ligne, et à chaque gamin qui s'est connecté pour explorer Durunghins.",
   "credits.discord": "Rejoins-nous sur Discord",
 

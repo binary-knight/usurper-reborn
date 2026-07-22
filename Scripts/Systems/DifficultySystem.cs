@@ -36,6 +36,43 @@ public static class DifficultySystem
     };
 
     /// <summary>
+    /// v0.65.7: localized display name (difficulty.mode_* keys in all 5
+    /// languages, falling back to the English GetDisplayName if a key is
+    /// missing). Use this at every player-facing display site.
+    /// </summary>
+    public static string GetLocalizedName(DifficultyMode mode)
+    {
+        string key = mode switch
+        {
+            DifficultyMode.Easy => "difficulty.mode_easy",
+            DifficultyMode.Hard => "difficulty.mode_hard",
+            DifficultyMode.Nightmare => "difficulty.mode_nightmare",
+            _ => "difficulty.mode_normal",
+        };
+        var loc = UsurperRemake.Systems.Loc.Get(key);
+        return loc == key ? GetDisplayName(mode) : loc;
+    }
+
+    /// <summary>
+    /// v0.65.7: localized description (difficulty.desc_* keys in all 5
+    /// languages, falling back to the English GetDescription). Used by both
+    /// character creation and the preferences difficulty changer so the two
+    /// screens always read the same.
+    /// </summary>
+    public static string GetLocalizedDescription(DifficultyMode mode)
+    {
+        string key = mode switch
+        {
+            DifficultyMode.Easy => "difficulty.desc_easy",
+            DifficultyMode.Hard => "difficulty.desc_hard",
+            DifficultyMode.Nightmare => "difficulty.desc_nightmare",
+            _ => "difficulty.desc_normal",
+        };
+        var loc = UsurperRemake.Systems.Loc.Get(key);
+        return loc == key ? GetDescription(mode) : loc;
+    }
+
+    /// <summary>
     /// Get description for a difficulty mode
     /// </summary>
     public static string GetDescription(DifficultyMode mode) => mode switch

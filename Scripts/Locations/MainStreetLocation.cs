@@ -1814,10 +1814,14 @@ public class MainStreetLocation : BaseLocation
         terminal.WriteLine($"  {Loc.Get("main_street.stat_longest_streak"),-21} {stats.LongestStreak,10} {Loc.Get("main_street.stat_days")}");
         terminal.WriteLine("");
 
-        // Difficulty indicator
-        terminal.SetColor(DifficultySystem.GetColor(currentPlayer.Difficulty));
-        terminal.WriteLine(Loc.Get("main_street.stat_difficulty", DifficultySystem.GetDisplayName(currentPlayer.Difficulty)));
-        terminal.WriteLine("");
+        // Difficulty indicator (v0.65.7: localized mode name).
+        // Single-player only: online is always Normal, so the line is noise there.
+        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
+        {
+            terminal.SetColor(DifficultySystem.GetColor(currentPlayer.Difficulty));
+            terminal.WriteLine(Loc.Get("main_street.stat_difficulty", DifficultySystem.GetLocalizedName(currentPlayer.Difficulty)));
+            terminal.WriteLine("");
+        }
 
         terminal.SetColor("gray");
         terminal.WriteLine(Loc.Get("ui.press_enter"));

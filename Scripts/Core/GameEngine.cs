@@ -5237,6 +5237,7 @@ public partial class GameEngine
             Orientation = (SexualOrientation)playerData.Orientation,
             Age = playerData.Age,
             Difficulty = playerData.Difficulty,
+            NightmareStartLevel = playerData.NightmareStartLevel,
             
             // Game state
             TurnCount = playerData.TurnCount,  // World simulation turn counter
@@ -5747,10 +5748,17 @@ public partial class GameEngine
         // (some legacy characters were created before the online gate was added)
         if (UsurperRemake.BBS.DoorMode.IsOnlineMode && player.Difficulty != DifficultyMode.Normal)
         {
-            DebugLogger.Instance.LogWarning("ONLINE", $"Player {player.Name2 ?? player.Name1} had non-Normal difficulty ({player.Difficulty}) in online mode — forcing Normal");
+            DebugLogger.Instance.LogWarning("ONLINE", $"Player {player.Name2 ?? player.Name1} had non-Normal difficulty ({player.Difficulty}) in online mode -- forcing Normal");
             player.Difficulty = DifficultyMode.Normal;
         }
         DifficultySystem.CurrentDifficulty = player.Difficulty;
+
+        // v0.65.7 audit F1: heal pre-0.65.7 Nightmare saves. Before the prefs
+        // difficulty changer existed, creation was the only path onto Nightmare,
+        // so a Nightmare save with no anchor is grandfathered as legit-from-
+        // creation (anchor 1 preserves the original achievement thresholds).
+        if (player.Difficulty == DifficultyMode.Nightmare && player.NightmareStartLevel <= 0)
+            player.NightmareStartLevel = 1;
 
         // Load player statistics (or initialize if not present)
         if (playerData.Statistics != null)
@@ -8048,6 +8056,7 @@ public partial class GameEngine
         terminal.WriteLine(Loc.Get("engine.credits_xykier"));
         terminal.WriteLine(Loc.Get("engine.credits_lowleveljavacoder"));
         terminal.WriteLine(Loc.Get("engine.credits_coosh"));
+        terminal.WriteLine(Loc.Get("engine.credits_testingbytes"));
         terminal.WriteLine("");
 
         terminal.SetColor("bright_magenta");

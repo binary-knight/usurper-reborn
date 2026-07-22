@@ -3918,6 +3918,15 @@ public abstract class BaseLocation
                 terminal.WriteLine("");
         }
 
+        // v0.65.7: difficulty readout (single-player only -- online is always Normal)
+        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && currentPlayer != null)
+        {
+            terminal.SetColor("white");
+            terminal.Write($"  {Loc.Get("status.difficulty")}: ");
+            terminal.SetColor(DifficultySystem.GetColor(currentPlayer.Difficulty));
+            terminal.WriteLine(DifficultySystem.GetLocalizedName(currentPlayer.Difficulty));
+        }
+
         // Fame display
         if (currentPlayer != null)
         {
@@ -4163,6 +4172,8 @@ public abstract class BaseLocation
                 terminal.WriteLine(Loc.Get("prefs.current_settings"));
                 terminal.WriteLine($"  {Loc.Get("prefs.combat_speed")}: {speedDesc}");
                 terminal.WriteLine($"  {Loc.Get("prefs.auto_heal")}: {(currentPlayer.AutoHeal ? Loc.Get("prefs.enabled") : Loc.Get("prefs.disabled"))}");
+                if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                    terminal.WriteLine($"  {Loc.Get("prefs.difficulty")}: {DifficultySystem.GetLocalizedName(currentPlayer.Difficulty)}");
                 terminal.WriteLine($"  {Loc.Get("prefs.skip_intimate")}: {(currentPlayer.SkipIntimateScenes ? Loc.Get("prefs.enabled") : Loc.Get("prefs.disabled"))}");
                 terminal.WriteLine($"  {Loc.Get("prefs.screen_reader")}: {Loc.Get("prefs.enabled")}");
                 terminal.WriteLine($"  {Loc.Get("prefs.color_theme")}: {ColorTheme.GetThemeName(currentPlayer.ColorTheme)}");
@@ -4180,6 +4191,8 @@ public abstract class BaseLocation
                 terminal.WriteLine(Loc.Get("base.prefs_gameplay"));
                 terminal.WriteLine($"  1. {Loc.Get("prefs.toggle", Loc.Get("prefs.combat_speed"))}");
                 terminal.WriteLine($"  2. {Loc.Get("prefs.toggle", Loc.Get("prefs.auto_heal"))}");
+                if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                    terminal.WriteLine($"  5. {Loc.Get("prefs.difficulty")} ({DifficultySystem.GetLocalizedName(currentPlayer.Difficulty)})");
                 terminal.WriteLine($"  8. {Loc.Get("prefs.toggle", Loc.Get("prefs.auto_level"))}");
                 terminal.WriteLine($"  A. {Loc.Get("prefs.toggle", Loc.Get("prefs.auto_equip"))}");
                 terminal.WriteLine(Loc.Get("base.prefs_display"));
@@ -4237,6 +4250,12 @@ public abstract class BaseLocation
                 terminal.SetColor("white");
                 WriteMenuOption("1", $"{Loc.Get("prefs.combat_speed")}: {speedDesc}");
                 WriteMenuOption("2", $"{Loc.Get("prefs.auto_heal")}: {onOff(currentPlayer.AutoHeal)}");
+                // v0.65.7: single-player difficulty changer. Closes the Quick
+                // Start gap (creation's difficulty screen is skipped there with
+                // no way to revisit it). Hidden online -- difficulty is forced
+                // Normal at login; admins tune server-wide multipliers instead.
+                if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                    WriteMenuOption("5", $"{Loc.Get("prefs.difficulty")}: {DifficultySystem.GetLocalizedName(currentPlayer.Difficulty)}");
                 WriteMenuOption("8", $"{Loc.Get("prefs.auto_level")}: {onOff(currentPlayer.AutoLevelUp)}");
                 WriteMenuOption("A", $"{Loc.Get("prefs.auto_equip")}: {onOff(!currentPlayer.AutoEquipDisabled)}");
                 terminal.WriteLine("");
@@ -4335,6 +4354,11 @@ public abstract class BaseLocation
                     }
                     await GameEngine.Instance.SaveCurrentGame();
                     await Task.Delay(1200);
+                    break;
+
+                case "5" when !UsurperRemake.BBS.DoorMode.IsOnlineMode:
+                    // v0.65.7: single-player difficulty changer
+                    await ChangeDifficultyPreference();
                     break;
 
                 case "6":
@@ -4615,6 +4639,121 @@ public abstract class BaseLocation
                     break;
             }
         }
+    }
+
+    /// <summary>
+    /// v0.65.7: single-player difficulty changer ([~] Preferences option 5).
+    /// Closes the Quick Start gap: creation's difficulty screen is skipped by
+    /// Quick Start (defaulting to Normal) and the flow's design promise is
+    /// that every skipped choice has a Preferences mirror -- difficulty was
+    /// the one exception. Never reachable in online mode (option hidden +
+    /// case guarded): online difficulty is forced Normal at every login and
+    /// server admins tune global multipliers instead.
+    ///
+    /// Same letters as character creation (E/N/H/!). Switching INTO Nightmare
+    /// reuses the creation flow's permadeath warning + confirmation, plus a
+    /// note that Nightmare disables the Last Stand / Death's Door survival
+    /// guarantees. Applied to both the save field and the live
+    /// DifficultySystem.CurrentDifficulty, then saved immediately.
+    /// </summary>
+    private async Task ChangeDifficultyPreference()
+    {
+        terminal.ClearScreen();
+        if (IsScreenReader)
+        {
+            terminal.WriteLine(Loc.Get("prefs.difficulty_header"));
+        }
+        else
+        {
+            WriteBoxHeader(Loc.Get("prefs.difficulty_header"), "bright_yellow");
+        }
+        terminal.WriteLine("");
+        terminal.SetColor("white");
+        terminal.Write($"{Loc.Get("prefs.difficulty_current")} ");
+        terminal.SetColor(DifficultySystem.GetColor(currentPlayer.Difficulty));
+        terminal.WriteLine(DifficultySystem.GetLocalizedName(currentPlayer.Difficulty));
+        terminal.WriteLine("");
+
+        var options = new (string Letter, DifficultyMode Mode)[]
+        {
+            ("E", DifficultyMode.Easy),
+            ("N", DifficultyMode.Normal),
+            ("H", DifficultyMode.Hard),
+            ("!", DifficultyMode.Nightmare),
+        };
+        foreach (var (letter, mode) in options)
+        {
+            if (IsScreenReader)
+            {
+                terminal.WriteLine($"{letter}. {DifficultySystem.GetLocalizedName(mode)} - {DifficultySystem.GetLocalizedDescription(mode)}");
+            }
+            else
+            {
+                terminal.SetColor("darkgray");
+                terminal.Write("[");
+                terminal.SetColor("bright_yellow");
+                terminal.Write(letter);
+                terminal.SetColor("darkgray");
+                terminal.Write("] ");
+                terminal.SetColor(DifficultySystem.GetColor(mode));
+                terminal.Write($"{DifficultySystem.GetLocalizedName(mode),-11}");
+                terminal.SetColor("gray");
+                terminal.WriteLine(DifficultySystem.GetLocalizedDescription(mode));
+            }
+        }
+        terminal.WriteLine("");
+
+        terminal.SetColor("white");
+        var input = (await terminal.GetInput(Loc.Get("prefs.difficulty_prompt"))).Trim().ToUpperInvariant();
+        DifficultyMode? selected = input switch
+        {
+            "E" => DifficultyMode.Easy,
+            "N" => DifficultyMode.Normal,
+            "H" => DifficultyMode.Hard,
+            "!" => DifficultyMode.Nightmare,
+            _ => (DifficultyMode?)null,
+        };
+
+        if (selected == null || selected == currentPlayer.Difficulty)
+        {
+            terminal.WriteLine(Loc.Get("prefs.difficulty_unchanged"), "gray");
+            await Task.Delay(800);
+            return;
+        }
+
+        if (selected == DifficultyMode.Nightmare)
+        {
+            terminal.WriteLine("");
+            terminal.SetColor("bright_red");
+            terminal.WriteLine(Loc.Get("creation.difficulty.nightmare_desc1"));
+            terminal.WriteLine(Loc.Get("creation.difficulty.nightmare_desc2"));
+            terminal.WriteLine(Loc.Get("creation.difficulty.nightmare_desc3"));
+            terminal.SetColor("red");
+            terminal.WriteLine(Loc.Get("prefs.difficulty_nightmare_note"));
+            terminal.WriteLine("");
+            terminal.SetColor("white");
+            var confirm = await terminal.GetInput(Loc.Get("creation.difficulty.nightmare_confirm"));
+            if (!GameConfig.IsAffirmative(confirm))
+            {
+                terminal.WriteLine(Loc.Get("creation.difficulty.nightmare_wise"), "green");
+                await Task.Delay(1200);
+                return;
+            }
+        }
+
+        currentPlayer.Difficulty = selected.Value;
+        // v0.65.7 audit F1: anchor / clear the Nightmare achievement ladder.
+        // Switching IN anchors at the current level (achievements measure levels
+        // gained on Nightmare); switching OUT clears the anchor.
+        currentPlayer.NightmareStartLevel =
+            selected == DifficultyMode.Nightmare ? Math.Max(1, currentPlayer.Level) : 0;
+        DifficultySystem.CurrentDifficulty = selected.Value;
+        await GameEngine.Instance.SaveCurrentGame();
+
+        terminal.WriteLine("");
+        terminal.SetColor(DifficultySystem.GetColor(selected.Value));
+        terminal.WriteLine(Loc.Get("prefs.difficulty_set", DifficultySystem.GetLocalizedName(selected.Value)));
+        await Task.Delay(1500);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -4943,8 +5082,11 @@ public abstract class BaseLocation
         var npcsHere = GetLiveNPCsAtLocation();
 
         // Also include any static LocationNPCs, but exclude special NPCs that have
-        // their own dedicated interaction paths (e.g., Seth Able has [F] Challenge)
-        var allNPCs = new List<NPC>(LocationNPCs.Where(n => !n.IsSpecialNPC));
+        // their own dedicated interaction paths (e.g., Seth Able has [F] Challenge).
+        // v0.65.7 audit: dead filter added for parity with GetLiveNPCsAtLocation --
+        // a dead NPC lingering in a static location list was still talkable here
+        // (the old "dead NPC interactions" bug class).
+        var allNPCs = new List<NPC>(LocationNPCs.Where(n => !n.IsSpecialNPC && n.IsAlive && !n.IsDead));
         foreach (var npc in npcsHere)
         {
             if (!npc.IsSpecialNPC && !allNPCs.Any(n => n.Name2 == npc.Name2))
@@ -5117,11 +5259,19 @@ public abstract class BaseLocation
                 WriteBoxHeader(Loc.Get("base.talking_to", headerName), "bright_cyan");
                 terminal.WriteLine("");
 
-                // Show NPC portrait (skip for screen readers and art-disabled)
+                // Show NPC portrait (skip for screen readers and art-disabled).
+                // v0.65.7: AI-painted portrait from the disk cache when one exists
+                // (rendered at the session's terminal capability tier); falls back
+                // to the classic procedural portrait otherwise. The first miss
+                // kicks a background generation (when the server has a PixelLab
+                // key configured), so the painted portrait exists on a later visit.
                 if (!currentPlayer.ScreenReaderMode && !GameConfig.DisableCharacterMonsterArt)
                 {
-                    var portrait = PortraitGenerator.GeneratePortrait(npc);
-                    ANSIArt.DisplayArt(terminal, portrait);
+                    if (!UsurperRemake.Systems.NPCPortraitSystem.TryDisplayPortrait(terminal, npc))
+                    {
+                        var portrait = PortraitGenerator.GeneratePortrait(npc);
+                        ANSIArt.DisplayArt(terminal, portrait);
+                    }
                     terminal.WriteLine("");
                 }
 
@@ -6378,6 +6528,17 @@ public abstract class BaseLocation
             terminal.Write(fatigueLabel);
             terminal.SetColor("gray");
             terminal.WriteLine($" ({currentPlayer.Fatigue}/100)");
+        }
+
+        // v0.65.7: difficulty readout (single-player only -- online mode forces
+        // Normal at login, so showing it there would be noise). Changeable via
+        // [~] Preferences in single-player.
+        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
+        {
+            terminal.SetColor("white");
+            terminal.Write($"{Loc.Get("status.difficulty")}: ");
+            terminal.SetColor(DifficultySystem.GetColor(currentPlayer.Difficulty));
+            terminal.WriteLine(DifficultySystem.GetLocalizedName(currentPlayer.Difficulty));
         }
         terminal.WriteLine("");
 

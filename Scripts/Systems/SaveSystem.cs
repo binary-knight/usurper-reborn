@@ -476,6 +476,7 @@ namespace UsurperRemake.Systems
                 Orientation = (int)player.Orientation,
                 Age = player.Age,
                 Difficulty = player.Difficulty,
+                NightmareStartLevel = player.NightmareStartLevel,
                 
                 // Game state
                 CurrentLocation = player.Location.ToString(),

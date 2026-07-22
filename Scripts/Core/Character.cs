@@ -216,6 +216,18 @@ public class Character
     // Difficulty mode (set at character creation)
     public DifficultyMode Difficulty { get; set; } = DifficultyMode.Normal;
 
+    // v0.65.7 audit F1: the level at which the CURRENT stretch of Nightmare play
+    // began (0 = not playing Nightmare / unknown). Set to the creation level when
+    // a character is born on Nightmare, and to the current level whenever the
+    // Preferences difficulty changer switches INTO Nightmare. The Nightmare
+    // achievements compare levels GAINED on Nightmare (Level - NightmareStartLevel)
+    // instead of raw Level, so a Lv 50 Easy character can no longer flip to
+    // Nightmare for one screen, collect the Diamond Steam achievement, and flip
+    // back. Pre-0.65.7 Nightmare saves load with 0 and are healed to 1 at login
+    // (grandfathered as legit-from-creation; that was the only way onto Nightmare
+    // before the prefs changer existed).
+    public int NightmareStartLevel { get; set; } = 0;
+
     // Player statistics tracking
     public PlayerStatistics Statistics { get; set; } = new PlayerStatistics();
 

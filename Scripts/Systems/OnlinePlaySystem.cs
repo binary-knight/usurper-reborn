@@ -827,7 +827,18 @@ namespace UsurperRemake.Systems
         /// </summary>
         private async Task PipeIO(CancellationToken ct)
         {
-            vtProcessingEnabled = false;
+            // v0.65.7: actually try to enable VT passthrough. This flag existed
+            // since the online-play client shipped but nothing ever set it, so
+            // ALL server output went through the legacy WriteAnsiToConsole
+            // parser -- which predates extended SGR and applied each ';'
+            // parameter independently, shredding truecolor (38;2;r;g;b) and
+            // xterm-256 (38;5;n) sequences into random 16-color noise (the
+            // AI-portrait corruption report). With VT passthrough the terminal
+            // (WezTerm / Windows Terminal / any ConPTY host) parses the
+            // server's ANSI natively; the legacy parser remains the fallback
+            // for pre-Win10 consoles and now at least consumes extended
+            // sequences correctly (see ProcessSgr).
+            vtProcessingEnabled = !UsurperRemake.BBS.DoorMode.IsInDoorMode && TryEnableVtPassthrough();
 
             if (!UsurperRemake.BBS.DoorMode.IsInDoorMode)
                 Console.OutputEncoding = Encoding.UTF8;
@@ -855,6 +866,14 @@ namespace UsurperRemake.Systems
                 else if (UsurperRemake.BBS.DoorMode.IsInDoorMode)
                 {
                     terminal.WriteRawAnsi(_authLeftover);
+                }
+                else if (vtProcessingEnabled)
+                {
+                    // Mirror the read loop: with VT passthrough active the legacy
+                    // parser must never touch this chunk (a partial escape at the
+                    // end would be stashed in ansiBuffer and never flushed, and
+                    // the first screen would render in approximated colors).
+                    Console.Write(_authLeftover);
                 }
                 else
                 {
@@ -1064,6 +1083,14 @@ namespace UsurperRemake.Systems
             try { await readTask; } catch { }
             try { await watchdog; } catch { }
 
+            // A disconnect mid-portrait-row can leave a truecolor SGR background
+            // active in the terminal; reset attributes so the local disconnect
+            // banner and the following prompt do not render on a color smear.
+            if (vtProcessingEnabled)
+            {
+                try { Console.Write("\x1b[0m"); } catch { }
+            }
+
             terminal.WriteLine("");
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("online.disconnected"));
@@ -1129,6 +1156,41 @@ namespace UsurperRemake.Systems
 
             return sb.ToString();
         }
+
+        /// <summary>
+        /// v0.65.7: enable ENABLE_VIRTUAL_TERMINAL_PROCESSING on the stdout
+        /// console handle so raw ANSI from the server (including truecolor)
+        /// passes straight through to the terminal. Returns true when the
+        /// terminal will interpret VT sequences natively. Non-Windows
+        /// terminals are VT-native. Failure (legacy Win7-era conhost) keeps
+        /// the WriteAnsiToConsole fallback.
+        /// </summary>
+        private static bool TryEnableVtPassthrough()
+        {
+            if (!System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
+                    System.Runtime.InteropServices.OSPlatform.Windows))
+                return true;
+            try
+            {
+                IntPtr handle = GetStdHandle(-11); // STD_OUTPUT_HANDLE
+                if (handle == IntPtr.Zero || handle == new IntPtr(-1)) return false;
+                if (!GetConsoleMode(handle, out uint mode)) return false;
+                const uint ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004;
+                if ((mode & ENABLE_VIRTUAL_TERMINAL_PROCESSING) != 0) return true;
+                return SetConsoleMode(handle, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
+        private static extern IntPtr GetStdHandle(int nStdHandle);
+        [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+        private static extern bool GetConsoleMode(IntPtr hConsoleHandle, out uint lpMode);
+        [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+        private static extern bool SetConsoleMode(IntPtr hConsoleHandle, uint dwMode);
 
         private void WriteAnsiToConsole(string text)
         {
@@ -1281,10 +1343,44 @@ namespace UsurperRemake.Systems
             }
 
             var codes = parameters.Split(';');
-            foreach (var codeStr in codes)
+            for (int ci = 0; ci < codes.Length; ci++)
             {
-                if (!int.TryParse(codeStr, out int code))
+                if (!int.TryParse(codes[ci], out int code))
                     continue;
+
+                // v0.65.7: extended color sequences (38/48 = set fg/bg) MUST
+                // consume their sub-parameters as a unit. Pre-fix, this loop
+                // applied every ';' parameter independently, so a truecolor
+                // sequence like 38;2;29;33;43 painted random 16-colors from
+                // whichever RGB components happened to land in the 30-47
+                // range (the AI-portrait noise report). This fallback path
+                // (VT passthrough unavailable) approximates to the nearest
+                // ConsoleColor; VT-capable terminals never reach this code.
+                if (code == 38 || code == 48)
+                {
+                    bool isForeground = code == 38;
+                    if (ci + 1 < codes.Length && int.TryParse(codes[ci + 1], out int mode))
+                    {
+                        if (mode == 2 && ci + 4 < codes.Length
+                            && int.TryParse(codes[ci + 2], out int r)
+                            && int.TryParse(codes[ci + 3], out int g)
+                            && int.TryParse(codes[ci + 4], out int b))
+                        {
+                            ApplyNearestConsoleColor(isForeground, r, g, b);
+                            ci += 4;
+                            continue;
+                        }
+                        if (mode == 5 && ci + 2 < codes.Length
+                            && int.TryParse(codes[ci + 2], out int idx256))
+                        {
+                            var (xr, xg, xb) = Xterm256ToRgb(idx256);
+                            ApplyNearestConsoleColor(isForeground, xr, xg, xb);
+                            ci += 2;
+                            continue;
+                        }
+                    }
+                    continue; // malformed extended sequence: swallow the 38/48 alone
+                }
 
                 switch (code)
                 {
@@ -1344,6 +1440,63 @@ namespace UsurperRemake.Systems
                     case 107: Console.BackgroundColor = ConsoleColor.White; break;
                 }
             }
+        }
+
+        /// <summary>
+        /// v0.65.7: map an RGB color to the nearest ConsoleColor for the
+        /// legacy (non-VT) console fallback. Uses the classic VGA palette
+        /// with perceptual channel weights.
+        /// </summary>
+        private static void ApplyNearestConsoleColor(bool foreground, int r, int g, int b)
+        {
+            (int R, int G, int B, ConsoleColor C)[] palette =
+            {
+                (0, 0, 0, ConsoleColor.Black), (170, 0, 0, ConsoleColor.DarkRed),
+                (0, 170, 0, ConsoleColor.DarkGreen), (170, 85, 0, ConsoleColor.DarkYellow),
+                (0, 0, 170, ConsoleColor.DarkBlue), (170, 0, 170, ConsoleColor.DarkMagenta),
+                (0, 170, 170, ConsoleColor.DarkCyan), (170, 170, 170, ConsoleColor.Gray),
+                (85, 85, 85, ConsoleColor.DarkGray), (255, 85, 85, ConsoleColor.Red),
+                (85, 255, 85, ConsoleColor.Green), (255, 255, 85, ConsoleColor.Yellow),
+                (85, 85, 255, ConsoleColor.Blue), (255, 85, 255, ConsoleColor.Magenta),
+                (85, 255, 255, ConsoleColor.Cyan), (255, 255, 255, ConsoleColor.White),
+            };
+            ConsoleColor best = ConsoleColor.Black;
+            long bd = long.MaxValue;
+            foreach (var p in palette)
+            {
+                long dr = r - p.R, dg = g - p.G, db = b - p.B;
+                long d = 2 * dr * dr + 4 * dg * dg + 3 * db * db;
+                if (d < bd) { bd = d; best = p.C; }
+            }
+            try
+            {
+                if (foreground) Console.ForegroundColor = best;
+                else Console.BackgroundColor = best;
+            }
+            catch { }
+        }
+
+        /// <summary>v0.65.7: xterm-256 index to RGB (system 16 + 6x6x6 cube + grays).</summary>
+        private static (int R, int G, int B) Xterm256ToRgb(int idx)
+        {
+            if (idx < 0) return (0, 0, 0);
+            if (idx < 16)
+            {
+                (int, int, int)[] sys =
+                {
+                    (0,0,0),(170,0,0),(0,170,0),(170,85,0),(0,0,170),(170,0,170),(0,170,170),(170,170,170),
+                    (85,85,85),(255,85,85),(85,255,85),(255,255,85),(85,85,255),(255,85,255),(85,255,255),(255,255,255),
+                };
+                return sys[idx];
+            }
+            if (idx < 232)
+            {
+                int[] steps = { 0, 95, 135, 175, 215, 255 };
+                int i = idx - 16;
+                return (steps[i / 36], steps[(i / 6) % 6], steps[i % 6]);
+            }
+            int v = 8 + Math.Min(23, idx - 232) * 10;
+            return (v, v, v);
         }
 
         /// <summary>

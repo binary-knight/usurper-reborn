@@ -383,6 +383,9 @@
   "credits.coosh_name": "Coosh",
   "credits.coosh_role": "Contributi al Codice",
   "credits.coosh_desc": "Collaboratore della comunità. Ha trovato e risolto una regressione di desincronizzazione della formula XP risalendo dal proprio personaggio Lv.73 bloccato fino a 12 copie duplicate della stessa funzione nel codice, e poi centralizzandole in un'unica implementazione canonica.",
+  "credits.testingbytes_name": "TestingBytes",
+  "credits.testingbytes_role": "Contributi al Codice",
+  "credits.testingbytes_desc": "Collaboratore della comunità che aiuta a rifinire i menù di gioco.",
   "credits.thanks": "Grazie a ogni SysOp che ha tenuto in piedi una board, e a ogni ragazzino che si è collegato per esplorare Durunghins.",
   "credits.discord": "Unisciti a noi su Discord",
 

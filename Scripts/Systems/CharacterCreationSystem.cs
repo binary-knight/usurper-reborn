@@ -164,6 +164,10 @@ public class CharacterCreationSystem
             {
                 character.Difficulty = await SelectDifficulty();
                 DifficultySystem.CurrentDifficulty = character.Difficulty;
+                // v0.65.7 audit F1: anchor the Nightmare achievement ladder at the
+                // creation level (levels-gained semantics; see AchievementSystem).
+                if (character.Difficulty == DifficultyMode.Nightmare)
+                    character.NightmareStartLevel = Math.Max(1, character.Level);
             }
 
             // Step 6: Roll stats with re-roll option (up to 5 re-rolls)
@@ -682,22 +686,22 @@ public class CharacterCreationSystem
                 {
                     options = new[]
                     {
-                        new { key = "E", label = Loc.Get("character_creation.easy_label").Trim(), description = DifficultySystem.GetDescription(DifficultyMode.Easy), color = DifficultySystem.GetColor(DifficultyMode.Easy) },
-                        new { key = "N", label = Loc.Get("character_creation.normal_label").Trim(), description = DifficultySystem.GetDescription(DifficultyMode.Normal), color = DifficultySystem.GetColor(DifficultyMode.Normal) },
-                        new { key = "H", label = Loc.Get("character_creation.hard_label").Trim(), description = DifficultySystem.GetDescription(DifficultyMode.Hard), color = DifficultySystem.GetColor(DifficultyMode.Hard) },
-                        new { key = "!", label = Loc.Get("character_creation.nightmare_label").Trim(), description = DifficultySystem.GetDescription(DifficultyMode.Nightmare), color = DifficultySystem.GetColor(DifficultyMode.Nightmare) }
+                        new { key = "E", label = Loc.Get("character_creation.easy_label").Trim(), description = DifficultySystem.GetLocalizedDescription(DifficultyMode.Easy), color = DifficultySystem.GetColor(DifficultyMode.Easy) },
+                        new { key = "N", label = Loc.Get("character_creation.normal_label").Trim(), description = DifficultySystem.GetLocalizedDescription(DifficultyMode.Normal), color = DifficultySystem.GetColor(DifficultyMode.Normal) },
+                        new { key = "H", label = Loc.Get("character_creation.hard_label").Trim(), description = DifficultySystem.GetLocalizedDescription(DifficultyMode.Hard), color = DifficultySystem.GetColor(DifficultyMode.Hard) },
+                        new { key = "!", label = Loc.Get("character_creation.nightmare_label").Trim(), description = DifficultySystem.GetLocalizedDescription(DifficultyMode.Nightmare), color = DifficultySystem.GetColor(DifficultyMode.Nightmare) }
                     }
                 });
 
 
             // Display difficulty options with descriptions
-            terminal.WriteLine($"(E){Loc.Get("character_creation.easy_label")}      - " + DifficultySystem.GetDescription(DifficultyMode.Easy), DifficultySystem.GetColor(DifficultyMode.Easy));
+            terminal.WriteLine($"(E){Loc.Get("character_creation.easy_label")}      - " + DifficultySystem.GetLocalizedDescription(DifficultyMode.Easy), DifficultySystem.GetColor(DifficultyMode.Easy));
             terminal.WriteLine("");
-            terminal.WriteLine($"(N){Loc.Get("character_creation.normal_label")}    - " + DifficultySystem.GetDescription(DifficultyMode.Normal), DifficultySystem.GetColor(DifficultyMode.Normal));
+            terminal.WriteLine($"(N){Loc.Get("character_creation.normal_label")}    - " + DifficultySystem.GetLocalizedDescription(DifficultyMode.Normal), DifficultySystem.GetColor(DifficultyMode.Normal));
             terminal.WriteLine("");
-            terminal.WriteLine($"(H){Loc.Get("character_creation.hard_label")}      - " + DifficultySystem.GetDescription(DifficultyMode.Hard), DifficultySystem.GetColor(DifficultyMode.Hard));
+            terminal.WriteLine($"(H){Loc.Get("character_creation.hard_label")}      - " + DifficultySystem.GetLocalizedDescription(DifficultyMode.Hard), DifficultySystem.GetColor(DifficultyMode.Hard));
             terminal.WriteLine("");
-            terminal.WriteLine($"(!){Loc.Get("character_creation.nightmare_label")}- " + DifficultySystem.GetDescription(DifficultyMode.Nightmare), DifficultySystem.GetColor(DifficultyMode.Nightmare));
+            terminal.WriteLine($"(!){Loc.Get("character_creation.nightmare_label")}- " + DifficultySystem.GetLocalizedDescription(DifficultyMode.Nightmare), DifficultySystem.GetColor(DifficultyMode.Nightmare));
             terminal.WriteLine("");
 
             var choice = await terminal.GetInputAsync(Loc.Get("creation.difficulty.prompt"));

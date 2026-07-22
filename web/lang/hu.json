@@ -379,6 +379,9 @@
   "credits.coosh_name": "Coosh",
   "credits.coosh_role": "Kódbeli közreműködés",
   "credits.coosh_desc": "Közösségi közreműködő. Megtalált és javított egy XP-képlet-deszinkronizációs regressziót: saját elakadt 73. szintű karakteréből kiindulva felderítette ugyanannak a függvénynek a 12 duplikált példányát a kódban, majd egyetlen kanonikus implementációba központosította őket.",
+  "credits.testingbytes_name": "TestingBytes",
+  "credits.testingbytes_role": "Kód hozzájárulások",
+  "credits.testingbytes_desc": "Közösségi közreműködő, aki segít csiszolni a játék menüit.",
   "credits.thanks": "Köszönet minden Rendszeroperátornak, aki életben tartott egy boardot, és minden gyereknek, aki betárcsázott, hogy felfedezze Durunghins-t.",
   "credits.discord": "Csatlakozz hozzánk Discordon",
 

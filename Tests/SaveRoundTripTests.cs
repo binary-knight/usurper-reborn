@@ -289,6 +289,23 @@ public class SaveRoundTripTests
     }
 
     [Fact]
+    public void PlayerData_RoundTrip_PreservesNightmareStartLevel()
+    {
+        // v0.65.7 audit F1: the prefs difficulty changer would otherwise let a
+        // Lv.50 Normal character flip to Nightmare and instantly cheese the
+        // "reach level 10/50 on Nightmare" achievements. NightmareStartLevel
+        // anchors the ladder at the level where Nightmare began; it must
+        // survive save/load or the anchor resets and the cheese returns.
+        var original = new PlayerData { NightmareStartLevel = 42 };
+
+        var json = JsonSerializer.Serialize(original, _jsonOptions);
+        var restored = JsonSerializer.Deserialize<PlayerData>(json, _jsonOptions);
+
+        restored.Should().NotBeNull();
+        restored!.NightmareStartLevel.Should().Be(42, "NightmareStartLevel must survive save/load so the Nightmare achievement anchor holds across sessions");
+    }
+
+    [Fact]
     public void PlayerData_RoundTrip_PreservesLastRiteOfReturnUtc()
     {
         // v0.65.6 renewable resurrections: the Temple's Rite of Return has a

@@ -394,6 +394,9 @@
   "credits.coosh_name": "Coosh",
   "credits.coosh_role": "Code Contributions",
   "credits.coosh_desc": "Community contributor. Found and fixed an XP-formula desync regression by tracing his own soft-locked Lv.73 character to 12 duplicated copies of the same function across the codebase, then centralizing them into one canonical implementation.",
+  "credits.testingbytes_name": "TestingBytes",
+  "credits.testingbytes_role": "Code Contributions",
+  "credits.testingbytes_desc": "Community contributor helping polish the game's menus.",
   "credits.thanks": "Thanks to every SysOp who kept a board running, and every kid who dialed in to explore Durunghins.",
   "credits.discord": "Join us on Discord",
 
