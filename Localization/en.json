@@ -1803,7 +1803,7 @@
   "level_master.level_raise": "Level Raise",
   "level_master.abilities": "Abilities",
   "level_master.abilities_desc": "view and learn combat abilities or spells",
-  "level_master.menu_path": "Path - {0}",
+  "level_master.menu_path": "ath - {0}",
   "level_master.menu_specialize": "Specialize - {0}",
   "level_master.specialize_desc": "choose your class specialization (level 25+)",
   "level_master.path_desc": "see your next abilities, spells, and story milestone",
