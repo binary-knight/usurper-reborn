@@ -4899,6 +4899,38 @@ public partial class GameEngine
             }
         }
 
+        // v0.65.8 (R5) Fallen Legacy claim: if this account's previous character
+        // fell to involuntary permadeath, the fresh character inherits the
+        // heirloom. Granted BEFORE the first save so it persists in it. Keyed on
+        // CharacterKey (same key ExecutePermadeath recorded under) so alt-slot
+        // deaths pay the alt slot's next character, not the main's.
+        if (UsurperRemake.BBS.DoorMode.IsOnlineMode
+            && SaveSystem.Instance?.Backend is UsurperRemake.Systems.SqlSaveBackend legacyBackend)
+        {
+            try
+            {
+                var ctxLegacy = UsurperRemake.Server.SessionContext.Current;
+                string legacyKey = (!string.IsNullOrEmpty(ctxLegacy?.CharacterKey)
+                    ? ctxLegacy!.CharacterKey : ctxLegacy?.Username) ?? playerName;
+                var legacy = legacyBackend.ClaimFallenLegacy(legacyKey);
+                if (legacy != null)
+                {
+                    var (fallenName, fallenLevel, fallenClass, heirloomGold) = legacy.Value;
+                    currentPlayer.Gold += heirloomGold;
+                    terminal.WriteLine("");
+                    terminal.WriteLine(Loc.Get("engine.legacy_claimed", fallenName, fallenLevel, heirloomGold), "bright_magenta");
+                    terminal.WriteLine(Loc.Get("engine.legacy_claimed_hint"), "gray");
+                    await Task.Delay(2500);
+                    DebugLogger.Instance.LogInfo("GOLD",
+                        $"Fallen-legacy heirloom +{heirloomGold}g to '{currentPlayer.Name1}' from '{fallenName}' (Lv.{fallenLevel} {fallenClass}).");
+                }
+            }
+            catch (Exception lex)
+            {
+                DebugLogger.Instance.LogWarning("DEATH_CAP", $"Fallen-legacy claim failed: {lex.Message}");
+            }
+        }
+
         // Save the new game using the character's actual name (Name1)
         // This is important because playerName may be empty if coming from no-saves path
         string savePlayerName = !string.IsNullOrEmpty(currentPlayer.Name1) ? currentPlayer.Name1 : currentPlayer.Name2;

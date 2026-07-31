@@ -63,6 +63,31 @@ public static class LLMSettings
     public static string? GetCheapModelOrDefault() => CheapModel ?? Model;
 
     /// <summary>
+    /// v0.65.10: native Anthropic Messages API provider with prompt caching
+    /// (the Slice 5b follow-up the v0.64.0 notes deferred). Auto-detected when
+    /// the endpoint host is api.anthropic.com; override with
+    /// USURPER_LLM_NATIVE_ANTHROPIC=true/false. The native path adds an
+    /// explicit cache_control breakpoint on the system block so repeated calls
+    /// sharing a system prompt read it from cache at 10% of the input price
+    /// (when the prompt meets the model's minimum cacheable length; below the
+    /// minimum the API silently skips caching, which is harmless).
+    /// </summary>
+    public static bool UseNativeAnthropic
+    {
+        get
+        {
+            var v = GetString("USURPER_LLM_NATIVE_ANTHROPIC");
+            if (v != null)
+                return v.Equals("true", StringComparison.OrdinalIgnoreCase)
+                    || v.Equals("1", StringComparison.OrdinalIgnoreCase)
+                    || v.Equals("yes", StringComparison.OrdinalIgnoreCase)
+                    || v.Equals("on", StringComparison.OrdinalIgnoreCase);
+            var ep = Endpoint;
+            return ep != null && ep.Contains("api.anthropic.com", StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    /// <summary>
     /// True when LLM is fully configured AND we're running in online mode.
     /// Moment generators check this and skip the LLM path entirely when false.
     /// </summary>

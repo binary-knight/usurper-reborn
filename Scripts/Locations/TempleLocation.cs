@@ -137,6 +137,10 @@ public partial class TempleLocation : BaseLocation
                     case "U": // v0.65.6 Rite of Return (resurrection refill, online permadeath mode)
                         await ProcessRiteOfReturn();
                         break;
+
+                    case "K": // v0.65.8 (R5) Hall of the Fallen (permadeath memorial, online)
+                        await ShowHallOfTheFallen();
+                        break;
                         
                     case GameConfig.TempleMenuStatus: // "S"
                         await DisplayPlayerStatus();
@@ -321,6 +325,8 @@ public partial class TempleLocation : BaseLocation
             terminal.WriteLine(Loc.Get("temple.sr_confess"));
             if (CanShowRiteOfReturn())
                 terminal.WriteLine(Loc.Get("temple.sr_rite", GameConfig.GetRiteOfReturnCost(currentPlayer.Level)));
+            if (CanShowHallOfTheFallen())
+                terminal.WriteLine(Loc.Get("temple.sr_hall_fallen"));
             terminal.WriteLine(Loc.Get("temple.sr_item_sacrifice"));
             terminal.WriteLine(Loc.Get("temple.sr_status"));
             terminal.WriteLine(Loc.Get("temple.sr_god_ranking"));
@@ -705,6 +711,21 @@ public partial class TempleLocation : BaseLocation
             terminal.SetColor("white");
             terminal.WriteLine(" Hall of the Ascended");
 
+            // v0.65.8 (R5): Hall of the Fallen -- memorial wall for characters
+            // erased by permadeath. Online mode only (the memorial lives in the
+            // shared server DB; single-player has no permadeath erasure).
+            if (CanShowHallOfTheFallen())
+            {
+                terminal.SetColor("darkgray");
+                terminal.Write(" [");
+                terminal.SetColor("bright_yellow");
+                terminal.Write("K");
+                terminal.SetColor("darkgray");
+                terminal.Write("]");
+                terminal.SetColor("white");
+                terminal.WriteLine(Loc.Get("temple.menu_hall_fallen"));
+            }
+
             terminal.SetColor("darkgray");
             terminal.Write(" [");
             terminal.SetColor("bright_yellow");
@@ -993,6 +1014,61 @@ public partial class TempleLocation : BaseLocation
             && GameConfig.OnlinePermadeathEnabled
             && currentPlayer != null
             && currentPlayer.Resurrections < Math.Max(1, currentPlayer.MaxResurrections);
+    }
+
+    /// <summary>
+    /// v0.65.8 (R5): the Hall of the Fallen memorial renders only where the
+    /// shared server DB exists (online mode). Single-player has no permadeath
+    /// erasure, so there is nothing to memorialize.
+    /// </summary>
+    private bool CanShowHallOfTheFallen()
+    {
+        return DoorMode.IsOnlineMode
+            && SaveSystem.Instance?.Backend is UsurperRemake.Systems.SqlSaveBackend;
+    }
+
+    /// <summary>
+    /// v0.65.8 (R5): memorial wall for characters erased by permadeath. Every
+    /// erased character's name endures here -- deletion produces a story
+    /// instead of nothing (see DOCS/PLAYER_EXPERIENCE_ANALYSIS.md R5).
+    /// </summary>
+    private async Task ShowHallOfTheFallen()
+    {
+        if (!CanShowHallOfTheFallen()) return;
+
+        terminal.ClearScreen();
+        WriteSectionHeader(Loc.Get("temple.hall_fallen_header"), "bright_cyan");
+        terminal.SetColor("gray");
+        terminal.WriteLine(" " + Loc.Get("temple.hall_fallen_desc"));
+        terminal.WriteLine("");
+
+        var backend = SaveSystem.Instance?.Backend as UsurperRemake.Systems.SqlSaveBackend;
+        var memorials = backend?.GetFallenMemorials(15) ?? new List<(string, int, string, string, string)>();
+
+        if (memorials.Count == 0)
+        {
+            terminal.SetColor("darkgray");
+            terminal.WriteLine(" " + Loc.Get("temple.hall_fallen_empty"));
+        }
+        else
+        {
+            foreach (var (name, level, className, killer, diedAt) in memorials)
+            {
+                terminal.SetColor("bright_white");
+                terminal.Write($" {name}");
+                terminal.SetColor("gray");
+                string classDisplay = GameConfig.GetLocalizedClassNameFromString(className);
+                string killerDisplay = string.IsNullOrWhiteSpace(killer)
+                    ? Loc.Get("temple.hall_fallen_unknown_end") : killer;
+                terminal.WriteLine("  " + Loc.Get("temple.hall_fallen_row", level, classDisplay, killerDisplay, diedAt));
+            }
+        }
+
+        terminal.WriteLine("");
+        terminal.SetColor("cyan");
+        terminal.WriteLine(" " + Loc.Get("temple.hall_fallen_footer"));
+        terminal.WriteLine("");
+        await terminal.PressAnyKey();
     }
 
     /// <summary>

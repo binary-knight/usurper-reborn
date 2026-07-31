@@ -270,6 +270,12 @@ namespace UsurperRemake.BBS
             { 'à', 133 },
             { 'ç', 135 },
             { 'Ç', 128 },
+            // v0.65.12 (loc audit): Hungarian double-acute vowels are not in
+            // CP437; transliterate to the umlaut forms instead of '?'.
+            { 'ő', 148 },  // ő -> ö
+            { 'Ő', 153 },  // Ő -> Ö
+            { 'ű', 129 },  // ű -> ü
+            { 'Ű', 154 },  // Ű -> Ü
         };
 
         public bool IsConnected => _socket?.Connected ?? false;

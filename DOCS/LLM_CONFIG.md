@@ -39,8 +39,9 @@ not literally `"true"` and every call recorded `llm_disabled`.
 | `USURPER_LLM_API_KEY`          | yes      | (none)     | Bearer token. Never logged. |
 | `USURPER_LLM_MODEL`            | yes      | (none)     | Model id, e.g. `gpt-4o-mini`, `claude-haiku-4-5-20251001`, `llama3.1`. |
 | `USURPER_LLM_DAILY_TOKEN_CAP`  | no       | `500000`   | Per-server daily cap on combined input+output tokens. Shared across all players; when reached, further calls fall back to templates until the UTC day rolls over. |
-| `USURPER_LLM_TIMEOUT_MS`       | no       | `3000`     | Per-request timeout. Most moments are fire-and-forget; timing out and using the template is safer than hanging a world-sim tick. |
+| `USURPER_LLM_TIMEOUT_MS`       | no       | `3000`     | Per-request timeout. Most moments are fire-and-forget; timing out and using the template is safer than hanging a world-sim tick. Recommended: `10000` when strategic goals are in play -- historical successful goal calls averaged 2.4s, so the 3s default clips the tail (v0.65.6 operational note). |
 | `USURPER_LLM_MODEL_CHEAP`      | no       | (unset)    | Optional cheaper model for low-stakes decoration (dialogue layers, fork decisions, avenge news). When set, those callers use it while narrative-depth callers stay on `USURPER_LLM_MODEL`. |
+| `USURPER_LLM_NATIVE_ANTHROPIC` | no       | (auto)     | v0.65.10: force the native Anthropic Messages provider on (`true`) or off (`false`). Unset = auto-detect: on when the endpoint host is `api.anthropic.com`. The native provider adds prompt caching (a `cache_control` breakpoint on the system prompt), so repeated calls sharing a system prompt read it from cache at ~10% of the input price. Either endpoint form works -- `/v1/chat/completions` is rewritten to `/v1/messages` automatically. Non-Anthropic endpoints keep the OpenAI-compat shape. |
 
 If any of the four required variables is missing, the LLM is treated as disabled and everything
 falls back to templates. There is no partial-configuration failure mode.

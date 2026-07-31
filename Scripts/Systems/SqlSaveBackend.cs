@@ -579,6 +579,25 @@ namespace UsurperRemake.Systems
                     CREATE INDEX IF NOT EXISTS idx_deleted_characters_expires
                         ON deleted_characters(expires_at);
 
+                    -- v0.65.8 (R5) Fallen Legacy: durable memorial + heirloom for
+                    -- involuntary permadeaths. Rows are never pruned (the memorial
+                    -- IS the point); at ~3 deaths/week this grows ~150 rows/year.
+                    CREATE TABLE IF NOT EXISTS fallen_legacy (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        username TEXT NOT NULL,
+                        display_name TEXT NOT NULL,
+                        level INTEGER NOT NULL,
+                        class_name TEXT NOT NULL DEFAULT '',
+                        killer TEXT NOT NULL DEFAULT '',
+                        heirloom_gold INTEGER NOT NULL DEFAULT 0,
+                        claimed INTEGER NOT NULL DEFAULT 0,
+                        died_at TEXT DEFAULT (datetime('now'))
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_fallen_legacy_username
+                        ON fallen_legacy(LOWER(username), claimed);
+                    CREATE INDEX IF NOT EXISTS idx_fallen_legacy_died
+                        ON fallen_legacy(died_at DESC);
+
                     CREATE TABLE IF NOT EXISTS combat_events (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         player_name TEXT NOT NULL,
@@ -3971,6 +3990,118 @@ namespace UsurperRemake.Systems
             }
         }
 
+        /// <summary>
+        /// v0.65.8 (R5) Fallen Legacy: record an involuntary permadeath so the
+        /// name endures in the Hall of the Fallen and the account's next
+        /// character can claim the heirloom. Called from PermadeathHelper
+        /// BEFORE DeleteGameData (the players row is about to vanish).
+        /// </summary>
+        public void RecordFallenLegacy(string username, string displayName, int level, string className, string killer, long heirloomGold)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(displayName)) return;
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    INSERT INTO fallen_legacy (username, display_name, level, class_name, killer, heirloom_gold)
+                    VALUES (@username, @display, @level, @class, @killer, @gold);";
+                cmd.Parameters.AddWithValue("@username", username.ToLowerInvariant());
+                cmd.Parameters.AddWithValue("@display", displayName);
+                cmd.Parameters.AddWithValue("@level", level);
+                cmd.Parameters.AddWithValue("@class", className ?? "");
+                cmd.Parameters.AddWithValue("@killer", killer ?? "");
+                cmd.Parameters.AddWithValue("@gold", heirloomGold);
+                cmd.ExecuteNonQuery();
+                DebugLogger.Instance.LogInfo("DEATH_CAP",
+                    $"Fallen legacy recorded: '{displayName}' Lv.{level} {className} (heirloom {heirloomGold}g) for account '{username}'.");
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogWarning("DEATH_CAP", $"RecordFallenLegacy failed: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// v0.65.8 (R5): claim the most recent unclaimed heirloom for this
+        /// account. Atomic (UPDATE ... WHERE claimed = 0 wins the race) so a
+        /// double-call can't double-grant. Returns null when nothing to claim.
+        /// </summary>
+        public (string displayName, int level, string className, long heirloomGold)? ClaimFallenLegacy(string username)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(username)) return null;
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT id, display_name, level, class_name, heirloom_gold
+                    FROM fallen_legacy
+                    WHERE username = @username AND claimed = 0
+                    ORDER BY id DESC LIMIT 1;";
+                cmd.Parameters.AddWithValue("@username", username.ToLowerInvariant());
+                using var reader = cmd.ExecuteReader();
+                if (!reader.Read()) return null;
+                long id = reader.GetInt64(0);
+                string display = reader.GetString(1);
+                int level = reader.GetInt32(2);
+                string className = reader.GetString(3);
+                long gold = reader.GetInt64(4);
+                reader.Close();
+
+                using var claim = connection.CreateCommand();
+                claim.CommandText = "UPDATE fallen_legacy SET claimed = 1 WHERE id = @id AND claimed = 0;";
+                claim.Parameters.AddWithValue("@id", id);
+                if (claim.ExecuteNonQuery() == 0) return null; // lost the race
+
+                // Older unclaimed rows (multiple deaths before a re-roll) are
+                // folded closed too -- only the most recent legacy pays out.
+                using var fold = connection.CreateCommand();
+                fold.CommandText = "UPDATE fallen_legacy SET claimed = 1 WHERE username = @username AND claimed = 0;";
+                fold.Parameters.AddWithValue("@username", username.ToLowerInvariant());
+                fold.ExecuteNonQuery();
+
+                return (display, level, className, gold);
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogWarning("DEATH_CAP", $"ClaimFallenLegacy failed: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// v0.65.8 (R5): newest-first memorial rows for the Hall of the Fallen.
+        /// </summary>
+        public List<(string displayName, int level, string className, string killer, string diedAt)> GetFallenMemorials(int limit = 15)
+        {
+            var rows = new List<(string, int, string, string, string)>();
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT display_name, level, class_name, killer, died_at
+                    FROM fallen_legacy
+                    ORDER BY id DESC LIMIT @limit;";
+                cmd.Parameters.AddWithValue("@limit", Math.Clamp(limit, 1, 100));
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    string diedAtRaw = reader.IsDBNull(4) ? "" : reader.GetString(4);
+                    // Stored as SQLite datetime('now') "yyyy-MM-dd HH:mm:ss"; the
+                    // memorial only needs the date part.
+                    string diedAt = diedAtRaw.Length >= 10 ? diedAtRaw.Substring(0, 10) : diedAtRaw;
+                    rows.Add((reader.GetString(0), reader.GetInt32(1), reader.GetString(2), reader.GetString(3), diedAt));
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogWarning("DEATH_CAP", $"GetFallenMemorials failed: {ex.Message}");
+            }
+            return rows;
+        }
+
         public async Task<(bool success, string message)> RegisterPlayer(string username, string password, string? ipAddress = null)
         {
             // v0.60.5: full ban means no new accounts from this IP either. Same
@@ -4159,6 +4290,29 @@ namespace UsurperRemake.Systems
         /// <summary>
         /// Authenticate a player. Returns (success, displayName, message).
         /// </summary>
+        /// <summary>
+        /// v0.65.12 (loc audit): persist the language chosen at the login gate
+        /// so a fresh registration's first session runs in the player's language
+        /// (the column otherwise only updates from the first character save).
+        /// </summary>
+        public void SetAccountLanguage(string username, string language)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(language)) return;
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "UPDATE players SET language = @lang WHERE LOWER(username) = LOWER(@username);";
+                cmd.Parameters.AddWithValue("@lang", language);
+                cmd.Parameters.AddWithValue("@username", username);
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogWarning("AUTH", $"SetAccountLanguage failed: {ex.Message}");
+            }
+        }
+
         public async Task<(bool success, string displayName, string message, bool screenReader, string language)> AuthenticatePlayer(string username, string password, string? ipAddress = null)
         {
             // v0.60.5: defense-in-depth IP check. The MudServer accept-time check

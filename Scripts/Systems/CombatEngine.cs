@@ -3009,10 +3009,32 @@ public partial class CombatEngine
     }
 
     /// <summary>
+    /// v0.65.8 (audit T2): guard for the DEAD single-monster PvE chain.
+    /// PlayerVsMonster delegates 100% to PlayerVsMonsters, so ProcessPlayerAction /
+    /// DetermineCombatOutcome / HandleVictory / ApplyAbilityEffects (and their
+    /// Execute* twins) are unreachable. They are retained until a dedicated
+    /// deletion pass, but patched-by-mistake they silently "fix" nothing -- that
+    /// trap produced the dead married-XP bonus (audit T1-2). Calling any guarded
+    /// method now throws instantly so an accidental re-wire screams in testing
+    /// instead of diverging quietly. The compiler can't prove the guard throws,
+    /// so no unreachable-code warnings are introduced.
+    /// </summary>
+    private static void DeadCombatPathGuard([System.Runtime.CompilerServices.CallerMemberName] string caller = "")
+    {
+        throw new InvalidOperationException(
+            $"Dead single-monster combat path invoked: {caller}. " +
+            "The live PvE path is PlayerVsMonsters (multi-monster). " +
+            "Use the *MultiMonster equivalents.");
+    }
+
+    /// <summary>
+    /// ═══ DEAD PATH — DO NOT PATCH ═══ (see DeadCombatPathGuard)
+    /// Live equivalent: ProcessPlayerActionMultiMonster.
     /// Process player action - Pascal combat mechanics
     /// </summary>
     private async Task ProcessPlayerAction(CombatAction action, Character player, Monster monster, CombatResult result)
     {
+        DeadCombatPathGuard();
         player.UsedItem = false;
         player.Casted = false;
         
@@ -4142,7 +4164,24 @@ public partial class CombatEngine
     private int CalculateFleeChance(Character player, bool isBossFight)
     {
         if (isBossFight)
-            return 20;
+        {
+            // v0.65.8 (R3): desperation scaling. A flat 20% made the escape
+            // valve useless in exactly the fights that kill people (telemetry:
+            // 0.5% flee usage; every real death a boss-round burst). Below 50%
+            // HP the chance ramps up, reaching 60% near death -- a desperate
+            // player can actually get out.
+            int bossChance = 20;
+            if (player.MaxHP > 0)
+            {
+                double hpPct = (double)player.HP / player.MaxHP;
+                if (hpPct < 0.5)
+                {
+                    int pointsBelowHalf = (int)((0.5 - hpPct) * 100);
+                    bossChance += Math.Min(40, (int)(pointsBelowHalf * 1.75));
+                }
+            }
+            return bossChance;
+        }
 
         int chance = 40;
         chance += (int)(player.Dexterity / 2);
@@ -5018,6 +5057,9 @@ public partial class CombatEngine
             }
         }
 
+        // v0.65.8 (R3): failed flee this round -> guarded half-round
+        actualDamage = ApplyFleeGrace(player, actualDamage);
+
         // Check for divine intervention (save from lethal hit)
         bool wouldDie = player.HP - actualDamage <= 0;
         if (wouldDie && DivineBlessingSystem.Instance.CheckDivineIntervention(player, (int)actualDamage))
@@ -5323,6 +5365,9 @@ public partial class CombatEngine
                 long maxDmg = Math.Max(1, (long)(player.MaxHP * capPercent));
                 if (actualDamage > maxDmg) actualDamage = maxDmg;
 
+                // v0.65.8 (R3): failed flee this round -> guarded half-round
+                actualDamage = ApplyFleeGrace(player, actualDamage);
+
                 player.HP -= actualDamage;
 
                 // v0.56.1 Divine Mandate thorn reflect: reflect % back at attacker for ability damage too
@@ -5437,6 +5482,9 @@ public partial class CombatEngine
                 long maxDmg = Math.Max(1, (long)(player.MaxHP * capPercent));
                 if (damage > maxDmg) damage = maxDmg;
 
+                // v0.65.8 (R3): failed flee this round -> guarded half-round
+                damage = ApplyFleeGrace(player, damage);
+
                 player.HP -= damage;
                 long healAmount = damage * abilityResult.LifeStealPercent / 100;
                 monster.HP = Math.Min(monster.MaxHP, monster.HP + healAmount);
@@ -5494,6 +5542,9 @@ public partial class CombatEngine
                 else capPercent = 0.75;
                 long maxDmg = Math.Max(1, (long)(player.MaxHP * capPercent));
                 if (damage > maxDmg) damage = maxDmg;
+
+                // v0.65.8 (R3): failed flee this round -> guarded half-round
+                damage = ApplyFleeGrace(player, damage);
 
                 player.HP -= damage;
                 terminal.WriteLine(Loc.Get("combat.you_take_damage", damage), "red");
@@ -6332,8 +6383,13 @@ public partial class CombatEngine
     /// <summary>
     /// Determine combat outcome and apply rewards/penalties
     /// </summary>
+    /// <summary>
+    /// ═══ DEAD PATH — DO NOT PATCH ═══ (see DeadCombatPathGuard)
+    /// Live equivalent: the outcome handling inside PlayerVsMonsters.
+    /// </summary>
     private async Task DetermineCombatOutcome(CombatResult result)
     {
+        DeadCombatPathGuard();
         if (globalEscape)
         {
             result.Outcome = CombatOutcome.PlayerEscaped;
@@ -6411,8 +6467,15 @@ public partial class CombatEngine
         catch { /* telemetry is decoration */ }
     }
 
+    /// <summary>
+    /// ═══ DEAD PATH — DO NOT PATCH ═══ (see DeadCombatPathGuard)
+    /// Live equivalent: HandleVictoryMultiMonster (and DistributeGroupRewards
+    /// for grouped parity). Patching reward logic here fixes nothing — this is
+    /// exactly how the married/divine XP bonuses went dead (audit T1-2).
+    /// </summary>
     private async Task HandleVictory(CombatResult result)
     {
+        DeadCombatPathGuard();
         // Check if this was a boss fight for dramatic art display
         // ONLY actual floor bosses count - not mini-bosses, champions, or high-level monsters
         bool isBoss = result.Monster.IsBoss;
@@ -12911,6 +12974,12 @@ public partial class CombatEngine
                     {
                         terminal.WriteLine(Loc.Get("combat.flee_fail"));
                     }
+                    // v0.65.8 (R3): a failed flee costs a guarded half-round,
+                    // not a full free enemy round -- incoming damage is halved
+                    // until the next round starts.
+                    player.FleeGraceThisRound = true;
+                    terminal.SetColor("gray");
+                    terminal.WriteLine(Loc.Get("combat.flee_guarded"));
                 }
                 await Task.Delay(GetCombatDelay(1500));
                 break;
@@ -20365,26 +20434,26 @@ public partial class CombatEngine
             terminal.SetColor("dark_red");
             terminal.WriteLine("");
             terminal.WriteLine("");
-            terminal.WriteLine($"  You have died for the {GameConfig.MaxPlaythroughDeaths + 1}th time.");
+            terminal.WriteLine($"  {Loc.Get("death.died_times", GameConfig.MaxPlaythroughDeaths + 1)}");
             await Task.Delay(2000);
             terminal.WriteLine("");
-            terminal.WriteLine("  The threads that bind your soul to the world fray.");
+            terminal.WriteLine($"  {Loc.Get("permadeath.threads")}");
             await Task.Delay(2000);
-            terminal.WriteLine("  No temple will receive you. No god will bargain.");
+            terminal.WriteLine($"  {Loc.Get("permadeath.no_temple")}");
             await Task.Delay(2000);
-            terminal.WriteLine("  No coin will buy your return.");
+            terminal.WriteLine($"  {Loc.Get("permadeath.no_coin")}");
             await Task.Delay(2500);
 
             terminal.WriteLine("");
             terminal.SetColor("bright_red");
-            terminal.WriteLine($"  {player.Name2 ?? player.Name1 ?? "Mortal"}, you have exhausted your lives.");
+            terminal.WriteLine($"  {Loc.Get("permadeath.exhausted", player.Name2 ?? player.Name1 ?? "???")}");
             await Task.Delay(2500);
 
             terminal.WriteLine("");
             terminal.SetColor("gray");
-            terminal.WriteLine("  The Veil closes for the last time.");
+            terminal.WriteLine($"  {Loc.Get("permadeath.veil_closes")}");
             await Task.Delay(2000);
-            terminal.WriteLine("  Your record is being erased.");
+            terminal.WriteLine($"  {Loc.Get("permadeath.erasing")}");
             await Task.Delay(2500);
         }
         catch (Exception ex)
@@ -20421,11 +20490,12 @@ public partial class CombatEngine
             // for posterity.
             if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
             {
-                string eulogy = $"\r\n  *** {displayName} the Lv.{finalLevel} {className} has been erased forever, slain by {killerName}. ***\r\n";
+                // v0.65.12 (loc audit): eulogy is rendered per-recipient below.
                 try
                 {
-                    UsurperRemake.Server.MudServer.Instance?.BroadcastToAll(
-                        $"[1;31m{eulogy}[0m", excludeUsername: username);
+                    UsurperRemake.Server.MudServer.Instance?.BroadcastLocalized(
+                        lang => "\u001b[1;31m\r\n  *** " + Loc.GetIn(lang, "permadeath.eulogy", displayName, finalLevel, className, killerName) + " ***\r\n\u001b[0m",
+                        excludeUsername: username);
                 }
                 catch (Exception ex) { DebugLogger.Instance.LogError("DEATH_CAP", $"Broadcast failed: {ex.Message}"); }
 
@@ -20451,10 +20521,10 @@ public partial class CombatEngine
         {
             terminal.WriteLine("");
             terminal.SetColor("dark_gray");
-            terminal.WriteLine("  Your character has been erased.");
-            terminal.WriteLine("  If this was a mistake, type /restore within 7 days to recover,");
-            terminal.WriteLine("  or contact a sysop on Discord.");
-            terminal.WriteLine("  Disconnecting.");
+            terminal.WriteLine($"  {Loc.Get("permadeath.erased")}");
+            terminal.WriteLine($"  {Loc.Get("permadeath.restore_hint")}");
+            terminal.WriteLine($"  {Loc.Get("permadeath.restore_hint2")}");
+            terminal.WriteLine($"  {Loc.Get("permadeath.disconnecting")}");
             terminal.WriteLine("");
             await Task.Delay(3000);
         }
@@ -21711,8 +21781,13 @@ public partial class CombatEngine
     /// <summary>
     /// Apply the effects of a class ability to combat
     /// </summary>
+    /// <summary>
+    /// ═══ DEAD PATH — DO NOT PATCH ═══ (see DeadCombatPathGuard)
+    /// Live equivalent: ApplyAbilityEffectsMultiMonster.
+    /// </summary>
     private async Task ApplyAbilityEffects(Character player, Monster monster, ClassAbilityResult abilityResult, CombatResult result)
     {
+        DeadCombatPathGuard();
         var ability = abilityResult.AbilityUsed;
         if (ability == null) return;
 
@@ -26921,6 +26996,20 @@ public partial class CombatEngine
     }
 
     /// <summary>
+    /// v0.65.8 (R3): a failed flee costs a guarded half-round instead of a full
+    /// free enemy round. When the target's retreat attempt failed this round,
+    /// incoming monster damage is halved (min 1). Applied as the final modifier
+    /// at every monster-vs-player damage site so the reduction is a true half of
+    /// what would otherwise have landed. Cleared by CaptureRoundStartHP.
+    /// </summary>
+    private static long ApplyFleeGrace(Character target, long damage)
+    {
+        if (damage > 0 && target != null && target.FleeGraceThisRound)
+            return Math.Max(1, damage / 2);
+        return damage;
+    }
+
+    /// <summary>
     /// Calculate attack damage modifier based on weapon configuration
     /// Two-Handed: +25% damage bonus
     /// Dual-Wield: Off-hand attack at 50% power (handled in attack count)
@@ -27961,6 +28050,8 @@ public partial class CombatEngine
             if (player.IsAlive)
             {
                 long playerDmg = Math.Max(1, damage - (long)(Math.Sqrt(player.Defence) * 3));
+                // v0.65.8 (R3): failed flee this round -> guarded half-round
+                playerDmg = ApplyFleeGrace(player, playerDmg);
                 player.HP = Math.Max(0, player.HP - playerDmg);
                 terminal.WriteLine($"  {player.DisplayName} takes {playerDmg} damage!");
             }
@@ -28071,6 +28162,9 @@ public partial class CombatEngine
             // Old God fight cap for non-player teammates so AoE can't one-shot companions
             if (target != player)
                 dmg = CapTeammateDamageInOldGodFight(target, dmg);
+            // v0.65.8 (R3): failed flee this round -> guarded half-round (player only)
+            if (target == player)
+                dmg = ApplyFleeGrace(player, dmg);
             target.HP = Math.Max(0, target.HP - dmg);
             string tankTag = (tank != null && target == tank) ? " [ABSORBING]" : "";
             terminal.WriteLine($"  {target.DisplayName} takes {dmg} damage!{tankTag}");

@@ -37,9 +37,9 @@ namespace UsurperRemake.Systems
                 player.HP = restoredHP;
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine("");
-                terminal.WriteLine($"  Divine intervention restores you. ({restoredHP}/{player.MaxHP} HP)");
+                terminal.WriteLine($"  {Loc.Get("death.divine_restore", restoredHP, player.MaxHP)}");
                 terminal.SetColor("gray");
-                terminal.WriteLine("  (Permadeath is disabled on this server.)");
+                terminal.WriteLine($"  {Loc.Get("death.permadeath_disabled")}");
                 terminal.WriteLine("");
                 await Task.Delay(2000);
                 return true;
@@ -54,19 +54,19 @@ namespace UsurperRemake.Systems
 
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine("");
-                terminal.WriteLine($"  Divine intervention restores you. ({restoredHP}/{player.MaxHP} HP)");
+                terminal.WriteLine($"  {Loc.Get("death.divine_restore", restoredHP, player.MaxHP)}");
                 int rezLeft = player.Resurrections;
                 if (rezLeft == 0)
                 {
                     terminal.SetColor("bright_red");
-                    terminal.WriteLine($"  WARNING: This was your final resurrection.");
-                    terminal.WriteLine($"  The next death will erase your character permanently.");
+                    terminal.WriteLine($"  {Loc.Get("death.final_warning")}");
+                    terminal.WriteLine($"  {Loc.Get("death.final_warning2")}");
                 }
                 else
                 {
                     terminal.SetColor("yellow");
                     int max = Math.Max(1, player.MaxResurrections);
-                    terminal.WriteLine($"  Resurrections remaining: {rezLeft} of {max}");
+                    terminal.WriteLine($"  {Loc.Get("death.rez_remaining", rezLeft, max)}");
                 }
                 // v0.65.6: lives are renewable now -- say so at the moment the
                 // player is most afraid, or the countdown reads as a death spiral.
@@ -96,19 +96,19 @@ namespace UsurperRemake.Systems
                 terminal.SetColor("dark_red");
                 terminal.WriteLine("");
                 terminal.WriteLine("");
-                terminal.WriteLine($"  You have died with no resurrections remaining.");
+                terminal.WriteLine($"  {Loc.Get("permadeath.no_rez")}");
                 await Task.Delay(2000);
                 terminal.WriteLine("");
-                terminal.WriteLine("  The threads that bind your soul to the world fray.");
+                terminal.WriteLine($"  {Loc.Get("permadeath.threads")}");
                 await Task.Delay(2000);
-                terminal.WriteLine("  No temple will receive you. No god will bargain.");
+                terminal.WriteLine($"  {Loc.Get("permadeath.no_temple")}");
                 await Task.Delay(2000);
-                terminal.WriteLine("  No coin will buy your return.");
+                terminal.WriteLine($"  {Loc.Get("permadeath.no_coin")}");
                 await Task.Delay(2500);
 
                 terminal.WriteLine("");
                 terminal.SetColor("bright_red");
-                terminal.WriteLine($"  {player.Name2 ?? player.Name1 ?? "Mortal"}, you have exhausted your lives.");
+                terminal.WriteLine($"  {Loc.Get("permadeath.exhausted", player.Name2 ?? player.Name1 ?? "???")}");
                 await Task.Delay(2500);
 
                 // v0.63.0 slice 3 D4: Inheritance. Before the Veil closes, if
@@ -117,11 +117,21 @@ namespace UsurperRemake.Systems
                 // back to them. Idempotent via PermadeathInheritanceClaimed.
                 await TryDistributeInheritance(player, terminal);
 
+                // v0.65.8 (R5) Fallen Legacy: deletion is no longer a total
+                // loss. Say so DURING the worst moment of the player's session.
+                terminal.WriteLine("");
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine($"  {Loc.Get("permadeath.legacy_recorded")}");
+                await Task.Delay(2500);
+                terminal.SetColor("cyan");
+                terminal.WriteLine($"  {Loc.Get("permadeath.legacy_heirloom_hint")}");
+                await Task.Delay(2500);
+
                 terminal.WriteLine("");
                 terminal.SetColor("gray");
-                terminal.WriteLine("  The Veil closes for the last time.");
+                terminal.WriteLine($"  {Loc.Get("permadeath.veil_closes")}");
                 await Task.Delay(2000);
-                terminal.WriteLine("  Your record is being erased.");
+                terminal.WriteLine($"  {Loc.Get("permadeath.erasing")}");
                 await Task.Delay(2500);
             }
             catch (Exception ex)
@@ -176,6 +186,13 @@ namespace UsurperRemake.Systems
 
                 if (SaveSystem.Instance?.Backend is SqlSaveBackend sqlBackend && !string.IsNullOrEmpty(username))
                 {
+                    // v0.65.8 (R5) Fallen Legacy: carve the memorial + queue the
+                    // heirloom BEFORE the row is deleted. Heirloom scales with the
+                    // fallen character's LEVEL (never wealth), claimed by the next
+                    // character created on this account key.
+                    sqlBackend.RecordFallenLegacy(username, displayName, finalLevel, className,
+                        killerName, GameConfig.GetFallenLegacyGold(finalLevel));
+
                     // v0.60.5: purge shared world-state references (guild membership,
                     // bounties, trades, world-boss damage, etc.) BEFORE clearing the
                     // player_data so any joined queries in the purge hooks still
@@ -226,14 +243,15 @@ namespace UsurperRemake.Systems
 
                 if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
                 {
-                    string eulogy = $"\r\n  *** {displayName} the Lv.{finalLevel} {className} has been erased forever, slain by {killerName}. ***\r\n";
+                    // v0.65.12 (loc audit): eulogy is rendered per-recipient below.
                     try
                     {
                         // ANSI: bright red ([1;31m) ... reset ([0m).
                         // Earlier write missed the ESC byte and rendered as
                         // literal "[1;31m" text in clients.
-                        UsurperRemake.Server.MudServer.Instance?.BroadcastToAll(
-                            "[1;31m" + eulogy + "[0m", excludeUsername: username);
+                        UsurperRemake.Server.MudServer.Instance?.BroadcastLocalized(
+                            lang => "[1;31m\r\n  *** " + Loc.GetIn(lang, "permadeath.eulogy", displayName, finalLevel, className, killerName) + " ***\r\n[0m",
+                            excludeUsername: username);
                     }
                     catch (Exception ex) { DebugLogger.Instance.LogError("DEATH_CAP", $"Broadcast failed: {ex.Message}"); }
 
@@ -259,10 +277,10 @@ namespace UsurperRemake.Systems
             {
                 terminal.WriteLine("");
                 terminal.SetColor("dark_gray");
-                terminal.WriteLine("  Your character has been erased.");
-                terminal.WriteLine("  If this was a mistake, contact an admin on Discord");
-                terminal.WriteLine("  within 7 days for a possible restoration.");
-                terminal.WriteLine("  Disconnecting.");
+                terminal.WriteLine($"  {Loc.Get("permadeath.erased")}");
+                terminal.WriteLine($"  {Loc.Get("permadeath.contact_admin")}");
+                terminal.WriteLine($"  {Loc.Get("permadeath.contact_admin2")}");
+                terminal.WriteLine($"  {Loc.Get("permadeath.disconnecting")}");
                 terminal.WriteLine("");
                 await Task.Delay(3000);
             }

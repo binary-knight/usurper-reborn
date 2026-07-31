@@ -211,6 +211,14 @@ public partial class TerminalEmulator
                 '\u201C' or '\u201D' => '"',   // curly double quotes
                 '\u2014' => '-',               // em dash
                 '\u2013' => '-',               // en dash
+                // v0.65.12 (loc audit): Hungarian double-acute vowels do not
+                // exist in CP437 and were degrading to '?' on BBS terminals --
+                // 7,500+ occurrences across 24% of hu.json. Hungarians read
+                // the umlaut forms without difficulty; '?' is unreadable.
+                '\u0151' => '\u00F6',               // \u0151
+                '\u0171' => '\u00FC',               // \u0171
+                '\u0150' => '\u00D6',               // \u0150
+                '\u0170' => '\u00DC',               // \u0170
                 _ => c
             });
         }

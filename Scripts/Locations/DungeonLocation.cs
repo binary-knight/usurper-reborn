@@ -461,24 +461,26 @@ public class DungeonLocation : BaseLocation
         term.ClearScreen();
         if (isSR)
         {
-            term.WriteLine("=== DUNGEON TUTORIAL ===", "bright_yellow");
-            term.WriteLine("Welcome to the Dungeons!", "white");
+            term.WriteLine($"=== {Loc.Get("dungeon.tut.welcome_title")} ===", "bright_yellow");
+            term.WriteLine(Loc.Get("dungeon.tut.welcome_sr"), "white");
         }
         else
         {
             term.WriteLine("╔══════════════════════════════════════════════════════════╗", "bright_yellow");
-            term.WriteLine("║              WELCOME TO THE DUNGEONS                    ║", "bright_yellow");
+            string wtitle = Loc.Get("dungeon.tut.welcome_title");
+            int pad = Math.Max(0, (56 - wtitle.Length) / 2);
+            term.WriteLine("║ " + new string(' ', pad) + wtitle + new string(' ', Math.Max(0, 56 - pad - wtitle.Length)) + " ║", "bright_yellow");
             term.WriteLine("╚══════════════════════════════════════════════════════════╝", "bright_yellow");
         }
         term.WriteLine("");
-        term.WriteLine("This looks like your first time venturing underground.", "white");
-        term.WriteLine("Would you like a quick guided tour? It covers everything:", "gray");
-        term.WriteLine("  navigation, combat, potions, events, and more.", "gray");
+        term.WriteLine(Loc.Get("dungeon.tut.intro1"), "white");
+        term.WriteLine(Loc.Get("dungeon.tut.intro2"), "gray");
+        term.WriteLine(Loc.Get("dungeon.tut.intro3"), "gray");
         term.WriteLine("");
-        term.WriteLine("Skip it if you already know the ropes.", "darkgray");
+        term.WriteLine(Loc.Get("dungeon.tut.intro_skip"), "darkgray");
         term.WriteLine("");
 
-        string ans = await term.GetInput(isSR ? "Take the tutorial? (Y/N): " : "[Y] Take the Tutorial   [N] Skip it > ");
+        string ans = await term.GetInput(Loc.Get(isSR ? "dungeon.tut.prompt_sr" : "dungeon.tut.prompt"));
         ans = ans.Trim().ToUpperInvariant();
 
         // Mark as seen regardless of choice so we never ask again
@@ -486,7 +488,7 @@ public class DungeonLocation : BaseLocation
 
         if (!GameConfig.IsAffirmative(ans))
         {
-            term.WriteLine("Alright — good luck down there!", "gray");
+            term.WriteLine(Loc.Get("dungeon.tut.declined"), "gray");
             await Task.Delay(1200);
             return;
         }
@@ -512,144 +514,144 @@ public class DungeonLocation : BaseLocation
         }
 
         // ── Screen 1: The Floor Map ────────────────────────────────────────────
-        await Page("1 of 8 — The Floor Map", "cyan", new()
+        await Page(Loc.Get("dungeon.tut.p1.title"), "cyan", new()
         {
-            ("The dungeon is made up of connected ROOMS spread across a floor.", "white"),
-            ("Press [M] from any room to see the map. Read it like this:", "gray"),
+            (Loc.Get("dungeon.tut.p1.l1"), "white"),
+            (Loc.Get("dungeon.tut.p1.l2"), "gray"),
             ("", "white"),
-            (isBBS ? "  @  You are here" : "  @  You are here (bright yellow)", "bright_yellow"),
-            (isBBS ? "  ?  Unexplored room (you haven't been there yet)" : "  ?  Unexplored — you haven't been there yet", "darkgray"),
-            (isBBS ? "  #  Cleared room (no threats left)" : "  #  Cleared — no threats remain", "green"),
-            (isBBS ? "  X  Room with monsters" : "  █  Room with monsters (danger!)", "red"),
-            (isBBS ? "  >  Stairs down to next floor" : "  >  Stairs down to the next floor", "blue"),
-            (isBBS ? "  B  Boss room" : "  B  Boss room — powerful enemy within", "bright_red"),
+            (Loc.Get(isBBS ? "dungeon.tut.p1.map_here_bbs" : "dungeon.tut.p1.map_here"), "bright_yellow"),
+            (Loc.Get(isBBS ? "dungeon.tut.p1.map_unexplored_bbs" : "dungeon.tut.p1.map_unexplored"), "darkgray"),
+            (Loc.Get(isBBS ? "dungeon.tut.p1.map_cleared_bbs" : "dungeon.tut.p1.map_cleared"), "green"),
+            (Loc.Get(isBBS ? "dungeon.tut.p1.map_monsters_bbs" : "dungeon.tut.p1.map_monsters"), "red"),
+            (Loc.Get(isBBS ? "dungeon.tut.p1.map_stairs_bbs" : "dungeon.tut.p1.map_stairs"), "blue"),
+            (Loc.Get(isBBS ? "dungeon.tut.p1.map_boss_bbs" : "dungeon.tut.p1.map_boss"), "bright_red"),
             ("", "white"),
-            ("To move between rooms, use the direction keys:", "gray"),
-            ("  N = North   S = South   E = East   W = West", "white"),
-            ("  (or enter a room number shown on the map)", "darkgray"),
+            (Loc.Get("dungeon.tut.p1.move1"), "gray"),
+            (Loc.Get("dungeon.tut.p1.move2"), "white"),
+            (Loc.Get("dungeon.tut.p1.move3"), "darkgray"),
         });
 
         // ── Screen 2: Entering a Room ──────────────────────────────────────────
-        await Page("2 of 8 — Entering Rooms", "cyan", new()
+        await Page(Loc.Get("dungeon.tut.p2.title"), "cyan", new()
         {
-            ("When you enter a room, you'll see what it contains:", "white"),
+            (Loc.Get("dungeon.tut.p2.l1"), "white"),
             ("", "white"),
-            ("  MONSTERS  — Enemies waiting to fight you", "red"),
-            ("  TREASURE  — Loot to collect after the monsters are dead", "bright_yellow"),
-            ("  EVENT     — A special encounter or mystery to investigate", "magenta"),
-            ("  FEATURE   — An object to examine: shrine, lever, puzzle", "cyan"),
-            ("  STAIRS    — A passage down to the next floor", "blue"),
-            ("  SAFE ROOM — No enemies here; great for resting", "green"),
+            (Loc.Get("dungeon.tut.p2.mon"), "red"),
+            (Loc.Get("dungeon.tut.p2.tre"), "bright_yellow"),
+            (Loc.Get("dungeon.tut.p2.evt"), "magenta"),
+            (Loc.Get("dungeon.tut.p2.feat"), "cyan"),
+            (Loc.Get("dungeon.tut.p2.stairs"), "blue"),
+            (Loc.Get("dungeon.tut.p2.safe"), "green"),
             ("", "white"),
-            ("The room menu shows the available actions. You can only loot treasure", "gray"),
-            ("or descend the stairs AFTER all monsters in the room are dead.", "gray"),
+            (Loc.Get("dungeon.tut.p2.l8"), "gray"),
+            (Loc.Get("dungeon.tut.p2.l9"), "gray"),
         });
 
         // ── Screen 3: Combat ──────────────────────────────────────────────────
-        await Page("3 of 8 — Combat", "cyan", new()
+        await Page(Loc.Get("dungeon.tut.p3.title"), "cyan", new()
         {
-            ("Press [F] to Fight the monsters in a room. In combat:", "white"),
+            (Loc.Get("dungeon.tut.p3.l1"), "white"),
             ("", "white"),
-            ("  [A] Attack       — Standard hit. Reliable.", "bright_green"),
-            ("  [D] Defend       — Skip attacking; reduce damage you take this round.", "bright_green"),
-            ("  [P] Power Attack — Hit harder, but you take more damage too.", "bright_green"),
-            ("  [S] Precise Strike — Slower but lands more reliably on tough enemies.", "bright_green"),
-            ("  [T] Taunt        — Draw enemy attention; protects fragile allies.", "bright_green"),
-            ("  [E] Disarm       — Try to knock the enemy's weapon free.", "bright_green"),
-            ("  [C] Cast Spell   — Use magic (spellcasters only).", "bright_green"),
-            ("  [1-9] Abilities  — Your class special moves.", "bright_green"),
-            ("  [R] Flee         — Attempt to escape. May cost HP.", "yellow"),
+            (Loc.Get("dungeon.tut.p3.a"), "bright_green"),
+            (Loc.Get("dungeon.tut.p3.d"), "bright_green"),
+            (Loc.Get("dungeon.tut.p3.p"), "bright_green"),
+            (Loc.Get("dungeon.tut.p3.s"), "bright_green"),
+            (Loc.Get("dungeon.tut.p3.t"), "bright_green"),
+            (Loc.Get("dungeon.tut.p3.e"), "bright_green"),
+            (Loc.Get("dungeon.tut.p3.c"), "bright_green"),
+            (Loc.Get("dungeon.tut.p3.num"), "bright_green"),
+            (Loc.Get("dungeon.tut.p3.r"), "yellow"),
             ("", "white"),
-            ("Tip: check /health often. Dead is bad. Retreat is smart.", "darkgray"),
+            (Loc.Get("dungeon.tut.p3.tip"), "darkgray"),
         });
 
         // ── Screen 4: Potions & Healing ───────────────────────────────────────
-        await Page("4 of 8 — Potions & Healing", "cyan", new()
+        await Page(Loc.Get("dungeon.tut.p4.title"), "cyan", new()
         {
-            ("Healing potions restore HP. Mana potions restore MP.", "white"),
+            (Loc.Get("dungeon.tut.p4.l1"), "white"),
             ("", "white"),
-            ("In combat, press [U] to use a potion during your turn.", "bright_green"),
-            ("Outside combat, press [P] from the room menu anytime.", "bright_green"),
+            (Loc.Get("dungeon.tut.p4.l2"), "bright_green"),
+            (Loc.Get("dungeon.tut.p4.l3"), "bright_green"),
             ("", "white"),
-            ("Where to get potions:", "gray"),
-            ("  • The Healer in town sells healing potions (expensive but reliable).", "white"),
-            ("  • Treasure chests in dungeon rooms sometimes contain potions.", "white"),
-            ("  • Monster drops can include potions.", "white"),
-            ("  • If you have Herbs, press [J] to use one (buffs vary by herb type).", "white"),
+            (Loc.Get("dungeon.tut.p4.l4"), "gray"),
+            (Loc.Get("dungeon.tut.p4.src1"), "white"),
+            (Loc.Get("dungeon.tut.p4.src2"), "white"),
+            (Loc.Get("dungeon.tut.p4.src3"), "white"),
+            (Loc.Get("dungeon.tut.p4.src4"), "white"),
             ("", "white"),
-            ("You carry potions automatically. Check your count with [%] (Status).", "darkgray"),
+            (Loc.Get("dungeon.tut.p4.l9"), "darkgray"),
         });
 
         // ── Screen 5: Healing Teammates ───────────────────────────────────────
-        await Page("5 of 8 — Healing Teammates", "cyan", new()
+        await Page(Loc.Get("dungeon.tut.p5.title"), "cyan", new()
         {
-            ("If you have companions or NPC allies in your party, they fight with you.", "white"),
-            ("You can heal them mid-combat with:", "gray"),
+            (Loc.Get("dungeon.tut.p5.l1"), "white"),
+            (Loc.Get("dungeon.tut.p5.l2"), "gray"),
             ("", "white"),
-            ("  [H] Aid Ally — Give a potion or herbs to a wounded teammate.", "bright_green"),
+            (Loc.Get("dungeon.tut.p5.aid"), "bright_green"),
             ("", "white"),
-            ("A well-timed heal can save a companion from death.", "gray"),
-            ("Companions who die permanently are GONE — permadeath is real.", "red"),
+            (Loc.Get("dungeon.tut.p5.l4"), "gray"),
+            (Loc.Get("dungeon.tut.p5.l5"), "red"),
             ("", "white"),
-            ("Recruit companions at the Inn (Aldric) and other town locations.", "darkgray"),
-            ("They level up with you and gain their own equipment.", "darkgray"),
+            (Loc.Get("dungeon.tut.p5.l6"), "darkgray"),
+            (Loc.Get("dungeon.tut.p5.l7"), "darkgray"),
         });
 
         // ── Screen 6: Events & Investigate ───────────────────────────────────
-        await Page("6 of 8 — Events & Investigate", "cyan", new()
+        await Page(Loc.Get("dungeon.tut.p6.title"), "cyan", new()
         {
-            ("Some rooms have an EVENT marked on them.", "white"),
-            ("Press [V] to Investigate the event.", "bright_green"),
+            (Loc.Get("dungeon.tut.p6.l1"), "white"),
+            (Loc.Get("dungeon.tut.p6.l2"), "bright_green"),
             ("", "white"),
-            ("Events can be:", "gray"),
-            ("  • A traveller or wandering merchant", "white"),
-            ("  • A wounded survivor who needs help", "white"),
-            ("  • A mysterious altar or arcane node", "white"),
-            ("  • A hidden cache of treasure", "white"),
-            ("  • A trap disguised as an opportunity", "white"),
+            (Loc.Get("dungeon.tut.p6.l3"), "gray"),
+            (Loc.Get("dungeon.tut.p6.e1"), "white"),
+            (Loc.Get("dungeon.tut.p6.e2"), "white"),
+            (Loc.Get("dungeon.tut.p6.e3"), "white"),
+            (Loc.Get("dungeon.tut.p6.e4"), "white"),
+            (Loc.Get("dungeon.tut.p6.e5"), "white"),
             ("", "white"),
-            ("Events often present choices with consequences.", "gray"),
-            ("Your alignment and stats influence outcomes.", "darkgray"),
+            (Loc.Get("dungeon.tut.p6.l9"), "gray"),
+            (Loc.Get("dungeon.tut.p6.l10"), "darkgray"),
         });
 
         // ── Screen 7: Examine Features ────────────────────────────────────────
-        await Page("7 of 8 — Examine Features", "cyan", new()
+        await Page(Loc.Get("dungeon.tut.p7.title"), "cyan", new()
         {
-            ("Some rooms contain FEATURES — permanent objects to interact with.", "white"),
-            ("Press [X] to Examine them.", "bright_green"),
+            (Loc.Get("dungeon.tut.p7.l1"), "white"),
+            (Loc.Get("dungeon.tut.p7.l2"), "bright_green"),
             ("", "white"),
-            ("Common features include:", "gray"),
-            ("  • Shrines — Pray for a blessing (or risk a curse).", "white"),
-            ("  • Levers — Pull them in the right sequence to unlock secrets.", "white"),
-            ("  • Puzzles — Riddles and challenges for XP and loot rewards.", "white"),
-            ("  • Ancient Inscriptions — Lore about the Old Gods.", "white"),
-            ("  • Sealed Doors — Require specific items or quests to open.", "white"),
+            (Loc.Get("dungeon.tut.p7.l3"), "gray"),
+            (Loc.Get("dungeon.tut.p7.f1"), "white"),
+            (Loc.Get("dungeon.tut.p7.f2"), "white"),
+            (Loc.Get("dungeon.tut.p7.f3"), "white"),
+            (Loc.Get("dungeon.tut.p7.f4"), "white"),
+            (Loc.Get("dungeon.tut.p7.f5"), "white"),
             ("", "white"),
-            ("Features are one-time interactions per floor visit.", "darkgray"),
+            (Loc.Get("dungeon.tut.p7.l9"), "darkgray"),
         });
 
         // ── Screen 8: Rest, Return & Tips ─────────────────────────────────────
-        await Page("8 of 8 — Rest, Return & Tips", "cyan", new()
+        await Page(Loc.Get("dungeon.tut.p8.title"), "cyan", new()
         {
-            ("When you're tired or wounded:", "white"),
+            (Loc.Get("dungeon.tut.p8.l1"), "white"),
             ("", "white"),
-            ("  [R] Camp — Rest in a cleared room. Restores HP/MP. Once per floor.", "bright_green"),
-            ("  [Q] Quit — Leave the dungeon and return to the surface.", "bright_green"),
-            ("  [B] Back — Return to the floor map from a room.", "bright_green"),
-            ("  [M] Map  — View the full floor map at any time.", "bright_green"),
+            (Loc.Get("dungeon.tut.p8.camp"), "bright_green"),
+            (Loc.Get("dungeon.tut.p8.quit"), "bright_green"),
+            (Loc.Get("dungeon.tut.p8.back"), "bright_green"),
+            (Loc.Get("dungeon.tut.p8.map"), "bright_green"),
             ("", "white"),
-            ("A few important tips:", "gray"),
-            ("  • Floors within ±10 levels of yours are accessible.", "white"),
-            ("  • Floor 25, 40, 55, 70, 85, 95, 100 have Old God bosses.", "white"),
-            ("    You cannot leave these floors until you fight them.", "white"),
-            ("  • Floors 15, 30, 45, 60, 80, 99 hold ancient Seals to collect.", "white"),
-            ("  • Use /health anytime to see your full status and active buffs.", "white"),
-            ("  • Use /gear to inspect your equipped items and their bonuses.", "white"),
+            (Loc.Get("dungeon.tut.p8.tips"), "gray"),
+            (Loc.Get("dungeon.tut.p8.t1"), "white"),
+            (Loc.Get("dungeon.tut.p8.t2"), "white"),
+            (Loc.Get("dungeon.tut.p8.t3"), "white"),
+            (Loc.Get("dungeon.tut.p8.t4"), "white"),
+            (Loc.Get("dungeon.tut.p8.t5"), "white"),
+            (Loc.Get("dungeon.tut.p8.t6"), "white"),
             ("", "white"),
-            ("That's everything. Now go find glory — or a gruesome death!", "bright_yellow"),
+            (Loc.Get("dungeon.tut.p8.outro"), "bright_yellow"),
         });
 
-        term.WriteLine("Tutorial complete. The dungeon awaits!", "bright_green");
+        term.WriteLine(Loc.Get("dungeon.tut.complete"), "bright_green");
         await Task.Delay(1500);
     }
 
@@ -663,15 +665,15 @@ public class DungeonLocation : BaseLocation
         term.ClearScreen();
         term.WriteLine("");
         term.SetColor("bright_red");
-        term.WriteLine("  A massive figure blocks the passage ahead!");
+        term.WriteLine("  " + Loc.Get("dungeon.tut.guardian_blocks"));
         term.WriteLine("");
         term.SetColor("yellow");
-        term.WriteLine("  The Dungeon Guardian rises from the shadows,");
-        term.WriteLine("  an ancient sentinel that tests all who seek");
-        term.WriteLine("  to venture deeper into the dungeon.");
+        term.WriteLine("  " + Loc.Get("dungeon.tut.guardian_rises1"));
+        term.WriteLine("  " + Loc.Get("dungeon.tut.guardian_rises2"));
+        term.WriteLine("  " + Loc.Get("dungeon.tut.guardian_rises3"));
         term.WriteLine("");
         term.SetColor("gray");
-        term.WriteLine("  \"None shall pass without proving their worth!\"");
+        term.WriteLine("  " + Loc.Get("dungeon.tut.guardian_quote"));
         term.WriteLine("");
         await term.PressAnyKey();
 

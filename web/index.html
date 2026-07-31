@@ -1354,6 +1354,74 @@
             background: var(--bg-dark);
             color: var(--text);
         }
+
+        /* v1.0 redesign additions */
+        .hero-live {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            color: var(--text-dim);
+            margin: 18px auto 6px;
+            max-width: 720px;
+            line-height: 1.9;
+        }
+        .hero-live b { color: var(--green); font-weight: 700; }
+        .hero-live .hl-news-line { display: block; color: var(--text-dim); font-size: 12px; }
+        .hero-live #hl-news-text { color: var(--cyan); }
+        .live-dot-inline {
+            display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+            background: var(--green); margin-right: 8px; vertical-align: middle;
+            box-shadow: 0 0 6px var(--green);
+            animation: pulse-dot 2s ease-in-out infinite;
+        }
+        @keyframes pulse-dot { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+        .hero-cta-note {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px; color: var(--text-dim);
+            margin-top: 10px; text-align: center;
+        }
+        .hero-alt-links {
+            margin-top: 16px; text-align: center; font-size: 13px;
+        }
+        .hero-alt-links a { color: var(--text-dim); text-decoration: underline; text-underline-offset: 3px; }
+        .hero-alt-links a:hover { color: var(--cyan); }
+        .hero-alt-links .alt-sep { color: var(--border); margin: 0 10px; }
+        .hero-nostalgia {
+            margin: 26px auto 0; max-width: 640px; text-align: center;
+            font-size: 13px; font-style: italic; color: var(--text-dim);
+        }
+        .feature-footer {
+            margin-top: 28px; text-align: center; color: var(--text-dim);
+            font-size: 14px; max-width: 780px; margin-left: auto; margin-right: auto;
+        }
+        .class-roster {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 8px 24px; max-width: 860px; margin: 0 auto;
+            font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text);
+        }
+        .class-roster div { padding: 6px 10px; border-left: 2px solid var(--border); }
+        .class-roster div:hover { border-left-color: var(--cyan); color: var(--cyan); }
+        .class-note {
+            margin-top: 22px; text-align: center; color: var(--text-dim);
+            font-size: 13px; max-width: 720px; margin-left: auto; margin-right: auto;
+        }
+        .class-note.prestige { color: var(--purple); }
+        .endings-teaser { max-width: 760px; margin: 0 auto; }
+        .endings-close {
+            margin-top: 16px; color: var(--purple);
+            font-family: 'JetBrains Mono', monospace; font-size: 13px;
+        }
+        .roadmap-now h3 { color: var(--green); }
+        .finale-section {
+            text-align: center; padding: 100px 0;
+            background: radial-gradient(ellipse at center, rgba(139,92,246,0.08), transparent 70%);
+        }
+        .finale-line1 {
+            font-size: 22px; color: var(--text); max-width: 700px;
+            margin: 0 auto; line-height: 1.6;
+        }
+        .finale-line2 {
+            font-size: 16px; color: var(--text-dim); margin-top: 14px;
+        }
     </style>
 </head>
 <body>
@@ -1363,15 +1431,9 @@
         <a href="#" class="logo">USURPER REBORN</a>
         <nav class="nav-links">
             <a href="#live-stats" data-i18n="nav.live">Live</a>
-            <a href="#philosophy" data-i18n="nav.about">About</a>
-            <a href="#features" data-i18n="nav.features">Features</a>
             <a href="#story" data-i18n="nav.story">Story</a>
-            <a href="#gods" data-i18n="nav.gods">Old Gods</a>
-            <a href="#classes" data-i18n="nav.classes">Classes</a>
-            <a href="#companions" data-i18n="nav.companions">Companions</a>
-            <a href="#history" data-i18n="nav.history">History</a>
+            <a href="#roadmap" data-i18n="nav.roadmap">Roadmap</a>
             <a href="#connect" data-i18n="nav.play">Play</a>
-            <a href="/dashboard" data-i18n="nav.observatory">Observatory</a>
             <a href="https://discord.gg/EZhwgDT6Ta" target="_blank" style="color:#5865F2;" data-i18n="nav.discord">Discord</a>
             <a href="https://github.com/binary-knight/usurper-reborn" target="_blank" data-i18n="nav.github">GitHub</a>
             <a href="https://github.com/sponsors/binary-knight" target="_blank" style="color:#ea4aaa;" data-i18n-html="nav.sponsor">&#9829; Sponsor</a>
@@ -1384,11 +1446,6 @@
     </div>
 </header>
 
-<div style="display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 24px; padding: 24px 16px 0; background: var(--bg-dark);">
-    <iframe src="https://discord.com/widget?id=1361378414002573312&theme=dark" width="350" height="500" allowtransparency="true" frameborder="0" sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts" style="max-width: 100%;"></iframe>
-    <iframe src="https://store.steampowered.com/widget/4336570/" frameborder="0" width="646" height="190" style="max-width: 100%;"></iframe>
-</div>
-
 <section class="hero">
     <div class="container">
         <div class="title-banner">
@@ -1396,16 +1453,30 @@
             <div class="title-sub">REBORN</div>
         </div>
         <p class="hero-subtitle" data-i18n="hero.subtitle">THE 1993 BBS CLASSIC, REBUILT</p>
-        <p class="hero-desc" data-i18n="hero.desc">
-            A text RPG where the town keeps going when you log off. NPCs get married, have kids, get old, die.
-            100-floor dungeon. Seven gods who want to talk before you fight them.
-            Five different endings. GPL licensed, totally free.
+        <p class="hero-desc" data-i18n="r1.hero_desc">
+            The town of Dorashire does not wait for you. Its people marry, raise children, grow old,
+            scheme, and remember what you did -- to them, and to their parents. Beneath their streets
+            lies a 100-floor dungeon; sealed within it, seven broken gods who would rather talk than
+            fight. This is a text RPG where the world carries on without you, where death is permanent,
+            and where your name -- for glory or for infamy -- is carved in stone.
         </p>
-        <div class="hero-buttons">
-            <button class="btn btn-primary" id="play-btn" onclick="openTerminal()" data-i18n="hero.play_btn">Play Now in Browser</button>
-            <a class="btn btn-secondary" href="https://github.com/binary-knight/usurper-reborn/releases/latest" target="_blank" data-i18n="hero.download_btn">Download Latest Release</a>
-            <a class="btn btn-sponsor" href="https://github.com/sponsors/binary-knight" target="_blank" data-i18n-html="hero.sponsor_btn">&#9829; Sponsor this Project</a>
+        <div class="hero-live" id="hero-live">
+            <span id="hl-online" hidden><span class="live-dot-inline"></span><b id="hl-online-n">0</b>&nbsp;<span data-i18n="r1.live_online">adventurers in the world right now</span></span>
+            <span id="hl-world" hidden><span class="live-dot-inline"></span><span data-i18n="r1.live_world">The world is alive:</span> <b id="hl-marr">0</b> <span data-i18n="r1.live_marr">marriages</span>, <b id="hl-kids">0</b> <span data-i18n="r1.live_kids">children born</span>, <b id="hl-kills">0</b> <span data-i18n="r1.live_kills">monsters slain</span></span>
+            <span id="hl-news" hidden class="hl-news-line"><span data-i18n="r1.live_latest">Just now:</span> <span id="hl-news-text"></span></span>
         </div>
+        <div class="hero-buttons">
+            <button class="btn btn-primary" id="play-btn" onclick="openTerminal()" data-i18n="r1.cta_play">&#9658; Play Now -- Free, In Your Browser</button>
+        </div>
+        <p class="hero-cta-note" data-i18n="r1.cta_note">No download. No signup. Two minutes from now you will be fighting for your life.</p>
+        <p class="hero-alt-links">
+            <a href="https://store.steampowered.com/app/4336570/" target="_blank" data-i18n="r1.alt_steam">Also on Steam</a>
+            <span class="alt-sep">&middot;</span>
+            <a href="https://github.com/binary-knight/usurper-reborn/releases/latest" target="_blank" data-i18n="r1.alt_download">Download for Windows / Linux / macOS</a>
+            <span class="alt-sep">&middot;</span>
+            <a href="#connect" data-i18n="r1.alt_ssh">Play over SSH or telnet</a>
+        </p>
+        <p class="hero-nostalgia" data-i18n="r1.hero_nostalgia">If you remember the shriek of a 14.4k modem handshake: welcome home. If you don't: this is the kind of world we fought over before MMOs existed, and it has lost none of its teeth.</p>
     </div>
 </section>
 
@@ -1429,8 +1500,8 @@
 <!-- Live Stats -->
 <section id="live-stats">
     <div class="container">
-        <h2 class="section-title" data-i18n="stats.title">// WORLD STATUS</h2>
-        <p class="section-subtitle" data-i18n="stats.subtitle">Pulled live from the game server. The world sim ticks every 30 seconds.</p>
+        <h2 class="section-title" data-i18n="r1.stats_title">// THE WORLD, RIGHT NOW</h2>
+        <p class="section-subtitle" data-i18n="r1.stats_sub">What follows is not a screenshot. It is a live window into a running world. Every name below belongs to someone the simulation is living for at this very moment, with or without an audience.</p>
 
         <div id="stats-content">
             <div class="stats-error" id="stats-loading" data-i18n="stats.loading">Loading world data...</div>
@@ -1451,22 +1522,22 @@
         <div class="manifesto-grid">
             <div class="manifesto-block">
                 <h3 data-i18n="philosophy.world_title">The World Keeps Going</h3>
-                <p data-i18n-html="philosophy.world_desc">This was the thing I most wanted to get right. The NPCs aren't just standing around waiting for you to show up. They've got birthdays, personalities, opinions. They get married on their own, have kids, those kids grow up and become new NPCs. People die of old age. If you don't log in for a while, the town will look different when you come back &mdash; people you knew might be gone, and there'll be new faces you've never seen. It's a bit like checking in on a fish tank, except the fish have drama.</p>
+                <p data-i18n-html="philosophy.world_desc">This was the thing I most wanted to get right. The NPCs aren't just standing around waiting for you to show up. They've got birthdays, personalities, opinions. They get married on their own, have kids, those kids grow up and become new NPCs. People die of old age. If you don't log in for a while, the town will look different when you come back -- people you knew might be gone, and there'll be new faces you've never seen. It's a bit like checking in on a fish tank, except the fish have drama.</p>
             </div>
 
             <div class="manifesto-block">
                 <h3 data-i18n="philosophy.ngplus_title">NG+ That Isn't Just Harder Numbers</h3>
-                <p data-i18n-html="philosophy.ngplus_desc">When you beat the game, it loops. But the NPCs start to remember. First cycle it's subtle &mdash; "Have we met before?" By cycle three they're asking uncomfortable questions about why everything feels like it already happened. The five endings aren't ranked by difficulty. They're five different takes on the same problem, and honestly I don't think any of them are "the right one."</p>
+                <p data-i18n-html="philosophy.ngplus_desc">When you beat the game, it loops. But the NPCs start to remember. First cycle it's subtle -- "Have we met before?" By cycle three they're asking uncomfortable questions about why everything feels like it already happened. The five endings aren't ranked by difficulty. They're five different takes on the same problem, and honestly I don't think any of them are "the right one."</p>
             </div>
 
             <div class="manifesto-block">
                 <h3 data-i18n="philosophy.gods_title">The Gods Talk To You</h3>
-                <p data-i18n-html="philosophy.gods_desc">There are seven bosses sealed in the dungeon, but they're not really bosses. They're gods who used to mean something and got corrupted. Before you fight each one, they'll talk to you, and your dialogue choices actually change the combat &mdash; different stat modifiers, different abilities. The guy at the very bottom of floor 100 doesn't even want to fight. He's just tired and he has a question for you. What you tell him determines how the game ends.</p>
+                <p data-i18n-html="philosophy.gods_desc">There are seven bosses sealed in the dungeon, but they're not really bosses. They're gods who used to mean something and got corrupted. Before you fight each one, they'll talk to you, and your dialogue choices actually change the combat -- different stat modifiers, different abilities. The guy at the very bottom of floor 100 doesn't even want to fight. He's just tired and he has a question for you. What you tell him determines how the game ends.</p>
             </div>
 
             <div class="manifesto-block">
                 <h3 data-i18n="philosophy.text_title">Why Text</h3>
-                <p data-i18n-html="philosophy.text_desc">The original was a text game and this is a text game. I get asked about this a lot. Partly it's staying true to the source material, but honestly, some of the stuff in this game hits harder as words on a screen at 2am than it would as a cutscene. There's also a shared online server where other players' choices affect the same world, and you can play from literally anything with a terminal &mdash; browser, SSH client, telnet, even an actual BBS.</p>
+                <p data-i18n-html="philosophy.text_desc">The original was a text game and this is a text game. I get asked about this a lot. Partly it's staying true to the source material, but honestly, some of the stuff in this game hits harder as words on a screen at 2am than it would as a cutscene. There's also a shared online server where other players' choices affect the same world, and you can play from literally anything with a terminal -- browser, SSH client, telnet, even an actual BBS.</p>
             </div>
         </div>
 
@@ -1478,51 +1549,38 @@
     </div>
 </section>
 
-<!-- Features -->
+<!-- What makes it different: consequences, not features -->
 <section id="features">
     <div class="container">
-        <h2 class="section-title" data-i18n="features.title">// WHAT'S IN IT</h2>
-        <p class="section-subtitle" data-i18n="features.subtitle">The stuff the original had, plus everything I kept wishing it had back in the day.</p>
+        <h2 class="section-title" data-i18n="r1.world_title">// A WORLD THAT REMEMBERS YOU</h2>
+        <p class="section-subtitle" data-i18n="r1.world_sub">Most games build a world that waits for the player. This one does not. Six truths that hold here and almost nowhere else:</p>
         <div class="feature-grid">
             <div class="feature-card">
-                <h3 data-i18n="features.npcs_title">60+ NPCs</h3>
-                <p data-i18n="features.npcs_desc">They've each got personality traits (like commitment, romanticism, aggression), goals, opinions, and memory of what you've done to them. They hold grudges. They remember stuff across NG+ cycles too, which gets weird.</p>
+                <h3 data-i18n="r1.w1t">Everyone you meet is living a life</h3>
+                <p data-i18n="r1.w1d">Every citizen carries a personality, goals, memories, and a mind of their own. They shop, train, fall in love, pick fights, and mount their own expeditions into the dungeon, whether or not anyone is logged in to witness it.</p>
             </div>
             <div class="feature-card">
-                <h3 data-i18n="features.lifecycle_title">NPC Lifecycle</h3>
-                <p data-i18n="features.lifecycle_desc">This is the part people seem to notice first. The NPCs actually get married, have children, grow old, and die. Their kids grow up into new NPCs. The population turns over. You might log in one day and your favorite shopkeeper is just... gone, and their kid is running the place now.</p>
+                <h3 data-i18n="r1.w2t">Grudges outlive you</h3>
+                <p data-i18n="r1.w2d">Kill a man in a dark alley and the matter does not end there. His daughter will grow up knowing your name, and she will not forget it. Some remember across your lifetimes; in New Game+, they begin remembering things they should not be able to.</p>
             </div>
             <div class="feature-card">
-                <h3 data-i18n="features.news_title">News Feed</h3>
-                <p data-i18n="features.news_desc">There's a live news system that tracks everything happening in town. Marriages, deaths, births, assassinations, plagues, coming-of-age ceremonies. It all just happens on its own.</p>
+                <h3 data-i18n="r1.w3t">Families, not spawn points</h3>
+                <p data-i18n="r1.w3d">The townsfolk marry, raise children, grow old, and die of it; their children inherit the shop. So can yours: court someone, raise heirs, and when you finally fall, your estate passes to your eldest, who remembers exactly how you raised them.</p>
             </div>
             <div class="feature-card">
-                <h3 data-i18n="features.multiplayer_title">Multiplayer</h3>
-                <p data-i18n="features.multiplayer_desc">You can play offline by yourself or hop on the shared server. The server runs the world sim 24/7. There's PvP, chat, a shared economy, and a leaderboard. Your actions show up in other players' news feeds.</p>
+                <h3 data-i18n="r1.w4t">Death is real</h3>
+                <p data-i18n="r1.w4d">Online, you carry a small number of lives. Lose the last of them and your character is erased: mourned in the town news, the name carved forever into the Temple's Hall of the Fallen, the heirloom passed to whoever comes after. Consequence is the entire point. A game without stakes teaches nothing.</p>
             </div>
             <div class="feature-card">
-                <h3 data-i18n="features.dungeon_title">100-Floor Dungeon</h3>
-                <p data-i18n="features.dungeon_desc">Floors are generated deterministically, so the layout stays the same each visit and you actually learn the map. Seven god encounters. Six seals to find. Gets genuinely hard around floor 50+.</p>
+                <h3 data-i18n="r1.w5t">The gods want to talk first</h3>
+                <p data-i18n="r1.w5d">Seven bosses guard the descent, and every one of them has something to say before the fighting starts. What you answer changes the battle itself. And the thing waiting at the bottom of floor 100 does not want to fight at all. It has one question, and your answer is the ending.</p>
             </div>
             <div class="feature-card">
-                <h3 data-i18n="features.rpg_title">The RPG Stuff</h3>
-                <p data-i18n="features.rpg_desc">12 classes, 10 races, 75 spells. Romance system, marriage, kids. Court politics and throne challenges. Factions you can join or betray. 5 recruitable companions with their own quest lines. A PvP arena. Pretty much everything the original had, plus a lot more on top.</p>
+                <h3 data-i18n="r1.w6t">The world writes its own history</h3>
+                <p data-i18n="r1.w6d">Marriages, murders, births, coups, plagues: a running chronicle of events, most of which no player caused. Scroll up to the live window. It is being written right now, mid-sentence.</p>
             </div>
         </div>
-    </div>
-</section>
-
-<!-- Sponsors -->
-<section class="sponsors-section" id="sponsors">
-    <div class="container" style="padding-top:48px;padding-bottom:48px;">
-        <h2 class="section-title" style="color:#ea4aaa;text-shadow:0 0 10px rgba(234,74,170,0.5)" data-i18n-html="sponsors.title">// SPONSORS</h2>
-        <p class="section-subtitle" data-i18n="sponsors.subtitle">People who help keep this project alive. Thank you.</p>
-        <div class="sponsors-grid" id="sponsors-grid">
-            <div class="sponsors-empty" id="sponsors-loading" data-i18n="sponsors.loading">Loading sponsors...</div>
-        </div>
-        <div class="sponsor-cta">
-            <a href="https://github.com/sponsors/binary-knight" target="_blank" data-i18n-html="sponsors.cta">&#9829; Become a Sponsor</a>
-        </div>
+        <p class="feature-footer" data-i18n="r1.world_footer">Beneath all of that stands everything the 1993 original had: 12 classes, 10 races, 75 spells, throne politics, factions, PvP, a shared economy, and a 100-floor dungeon that stops being polite around floor 50.</p>
     </div>
 </section>
 
@@ -1539,12 +1597,12 @@
 
         <div class="story-page">
             <h3 data-i18n="story.sundering_title">~ The Sundering ~</h3>
-            <p data-i18n-html="story.sundering_desc">Then something went catastrophically wrong. Nobody agrees on what exactly happened &mdash; maybe mortals got too proud, maybe one of the gods betrayed the others. The result was the same either way: all seven gods were corrupted and imprisoned underground. The war god lost his mind. The love goddess started fading. The god of truth went quiet. One by one, they all broke.</p>
+            <p data-i18n-html="story.sundering_desc">Then something went catastrophically wrong. Nobody agrees on what exactly happened -- maybe mortals got too proud, maybe one of the gods betrayed the others. The result was the same either way: all seven gods were corrupted and imprisoned underground. The war god lost his mind. The love goddess started fading. The god of truth went quiet. One by one, they all broke.</p>
         </div>
 
         <div class="story-page">
             <h3 data-i18n="story.avarice_title">~ The Age of Avarice ~</h3>
-            <p data-i18n-html="story.avarice_desc">Centuries later, the old gods are just stories people tell to scare kids. The dungeon where they're sealed &mdash; the Halls of Avarice &mdash; became a place where adventurers go to get rich or die trying. Most of them are just there for gold and glory. But some of them, if they go deep enough, start hearing things. Voices in the dark, from something very old, calling them further down.</p>
+            <p data-i18n-html="story.avarice_desc">Centuries later, the old gods are just stories people tell to scare kids. The dungeon where they're sealed -- the Halls of Avarice -- became a place where adventurers go to get rich or die trying. Most of them are just there for gold and glory. But some of them, if they go deep enough, start hearing things. Voices in the dark, from something very old, calling them further down.</p>
         </div>
 
         <div class="story-page">
@@ -1623,180 +1681,24 @@
 <!-- Classes -->
 <section id="classes">
     <div class="container">
-        <h2 class="section-title" data-i18n-html="classes.title">// CLASSES &amp; RACES</h2>
-        <p class="section-subtitle" data-i18n="classes.subtitle">12 classes + 5 prestige classes, 10 races. Pick whatever sounds fun. They all play differently.</p>
-
-        <h3 style="font-family:'JetBrains Mono',monospace;color:var(--cyan);font-size:13px;margin-bottom:16px;text-align:center;" data-i18n="classes.section_classes">Character Classes</h3>
-        <div class="class-grid">
-            <div class="class-card">
-                <h4 data-i18n="classes.warrior_name">Warrior</h4>
-                <div class="class-role" data-i18n="classes.warrior_role">Melee Fighter</div>
-                <p data-i18n="classes.warrior_desc">The default pick. Decent at everything. Not going to blow anyone away but won't let you down either.</p>
-                <div class="stat-bar"><span>STR</span><div class="bar"><div class="bar-fill str" style="width:80%"></div></div></div>
-                <div class="stat-bar"><span>CON</span><div class="bar"><div class="bar-fill def" style="width:80%"></div></div></div>
-            </div>
-            <div class="class-card">
-                <h4 data-i18n="classes.paladin_name">Paladin</h4>
-                <div class="class-role" data-i18n="classes.paladin_role">Holy Knight</div>
-                <p data-i18n="classes.paladin_desc">Tanky through holy magic and high constitution. Healing spells and divine armor keep you alive where raw defense won't. Good if you want to not die.</p>
-                <div class="stat-bar"><span>STR</span><div class="bar"><div class="bar-fill str" style="width:80%"></div></div></div>
-                <div class="stat-bar"><span>WIS</span><div class="bar"><div class="bar-fill mag" style="width:80%"></div></div></div>
-            </div>
-            <div class="class-card">
-                <h4 data-i18n="classes.ranger_name">Ranger</h4>
-                <div class="class-role" data-i18n-html="classes.ranger_role">Scout &amp; Tracker</div>
-                <p data-i18n="classes.ranger_desc">Quick, versatile. High stamina and dex. Good all-arounder for people who want to explore the dungeon without worrying too much about builds.</p>
-                <div class="stat-bar"><span>DEX</span><div class="bar"><div class="bar-fill spd" style="width:80%"></div></div></div>
-                <div class="stat-bar"><span>STA</span><div class="bar"><div class="bar-fill def" style="width:80%"></div></div></div>
-            </div>
-            <div class="class-card">
-                <h4 data-i18n="classes.assassin_name">Assassin</h4>
-                <div class="class-role" data-i18n="classes.assassin_role">Shadow Striker</div>
-                <p data-i18n="classes.assassin_desc">Highest dex in the game and the backstab mechanic is devastating when it lands. You will die fast if something connects though. High risk, high reward.</p>
-                <div class="stat-bar"><span>DEX</span><div class="bar"><div class="bar-fill spd" style="width:100%"></div></div></div>
-                <div class="stat-bar"><span>AGI</span><div class="bar"><div class="bar-fill spd" style="width:80%"></div></div></div>
-            </div>
-            <div class="class-card">
-                <h4 data-i18n="classes.bard_name">Bard</h4>
-                <div class="class-role" data-i18n="classes.bard_role">Jack of All Trades</div>
-                <p data-i18n="classes.bard_desc">High charisma so NPCs treat you better. Can do a bit of everything. Not amazing at any one thing but you'll never feel useless.</p>
-                <div class="stat-bar"><span>CHA</span><div class="bar"><div class="bar-fill mag" style="width:80%"></div></div></div>
-                <div class="stat-bar"><span>DEX</span><div class="bar"><div class="bar-fill spd" style="width:80%"></div></div></div>
-            </div>
-            <div class="class-card">
-                <h4 data-i18n="classes.jester_name">Jester</h4>
-                <div class="class-role" data-i18n="classes.jester_role">Trickster</div>
-                <p data-i18n="classes.jester_desc">Fastest thing on two legs. Max agility and dex. The abilities are chaotic and weird. Fun class if you don't mind some randomness.</p>
-                <div class="stat-bar"><span>AGI</span><div class="bar"><div class="bar-fill spd" style="width:100%"></div></div></div>
-                <div class="stat-bar"><span>DEX</span><div class="bar"><div class="bar-fill spd" style="width:100%"></div></div></div>
-            </div>
-            <div class="class-card">
-                <h4 data-i18n="classes.alchemist_name">Alchemist</h4>
-                <div class="class-role" data-i18n="classes.alchemist_role">Arcane Crafter</div>
-                <p data-i18n="classes.alchemist_desc">Sort of a wizard-scientist hybrid. High INT and WIS. The abilities have a crafting flavor to them.</p>
-                <div class="stat-bar"><span>INT</span><div class="bar"><div class="bar-fill mag" style="width:100%"></div></div></div>
-                <div class="stat-bar"><span>WIS</span><div class="bar"><div class="bar-fill mag" style="width:100%"></div></div></div>
-            </div>
-            <div class="class-card">
-                <h4 data-i18n="classes.magician_name">Magician</h4>
-                <div class="class-role" data-i18n="classes.magician_role">Arcane Caster</div>
-                <p data-i18n="classes.magician_desc">The full spellcaster. Access to all 25 arcane spells. Will destroy things with magic, but if a monster actually reaches you in melee you're in trouble.</p>
-                <div class="stat-bar"><span>INT</span><div class="bar"><div class="bar-fill mag" style="width:100%"></div></div></div>
-                <div class="stat-bar"><span>WIS</span><div class="bar"><div class="bar-fill mag" style="width:80%"></div></div></div>
-            </div>
-            <div class="class-card">
-                <h4 data-i18n="classes.cleric_name">Cleric</h4>
-                <div class="class-role" data-i18n="classes.cleric_role">Divine Healer</div>
-                <p data-i18n="classes.cleric_desc">Healing and support magic. Can hold their own in a fight too. In multiplayer, everybody wants a cleric in the party.</p>
-                <div class="stat-bar"><span>WIS</span><div class="bar"><div class="bar-fill mag" style="width:80%"></div></div></div>
-                <div class="stat-bar"><span>INT</span><div class="bar"><div class="bar-fill mag" style="width:80%"></div></div></div>
-            </div>
-            <div class="class-card">
-                <h4 data-i18n="classes.sage_name">Sage</h4>
-                <div class="class-role" data-i18n="classes.sage_role">Scholar Mage</div>
-                <p data-i18n="classes.sage_desc">Biggest mana pool in the game (50 base). Highest WIS and INT. You'll cast spells all day while the magician ran out three fights ago.</p>
-                <div class="stat-bar"><span>INT</span><div class="bar"><div class="bar-fill mag" style="width:100%"></div></div></div>
-                <div class="stat-bar"><span>WIS</span><div class="bar"><div class="bar-fill mag" style="width:100%"></div></div></div>
-            </div>
-            <div class="class-card">
-                <h4 data-i18n="classes.barbarian_name">Barbarian</h4>
-                <div class="class-role" data-i18n="classes.barbarian_role">Berserker</div>
-                <p data-i18n="classes.barbarian_desc">Biggest numbers in the game. Most HP, most strength, most stamina. Basically just walks forward and hits things. INT stat is there technically.</p>
-                <div class="stat-bar"><span>STR</span><div class="bar"><div class="bar-fill str" style="width:100%"></div></div></div>
-                <div class="stat-bar"><span>CON</span><div class="bar"><div class="bar-fill def" style="width:100%"></div></div></div>
-            </div>
-            <div class="class-card">
-                <h4 data-i18n="classes.shaman_name">Mystic Shaman</h4>
-                <div class="class-role" data-i18n="classes.shaman_role">Spirit Warrior</div>
-                <p data-i18n="classes.shaman_desc">Melee-caster hybrid, locked to Troll, Orc, and Gnoll. Enchants its weapon with the elements and plants totems that keep working while it swings. Fights up close and casts at the same time.</p>
-                <div class="stat-bar"><span>STR</span><div class="bar"><div class="bar-fill str" style="width:80%"></div></div></div>
-                <div class="stat-bar"><span>INT</span><div class="bar"><div class="bar-fill mag" style="width:80%"></div></div></div>
-            </div>
+        <h2 class="section-title" data-i18n="r1.classes_title">// CHOOSE YOUR SHAPE</h2>
+        <p class="section-subtitle" data-i18n="r1.classes_sub">12 classes, 10 races, and 5 prestige classes reserved for those who have seen an ending. There is no meta and there are no wrong answers: a Troll Shaman and a Gnome Assassin are both honorable careers here.</p>
+        <div class="class-roster">
+            <div data-i18n="r1.cl_warrior">Warrior -- steel and stubbornness</div>
+            <div data-i18n="r1.cl_paladin">Paladin -- the shield that prays</div>
+            <div data-i18n="r1.cl_barbarian">Barbarian -- anger as a strategy</div>
+            <div data-i18n="r1.cl_ranger">Ranger -- death from a distance</div>
+            <div data-i18n="r1.cl_assassin">Assassin -- one knife, no witnesses</div>
+            <div data-i18n="r1.cl_magician">Magician -- glass cannon, real cannon</div>
+            <div data-i18n="r1.cl_cleric">Cleric -- keeps everyone breathing</div>
+            <div data-i18n="r1.cl_sage">Sage -- knows too much</div>
+            <div data-i18n="r1.cl_bard">Bard -- fights with a song</div>
+            <div data-i18n="r1.cl_jester">Jester -- chaos, grinning</div>
+            <div data-i18n="r1.cl_alchemist">Alchemist -- science, loosely</div>
+            <div data-i18n="r1.cl_shaman">Mystic Shaman -- storms and totems</div>
         </div>
-
-        <h3 style="font-family:'JetBrains Mono',monospace;color:var(--purple);font-size:13px;margin:40px 0 8px;text-align:center;" data-i18n="classes.section_prestige">Prestige Classes <span style="font-size:11px;color:var(--text-dim);font-family:'Inter',sans-serif;" data-i18n="classes.prestige_note">(NG+ only)</span></h3>
-        <p style="font-size:12px;color:var(--text-dim);text-align:center;margin-bottom:16px;" data-i18n="classes.prestige_desc">Unlocked by completing different endings. Each has both spells and combat abilities.</p>
-        <div class="class-grid">
-            <div class="class-card" style="border-top:2px solid var(--purple)">
-                <h4 style="color:var(--purple)" data-i18n="classes.tidesworn_name">Tidesworn</h4>
-                <div class="class-role" data-i18n="classes.tidesworn_role">Holy Tank / Healer</div>
-                <p data-i18n="classes.tidesworn_desc">The Ocean's divine shield. Channel primordial waters as a holy tank and healer. Unlocked by the Savior ending.</p>
-                <div class="stat-bar"><span>STR</span><div class="bar"><div class="bar-fill str" style="width:100%"></div></div></div>
-                <div class="stat-bar"><span>WIS</span><div class="bar"><div class="bar-fill mag" style="width:80%"></div></div></div>
-            </div>
-            <div class="class-card" style="border-top:2px solid var(--purple)">
-                <h4 style="color:var(--purple)" data-i18n="classes.wavecaller_name">Wavecaller</h4>
-                <div class="class-role" data-i18n="classes.wavecaller_role">Support / Buffer</div>
-                <p data-i18n="classes.wavecaller_desc">Conductor of the Ocean's harmonics. Amplify allies with powerful buffs and healing. Unlocked by the Savior ending.</p>
-                <div class="stat-bar"><span>CHA</span><div class="bar"><div class="bar-fill mag" style="width:100%"></div></div></div>
-                <div class="stat-bar"><span>WIS</span><div class="bar"><div class="bar-fill mag" style="width:80%"></div></div></div>
-            </div>
-            <div class="class-card" style="border-top:2px solid var(--purple)">
-                <h4 style="color:var(--purple)" data-i18n="classes.cyclebreaker_name">Cyclebreaker</h4>
-                <div class="class-role" data-i18n="classes.cyclebreaker_role">Reality Manipulator</div>
-                <p data-i18n="classes.cyclebreaker_desc">Exploits the seams between cycles to bend probability and time. Unlocked by the Defiant ending.</p>
-                <div class="stat-bar"><span>INT</span><div class="bar"><div class="bar-fill mag" style="width:100%"></div></div></div>
-                <div class="stat-bar"><span>DEX</span><div class="bar"><div class="bar-fill spd" style="width:80%"></div></div></div>
-            </div>
-            <div class="class-card" style="border-top:2px solid var(--purple)">
-                <h4 style="color:var(--purple)" data-i18n="classes.abysswarden_name">Abysswarden</h4>
-                <div class="class-role" data-i18n="classes.abysswarden_role">Drain / Debuff Striker</div>
-                <p data-i18n="classes.abysswarden_desc">Warden of the Old Gods' prisons. Siphon divine corruption as weapon and sustain. Unlocked by the Usurper ending.</p>
-                <div class="stat-bar"><span>DEX</span><div class="bar"><div class="bar-fill spd" style="width:100%"></div></div></div>
-                <div class="stat-bar"><span>STR</span><div class="bar"><div class="bar-fill str" style="width:80%"></div></div></div>
-            </div>
-            <div class="class-card" style="border-top:2px solid var(--purple)">
-                <h4 style="color:var(--purple)" data-i18n="classes.voidreaver_name">Voidreaver</h4>
-                <div class="class-role" data-i18n="classes.voidreaver_role">Glass Cannon</div>
-                <p data-i18n="classes.voidreaver_desc">Consumer of the void between cycles. Sacrifice your own life force for devastating power. Unlocked by the Usurper ending.</p>
-                <div class="stat-bar"><span>STR</span><div class="bar"><div class="bar-fill str" style="width:100%"></div></div></div>
-                <div class="stat-bar"><span>INT</span><div class="bar"><div class="bar-fill mag" style="width:100%"></div></div></div>
-            </div>
-        </div>
-
-        <h3 style="font-family:'JetBrains Mono',monospace;color:var(--cyan);font-size:13px;margin:40px 0 16px;text-align:center;" data-i18n="classes.section_races">Character Races</h3>
-        <div class="class-grid">
-            <div class="class-card">
-                <h4 data-i18n="classes.human_name">Human</h4>
-                <p data-i18n="classes.human_desc">Middle of the road. No restrictions, no weaknesses, no standout strengths. Safe pick.</p>
-            </div>
-            <div class="class-card">
-                <h4 data-i18n="classes.hobbit_name">Hobbit</h4>
-                <p data-i18n="classes.hobbit_desc">Harder to kill than you'd expect from something that short. Low STR though.</p>
-            </div>
-            <div class="class-card">
-                <h4 data-i18n="classes.elf_name">Elf</h4>
-                <p data-i18n="classes.elf_desc">The caster race. Lower HP but better magic stats and good agility. Pick this if you're going Magician or Sage.</p>
-            </div>
-            <div class="class-card">
-                <h4 data-i18n="classes.halfelf_name">Half-Elf</h4>
-                <p data-i18n="classes.halfelf_desc">A bit of human, a bit of elf. Good stamina. Nothing flashy.</p>
-            </div>
-            <div class="class-card">
-                <h4 data-i18n="classes.dwarf_name">Dwarf</h4>
-                <p data-i18n="classes.dwarf_desc">Most HP, most STR, most DEF. The tank race. Short, stubborn, will outlast anything.</p>
-            </div>
-            <div class="class-card">
-                <h4 data-i18n="classes.troll_name">Troll</h4>
-                <p data-i18n="classes.troll_desc">Huge. Can't be every class but the stats are hard to argue with. Dwarf-tier tankiness with even more raw strength.</p>
-            </div>
-            <div class="class-card">
-                <h4 data-i18n="classes.orc_name">Orc</h4>
-                <p data-i18n="classes.orc_desc">Natural fighter. Not charming. Gets the job done.</p>
-            </div>
-            <div class="class-card">
-                <h4 data-i18n="classes.gnome_name">Gnome</h4>
-                <p data-i18n="classes.gnome_desc">Small, clever, modest stats. They work better than they look on paper.</p>
-            </div>
-            <div class="class-card">
-                <h4 data-i18n="classes.gnoll_name">Gnoll</h4>
-                <p data-i18n="classes.gnoll_desc">Smallest race. Makes up for it with determination and surprisingly decent STR.</p>
-            </div>
-            <div class="class-card">
-                <h4 data-i18n="classes.mutant_name">Mutant</h4>
-                <p data-i18n="classes.mutant_desc">Weird one. The bonuses are random-ish so every mutant plays a little different. Pick this if you like surprises.</p>
-            </div>
-        </div>
+        <p class="class-note" data-i18n="r1.classes_races">Races: Human, Elf, Half-Elf, Dwarf, Troll, Orc, Gnome, Gnoll, Hobbit, Mutant. Yes, Mutant. Trolls regenerate. Gnolls bite.</p>
+        <p class="class-note prestige" data-i18n="r1.classes_prestige">See an ending and five prestige classes open on your next life: Tidesworn, Wavecaller, Cyclebreaker, Abysswarden, Voidreaver. Each one is shaped by the ending you chose.</p>
     </div>
 </section>
 
@@ -1878,34 +1780,10 @@
 <section id="endings">
     <div class="container">
         <h2 class="section-title" style="color:var(--red);text-shadow:var(--glow-red)" data-i18n="endings.title">// FIVE ENDINGS</h2>
-        <p class="section-subtitle" data-i18n="endings.subtitle">Won't say much about these. They're better if you find them yourself.</p>
-
-        <div class="ending-grid">
-            <div class="ending-card" style="border-top:3px solid var(--red)">
-                <h3 style="color:var(--red)" data-i18n="endings.usurper_name">The Usurper</h3>
-                <p data-i18n="endings.usurper_desc">Take the power. Become god. Get everything you wanted. Live with the consequences of "everything" lasting forever.</p>
-                <div class="ending-hint" data-i18n="endings.usurper_hint">Power</div>
-            </div>
-            <div class="ending-card" style="border-top:3px solid var(--green)">
-                <h3 style="color:var(--green)" data-i18n="endings.savior_name">The Savior</h3>
-                <p data-i18n="endings.savior_desc">Fix the gods. Heal what was broken. Everyone calls you a hero and that sounds great until you realize what that obligation actually means long-term.</p>
-                <div class="ending-hint" data-i18n="endings.savior_hint">Compassion</div>
-            </div>
-            <div class="ending-card" style="border-top:3px solid var(--gold)">
-                <h3 style="color:var(--gold)" data-i18n="endings.defiant_name">The Defiant</h3>
-                <p data-i18n="endings.defiant_desc">Smash all of it. Walk away. No gods, no power, just a person.</p>
-                <div class="ending-hint" data-i18n="endings.defiant_hint">Independence</div>
-            </div>
-            <div class="ending-card" style="border-top:3px solid var(--purple)">
-                <h3 style="color:var(--purple)" data-i18n="endings.awakening_name">The True Awakening</h3>
-                <p data-i18n="endings.awakening_desc">Requires NG+. You start to see the loop for what it is. This ending only makes sense if you've been through the cycle more than once.</p>
-                <div class="ending-hint" data-i18n="endings.awakening_hint">Requires NG+</div>
-            </div>
-            <div class="ending-card" style="border-top:3px solid #ffffff">
-                <h3 style="color:#ffffff" data-i18n="endings.dissolution_name">Dissolution</h3>
-                <p data-i18n="endings.dissolution_desc">Cycle 3 or later. The secret one. Hardest to reach. Quietest. I'm not going to describe it here.</p>
-                <div class="ending-hint" data-i18n="endings.dissolution_hint">Cycle 3+</div>
-            </div>
+        <p class="section-subtitle" data-i18n="r1.endings_sub">Not listed here. Deliberately.</p>
+        <div class="story-page endings-teaser">
+            <p data-i18n-html="r1.endings_desc">The game ends when you answer the Weary Creator's question at the bottom of floor 100. There are five answers. Power is one. Compassion is another. Two of them cannot be reached until the world has looped and the people in it begin to remember that it looped. No one agrees on which ending is the right one; the man who wrote them does not agree with himself. That is the design.</p>
+            <p class="endings-close" data-i18n="r1.endings_close">Each ending you reach unlocks a prestige class for your next life. The loop is the game.</p>
         </div>
     </div>
 </section>
@@ -1918,28 +1796,28 @@
 
         <div class="history-timeline">
             <div class="history-entry">
-                <h3 data-i18n-html="history.bbs_title">BBSes (1978&ndash;1999)</h3>
-                <p data-i18n-html="history.bbs_desc">If you're under 35 you probably missed this entirely. Before the web, people ran Bulletin Board Systems out of their houses. You'd use your phone line to dial into someone else's computer with a modem. It made this awful screeching noise during the handshake and then you were in &mdash; ANSI art, message forums, file downloads, games. There were something like 25,000 BBSes in the US by 1992, each one run by a "SysOp" on a dedicated phone line in their spare bedroom.</p>
+                <h3 data-i18n-html="history.bbs_title">BBSes (1978-1999)</h3>
+                <p data-i18n-html="history.bbs_desc">If you're under 35 you probably missed this entirely. Before the web, people ran Bulletin Board Systems out of their houses. You'd use your phone line to dial into someone else's computer with a modem. It made this awful screeching noise during the handshake and then you were in -- ANSI art, message forums, file downloads, games. There were something like 25,000 BBSes in the US by 1992, each one run by a "SysOp" on a dedicated phone line in their spare bedroom.</p>
             </div>
 
             <div class="history-entry">
                 <h3 data-i18n="history.doors_title">Door Games</h3>
-                <p data-i18n-html="history.doors_desc">BBSes could run external programs called "door games." Totally text-based, running over a phone line at 2400&ndash;14400 baud, and you only got limited play time per day because other callers needed the line. The constraints were insane by modern standards, but that's exactly what made people creative. Trade Wars 2002, Legend of the Red Dragon, Usurper &mdash; these games had persistent worlds where what one caller did today affected what the next caller found tomorrow. Before the term "MMO" existed, these were it.</p>
+                <p data-i18n-html="history.doors_desc">BBSes could run external programs called "door games." Totally text-based, running over a phone line at 2400-14400 baud, and you only got limited play time per day because other callers needed the line. The constraints were insane by modern standards, but that's exactly what made people creative. Trade Wars 2002, Legend of the Red Dragon, Usurper -- these games had persistent worlds where what one caller did today affected what the next caller found tomorrow. Before the term "MMO" existed, these were it.</p>
             </div>
 
             <div class="history-entry">
                 <h3 data-i18n="history.usurper_title">Usurper (1993)</h3>
-                <p data-i18n-html="history.usurper_desc"><strong style="color:var(--gold)">Jakob Dangarden</strong> wrote it in Turbo Pascal. LORD was the big one at the time, but Usurper went way deeper &mdash; real class differences, 10 races, a 100-level dungeon, team warfare, throne politics, complex progression. Set in Dorashire, you explored the Dungeons of Durunghins and the whole point was to get powerful enough to take the throne. It was harder and darker than most door games. Not as popular as LORD but the people who played it <em>really</em> played it.</p>
+                <p data-i18n-html="history.usurper_desc"><strong style="color:var(--gold)">Jakob Dangarden</strong> wrote it in Turbo Pascal. LORD was the big one at the time, but Usurper went way deeper -- real class differences, 10 races, a 100-level dungeon, team warfare, throne politics, complex progression. Set in Dorashire, you explored the Dungeons of Durunghins and the whole point was to get powerful enough to take the throne. It was harder and darker than most door games. Not as popular as LORD but the people who played it <em>really</em> played it.</p>
             </div>
 
             <div class="history-entry">
                 <h3 data-i18n="history.alive_title">Who Kept It Alive</h3>
-                <p data-i18n-html="history.alive_desc"><strong style="color:var(--gold)">Jakob Dangarden</strong> open-sourced Usurper under the GPL in 2004. Can't overstate how important that was &mdash; without that, this remake literally could not exist.<br><br><strong style="color:var(--gold)">Rick Parrish</strong> at R&amp;M Software ported the Turbo Pascal source to run on modern systems. He also wrote GameSrv, which is the BBS server software that a lot of the surviving door game community still runs on. Huge amount of work.<br><br><strong style="color:var(--gold)">Daniel Zingaro</strong> did a ton of bug fixing on the ancient Pascal code. Edge cases from 1993 that nobody had bothered to track down until he went through it methodically. Version 0.20e is stable because of him.</p>
+                <p data-i18n-html="history.alive_desc"><strong style="color:var(--gold)">Jakob Dangarden</strong> open-sourced Usurper under the GPL in 2004. Can't overstate how important that was -- without that, this remake literally could not exist.<br><br><strong style="color:var(--gold)">Rick Parrish</strong> at R&amp;M Software ported the Turbo Pascal source to run on modern systems. He also wrote GameSrv, which is the BBS server software that a lot of the surviving door game community still runs on. Huge amount of work.<br><br><strong style="color:var(--gold)">Daniel Zingaro</strong> did a ton of bug fixing on the ancient Pascal code. Edge cases from 1993 that nobody had bothered to track down until he went through it methodically. Version 0.20e is stable because of him.</p>
             </div>
 
             <div class="history-entry">
-                <h3 data-i18n-html="history.reborn_title">Usurper Reborn (2024&ndash;Now)</h3>
-                <p data-i18n-html="history.reborn_desc">I (<strong style="color:var(--gold)">Jason Knight</strong>) started this project because I kept coming back to Usurper and thinking about what it could've been if the 90s hardware constraints weren't a factor. The original game had so much going on under the hood &mdash; race mechanics, class abilities, political systems &mdash; but the BBS environment limited how far any of it could go. I wanted to see what happened if you took that foundation and built on it with modern tools.<br><br>It's written in C# on .NET 8.0. All the original gameplay is in there. Then I added about 60 unique NPCs with an autonomous world simulation, a companion system, New Game+ where the NPCs gradually become aware of the loop, seven god encounters with branching dialogue, and five endings. The world simulation runs on the server 24/7 and keeps going whether anyone's logged in or not. It still runs on BBSes too &mdash; there are a couple boards on the BBS list below that have it installed as a door game right now.</p>
+                <h3 data-i18n-html="history.reborn_title">Usurper Reborn (2024-Now)</h3>
+                <p data-i18n-html="history.reborn_desc">I (<strong style="color:var(--gold)">Jason Knight</strong>) started this project because I kept coming back to Usurper and thinking about what it could've been if the 90s hardware constraints weren't a factor. The original game had so much going on under the hood -- race mechanics, class abilities, political systems -- but the BBS environment limited how far any of it could go. I wanted to see what happened if you took that foundation and built on it with modern tools.<br><br>It's written in C# on .NET 8.0. All the original gameplay is in there. Then I added about 60 unique NPCs with an autonomous world simulation, a companion system, New Game+ where the NPCs gradually become aware of the loop, seven god encounters with branching dialogue, and five endings. The world simulation runs on the server 24/7 and keeps going whether anyone's logged in or not. It still runs on BBSes too -- there are a couple boards on the BBS list below that have it installed as a door game right now.</p>
             </div>
         </div>
     </div>
@@ -1988,6 +1866,9 @@
                 <p data-i18n="connect.observatory_desc">Track NPC relationships, personality data, demographics, and live events as they happen on the server.</p>
                 <a class="btn btn-secondary" href="/dashboard" style="width:100%;justify-content:center;" data-i18n="connect.observatory_btn">Open Dashboard</a>
             </div>
+        </div>
+        <div style="display:flex;justify-content:center;margin-top:32px;">
+            <iframe src="https://store.steampowered.com/widget/4336570/" frameborder="0" width="646" height="190" style="max-width:100%;"></iframe>
         </div>
     </div>
 </section>
@@ -2048,6 +1929,70 @@
         <div class="bbs-note">
             <p data-i18n-html="bbs.note">Running Usurper Reborn on your board? <a href="https://github.com/binary-knight/usurper-reborn/issues" target="_blank">Let me know and I'll add you.</a></p>
         </div>
+    </div>
+</section>
+
+<!-- Roadmap -->
+<section id="roadmap">
+    <div class="container">
+        <h2 class="section-title" style="color:var(--green);text-shadow:0 0 10px rgba(80,250,123,0.4)" data-i18n="r1.road_title">// ROADMAP</h2>
+        <p class="section-subtitle" data-i18n="r1.road_sub">Built in the open since 2024. The source, the issue tracker, and this list are public, and half of what ships begins as a player report. A plan is only as good as its execution; judge for yourself:</p>
+
+        <div class="history-timeline">
+            <div class="history-entry roadmap-now">
+                <h3 data-i18n="r1.road_now_t">NOW -- The road to 1.0</h3>
+                <p data-i18n="r1.road_now_d">The final Countdown releases are live on the server: renewable lives and burst-death protection have broken the death spiral, five languages stand at full parity, the entire population runs on real AI brains, the NPCs wear painted portraits, and the Hall of the Fallen keeps the names of the dead. We are in the last telemetry window before the 1.0 tag, watching real players cross level 40, a line that once marked a wall.</p>
+            </div>
+            <div class="history-entry">
+                <h3 data-i18n="r1.road_10_t">1.0 -- The world opens</h3>
+                <p data-i18n="r1.road_10_d">The Beta label comes off. A launch event on the live server: world bosses, a Blood Moon, and the crowning of the first monarch of the new age. If you played in the early days and drifted away, understand two things: the flaws that drove you off have been repaired, and your grudges are still remembered.</p>
+            </div>
+            <div class="history-entry">
+                <h3 data-i18n="r1.road_11_t">1.1 -- Gear worth coveting</h3>
+                <p data-i18n="r1.road_11_d">The reward loop deepens: gear set bonuses, faction vendors with exclusive stock, allies who rally to your banner when your renown warrants it, and darker games in the Dark Alley for those who walk the other path.</p>
+            </div>
+            <div class="history-entry">
+                <h3 data-i18n="r1.road_beyond_t">Beyond</h3>
+                <p data-i18n="r1.road_beyond_d">A graphical client already runs in the repository. More languages. And more of the world growing on its own: settlements, wilderness, families, and whatever the simulation surprises us with next. Bring ideas to Discord; they have a habit of shipping with your name in the release notes.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Community -->
+<section id="community">
+    <div class="container">
+        <h2 class="section-title" style="color:#5865F2;text-shadow:0 0 10px rgba(88,101,242,0.4)" data-i18n="r1.comm_title">// THE TOWN OUTSIDE THE GAME</h2>
+        <p class="section-subtitle" data-i18n="r1.comm_sub">Small, friendly, and unusually effective: bug reports here become patches in days, and player ideas ship with credit. Come tell us how you died.</p>
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;align-items:flex-start;gap:24px;">
+            <iframe src="https://discord.com/widget?id=1361378414002573312&theme=dark" width="350" height="400" allowtransparency="true" frameborder="0" sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts" style="max-width:100%;"></iframe>
+        </div>
+    </div>
+</section>
+
+<!-- Sponsors -->
+<section class="sponsors-section" id="sponsors">
+    <div class="container" style="padding-top:48px;padding-bottom:48px;">
+        <h2 class="section-title" style="color:#ea4aaa;text-shadow:0 0 10px rgba(234,74,170,0.5)" data-i18n-html="sponsors.title">// SPONSORS</h2>
+        <p class="section-subtitle" data-i18n="r1.sponsors_sub">Free forever, GPL forever. No ads, no microtransactions. These people keep the server standing anyway. Thank you.</p>
+        <div class="sponsors-grid" id="sponsors-grid">
+            <div class="sponsors-empty" id="sponsors-loading" data-i18n="sponsors.loading">Loading sponsors...</div>
+        </div>
+        <div class="sponsor-cta">
+            <a href="https://github.com/sponsors/binary-knight" target="_blank" data-i18n-html="sponsors.cta">&#9829; Become a Sponsor</a>
+        </div>
+    </div>
+</section>
+
+<!-- Finale -->
+<section id="finale" class="finale-section">
+    <div class="container">
+        <p class="finale-line1" data-i18n="r1.finale_line1">Somewhere below floor 90, the god who made everything is waiting to ask you one question.</p>
+        <p class="finale-line2" data-i18n="r1.finale_line2">The town will remember your answer. So will their children.</p>
+        <div class="hero-buttons" style="margin-top:28px;">
+            <button class="btn btn-primary" onclick="openTerminal();window.scrollTo({top:0,behavior:'smooth'});" data-i18n="r1.finale_cta">&#9658; Begin</button>
+        </div>
+        <p class="hero-cta-note" style="margin-top:12px;"><a href="#story" style="color:var(--text-dim);" data-i18n="r1.finale_alt">or read the story first</a></p>
     </div>
 </section>
 
@@ -2138,7 +2083,7 @@
             <a href="https://github.com/binary-knight/usurper-reborn/issues" target="_blank" data-i18n="footer.bug">Report Bug</a>
             <a href="https://discord.gg/EZhwgDT6Ta" target="_blank" data-i18n="footer.discord">Discord</a>
         </div>
-        <p data-i18n-html="footer.desc">Usurper Reborn &mdash; a free, open-source remake of Usurper (1993) by Jakob Dangarden.</p>
+        <p data-i18n-html="footer.desc">Usurper Reborn -- a free, open-source remake of Usurper (1993) by Jakob Dangarden.</p>
         <p style="margin-top:4px;" data-i18n-html="footer.tech">GPL v2 &bull; C# / .NET 8.0 &bull; Made by one person who liked BBS games too much</p>
     </div>
 </footer>
@@ -2228,7 +2173,7 @@
                 i18nStrings = data;
                 var sel = document.getElementById('lang-select');
                 if (sel) sel.value = 'en';
-                // Same re-render as loadLanguage — stats may have rendered with raw keys before en.json arrived.
+                // Same re-render as loadLanguage -- stats may have rendered with raw keys before en.json arrived.
                 if (_lastStatsData) renderStats(_lastStatsData);
             })
             .catch(function() {});
@@ -2740,15 +2685,43 @@
         };
     }
 
-    // Cached stats response — lets loadLanguage re-render the feed after lang arrives if stats
+    // Cached stats response -- lets loadLanguage re-render the feed after lang arrives if stats
     // resolved first (otherwise raw `stats.*` keys show in the feed for up to ~2 minutes until
     // the periodic re-fetch at setInterval below).
     var _lastStatsData = null;
 
+    // v1.0 redesign: hero live-proof strip. Fed by the same /api/stats fetch;
+    // shows online-now count when anyone is on, otherwise falls back to
+    // lifetime world facts (marriages / children / kills). All labels are
+    // static data-i18n spans in the hero -- JS only fills numbers + toggles.
+    function updateHeroLive(data) {
+        try {
+            var onlineEl = document.getElementById('hl-online');
+            var worldEl = document.getElementById('hl-world');
+            var newsEl = document.getElementById('hl-news');
+            if (!onlineEl || !worldEl) return;
+            var n = (data.online && data.online.length) || 0;
+            if (n > 0) {
+                document.getElementById('hl-online-n').textContent = n;
+                onlineEl.hidden = false; worldEl.hidden = true;
+            } else if (data.stats) {
+                var fmt = function(x) { return (x || 0).toLocaleString(); };
+                document.getElementById('hl-marr').textContent = fmt(data.stats.marriages);
+                document.getElementById('hl-kids').textContent = fmt(data.stats.children);
+                document.getElementById('hl-kills').textContent = fmt(data.stats.totalKills);
+                worldEl.hidden = false; onlineEl.hidden = true;
+            }
+            if (newsEl && data.news && data.news.length > 0 && data.news[0].message) {
+                document.getElementById('hl-news-text').textContent = data.news[0].message;
+                newsEl.hidden = false;
+            }
+        } catch (e) { /* hero strip is decoration */ }
+    }
+
     function fetchStats() {
         fetch('/api/stats')
             .then(res => res.json())
-            .then(data => { _lastStatsData = data; renderStats(data); })
+            .then(data => { _lastStatsData = data; renderStats(data); updateHeroLive(data); })
             .catch(() => {
                 document.getElementById('stats-content').innerHTML =
                     '<div class="stats-error">' + t('stats.server_error') + '</div>';

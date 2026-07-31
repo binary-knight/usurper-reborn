@@ -109,6 +109,13 @@ public class PlayerSession : IDisposable
     /// <summary>Commands injected by a wizard via /force. Processed before normal input.</summary>
     public ConcurrentQueue<string> ForcedCommands { get; } = new();
 
+    /// <summary>
+    /// Game version the client declared in the AUTH 5th field (v0.65.13+),
+    /// or null for older clients / relays that don't send one. Used to
+    /// pick the portrait render tier for the game's own [O] Online client.
+    /// </summary>
+    public string? ClientVersion { get; set; }
+
     public PlayerSession(
         string username,
         string connectionType,
@@ -157,6 +164,7 @@ public class PlayerSession : IDisposable
             Username = Username,
             CharacterKey = Username,  // Default to account name; updated if playing alt character
             ConnectionType = ConnectionType,
+            ClientVersion = ClientVersion,
             RemoteIP = _forwardedIP ?? (_tcpClient.Client.RemoteEndPoint as System.Net.IPEndPoint)?.Address.ToString() ?? "",
             CancellationToken = _sessionCts.Token
         };

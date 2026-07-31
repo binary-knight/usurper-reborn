@@ -39,6 +39,7 @@ public class SessionContext : IDisposable
     public string Username { get; init; } = "";
     public string CharacterKey { get; set; } = "";  // Save key — same as Username unless playing alt character
     public string ConnectionType { get; init; } = "Unknown"; // Web, SSH, BBS
+    public string? ClientVersion { get; init; } // Game version from AUTH 5th field (v0.65.13+ clients); null otherwise
     public string RemoteIP { get; init; } = ""; // Client IP address
     public CancellationToken CancellationToken { get; init; }
 

@@ -423,7 +423,10 @@ namespace UsurperRemake.Systems
                     terminal.SetColor("gray");
                     terminal.WriteLine(Loc.Get("online.logging_in_as", savedCreds.Username));
 
-                    string authLine = $"AUTH:{savedCreds.Username}:{savedCreds.GetDecodedPassword()}:{GetConnectionType()}\n";
+                    // v0.65.13: 5th field = client version. The server uses it to pick
+                    // the portrait render tier (truecolor for 0.65.7+ clients whose SGR
+                    // parser passes 38;2 through). Old servers ignore the extra field.
+                    string authLine = $"AUTH:{savedCreds.Username}:{savedCreds.GetDecodedPassword()}:{GetConnectionType()}:{GameConfig.Version}\n";
                     WriteToServer(authLine);
 
                     var response = await ReadAuthResponse();
@@ -605,9 +608,14 @@ namespace UsurperRemake.Systems
                 string connType = GetConnectionType();
                 string authHeader;
                 if (isRegistration)
+                    // REGISTER stays 5-part: appending a version here would fold into
+                    // the type field on pre-0.65.13 servers (Split limit 5). The first
+                    // session after registering just renders portraits at the safe
+                    // tier; every later login sends the versioned form below.
                     authHeader = $"AUTH:{username}:{password}:REGISTER:{connType}\n";
                 else
-                    authHeader = $"AUTH:{username}:{password}:{connType}\n";
+                    // v0.65.13: 5th field = client version (see saved-creds path).
+                    authHeader = $"AUTH:{username}:{password}:{connType}:{GameConfig.Version}\n";
 
                 try
                 {

@@ -800,6 +800,12 @@ public class Character
     // performed the level-up (auto-level, Level Master, grouped combat). Transient.
     [System.Text.Json.Serialization.JsonIgnore] public int PendingResurrectionGrants { get; set; } = 0;
 
+    // v0.65.8 (R3): a failed flee no longer gives the enemies a full free round.
+    // Set when the player's retreat attempt fails; monster damage against the
+    // player is halved for the remainder of that round (the player is guarded,
+    // backing away). Cleared at the top of the next round. Transient combat state.
+    [System.Text.Json.Serialization.JsonIgnore] public bool FleeGraceThisRound { get; set; } = false;
+
     /// <summary>
     /// v0.61.2 Last-Stand cap. Call at the top of each combat round before any
     /// damage can land on the player. Captures the HP value the round-start
@@ -810,6 +816,7 @@ public class Character
         RoundStartHP = HP;
         LastStandFiredThisRound = false;
         DeathsDoorFiredThisRound = false;
+        FleeGraceThisRound = false;
     }
 
     /// <summary>

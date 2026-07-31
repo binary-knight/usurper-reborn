@@ -144,10 +144,39 @@ function setBalancePasswordHash(hash) {
       value TEXT NOT NULL
     )`);
     dbWrite.prepare("INSERT OR REPLACE INTO balance_config (key, value) VALUES ('password_hash', ?)").run(hash);
+    _defaultCredCache = null; // re-evaluate default-credential lockout
     return true;
   } catch (e) {
     console.error(`[usurper-web] Balance config write error: ${e.message}`);
     return false;
+  }
+}
+
+// v0.65.8 (audit T1-4): with no BALANCE_PASS env and the stored password still
+// the shipped default, the dashboards front /api/admin/nuke (full world wipe),
+// bans, and player edits wide open on any fresh self-hosted/Docker deploy.
+// While the default credential is active, every authenticated route EXCEPT
+// change-password is disabled -- the operator logs in with the default once,
+// is forced to set a real password, and only then does the dashboard unlock.
+// Cached because bcrypt.compareSync is ~100ms; invalidated on password change.
+let _defaultCredCache = null; // null = unknown, else boolean
+function isDefaultCredentialActive() {
+  if (process.env.BALANCE_PASS) return false; // operator-chosen via env
+  if (_defaultCredCache !== null) return _defaultCredCache;
+  try {
+    const storedHash = getBalancePasswordHash();
+    let isDefault;
+    if (isBcryptHash(storedHash)) {
+      // Auto-migration can persist a bcrypt hash OF the default, so compare.
+      isDefault = bcrypt ? bcrypt.compareSync(BALANCE_DEFAULT_PASS, storedHash) : false;
+    } else {
+      isDefault = storedHash === hashPasswordSha256(BALANCE_DEFAULT_PASS);
+    }
+    _defaultCredCache = isDefault;
+    return isDefault;
+  } catch (e) {
+    console.error(`[security] Default-credential check failed (${e.message}); locking admin routes.`);
+    return true; // fail safe: locked down
   }
 }
 
@@ -1434,6 +1463,10 @@ async function handleBalanceRequest(req, res) {
         sendJson(res, 400, { error: 'Password must be at least 6 characters' });
         return true;
       }
+      if (body.newPassword === BALANCE_DEFAULT_PASS) {
+        sendJson(res, 400, { error: 'New password must differ from the default' });
+        return true;
+      }
       if (setBalancePasswordHash(hashPassword(body.newPassword))) {
         sendJson(res, 200, { success: true });
       } else {
@@ -1442,6 +1475,13 @@ async function handleBalanceRequest(req, res) {
     } catch (e) {
       sendJson(res, 400, { error: 'Invalid request' });
     }
+    return true;
+  }
+
+  // v0.65.8 (T1-4): default credential still active -> everything past
+  // login + change-password is disabled until a real password is set.
+  if (isDefaultCredentialActive()) {
+    sendJson(res, 403, { error: 'Dashboard locked: the default password is still active. Change it first (POST /api/balance/change-password).' });
     return true;
   }
 
@@ -2472,6 +2512,10 @@ async function handleAdminRequest(req, res) {
         sendJson(res, 400, { error: 'Password must be at least 6 characters' });
         return true;
       }
+      if (body.newPassword === BALANCE_DEFAULT_PASS) {
+        sendJson(res, 400, { error: 'New password must differ from the default' });
+        return true;
+      }
       if (setBalancePasswordHash(hashPassword(body.newPassword))) {
         sendJson(res, 200, { success: true });
       } else {
@@ -2480,6 +2524,14 @@ async function handleAdminRequest(req, res) {
     } catch (e) {
       sendJson(res, 400, { error: 'Invalid request' });
     }
+    return true;
+  }
+
+  // v0.65.8 (T1-4): default credential still active -> every admin route past
+  // login + change-password is disabled. A fresh self-hosted/Docker deploy no
+  // longer exposes /api/admin/nuke, bans, or player edits behind admin/changeme.
+  if (isDefaultCredentialActive()) {
+    sendJson(res, 403, { error: 'Admin dashboard locked: the default password is still active. Change it first (POST /api/admin/change-password).' });
     return true;
   }
 
@@ -4047,9 +4099,81 @@ function startDiscordBridge() {
   });
 }
 
+// --- LLM Health Monitor ---
+// v0.65.8: the LLM moments/goals pipeline failed silently for three weeks
+// (June 17 - July 11 API-key outage) because nothing watched the llm_usage
+// failure rate. Every 30 min, examine the last 2 hours of attempts (excluding
+// 'llm_disabled' rows so intentionally-LLM-less servers never alarm): if
+// there are >= 5 real attempts and the success rate is under 50%, alert to
+// the Discord gossip channel (when the bridge is up) and the console. At most
+// one alert per 12 hours so a dead key doesn't spam.
+const LLM_HEALTH_CHECK_INTERVAL_MS = 30 * 60 * 1000;
+const LLM_HEALTH_ALERT_COOLDOWN_MS = 12 * 60 * 60 * 1000;
+let _lastLlmAlertAt = 0;
+function checkLlmHealth() {
+  if (!db) return;
+  try {
+    const tableCheck = db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='llm_usage'`).get();
+    if (!tableCheck) return;
+    const row = db.prepare(`
+      SELECT COUNT(*) AS total,
+             SUM(CASE WHEN succeeded = 1 THEN 1 ELSE 0 END) AS ok
+      FROM llm_usage
+      WHERE created_at >= datetime('now', '-2 hours')
+        AND COALESCE(failure_reason, '') != 'llm_disabled'`).get();
+    if (!row || row.total < 5) return;
+    const okCount = row.ok || 0;
+    const rate = okCount / row.total;
+    if (rate >= 0.5) return;
+    const now = Date.now();
+    if (now - _lastLlmAlertAt < LLM_HEALTH_ALERT_COOLDOWN_MS) return;
+    _lastLlmAlertAt = now;
+
+    let topReason = '';
+    try {
+      const reasonRow = db.prepare(`
+        SELECT COALESCE(failure_reason, 'unknown') AS reason, COUNT(*) AS c
+        FROM llm_usage
+        WHERE created_at >= datetime('now', '-2 hours') AND succeeded = 0
+          AND COALESCE(failure_reason, '') != 'llm_disabled'
+        GROUP BY reason ORDER BY c DESC LIMIT 1`).get();
+      if (reasonRow) topReason = ` Top failure: ${reasonRow.reason} (${reasonRow.c}x).`;
+    } catch { /* reason is decoration */ }
+
+    const msg = `LLM pipeline degraded: ${okCount}/${row.total} calls succeeded in the last 2h (${Math.round(rate * 100)}%).${topReason} Check the API key / endpoint (see DOCS/LLM_CONFIG.md).`;
+    console.error(`[llm-health] ALERT: ${msg}`);
+    try {
+      if (typeof discordGossipChannel !== 'undefined' && discordGossipChannel) {
+        discordGossipChannel.send({ content: `:warning: ${msg}`, allowedMentions: { parse: [] } }).catch(() => {});
+      }
+    } catch { /* Discord optional */ }
+  } catch (e) {
+    console.error(`[llm-health] Check failed: ${e.message}`);
+  }
+}
+setInterval(checkLlmHealth, LLM_HEALTH_CHECK_INTERVAL_MS);
+
 // --- HTTP + WebSocket Server ---
 const httpServer = http.createServer(handleHttpRequest);
-const wss = new Server({ server: httpServer });
+// v0.65.8 (audit T2 ops): cap WS frames at 64 KB -- terminal keystrokes are
+// tiny; an unbounded maxPayload lets one client buffer-bomb the proxy.
+const wss = new Server({ server: httpServer, maxPayload: 64 * 1024 });
+
+// v0.65.8 (audit T2 ops): per-IP concurrent WebSocket connection cap. A single
+// address opening dozens of sockets is either a bug or a flood; the game
+// itself enforces one session per account anyway.
+const WS_MAX_CONN_PER_IP = parseInt(process.env.WS_MAX_CONN_PER_IP || '8', 10);
+const wsConnPerIp = new Map(); // ip -> count
+function wsConnAcquire(ip) {
+  const count = wsConnPerIp.get(ip) || 0;
+  if (count >= WS_MAX_CONN_PER_IP) return false;
+  wsConnPerIp.set(ip, count + 1);
+  return true;
+}
+function wsConnRelease(ip) {
+  const count = wsConnPerIp.get(ip) || 0;
+  if (count <= 1) wsConnPerIp.delete(ip); else wsConnPerIp.set(ip, count - 1);
+}
 
 httpServer.listen(WS_PORT, () => {
   console.log(`[usurper-web] HTTP + WebSocket server listening on port ${WS_PORT}`);
@@ -4087,6 +4211,17 @@ wss.on('connection', (ws, req) => {
     ws.close(1008, 'Origin not allowed');
     return;
   }
+
+  // v0.65.8 (audit T2 ops): per-IP concurrent connection cap
+  if (!wsConnAcquire(clientIP)) {
+    console.warn(`[security] WS connection cap reached for ${clientIP} (${WS_MAX_CONN_PER_IP})`);
+    ws.close(1013, 'Too many connections from your address');
+    return;
+  }
+  let wsConnReleased = false;
+  ws.on('close', () => {
+    if (!wsConnReleased) { wsConnReleased = true; wsConnRelease(clientIP); }
+  });
 
   console.log(`[usurper-web] New connection from ${clientIP} (${MUD_MODE ? 'MUD TCP' : 'SSH'} mode)`);
 

@@ -10,7 +10,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.65.7";
+    public const string Version = "0.65.13";
     public const string VersionName = "Countdown"; // the Beta -> 1.0 release-prep cycle
 
     // v0.57.12: Alignment scale cap. Character.Chivalry and Character.Darkness setters clamp to [0, AlignmentCap]
@@ -201,6 +201,20 @@ public static partial class GameConfig
     /// <summary>Gold cost of the Rite of Return at a given level.</summary>
     public static long GetRiteOfReturnCost(int level) =>
         RiteOfReturnBaseCost + (long)level * level * RiteOfReturnCostPerLevelSquared;
+
+    // v0.65.8 (R5) Fallen Legacy: an involuntary permadeath is no longer a
+    // total loss. The fallen character's name is carved into the Hall of the
+    // Fallen (Temple) and the next character created on the same account
+    // inherits a level-scaled gold heirloom. Scales with the LEVEL of the
+    // fallen character (never their wealth -- no funnel-gold-through-death
+    // exploit), capped so a Lv.100 death can't mint a fortune.
+    /// <summary>Heirloom gold per level of the fallen character.</summary>
+    public const long FallenLegacyGoldPerLevel = 500;
+    /// <summary>Cap on the heirloom grant regardless of level.</summary>
+    public const long FallenLegacyMaxGold = 40000;
+    /// <summary>Heirloom gold for a fallen character of the given level.</summary>
+    public static long GetFallenLegacyGold(int level) =>
+        Math.Min(FallenLegacyMaxGold, Math.Max(0, (long)level * FallenLegacyGoldPerLevel));
 
     /// <summary>
     /// Online server address for the [O]nline Play connection.
@@ -1528,16 +1542,21 @@ public static partial class GameConfig
     /// progression. Applied in HandleVictory / HandleVictoryMultiMonster
     /// at the end of the XP-modifier chain.
     ///
-    /// Curve targets ~30 combats to Lv 5, ~50 to Lv 10, transparent at Lv 21+.
+    /// Curve targets ~30 combats to Lv 5, ~50 to Lv 10, then tapers smoothly
+    /// to 1.0 at Lv 40 (v0.65.8 mid-game flattening: the old transparent-at-21
+    /// cutoff landed exactly where the ~650-fights-per-decade grind wall began;
+    /// see DOCS/PLAYER_EXPERIENCE_ANALYSIS.md R4). Monotonic decreasing so
+    /// leveling never makes per-fight XP jump upward.
     /// </summary>
     public static double GetEarlyGameXPMultiplier(int playerLevel)
     {
         if (playerLevel <= 0) return 1.0;
         if (playerLevel <= 5)  return 3.0;
         if (playerLevel <= 10) return 2.0;
-        if (playerLevel <= 15) return 1.5;
-        if (playerLevel <= 20) return 1.2;
-        return 1.0;
+        if (playerLevel <= 15) return 1.8;
+        if (playerLevel >= 40) return 1.0;
+        // 16-39: linear taper from 1.8 down to 1.0 at level 40
+        return 1.0 + (40 - playerLevel) * (0.8 / 24.0);
     }
 
     /// <summary>

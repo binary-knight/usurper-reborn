@@ -921,10 +921,11 @@ namespace UsurperRemake.Systems
 
         /// <summary>
         /// v0.61.4: enhancer flavor pools and the VN templates the enhancer
-        /// wraps are now both localized to English AND Hungarian. Other
-        /// languages (es/fr/it) still see the unmodified base line because
-        /// VN templates and flavor pools have not been translated for them
-        /// yet. The gate widens as more languages are translated.
+        /// wraps are localized in all five shipped languages as of v0.65.8
+        /// (en/hu since v0.61.4; es/fr/it joined when their dialogue.vn.* and
+        /// dialogue.enhance.* pools were translated). The gate enumeration
+        /// remains so a future partially-translated language degrades to
+        /// clean base lines instead of mixed-language output.
         /// Returns true when the current session language is supported.
         /// Test/world-sim contexts without a SessionContext resolve to
         /// English via `GameConfig.Language`'s fallback chain (still supported).
@@ -935,8 +936,17 @@ namespace UsurperRemake.Systems
             {
                 var lang = GameConfig.Language;
                 if (string.IsNullOrEmpty(lang)) return true; // default to en
+                // v0.65.8: es/fr/it joined en/hu -- the dialogue.vn.* and
+                // dialogue.enhance.* pools are now translated in all five
+                // languages, so every shipped language gets the full
+                // contextual-dialogue experience. Keep the enumeration (rather
+                // than always-true) so a future partially-translated language
+                // falls back to clean base lines instead of mixed-language output.
                 return lang.Equals("en", StringComparison.OrdinalIgnoreCase)
-                    || lang.Equals("hu", StringComparison.OrdinalIgnoreCase);
+                    || lang.Equals("hu", StringComparison.OrdinalIgnoreCase)
+                    || lang.Equals("es", StringComparison.OrdinalIgnoreCase)
+                    || lang.Equals("fr", StringComparison.OrdinalIgnoreCase)
+                    || lang.Equals("it", StringComparison.OrdinalIgnoreCase);
             }
             catch
             {

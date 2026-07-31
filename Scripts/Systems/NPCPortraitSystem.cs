@@ -129,11 +129,11 @@ namespace UsurperRemake.Systems
                     return false;
                 }
 
-                var tier = ResolveTier(terminal);
+                var (tier, cols, cellRows) = ResolveLayout(terminal);
                 string[] rows;
                 try
                 {
-                    rows = GetEncodedRows(pngPath, tier);
+                    rows = GetEncodedRows(pngPath, tier, cols, cellRows);
                 }
                 catch (Exception decodeEx)
                 {
@@ -146,7 +146,7 @@ namespace UsurperRemake.Systems
                     try { File.Move(pngPath, pngPath + ".bad", overwrite: true); } catch { /* best effort */ }
                     return false;
                 }
-                RenderFramed(terminal, npc, rows);
+                RenderFramed(terminal, npc, rows, cols);
                 return true;
             }
             catch (Exception ex)
@@ -158,42 +158,64 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Pick the encoder tier for the current session's terminal capability.
-        ///   BBS door / CP437       -> 16-color ANSI (the BBS-scene half-block style)
-        ///   BBS / Steam / Local    -> 16-color ANSI. Steam/Local means the game's own
-        ///                             [O] Online Play client is on the other end, and
-        ///                             every client older than v0.65.7 pipes server
-        ///                             output through a legacy SGR parser that shreds
-        ///                             38;2/38;5 sequences into color noise (the
-        ///                             AI-portrait corruption report). 16-color SGR is
-        ///                             the dialect those clients parse correctly.
-        ///                             TODO: promote to TrueColor once pre-0.65.7
-        ///                             clients have aged out of the field.
-        ///   SSH / raw-TCP MUD      -> xterm-256 (client could be anything; 256 is safe)
-        ///   Web / single-player    -> 24-bit truecolor (xterm.js and WezTerm support it)
+        /// Pick the encoder tier + cell footprint for the current session's
+        /// terminal capability.
+        ///   BBS door / CP437       -> 16-color ANSI at 34x14 (the BBS-scene
+        ///                             half-block style; real BBS terminals).
+        ///   Steam / Local          -> the game's own [O] Online Play client.
+        ///                             Clients older than v0.65.7 pipe server
+        ///                             output through a legacy SGR parser that
+        ///                             shreds 38;2/38;5 sequences into color
+        ///                             noise, so they stay on 16-color. v0.65.13+
+        ///                             clients declare their version in the AUTH
+        ///                             5th field; 0.65.7+ get full truecolor at
+        ///                             the large 48x24 footprint (the 16-color
+        ///                             34x28px encode of a painted bust is the
+        ///                             "portraits look horrible" report).
+        ///   SSH / raw-TCP MUD      -> xterm-256 at 34x14 (client could be
+        ///                             anything, incl. 80x24 -- keep it small).
+        ///   Web / single-player    -> 24-bit truecolor at 48x24 (xterm.js and
+        ///                             WezTerm both support truecolor).
         /// </summary>
-        private static PortraitEncoder.Tier ResolveTier(TerminalEmulator terminal)
+        private static (PortraitEncoder.Tier Tier, int Cols, int Rows) ResolveLayout(TerminalEmulator terminal)
         {
             if (terminal.UseCp437 || UsurperRemake.BBS.DoorMode.IsInDoorMode)
-                return PortraitEncoder.Tier.Ansi16;
-            var ct = UsurperRemake.Server.SessionContext.Current?.ConnectionType;
+                return (PortraitEncoder.Tier.Ansi16, PortraitEncoder.Cols, PortraitEncoder.Rows);
+            var ctx = UsurperRemake.Server.SessionContext.Current;
+            var ct = ctx?.ConnectionType;
             return ct switch
             {
-                "BBS" or "Steam" or "Local" => PortraitEncoder.Tier.Ansi16,
-                "SSH" or "MUD" => PortraitEncoder.Tier.Xterm256,
-                _ => PortraitEncoder.Tier.TrueColor,
+                "BBS" => (PortraitEncoder.Tier.Ansi16, PortraitEncoder.Cols, PortraitEncoder.Rows),
+                "Steam" or "Local" => ClientSupportsTrueColor(ctx?.ClientVersion)
+                    ? (PortraitEncoder.Tier.TrueColor, PortraitEncoder.TrueColorCols, PortraitEncoder.TrueColorRows)
+                    : (PortraitEncoder.Tier.Ansi16, PortraitEncoder.Cols, PortraitEncoder.Rows),
+                "SSH" or "MUD" => (PortraitEncoder.Tier.Xterm256, PortraitEncoder.Cols, PortraitEncoder.Rows),
+                _ => (PortraitEncoder.Tier.TrueColor, PortraitEncoder.TrueColorCols, PortraitEncoder.TrueColorRows),
             };
         }
 
-        private static string[] GetEncodedRows(string pngPath, PortraitEncoder.Tier tier)
+        /// <summary>
+        /// True when the [O] Online client on the other end declared a game
+        /// version whose SGR parser passes truecolor through (0.65.7+). Null /
+        /// unparseable = older client = false.
+        /// </summary>
+        internal static bool ClientSupportsTrueColor(string? clientVersion)
+        {
+            if (string.IsNullOrWhiteSpace(clientVersion)) return false;
+            return Version.TryParse(clientVersion.Trim(), out var v)
+                && v >= new Version(0, 65, 7);
+        }
+
+        private static string[] GetEncodedRows(string pngPath, PortraitEncoder.Tier tier, int cols, int cellRows)
         {
             // mtime in the key so an in-place PNG replacement (sysop drops a new
-            // file into the cache dir) shows fresh art without a restart.
-            string key = pngPath + "|" + (int)tier + "|" + File.GetLastWriteTimeUtc(pngPath).Ticks;
+            // file into the cache dir) shows fresh art without a restart. Size in
+            // the key because the same tier could render at different footprints.
+            string key = pngPath + "|" + (int)tier + "|" + cols + "x" + cellRows + "|" + File.GetLastWriteTimeUtc(pngPath).Ticks;
             if (EncodedCache.TryGetValue(key, out var cached)) return cached;
 
             var (rgba, w, h) = MiniPng.Decode(File.ReadAllBytes(pngPath));
-            var rows = PortraitEncoder.Encode(rgba, w, h, tier);
+            var rows = PortraitEncoder.Encode(rgba, w, h, tier, cols, cellRows);
 
             if (EncodedCache.Count >= EncodedCacheCap) EncodedCache.Clear();
             EncodedCache[key] = rows;
@@ -207,10 +229,10 @@ namespace UsurperRemake.Systems
         /// markup writer (CP437-safe); image rows go through WriteRawAnsi,
         /// the same split the race-portrait screen has used since v0.43.3.
         /// </summary>
-        private static void RenderFramed(TerminalEmulator terminal, global::Character npc, string[] rows)
+        private static void RenderFramed(TerminalEmulator terminal, global::Character npc, string[] rows, int cols)
         {
             const string bc = "gray";
-            string horiz = new string('═', PortraitEncoder.Cols);
+            string horiz = new string('═', cols);
 
             terminal.WriteLine($"   ╔{horiz}╗", bc);
             foreach (var row in rows)
@@ -220,17 +242,18 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("║", bc);
             }
 
+            int textMax = cols - 2;
             string name = npc.Name2 ?? npc.Name1 ?? "Unknown";
-            if (name.Length > 32) name = name.Substring(0, 32);
+            if (name.Length > textMax) name = name.Substring(0, textMax);
             string raceClass = $"{npc.Race} {npc.Class}";
-            if (raceClass.Length > 32) raceClass = raceClass.Substring(0, 32);
+            if (raceClass.Length > textMax) raceClass = raceClass.Substring(0, textMax);
 
             terminal.WriteLine($"   ╠{horiz}╣", bc);
             terminal.Write("   ║", bc);
-            terminal.Write(CenterText(name, PortraitEncoder.Cols), "bright_yellow");
+            terminal.Write(CenterText(name, cols), "bright_yellow");
             terminal.WriteLine("║", bc);
             terminal.Write("   ║", bc);
-            terminal.Write(CenterText(raceClass, PortraitEncoder.Cols), "gray");
+            terminal.Write(CenterText(raceClass, cols), "gray");
             terminal.WriteLine("║", bc);
             terminal.WriteLine($"   ╚{horiz}╝", bc);
         }

@@ -6,6 +6,19 @@
 cd "$(dirname "$0")"
 chmod +x UsurperReborn 2>/dev/null
 
+# v0.65.9: sweep leftover game processes from a previous session (see play.sh)
+# so Steam's "already running" state self-heals on the next launch.
+if command -v pgrep >/dev/null 2>&1; then
+    install_dir="$(pwd)"
+    stale=$(pgrep -f "$install_dir/UsurperReborn" 2>/dev/null)
+    if [ -n "$stale" ]; then
+        echo "[usurper] Cleaning up leftover game process(es): $stale" >&2
+        kill $stale 2>/dev/null
+        sleep 1
+        kill -9 $stale 2>/dev/null
+    fi
+fi
+
 # Fall back to common Linux terminal emulators
 for term_cmd in gnome-terminal konsole xfce4-terminal mate-terminal lxterminal alacritty kitty xterm; do
     if command -v "$term_cmd" >/dev/null 2>&1; then

@@ -8,6 +8,24 @@ chmod +x UsurperReborn 2>/dev/null
 
 log() { echo "[usurper] $*" >&2; }
 
+# --- Stale-process sweep ------------------------------------------------------
+# v0.65.9 (player report): a leftover UsurperReborn/wezterm process from a
+# previous session kept Steam saying "already running" until a reboot. Sweep
+# any leftovers launched from THIS install directory before starting. TERM
+# first, then KILL for anything that ignores it. (A process stuck in
+# uninterruptible D-state — the FUSE-mount hang addressed below — survives
+# even SIGKILL; the extract-and-run change removes that failure class.)
+if command -v pgrep >/dev/null 2>&1; then
+    install_dir="$(pwd)"
+    stale=$(pgrep -f "$install_dir/UsurperReborn" 2>/dev/null)
+    if [ -n "$stale" ]; then
+        log "Cleaning up leftover game process(es) from a previous session: $stale"
+        kill $stale 2>/dev/null
+        sleep 1
+        kill -9 $stale 2>/dev/null
+    fi
+fi
+
 # Without a graphical session neither WezTerm nor any other GUI terminal can
 # start — run the game directly in whatever terminal we're already in.
 # (Linux only: macOS WezTerm is native Cocoa and does not use DISPLAY.)
@@ -17,10 +35,17 @@ if [ "$(uname)" = "Linux" ] && [ -z "$DISPLAY" ] && [ -z "$WAYLAND_DISPLAY" ]; t
 fi
 
 # --- Bundled WezTerm (preferred: ships its own dark theme and fonts) ---------
-# The AppImage needs FUSE2 to mount itself; when FUSE is missing we retry with
-# APPIMAGE_EXTRACT_AND_RUN=1, which self-extracts instead of mounting.
+# v0.65.9: on Linux the AppImage now ALWAYS self-extracts instead of
+# FUSE-mounting (APPIMAGE_EXTRACT_AND_RUN=1). A FUSE mount that wedges — a
+# known AppImage failure mode after suspend/resume or a fusermount crash —
+# leaves wezterm in uninterruptible D-state: unkillable, Steam reports the
+# game as "already running", and only a reboot clears it (player-reported).
+# Self-extraction costs a second at startup and removes the entire failure
+# class. The env var is ignored by non-AppImage builds (macOS), so exporting
+# it unconditionally is safe.
 if [ -x "./wezterm/wezterm-gui" ]; then
     export WEZTERM_CONFIG_FILE="$(pwd)/wezterm.lua"
+    export APPIMAGE_EXTRACT_AND_RUN=1
 
     run_wezterm() {
         # Run (not exec) so a crash at GUI startup falls through to the system
@@ -40,12 +65,9 @@ if [ -x "./wezterm/wezterm-gui" ]; then
 
     if ./wezterm/wezterm-gui --version >/dev/null 2>&1; then
         run_wezterm
-    elif APPIMAGE_EXTRACT_AND_RUN=1 ./wezterm/wezterm-gui --version >/dev/null 2>&1; then
-        export APPIMAGE_EXTRACT_AND_RUN=1
-        run_wezterm
     else
         log "Bundled WezTerm could not start on this system."
-        log "Common causes: missing libfuse2 (Debian/Ubuntu: sudo apt install libfuse2) or missing GUI libraries."
+        log "Common causes: missing GUI libraries (X11/Wayland client libs)."
         log "Run ./wezterm/wezterm-gui directly to see the exact error."
         log "Falling back to a system terminal."
     fi

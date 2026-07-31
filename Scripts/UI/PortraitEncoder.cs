@@ -40,6 +40,15 @@ namespace UsurperRemake.UI
         public const int PixelW = Cols;      // pixel canvas width
         public const int PixelH = Rows * 2;  // pixel canvas height via half-blocks
 
+        // v0.65.13: larger canvas for terminals that can carry it. At 34x28 px a
+        // painted 128px bust reads as mush; at 48x48 px it is clearly the same
+        // character (validated against real cached portraits in the sim harness).
+        // Only the TrueColor tier uses this -- 16-color at any size stays the
+        // classic BBS footprint, and xterm-256 keeps 34x14 so 80x24 SSH
+        // terminals don't scroll the talk menu off-screen.
+        public const int TrueColorCols = 48;
+        public const int TrueColorRows = 24;
+
         public enum Tier
         {
             TrueColor,
@@ -106,15 +115,26 @@ namespace UsurperRemake.UI
 
         /// <summary>
         /// Encode an RGBA image (any size) into Rows raw-ANSI strings at the
-        /// requested tier. Alpha is composited over the dark backdrop, then
-        /// the image is box-downsampled to the 34x28 pixel canvas.
+        /// requested tier in the classic 34x14-cell footprint. Alpha is
+        /// composited over the dark backdrop, then the image is
+        /// box-downsampled to the 34x28 pixel canvas.
         /// </summary>
         public static string[] Encode(byte[] rgba, int width, int height, Tier tier)
+            => Encode(rgba, width, height, tier, Cols, Rows);
+
+        /// <summary>
+        /// Size-parameterized encode: cols x rows CELLS (pixel canvas is
+        /// cols x rows*2 via half-blocks). Same pipeline, caller-chosen
+        /// footprint.
+        /// </summary>
+        public static string[] Encode(byte[] rgba, int width, int height, Tier tier, int cols, int rows)
         {
             if (rgba == null || width <= 0 || height <= 0 || rgba.Length < width * height * 4)
                 throw new ArgumentException("Invalid image buffer");
+            if (cols <= 0 || rows <= 0)
+                throw new ArgumentException("Invalid canvas size");
 
-            var px = Downsample(rgba, width, height);
+            var px = Downsample(rgba, width, height, cols, rows * 2);
             return tier switch
             {
                 Tier.TrueColor => EncodeTrueColor(px),
@@ -131,17 +151,17 @@ namespace UsurperRemake.UI
         /// effectively the "render high, sample down" step that gives the art
         /// its anti-aliased look.
         /// </summary>
-        private static (byte R, byte G, byte B)[,] Downsample(byte[] rgba, int width, int height)
+        private static (byte R, byte G, byte B)[,] Downsample(byte[] rgba, int width, int height, int pixelW, int pixelH)
         {
-            var outPx = new (byte, byte, byte)[PixelH, PixelW];
-            for (int ty = 0; ty < PixelH; ty++)
+            var outPx = new (byte, byte, byte)[pixelH, pixelW];
+            for (int ty = 0; ty < pixelH; ty++)
             {
-                int sy0 = ty * height / PixelH;
-                int sy1 = Math.Max(sy0 + 1, (ty + 1) * height / PixelH);
-                for (int tx = 0; tx < PixelW; tx++)
+                int sy0 = ty * height / pixelH;
+                int sy1 = Math.Max(sy0 + 1, (ty + 1) * height / pixelH);
+                for (int tx = 0; tx < pixelW; tx++)
                 {
-                    int sx0 = tx * width / PixelW;
-                    int sx1 = Math.Max(sx0 + 1, (tx + 1) * width / PixelW);
+                    int sx0 = tx * width / pixelW;
+                    int sx1 = Math.Max(sx0 + 1, (tx + 1) * width / pixelW);
                     long r = 0, g = 0, b = 0;
                     int n = 0;
                     for (int sy = sy0; sy < sy1; sy++)
@@ -167,13 +187,14 @@ namespace UsurperRemake.UI
 
         private static string[] EncodeTrueColor((byte R, byte G, byte B)[,] px)
         {
-            var rows = new string[Rows];
-            var sb = new StringBuilder(Cols * 40);
-            for (int row = 0; row < Rows; row++)
+            int cellRows = px.GetLength(0) / 2, cellCols = px.GetLength(1);
+            var rows = new string[cellRows];
+            var sb = new StringBuilder(cellCols * 40);
+            for (int row = 0; row < cellRows; row++)
             {
                 sb.Clear();
                 (int, int, int) lastFg = (-1, -1, -1), lastBg = (-1, -1, -1);
-                for (int col = 0; col < Cols; col++)
+                for (int col = 0; col < cellCols; col++)
                 {
                     var t = px[row * 2, col];
                     var b = px[row * 2 + 1, col];
@@ -199,13 +220,14 @@ namespace UsurperRemake.UI
 
         private static string[] EncodeXterm256((byte R, byte G, byte B)[,] px)
         {
-            var rows = new string[Rows];
-            var sb = new StringBuilder(Cols * 24);
-            for (int row = 0; row < Rows; row++)
+            int cellRows = px.GetLength(0) / 2, cellCols = px.GetLength(1);
+            var rows = new string[cellRows];
+            var sb = new StringBuilder(cellCols * 24);
+            for (int row = 0; row < cellRows; row++)
             {
                 sb.Clear();
                 int lastFg = -1, lastBg = -1;
-                for (int col = 0; col < Cols; col++)
+                for (int col = 0; col < cellCols; col++)
                 {
                     int fg = NearestXterm256(GammaLift(px[row * 2, col]));
                     int bg = NearestXterm256(GammaLift(px[row * 2 + 1, col]));
@@ -242,13 +264,14 @@ namespace UsurperRemake.UI
 
         private static string[] EncodeAnsi16((byte R, byte G, byte B)[,] px)
         {
-            var rows = new string[Rows];
-            var sb = new StringBuilder(Cols * 16);
-            for (int row = 0; row < Rows; row++)
+            int cellRows = px.GetLength(0) / 2, cellCols = px.GetLength(1);
+            var rows = new string[cellRows];
+            var sb = new StringBuilder(cellCols * 16);
+            for (int row = 0; row < cellRows; row++)
             {
                 sb.Clear();
                 int lastFg = -1, lastBg = -1;
-                for (int col = 0; col < Cols; col++)
+                for (int col = 0; col < cellCols; col++)
                 {
                     var top = px[row * 2, col];
                     var bot = px[row * 2 + 1, col];

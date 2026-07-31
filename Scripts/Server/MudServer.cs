@@ -368,6 +368,7 @@ public class MudServer
     private async Task HandleConnectionAsync(TcpClient client, SqlSaveBackend sqlBackend, CancellationToken ct)
     {
         string? username = null;
+        string? clientVersion = null; // from the optional AUTH 5th field (v0.65.13)
         try
         {
             client.NoDelay = true;
@@ -433,11 +434,42 @@ public class MudServer
             // from the AUTH protocol (untrusted -- any client could spoof it).
             // Letting X-IP override a PROXY-supplied IP would defeat the whole
             // point of the PROXY parsing.
+            // Capture the RAW TCP peer up front -- both the X-IP trust gate below
+            // and the trusted-auth gate later need it. Anyone can spoof an X-IP
+            // header; only a process on this host can present a loopback peer.
+            string? rawPeerIp = null;
+            try { rawPeerIp = (client.Client.RemoteEndPoint as System.Net.IPEndPoint)?.Address.ToString(); }
+            catch { /* socket may have closed */ }
+            bool isLoopbackPeer = false;
+            if (!string.IsNullOrEmpty(rawPeerIp))
+            {
+                try
+                {
+                    var addr = System.Net.IPAddress.Parse(rawPeerIp);
+                    isLoopbackPeer = System.Net.IPAddress.IsLoopback(addr);
+                }
+                catch { /* malformed; not loopback */ }
+            }
+
             string? proxyClientType = null;
             if (forwardedIP == null && authLine != null && authLine.StartsWith("X-IP:"))
             {
-                forwardedIP = authLine.Substring(5).Trim();
-                Console.Error.WriteLine($"[MUD] Forwarded client IP: {forwardedIP}");
+                string claimedIp = authLine.Substring(5).Trim();
+                if (isLoopbackPeer)
+                {
+                    forwardedIP = claimedIp;
+                    Console.Error.WriteLine($"[MUD] Forwarded client IP: {forwardedIP}");
+                }
+                else
+                {
+                    // v0.65.8 (audit T2 security): X-IP drives ban + login-throttle
+                    // attribution. Honoring it from a non-loopback peer lets an
+                    // external client spoof another address (evade its own ban, or
+                    // pin failed-login lockouts on a victim IP). Consume the header
+                    // line so the protocol stays in sync, but keep the raw peer as
+                    // the effective identity.
+                    Console.Error.WriteLine($"[MUD] SECURITY: ignored X-IP '{claimedIp}' from non-loopback peer {rawPeerIp ?? "unknown"}");
+                }
                 // Read the next line for AUTH header or X-Client
                 authLine = null;
                 try
@@ -477,24 +509,8 @@ public class MudServer
                 firstBytes = System.Text.Encoding.UTF8.GetBytes(authLine);
             }
 
-            // Capture the RAW TCP peer IP separately from effectiveIp. effectiveIp
-            // is the public-facing address (X-IP from a relay if set), used for ban
-            // checks and rate-limit attribution. rawPeerIp is the actual socket peer,
-            // used for trust-gating: only loopback connections may use trusted auth
-            // (no password). Anyone can spoof X-IP, only loopback can spoof rawPeerIp.
-            string? rawPeerIp = null;
-            try { rawPeerIp = (client.Client.RemoteEndPoint as System.Net.IPEndPoint)?.Address.ToString(); }
-            catch { /* socket may have closed */ }
-            bool isLoopbackPeer = false;
-            if (!string.IsNullOrEmpty(rawPeerIp))
-            {
-                try
-                {
-                    var addr = System.Net.IPAddress.Parse(rawPeerIp);
-                    isLoopbackPeer = System.Net.IPAddress.IsLoopback(addr);
-                }
-                catch { /* malformed; not loopback */ }
-            }
+            // (rawPeerIp / isLoopbackPeer captured above, before the X-IP parse --
+            // v0.65.8 moved the capture up so the X-IP header itself is trust-gated.)
 
             // v0.60.5: IP-ban check at the earliest practical point. Effective IP
             // is the X-IP forwarded header value if a relay set one (web/SSH gateway),
@@ -587,6 +603,13 @@ public class MudServer
                     username = parts[1].Trim();
                     password = parts[2];
                     connectionType = parts[3].Trim();
+                    // v0.65.13: optional 5th field is the client's game version
+                    // (AUTH:user:pass:type:version). 0.65.7+ clients pass truecolor
+                    // SGR through cleanly, which lets NPCPortraitSystem serve them
+                    // the truecolor portrait tier instead of the defensive 16-color
+                    // one. Pre-0.65.13 clients simply omit the field.
+                    if (parts.Length == 5 && !string.IsNullOrWhiteSpace(parts[4]))
+                        clientVersion = parts[4].Trim();
                 }
                 else
                 {
@@ -709,6 +732,7 @@ public class MudServer
                     gmcpEnabled: gmcpEnabled,
                     forwardedIP: forwardedIP
                 );
+                session.ClientVersion = clientVersion;
 
                 // If TryAdd fails (race condition), kick stale session and retry
                 if (!ActiveSessions.TryAdd(sessionUsernameKey, session))
@@ -768,43 +792,87 @@ public class MudServer
     {
         const int MAX_ATTEMPTS = 5;
 
+        // v0.65.12 (loc audit Tier A-1): the login gate was 100% hardcoded
+        // English -- a fully-translated game sat behind an English door. All
+        // strings now render via Loc.GetIn(authLang), and [G] cycles through
+        // the installed languages BEFORE login. On successful REGISTRATION the
+        // chosen language is persisted to the account so the first session
+        // starts localized; existing accounts keep their saved preference
+        // (applied in PlayerSession as before).
+        string authLang = "en";
+        var langCodes = UsurperRemake.Systems.Loc.AvailableLanguages?.Select(l => l.Code).ToList()
+            ?? new List<string> { "en" };
+        if (langCodes.Count == 0) langCodes.Add("en");
+        string L(string key, params object[] args) => UsurperRemake.Systems.Loc.GetIn(authLang, key, args);
+
+        // Pads a hotkey menu row into the 78-char box interior; colors sit on
+        // the hotkey only so visible length stays computable for the padding.
+        string BoxRow(string colorCode, string hotkey, string label)
+        {
+            string visible = $"  [{hotkey}] {label}";
+            if (visible.Length > 78) visible = visible.Substring(0, 78);
+            int pad = 78 - visible.Length;
+            return $"\u2551  \u001b[{colorCode}m[{hotkey}]\u001b[0;37m {label}{new string(' ', pad)}\u2551\r\n";
+        }
+
         for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++)
         {
             if (ct.IsCancellationRequested) return null;
 
+            string langName = authLang;
+            foreach (var ll in UsurperRemake.Systems.Loc.AvailableLanguages)
+            {
+                if (ll.Code == authLang) { langName = ll.Name; break; }
+            }
+
             // Show auth menu
             if (isPlainText)
             {
-                await WriteAnsiAsync(stream, "\r\n=== Usurper Reborn Online ===\r\n", isCp437);
-                await WriteAnsiAsync(stream, "[L] Login\r\n", isCp437);
-                await WriteAnsiAsync(stream, "[R] Register\r\n", isCp437);
-                await WriteAnsiAsync(stream, "[Q] Quit\r\n", isCp437);
-                await WriteAnsiAsync(stream, "Choice: ", isCp437);
+                await WriteAnsiAsync(stream, $"\r\n=== {L("auth.title")} ===\r\n", isCp437);
+                await WriteAnsiAsync(stream, $"[L] {L("auth.login")}\r\n", isCp437);
+                await WriteAnsiAsync(stream, $"[R] {L("auth.register")}\r\n", isCp437);
+                await WriteAnsiAsync(stream, $"[G] {L("auth.language")} ({langName})\r\n", isCp437);
+                await WriteAnsiAsync(stream, $"[Q] {L("auth.quit")}\r\n", isCp437);
+                await WriteAnsiAsync(stream, $"{L("auth.choice")} ", isCp437);
             }
             else
             {
+                string title = L("auth.title");
+                if (title.Length > 78) title = title.Substring(0, 78);
+                int tpad = 78 - title.Length;
+                int tleft = tpad / 2;
+
                 await WriteAnsiAsync(stream, "\u001b[2J\u001b[H", isCp437); // Clear screen
                 await WriteAnsiAsync(stream, "\u001b[1;36m", isCp437);
-                await WriteAnsiAsync(stream, "╔══════════════════════════════════════════════════════════════════════════════╗\r\n", isCp437);
+                await WriteAnsiAsync(stream, "\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557\r\n", isCp437);
                 await WriteAnsiAsync(stream, "\u001b[1;37m", isCp437);
-                await WriteAnsiAsync(stream, "║                      Welcome to Usurper Reborn Online                      ║\r\n", isCp437);
+                await WriteAnsiAsync(stream, "\u2551" + new string(' ', tleft) + title + new string(' ', tpad - tleft) + "\u2551\r\n", isCp437);
                 await WriteAnsiAsync(stream, "\u001b[1;36m", isCp437);
-                await WriteAnsiAsync(stream, "╠══════════════════════════════════════════════════════════════════════════════╣\r\n", isCp437);
+                await WriteAnsiAsync(stream, "\u2560\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2563\r\n", isCp437);
                 await WriteAnsiAsync(stream, "\u001b[0;37m", isCp437);
-                await WriteAnsiAsync(stream, "║                                                                              ║\r\n", isCp437);
-                await WriteAnsiAsync(stream, "║  \u001b[1;36m[L]\u001b[0;37m Login to existing account                                             ║\r\n", isCp437);
-                await WriteAnsiAsync(stream, "║  \u001b[1;32m[R]\u001b[0;37m Register new account                                                  ║\r\n", isCp437);
-                await WriteAnsiAsync(stream, "║  \u001b[1;31m[Q]\u001b[0;37m Quit                                                                  ║\r\n", isCp437);
-                await WriteAnsiAsync(stream, "║                                                                              ║\r\n", isCp437);
+                await WriteAnsiAsync(stream, "\u2551" + new string(' ', 78) + "\u2551\r\n", isCp437);
+                await WriteAnsiAsync(stream, BoxRow("1;36", "L", L("auth.login")), isCp437);
+                await WriteAnsiAsync(stream, BoxRow("1;32", "R", L("auth.register")), isCp437);
+                await WriteAnsiAsync(stream, BoxRow("1;35", "G", $"{L("auth.language")} ({langName})"), isCp437);
+                await WriteAnsiAsync(stream, BoxRow("1;31", "Q", L("auth.quit")), isCp437);
+                await WriteAnsiAsync(stream, "\u2551" + new string(' ', 78) + "\u2551\r\n", isCp437);
                 await WriteAnsiAsync(stream, "\u001b[1;36m", isCp437);
-                await WriteAnsiAsync(stream, "╚══════════════════════════════════════════════════════════════════════════════╝\r\n", isCp437);
+                await WriteAnsiAsync(stream, "\u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d\r\n", isCp437);
                 await WriteAnsiAsync(stream, "\u001b[0m", isCp437);
-                await WriteAnsiAsync(stream, "\r\n  Choice: ", isCp437);
+                await WriteAnsiAsync(stream, $"\r\n  {L("auth.choice")} ", isCp437);
             }
 
             var choice = (await ReadLineAsync(stream, ct))?.Trim().ToUpperInvariant();
             if (string.IsNullOrEmpty(choice)) continue;
             if (choice == "Q") return null;
+            if (choice == "G")
+            {
+                // Cycle to the next installed language; doesn't consume an attempt.
+                int idx = langCodes.IndexOf(authLang);
+                authLang = langCodes[(idx + 1) % langCodes.Count];
+                attempt--;
+                continue;
+            }
 
             string? username = null;
             string? password = null;
@@ -814,19 +882,19 @@ public class MudServer
             {
                 if (isPlainText)
                 {
-                    await WriteAnsiAsync(stream, "Username: ", isCp437);
+                    await WriteAnsiAsync(stream, $"{L("auth.username")} ", isCp437);
                     username = (await ReadLineAsync(stream, ct))?.Trim();
                     if (string.IsNullOrEmpty(username)) continue;
-                    await WriteAnsiAsync(stream, "Password: ", isCp437);
+                    await WriteAnsiAsync(stream, $"{L("auth.password")} ", isCp437);
                     password = (await ReadLineAsync(stream, ct))?.Trim();
                     if (string.IsNullOrEmpty(password)) continue;
                 }
                 else
                 {
-                    await WriteAnsiAsync(stream, "\r\n\u001b[1;37m  Username: \u001b[0m", isCp437);
+                    await WriteAnsiAsync(stream, $"\r\n\u001b[1;37m  {L("auth.username")} \u001b[0m", isCp437);
                     username = (await ReadLineAsync(stream, ct))?.Trim();
                     if (string.IsNullOrEmpty(username)) continue;
-                    await WriteAnsiAsync(stream, "\u001b[1;37m  Password: \u001b[0m", isCp437);
+                    await WriteAnsiAsync(stream, $"\u001b[1;37m  {L("auth.password")} \u001b[0m", isCp437);
                     password = (await ReadLineAsync(stream, ct))?.Trim();
                     if (string.IsNullOrEmpty(password)) continue;
                 }
@@ -835,53 +903,53 @@ public class MudServer
             {
                 if (isPlainText)
                 {
-                    await WriteAnsiAsync(stream, "Choose a username: ", isCp437);
+                    await WriteAnsiAsync(stream, $"{L("auth.reg_username")} ", isCp437);
                     username = (await ReadLineAsync(stream, ct))?.Trim();
                     if (string.IsNullOrEmpty(username)) continue;
                     if (username.Length < 2 || username.Length > 20)
                     {
-                        await WriteAnsiAsync(stream, "Username must be 2-20 characters.\r\n\r\n", isCp437);
+                        await WriteAnsiAsync(stream, $"{L("auth.err_username_len")}\r\n\r\n", isCp437);
                         continue;
                     }
-                    await WriteAnsiAsync(stream, "Choose a password: ", isCp437);
+                    await WriteAnsiAsync(stream, $"{L("auth.reg_password")} ", isCp437);
                     password = (await ReadLineAsync(stream, ct))?.Trim();
                     if (string.IsNullOrEmpty(password)) continue;
                     if (password.Length < 4)
                     {
-                        await WriteAnsiAsync(stream, "Password must be at least 4 characters.\r\n\r\n", isCp437);
+                        await WriteAnsiAsync(stream, $"{L("auth.err_password_len")}\r\n\r\n", isCp437);
                         continue;
                     }
-                    await WriteAnsiAsync(stream, "Confirm password: ", isCp437);
+                    await WriteAnsiAsync(stream, $"{L("auth.reg_confirm")} ", isCp437);
                     var confirm = (await ReadLineAsync(stream, ct))?.Trim();
                     if (password != confirm)
                     {
-                        await WriteAnsiAsync(stream, "Passwords do not match.\r\n\r\n", isCp437);
+                        await WriteAnsiAsync(stream, $"{L("auth.err_password_match")}\r\n\r\n", isCp437);
                         continue;
                     }
                 }
                 else
                 {
-                    await WriteAnsiAsync(stream, "\r\n\u001b[1;32m  Choose a username: \u001b[0m", isCp437);
+                    await WriteAnsiAsync(stream, $"\r\n\u001b[1;32m  {L("auth.reg_username")} \u001b[0m", isCp437);
                     username = (await ReadLineAsync(stream, ct))?.Trim();
                     if (string.IsNullOrEmpty(username)) continue;
                     if (username.Length < 2 || username.Length > 20)
                     {
-                        await WriteAnsiAsync(stream, "\r\n\u001b[1;31m  Username must be 2-20 characters.\u001b[0m\r\n\r\n", isCp437);
+                        await WriteAnsiAsync(stream, $"\r\n\u001b[1;31m  {L("auth.err_username_len")}\u001b[0m\r\n\r\n", isCp437);
                         continue;
                     }
-                    await WriteAnsiAsync(stream, "\u001b[1;32m  Choose a password: \u001b[0m", isCp437);
+                    await WriteAnsiAsync(stream, $"\u001b[1;32m  {L("auth.reg_password")} \u001b[0m", isCp437);
                     password = (await ReadLineAsync(stream, ct))?.Trim();
                     if (string.IsNullOrEmpty(password)) continue;
                     if (password.Length < 4)
                     {
-                        await WriteAnsiAsync(stream, "\r\n\u001b[1;31m  Password must be at least 4 characters.\u001b[0m\r\n\r\n", isCp437);
+                        await WriteAnsiAsync(stream, $"\r\n\u001b[1;31m  {L("auth.err_password_len")}\u001b[0m\r\n\r\n", isCp437);
                         continue;
                     }
-                    await WriteAnsiAsync(stream, "\u001b[1;32m  Confirm password: \u001b[0m", isCp437);
+                    await WriteAnsiAsync(stream, $"\u001b[1;32m  {L("auth.reg_confirm")} \u001b[0m", isCp437);
                     var confirm = (await ReadLineAsync(stream, ct))?.Trim();
                     if (password != confirm)
                     {
-                        await WriteAnsiAsync(stream, "\r\n\u001b[1;31m  Passwords do not match.\u001b[0m\r\n\r\n", isCp437);
+                        await WriteAnsiAsync(stream, $"\r\n\u001b[1;31m  {L("auth.err_password_match")}\u001b[0m\r\n\r\n", isCp437);
                         continue;
                     }
                 }
@@ -906,6 +974,10 @@ public class MudServer
                     continue;
                 }
                 Console.Error.WriteLine($"[MUD] New player registered: '{username}'");
+                // Persist the gate-chosen language so the first session (and
+                // first character) starts localized. English is the column
+                // default, so only non-en needs a write.
+                if (authLang != "en") sqlBackend.SetAccountLanguage(username!, authLang);
             }
 
             // Authenticate
@@ -914,7 +986,7 @@ public class MudServer
             if (IsLoginThrottled(effectiveIp, out int interactiveWait))
             {
                 Console.Error.WriteLine($"[MUD] SECURITY: throttled interactive login from {effectiveIp} ({interactiveWait}s remaining)");
-                string throttleMsg = $"Too many failed logins. Try again in {interactiveWait} seconds.";
+                string throttleMsg = L("auth.err_throttled", interactiveWait);
                 if (isPlainText)
                     await WriteAnsiAsync(stream, $"Error: {throttleMsg}\r\n\r\n", isCp437);
                 else
@@ -952,23 +1024,23 @@ public class MudServer
                 ActiveSessions.TryRemove(interactiveKey, out _);
                 await Task.Delay(500);
                 if (isPlainText)
-                    await WriteAnsiAsync(stream, "Previous session disconnected.\r\n", isCp437);
+                    await WriteAnsiAsync(stream, $"{L("auth.prev_session")}\r\n", isCp437);
                 else
-                    await WriteAnsiAsync(stream, "\r\n\u001b[1;33m  Previous session disconnected.\u001b[0m\r\n", isCp437);
+                    await WriteAnsiAsync(stream, $"\r\n\u001b[1;33m  {L("auth.prev_session")}\u001b[0m\r\n", isCp437);
             }
 
             if (isPlainText)
-                await WriteAnsiAsync(stream, $"Welcome, {username}!\r\n\r\n", isCp437);
+                await WriteAnsiAsync(stream, $"{L("auth.welcome", username!)}\r\n\r\n", isCp437);
             else
-                await WriteAnsiAsync(stream, $"\r\n\u001b[1;32m  Welcome, {username}!\u001b[0m\r\n\r\n", isCp437);
+                await WriteAnsiAsync(stream, $"\r\n\u001b[1;32m  {L("auth.welcome", username!)}\u001b[0m\r\n\r\n", isCp437);
             Console.Error.WriteLine($"[MUD] Interactive auth succeeded for '{username}'");
             return (username!, "MUD");
         }
 
         if (isPlainText)
-            await WriteAnsiAsync(stream, "Too many attempts. Goodbye.\r\n", isCp437);
+            await WriteAnsiAsync(stream, $"{L("auth.too_many")}\r\n", isCp437);
         else
-            await WriteAnsiAsync(stream, "\r\n\u001b[1;31m  Too many attempts. Goodbye.\u001b[0m\r\n", isCp437);
+            await WriteAnsiAsync(stream, $"\r\n\u001b[1;31m  {L("auth.too_many")}\u001b[0m\r\n", isCp437);
         return null;
     }
 
@@ -988,6 +1060,9 @@ public class MudServer
                     new System.Text.EncoderReplacementFallback("?"),
                     new System.Text.DecoderReplacementFallback("?"));
             }
+            // v0.65.12 (loc audit): Hungarian double-acute vowels are not in
+            // CP437; transliterate to umlaut forms instead of '?'.
+            text = text.Replace('ő', 'ö').Replace('ű', 'ü').Replace('Ő', 'Ö').Replace('Ű', 'Ü');
             bytes = _cp437Encoding.GetBytes(text);
         }
         else

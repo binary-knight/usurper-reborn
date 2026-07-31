@@ -1907,6 +1907,17 @@ public static class LLMMoments
                     UserPrompt = userPrompt,
                     MaxTokens = 300,
                     Temperature = 0.85,
+                    // v0.65.11 telemetry-driven tiering: strategic goals are
+                    // 96.5% of ALL LLM calls (2,346/wk vs ~86/wk for every
+                    // player-facing moment combined) yet their output is a tiny
+                    // structured JSON list ("Find Better Weapons", Economic,
+                    // 0.8) -- cheap-tier work that was riding the premium
+                    // model. ParseStrategicGoalsJson is already tolerant and
+                    // the template fallback always works, so quality risk is
+                    // minimal while the dominant cost drops ~3x and latency
+                    // improves. Player-facing narrative depth (topic responses,
+                    // personality summaries) stays on the premium tier.
+                    Model = LLMSettings.GetCheapModelOrDefault(),
                 }, ct);
 
                 if (llmResp != null && !string.IsNullOrWhiteSpace(llmResp.Text))

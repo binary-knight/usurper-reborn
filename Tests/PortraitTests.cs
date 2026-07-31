@@ -99,6 +99,52 @@ namespace UsurperRemake.Tests
             }
         }
 
+        [Theory]
+        [InlineData(PortraitEncoder.Tier.TrueColor)]
+        [InlineData(PortraitEncoder.Tier.Xterm256)]
+        [InlineData(PortraitEncoder.Tier.Ansi16)]
+        public void Encoder_SizedOverload_HonorsRequestedFootprint(PortraitEncoder.Tier tier)
+        {
+            // v0.65.13: the large truecolor footprint (and any custom size)
+            // must produce exactly the requested cell rows, each carrying the
+            // requested number of half-block glyphs.
+            var rows = PortraitEncoder.Encode(SolidRgba(128, 128, 200, 150, 120), 128, 128, tier,
+                PortraitEncoder.TrueColorCols, PortraitEncoder.TrueColorRows);
+
+            rows.Length.Should().Be(PortraitEncoder.TrueColorRows);
+            foreach (var row in rows)
+            {
+                row.Should().EndWith("\x1b[0m");
+                // Count printable glyphs (everything outside escape sequences).
+                int glyphs = System.Text.RegularExpressions.Regex
+                    .Replace(row, "\x1b\\[[0-9;]*m", "").Length;
+                glyphs.Should().Be(PortraitEncoder.TrueColorCols);
+            }
+        }
+
+        [Fact]
+        public void Encoder_ClassicOverload_UnchangedFootprint()
+        {
+            // The delegating overload must keep the 34x14 contract every
+            // pre-0.65.13 call site (and the BBS tier) relies on.
+            var rows = PortraitEncoder.Encode(SolidRgba(96, 96, 90, 90, 90), 96, 96, PortraitEncoder.Tier.Ansi16);
+            rows.Length.Should().Be(PortraitEncoder.Rows);
+        }
+
+        [Theory]
+        [InlineData(null, false)]           // pre-0.65.13 client: no version field
+        [InlineData("", false)]
+        [InlineData("garbage", false)]
+        [InlineData("0.65.6", false)]       // legacy SGR parser -- shreds truecolor
+        [InlineData("0.65.7", true)]        // first client whose parser passes 38;2
+        [InlineData("0.65.13", true)]
+        [InlineData("1.0.0", true)]         // release build stays eligible
+        public void ClientSupportsTrueColor_GatesOnVersion(string? version, bool expected)
+        {
+            UsurperRemake.Systems.NPCPortraitSystem.ClientSupportsTrueColor(version)
+                .Should().Be(expected);
+        }
+
         [Fact]
         public void Encoder_TrueColor_EmitsExactRgbOfSolidInput()
         {
