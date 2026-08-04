@@ -142,24 +142,54 @@ public static class RelayClient
 
     /// <summary>
     /// Parse a direct AUTH header sent by the game client through SSH.
-    /// Format: AUTH:username:password:connectionType or AUTH:username:password:REGISTER:connectionType
+    ///
+    /// Accepted shapes (payload = everything after the "AUTH:" prefix):
+    ///   username:password:connectionType                        (3)
+    ///   username:password:connectionType:clientVersion          (4)  v0.65.13+
+    ///   username:password:REGISTER:connectionType               (4)
+    ///   username:password:REGISTER:connectionType:clientVersion (5)
+    ///
+    /// v1.0.1 REGRESSION FIX: v0.65.13 appended a trailing client-version
+    /// field to the login AUTH line and updated MudServer's parser, but NOT
+    /// this one. The desktop and Steam clients connect SSH-encrypted by
+    /// default, which routes through this relay, so every one of them was
+    /// rejected here with "Invalid AUTH format: 4 parts" and bounced back to
+    /// the main menu. Direct-TCP clients were unaffected (they skip the relay
+    /// and hit MudServer's parser), which is why the failure looked
+    /// account-specific instead of transport-specific.
+    ///
+    /// The REGISTER discriminator is checked BEFORE the plain 4-part shape so
+    /// a register line can never be mistaken for a versioned login line.
     /// </summary>
-    private static (string username, string password, string connectionType, bool isRegistration)?
+    internal static (string username, string password, string connectionType, bool isRegistration, string? clientVersion)?
         ParseDirectAuth(string authLine)
     {
         // Strip the "AUTH:" prefix
         var payload = authLine.Substring(5);
         var parts = payload.Split(':');
 
+        bool IsRegisterAt(int i) =>
+            parts.Length > i && parts[i].Equals("REGISTER", StringComparison.OrdinalIgnoreCase);
+
+        if (parts.Length == 4 && IsRegisterAt(2))
+        {
+            // username:password:REGISTER:connectionType
+            return (parts[0], parts[1], parts[3], true, null);
+        }
+        if (parts.Length == 5 && IsRegisterAt(2))
+        {
+            // username:password:REGISTER:connectionType:clientVersion
+            return (parts[0], parts[1], parts[3], true, parts[4]);
+        }
         if (parts.Length == 3)
         {
-            // AUTH:username:password:connectionType
-            return (parts[0], parts[1], parts[2], false);
+            // username:password:connectionType
+            return (parts[0], parts[1], parts[2], false, null);
         }
-        else if (parts.Length == 4 && parts[2].Equals("REGISTER", StringComparison.OrdinalIgnoreCase))
+        if (parts.Length == 4)
         {
-            // AUTH:username:password:REGISTER:connectionType
-            return (parts[0], parts[1], parts[3], true);
+            // username:password:connectionType:clientVersion
+            return (parts[0], parts[1], parts[2], false, parts[3]);
         }
 
         Console.Error.WriteLine($"[RELAY] Invalid AUTH format: {parts.Length} parts");

@@ -1,0 +1,32 @@
+[h1]Usurper Reborn 1.0.1 - Login Fix[/h1]
+
+If you tried to play from the desktop or Steam client since launch and got bounced back to the main menu, this is the fix. Update and you are back in.
+
+[h2]What was broken[/h2]
+
+Selecting your account returned straight to the main menu, with an error that flashed by too fast to read. Playing in the browser worked fine, which made it look like an account problem. It was not.
+
+The desktop and Steam clients connect to the server over an encrypted link by default, and that link passes through a relay. In an earlier update the login message gained one extra piece of information so the game could send you better looking NPC portraits. The main server was taught to expect it. The relay was not, so it rejected every login it saw and dropped you back to the menu.
+
+Your characters were never in any danger. Nothing was lost, nothing was corrupted, and no account was ever locked or banned. The server simply never heard you knock.
+
+[h2]The fix[/h2]
+
+The relay now understands every version of the login message, old and new. Eight automated tests were added covering each one, so this specific mistake cannot slip through again.
+
+[h2]What you need to do[/h2]
+
+[list]
+[*]Let Steam update the game, then log in normally.
+[*]If you were already updated and still could not get in, that was this bug, not your password. Try again now.
+[*]Playing in a browser at usurper-reborn.net was never affected and still works.
+[/list]
+
+[h2]Still on the list[/h2]
+
+[list]
+[*]On the encrypted connection, NPC portraits currently render in 16 colors rather than full color. Everything works, it just looks less sharp than it should. A proper fix is coming.
+[*]The browser login menu takes a few seconds to appear while the connection is set up. Anything you type before it shows up is lost. That needs a loading indicator.
+[/list]
+
+Apologies to anyone who hit this on launch day. Thank you to the players who reported it clearly enough to track down.
