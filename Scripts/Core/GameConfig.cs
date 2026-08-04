@@ -10,8 +10,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "0.65.14";
-    public const string VersionName = "Countdown"; // the Beta -> 1.0 release-prep cycle
+    public const string Version = "1.0.0";
+    public const string VersionName = "Coronation"; // 1.0 release
 
     // v0.57.12: Alignment scale cap. Character.Chivalry and Character.Darkness setters clamp to [0, AlignmentCap]
     // as defense in depth against direct-mutation bypass sites that don't route through AlignmentSystem.ChangeAlignment.

@@ -403,7 +403,7 @@ public partial class GameEngine
             terminal.WriteLine("");
         }
 
-        ShowAlphaBanner();
+        ShowLaunchBanner();
 
         // Check if this account has existing characters (main + alt)
         var accountName = playerName;
@@ -1237,7 +1237,21 @@ public partial class GameEngine
         await terminal.WaitForKey();
     }
     
-    private void ShowAlphaBanner()
+    /// <summary>
+    /// Title-screen banner. Through the alpha and beta cycles this was a red
+    /// "expect bugs" warning; at 1.0 it is a welcome that still carries the
+    /// two things worth putting in front of every player on every launch --
+    /// how to report a bug, and where the community is.
+    ///
+    /// The engine.alpha_* loc keys keep their names (they are internal, and
+    /// renaming 7 keys across 5 languages on release day buys nothing).
+    ///
+    /// Box geometry: the border is 74 columns wide inside the corners, and
+    /// every content line is written as "  ║ " + text + " ║", so each of the
+    /// three text strings must be EXACTLY 72 display columns in every
+    /// language. The Discord line pads to the same width in code.
+    /// </summary>
+    private void ShowLaunchBanner()
     {
         bool compact = UsurperRemake.BBS.DoorMode.IsInDoorMode ||
             UsurperRemake.Server.SessionContext.Current?.ConnectionType == "BBS";
@@ -1262,28 +1276,35 @@ public partial class GameEngine
         }
         else
         {
-            terminal.SetColor("bright_red");
+            const int BoxInner = 72; // display columns available per content line
+            string Fit(string key)
+            {
+                var s = Loc.Get(key) ?? "";
+                // Translations drift; never let one blow the border apart.
+                return s.Length > BoxInner ? s.Substring(0, BoxInner) : s.PadRight(BoxInner);
+            }
+
+            terminal.SetColor("bright_cyan");
             terminal.WriteLine("  ╔══════════════════════════════════════════════════════════════════════════╗");
             terminal.Write("  ║ ");
             terminal.SetColor("bright_yellow");
-            terminal.Write(Loc.Get("engine.alpha_box_title"));
-            terminal.SetColor("bright_red");
-            terminal.WriteLine("  ║");
-            terminal.Write("  ║ ");
-            terminal.SetColor("white");
-            terminal.Write(Loc.Get("engine.alpha_box_wipe"));
-            terminal.SetColor("bright_red");
+            terminal.Write(Fit("engine.alpha_box_title"));
+            terminal.SetColor("bright_cyan");
             terminal.WriteLine(" ║");
             terminal.Write("  ║ ");
             terminal.SetColor("white");
-            terminal.Write(Loc.Get("engine.alpha_box_report"));
-            terminal.SetColor("bright_red");
+            terminal.Write(Fit("engine.alpha_box_wipe"));
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine(" ║");
+            terminal.Write("  ║ ");
+            terminal.SetColor("white");
+            terminal.Write(Fit("engine.alpha_box_report"));
+            terminal.SetColor("bright_cyan");
             terminal.WriteLine(" ║");
             terminal.Write("  ║ ");
             terminal.SetColor("bright_cyan");
-            terminal.Write(GameConfig.DiscordInvite);
-            terminal.SetColor("bright_red");
-            terminal.WriteLine("                                                    ║");
+            terminal.Write(GameConfig.DiscordInvite.PadRight(BoxInner));
+            terminal.WriteLine(" ║");
             terminal.WriteLine("  ╚══════════════════════════════════════════════════════════════════════════╝");
         }
         terminal.WriteLine("");
@@ -1338,7 +1359,7 @@ public partial class GameEngine
             }
             terminal.SetColor("darkgray");
             terminal.WriteLine($"  v{GameConfig.Version} \"{GameConfig.VersionName}\"");
-            ShowAlphaBanner();
+            ShowLaunchBanner();
 
             if (GameConfig.ScreenReaderMode)
             {

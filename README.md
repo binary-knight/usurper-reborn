@@ -2,7 +2,7 @@
 
 ## A Persistent Online Text RPG with a Living World
 
-**BETA v0.65.5** | **FREE AND OPEN SOURCE** | **GPL v2**
+**v1.0.0 "Coronation"** | **FREE AND OPEN SOURCE** | **GPL v2**
 
 130+ autonomous NPCs wake up, go to work, visit taverns, fall in love, get married, have children, age, and eventually die of old age, all while you're offline. Log back in, read the news feed, and discover that the blacksmith married the barmaid, the king was assassinated, or a new generation just came of age. The world doesn't wait for you.
 
@@ -278,6 +278,7 @@ For detailed BBS setup, see [DOCS/BBS_DOOR_SETUP.md](DOCS/BBS_DOOR_SETUP.md).
 
 The game ships small patches frequently. Each version has a dedicated release notes file in `DOCS/RELEASE_NOTES_*.md`. Highlights of the recent arc:
 
+- **v1.0.0 "Coronation":** the release. The Beta label comes off. Nothing in this version is a new subsystem; it is the accumulated result of the Countdown arc below plus a final hardening pass: the level-40 progression cliff closed end to end (XP taper through level 40, boss-flee desperation scaling, a guarded round after a failed flee, and the Hall of the Fallen memorial that hands a fallen character's heir a level-scaled inheritance), the login gate and permadeath cinematic fully localized in all five languages, AI-painted NPC portraits rendered at full fidelity for terminals that can carry them, and an external security audit answered in full. See `DOCS/RELEASE_NOTES_1.0.0.md`.
 - **v0.62 through v0.65 (the Beta to 1.0 "Countdown" arc):** the alignment / Light-and-Dark payoff pass (Dread and Renown notoriety ladders, the Sellsword Hall freelance career, the Sanctum light hub, Dark Alley depth); the "Bloodlines" multi-generational family arc (adult children recognize you as their parent, dynasty standing, inheritance on permadeath); the NPC "Brain v2" overhaul (goal-aware utility scorer, real combat for notable NPCs, optional server-side LLM moment generators with a heuristic fallback that always works); a haproxy migration for the online server; a big onboarding pass (guided first fight, guaranteed level 2, progression roadmap screen); player class specializations at level 25; and companion three-beat quest chains ("The Long Road"). See the individual `DOCS/RELEASE_NOTES_0.6*.md` files for detail.
 - **v0.61.4 (Dynamic NPC Dialogue Phase 1.5 + Hungarian end-to-end + Steam achievement coverage):** Phase 1.5 of the dynamic NPC dialogue plan. Seven contextual flavor layers (mood, memory, witness, player-state, grief, personality, faction-tension) tone-coherent via a Tone classification on the mood layer that downstream layers consult, recent-line variety cache keyed per-(npc, layer), romance-partner suppression for the faction layer. Wired into `ShowGreeting`, `ShowFarewell`, `HandleChatTopic`, and `HandlePersonalQuestion`. **Hungarian end-to-end:** 175 VN dialogue template strings + 114 enhancer flavor pool strings extracted to `dialogue.vn.*` and `dialogue.enhance.*` loc keys with full Hungarian translations. Language gate widened from English-only to en+hu. Hungarian players now get the complete contextual-dialogue experience. **Steam achievement coverage: 79/79 live.** One previously-unreachable in-game achievement (`big_spender_magic`) wired up, and 30 in-game achievements that had never been registered on the Steamworks Partner dashboard are now live with unique icon art per achievement (tier-appropriate frames: Diamond rainbow / Platinum / ornate gold / polished silver / bronze; visual progression sets for the Gauntlet tier, login-streak, and world-boss series). The `bouny_hunter` typo on the Steam side corrected to `bounty_hunter`. Plus rolled-in hotfix work: 12 pre-existing v0.60.0 corrupted loc keys fixed (dungeon advice, duel decline, attack treacherous, breadcrumb -- they shipped with literal `"  \\"` placeholder values and never got real content); stuck player-echo recruitment auto-cleanup at dungeon entry + visible recruited-list at Team Corner + new `[U]` un-recruit hotkey; dungeon feature gold-split bug (companions/NPCs were eating the player's gold reward, now grouped-players-only); class names localized everywhere (`Character.ClassName` now routes through `Loc.Get` so all ~15 display sites pick up session language); bug-report cancel hint surfaced; 10 login-streak messages localized.
 - **v0.61.0 (Wilderness Reborn):** Two new systems folded into the wilderness. **Druid's Shrines** -- 5 named shrines (one per remaining Old God: Terravok, Maelketh, Noctura, Aurelion, Veloura), each in a wilderness region, granting a 24-hour combat passive on attunement (HP regen / melee damage / crit + backstab / holy damage / charisma + reaction). One attunement at a time with alignment cost; per-shrine favor counter; favor-10 milestone grants a permanent stat lift themed to the god's domain. **Beast Taming** -- 8 tameable wild creatures, permanent roster (cap 8), per-encounter 3-attempt CHA+DEX skill check. 6 passives (hawk map-reveal, goat fatigue reduction, toad poison resist + daily antidote, sprite mana regen, spider crit + reaction penalty, wisp shadow proc + opening-fight Hidden) and 2 combat pets (Dire Wolf + Storm Eagle) that occupy a brand-new 5th party slot in dungeon combat. Plus a street-encounter NPC murder-cap bypass fix (was uncapped, now real-NPC kills count toward the 3/day limit), and the newborn notification text correction (children live at Home, not Love Corner). All 66 new keys translated into Spanish, French, Italian, Hungarian.
@@ -329,16 +330,17 @@ Join Discord for discussions, feedback, and updates: **https://discord.gg/EZhwgD
 
 *"You are not a wave fighting the ocean. You ARE the ocean, dreaming of being a wave."*
 
-## Known Issues (Beta v0.65.5)
+## Known Issues (v1.0.0)
 
-- Save files from earlier alpha versions may not be fully compatible.
+- Save files from the earliest alpha versions may not be fully compatible.
 - BBS FOSSIL mode not natively supported (use `--stdio` flag for FOSSIL-based BBSes via host pipe).
-- Steam features only work when game is launched through the Steam client.
-- Electron graphical client inventory equip flow is partially functional (interactive overlays in progress).
+- Steam features only work when the game is launched through the Steam client.
+- The Electron graphical client is optional and still incomplete; the terminal client is the supported way to play.
+- World news feed entries are stored pre-rendered in English. Interface, dialogue, and gameplay text are fully localized in all five languages; the news feed is not yet.
 - Auto-updater for Linux x64 BBS deployments doesn't currently apply the update (under investigation).
 
 **Report bugs:** Press `!` in-game, or [Discord](https://discord.gg/EZhwgDT6Ta), or [GitHub Issues](https://github.com/binary-knight/usurper-reborn/issues).
 
 ---
 
-**Status:** BETA v0.65.5. The world is running. [Watch it live.](https://usurper-reborn.net)
+**Status:** v1.0.0 "Coronation". The world is running. [Watch it live.](https://usurper-reborn.net)
