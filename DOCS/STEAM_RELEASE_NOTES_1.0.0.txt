@@ -1,0 +1,74 @@
+[h1]Usurper Reborn 1.0 "Coronation"[/h1]
+
+The Beta label comes off.
+
+Nothing in this release is a new subsystem. Version 1.0 is what the last year of work was building toward: a world that runs whether or not you are watching, a progression curve that no longer punishes the players it was meant to reward, five languages at full parity, and a server a stranger can host safely. This is the seal on that work.
+
+[h2]The level 40 wall is gone[/h2]
+
+Telemetry showed players leaving the game at the exact point it was supposed to open up. Around level 40, one bad fight became a dead character, and a dead character became a deleted one. That is fixed, and not by making the world safe.
+
+[list]
+[*][b]The experience curve tapers.[/b] The early-game bonus now winds down smoothly through level 40 instead of falling off a shelf at 21.
+[*][b]Bosses let you run.[/b] Your odds of escaping a boss fight climb as you drop below half health. A losing fight is survivable if you read it in time.
+[*][b]A failed escape is no longer a death sentence.[/b] Fail the roll and you get one guarded round at halved incoming damage instead of a free kill.
+[*][b]Death carries forward.[/b] When a character is gone for good, the Hall of the Fallen at the Temple keeps their name, and the next character on your account inherits gold scaled to what they achieved.
+[/list]
+
+Involuntary character deletions have effectively stopped in the live data.
+
+[h2]Five languages, all the way to the edges[/h2]
+
+English, Spanish, French, Italian, and Hungarian. Not a partial translation.
+
+[list]
+[*]The login screen, the permadeath cinematic, and the death broadcast are localized. Those were the last three surfaces still speaking English to everyone.
+[*]When a character dies permanently, every player watching sees the announcement in their own language.
+[*]You can pick your language before you log in, from the login screen itself.
+[*]Hungarian long-vowel characters now display correctly on BBS terminals instead of dropping.
+[*]An automated gate now fails the build if a single translation key drifts out of parity, so this does not quietly rot.
+[/list]
+
+[h2]NPC portraits at full fidelity[/h2]
+
+The painted NPC portraits added late in beta were being crushed down to 16 colors and a postage stamp for the game's own client, which turned a painted face into noise. Clients now tell the server what they can render, and capable ones get full color at more than double the resolution. BBS terminals keep the authentic 16 color look on purpose. No art was regenerated, so every portrait already in the world looks better the moment you connect.
+
+[h2]Security[/h2]
+
+An independent researcher audited the source and reported eight findings. Four are fixed in this release, two were already correct in the code, one could not be reproduced, and one is documented with a plan.
+
+The two that mattered both affected people running their own servers. A stock Docker deployment shipped a working default administrator password whose lockout disarmed itself, and the superuser account name could be registered by anyone on a fresh server. Both are closed. The public server was never exposed by either.
+
+If you self-host, update. The full detail is in the repository.
+
+[h2]Also in this release[/h2]
+
+[list]
+[*]The title screen no longer warns you to expect bugs. It now tells you how to report one and where the community is.
+[*]The Linux launcher no longer leaves an unkillable process behind after you quit.
+[*]NPC decision-making moved to a cheaper model tier, cutting server running costs without changing behavior.
+[*]The website has been rebuilt, including a public roadmap.
+[/list]
+
+[h2]Known limits, stated plainly[/h2]
+
+[list]
+[*]World news entries are still stored in English. The interface, dialogue, quests, and combat are fully localized; the news feed is not yet. It is a data problem, not a translation problem, and it is on the list.
+[*]The graphical client is optional and incomplete. The terminal client is the supported way to play.
+[*]The auto updater for Linux BBS deployments does not currently apply updates.
+[/list]
+
+[h2]Where to play[/h2]
+
+[list]
+[*]In your browser at usurper-reborn.net, with no install
+[*]Over SSH, or from any MUD client such as Mudlet, TinTin++, or MUSHclient
+[*]As a door on a real BBS
+[*]Offline as a full single player campaign, then bring the same character online whenever you want
+[/list]
+
+Free forever, open source under GPL v2.
+
+The world does not wait for you. The town marries, raises children, grows old, and buries its dead on its own schedule, and it will do all of that whether or not you ever log in. But it remembers the people who show up.
+
+The throne is open.
