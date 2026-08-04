@@ -4119,9 +4119,15 @@ namespace UsurperRemake.Systems
                 if (password.Length < 4)
                     return (false, "Password must be at least 4 characters.");
 
+                // (reserved-name gate is applied with the other name rules below)
+
                 // Block reserved alt character suffix
                 if (username.Contains(GameConfig.AltCharacterSuffix, StringComparison.OrdinalIgnoreCase))
                     return (false, "Username contains reserved characters.");
+
+                // Block the Implementor account (security audit F1, v0.65.14)
+                if (IsReservedUsername(username))
+                    return (false, "That username is reserved.");
 
                 // Check for valid characters (alphanumeric, spaces, hyphens, underscores)
                 foreach (char c in username)
@@ -4223,6 +4229,24 @@ namespace UsurperRemake.Systems
         /// Used by --auto-provision flag for BBS passthrough connections where
         /// the BBS already handles user authentication.
         /// </summary>
+        /// <summary>
+        /// Usernames no self-service path may claim. Currently the Implementor
+        /// account: PlayerSession auto-promotes it to the top wizard tier on
+        /// every login and Implementor can never be demoted, so registering it
+        /// would hand a stranger the server (security audit F1, v0.65.14).
+        /// The operator provisions it out of band (direct DB insert, or by
+        /// pointing USURPER_IMPLEMENTOR at an account they already control).
+        /// Case-insensitive: usernames are lowercased at INSERT, and the
+        /// auto-promotion compares case-insensitively.
+        /// </summary>
+        public static bool IsReservedUsername(string username)
+        {
+            if (string.IsNullOrWhiteSpace(username)) return false;
+            return username.Trim().Equals(
+                UsurperRemake.Server.WizardConstants.ImplementorUsername,
+                StringComparison.OrdinalIgnoreCase);
+        }
+
         public async Task<(bool success, string message)> AutoProvisionPlayer(string username)
         {
             try
@@ -4233,6 +4257,10 @@ namespace UsurperRemake.Systems
                 // Block reserved alt character suffix
                 if (username.Contains(GameConfig.AltCharacterSuffix, StringComparison.OrdinalIgnoreCase))
                     return (false, "Username contains reserved characters.");
+
+                // Block the Implementor account (security audit F1, v0.65.14)
+                if (IsReservedUsername(username))
+                    return (false, "That username is reserved.");
 
                 // Check for valid characters (alphanumeric, spaces, hyphens, underscores)
                 foreach (char c in username)

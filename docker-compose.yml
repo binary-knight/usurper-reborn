@@ -8,9 +8,14 @@
 # Game server listens on port 4000 (raw TCP) for BBS/MUD client connections.
 # Web interface available on port 80 (browser play + dashboards).
 #
-# Customize:
+# Customize (DO THIS BEFORE EXPOSING THE SERVER TO A NETWORK):
 #   - Replace "YourAdminName" with your admin username
-#   - Change BALANCE_PASS from the default
+#   - Set BALANCE_PASS to a real password. It is deliberately NOT set below:
+#     the admin dashboard (which fronts world-wipe, bans, and player edits)
+#     refuses every route except change-password while the shipped default
+#     password is still active, so an unconfigured deploy cannot be nuked by
+#     anyone who read this file. Setting BALANCE_PASS=changeme counts as
+#     unconfigured and stays locked.
 #   - Mount your own index.html: ./my-landing.html:/opt/usurper/web/index.html
 
 services:
@@ -46,7 +51,13 @@ services:
       - MUD_PORT=4000
       - DB_PATH=/var/usurper/usurper_online.db
       - BALANCE_USER=admin
-      - BALANCE_PASS=changeme
+      # Set a real password here before exposing this deploy. Leaving it unset
+      # (or setting it to 'changeme') keeps the admin dashboard locked to the
+      # change-password flow only. See the header comment.
+      # - BALANCE_PASS=pick-something-long-and-unique
+      # SSH gateway account used only when MUD_MODE=0 (legacy SSH hop).
+      # - SSH_USER=usurper
+      # - SSH_PASS=set-a-real-one
     depends_on:
       - usurper-game
     restart: unless-stopped

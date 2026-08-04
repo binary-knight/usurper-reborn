@@ -36,8 +36,33 @@ public enum WizardLevel
 /// </summary>
 public static class WizardConstants
 {
-    /// <summary>The username that is always auto-promoted to Implementor.</summary>
-    public const string IMPLEMENTOR_USERNAME = "rage";
+    /// <summary>
+    /// The account that is auto-promoted to Implementor on login. Defaults to
+    /// the canonical server's owner; self-hosters override it with the
+    /// USURPER_IMPLEMENTOR env var so their deploy's superuser is an account
+    /// THEY control.
+    ///
+    /// v0.65.14 (security audit F1): auto-promotion is self-escalating and
+    /// Implementor can never be demoted, so whoever holds this name owns the
+    /// server. On a fresh deploy the name was unregistered, meaning anyone who
+    /// registered it first became superuser. Registration now REFUSES this
+    /// name (see SqlSaveBackend.IsReservedUsername), so the account can only
+    /// come into existence through the operator's own provisioning.
+    /// </summary>
+    public static string ImplementorUsername
+    {
+        get
+        {
+            var env = Environment.GetEnvironmentVariable("USURPER_IMPLEMENTOR");
+            return string.IsNullOrWhiteSpace(env) ? DefaultImplementorUsername : env.Trim().ToLowerInvariant();
+        }
+    }
+
+    /// <summary>Fallback when USURPER_IMPLEMENTOR is not configured.</summary>
+    public const string DefaultImplementorUsername = "rage";
+
+    /// <summary>Back-compat alias for the pre-v0.65.14 constant name.</summary>
+    public static string IMPLEMENTOR_USERNAME => ImplementorUsername;
 
     /// <summary>Get the display title for a wizard level.</summary>
     public static string GetTitle(WizardLevel level) => level switch

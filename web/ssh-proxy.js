@@ -32,8 +32,13 @@ try {
 const WS_PORT = 3000;
 const SSH_HOST = '127.0.0.1';
 const SSH_PORT = 4000;
-const SSH_USER = 'usurper';
-const SSH_PASS = 'play';
+// Gateway account for the legacy SSH hop (only used when MUD_MODE=0). This is
+// a dumb pipe -- sshd-usurper ForceCommands the relay and real authentication
+// happens in-game -- but a source-hardcoded password is still a credential
+// every deploy shares, so it is env-overridable per deploy.
+// v0.65.14 (security audit F3).
+const SSH_USER = process.env.SSH_USER || 'usurper';
+const SSH_PASS = process.env.SSH_PASS || 'play';
 const DB_PATH = process.env.DB_PATH || '/var/usurper/usurper_online.db';
 
 // MUD mode: connect directly to MUD TCP server instead of through SSH
@@ -52,7 +57,12 @@ const SPONSORS_CACHE_TTL = 3600000; // 1 hour
 
 // Balance dashboard auth
 const BALANCE_USER = process.env.BALANCE_USER || 'admin';
-const BALANCE_DEFAULT_PASS = process.env.BALANCE_PASS || 'changeme';
+// The password this repo ships (docker-compose, docs, examples). NEVER derived
+// from the environment -- isDefaultCredentialActive() compares against it to
+// decide whether the admin surface is still wearing its factory lock, so an
+// operator who "sets" BALANCE_PASS to this exact value must stay locked out.
+const SHIPPED_DEFAULT_PASS = 'changeme';
+const BALANCE_DEFAULT_PASS = process.env.BALANCE_PASS || SHIPPED_DEFAULT_PASS;
 const BALANCE_SECRET = process.env.BALANCE_SECRET || crypto.randomBytes(32).toString('hex');
 const BALANCE_TOKEN_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -159,9 +169,21 @@ function setBalancePasswordHash(hash) {
 // change-password is disabled -- the operator logs in with the default once,
 // is forced to set a real password, and only then does the dashboard unlock.
 // Cached because bcrypt.compareSync is ~100ms; invalidated on password change.
+//
+// v0.65.14 (security audit F2): the env check below used to be
+// `if (process.env.BALANCE_PASS) return false;` -- merely SETTING the variable
+// disarmed the lock regardless of its value. docker-compose.yml ships
+// `BALANCE_PASS=changeme`, so every stock Docker deploy authenticated
+// admin/changeme straight through to /api/admin/nuke. The env bypass now
+// requires the operator's password to differ from the shipped default; setting
+// it to 'changeme' is treated as no password at all (fail closed).
 let _defaultCredCache = null; // null = unknown, else boolean
 function isDefaultCredentialActive() {
-  if (process.env.BALANCE_PASS) return false; // operator-chosen via env
+  if (process.env.BALANCE_PASS) {
+    if (process.env.BALANCE_PASS !== SHIPPED_DEFAULT_PASS) return false; // operator-chosen via env
+    console.warn('[security] BALANCE_PASS is set to the shipped default; admin routes stay locked until it is changed.');
+    return true;
+  }
   if (_defaultCredCache !== null) return _defaultCredCache;
   try {
     const storedHash = getBalancePasswordHash();
@@ -328,6 +350,31 @@ const ALLOWED_ORIGINS = [
   'file://',            // Electron desktop client
   'app://',             // Electron custom protocol
 ];
+
+// Exact scheme+host origin match. Browsers send an absolute Origin; we parse it
+// and compare against the allowlist parsed the same way, so a suffix like
+// "https://usurper-reborn.net.evil.com" no longer satisfies the check. The
+// non-http schemes in the list (file://, app://) carry no host, so they are
+// matched on the scheme alone -- which is what Electron actually sends.
+function isAllowedOrigin(origin) {
+  let parsed;
+  try { parsed = new URL(origin); } catch { return false; }
+  for (const allowed of ALLOWED_ORIGINS) {
+    if (allowed.endsWith('://')) {
+      if (parsed.protocol === allowed.slice(0, -2)) return true; // 'file://' -> 'file:'
+      continue;
+    }
+    let a;
+    try { a = new URL(allowed); } catch { continue; }
+    if (parsed.protocol === a.protocol && parsed.hostname === a.hostname) {
+      // Port must match when the allowlist pins one; localhost dev ports are
+      // listed without one and may use any port.
+      if (a.port && parsed.port !== a.port) continue;
+      return true;
+    }
+  }
+  return false;
+}
 
 // --- Database Setup ---
 let db = null;
@@ -4205,8 +4252,12 @@ wss.on('connection', (ws, req) => {
   const origin = req.headers.origin || '';
   const clientIP = req.headers['x-real-ip'] || req.socket.remoteAddress;
 
-  // Origin check (allow if no origin header - direct WS clients)
-  if (origin && !ALLOWED_ORIGINS.some(o => origin.startsWith(o))) {
+  // Origin check (allow if no origin header - direct WS clients, e.g. Electron
+  // and MUD tooling, which send none).
+  // v0.65.14 (security audit F5): this used to be `origin.startsWith(o)`, so
+  // https://usurper-reborn.net.evil.com passed the gate. Now compared on the
+  // parsed scheme+host, exactly.
+  if (origin && !isAllowedOrigin(origin)) {
     console.log(`[usurper-web] Rejected connection from origin: ${origin}`);
     ws.close(1008, 'Origin not allowed');
     return;
