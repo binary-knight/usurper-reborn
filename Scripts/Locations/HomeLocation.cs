@@ -677,8 +677,26 @@ public class HomeLocation : BaseLocation
         if (currentPlayer.MurderWeight >= 6f) restEfficiency *= 0.50f;
         else if (currentPlayer.MurderWeight >= 3f) restEfficiency *= 0.75f;
 
-        long healAmount = (long)((currentPlayer.MaxHP - currentPlayer.HP) * restEfficiency);
-        long manaAmount = (long)((currentPlayer.MaxMana - currentPlayer.Mana) * restEfficiency);
+        // v1.0.2 (player report): recover a percentage of MAXIMUM hp/mana, not of
+        // the missing amount. HomeRecoveryPercent is a per-tier share of your full
+        // bar (25% at a straw pallet up to 100% at the best quarters), and the
+        // on-screen message reports restEfficiency as that percentage.
+        //
+        // Pre-fix this multiplied the SHORTFALL, which made every tier below the
+        // top asymptotic: each rest closed a fraction of the remaining gap, so a
+        // wounded player could never actually reach full health no matter how
+        // many rests they spent, and the same rest healed wildly different
+        // amounts depending on how hurt they happened to be. Tier 5 (100%)
+        // coincidentally behaved correctly, which is why this survived.
+        //
+        // The full-recovery sleep paths deliberately keep the shortfall formula:
+        // there restEfficiency starts at 1.0 and is only cut by the Blood Price
+        // penalty, so "75% of the way to full" is the intended meaning.
+        long healAmount = GameConfig.GetRestRecoveryAmount(
+            currentPlayer.MaxHP, currentPlayer.HP, restEfficiency);
+        long manaAmount = GameConfig.GetRestRecoveryAmount(
+            currentPlayer.MaxMana, currentPlayer.Mana, restEfficiency);
+
         currentPlayer.HP = Math.Min(currentPlayer.MaxHP, currentPlayer.HP + healAmount);
         currentPlayer.Mana = Math.Min(currentPlayer.MaxMana, currentPlayer.Mana + manaAmount);
 

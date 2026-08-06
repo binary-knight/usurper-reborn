@@ -21,6 +21,7 @@ namespace UsurperReborn.Tests;
 ///   - Slice 9a/9b: LLM moment fallback paths still complete safely with
 ///     LLM disabled.
 /// </summary>
+[Collection("LLMEnvironmentVars")]
 public class BrainV2SlicesSevenEightNineTests
 {
     private static NPC MakeNPC(

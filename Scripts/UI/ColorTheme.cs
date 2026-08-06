@@ -15,6 +15,62 @@ public enum ColorThemeType
     HighContrast   // Maximum brightness/readability
 }
 
+/// <summary>
+/// Semantic color ROLES. v1.0.2.
+///
+/// Player report: "Text color in general is just inconsistent as all get-out.
+/// Please stop using darkgray for important readouts... use it for things that
+/// are irrelevant to the flow of the game, like stat rolls." Correct, and the
+/// cause is structural: call sites named a COLOR, so every author guessed, and
+/// the same kind of message ended up in different colors all over the codebase.
+///
+/// A theme could never fix that. ColorTheme.Resolve maps a color name to
+/// another color name, which is one level BELOW meaning -- it restyles a slot,
+/// it cannot move a message into a different slot. Worse, ClassicDark collapses
+/// white / gray / dark_gray / green all into dim_green, so under it an urgent
+/// readout and an ignorable stat roll render identically.
+///
+/// Naming the ROLE instead fixes both problems at once: the call site declares
+/// how important the line is, and each theme decides independently what that
+/// importance looks like in its own palette. Every theme stays coherent for
+/// free, including the monochrome ones.
+///
+/// Use these instead of literal color names for anything a player reads during
+/// play. Literal names still work everywhere, so migration is incremental.
+/// </summary>
+public static class ColorRole
+{
+    /// <summary>You are in danger or just lost something: damage taken, death, a debuff landing.</summary>
+    public const string Critical = "role_critical";
+
+    /// <summary>Something went your way: healing, a resist, a buff gained, victory.</summary>
+    public const string Success = "role_success";
+
+    /// <summary>Something you interact with: hotkeys, prompts, menu choices.</summary>
+    public const string Action = "role_action";
+
+    /// <summary>Worth reading but not urgent: a buff expiring, a warning, a state change.</summary>
+    public const string Notice = "role_notice";
+
+    /// <summary>Ordinary body text and flavor.</summary>
+    public const string Narration = "role_narration";
+
+    /// <summary>
+    /// Safe to skip entirely: stat rolls, damage-vs-defense breakdowns, chrome.
+    /// This is the ONLY role that should ever be dim. If a player needs to act
+    /// on it, it is not Derived.
+    /// </summary>
+    public const string Derived = "role_derived";
+
+    /// <summary>
+    /// An option that exists but cannot be chosen right now: an ability on
+    /// cooldown, a purchase you cannot afford. Visually dim like Derived, but a
+    /// separate name because the meaning differs -- Derived is information you
+    /// may ignore, Disabled is a choice being withheld.
+    /// </summary>
+    public const string Disabled = "role_disabled";
+}
+
 public static class ColorTheme
 {
     /// <summary>
@@ -169,9 +225,96 @@ public static class ColorTheme
     /// Resolve a color name through the current theme's remapping.
     /// Returns the input unchanged if no theme is active or if the color has no mapping.
     /// </summary>
+    /// <summary>
+    /// Role to concrete color, per theme. Each theme answers the same six
+    /// questions in its own palette, which is what keeps every theme readable
+    /// without any call site knowing which theme is active.
+    ///
+    /// The monochrome themes only have three brightness tiers, so some roles
+    /// necessarily share one. The collapse is chosen deliberately: everything
+    /// actionable stays loud and Derived alone drops to the dim tier, because
+    /// "can I ignore this line" is the distinction that actually matters.
+    /// </summary>
+    private static readonly Dictionary<ColorThemeType, Dictionary<string, string>> RoleMaps = new()
+    {
+        [ColorThemeType.Default] = new()
+        {
+            [ColorRole.Critical]  = "bright_red",
+            [ColorRole.Success]   = "bright_green",
+            [ColorRole.Action]    = "bright_yellow",
+            [ColorRole.Notice]    = "yellow",
+            [ColorRole.Narration] = "white",
+            [ColorRole.Derived]   = "dark_gray",
+            [ColorRole.Disabled]  = "dark_gray",
+        },
+        // Faithful to the original's narrow palette, but the roles stay
+        // distinct -- which plain ClassicDark could not manage, since it
+        // collapses white/gray/dark_gray/green into a single dim_green.
+        [ColorThemeType.ClassicDark] = new()
+        {
+            [ColorRole.Critical]  = "bright_red",
+            [ColorRole.Success]   = "bright_green",
+            [ColorRole.Action]    = "dark_magenta",
+            [ColorRole.Notice]    = "yellow",
+            [ColorRole.Narration] = "dim_green",
+            [ColorRole.Derived]   = "dark_gray",
+            [ColorRole.Disabled]  = "dark_gray",
+        },
+        [ColorThemeType.AmberRetro] = new()
+        {
+            [ColorRole.Critical]  = "bright_yellow",
+            [ColorRole.Success]   = "bright_yellow",
+            [ColorRole.Action]    = "bright_yellow",
+            [ColorRole.Notice]    = "yellow",
+            [ColorRole.Narration] = "yellow",
+            [ColorRole.Derived]   = "dark_yellow",
+            [ColorRole.Disabled]  = "dark_yellow",
+        },
+        [ColorThemeType.GreenPhosphor] = new()
+        {
+            [ColorRole.Critical]  = "bright_green",
+            [ColorRole.Success]   = "bright_green",
+            [ColorRole.Action]    = "bright_green",
+            [ColorRole.Notice]    = "green",
+            [ColorRole.Narration] = "green",
+            [ColorRole.Derived]   = "dark_green",
+            [ColorRole.Disabled]  = "dark_green",
+        },
+        // Even at maximum contrast Derived stays a step down, or the hierarchy
+        // flattens and nothing stands out at all.
+        [ColorThemeType.HighContrast] = new()
+        {
+            [ColorRole.Critical]  = "bright_red",
+            [ColorRole.Success]   = "bright_green",
+            [ColorRole.Action]    = "bright_yellow",
+            [ColorRole.Notice]    = "bright_yellow",
+            [ColorRole.Narration] = "bright_white",
+            [ColorRole.Derived]   = "white",
+            [ColorRole.Disabled]  = "white",
+        },
+    };
+
+    /// <summary>True when the name is a semantic role rather than a literal color.</summary>
+    public static bool IsRole(string color) =>
+        !string.IsNullOrEmpty(color) && color.StartsWith("role_", System.StringComparison.Ordinal);
+
     public static string Resolve(string color)
     {
-        if (Current == ColorThemeType.Default || string.IsNullOrEmpty(color))
+        if (string.IsNullOrEmpty(color)) return color;
+
+        // Roles resolve straight to a final color for the active theme and are
+        // deliberately NOT passed through the literal remap below -- that map
+        // collapses several colors together, which is exactly what would undo
+        // the distinction the role is there to guarantee.
+        if (IsRole(color))
+        {
+            var roles = RoleMaps.TryGetValue(Current, out var m) ? m : RoleMaps[ColorThemeType.Default];
+            if (roles.TryGetValue(color, out var byRole)) return byRole;
+            if (RoleMaps[ColorThemeType.Default].TryGetValue(color, out var byDefault)) return byDefault;
+            return "white"; // unknown role: legible beats invisible
+        }
+
+        if (Current == ColorThemeType.Default)
             return color;
 
         var map = Current switch

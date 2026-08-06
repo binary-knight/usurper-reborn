@@ -5260,18 +5260,14 @@ public abstract class BaseLocation
                 terminal.WriteLine("");
 
                 // Show NPC portrait (skip for screen readers and art-disabled).
-                // v0.65.7: AI-painted portrait from the disk cache when one exists
-                // (rendered at the session's terminal capability tier); falls back
-                // to the classic procedural portrait otherwise. The first miss
-                // kicks a background generation (when the server has a PixelLab
-                // key configured), so the painted portrait exists on a later visit.
+                // The classic procedural portrait is the only path. The v0.65.7
+                // AI-generated portraits were removed: they did not look good, and
+                // a hand-tuned generator that always works beats a service call
+                // that sometimes returns something worse.
                 if (!currentPlayer.ScreenReaderMode && !GameConfig.DisableCharacterMonsterArt)
                 {
-                    if (!UsurperRemake.Systems.NPCPortraitSystem.TryDisplayPortrait(terminal, npc))
-                    {
-                        var portrait = PortraitGenerator.GeneratePortrait(npc);
-                        ANSIArt.DisplayArt(terminal, portrait);
-                    }
+                    var portrait = PortraitGenerator.GeneratePortrait(npc);
+                    ANSIArt.DisplayArt(terminal, portrait);
                     terminal.WriteLine("");
                 }
 

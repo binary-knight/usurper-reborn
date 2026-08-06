@@ -29,6 +29,12 @@ public class Monster
     public bool Distracted { get; set; }                // distracted?, reduced accuracy
     public int DistractedPenalty { get; set; }           // scaled penalty (5 + level/5 + CHA/10)
     public bool Charmed { get; set; }                   // charmed?, may skip attack
+    // v1.0.2: how many more rounds the charm lasts. Charming Performance has
+    // carried Duration = 3 since it was written, but nothing read it -- Charmed
+    // was cleared on the target's very next turn either way, so a level 26
+    // ability with a 4-round cooldown delivered one coinflip. 0 means the
+    // legacy one-shot behavior, which is what Dominate still wants.
+    public int CharmedRounds { get; set; }
     public string Weapon { get; set; } = "";            // name of weapon
     public string Armor { get; set; } = "";             // name of armor
     public bool Disease { get; set; }                   // infected by a disease?

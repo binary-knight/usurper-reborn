@@ -1107,7 +1107,7 @@ public static class ClassAbilitySystem
         {
             Id = "charm",
             Name = "Charming Performance",
-            Description = "A captivating performance that charms the enemy. 40% chance to charm, causing 50% chance to skip their next attack.",
+            Description = "A captivating performance that charms the enemy. 70% chance to charm for 3 rounds; a charmed foe has a 50% chance to skip each attack.",
             LevelRequired = 26,
             StaminaCost = 35,
             Cooldown = 4,

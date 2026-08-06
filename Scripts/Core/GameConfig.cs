@@ -10,7 +10,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "1.0.1";
+    public const string Version = "1.0.2";
     public const string VersionName = "Coronation"; // 1.0 release
 
     // v0.57.12: Alignment scale cap. Character.Chivalry and Character.Darkness setters clamp to [0, AlignmentCap]
@@ -1327,6 +1327,27 @@ public static partial class GameConfig
     // Home Overhaul (v0.44.0)
     // Living Quarters: recovery % and uses/day per level
     public static readonly float[] HomeRecoveryPercent = { 0.25f, 0.40f, 0.55f, 0.70f, 0.85f, 1.00f };
+
+    /// <summary>
+    /// How much a Home rest actually restores: a share of the MAXIMUM bar,
+    /// capped by whatever is actually missing so the reported figure is the
+    /// real gain rather than a theoretical one.
+    ///
+    /// v1.0.2 (player report). This used to multiply the SHORTFALL, which made
+    /// every tier below the top asymptotic -- each rest closed a fraction of
+    /// the remaining gap, so a wounded player could never reach full no matter
+    /// how many rests they spent, and an identical rest healed wildly
+    /// different amounts depending on how hurt they happened to be. Tier 5
+    /// (100%) behaved correctly by coincidence, which hid it.
+    /// </summary>
+    public static long GetRestRecoveryAmount(long max, long current, float percentOfMax)
+    {
+        if (max <= 0 || percentOfMax <= 0f) return 0;
+        long missing = max - current;
+        if (missing <= 0) return 0;
+        long fromMax = (long)(max * percentOfMax);
+        return Math.Min(fromMax, missing);
+    }
     public static readonly int[] HomeRestsPerDay = { 1, 2, 2, 3, 4, 5 };
     // Bed: fertility modifier per level (negative = penalty)
     public static readonly float[] BedFertilityModifier = { -0.50f, 0f, 0.10f, 0.20f, 0.35f, 0.50f };
@@ -1484,6 +1505,17 @@ public static partial class GameConfig
     }
     // Jester Trickster's Luck
     public const int JesterTrickstersLuckChance = 20;        // Jester: 20% chance per attack to proc random bonus
+
+    // Charming Performance (Jester/Bard, Lv26). v1.0.2 rebalance.
+    // Was 40% to apply x 50% to skip, resolved once = a 20% chance to skip a
+    // single attack, for 35 stamina and a 4-round cooldown with no damage. That
+    // is strictly worse than Pratfall, which unlocks 8 levels EARLIER for half
+    // the stamina and half the cooldown and also deals damage. Now the charm
+    // actually lasts its stated duration, so one cast is worth roughly one
+    // skipped enemy attack (0.70 x 3 rounds x 0.50).
+    public const int CharmApplyChance = 70;                  // chance the charm lands at all
+    public const int CharmSkipAttackChance = 50;             // per-round chance a charmed foe skips
+    public const int CharmDurationRounds = 3;                // rounds the charm persists
     public const float JesterLuckBonusDamage = 0.50f;        // +50% bonus damage on lucky proc
     public const int JesterLuckStaminaRefund = 15;           // Stamina refunded on lucky proc
     // Song buffs (Music Shop performances)

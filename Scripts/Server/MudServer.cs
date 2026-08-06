@@ -604,10 +604,12 @@ public class MudServer
                     password = parts[2];
                     connectionType = parts[3].Trim();
                     // v0.65.13: optional 5th field is the client's game version
-                    // (AUTH:user:pass:type:version). 0.65.7+ clients pass truecolor
-                    // SGR through cleanly, which lets NPCPortraitSystem serve them
-                    // the truecolor portrait tier instead of the defensive 16-color
-                    // one. Pre-0.65.13 clients simply omit the field.
+                    // (AUTH:user:pass:type:version). Pre-0.65.13 clients omit it.
+                    // It was introduced to pick a portrait color tier; that system
+                    // is gone, but the field is kept because both ends already
+                    // parse it correctly and it is useful for diagnostics.
+                    // Do not remove it casually: a mismatch between this parser
+                    // and RelayClient's is what caused the v1.0.1 login outage.
                     if (parts.Length == 5 && !string.IsNullOrWhiteSpace(parts[4]))
                         clientVersion = parts[4].Trim();
                 }

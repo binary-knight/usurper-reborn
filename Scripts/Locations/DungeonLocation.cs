@@ -5002,6 +5002,65 @@ public class DungeonLocation : BaseLocation
     }
 
     /// <summary>
+    /// The evasion chance a trap is rolled against, without rolling it.
+    /// Lets the outcome line report the real odds on a FAILURE as well as a
+    /// success -- see TrapMitigationCheck for why that matters.
+    /// </summary>
+    private int GetTrapEvasionChance(Character player)
+    {
+        int evasionChance = (int)Math.Min(75, player.Agility / 3);
+        evasionChance -= currentDungeonLevel / 5;
+        if (player.Class == CharacterClass.Assassin)
+            evasionChance += 15 + (int)(player.Dexterity / 8);
+        else if (player.Class == CharacterClass.Ranger)
+            evasionChance += 10 + (int)(player.Dexterity / 12);
+        else if (player.Class == CharacterClass.Jester || player.Class == CharacterClass.Bard)
+            evasionChance += 5;
+        return Math.Clamp(evasionChance, 5, 85);
+    }
+
+    /// <summary>
+    /// v1.0.2: the single shape every trap now resolves through.
+    ///
+    /// Player report: "Traps have inconsistent risk-reward and skill roll
+    /// displays. Sometimes they happen, sometimes they don't." Both halves were
+    /// accurate. Only 2 of the 6 traps rolled any check at all, and the two that
+    /// did printed the governing stat ONLY when the player succeeded -- a
+    /// failure said "You couldn't react in time!" with no stat and no odds. So a
+    /// stat readout appeared sporadically and vanished exactly when the player
+    /// most wanted to understand what happened.
+    ///
+    /// Every trap now rolls one mitigation check against a thematically
+    /// appropriate stat and reports it the same way whether it passes or fails:
+    /// which stat, its value, and the real percentage. Passing halves the
+    /// effect (or negates it outright for the curse).
+    /// </summary>
+    /// <returns>True when the player mitigated the trap.</returns>
+    private bool TrapMitigationCheck(Character player, long statValue, string statNameKey)
+    {
+        // Same shape as evasion: stat/3, harder the deeper you are, clamped so
+        // there is always a chance either way.
+        int chance = (int)Math.Min(70, statValue / 3);
+        chance -= currentDungeonLevel / 6;
+        chance = Math.Clamp(chance, 5, 80);
+
+        bool passed = dungeonRandom.Next(100) < chance;
+        string statName = Loc.Get(statNameKey);
+
+        if (passed)
+        {
+            terminal.SetColor(ColorRole.Success);
+            terminal.WriteLine(Loc.Get("dungeon.trap_check_passed", statName, statValue, chance));
+        }
+        else
+        {
+            terminal.SetColor(ColorRole.Derived);
+            terminal.WriteLine(Loc.Get("dungeon.trap_check_failed", statName, statValue, chance));
+        }
+        return passed;
+    }
+
+    /// <summary>
     /// Trigger a trap when entering a room
     /// </summary>
     private async Task TriggerTrap(DungeonRoom room)
@@ -5014,18 +5073,22 @@ public class DungeonLocation : BaseLocation
         BroadcastDungeonEvent("\u001b[1;31m  *** TRAP! ***\u001b[0m");
         await Task.Delay(500);
 
-        // Check for evasion based on agility
+        // Check for evasion based on agility. v1.0.2: the odds are reported on
+        // BOTH outcomes now -- a failure used to give no stat and no number, so
+        // players could not tell whether Agility was doing anything at all.
+        int evadeChance = GetTrapEvasionChance(player!);
         if (TryEvadeTrap(player!))
         {
             terminal.SetColor("green");
             terminal.WriteLine(Loc.Get("dungeon.trap_evade_reflexes"));
-            terminal.WriteLine(Loc.Get("dungeon.trap_evade_agility", player.Agility));
+            terminal.WriteLine(Loc.Get("dungeon.trap_evade_agility", player.Agility, evadeChance));
             BroadcastDungeonEvent($"\u001b[32m  {player!.Name2}'s quick reflexes avoid the trap!\u001b[0m");
             await Task.Delay(1500);
             return;
         }
 
-        terminal.WriteLine(Loc.Get("dungeon.trap_no_react"), "yellow");
+        terminal.SetColor("yellow");
+        terminal.WriteLine(Loc.Get("dungeon.trap_no_react", player.Agility, evadeChance));
         await Task.Delay(300);
 
         var trapType = dungeonRandom.Next(6);
@@ -5033,16 +5096,21 @@ public class DungeonLocation : BaseLocation
         {
             case 0:
                 var pitDmg = currentDungeonLevel * 3 + dungeonRandom.Next(10);
+                if (TrapMitigationCheck(player, player.Agility, "ui.stat_agility")) pitDmg /= 2;
                 player.HP = Math.Max(1, player.HP - pitDmg);
+                terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("dungeon.trap_pit", pitDmg));
                 BroadcastDungeonEvent($"\u001b[31m  The floor gives way! {player!.Name2} falls into a pit for {pitDmg} damage!\u001b[0m");
                 break;
 
             case 1:
                 var dartDmg = currentDungeonLevel * 2 + dungeonRandom.Next(8);
+                bool dartShrugged = TrapMitigationCheck(player, player.Constitution, "ui.stat_constitution");
+                if (dartShrugged) dartDmg /= 2;
                 player.HP = Math.Max(1, player.HP - dartDmg);
-                // v0.61.1 Beast Taming: Marsh Toad active pet rolls to absorb the poison.
-                if (player.TryResistPoison())
+                // A passed Constitution check throws off the venom outright; otherwise
+                // the Marsh Toad pet (v0.61.1) still gets its own absorb roll.
+                if (dartShrugged || player.TryResistPoison())
                 {
                     terminal.WriteLine(Loc.Get("dungeon.toad_resist_poison"), "bright_green");
                 }
@@ -5057,24 +5125,31 @@ public class DungeonLocation : BaseLocation
 
             case 2:
                 var fireDmg = currentDungeonLevel * 4 + dungeonRandom.Next(12);
+                if (TrapMitigationCheck(player, player.Dexterity, "ui.stat_dexterity")) fireDmg /= 2;
                 player.HP = Math.Max(1, player.HP - fireDmg);
+                terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("dungeon.trap_fire", fireDmg));
                 BroadcastDungeonEvent($"\u001b[31m  A gout of flame! {player!.Name2} takes {fireDmg} fire damage!\u001b[0m");
                 break;
 
             case 3:
-                var goldLost = player.Gold / 10;
+                // v1.0.2: was a flat 10% of gold, the only trap that scaled on the
+                // player's WEALTH rather than the floor -- ruinous when rich, free
+                // when poor. Capped to a floor-scaled amount so it lands like the
+                // damage traps do.
+                long acidCap = currentDungeonLevel * 150L;
+                var goldLost = Math.Min(player.Gold / 10, acidCap);
+                if (TrapMitigationCheck(player, player.Dexterity, "ui.stat_dexterity")) goldLost /= 2;
                 player.Gold -= goldLost;
+                terminal.SetColor("yellow");
                 terminal.WriteLine(Loc.Get("dungeon.trap_acid", goldLost));
                 BroadcastDungeonEvent($"\u001b[33m  Acid sprays the party! {player!.Name2} loses {goldLost} gold!\u001b[0m");
                 break;
 
             case 4:
-                // Wisdom check: high wisdom can fully resist the curse
-                int resistChance = (int)Math.Min(60, player.Wisdom / 2);
-                if (player.Class == CharacterClass.Cleric || player.Class == CharacterClass.Sage)
-                    resistChance += 15;
-                if (dungeonRandom.Next(100) < resistChance)
+                // Wisdom fully negates the curse. Routed through the shared helper so
+                // the roll is reported identically to every other trap.
+                if (TrapMitigationCheck(player, player.Wisdom, "ui.stat_wisdom"))
                 {
                     terminal.SetColor("bright_cyan");
                     terminal.WriteLine(Loc.Get("dungeon.trap_curse_resist", player.Wisdom));
@@ -8866,7 +8941,10 @@ public class DungeonLocation : BaseLocation
 
         var currentPlayer = GetCurrentPlayer();
 
-        // Check for evasion based on agility
+        // Check for evasion based on agility. v1.0.2: trap_no_react gained the
+        // stat + odds arguments, and this second trap handler must pass them
+        // too or the placeholders render literally.
+        int evadeChance = GetTrapEvasionChance(currentPlayer);
         if (TryEvadeTrap(currentPlayer))
         {
             terminal.SetColor("green");
@@ -8876,7 +8954,8 @@ public class DungeonLocation : BaseLocation
             return;
         }
 
-        terminal.WriteLine(Loc.Get("dungeon.trap_no_react"), "yellow");
+        terminal.SetColor("yellow");
+        terminal.WriteLine(Loc.Get("dungeon.trap_no_react", currentPlayer.Agility, evadeChance));
         await Task.Delay(300);
 
         var trapType = dungeonRandom.Next(5);
@@ -8887,6 +8966,7 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("dungeon.trap_floor_gives_way"), "white");
                 var fallDmg = currentDungeonLevel * 3 + dungeonRandom.Next(10);
                 fallDmg = ApplyTrapResistBuff(currentPlayer, fallDmg);
+                if (TrapMitigationCheck(currentPlayer, currentPlayer.Agility, "ui.stat_agility")) fallDmg /= 2;
                 currentPlayer.HP = Math.Max(1, currentPlayer.HP - fallDmg);
                 terminal.WriteLine(Loc.Get("dungeon.trap_fall_damage", fallDmg), "red");
                 break;
@@ -8894,9 +8974,12 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("dungeon.trap_poison_darts"), "white");
                 var dartDmg = currentDungeonLevel * 2 + dungeonRandom.Next(8);
                 dartDmg = ApplyTrapResistBuff(currentPlayer, dartDmg);
+                bool dartShrugged2 = TrapMitigationCheck(currentPlayer, currentPlayer.Constitution, "ui.stat_constitution");
+                if (dartShrugged2) dartDmg /= 2;
                 currentPlayer.HP = Math.Max(1, currentPlayer.HP - dartDmg);
-                // v0.61.1 Marsh Toad rolls to absorb.
-                if (currentPlayer.TryResistPoison())
+                // A passed Constitution check throws off the venom outright; otherwise
+                // the Marsh Toad pet (v0.61.1) still gets its own absorb roll.
+                if (dartShrugged2 || currentPlayer.TryResistPoison())
                 {
                     terminal.WriteLine(Loc.Get("dungeon.toad_resist_poison"), "bright_green");
                 }
@@ -8911,6 +8994,7 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("dungeon.trap_rune_explodes"), "bright_magenta");
                 var runeDmg = currentDungeonLevel * 5 + dungeonRandom.Next(15);
                 runeDmg = ApplyTrapResistBuff(currentPlayer, runeDmg);
+                if (TrapMitigationCheck(currentPlayer, currentPlayer.Wisdom, "ui.stat_wisdom")) runeDmg /= 2;
                 currentPlayer.HP = Math.Max(1, currentPlayer.HP - runeDmg);
                 terminal.WriteLine(Loc.Get("dungeon.trap_magic_damage", runeDmg), "red");
                 break;
@@ -14009,6 +14093,19 @@ public class DungeonLocation : BaseLocation
                     terminal.SetColor("red");
                     terminal.WriteLine(Loc.Get("dungeon.not_quite_right"));
                     terminal.WriteLine("");
+
+                    // v1.0.2: reprint the clues on every retry. They were shown
+                    // once before the loop, so after a wrong guess (or a screen
+                    // clear in MUD mode) the player was being asked to reproduce
+                    // a sequence whose only source had scrolled away. That is
+                    // half of what "unsolvable" meant in the report.
+                    if (puzzle.Hints.Count > 0)
+                    {
+                        terminal.SetColor("cyan");
+                        foreach (var hint in puzzle.Hints)
+                            terminal.WriteLine(hint);
+                        terminal.WriteLine("");
+                    }
                 }
             }
         }
@@ -14047,15 +14144,48 @@ public class DungeonLocation : BaseLocation
         await terminal.PressAnyKey();
     }
 
+    /// <summary>
+    /// Builds the worked example shown in a sequence-puzzle prompt: "1,2,3" for
+    /// three, "1,2,3,4,5" for five. v1.0.2 -- the example used to be a hardcoded
+    /// three numbers for levers (and four for plates) no matter how many the
+    /// puzzle actually had, while the handler rejects anything that is not
+    /// exactly N entries. On a 5-lever puzzle the game demonstrated an input it
+    /// would then refuse, and refused it by silently burning an attempt.
+    /// </summary>
+    private static string BuildSequenceExample(int count)
+        => string.Join(",", Enumerable.Range(1, count));
+
+    /// <summary>
+    /// Reads a sequence of exactly <paramref name="count"/> numbers. Returns null
+    /// if the player gave up (blank line). A wrong-length entry is a formatting
+    /// mistake rather than a wrong guess, so it re-prompts with a specific
+    /// message instead of consuming one of the puzzle's limited attempts.
+    /// </summary>
+    private async Task<List<string>?> ReadSequenceInput(int count, string promptKey)
+    {
+        while (true)
+        {
+            terminal.WriteLine(Loc.Get(promptKey, count, BuildSequenceExample(count)), "white");
+
+            var input = await terminal.GetInput("> ");
+            var parts = input.Split(',', ' ')
+                             .Select(s => s.Trim())
+                             .Where(s => !string.IsNullOrEmpty(s))
+                             .ToList();
+
+            if (parts.Count == 0) return null;          // blank line = give up, costs the attempt
+            if (parts.Count == count) return parts;
+
+            terminal.WriteLine(Loc.Get("dungeon.puzzle_wrong_count", count, parts.Count), "yellow");
+        }
+    }
+
     private async Task<bool> HandleLeverPuzzle(PuzzleInstance puzzle, Character player)
     {
         int leverCount = puzzle.Solution.Count;
-        terminal.WriteLine(Loc.Get("dungeon.lever_puzzle", leverCount), "white");
 
-        var input = await terminal.GetInput("> ");
-        var parts = input.Split(',', ' ').Select(s => s.Trim()).Where(s => !string.IsNullOrEmpty(s)).ToList();
-
-        if (parts.Count != leverCount) return false;
+        var parts = await ReadSequenceInput(leverCount, "dungeon.lever_puzzle");
+        if (parts == null) return false;
 
         for (int i = 0; i < leverCount; i++)
         {
@@ -14082,12 +14212,9 @@ public class DungeonLocation : BaseLocation
     private async Task<bool> HandlePressurePlatesPuzzle(PuzzleInstance puzzle, Character player)
     {
         int plateCount = puzzle.Solution.Count;
-        terminal.WriteLine(Loc.Get("dungeon.pressure_plates_prompt", plateCount), "white");
 
-        var input = await terminal.GetInput("> ");
-        var parts = input.Split(',', ' ').Select(s => s.Trim()).Where(s => !string.IsNullOrEmpty(s)).ToList();
-
-        if (parts.Count != plateCount) return false;
+        var parts = await ReadSequenceInput(plateCount, "dungeon.pressure_plates_prompt");
+        if (parts == null) return false;
 
         for (int i = 0; i < plateCount; i++)
         {

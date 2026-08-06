@@ -232,6 +232,17 @@ public partial class RelationshipSystem
         // call site -- BBS status lines, /who, dialogue render hooks. Reads
         // should be reads. Dead-spouse cleanup is now a separate
         // SyncDeadSpouseState(character) callable from a login healing path.
+        // v1.0.2: a spouse who is GONE from the roster counts as dead. Pre-fix
+        // this tested `spouse != null && spouse.IsDead`, which was unreachable --
+        // GetNPCByName already excludes dead NPCs and returns null for them, so a
+        // dead spouse fell through as "alive". Treating null as dead is what makes
+        // the dead-spouse case work at all.
+        //
+        // Hoisted out of the loop (reviewer E3): computing it per-iteration let the
+        // verdict change mid-scan during a roster rebuild. Gated on the roster being
+        // settled and plausibly complete, never merely non-empty (reviewer B1).
+        bool rosterTrusted = NPCSpawnSystem.Instance?.IsRosterTrustworthy ?? false;
+
         foreach (var relationGroup in _relationships.Values)
         {
             foreach (var relation in relationGroup.Values)
@@ -244,13 +255,13 @@ public partial class RelationshipSystem
                 if (relation.Name1 == character.Name)
                 {
                     var spouse = NPCSpawnSystem.Instance?.GetNPCByName(relation.Name2);
-                    if (spouse != null && spouse.IsDead) continue; // skip dead, don't mutate
+                    if (rosterTrusted && (spouse == null || spouse.IsDead)) continue; // skip dead/gone, don't mutate
                     return relation.Name2;
                 }
                 if (relation.Name2 == character.Name)
                 {
                     var spouse = NPCSpawnSystem.Instance?.GetNPCByName(relation.Name1);
-                    if (spouse != null && spouse.IsDead) continue;
+                    if (rosterTrusted && (spouse == null || spouse.IsDead)) continue;
                     return relation.Name1;
                 }
             }
@@ -270,6 +281,7 @@ public partial class RelationshipSystem
     {
         if (character == null) return 0;
         int cleared = 0;
+        bool rosterLoaded = NPCSpawnSystem.Instance?.IsRosterTrustworthy ?? false;
         foreach (var relationGroup in _relationships.Values)
         {
             foreach (var relation in relationGroup.Values)
@@ -285,7 +297,10 @@ public partial class RelationshipSystem
 
                 string otherName = relation.Name1 == character.Name ? relation.Name2 : relation.Name1;
                 var spouse = NPCSpawnSystem.Instance?.GetNPCByName(otherName);
-                if (spouse != null && spouse.IsDead)
+                // v1.0.2: missing counts as dead (see GetSpouseName). Guarded on
+                // a loaded roster so an early call can never mass-widow.
+                if (spouse == null && !rosterLoaded) continue;
+                if (spouse == null || spouse.IsDead)
                 {
                     relation.Relation1 = GameConfig.RelationNormal;
                     relation.Relation2 = GameConfig.RelationNormal;
@@ -295,10 +310,32 @@ public partial class RelationshipSystem
             }
         }
 
-        // Also clear player-side flags that reference a dead spouse name.
-        if (cleared > 0 && (character.IsMarried || character.Married))
+        // Clear player-side flags that reference a spouse who is no longer
+        // resolvable. v1.0.2: this used to be gated behind `cleared > 0`, which
+        // contradicted its own stated purpose (audit N8 was meant to clear a
+        // dangling Married flag "when no live spouse can be found"). If the
+        // relation record had already been downgraded by some other path, or
+        // never existed, cleared stayed 0 and the stale flags survived. The
+        // roster guard keeps this from firing before NPCs are loaded.
+        // v1.0.2 (reviewer finding E1): require POSITIVE evidence that the named
+        // spouse is gone before wiping these flags. An empty GetSpouseName is
+        // not that evidence -- it also comes back empty when the relationship
+        // table was never imported for this save, or when a record was already
+        // downgraded by another path. Corroborate against RomanceTracker, which
+        // is the register that actually decides married-ness: if it still lists
+        // a spouse, this player is married and the flags stay. (SyncDeadPartners
+        // runs immediately after this and heals RomanceTracker itself, so a
+        // genuinely dead spouse is cleared there and then here on the next pass.)
+        if (rosterLoaded && (character.IsMarried || character.Married))
         {
-            if (string.IsNullOrEmpty(GetSpouseName(character)))
+            bool spouseNameStillResolves = !string.IsNullOrEmpty(character.SpouseName)
+                && NPCSpawnSystem.Instance?.GetNPCByName(character.SpouseName) != null;
+            bool romanceStillSaysMarried =
+                (RomanceTracker.Instance?.Spouses?.Count ?? 0) > 0;
+
+            if (!spouseNameStillResolves
+                && !romanceStillSaysMarried
+                && string.IsNullOrEmpty(GetSpouseName(character)))
             {
                 character.IsMarried = false;
                 character.Married = false;

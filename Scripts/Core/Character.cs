@@ -2215,21 +2215,21 @@ public class Character
                 case StatusEffect.Defending:
                 case StatusEffect.Protected:
                     MagicACBonus = 0;
-                    messages.Add(($"{DisplayName}'s {effectName} effect fades.", "gray"));
+                    messages.Add(($"{DisplayName}'s {effectName} effect fades.", ColorRole.Notice));
                     break;
                 case StatusEffect.Stoneskin:
                     DamageAbsorptionPool = 0;
-                    messages.Add(($"{DisplayName}'s stoneskin crumbles away.", "gray"));
+                    messages.Add(($"{DisplayName}'s stoneskin crumbles away.", ColorRole.Notice));
                     break;
                 case StatusEffect.Raging:
                     IsRaging = false;
-                    messages.Add(($"{DisplayName}'s rage subsides.", "gray"));
+                    messages.Add(($"{DisplayName}'s rage subsides.", ColorRole.Notice));
                     break;
                 case StatusEffect.Haste:
-                    messages.Add(($"{DisplayName} slows to normal speed.", "gray"));
+                    messages.Add(($"{DisplayName} slows to normal speed.", ColorRole.Notice));
                     break;
                 case StatusEffect.Slow:
-                    messages.Add(($"{DisplayName} can move normally again.", "gray"));
+                    messages.Add(($"{DisplayName} can move normally again.", ColorRole.Success));
                     break;
                 case StatusEffect.Stunned:
                 case StatusEffect.Paralyzed:
@@ -2250,14 +2250,14 @@ public class Character
                 case StatusEffect.Frozen:
                 case StatusEffect.Cursed:
                 case StatusEffect.Diseased:
-                    messages.Add(($"{DisplayName} is no longer {s.ToString().ToLower()}.", "gray"));
+                    messages.Add(($"{DisplayName} is no longer {s.ToString().ToLower()}.", ColorRole.Success));
                     break;
                 case StatusEffect.Lifesteal:
                     StatusLifestealPercent = 0;
-                    messages.Add(($"{DisplayName}'s lifesteal fades.", "gray"));
+                    messages.Add(($"{DisplayName}'s lifesteal fades.", ColorRole.Notice));
                     break;
                 default:
-                    messages.Add(($"{DisplayName}'s {effectName} wears off.", "gray"));
+                    messages.Add(($"{DisplayName}'s {effectName} wears off.", ColorRole.Notice));
                     break;
             }
         }

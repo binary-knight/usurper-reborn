@@ -10,6 +10,9 @@ namespace UsurperReborn.Tests;
 /// singletons) so each test resets those systems to a known state. In single-player
 /// test mode there's no SessionContext so the singletons just store in a fallback slot.
 /// </summary>
+// v1.0.2: shares process-wide singletons (RomanceTracker.Instance,
+// DailySystemManager.Instance) with other suites; serialize against them.
+[Collection("SharedGameSingletons")]
 public class TeamSystemRecruitmentTests
 {
     private static Character MakePlayer(long level = 20)

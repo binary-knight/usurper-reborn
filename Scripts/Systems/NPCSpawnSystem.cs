@@ -60,6 +60,58 @@ namespace UsurperRemake.Systems
         private int _listVersion;
 
         /// <summary>
+        /// True while the roster is being torn down and rebuilt (ClearAllNPCs
+        /// followed by many AddRestoredNPC calls).
+        ///
+        /// v1.0.2 (relationship-reviewer finding B1/B2). The rebuild is NOT
+        /// atomic: ClearAllNPCs takes and releases the write lock, then each
+        /// NPC is added under its own separate lock acquisition. Because this
+        /// singleton is process-wide and shared by every MUD session plus the
+        /// in-process world sim, a concurrent reader can observe a perfectly
+        /// valid but PARTIALLY FILLED roster -- Count walks 1, 2, 3 ... 151
+        /// during the rebuild.
+        ///
+        /// That was harmless while callers only read the roster. It stopped
+        /// being harmless when login healing began making DESTRUCTIVE
+        /// decisions from a missing lookup ("spouse not found, therefore dead,
+        /// therefore widow this player"), which has no undo path. Any code
+        /// that deletes or retires state on the basis of an NPC being absent
+        /// MUST consult IsRosterTrustworthy first.
+        /// </summary>
+        public volatile bool IsRebuilding;
+
+        /// <summary>Largest roster size seen this process; the plausibility baseline.</summary>
+        private volatile int _rosterHighWaterMark;
+
+        /// <summary>Absolute floor below which a roster is never authoritative for deletions.</summary>
+        private const int RosterPlausibilityFloor = 25;
+
+        /// <summary>
+        /// True when the roster can be trusted to answer "this NPC does not
+        /// exist" for a DESTRUCTIVE decision. Requires that no rebuild is in
+        /// flight and that the roster is at a plausible size (at least half of
+        /// the high-water mark, and above a hard floor). Read-only callers do
+        /// not need this; only callers that delete state on a miss do.
+        /// </summary>
+        public bool IsRosterTrustworthy => !IsRebuilding && IsCountPlausible(ActiveNPCs?.Count ?? 0);
+
+        /// <summary>
+        /// Is a roster of this size plausibly complete enough to prove absence?
+        ///
+        /// Callers that hold their OWN snapshot must pass its count here rather
+        /// than relying on IsRosterTrustworthy, which measures the live
+        /// singleton. The two can legitimately disagree -- the caller's snapshot
+        /// was taken at some earlier instant -- and the judgement has to be
+        /// about the data the decision is actually made from.
+        /// </summary>
+        public bool IsCountPlausible(int count)
+        {
+            if (count > _rosterHighWaterMark) _rosterHighWaterMark = count;
+            if (count < RosterPlausibilityFloor) return false;
+            return count >= _rosterHighWaterMark / 2;
+        }
+
+        /// <summary>
         /// Get all active NPCs. In MUD mode, returns a cached snapshot for safe
         /// concurrent iteration (invalidated when the list is mutated).
         /// </summary>

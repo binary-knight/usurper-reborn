@@ -338,6 +338,93 @@ namespace UsurperRemake.Systems
         /// permadied lover sat in CurrentLovers forever. Pre-fix (audit C5):
         /// JealousyLevels[deadId] kept ticking with no live NPC to read.
         /// </summary>
+        /// <summary>
+        /// v1.0.2 login healing: reconcile this player's romance state against
+        /// the live NPC roster, and retire any partner who is dead or gone.
+        ///
+        /// WHY THIS EXISTS. A player's romance data lives in their own save
+        /// blob, but partners die during world-simulator ticks that run with
+        /// NO session attached to that player. The death cascade calls
+        /// OnNPCPermadied on RomanceTracker.Instance, which in online mode
+        /// resolves per-session -- so for an offline player it mutates a
+        /// different instance entirely and their saved spouse record is never
+        /// touched. Login then reloads that stale record verbatim. Result: a
+        /// player stays married to a spouse who no longer exists, forever,
+        /// and never becomes a widow or widower.
+        ///
+        /// Reported live: a player married to an NPC whose id was absent from
+        /// the entire world roster, with an empty ExSpouses list, while the
+        /// marriage registry and the RelationshipSystem record had BOTH been
+        /// cleaned up correctly by the same cascade.
+        ///
+        /// A MISSING npc counts as dead. A spouse culled from the population
+        /// is just as gone as one flagged IsDead, and the pre-existing checks
+        /// that tested `npc != null && npc.IsDead` treated "vanished" as
+        /// "alive", which is what let this survive every login.
+        ///
+        /// SAFETY: if the roster is null or empty this returns 0 and changes
+        /// nothing. Running this before the NPC roster is restored would make
+        /// every partner look missing and would widow the entire server in one
+        /// pass. That guard is load-bearing -- do not remove it.
+        ///
+        /// Idempotent: partners already retired are no longer in the live
+        /// lists, so repeated calls are no-ops.
+        /// </summary>
+        /// <returns>Number of partners retired.</returns>
+        public int SyncDeadPartners(IEnumerable<NPC>? roster)
+        {
+            if (roster == null) return 0;
+            var pool = roster as IList<NPC> ?? roster.ToList();
+            if (pool.Count == 0) return 0; // roster not loaded -- see SAFETY above
+
+            // v1.0.2 (reviewer finding B1/B2): "not empty" is NOT good enough.
+            // The roster singleton is rebuilt non-atomically and is shared by
+            // every session plus the world sim, so a concurrent login can hand
+            // us a valid-looking snapshot holding 12 of 151 NPCs. Retiring a
+            // partner is irreversible, so demand a roster that is settled and
+            // plausibly complete before believing "this NPC does not exist".
+            // Judge the pool we were actually handed, not the live singleton --
+            // ours is a snapshot from some earlier instant and the two can differ.
+            var spawner = NPCSpawnSystem.Instance;
+            if (spawner != null && (spawner.IsRebuilding || !spawner.IsCountPlausible(pool.Count)))
+            {
+                DebugLogger.Instance?.LogDebug("ROMANCE",
+                    $"SyncDeadPartners skipped: roster rebuilding or implausibly small ({pool.Count} NPCs).");
+                return 0;
+            }
+
+            int healed = 0;
+            try
+            {
+                // Snapshot first: OnNPCPermadied mutates the very collections
+                // we are walking.
+                var partners = new List<(string Id, string Name, string Kind)>();
+                foreach (var s in Spouses) partners.Add((s.NPCId, s.NPCName, "spouse"));
+                foreach (var l in CurrentLovers) partners.Add((l.NPCId, l.NPCName, "lover"));
+                foreach (var f in FriendsWithBenefits) partners.Add((f, "", "fwb"));
+
+                foreach (var (id, name, kind) in partners)
+                {
+                    if (string.IsNullOrEmpty(id)) continue;
+                    var npc = NPCSpawnSystem.ResolvePartnerNpc(pool, id, name);
+                    bool goneOrDead = npc == null || npc.IsDead;
+                    if (!goneOrDead) continue;
+
+                    OnNPCPermadied(id);
+                    healed++;
+                    DebugLogger.Instance?.LogInfo("ROMANCE",
+                        $"SyncDeadPartners: retired {kind} '{(string.IsNullOrEmpty(name) ? id : name)}' " +
+                        $"({(npc == null ? "no longer in the world" : "dead")})");
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance?.LogWarning("ROMANCE",
+                    $"SyncDeadPartners failed: {ex.Message}");
+            }
+            return healed;
+        }
+
         public void OnNPCPermadied(string npcId)
         {
             if (string.IsNullOrEmpty(npcId)) return;

@@ -10,6 +10,7 @@ namespace UsurperRemake.Tests
     /// contract as the compat provider, covered by LLMTests); these tests pin
     /// the routing logic so a config change can't silently flip providers.
     /// </summary>
+    [Collection("LLMEnvironmentVars")]
     public class AnthropicProviderTests : IDisposable
     {
         private readonly string? _savedEndpoint;

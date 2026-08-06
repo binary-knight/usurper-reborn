@@ -1238,6 +1238,39 @@ public partial class GameEngine
     }
     
     /// <summary>
+    /// v1.0.2: one place that reconciles a logging-in player's relationship and
+    /// romance state against the live world. Called from BOTH load paths
+    /// (LoadSaveByFileName and LoadExistingGame) so they cannot drift apart --
+    /// the reviewer found the single-player path had never been healed at all.
+    ///
+    /// Both passes are internally guarded against acting on an untrustworthy
+    /// NPC roster, so calling this while the roster is rebuilding is a no-op
+    /// rather than a mass-widowing.
+    /// </summary>
+    private void HealRelationshipStateOnLogin()
+    {
+        if (currentPlayer == null) return;
+
+        int cleared = RelationshipSystem.SyncDeadSpouseState(currentPlayer);
+        if (cleared > 0)
+        {
+            UsurperRemake.Systems.DebugLogger.Instance?.LogInfo("ROMANCE",
+                $"SyncDeadSpouseState: cleared {cleared} stale dead-spouse marriage record(s) for {currentPlayer.Name}");
+        }
+
+        int retired = UsurperRemake.Systems.RomanceTracker.Instance
+            .SyncDeadPartners(NPCSpawnSystem.Instance?.ActiveNPCs);
+        if (retired > 0)
+        {
+            UsurperRemake.Systems.DebugLogger.Instance?.LogInfo("ROMANCE",
+                $"SyncDeadPartners: retired {retired} dead/missing partner(s) for {currentPlayer.Name}");
+        }
+
+        // Make the correction durable now; neither pass writes to disk itself.
+        if (retired > 0 || cleared > 0) _ = SaveCurrentGame();
+    }
+
+    /// <summary>
     /// Title-screen banner. Through the alpha and beta cycles this was a red
     /// "expect bugs" warning; at 1.0 it is a welcome that still carries the
     /// two things worth putting in front of every player on every launch --
@@ -2896,21 +2929,10 @@ public partial class GameEngine
             // arc counter. Idempotent via the name set.
             CreditCompletedFamilyArcs();
 
-            // v0.63.0 slice 4 (audit m10 + N8): explicit dead-spouse cleanup.
-            // Pre-fix, GetSpouseName silently mutated relation records during a
-            // "read" to clear stale marriage state when it noticed the spouse
-            // was dead. That side-effect is now in RelationshipSystem.SyncDeadSpouseState,
-            // called here once per login. Also clears the dangling Married=true
-            // flag on the widow when no live spouse can be found (audit N8).
-            if (currentPlayer != null)
-            {
-                int cleared = RelationshipSystem.SyncDeadSpouseState(currentPlayer);
-                if (cleared > 0)
-                {
-                    UsurperRemake.Systems.DebugLogger.Instance?.LogInfo("ROMANCE",
-                        $"SyncDeadSpouseState: cleared {cleared} stale dead-spouse marriage record(s) for {currentPlayer.Name}");
-                }
-            }
+            // v0.63.0 slice 4 (audit m10 + N8) + v1.0.2: reconcile marriage and
+            // romance state against the live world. Extracted so this path and
+            // LoadExistingGame share one implementation and cannot drift.
+            HealRelationshipStateOnLogin();
 
             terminal.WriteLine(Loc.Get("engine.save_loaded"), "bright_green");
             await Task.Delay(1000);
@@ -4646,6 +4668,9 @@ public partial class GameEngine
         // v0.63.0 slice 3 D5: family-arc completion credit (mirror).
         CreditCompletedFamilyArcs();
 
+        // v1.0.2: heal ghost marriages / dead partners on this path too.
+        HealRelationshipStateOnLogin();
+
         // Online mode: sync player King and CTurf flags with authoritative world state.
         if (UsurperRemake.BBS.DoorMode.IsOnlineMode && currentPlayer != null)
         {
@@ -6361,6 +6386,14 @@ public partial class GameEngine
             return;
         }
 
+        // v1.0.2: mark the roster as in-flight for the whole teardown-and-rebuild.
+        // The singleton is process-wide, so another session mid-login can otherwise
+        // observe a partially filled roster and wrongly conclude an NPC is gone.
+        // Anything that DELETES state on a missed lookup must wait this out.
+        NPCSpawnSystem.Instance.IsRebuilding = true;
+        try
+        {
+
         // Clear existing NPCs before restoring
         NPCSpawnSystem.Instance.ClearAllNPCs();
 
@@ -6927,6 +6960,13 @@ public partial class GameEngine
         }
 
         await Task.CompletedTask;
+
+        }
+        finally
+        {
+            // Roster is whole again; destructive lookups may trust it.
+            NPCSpawnSystem.Instance.IsRebuilding = false;
+        }
     }
 
     /// <summary>

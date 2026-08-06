@@ -170,7 +170,7 @@ public partial class CombatEngine
                 // Strip bracket-key formatting like [P]ower Attack → Power Attack
                 tip = System.Text.RegularExpressions.Regex.Replace(tip, @"\[(\w)\]", "$1");
             }
-            terminal.SetColor("dark_gray");
+            terminal.SetColor(ColorRole.Notice);
             terminal.WriteLine($"  {tip}");
             terminal.WriteLine("");
         }
@@ -356,8 +356,14 @@ public partial class CombatEngine
             // Attacker's turn — check for status effects that prevent action
             if (attacker.IsAlive && defender.IsAlive)
             {
-                var preventingStatus = attacker.ActiveStatuses.Keys.FirstOrDefault(s => s.PreventsAction());
-                if (preventingStatus != StatusEffect.None)
+                bool attackerCharmSkip = ResolvePvPCharm(attacker, isPlayer: true);
+                var preventingStatus = attacker.ActiveStatuses.Keys
+                    .FirstOrDefault(s => s.PreventsAction() && s != StatusEffect.Charmed);
+                if (attackerCharmSkip)
+                {
+                    await Task.Delay(GetCombatDelay(800));
+                }
+                else if (preventingStatus != StatusEffect.None)
                 {
                     terminal.WriteLine(Loc.Get("combat.you_status_prevented", preventingStatus.GetDescription().ToLower()), "red");
                     await Task.Delay(GetCombatDelay(800));
@@ -388,8 +394,14 @@ public partial class CombatEngine
             // Skip if attacker fled — no retaliation
             if (defender.IsAlive && attacker.IsAlive && !globalEscape && defender.AI == CharacterAI.Computer)
             {
-                var defenderPreventing = defender.ActiveStatuses.Keys.FirstOrDefault(s => s.PreventsAction());
-                if (defenderPreventing != StatusEffect.None)
+                bool defenderCharmSkip = ResolvePvPCharm(defender, isPlayer: false);
+                var defenderPreventing = defender.ActiveStatuses.Keys
+                    .FirstOrDefault(s => s.PreventsAction() && s != StatusEffect.Charmed);
+                if (defenderCharmSkip)
+                {
+                    await Task.Delay(GetCombatDelay(800));
+                }
+                else if (defenderPreventing != StatusEffect.None)
                 {
                     terminal.WriteLine(Loc.Get("combat.npc_status_prevented", defender.DisplayName, defenderPreventing.GetDescription().ToLower()), "cyan");
                     await Task.Delay(GetCombatDelay(800));
@@ -837,7 +849,7 @@ public partial class CombatEngine
             var griefFx = GriefSystem.Instance.GetCurrentEffects();
             if (griefFx.CombatModifier != 0 || griefFx.AllStatModifier != 0)
             {
-                terminal.SetColor("dark_gray");
+                terminal.SetColor(ColorRole.Notice);
                 float totalPenalty = griefFx.CombatModifier + griefFx.AllStatModifier;
                 if (totalPenalty < 0)
                     terminal.WriteLine(Loc.Get("combat.grief_penalty", $"{totalPenalty * 100:0}"));
@@ -1144,7 +1156,7 @@ public partial class CombatEngine
             var statusMessages = player.IsAlive ? player.ProcessStatusEffects() : new List<(string message, string color)>();
             if (statusMessages.Count > 0)
             {
-                terminal.SetColor("gray");
+                terminal.SetColor(ColorRole.Notice);
                 if (!GameConfig.ScreenReaderMode)
                     terminal.WriteLine($"─── {Loc.Get("combat.status_effects_label")} ───");
                 else
@@ -1440,10 +1452,19 @@ public partial class CombatEngine
                         continue;
                     }
 
-                    // Skip "attacks!" message for incapacitated monsters — check status BEFORE
+                    // Skip "attacks!" message for incapacitated monsters -- check status BEFORE
                     // printing so the player doesn't see "Monster attacks!" followed by "Monster is asleep!"
+                    //
+                    // v1.0.2: Charmed deliberately NOT listed here. Every other status in this
+                    // list stops the attack outright, but charm is only a per-round coin flip
+                    // resolved inside ProcessMonsterAction, so suppressing the header meant that
+                    // on the ~50% of charmed rounds where the monster DID attack, it attacked
+                    // with no "attacks!" line at all. That was survivable while charm lasted a
+                    // single round; now that it runs its full duration it would have been three
+                    // times as visible. Charmed monsters now announce the attack and then
+                    // hesitate out of it, which is both accurate and better narration.
                     if (monster.IsSleeping || monster.IsFeared || monster.IsStunned || monster.IsFrozen ||
-                        monster.Stunned || monster.Charmed || monster.StunRounds > 0)
+                        monster.Stunned || monster.StunRounds > 0)
                     {
                         // Still call ProcessMonsterAction to tick down durations and print status messages
                         if (hasGroup) terminal.StartCapture();
@@ -1468,14 +1489,9 @@ public partial class CombatEngine
                     terminal.WriteLine("");
                     terminal.SetColor("red");
 
-                    // Show boss ability name for boss attacks (before target selection)
-                    if (BossContext != null && monster.IsBoss)
-                    {
-                        string abilityName = SelectBossAbility(BossContext);
-                        terminal.WriteLine(Loc.Get("combat.monster_uses_ability", monster.Name, abilityName));
-                    }
-                    // "attacks you!" is now printed inside ProcessMonsterAction
-                    // after target selection, only when the monster actually targets the player
+                    // Boss ability name and "attacks you!" are both printed inside
+                    // ProcessMonsterAction now, after the skip-returns and target
+                    // selection, so neither announces an action the monster does not take.
 
                     await ProcessMonsterAction(monster, player, result, monsters);
 
@@ -1938,7 +1954,7 @@ public partial class CombatEngine
             var griefFx = GriefSystem.Instance.GetCurrentEffects();
             if (griefFx.CombatModifier != 0 || griefFx.AllStatModifier != 0)
             {
-                terminal.SetColor("dark_gray");
+                terminal.SetColor(ColorRole.Notice);
                 float totalPenalty = griefFx.CombatModifier + griefFx.AllStatModifier;
                 if (totalPenalty < 0)
                     terminal.WriteLine(Loc.Get("combat.grief_penalty", $"{totalPenalty * 100:0}"));
@@ -3200,7 +3216,7 @@ public partial class CombatEngine
         var attackRoll = TrainingSystem.RollAttack(attacker, monsterAC, false, null, random);
 
         // Show the roll result
-        terminal.SetColor("dark_gray");
+        terminal.SetColor(ColorRole.Derived);
         terminal.WriteLine(Loc.Get("combat.roll_result", attackRoll.NaturalRoll, attackRoll.Modifier, attackRoll.Total, monsterAC));
 
         // Show off-hand attack message
@@ -3613,7 +3629,7 @@ public partial class CombatEngine
         // Store punch for display
         attacker.Punch = attackPower;
 
-        terminal.SetColor("green");
+        terminal.SetColor(ColorRole.Success);
         terminal.WriteLine(Loc.Get("combat.you_hit", target.Name, attackPower));
 
         // Calculate defense absorption
@@ -3644,7 +3660,7 @@ public partial class CombatEngine
         long actualDamage = Math.Max(1, attackPower - defense);
 
         // Show defense calculation so player understands damage reduction
-        terminal.SetColor("dark_gray");
+        terminal.SetColor(ColorRole.Derived);
         terminal.WriteLine(Loc.Get("combat.damage_vs_defense", attackPower, defense));
 
         // Log defense calculation for every player attack (single-monster path)
@@ -4421,14 +4437,27 @@ public partial class CombatEngine
         // Check if monster is charmed (may skip attack)
         if (monster.Charmed)
         {
-            if (random.Next(100) < 50) // 50% chance to skip
+            bool skipped = random.Next(100) < GameConfig.CharmSkipAttackChance;
+
+            // v1.0.2: tick the duration instead of clearing on first contact.
+            // CharmedRounds == 0 keeps the old one-shot path for Dominate, which
+            // sets Charmed directly and never wanted a timer.
+            if (monster.CharmedRounds > 0)
             {
-                terminal.WriteLine(Loc.Get("combat.monster_charmed", monster.Name), "magenta");
+                monster.CharmedRounds--;
+                if (monster.CharmedRounds <= 0) monster.Charmed = false;
+            }
+            else
+            {
                 monster.Charmed = false;
+            }
+
+            if (skipped)
+            {
+                terminal.WriteLine(Loc.Get("combat.monster_charmed", monster.Name), ColorRole.Success);
                 await Task.Delay(GetCombatDelay(600));
                 return;
             }
-            monster.Charmed = false;
         }
 
         // Check if monster is sleeping (from Sleep spell or ability)
@@ -4612,6 +4641,20 @@ public partial class CombatEngine
             return;
         }
 
+        // Boss ability name. v1.0.2: relocated here from the caller, for the same
+        // reason "attacks you!" was moved down -- the caller printed it before
+        // ProcessMonsterAction ran, so once charm could survive past the
+        // suppression list a charmed boss announced "X uses Divine Wrath!" and
+        // then hesitated and did nothing. Printed after every skip-return but
+        // before target selection, so it still shows when the boss attacks a
+        // teammate rather than the player.
+        if (BossContext != null && monster.IsBoss)
+        {
+            string bossAbilityName = SelectBossAbility(BossContext);
+            terminal.SetColor("red");
+            terminal.WriteLine(Loc.Get("combat.monster_uses_ability", monster.Name, bossAbilityName));
+        }
+
         // === SMART MONSTER TARGETING ===
         // Monsters intelligently choose targets based on threat, class roles, and positioning
         var aliveTeammates = result.Teammates?.Where(t => t.IsAlive).ToList();
@@ -4687,7 +4730,7 @@ public partial class CombatEngine
             monsterRoll.Total -= penalty;
             monsterRoll.Modifier -= penalty;
             monsterRoll.Success = monsterRoll.Total >= monsterRoll.TargetDC;
-            terminal.SetColor("dark_gray");
+            terminal.SetColor(ColorRole.Derived);
             terminal.WriteLine(Loc.Get("combat.monster_roll_distracted", monster.Name, monsterRoll.NaturalRoll, monsterRoll.Modifier, monsterRoll.Total, monsterRoll.TargetDC, penalty));
             monster.Distracted = false;
             monster.DistractedPenalty = 0;
@@ -4695,7 +4738,7 @@ public partial class CombatEngine
         else
         {
             // Show the roll result
-            terminal.SetColor("dark_gray");
+            terminal.SetColor(ColorRole.Derived);
             terminal.WriteLine(Loc.Get("combat.monster_roll", monster.Name, monsterRoll.NaturalRoll, monsterRoll.Modifier, monsterRoll.Total, monsterRoll.TargetDC));
         }
 
@@ -4969,7 +5012,7 @@ public partial class CombatEngine
         // ApplySingleMonsterDamage:11321 in the player-attacks-monster path.
         if (playerDefense > 0 && playerDefense < monsterAttack)
         {
-            terminal.SetColor("dark_gray");
+            terminal.SetColor(ColorRole.Derived);
             terminal.WriteLine(Loc.Get("combat.damage_vs_defense", monsterAttack, playerDefense));
         }
 
@@ -5125,7 +5168,7 @@ public partial class CombatEngine
         // Track for telemetry
         result.TotalDamageTaken += actualDamage;
 
-        terminal.SetColor("red");
+        terminal.SetColor(ColorRole.Critical);
         if (blocked && actualDamage < monsterAttack / 2)
         {
             terminal.WriteLine(Loc.Get("combat.shield_absorbs_most", actualDamage), "bright_cyan");
@@ -5326,7 +5369,7 @@ public partial class CombatEngine
                 // Show defense calculation
                 if (abilityDefense > 0)
                 {
-                    terminal.SetColor("dark_gray");
+                    terminal.SetColor(ColorRole.Derived);
                     terminal.WriteLine(Loc.Get("combat.damage_vs_defense", abilityResult.DirectDamage, abilityDefense));
                 }
 
@@ -5512,8 +5555,8 @@ public partial class CombatEngine
                 // Show defense calculation
                 if (abilityDef > 0 && abilityDef < rawDamage)
                 {
-                    terminal.SetColor("dark_gray");
-                    terminal.WriteLine($"[{rawDamage} damage vs {abilityDef} defense]");
+                    terminal.SetColor(ColorRole.Derived);
+                    terminal.WriteLine(Loc.Get("combat.damage_vs_defense", rawDamage, abilityDef));
                 }
 
                 // v0.56.1 Old God solo: +15% boss damage, -20% player damage (non-lifesteal multiplier path)
@@ -7916,6 +7959,39 @@ public partial class CombatEngine
         target.StunDuration = duration;
         target.RecentStunCount++;
         target.RoundsSinceLastStun = 0;
+        return true;
+    }
+
+    /// <summary>
+    /// Applies Charming Performance's charm, honoring the same boss-protection
+    /// layers stuns go through. v1.0.2.
+    ///
+    /// Charm used to be a single coin flip resolved on the target's next turn,
+    /// so it never needed guarding. Once it started running its full 3-round
+    /// duration it became real action denial: ~75% uptime on a 4-round cooldown,
+    /// with re-casting simply overwriting the clock. That is the same
+    /// refresh-stacking shape TryStunMonster calls out as "the primary perma-stun
+    /// path", and with no boss resist roll anywhere it let a level 26 ability
+    /// soft-lock an Old God. Bosses now get a resist roll and a 1-round cap.
+    /// </summary>
+    private bool TryCharmMonster(Monster target, int requestedDuration)
+    {
+        if (target == null || !target.IsAlive) return false;
+
+        // Refuse to refresh an active charm -- re-casting must not extend the clock.
+        if (target.Charmed) return false;
+
+        int duration = Math.Max(1, requestedDuration);
+
+        if (target.IsBoss || target.IsMiniBoss)
+        {
+            if (random.Next(100) < (int)(GameConfig.BossStunResistChance * 100))
+                return false;
+            duration = Math.Min(duration, GameConfig.MaxStunDurationBoss);
+        }
+
+        target.Charmed = true;
+        target.CharmedRounds = duration;
         return true;
     }
 
@@ -11977,7 +12053,7 @@ public partial class CombatEngine
         // Show defense calculation when armor reduces damage
         if (effectiveArmor > 0 && effectiveArmor < damage)
         {
-            terminal.SetColor("dark_gray");
+            terminal.SetColor(ColorRole.Derived);
             terminal.WriteLine(Loc.Get("combat.damage_vs_defense", damage, effectiveArmor));
         }
 
@@ -14102,15 +14178,15 @@ public partial class CombatEngine
             case "charm":
                 if (target != null && target.IsAlive)
                 {
-                    if (random.Next(100) < 40)
+                    int charmRounds = abilityResult.Duration > 0 ? abilityResult.Duration : GameConfig.CharmDurationRounds;
+                    if (random.Next(100) < GameConfig.CharmApplyChance && TryCharmMonster(target, charmRounds))
                     {
-                        target.Charmed = true;
-                        terminal.SetColor("magenta");
+                        terminal.SetColor(ColorRole.Success);
                         terminal.WriteLine(Loc.Get("combat.ability_charmed", target.Name));
                     }
                     else
                     {
-                        terminal.SetColor("gray");
+                        terminal.SetColor(ColorRole.Notice);
                         terminal.WriteLine(Loc.Get("combat.resists_charm", target.Name));
                     }
                 }
@@ -16085,22 +16161,22 @@ public partial class CombatEngine
             bool onCooldown = abilityCooldowns.TryGetValue(ability.Id, out int cooldownLeft) && cooldownLeft > 0;
 
             string statusText = "";
-            string color = "white";
+            string color = ColorRole.Action;
 
             if (onCooldown)
             {
                 statusText = $" [Cooldown: {cooldownLeft} rounds]";
-                color = "dark_gray";
+                color = ColorRole.Disabled;
             }
             else if (!hasStamina)
             {
                 statusText = $" [Need {ability.StaminaCost} stamina]";
-                color = "dark_gray";
+                color = ColorRole.Disabled;
             }
             else if (ability.ManaCost > 0 && player.Mana < ability.ManaCost)
             {
                 statusText = $" [Need {ability.ManaCost} mana]";
-                color = "dark_gray";
+                color = ColorRole.Disabled;
             }
 
             string costDisplay = ability.ManaCost > 0
@@ -16108,7 +16184,7 @@ public partial class CombatEngine
                 : $"{ability.StaminaCost} stamina";
             terminal.SetColor(color);
             terminal.WriteLine($"  {displayIndex}. {ability.Name} - {costDisplay}{statusText}");
-            terminal.SetColor("gray");
+            terminal.SetColor(ColorRole.Narration);
             terminal.WriteLine($"     {ability.Description}");
 
             selectableAbilities.Add(ability);
@@ -19104,7 +19180,7 @@ public partial class CombatEngine
         // Apply damage to companion
         companion.HP = Math.Max(0, companion.HP - actualDamage);
 
-        terminal.SetColor("yellow");
+        terminal.SetColor(ColorRole.Notice);
         terminal.WriteLine(Loc.Get("combat.monster_hits_companion", monster.TheNameOrName, companion.DisplayName, actualDamage) + $" ({companion.HP}/{companion.MaxHP} HP)");
 
         // Divine Mandate thorn reflect (v0.56.0, NPC tank)
@@ -21654,22 +21730,22 @@ public partial class CombatEngine
             bool onCooldown = abilityCooldowns.TryGetValue(ability.Id, out int cooldownLeft) && cooldownLeft > 0;
 
             string statusText = "";
-            string color = "white";
+            string color = ColorRole.Action;
 
             if (onCooldown)
             {
                 statusText = $" [Cooldown: {cooldownLeft} rounds]";
-                color = "dark_gray";
+                color = ColorRole.Disabled;
             }
             else if (!hasStamina)
             {
                 statusText = $" [Need {ability.StaminaCost} stamina, have {player.CurrentCombatStamina}]";
-                color = "dark_gray";
+                color = ColorRole.Disabled;
             }
             else if (ability.ManaCost > 0 && player.Mana < ability.ManaCost)
             {
                 statusText = $" [Need {ability.ManaCost} mana, have {player.Mana}]";
-                color = "dark_gray";
+                color = ColorRole.Disabled;
             }
 
             string costDisplaySM = ability.ManaCost > 0
@@ -21677,7 +21753,7 @@ public partial class CombatEngine
                 : $"{ability.StaminaCost} stamina";
             terminal.SetColor(color);
             terminal.WriteLine($"  {displayIndex}. {ability.Name} - {costDisplaySM}{statusText}");
-            terminal.SetColor("gray");
+            terminal.SetColor(ColorRole.Narration);
             terminal.WriteLine($"     {ability.Description}");
 
             selectableAbilities.Add(ability);
@@ -22161,17 +22237,17 @@ public partial class CombatEngine
                 break;
 
             case "charm":
-                if (monster != null)
+                if (monster != null && monster.IsAlive)
                 {
-                    if (random.Next(100) < 40)
+                    int charmRounds2 = abilityResult.Duration > 0 ? abilityResult.Duration : GameConfig.CharmDurationRounds;
+                    if (random.Next(100) < GameConfig.CharmApplyChance && TryCharmMonster(monster, charmRounds2))
                     {
-                        monster.Charmed = true;
-                        terminal.SetColor("magenta");
+                        terminal.SetColor(ColorRole.Success);
                         terminal.WriteLine(Loc.Get("combat.ability_charmed", monster.Name));
                     }
                     else
                     {
-                        terminal.SetColor("gray");
+                        terminal.SetColor(ColorRole.Notice);
                         terminal.WriteLine(Loc.Get("combat.resists_charm", monster.Name));
                     }
                 }
@@ -24234,6 +24310,28 @@ public partial class CombatEngine
         await Task.Delay(GetCombatDelay(2000));
     }
     
+    /// <summary>
+    /// Resolves a charmed combatant's turn in PvP. v1.0.2.
+    ///
+    /// Charmed is filed under Control in StatusEffect.cs, so the generic
+    /// PreventsAction() gate treats it as a hard lock. In PvE charm is a 50%
+    /// per-round coin flip, and shipping two different rules for one named
+    /// effect is how the original bug happened. Returns true if the turn is lost.
+    /// </summary>
+    private bool ResolvePvPCharm(Character actor, bool isPlayer)
+    {
+        if (actor == null || !actor.HasStatus(StatusEffect.Charmed)) return false;
+
+        bool skipped = random.Next(100) < GameConfig.CharmSkipAttackChance;
+        if (skipped)
+        {
+            terminal.WriteLine(
+                Loc.Get(isPlayer ? "combat.you_charmed_hesitate" : "combat.monster_charmed", actor.DisplayName),
+                ColorRole.Success);
+        }
+        return skipped;
+    }
+
     private async Task ProcessPlayerVsPlayerAction(CombatAction action, Character attacker, Character defender, CombatResult result)
     {
         if (!attacker.IsAlive || !defender.IsAlive) return;
@@ -24634,22 +24732,22 @@ public partial class CombatEngine
                 bool onCooldown = abilityCooldowns.TryGetValue(ability.Id, out int cooldownLeft) && cooldownLeft > 0;
 
                 string statusText = "";
-                string color = "white";
+                string color = ColorRole.Action;
 
                 if (onCooldown)
                 {
                     statusText = $" [Cooldown: {cooldownLeft} rounds]";
-                    color = "dark_gray";
+                    color = ColorRole.Disabled;
                 }
                 else if (!hasStamina)
                 {
                     statusText = $" [Need {ability.StaminaCost} stamina, have {attacker.CurrentCombatStamina}]";
-                    color = "dark_gray";
+                    color = ColorRole.Disabled;
                 }
                 else if (ability.ManaCost > 0 && attacker.Mana < ability.ManaCost)
                 {
                     statusText = $" [Need {ability.ManaCost} mana, have {attacker.Mana}]";
-                    color = "dark_gray";
+                    color = ColorRole.Disabled;
                 }
 
                 string costDisplayPvP = ability.ManaCost > 0
@@ -24657,7 +24755,7 @@ public partial class CombatEngine
                     : $"{ability.StaminaCost} stamina";
                 terminal.SetColor(color);
                 terminal.WriteLine($"  {displayIndex}. {ability.Name} - {costDisplayPvP}{statusText}");
-                terminal.SetColor("gray");
+                terminal.SetColor(ColorRole.Narration);
                 terminal.WriteLine($"     {ability.Description}");
 
                 selectableAbilities.Add(ability);
@@ -24751,6 +24849,25 @@ public partial class CombatEngine
             {
                 actualDamage = (long)(actualDamage * 1.75);
                 terminal.WriteLine(Loc.Get("combat.critical_from_shadows"), "bright_yellow");
+            }
+            else if (abilityResult.SpecialEffect == "charm")
+            {
+                // v1.0.2: PvP charm existed on paper only. ExecutePvPAbility had no
+                // case for it, and charm deals no damage and grants no bonus, so in
+                // the arena the ability burned 35 stamina and a 4-round cooldown to
+                // do literally nothing while the menu printed its description. This
+                // is purely additive: nothing else in the codebase ever applies
+                // StatusEffect.Charmed to a Character.
+                if (random.Next(100) < GameConfig.CharmApplyChance)
+                {
+                    defender.ApplyStatus(StatusEffect.Charmed,
+                        abilityResult.Duration > 0 ? abilityResult.Duration : GameConfig.CharmDurationRounds);
+                    terminal.WriteLine($"  {Loc.Get("combat.ability_charmed", defender.DisplayName)}", ColorRole.Success);
+                }
+                else
+                {
+                    terminal.WriteLine($"  {Loc.Get("combat.resists_charm", defender.DisplayName)}", ColorRole.Notice);
+                }
             }
             else if (abilityResult.SpecialEffect == "biaxin")
             {

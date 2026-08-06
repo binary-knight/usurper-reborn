@@ -1390,6 +1390,13 @@ namespace UsurperRemake.Systems
 
         private void RestoreNPCsFromData(List<NPCData> npcData)
         {
+            // v1.0.2: see NPCSpawnSystem.IsRebuilding. The world-sim reload runs on
+            // the tick thread in the same process as live player sessions, so a
+            // session mid-login can otherwise read this roster while it is half
+            // rebuilt and wrongly retire a living partner.
+            NPCSpawnSystem.Instance.IsRebuilding = true;
+            try
+            {
             // Clear existing NPCs
             NPCSpawnSystem.Instance.ClearAllNPCs();
 
@@ -1940,6 +1947,11 @@ namespace UsurperRemake.Systems
 
             DebugLogger.Instance.LogInfo("WORLDSIM",
                 $"Restored {npcData.Count - skippedCount}/{npcData.Count} NPCs, {npcData.Count(n => n.IsDead)} dead");
+            }
+            finally
+            {
+                NPCSpawnSystem.Instance.IsRebuilding = false;
+            }
         }
 
         /// <summary>

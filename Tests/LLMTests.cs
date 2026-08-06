@@ -20,6 +20,18 @@ namespace UsurperReborn.Tests;
 /// test resets state in a finally / dispose pattern to keep cross-test
 /// contamination low.
 /// </summary>
+/// <summary>
+/// USURPER_LLM_* are process-global environment variables, and xUnit runs test
+/// CLASSES in parallel. Three separate classes set and clear them, so they raced:
+/// one class would clear the endpoint while another was mid-assertion. It
+/// reproduced roughly one full-suite run in four and passed every time in
+/// isolation, which is the worst shape a CI failure can have. Same fix as the
+/// SharedGameSingletons collection: serialize the classes that share the state.
+/// </summary>
+[CollectionDefinition("LLMEnvironmentVars")]
+public class LLMEnvironmentVarsCollection { }
+
+[Collection("LLMEnvironmentVars")]
 public class LLMTests : IDisposable
 {
     public LLMTests()
