@@ -168,14 +168,16 @@ public class Item
     /// </summary>
     public void RemoveEffects(Character character)
     {
-        character.MaxHP -= HP;
+        // Floor at 1/0 like the modern Equipment path -- an unclamped subtract can
+        // drive the pools negative when effects were never applied symmetrically.
+        character.MaxHP = Math.Max(1, character.MaxHP - HP);
         character.HP = Math.Min(character.HP, character.MaxHP);
         character.Stamina -= Stamina;
         character.Agility -= Agility;
         character.Charisma -= Charisma;
         character.Dexterity -= Dexterity;
         character.Wisdom -= Wisdom;
-        character.MaxMana -= Mana;
+        character.MaxMana = Math.Max(0, character.MaxMana - Mana);
         character.Mana = Math.Min(character.Mana, character.MaxMana);
         character.Strength -= Strength;
         character.Defence -= Defence;

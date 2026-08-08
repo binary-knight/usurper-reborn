@@ -2580,6 +2580,11 @@ public class DungeonLocation : BaseLocation
         // Show exits
         ShowExits(room);
 
+        // Persistent mini-map (player request): compact floor map that redraws with
+        // every room view. Preference-gated; SR players use the navigator instead.
+        if (player?.DungeonAutoMap == true && !GameConfig.ScreenReaderMode)
+            RenderMiniMap();
+
         // v0.65.4: point a brand-new zero-kill player at their first fight (no-op otherwise).
         ShowFirstFightGuidance(room, player);
 
@@ -13035,6 +13040,25 @@ public class DungeonLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("gray");
+
+        // Persistent mini-map toggle, surfaced where map users already are. BBS/compact
+        // sessions never render the mini-map, so don't advertise the toggle there.
+        var mapPlayer = GetCurrentPlayer();
+        if (!IsBBSSession && mapPlayer != null)
+        {
+            terminal.WriteLine($" {Loc.Get("dungeon.automap_toggle_hint", mapPlayer.DungeonAutoMap ? Loc.Get("prefs.on") : Loc.Get("prefs.off"))}");
+            terminal.WriteLine($" {Loc.Get("dungeon.press_enter_continue")}");
+            var mapInput = await terminal.GetInput("");
+            if (mapInput.Trim().ToUpperInvariant() == "P")
+            {
+                mapPlayer.DungeonAutoMap = !mapPlayer.DungeonAutoMap;
+                terminal.WriteLine(Loc.Get(mapPlayer.DungeonAutoMap ? "dungeon.automap_enabled" : "dungeon.automap_disabled"), "green");
+                await GameEngine.Instance.SaveCurrentGame();
+                await Task.Delay(800);
+            }
+            return;
+        }
+
         terminal.WriteLine($" {Loc.Get("dungeon.press_enter_continue")}");
         await terminal.GetInput("");
     }
@@ -13409,6 +13433,94 @@ public class DungeonLocation : BaseLocation
     /// <summary>
     /// Get single-character map symbol for a room (roguelike style)
     /// </summary>
+    /// <summary>
+    /// Compact persistent version of the [M] map, rendered inline with the room view
+    /// when the DungeonAutoMap preference is on. Same symbols and colors as
+    /// ShowDungeonMap, but 2 chars per room column, no legend, and connector rows
+    /// are only printed when a north/south link actually exists in that row.
+    /// Callers gate on mode: the BBS/compact view never calls this (25-row budget),
+    /// SR players get the navigator, Electron gets the graphical overlay.
+    /// </summary>
+    private void RenderMiniMap()
+    {
+        if (currentFloor == null)
+            return;
+
+        var roomPositions = BuildRoomPositionMap();
+        if (roomPositions.Count == 0)
+            return;
+
+        var posToRoom = new Dictionary<(int x, int y), DungeonRoom>();
+        foreach (var kvp in roomPositions)
+        {
+            var mapRoom = currentFloor.Rooms.FirstOrDefault(r => r.Id == kvp.Key);
+            if (mapRoom != null)
+                posToRoom[kvp.Value] = mapRoom;
+        }
+
+        int minX = roomPositions.Values.Min(p => p.x);
+        int maxX = roomPositions.Values.Max(p => p.x);
+        int minY = roomPositions.Values.Min(p => p.y);
+        int maxY = roomPositions.Values.Max(p => p.y);
+
+        int explored = currentFloor.Rooms.Count(r => r.IsExplored);
+        int total = currentFloor.Rooms.Count;
+        terminal.SetColor("darkgray");
+        terminal.WriteLine($"  {Loc.Get("dungeon.automap_caption", explored, total)}");
+
+        for (int y = minY; y <= maxY; y++)
+        {
+            terminal.Write("  ");
+            for (int x = minX; x <= maxX; x++)
+            {
+                if (posToRoom.TryGetValue((x, y), out var room))
+                {
+                    if (x > minX)
+                    {
+                        bool hasWest = room.Exits.TryGetValue(Direction.West, out var westExit)
+                            && roomPositions.TryGetValue(westExit.TargetRoomId, out var westPos)
+                            && westPos == (x - 1, y);
+                        terminal.SetColor("darkgray");
+                        terminal.Write(hasWest && room.IsExplored ? "─" : " ");
+                    }
+                    terminal.SetColor(GetRoomMapColor(room));
+                    terminal.Write(GetRoomMapChar(room).ToString());
+                }
+                else
+                {
+                    terminal.Write(x > minX ? "  " : " ");
+                }
+            }
+            terminal.WriteLine("");
+
+            // Connector row -- skipped entirely when no room in this row links south
+            if (y < maxY)
+            {
+                var connectorRow = new System.Text.StringBuilder("  ");
+                bool anySouth = false;
+                for (int x = minX; x <= maxX; x++)
+                {
+                    if (x > minX)
+                        connectorRow.Append(' ');
+                    bool hasSouth = posToRoom.TryGetValue((x, y), out var rowRoom)
+                        && rowRoom.IsExplored
+                        && rowRoom.Exits.TryGetValue(Direction.South, out var southExit)
+                        && roomPositions.TryGetValue(southExit.TargetRoomId, out var southPos)
+                        && southPos == (x, y + 1);
+                    connectorRow.Append(hasSouth ? '│' : ' ');
+                    anySouth |= hasSouth;
+                }
+                if (anySouth)
+                {
+                    terminal.SetColor("darkgray");
+                    terminal.WriteLine(connectorRow.ToString());
+                }
+            }
+        }
+
+        terminal.WriteLine("");
+    }
+
     private char GetRoomMapChar(DungeonRoom room)
     {
         bool isCurrentRoom = room.Id == currentFloor?.CurrentRoomId;

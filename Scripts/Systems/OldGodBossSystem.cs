@@ -847,21 +847,30 @@ namespace UsurperRemake.Systems
             // Set divine armor reduction on the combat context so CombatEngine applies it
             combatEngine.BossContext.DivineArmorReduction = GetDivineArmorReduction(boss.Type, player);
 
-            // Set static flags for Manwe battle
+            // Set session-scoped flag for Manwe battle
             CombatEngine.IsManweBattle = boss.Type == OldGodType.Manwe;
             combatEngine.ResetManweBossFlags();
 
-            // Run combat through the standard engine
-            var combatResult = await combatEngine.PlayerVsMonsters(
-                player, new List<Monster> { bossMonster }, dungeonTeammates);
+            CombatResult combatResult;
+            bool wasSaved;
+            try
+            {
+                // Run combat through the standard engine
+                combatResult = await combatEngine.PlayerVsMonsters(
+                    player, new List<Monster> { bossMonster }, dungeonTeammates);
 
-            // Capture boss context state before clearing
-            bool wasSaved = combatEngine.BossContext?.BossSaved ?? false;
-
-            // Clean up
-            CombatEngine.IsManweBattle = false;
-            combatEngine.BossContext = null;
-            ClearPlayerModifiers(player);
+                // Capture boss context state before clearing
+                wasSaved = combatEngine.BossContext?.BossSaved ?? false;
+            }
+            finally
+            {
+                // finally, not fall-through: a mid-fight exception (MUD disconnects
+                // throw through PlayerVsMonsters) used to leave the flag stuck set,
+                // rerouting later fights through the Manwe ability handler.
+                CombatEngine.IsManweBattle = false;
+                combatEngine.BossContext = null;
+                ClearPlayerModifiers(player);
+            }
 
             // Convert CombatResult to BossEncounterResult
             return await ConvertToBossResult(combatResult, boss, wasSaved, terminal);

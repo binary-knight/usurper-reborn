@@ -53,8 +53,19 @@ public partial class CombatEngine
     // Boss combat context - set by OldGodBossSystem when routing boss fights through CombatEngine
     public BossCombatContext? BossContext { get; set; }
 
-    /// <summary>True when the current combat is against Manwe (for Void Key artifact doubling)</summary>
-    public static bool IsManweBattle { get; set; }
+    /// <summary>
+    /// True when the current combat is against Manwe (for Void Key artifact doubling).
+    /// AsyncLocal, not a plain static: the MUD server hosts every player's session in
+    /// one process, and a plain static meant one player's Old God fight rewired every
+    /// other session's combat math (Manwe ability routing, Void Key doubling) mid-fight.
+    /// AsyncLocal scopes the flag to the async flow of the session that set it.
+    /// </summary>
+    private static readonly System.Threading.AsyncLocal<bool> _isManweBattle = new();
+    public static bool IsManweBattle
+    {
+        get => _isManweBattle.Value;
+        set => _isManweBattle.Value = value;
+    }
 
     public void ResetManweBossFlags()
     {
@@ -452,6 +463,22 @@ public partial class CombatEngine
                 foreach (var key in tcEntry.Keys.ToList())
                     if (tcEntry[key] > 0) tcEntry[key]--;
 
+            // Defend lasts one round. PvE clears this in ProcessEndOfRoundAbilityEffects,
+            // which the PvP loop never calls -- without this, one [D] press would halve
+            // AI damage for the rest of the duel.
+            foreach (var combatant in new[] { attacker, defender })
+            {
+                if (combatant.IsDefending)
+                {
+                    combatant.IsDefending = false;
+                    if (combatant.HasStatus(StatusEffect.Defending))
+                        combatant.ActiveStatuses.Remove(StatusEffect.Defending);
+                }
+                // Calm Waters shield ticks once per round for BOTH sides (used to tick
+                // per menu redraw for the attacker and never for the defender).
+                DecrementCalmWatersShield(combatant, result);
+            }
+
             // Check for combat end conditions
             if (!attacker.IsAlive || !defender.IsAlive)
                 break;
@@ -530,10 +557,17 @@ public partial class CombatEngine
             UsurperRemake.Server.GmcpBridge.EmitCombatPartyIfChanged(teammates);
         }
 
-        // Store teammates for healing/support actions
-        currentTeammates = teammates ?? new List<Character>();
+        // Store teammates for healing/support actions.
+        // SNAPSHOT the caller's list: in group play the incoming list is the leader's
+        // live dungeon roster, which other sessions mutate mid-combat (a member joining
+        // the dungeon, CleanupGroupFollower on disconnect) -- concurrent Add/Remove
+        // during this loop's enumerations threw InvalidOperationException and aborted
+        // the fight. Membership changes now take effect at the next combat; a follower
+        // [R]-retreat removes from this combat-local list only (they stay in the group).
+        currentTeammates = teammates != null ? new List<Character>(teammates) : new List<Character>();
 
         // Reset temporary flags per battle
+        player.IsDefending = false; // leaks when the prior fight ended mid-round (victory break skips round-end cleanup)
         player.IsRaging = false;
         player.TempAttackBonus = 0;
         player.TempAttackBonusDuration = 0;
@@ -698,7 +732,10 @@ public partial class CombatEngine
         {
             Player = player,
             Monsters = new List<Monster>(monsters), // Copy list
-            Teammates = teammates ?? new List<Character>(),
+            // Same combat-local snapshot as currentTeammates (assigned above) so a
+            // follower retreat's Remove stays consistent across both views and never
+            // mutates the leader's live dungeon roster mid-enumeration.
+            Teammates = currentTeammates,
             CombatLog = new List<string>()
         };
 
@@ -1304,8 +1341,10 @@ public partial class CombatEngine
                     terminal.WriteLine(Loc.Get("combat.auto_running"));
                     terminal.WriteLine("");
 
-                    // Check for key press to stop auto-combat (poll during delay)
-                    int delayMs = GetCombatDelay(500);
+                    // Check for key press to stop auto-combat (poll during delay).
+                    // Floor at one 50ms poll: Instant speed returns 0, which skipped
+                    // the loop entirely and made auto-combat impossible to stop.
+                    int delayMs = Math.Max(50, GetCombatDelay(500));
                     int elapsed = 0;
                     bool stopRequested = false;
                     while (elapsed < delayMs)
@@ -1384,7 +1423,10 @@ public partial class CombatEngine
                 break;
 
             // === TEAMMATES' TURNS ===
-            foreach (var teammate in result.Teammates.Where(t => t.IsAlive))
+            // Materialized with ToList: a grouped follower's successful [R] retreat
+            // removes them from result.Teammates mid-iteration (ProcessGroupedPlayerTurn),
+            // which threw InvalidOperationException and aborted combat for the party.
+            foreach (var teammate in result.Teammates.Where(t => t.IsAlive).ToList())
             {
                 if (monsters.Any(m => m.IsAlive))
                 {
@@ -1639,20 +1681,36 @@ public partial class CombatEngine
 
             // All monsters dead — victory! (Even if leader died, grouped players carried the fight)
             result.Outcome = CombatOutcome.Victory;
+            bool runVictory = true;
             if (!player.IsAlive)
             {
-                // Leader died but party won — handle leader death first, then victory rewards
-                result.Outcome = CombatOutcome.Victory; // Still a win for the group
-                terminal.SetColor("bright_yellow");
-                terminal.WriteLine("");
-                terminal.WriteLine($"  {Loc.Get("combat.party_fallen", player.DisplayName)}");
-                terminal.WriteLine("");
+                // "Grouped players carried the fight" only holds when living grouped
+                // players actually exist. A solo (or companions-only) mutual kill used
+                // to run BOTH pipelines: full death penalties, then full victory
+                // rewards with loot prompts shown to a dead player.
+                bool groupCarried = result.Teammates?.Any(t => t.IsGroupedPlayer && t.IsAlive) == true;
+                if (!groupCarried)
+                    runVictory = false;
+                if (groupCarried)
+                {
+                    // Leader died but party won — handle leader death first, then victory rewards
+                    terminal.SetColor("bright_yellow");
+                    terminal.WriteLine("");
+                    terminal.WriteLine($"  {Loc.Get("combat.party_fallen", player.DisplayName)}");
+                    terminal.WriteLine("");
+                }
                 BroadcastGroupCombatEvent(result,
                     $"\u001b[1;33m  {player.DisplayName} fell in battle, but the party prevails!\u001b[0m");
                 await HandlePlayerDeath(result);
                 CheckGroupLeaderDeath(result);
+                // Permadeath just erased the save (or, online, queued the disconnect).
+                // Running the victory pipeline afterwards re-created the save via its
+                // unconditional AutoSave and showed loot prompts on a dying socket.
+                if (result.IsPermadeath)
+                    runVictory = false;
             }
-            await HandleVictoryMultiMonster(result, offerMonkEncounter);
+            if (runVictory)
+                await HandleVictoryMultiMonster(result, offerMonkEncounter);
         }
         else if (!player.IsAlive)
         {
@@ -1972,11 +2030,12 @@ public partial class CombatEngine
 
         while (true) // Loop until valid action chosen
         {
-            // Apply status ticks before player chooses action
-            player.ProcessStatusEffects();
-
-            // Decrement Calm Waters debuff shield
-            DecrementCalmWatersShield(player, result);
+            // NOTE: no status tick here. The PvP round loop ticks both combatants at
+            // end of round; ticking again at the prompt (inside while(true), with the
+            // messages discarded) double-ran the attacker's DoTs/durations every round
+            // and re-ran them on every menu redraw -- mashing [SPD] shrugged off stuns,
+            // and a poisoned player could die at the menu with no damage message.
+            // Calm Waters decrement moved to the round-end tick for the same reason.
 
             // v0.60.3: GMCP Char.Vitals push at the start of every player-turn prompt
             // so MUD clients see fresh HP/MP/SP values when deciding their next action.
@@ -3954,9 +4013,18 @@ public partial class CombatEngine
             return;
         }
 
-        // If blade is already coated, ask to replace
+        // If blade is already coated, ask to replace. Grouped followers have no
+        // interactive prompt channel (GroupFollowerLoop is the live reader on their
+        // stream, same hazard as ExecuteUseItem) -- prompting would hang the whole
+        // party's combat, so keep the existing coating for them instead of asking.
         if (player.PoisonCoatingCombats > 0 && player.ActivePoisonType != PoisonType.None)
         {
+            if (player.IsGroupedPlayer)
+            {
+                terminal.WriteLine(Loc.Get("combat.poison_keep_current"), "gray");
+                await Task.Delay(GetCombatDelay(500));
+                return;
+            }
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("combat.poison_already_coated", $"{PoisonData.GetName(player.ActivePoisonType)} ({player.PoisonCoatingCombats} combats remaining)"));
             terminal.Write(Loc.Get("combat.replace_yn"));
@@ -4000,7 +4068,9 @@ public partial class CombatEngine
         terminal.WriteLine("");
         terminal.SetColor("white");
         terminal.Write(Loc.Get("combat.choose_cancel"));
-        var input = await terminal.GetInput("");
+        // Grouped followers can't answer prompts (see guard above) -- auto-pick the
+        // strongest poison they know rather than freezing the party on GetInput.
+        var input = player.IsGroupedPlayer ? available.Count.ToString() : await terminal.GetInput("");
 
         if (!int.TryParse(input.Trim(), out int choice) || choice < 1 || choice > available.Count)
         {
@@ -4337,8 +4407,13 @@ public partial class CombatEngine
 
         terminal.SetColor("red");
 
-        // Tick monster statuses — only once per round (boss multi-attacks shouldn't tick faster)
-        if (monster.StatusTickedThisRound)
+        // Tick monster statuses — only once per round (boss multi-attacks shouldn't tick
+        // faster). firstActionThisRound gates every DoT tick and duration decrement
+        // below: the old guard only early-returned for incapacitated monsters, so a
+        // free-to-act boss re-ran the whole tick block on each of its 2-3 attacks —
+        // DoTs dealt multiplied damage and debuffs/taunts expired 2-3x too fast.
+        bool firstActionThisRound = !monster.StatusTickedThisRound;
+        if (!firstActionThisRound)
         {
             // Already ticked this round — just check if still incapacitated
             if (monster.StunRounds > 0 || monster.Stunned || monster.IsSleeping ||
@@ -4356,7 +4431,7 @@ public partial class CombatEngine
         // Fix: BurnRounds is its own field on Monster; both tick blocks run.
 
         // Burn DoT (fire damage) — slightly higher per-tick than poison.
-        if (monster.BurnRounds > 0)
+        if (firstActionThisRound && monster.BurnRounds > 0)
         {
             int baseDmg = Math.Max(4, (int)(monster.MaxHP * (0.04 + random.NextDouble() * 0.02)));
             int dmg = baseDmg + random.Next(1, player.Level / 5 + 2);
@@ -4374,7 +4449,7 @@ public partial class CombatEngine
         }
 
         // Poison DoT (independent of burn now -- both can tick on the same round).
-        if (monster.PoisonRounds > 0)
+        if (firstActionThisRound && monster.PoisonRounds > 0)
         {
             int baseDmg = Math.Max(3, (int)(monster.MaxHP * (0.03 + random.NextDouble() * 0.02)));
             int dmg = baseDmg + random.Next(1, player.Level / 5 + 2);
@@ -4395,7 +4470,7 @@ public partial class CombatEngine
         // The ability's description says "Each tick heals you"; previously the implementation used
         // a generic Lifesteal status that only fired on player ATTACKS, not on DoT ticks, so the
         // heal felt absent mid-fight. Now applied per-round here next to poison.
-        if (monster.CorruptingDotRounds > 0)
+        if (firstActionThisRound && monster.CorruptingDotRounds > 0)
         {
             long corruptDmg = Math.Max(1, monster.CorruptingDotTickDamage);
             monster.HP = Math.Max(0, monster.HP - corruptDmg);
@@ -4442,14 +4517,19 @@ public partial class CombatEngine
             // v1.0.2: tick the duration instead of clearing on first contact.
             // CharmedRounds == 0 keeps the old one-shot path for Dominate, which
             // sets Charmed directly and never wanted a timer.
-            if (monster.CharmedRounds > 0)
+            // Duration only decays once per round (each boss attack still rolls
+            // its own skip chance above).
+            if (firstActionThisRound)
             {
-                monster.CharmedRounds--;
-                if (monster.CharmedRounds <= 0) monster.Charmed = false;
-            }
-            else
-            {
-                monster.Charmed = false;
+                if (monster.CharmedRounds > 0)
+                {
+                    monster.CharmedRounds--;
+                    if (monster.CharmedRounds <= 0) monster.Charmed = false;
+                }
+                else
+                {
+                    monster.Charmed = false;
+                }
             }
 
             if (skipped)
@@ -4477,7 +4557,7 @@ public partial class CombatEngine
         // v0.57.1 — tick Weaken duration. Previously this never decremented, so the status-bar
         // WEK(n) indicator was cosmetic and the buff effectively never expired. Now it ticks once
         // per monster-action cycle and falls off.
-        if (monster.WeakenRounds > 0)
+        if (firstActionThisRound && monster.WeakenRounds > 0)
         {
             monster.WeakenRounds--;
         }
@@ -4487,7 +4567,7 @@ public partial class CombatEngine
         // as WeakenRounds: counter set when the ability fires, decrements once per
         // monster-action cycle, falls off when it hits 0. Clear EvasionMissChance on
         // expiry so a future ability re-set is unambiguous.
-        if (monster.EvasionRounds > 0)
+        if (firstActionThisRound && monster.EvasionRounds > 0)
         {
             monster.EvasionRounds--;
             if (monster.EvasionRounds <= 0)
@@ -4495,7 +4575,7 @@ public partial class CombatEngine
         }
 
         // Tick corrosion duration
-        if (monster.IsCorroded)
+        if (firstActionThisRound && monster.IsCorroded)
         {
             monster.CorrodedDuration--;
             if (monster.CorrodedDuration <= 0)
@@ -4535,18 +4615,21 @@ public partial class CombatEngine
         }
 
         // Tick down stun immunity (monster is NOT stunned but can't be re-stunned yet)
-        if (monster.StunImmunityRounds > 0)
+        if (firstActionThisRound && monster.StunImmunityRounds > 0)
             monster.StunImmunityRounds--;
 
         // v0.60.0 stun-lock audit: tick the DR window. After StunDRWindowRounds
         // consecutive non-stunned rounds, decay RecentStunCount by 1. This lets a
         // stun-resistant boss eventually be stunned again later in a long fight
         // instead of being permanently DR-immune after one good chain.
-        monster.RoundsSinceLastStun++;
-        if (monster.RoundsSinceLastStun >= GameConfig.StunDRWindowRounds && monster.RecentStunCount > 0)
+        if (firstActionThisRound)
         {
-            monster.RecentStunCount--;
-            monster.RoundsSinceLastStun = 0;
+            monster.RoundsSinceLastStun++;
+            if (monster.RoundsSinceLastStun >= GameConfig.StunDRWindowRounds && monster.RecentStunCount > 0)
+            {
+                monster.RecentStunCount--;
+                monster.RoundsSinceLastStun = 0;
+            }
         }
 
         // Check if monster is frozen (from Frost Bomb)
@@ -4566,7 +4649,9 @@ public partial class CombatEngine
         // Check if monster is confused (from Deadly Joke)
         if (monster.IsConfused)
         {
-            monster.ConfusedDuration--;
+            // Duration decays once per round; each attack still rolls its own stumble.
+            if (firstActionThisRound)
+                monster.ConfusedDuration--;
             if (random.Next(100) < 50)
             {
                 terminal.WriteLine(Loc.Get("combat.confusion_stumble", monster.Name), "magenta");
@@ -4641,19 +4726,11 @@ public partial class CombatEngine
             return;
         }
 
-        // Boss ability name. v1.0.2: relocated here from the caller, for the same
-        // reason "attacks you!" was moved down -- the caller printed it before
-        // ProcessMonsterAction ran, so once charm could survive past the
-        // suppression list a charmed boss announced "X uses Divine Wrath!" and
-        // then hesitated and did nothing. Printed after every skip-return but
-        // before target selection, so it still shows when the boss attacks a
-        // teammate rather than the player.
-        if (BossContext != null && monster.IsBoss)
-        {
-            string bossAbilityName = SelectBossAbility(BossContext);
-            terminal.SetColor("red");
-            terminal.WriteLine(Loc.Get("combat.monster_uses_ability", monster.Name, bossAbilityName));
-        }
+        // Boss ability announcement removed (audit): SelectBossAbility here drew a
+        // fresh random name that was stored nowhere, while the actual ability roll in
+        // TryMonsterSpecialAbility independently picked its own -- every boss attack
+        // printed "uses X!" followed by "uses Y!" (and ~30% of announcements preceded
+        // a plain basic attack). The execution paths print the real ability name.
 
         // === SMART MONSTER TARGETING ===
         // Monsters intelligently choose targets based on threat, class roles, and positioning
@@ -4670,7 +4747,9 @@ public partial class CombatEngine
         // teammate (Aldric tank casting Thundering Roar / Shield Wall Formation, NPC Paladin
         // Divine Mandate, etc.) never decremented and locked monster aggro for the entire
         // fight. Only player-self-taunts decremented because the player branch falls through.
-        if (monster.TauntRoundsLeft > 0)
+        // Once per ROUND, not per attack: multi-attack bosses were burning a 3-round
+        // taunt in a single round -- precisely the fights tank taunts exist for.
+        if (firstActionThisRound && monster.TauntRoundsLeft > 0)
         {
             monster.TauntRoundsLeft--;
             if (monster.TauntRoundsLeft <= 0)
@@ -5103,6 +5182,18 @@ public partial class CombatEngine
         // v0.65.8 (R3): failed flee this round -> guarded half-round
         actualDamage = ApplyFleeGrace(player, actualDamage);
 
+        // Invulnerable: divine shield blocks all damage. Checked BEFORE divine
+        // intervention and companion sacrifice -- the sacrifice used to fire first,
+        // permanently killing a companion to absorb a hit the shield would have
+        // negated anyway.
+        if (player.HasStatus(StatusEffect.Invulnerable))
+        {
+            terminal.WriteLine(Loc.Get("combat.invulnerable_block"), "bright_white");
+            result.CombatLog.Add($"{monster.Name}'s attack blocked by Invulnerable");
+            await Task.Delay(GetCombatDelay(600));
+            return;
+        }
+
         // Check for divine intervention (save from lethal hit)
         bool wouldDie = player.HP - actualDamage <= 0;
         if (wouldDie && DivineBlessingSystem.Instance.CheckDivineIntervention(player, (int)actualDamage))
@@ -5125,14 +5216,7 @@ public partial class CombatEngine
             }
         }
 
-        // Invulnerable: divine shield blocks all damage
-        if (player.HasStatus(StatusEffect.Invulnerable))
-        {
-            terminal.WriteLine(Loc.Get("combat.invulnerable_block"), "bright_white");
-            result.CombatLog.Add($"{monster.Name}'s attack blocked by Invulnerable");
-            await Task.Delay(GetCombatDelay(600));
-            return;
-        }
+        // (Invulnerable is checked earlier, before divine intervention / sacrifice.)
 
         // Apply damage
         player.HP = Math.Max(0, player.HP - actualDamage);
@@ -5309,8 +5393,12 @@ public partial class CombatEngine
         if (random.Next(100) >= abilityChance)
             return false;
 
-        // Pick a random ability
-        string abilityName = monster.SpecialAbilities[random.Next(monster.SpecialAbilities.Count)];
+        // Pick a random ability. Bosses draw from the phase-filtered pool
+        // (SelectBossAbility) -- the single picker, now that the duplicate
+        // pre-announcement in ProcessMonsterAction is gone.
+        string abilityName = (BossContext != null && monster.IsBoss)
+            ? SelectBossAbility(BossContext)
+            : monster.SpecialAbilities[random.Next(monster.SpecialAbilities.Count)];
 
         // Old God boss abilities — handle by name before generic enum parse
         if (BossContext != null && monster.IsBoss)
@@ -5649,14 +5737,101 @@ public partial class CombatEngine
     /// Generic boss ability handler — maps ability names to effects for all non-Manwe gods.
     /// Grouped by effect type to keep code concise.
     /// </summary>
+    /// <summary>
+    /// Apply named-boss-ability damage to the player through the standard defensive
+    /// pipeline. These handlers used to do raw `player.HP -= damage` gated only on
+    /// Invulnerable -- bypassing difficulty scaling, the Old God solo adjustment,
+    /// Shield Wall, the first-3-rounds burst cap (a round-1 "Final Stand" could take
+    /// a full-HP player to 15%), flee grace, thorn reflect, and the Voidreaver
+    /// Death's Embrace revive, all of which every other damage source honors.
+    /// Prints the damage/block line; returns the damage actually dealt.
+    /// </summary>
+    private long ApplyBossAbilityDamageToPlayer(Monster monster, Character player, long rawDamage, string abilityName, CombatResult result)
+    {
+        if (player.HasStatus(StatusEffect.Invulnerable))
+        {
+            terminal.WriteLine(Loc.Get("combat.divine_shield_absorbs", monster.Name, abilityName), "bright_white");
+            result.CombatLog.Add($"{monster.Name}'s {abilityName} blocked by Invulnerable");
+            return 0;
+        }
+
+        long actualDamage = Math.Max(1, rawDamage);
+
+        // Difficulty scaling (named abilities previously bypassed it entirely,
+        // making the difficulty setting cosmetic in boss fights)
+        actualDamage = DifficultySystem.ApplyMonsterDamageMultiplier(actualDamage);
+
+        // Old God solo adjustment (+boss damage, then the player-side reduction)
+        bool soloVsOldGod = BossContext != null
+            && (currentTeammates == null || !currentTeammates.Any(t => t != null && t.IsAlive && !t.IsGroupedPlayer));
+        if (soloVsOldGod)
+        {
+            actualDamage = (long)(actualDamage * (1.0 + GameConfig.OldGodSoloDamageBonus));
+            actualDamage = (long)(actualDamage * (1.0 - GameConfig.OldGodSoloPlayerDamageReduction));
+        }
+
+        // Shield Wall Formation: % incoming damage reduction
+        if (player.TempDamageReductionPercent > 0 && player.TempDamageReductionDuration > 0 && actualDamage > 1)
+        {
+            long reduced = (long)(actualDamage * (player.TempDamageReductionPercent / 100.0));
+            if (reduced > 0)
+            {
+                actualDamage = Math.Max(1, actualDamage - reduced);
+                terminal.WriteLine(Loc.Get("combat.shield_wall_formation_absorbs", reduced), "bright_cyan");
+            }
+        }
+
+        // Per-hit cap: first-3-rounds burst cap, then the standing 85% boss cap
+        double capPercent = result.CurrentRound <= GameConfig.BossFirstRoundsDamageCapRounds
+            ? GameConfig.BossFirstRoundsDamageCapPercent
+            : 0.85;
+        long maxDmg = Math.Max(1, (long)(player.MaxHP * capPercent));
+        if (actualDamage > maxDmg) actualDamage = maxDmg;
+
+        // Failed flee this round -> guarded half-round
+        actualDamage = ApplyFleeGrace(player, actualDamage);
+
+        player.HP -= actualDamage;
+
+        // Divine Mandate thorn reflect
+        if (player.TempThornReflectPercent > 0 && player.TempThornReflectDuration > 0 && monster.IsAlive && actualDamage > 0)
+        {
+            long reflect = (long)(actualDamage * (player.TempThornReflectPercent / 100.0));
+            if (reflect > 0)
+            {
+                monster.HP = Math.Max(0, monster.HP - reflect);
+                terminal.WriteLine(Loc.Get("combat.divine_mandate_reflect", monster.Name, reflect), "bright_magenta");
+                if (monster.HP <= 0 && !result.DefeatedMonsters.Contains(monster))
+                    result.DefeatedMonsters.Add(monster);
+            }
+        }
+
+        // Voidreaver Death's Embrace: revive on lethal ability damage
+        if (player.HP <= 0 && player.DeathsEmbraceActive)
+        {
+            player.HP = Math.Max(1, (long)(player.MaxHP * 0.15));
+            player.DeathsEmbraceActive = false;
+            player.DodgeNextAttack = true;
+            terminal.SetColor("bright_red");
+            terminal.WriteLine(Loc.Get("combat.deaths_embrace_trigger"));
+            terminal.WriteLine(Loc.Get("combat.deaths_embrace_revived", player.HP), "dark_red");
+        }
+
+        terminal.WriteLine(Loc.Get("combat.you_take_damage_fmt", $"{actualDamage:N0}"), "red");
+        result.CombatLog.Add($"{monster.Name} uses {abilityName} for {actualDamage} damage");
+        return actualDamage;
+    }
+
     private async Task<bool> TryGenericBossAbility(Monster monster, Character player, string abilityName, CombatResult result, List<Monster>? monsterList)
     {
         long baseDamage = monster.GetAttackPower();
-        long maxDmg = Math.Max(1, (long)(player.MaxHP * 0.85));
 
         switch (abilityName)
         {
             // ─── HIGH DAMAGE (2x–3x) ───
+            // (Noctura betrayal names added in the audit pass -- none of her 12
+            // abilities were handled anywhere, so the climax boss only ever
+            // basic-attacked behind dramatic announcements.)
             case "Cleave":
             case "Whirlwind":
             case "Final Stand":
@@ -5668,21 +5843,19 @@ public partial class CombatEngine
             case "Final Verdict":
             case "Tyranny Unleashed":
             case "Final Secret":
+            case "Shadow Strike":
+            case "Shadow Storm":
+            case "Eclipse":
+            case "Final Darkness":
+            case "Desperate Betrayer":
+            case "Shadow Incarnate":
             {
                 double mult = abilityName is "Final Stand" or "Endless War" or "Last Light" or "World Breaker"
-                    or "Final Verdict" or "Tyranny Unleashed" or "Final Secret" ? 3.0 : 2.0;
-                long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * mult) - player.Defence));
-                if (player.HasStatus(StatusEffect.Invulnerable))
-                {
-                    terminal.WriteLine(Loc.Get("combat.divine_shield_absorbs", monster.Name, abilityName), "bright_white");
-                }
-                else
-                {
-                    player.HP -= damage;
-                    terminal.WriteLine(Loc.Get("combat.monster_uses_ability", monster.Name, abilityName), "bright_red");
-                    terminal.WriteLine(Loc.Get("combat.you_take_damage_fmt", $"{damage:N0}"), "red");
-                }
-                result.CombatLog.Add($"{monster.Name} uses {abilityName} for {damage} damage");
+                    or "Final Verdict" or "Tyranny Unleashed" or "Final Secret"
+                    or "Final Darkness" or "Desperate Betrayer" or "Shadow Incarnate" ? 3.0 : 2.0;
+                long damage = Math.Max(1, (long)(baseDamage * mult) - player.Defence);
+                terminal.WriteLine(Loc.Get("combat.monster_uses_ability", monster.Name, abilityName), "bright_red");
+                ApplyBossAbilityDamageToPlayer(monster, player, damage, abilityName, result);
                 return true;
             }
 
@@ -5698,18 +5871,9 @@ public partial class CombatEngine
             case "Purifying Light":
             case "Truth Revealed":
             {
-                long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 1.5) - player.Defence));
-                if (player.HasStatus(StatusEffect.Invulnerable))
-                {
-                    terminal.WriteLine(Loc.Get("combat.divine_shield_absorbs", monster.Name, abilityName), "bright_white");
-                }
-                else
-                {
-                    player.HP -= damage;
-                    terminal.WriteLine(Loc.Get("combat.monster_uses_ability", monster.Name, abilityName), "yellow");
-                    terminal.WriteLine(Loc.Get("combat.you_take_damage_fmt", $"{damage:N0}"), "red");
-                }
-                result.CombatLog.Add($"{monster.Name} uses {abilityName} for {damage} damage");
+                long damage = Math.Max(1, (long)(baseDamage * 1.5) - player.Defence);
+                terminal.WriteLine(Loc.Get("combat.monster_uses_ability", monster.Name, abilityName), "yellow");
+                ApplyBossAbilityDamageToPlayer(monster, player, damage, abilityName, result);
                 return true;
             }
 
@@ -5771,13 +5935,9 @@ public partial class CombatEngine
                 else
                 {
                     // Fallback to damage if already cursed
-                    long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 1.5) - player.Defence));
-                    if (!player.HasStatus(StatusEffect.Invulnerable))
-                    {
-                        player.HP -= damage;
-                        terminal.WriteLine(Loc.Get("combat.monster_uses_ability", monster.Name, abilityName), "dark_magenta");
-                        terminal.WriteLine(Loc.Get("combat.you_take_damage_fmt", $"{damage:N0}"), "red");
-                    }
+                    long damage = Math.Max(1, (long)(baseDamage * 1.5) - player.Defence);
+                    terminal.WriteLine(Loc.Get("combat.monster_uses_ability", monster.Name, abilityName), "dark_magenta");
+                    ApplyBossAbilityDamageToPlayer(monster, player, damage, abilityName, result);
                 }
                 result.CombatLog.Add($"{monster.Name} uses {abilityName}");
                 return true;
@@ -5789,6 +5949,7 @@ public partial class CombatEngine
             case "Desperate Plea":
             case "Eye for Eye":
             case "Judgment":
+            case "Puppeteer":
             {
                 if (!player.HasStatusImmunity && !player.HasStatus(StatusEffect.Stunned))
                 {
@@ -5818,21 +5979,20 @@ public partial class CombatEngine
             case "Forgotten Lovers":
             case "Shadow Step":
             case "Truth Unveiled":
+            case "Void Drain":
+            case "Soul Siphon":
             {
-                long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 1.8) - player.Defence));
-                long healAmt = damage * 30 / 100;
-                if (player.HasStatus(StatusEffect.Invulnerable))
+                long damage = Math.Max(1, (long)(baseDamage * 1.8) - player.Defence);
+                terminal.WriteLine(Loc.Get("combat.monster_uses_ability", monster.Name, abilityName), "magenta");
+                long dealt = ApplyBossAbilityDamageToPlayer(monster, player, damage, abilityName, result);
+                if (dealt > 0)
                 {
-                    terminal.WriteLine(Loc.Get("combat.divine_shield_deflects", monster.Name, abilityName), "bright_white");
-                }
-                else
-                {
-                    player.HP -= damage;
+                    // Heal from damage actually dealt (post-mitigation), not the raw roll
+                    long healAmt = dealt * 30 / 100;
                     monster.HP = Math.Min(monster.MaxHP, monster.HP + healAmt);
-                    terminal.WriteLine(Loc.Get("combat.monster_uses_ability", monster.Name, abilityName), "magenta");
-                    terminal.WriteLine(Loc.Get("combat.you_take_damage_monster_heals", $"{damage:N0}", monster.Name, $"{healAmt:N0}"), "red");
+                    terminal.WriteLine(Loc.Get("combat.monster_heals", monster.Name, $"{healAmt:N0}"), "green");
                 }
-                result.CombatLog.Add($"{monster.Name} life drains {damage} via {abilityName}");
+                result.CombatLog.Add($"{monster.Name} life drains {dealt} via {abilityName}");
                 return true;
             }
 
@@ -5841,6 +6001,7 @@ public partial class CombatEngine
             case "Summon Executioners":
             case "Shade Clones":
             case "Manifest Shadows":
+            case "Living Shadows":
             {
                 if (monsterList != null)
                 {
@@ -5862,6 +6023,7 @@ public partial class CombatEngine
                         "Summon Executioners" => "Divine Executioner",
                         "Shade Clones" => "Shadow Clone",
                         "Manifest Shadows" => "Living Shadow",
+                        "Living Shadows" => "Living Shadow",
                         _ => "Summoned Creature"
                     };
                     var minions = new List<Monster>();
@@ -5896,6 +6058,7 @@ public partial class CombatEngine
             case "Shadow Sovereignty":
             case "Final Kiss":
             case "HorrifyingScream":
+            case "Fear Aura":
             {
                 if (!player.HasStatusImmunity && !player.HasStatus(StatusEffect.Feared))
                 {
@@ -12969,6 +13132,10 @@ public partial class CombatEngine
                 terminal.WriteLine("");
                 terminal.SetColor("cyan");
                 terminal.WriteLine(Loc.Get("combat.defend_stance"));
+                // The live damage path halves on player.IsDefending (ProcessMonsterAction);
+                // setting only the display status here made [D] a wasted turn. The flag is
+                // cleared each round-end by ProcessEndOfRoundAbilityEffects.
+                player.IsDefending = true;
                 // Add defending status manually (Character doesn't have AddStatusEffect)
                 if (!player.ActiveStatuses.ContainsKey(StatusEffect.Defending))
                 {
@@ -13263,15 +13430,11 @@ public partial class CombatEngine
             powerDamage = (long)(powerDamage * (1.0 + GameConfig.PaladinDivineResolveDamageBonus));
         }
 
-        // Defense
+        // Defense: Defence only. ArmPow is NOT subtracted here -- ApplySingleMonsterDamage
+        // below subtracts the target's armor itself, and doing both taxed Power Attack
+        // with roughly double armor, making the 15-stamina attack weaker than a free
+        // basic swing against armored monsters.
         long defense = target.Defence + random.Next(0, (int)Math.Max(1, target.Defence / 8));
-        if (target.ArmPow > 0)
-        {
-            long effectiveArm = GetEffectiveArmPow(target.ArmPow);
-            long armBase = effectiveArm * 3 / 4;
-            int armVariance = (int)Math.Max(1, effectiveArm / 4);
-            defense += armBase + random.Next(0, armVariance + 1);
-        }
         powerDamage = Math.Max(1, powerDamage - defense);
 
         terminal.SetColor("bright_red");
@@ -13326,16 +13489,11 @@ public partial class CombatEngine
         double damageModifier = GetWeaponConfigDamageModifier(player);
         attackPower = (long)(attackPower * damageModifier);
 
-        // Full defense calculation with 25% reduction (accuracy boost)
+        // Defence with 25% reduction (accuracy boost). ArmPow is NOT subtracted here --
+        // ApplySingleMonsterDamage below subtracts armor itself; doing both double-taxed
+        // Precise Strike against armored monsters (same fix as Power Attack).
         long defense = target.Defence + random.Next(0, (int)Math.Max(1, target.Defence / 8));
         defense = (long)(defense * 0.75);
-        if (target.ArmPow > 0)
-        {
-            long effectiveArm = GetEffectiveArmPow(target.ArmPow);
-            long armBase = effectiveArm * 3 / 4;
-            int armVariance = (int)Math.Max(1, effectiveArm / 4);
-            defense += armBase + random.Next(0, armVariance + 1);
-        }
 
         long damage = Math.Max(1, attackPower - defense);
         damage = DifficultySystem.ApplyPlayerDamageMultiplier(damage);
@@ -13673,7 +13831,19 @@ public partial class CombatEngine
         bool isAoEAbility = abilityResult.SpecialEffect is "crescendo_aoe"
             or "aoe_holy" or "void_rupture"
             or "dissonant_wave" or "aoe_taunt" or "grand_finale_jester" or "execute_all"
-            or "shaman_chain_lightning";
+            or "shaman_chain_lightning"
+            // Audit sweep: every handler below applies its own damage (verified
+            // per-case), so running the base block too dealt ~2x listed damage --
+            // and when the base hit killed first, the handler's IsAlive guard
+            // skipped its on-kill riders (Consume Soul stacks, Reap reset,
+            // lifesteal heals) entirely. Same bug class as the v0.57.2
+            // shadow_harvest and v0.61.2 lifesteal fixes; this is the remainder.
+            or "echo_25" or "cycles_end" or "overflow_aoe" or "soul_leech"
+            or "consume_soul" or "execute_reap" or "devour" or "entropic_blade"
+            or "annihilation" or "wrath_deep" or "shaman_lightning_bolt"
+            or "sanctified_torrent" or "maelstrom_faithful" or "aoe_corrode"
+            or "entropy_aoe" or "singularity" or "abyssal_eruption"
+            or "abyss_unchained";
 
         // Apply damage
         if (abilityResult.Damage > 0 && target != null && target.IsAlive && !isAoEAbility)
@@ -13961,7 +14131,10 @@ public partial class CombatEngine
                 var aliveTeammates = result.Teammates.Where(t => t.IsAlive).ToList();
                 if (aliveTeammates.Count > 0)
                 {
-                    if (isPlayer)
+                    // Grouped followers count as isPlayer here (currentPlayer is swapped to
+                    // the follower for their turn) but have no interactive prompt channel --
+                    // GetInput would freeze the whole party. Route them to the AI targeting.
+                    if (isPlayer && !player.IsGroupedPlayer)
                     {
                         // Player chooses: show teammate HP and prompt
                         var candidates = new List<(int idx, Character c, double pct)>();
@@ -16705,6 +16878,16 @@ public partial class CombatEngine
                     target.HP -= holyBonus;
                     terminal.WriteLine(Loc.Get("combat.spell_holy_bonus", target.Name, holyBonus), "bright_yellow");
                     result.CombatLog.Add($"Holy bonus: {holyBonus} vs {target.MonsterClass}");
+                    // Kill check (audit): the spell path has no post-effect death sweep,
+                    // so a monster finished by the holy bonus vanished silently and never
+                    // joined DefeatedMonsters -- the list XP/gold iterate. Same fix its
+                    // sibling cases (ignore_defense, shadowstep, piercing_fire) carry.
+                    if (target.HP <= 0)
+                    {
+                        target.HP = 0;
+                        if (!result.DefeatedMonsters.Contains(target))
+                            result.DefeatedMonsters.Add(target);
+                    }
                 }
                 break;
 
@@ -17458,24 +17641,14 @@ public partial class CombatEngine
     /// </summary>
     private List<SpellSystem.SpellInfo> GetAvailableHealSpells(Character player)
     {
-        var result = new List<SpellSystem.SpellInfo>();
-
-        // Get spells for the player's class
-        var spells = SpellSystem.GetAllSpellsForClass(player.Class);
-        if (spells == null || spells.Count == 0) return result;
-
-        foreach (var spell in spells)
-        {
-            // Check if it's a heal spell and player can cast it
-            if (spell.SpellType == "Heal" &&
-                player.Level >= SpellSystem.GetLevelRequired(player.Class, spell.Level) &&
-                player.Mana >= spell.ManaCost)
-            {
-                result.Add(spell);
-            }
-        }
-
-        return result;
+        // Route through GetAvailableSpells (level + LEARNED gates -- the old direct
+        // GetAllSpellsForClass scan let Clerics cast heals they never trained) and
+        // gate affordability on CanCastSpell, which uses the real CalculateManaCost
+        // rather than the raw table value the menu used to check (raw-cost passes
+        // that then failed inside CastSpell consumed the turn for nothing).
+        return SpellSystem.GetAvailableSpells(player)
+            .Where(s => s.SpellType == "Heal" && SpellSystem.CanCastSpell(player, s.Level))
+            .ToList();
     }
 
     /// <summary>
@@ -17636,7 +17809,13 @@ public partial class CombatEngine
         {
             terminal.WriteLine(msg, color);
         }
-        if (!teammate.IsAlive) return; // DoT could have killed the teammate
+        if (!teammate.IsAlive)
+        {
+            // DoT killed the teammate: run the real death pipeline (permadeath,
+            // equipment return, world-NPC sync), not a silent skip.
+            await HandleTeammateDeathDispatch(teammate, Loc.Get("combat.dot_killer"), result);
+            return;
+        }
         if (!teammate.CanAct())
         {
             var preventingStatus = teammate.ActiveStatuses.Keys.FirstOrDefault(s => s.PreventsAction());
@@ -17856,9 +18035,13 @@ public partial class CombatEngine
     /// </summary>
     private async Task<bool> TeammateHealWithSpell(Character teammate, Character target, CombatResult result)
     {
-        // Get best healing spell the teammate can cast
+        // Get best healing spell the teammate can cast. Gate on CanCastSpell -- the
+        // real cast charges CalculateManaCost (10 + level*5, WIS-reduced), not the
+        // raw SpellInfo.ManaCost table value. Checking the raw value let mid-mana
+        // healers pass here, fizzle inside CastSpell, and burn every remaining turn
+        // re-attempting the same impossible heal with no potion fallback.
         var healSpell = GetBestHealSpell(teammate);
-        if (healSpell == null || teammate.Mana < healSpell.ManaCost)
+        if (healSpell == null || !SpellSystem.CanCastSpell(teammate, healSpell.Level))
         {
             return false;
         }
@@ -18036,7 +18219,9 @@ public partial class CombatEngine
         return spells
             .Where(s => s.SpellType == "Heal" &&
                         caster.Level >= SpellSystem.GetLevelRequired(caster.Class, s.Level) &&
-                        caster.Mana >= s.ManaCost &&
+                        // Affordability must use the real cast gate (CalculateManaCost +
+                        // spell weapon), not the raw table ManaCost -- see TeammateHealWithSpell.
+                        SpellSystem.CanCastSpell(caster, s.Level) &&
                         !disabledSpells.Contains(s.Name))
             .OrderByDescending(s => s.Level) // Prefer higher level heals
             .FirstOrDefault();
@@ -18143,10 +18328,10 @@ public partial class CombatEngine
         // 70% chance to cast spell instead of attacking (don't always spam spells)
         if (random.Next(100) >= 70) return false;
 
-        // Cast the spell
-        int manaCost = SpellSystem.CalculateManaCost(spell, teammate);
-        teammate.Mana -= manaCost;
-
+        // Cast the spell. NO manual pre-deduction here: CastSpell itself deducts
+        // CalculateManaCost on success -- the old pre-deduct made teammate casters
+        // pay double mana, and a mid-mana pre-deduct turned the cast into a
+        // guaranteed fizzle that still kept the deducted mana.
         var spellResult = SpellSystem.CastSpell(teammate, spell.Level, null);
 
         terminal.WriteLine("");
@@ -18318,9 +18503,12 @@ public partial class CombatEngine
             teammateCooldowns[teammate.DisplayName] = myCooldowns;
         }
 
-        // Filter to abilities the teammate can afford, off cooldown, AND has required weapon
+        // Filter to abilities the teammate can afford (stamina AND mana), off cooldown,
+        // AND has required weapon. Mana was previously never checked or deducted --
+        // NPC casters used 30-MP totems forever at 0 mana.
         var affordableAbilities = availableAbilities
             .Where(a => teammate.CurrentCombatStamina >= ClassAbilitySystem.GetEffectiveStaminaCost(a)
+                     && teammate.Mana >= a.ManaCost
                      && (!myCooldowns.TryGetValue(a.Id, out int cd) || cd <= 0)
                      && ClassAbilitySystem.CanUseAbility(teammate, a.Id, myCooldowns))
             .ToList();
@@ -18529,6 +18717,11 @@ public partial class CombatEngine
 
         // Deduct stamina AFTER confirming success (was before, wasting stamina on failures)
         teammate.SpendStamina(ClassAbilitySystem.GetEffectiveStaminaCost(chosenAbility));
+
+        // Deduct mana too (the affordability filter guarantees it's available) --
+        // player paths deduct ability.ManaCost, teammates never did.
+        if (chosenAbility.ManaCost > 0)
+            teammate.Mana = Math.Max(0, teammate.Mana - chosenAbility.ManaCost);
 
         // Track cooldown
         if (chosenAbility.Cooldown > 0)
@@ -19318,6 +19511,55 @@ public partial class CombatEngine
         }
 
         await Task.Delay(GetCombatDelay(1000));
+    }
+
+    /// <summary>
+    /// Route a dead teammate to the correct death handler (echo / mercenary / story
+    /// companion / grouped player / NPC teammate). Extracted so DoT deaths at the top
+    /// of a teammate's own turn get the same processing as monster-inflicted deaths --
+    /// previously a poison tick killing a teammate just silently returned: no death
+    /// message, no companion permadeath, no equipment return, and the "dead" companion
+    /// stayed eligible for a later sacrifice scene.
+    /// </summary>
+    private async Task HandleTeammateDeathDispatch(Character tm, string killerName, CombatResult result)
+    {
+        if (tm.IsEcho)
+        {
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine($"  {tm.DisplayName}'s echo dissipates...");
+            result.Teammates?.Remove(tm);
+        }
+        else if (tm.IsMercenary)
+        {
+            await HandleMercenaryDeath(tm, killerName, result);
+        }
+        else if (tm.IsCompanion && tm.CompanionId.HasValue)
+        {
+            await HandleCompanionDeath(tm, killerName, result);
+        }
+        else if (tm.IsGroupedPlayer)
+        {
+            terminal.SetColor("dark_red");
+            terminal.WriteLine($"  {Loc.Get("combat.npc_fallen_battle_inline", tm.DisplayName)}");
+            result.Teammates?.Remove(tm);
+            result.CombatLog.Add($"{tm.DisplayName} was slain by {killerName}");
+            if (tm.CombatInputChannel != null)
+            {
+                tm.CombatInputChannel.Writer.TryComplete();
+                tm.CombatInputChannel = null;
+            }
+            tm.IsAwaitingCombatInput = false;
+        }
+        else
+        {
+            await HandleNpcTeammateDeath(tm, killerName, result);
+        }
+
+        // Sync companion HP back to CompanionSystem (only for story companions)
+        if (tm.IsCompanion)
+        {
+            UsurperRemake.Systems.CompanionSystem.Instance.SyncCompanionHP(tm);
+        }
     }
 
     /// <summary>
@@ -24984,10 +25226,24 @@ public partial class CombatEngine
                 var chosen = spells[random.Next(spells.Count)];
                 var spellResult = SpellSystem.CastSpell(computer, chosen.Level, opponent);
                 terminal.WriteLine(spellResult.Message, "magenta");
-                // Apply damage/healing via Monster path (self-buff), then PvP effects on opponent
+                // Apply healing/self-buffs via the Monster path (null target = no damage
+                // lands there), then PvP special effects on the opponent. Attack damage
+                // must be applied here directly -- ApplySpellEffects only damages Monster
+                // targets and ApplyPvPSpellEffect only handles special effects, so AI
+                // caster defenders used to deal literally 0 spell damage.
                 ApplySpellEffects(computer, null, spellResult);
                 if (spellResult.Success)
+                {
+                    if (spellResult.Damage > 0)
+                    {
+                        long spellDamage = spellResult.Damage;
+                        if (opponent.IsDefending || opponent.HasStatus(StatusEffect.Defending))
+                            spellDamage = (long)Math.Ceiling(spellDamage / 2.0);
+                        opponent.HP = Math.Max(0, opponent.HP - spellDamage);
+                        terminal.WriteLine(Loc.Get("combat.pvp_magical_damage", opponent.DisplayName, spellDamage), "bright_magenta");
+                    }
                     ApplyPvPSpellEffect(computer, opponent, spellResult);
+                }
                 result.CombatLog.Add($"{computer.DisplayName} casts {chosen.Name}");
                 await Task.Delay(GetCombatDelay(1000));
                 return;
@@ -25023,6 +25279,10 @@ public partial class CombatEngine
                         long abilDef = opponent.Defence / 2;
                         actualDamage = Math.Max(1, actualDamage - abilDef);
                     }
+                    // Honor the human's Defend stance (was checked only on the
+                    // human-attacker path, where the AI can never be defending).
+                    if (opponent.IsDefending || opponent.HasStatus(StatusEffect.Defending))
+                        actualDamage = (long)Math.Ceiling(actualDamage / 2.0);
                     opponent.HP = Math.Max(0, opponent.HP - actualDamage);
                     terminal.WriteLine(Loc.Get("combat.pvp_ai_uses_ability", computer.DisplayName, chosen.Name, actualDamage), "bright_red");
                 }
@@ -25073,6 +25333,9 @@ public partial class CombatEngine
         defense = (long)(defense * defenseModifier);
 
         long damage = Math.Max(1, attackPower - defense);
+        // Honor the human's Defend stance in the AI's basic attack path.
+        if (opponent.IsDefending || opponent.HasStatus(StatusEffect.Defending))
+            damage = (long)Math.Ceiling(damage / 2.0);
         opponent.HP = Math.Max(0, opponent.HP - damage);
         terminal.WriteLine(Loc.Get("combat.pvp_ai_strikes", computer.DisplayName, damage), "red");
         result.CombatLog.Add($"{computer.DisplayName} hits {opponent.DisplayName} for {damage}");
@@ -25296,6 +25559,19 @@ public partial class CombatEngine
 
             // No XP/gold reward -- sparing isn't a kill. The alignment +
             // relationship swing is the reward.
+            return;
+        }
+
+        // CombatOutcome.Victory is the enum default, so a PvP fight that ends with
+        // both combatants alive and no explicit outcome (the Escape spell only sets
+        // globalEscape, unlike Retreat) used to fall through to the Victory payout
+        // in every caller -- arena gold theft + leaderboard win, sleeper kills, the
+        // bounty board, even the castle throne challenge. Both-alive PvP is never a
+        // victory: pin it to an explicit escape/stalemate before the death checks.
+        if (result.Player.IsAlive && (result.Opponent?.IsAlive ?? false))
+        {
+            if (result.Outcome != CombatOutcome.PlayerEscaped)
+                result.Outcome = globalEscape ? CombatOutcome.PlayerEscaped : CombatOutcome.Stalemate;
             return;
         }
 
@@ -28815,6 +29091,30 @@ public partial class CombatEngine
         {
             // Fallback to AI if RemoteTerminal/channel was lost (disconnect)
             await ProcessTeammateActionMultiMonster(teammate, monsters, result);
+            return;
+        }
+
+        // Tick statuses and honor control effects, mirroring the NPC-teammate path
+        // (ProcessTeammateActionMultiMonster). Connected grouped players used to skip
+        // both: poison never dealt damage, durations never decayed, and stun/freeze
+        // never prevented their action -- followers were effectively status-immune.
+        foreach (var (msg, color) in teammate.ProcessStatusEffects())
+        {
+            terminal.WriteLine(msg, color);
+            remoteTerminal.WriteLine(msg, color);
+        }
+        if (!teammate.IsAlive)
+        {
+            await HandleTeammateDeathDispatch(teammate, Loc.Get("combat.dot_killer"), result);
+            return;
+        }
+        if (!teammate.CanAct())
+        {
+            var preventingStatus = teammate.ActiveStatuses.Keys.FirstOrDefault(s => s.PreventsAction());
+            string prevented = Loc.Get("combat.teammate_status_prevented", teammate.DisplayName, preventingStatus.ToString().ToLower());
+            terminal.WriteLine(prevented, "yellow");
+            remoteTerminal.WriteLine(prevented, "yellow");
+            await Task.Delay(GetCombatDelay(800));
             return;
         }
 

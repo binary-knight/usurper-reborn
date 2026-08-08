@@ -5448,6 +5448,7 @@ public partial class GameEngine
             ScreenReaderMode = playerData.ScreenReaderMode,
             CompactMode = playerData.CompactMode,
             AutoLook = playerData.AutoLook,
+            DungeonAutoMap = playerData.DungeonAutoMap,
             DisableCharacterMonsterArt = playerData.DisableCharacterMonsterArt,
             Language = playerData.Language ?? "en",
             ColorTheme = playerData.ColorTheme,

@@ -139,6 +139,7 @@ public class Character
     public bool ScreenReaderMode { get; set; }      // simplified text output for screen readers (accessibility)
     public bool CompactMode { get; set; }             // compact menus for mobile/small screen SSH
     public bool AutoLook { get; set; }                // online: auto-redraw the location screen after each action (single-player feel)
+    public bool DungeonAutoMap { get; set; }          // render a compact floor map with every dungeon room view
     public bool DisableCharacterMonsterArt { get; set; } // skip race/class portraits, NPC portraits, monster + Old God art (without going full SR mode)
     public string Language { get; set; } = "en";       // player language preference for localization
     public ColorThemeType ColorTheme { get; set; } = ColorThemeType.Default;  // player-selected color theme
@@ -1679,6 +1680,14 @@ public class Character
         {
             ArmPow += BonusArmPow;
         }
+
+        // Floor the pools. Stacked penalties (cursed-gear Constitution drain feeding
+        // GetConstitutionHPBonus's (con-10)*3 term on a low-level character) could push
+        // MaxHP to zero or below. Negative MaxHP inverts every "HP >= MaxHP" full-health
+        // gate (healer refuses to heal) and makes the Last Stand rescue fire every round
+        // (RoundStartHP > MaxHP/2 is always true), so combat can never be won or lost.
+        MaxHP = Math.Max(1, MaxHP);
+        if (MaxMana < 0) MaxMana = 0;
 
         // Restore saved HP/Mana and clamp to final MaxHP/MaxMana
         // (the per-item ApplyToCharacter clamps were premature since MaxHP wasn't complete)

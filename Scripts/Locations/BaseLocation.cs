@@ -4182,6 +4182,7 @@ public abstract class BaseLocation
                 terminal.WriteLine($"  {Loc.Get("prefs.disable_char_monster_art")}: {(currentPlayer.DisableCharacterMonsterArt ? Loc.Get("prefs.enabled") : Loc.Get("prefs.disabled"))}");
                 if (UsurperRemake.BBS.DoorMode.IsMudServerMode)
                     terminal.WriteLine($"  {Loc.Get("prefs.auto_look")}: {(currentPlayer.AutoLook ? Loc.Get("prefs.enabled") : Loc.Get("prefs.disabled"))}");
+                terminal.WriteLine($"  {Loc.Get("prefs.dungeon_automap")}: {(currentPlayer.DungeonAutoMap ? Loc.Get("prefs.enabled") : Loc.Get("prefs.disabled"))}");
                 terminal.WriteLine($"  {Loc.Get("prefs.auto_equip")}: {(currentPlayer.AutoEquipDisabled ? Loc.Get("prefs.disabled") : Loc.Get("prefs.enabled"))}");
                 terminal.WriteLine("");
 
@@ -4201,6 +4202,7 @@ public abstract class BaseLocation
                 terminal.WriteLine($"  P. {Loc.Get("prefs.toggle", Loc.Get("prefs.disable_char_monster_art"))}");
                 if (UsurperRemake.BBS.DoorMode.IsMudServerMode)
                     terminal.WriteLine($"  L. {Loc.Get("prefs.toggle", Loc.Get("prefs.auto_look"))}");
+                terminal.WriteLine($"  M. {Loc.Get("prefs.toggle", Loc.Get("prefs.dungeon_automap"))}");
                 terminal.WriteLine($"  D. {Loc.Get("base.prefs_date_format")} ({srDateFormat})");
                 if (IsRunningInWezTerm())
                     terminal.WriteLine($"  7. {Loc.Get("prefs.terminal_font")}");
@@ -4269,6 +4271,7 @@ public abstract class BaseLocation
                 WriteMenuOption("P", $"{Loc.Get("prefs.disable_char_monster_art")}: {onOff(currentPlayer.DisableCharacterMonsterArt)}");
                 if (UsurperRemake.BBS.DoorMode.IsMudServerMode)
                     WriteMenuOption("L", $"{Loc.Get("prefs.auto_look")}: {onOff(currentPlayer.AutoLook)}");
+                WriteMenuOption("M", $"{Loc.Get("prefs.dungeon_automap")}: {onOff(currentPlayer.DungeonAutoMap)}");
                 WriteMenuOption("D", $"{Loc.Get("base.prefs_date_format")}: {dateFormatName}");
                 if (IsRunningInWezTerm())
                     WriteMenuOption("7", $"{Loc.Get("prefs.terminal_font")}: {ReadCurrentFont()}");
@@ -4475,6 +4478,21 @@ public abstract class BaseLocation
                         await GameEngine.Instance.SaveCurrentGame();
                         await Task.Delay(1000);
                     }
+                    break;
+
+                case "M":
+                    currentPlayer.DungeonAutoMap = !currentPlayer.DungeonAutoMap;
+                    if (currentPlayer.DungeonAutoMap)
+                    {
+                        terminal.WriteLine(Loc.Get("dungeon.automap_enabled"), "green");
+                        terminal.WriteLine(Loc.Get("base.pref_automap_enabled_desc"), "white");
+                    }
+                    else
+                    {
+                        terminal.WriteLine(Loc.Get("dungeon.automap_disabled"), "green");
+                    }
+                    await GameEngine.Instance.SaveCurrentGame();
+                    await Task.Delay(1000);
                     break;
 
                 case "D":
