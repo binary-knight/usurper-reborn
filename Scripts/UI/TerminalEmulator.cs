@@ -1942,6 +1942,21 @@ public partial class TerminalEmulator
     private Task<int>? _stdinReadTask;
 
     /// <summary>
+    /// True if a non-blocking read on the stream would return data immediately.
+    /// Handles the wrappers MUD sessions actually use: raw NetworkStream and
+    /// PrependedStream (leftover PROXY-probe bytes re-injected at connect).
+    /// Unknown stream types report false -- StreamReader.Peek() on a
+    /// network-backed stream BLOCKS until the client sends a byte, which froze
+    /// auto-combat's poll loop for any session wrapped in PrependedStream.
+    /// </summary>
+    private static bool StreamHasReadableData(Stream stream) => stream switch
+    {
+        System.Net.Sockets.NetworkStream ns => ns.DataAvailable,
+        UsurperRemake.Server.PrependedStream ps => ps.HasReadableData,
+        _ => false
+    };
+
+    /// <summary>
     /// Non-blocking check if input is available. Used by auto-combat to detect "stop" key presses.
     /// Returns true if there is pending input that can be read.
     /// </summary>
@@ -1953,9 +1968,7 @@ public partial class TerminalEmulator
             if (_streamReader != null)
             {
                 return _streamReader.BaseStream.CanRead &&
-                       (_streamReader.BaseStream is System.Net.Sockets.NetworkStream ns
-                           ? ns.DataAvailable
-                           : _streamReader.Peek() != -1);
+                       StreamHasReadableData(_streamReader.BaseStream);
             }
 
             // Console mode (local)
@@ -1994,10 +2007,14 @@ public partial class TerminalEmulator
 
             if (_streamReader != null)
             {
-                // Read whatever is buffered
-                while (_streamReader.BaseStream is System.Net.Sockets.NetworkStream ns && ns.DataAvailable)
+                // Discard raw bytes straight off the stream. Going through
+                // _streamReader.Read() here would pull the whole burst into the
+                // reader's internal buffer after one iteration (the stream shows
+                // empty while buffered chars leak into the next prompt).
+                var discard = new byte[256];
+                while (StreamHasReadableData(_streamReader.BaseStream))
                 {
-                    _streamReader.Read();
+                    _streamReader.BaseStream.Read(discard, 0, discard.Length);
                 }
                 return;
             }

@@ -4178,6 +4178,7 @@ public abstract class BaseLocation
                 terminal.WriteLine($"  P. {Loc.Get("prefs.toggle", Loc.Get("prefs.disable_char_monster_art"))}");
                 if (UsurperRemake.BBS.DoorMode.IsMudServerMode)
                     terminal.WriteLine($"  L. {Loc.Get("prefs.toggle", Loc.Get("prefs.auto_look"))}");
+                terminal.WriteLine($"  M. {Loc.Get("prefs.toggle", Loc.Get("prefs.dungeon_automap"))}");
                 terminal.WriteLine($"  D. {Loc.Get("base.prefs_date_format")} ({srDateFormat})");
                 if (IsRunningInWezTerm())
                     terminal.WriteLine($"  7. {Loc.Get("prefs.terminal_font")}");
@@ -4246,6 +4247,11 @@ public abstract class BaseLocation
                 WriteMenuOption("P", $"{Loc.Get("prefs.disable_char_monster_art")}: {onOff(currentPlayer.DisableCharacterMonsterArt)}");
                 if (UsurperRemake.BBS.DoorMode.IsMudServerMode)
                     WriteMenuOption("L", $"{Loc.Get("prefs.auto_look")}: {onOff(currentPlayer.AutoLook)}");
+                // Visual-mode only: the BBS/compact room view and the screen-reader
+                // navigator never call RenderMiniMap, so offering the toggle there
+                // is a switch that does nothing.
+                if (!IsBBSSession && !GameConfig.ScreenReaderMode)
+                    WriteMenuOption("M", $"{Loc.Get("prefs.dungeon_automap")}: {onOff(currentPlayer.DungeonAutoMap)}");
                 WriteMenuOption("D", $"{Loc.Get("base.prefs_date_format")}: {dateFormatName}");
                 if (IsRunningInWezTerm())
                     WriteMenuOption("7", $"{Loc.Get("prefs.terminal_font")}: {ReadCurrentFont()}");
@@ -4452,6 +4458,21 @@ public abstract class BaseLocation
                         await GameEngine.Instance.SaveCurrentGame();
                         await Task.Delay(1000);
                     }
+                    break;
+
+                case "M":
+                    currentPlayer.DungeonAutoMap = !currentPlayer.DungeonAutoMap;
+                    if (currentPlayer.DungeonAutoMap)
+                    {
+                        terminal.WriteLine(Loc.Get("dungeon.automap_enabled"), "green");
+                        terminal.WriteLine(Loc.Get("base.pref_automap_enabled_desc"), "white");
+                    }
+                    else
+                    {
+                        terminal.WriteLine(Loc.Get("dungeon.automap_disabled"), "green");
+                    }
+                    await GameEngine.Instance.SaveCurrentGame();
+                    await Task.Delay(1000);
                     break;
 
                 case "D":

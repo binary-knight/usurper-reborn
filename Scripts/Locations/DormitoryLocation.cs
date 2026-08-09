@@ -700,6 +700,12 @@ public class DormitoryLocation : BaseLocation
 
         if (result.Outcome == CombatOutcome.Victory)
         {
+            // Steal 1 random item FIRST. StealRandomItem writes the victim's entire
+            // pre-combat save blob back; running it after the gold deduction used to
+            // overwrite the deducted row with the original gold (duplication).
+            // Blob write first, atomic json_set deductions after.
+            var (stolenItemName, stolenEquipment) = await StealRandomItem(backend, target.Username, victimSave);
+
             // Steal 50% of their gold
             long stolenGold = (long)(victimGold * GameConfig.SleeperGoldTheftPercent);
             if (stolenGold > 0)
@@ -709,8 +715,6 @@ public class DormitoryLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("dormitory.steal_gold", stolenGold), "yellow");
             }
 
-            // Steal 1 random item
-            var (stolenItemName, stolenEquipment) = await StealRandomItem(backend, target.Username, victimSave);
             if (stolenItemName != null && stolenEquipment != null)
             {
                 // Add the stolen equipment to the attacker's inventory
@@ -752,6 +756,10 @@ public class DormitoryLocation : BaseLocation
         {
             terminal.SetColor("cyan");
             terminal.WriteLine(Loc.Get("dormitory.fought_off_player", target.Username));
+            // Losing the sleeper attack used to leave the attacker walking around at
+            // 0 HP with no death handling -- their next encounter or DoT tick became
+            // a "real" death attributed to the wrong cause (same fix as the pit fight).
+            if (currentPlayer.HP <= 0) currentPlayer.HP = 1;
             await Task.Delay(2000);
         }
         await terminal.WaitForKeyPress();

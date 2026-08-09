@@ -717,6 +717,7 @@ namespace UsurperRemake.Systems
                 ScreenReaderMode = player.ScreenReaderMode,
                 CompactMode = player.CompactMode,
                 AutoLook = player.AutoLook,
+                DungeonAutoMap = player.DungeonAutoMap,
                 DisableCharacterMonsterArt = player.DisableCharacterMonsterArt,
                 Language = player.Language ?? "en",
                 ColorTheme = player.ColorTheme,

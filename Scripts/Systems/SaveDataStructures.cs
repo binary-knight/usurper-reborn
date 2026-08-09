@@ -421,6 +421,7 @@ namespace UsurperRemake.Systems
         public bool ScreenReaderMode { get; set; }  // Simplified text for screen readers (accessibility)
         public bool CompactMode { get; set; }  // Compact menus for mobile/small screen SSH
         public bool AutoLook { get; set; }  // Online/MUD: auto-redraw location screen after each action
+        public bool DungeonAutoMap { get; set; }  // Compact floor map rendered with every dungeon room view
         public bool DisableCharacterMonsterArt { get; set; }  // Skip portrait + monster + Old God art (without going full SR)
         public string Language { get; set; } = "en";  // Player language preference
         public ColorThemeType ColorTheme { get; set; } = ColorThemeType.Default;  // Player-selected color theme

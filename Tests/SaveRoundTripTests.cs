@@ -1018,7 +1018,8 @@ public class SaveRoundTripTests
             AutoEquipDisabled = true,
             DateFormatPreference = 2,
             AutoRedistributeXP = false,
-            Specialization = 5  // v0.65.4: player class specialization (ClassSpecialization as int)
+            Specialization = 5,  // v0.65.4: player class specialization (ClassSpecialization as int)
+            DungeonAutoMap = true
         };
 
         var json = JsonSerializer.Serialize(original, _jsonOptions);
@@ -1036,6 +1037,7 @@ public class SaveRoundTripTests
         restored.DateFormatPreference.Should().Be(2);
         restored.AutoRedistributeXP.Should().BeFalse();
         restored.Specialization.Should().Be(5, "player specialization must survive save/load (v0.65.4)");
+        restored.DungeonAutoMap.Should().BeTrue();
     }
 
     [Fact]

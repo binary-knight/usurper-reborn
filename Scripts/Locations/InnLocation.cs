@@ -5795,6 +5795,11 @@ public class InnLocation : BaseLocation
 
         if (result.Outcome == CombatOutcome.Victory)
         {
+            // Item steal FIRST: StealRandomItem writes the victim's entire pre-combat
+            // save blob back, which used to overwrite (and revert) the atomic gold
+            // deduction below. Blob write first, json_set deductions after.
+            string stolenItemName = await StealRandomItem(backend, target.Username, victimSave);
+
             long stolenGold = (long)(victimGold * GameConfig.SleeperGoldTheftPercent);
             if (stolenGold > 0)
             {
@@ -5803,7 +5808,6 @@ public class InnLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("inn.atk_steal_gold", stolenGold.ToString("N0")), "yellow");
             }
 
-            string stolenItemName = await StealRandomItem(backend, target.Username, victimSave);
             if (stolenItemName != null)
                 terminal.WriteLine(Loc.Get("inn.atk_steal_item", stolenItemName), "yellow");
 
@@ -5835,6 +5839,8 @@ public class InnLocation : BaseLocation
         {
             terminal.SetColor("cyan");
             terminal.WriteLine(Loc.Get("inn.atk_player_fought_off", target.Username));
+            // Don't leave the attacker walking around at 0 HP (see pit-fight fix).
+            if (currentPlayer.HP <= 0) currentPlayer.HP = 1;
             await Task.Delay(2000);
         }
         await terminal.WaitForKeyPress();

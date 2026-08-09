@@ -243,4 +243,43 @@ public class CharacterTests
         character.Darkness += 20;
         character.Darkness.Should().Be(70);
     }
+
+    [Fact]
+    public void RecalculateStats_FloorsMaxHPAtOne_WhenConstitutionPenaltyExceedsBaseHP()
+    {
+        // Cursed-gear regression: a level-1 character whose Constitution was drained
+        // to 1 gets (1-10)*3 = -27 from GetConstitutionHPBonus. With BaseMaxHP 18
+        // that produced MaxHP = -9, which inverted every "HP >= MaxHP" full-health
+        // gate (healer refused to heal) and made the Last Stand rescue fire every
+        // round so combat could never be won or lost.
+        var character = new Character
+        {
+            Level = 1,
+            BaseMaxHP = 18,
+            BaseConstitution = 1,
+            HP = 1
+        };
+
+        character.RecalculateStats();
+
+        character.MaxHP.Should().BeGreaterThanOrEqualTo(1,
+            "stacked penalties must never produce a non-positive HP pool");
+        character.MaxMana.Should().BeGreaterThanOrEqualTo(0);
+        character.HP.Should().BeLessThanOrEqualTo(character.MaxHP);
+    }
+
+    [Fact]
+    public void ItemRemoveEffects_ClampsMaxHP_WhenRemovingUnappliedBonus()
+    {
+        // Legacy Item.RemoveEffects used an unclamped subtract; removing an item
+        // whose effects were never applied symmetrically drove MaxHP negative.
+        var character = new Character { MaxHP = 20, HP = 20, MaxMana = 10, Mana = 10 };
+        var item = new Item { HP = 50, Mana = 30 };
+
+        item.RemoveEffects(character);
+
+        character.MaxHP.Should().Be(1);
+        character.HP.Should().Be(1);
+        character.MaxMana.Should().Be(0);
+    }
 }

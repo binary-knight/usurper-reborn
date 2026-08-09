@@ -509,6 +509,9 @@ public class AnchorRoadLocation : BaseLocation
                 terminal.SetColor("red");
                 terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("anchor_road.bested_by_target", target.DisplayName));
+                // Don't leave the loser walking around at 0 HP -- their next encounter
+                // or DoT tick became a "real" death attributed to the wrong cause.
+                if (currentPlayer.HP <= 0) currentPlayer.HP = 1;
             }
         }
 
