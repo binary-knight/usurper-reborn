@@ -18,8 +18,7 @@ namespace UsurperReborn.Tests;
 ///   - Slice 8b: Buff/Defense ability application (TempAttackBonus,
 ///     TempDefenseBonus, TempDamageReductionPercent).
 ///   - Slice 8c: Equipment-enchant procs (LifeSteal heals on hit).
-///   - Slice 9a/9b: LLM moment fallback paths still complete safely with
-///     LLM disabled.
+///   - NPC first-impression text is deterministic and safe.
 /// </summary>
 [Collection("LLMEnvironmentVars")]
 public class BrainV2SlicesSevenEightNineTests
@@ -201,49 +200,43 @@ public class BrainV2SlicesSevenEightNineTests
         ls.Should().Be(0, "NPC with no equipment should have 0 lifesteal");
     }
 
-    // ----- Slice 9a/9b: LLM moment fallback paths -----
+    // ----- NPC first-impression text -----
+    //
+    // These four tests used to exercise the offline fallback paths of the live
+    // moment generators. Live generation was removed; the authored
+    // first-impression text it fell back to was worth keeping and now lives in
+    // NPCImpressionText as the only implementation.
 
     [Fact]
-    public async Task PostDeathEpitaph_CompletesWithFallback_WhenLLMDisabled()
+    public void Impression_ProducesNonEmptyText()
     {
-        // LLM disabled by default in test env. PostDeathEpitaphAsync should
-        // post the templated fallback news entry and complete within 2s.
-        Environment.SetEnvironmentVariable("USURPER_LLM_ENABLED", "false");
-        LLMProvider.ResetForTests();
-
         var npc = MakeNPC();
-        var task = LLMMoments.PostDeathEpitaphAsync(npc, "Black Hand Garrick", "the Dungeon");
-        var completed = await Task.WhenAny(task, Task.Delay(2000));
-        completed.Should().Be(task, "fallback path should complete within 2s");
+        UsurperRemake.Systems.NPCImpressionText.Build(npc)
+            .Should().NotBeNullOrEmpty("every NPC must yield a readable first impression");
     }
 
     [Fact]
-    public async Task PostDeathEpitaph_NullNPC_NoOp()
+    public void Impression_IsDeterministic()
     {
-        await LLMMoments.PostDeathEpitaphAsync(null!, "Killer", "Somewhere");
-        // No assertion beyond "didn't throw".
-    }
-
-    [Fact]
-    public async Task PersonalitySummary_CachesResult()
-    {
-        Environment.SetEnvironmentVariable("USURPER_LLM_ENABLED", "false");
-        LLMProvider.ResetForTests();
-
+        // No network, no cache needed: the same NPC must read the same way twice.
         var npc = MakeNPC();
-        var first = await LLMMoments.GeneratePersonalitySummaryAsync(npc, CancellationToken.None);
-        first.Should().NotBeNullOrEmpty("templated fallback should produce a non-empty summary");
-
-        npc.PersonalitySummaryCache.Should().Be(first, "first generation should cache the result");
-
-        var second = await LLMMoments.GeneratePersonalitySummaryAsync(npc, CancellationToken.None);
-        second.Should().Be(first, "second call should return cached value, not re-generate");
+        var a = UsurperRemake.Systems.NPCImpressionText.Build(npc);
+        var b = UsurperRemake.Systems.NPCImpressionText.Build(npc);
+        b.Should().Be(a);
     }
 
     [Fact]
-    public async Task PersonalitySummary_NullNPC_ReturnsEmpty()
+    public void Impression_NullNPC_ReturnsEmpty()
     {
-        var summary = await LLMMoments.GeneratePersonalitySummaryAsync(null!, CancellationToken.None);
-        summary.Should().Be("");
+        UsurperRemake.Systems.NPCImpressionText.Build(null!).Should().Be("");
+    }
+
+    [Fact]
+    public void Impression_NamesTheNPC()
+    {
+        var npc = MakeNPC();
+        string name = npc.Name2 ?? npc.Name1 ?? "";
+        if (!string.IsNullOrEmpty(name))
+            UsurperRemake.Systems.NPCImpressionText.Build(npc).Should().Contain(name);
     }
 }

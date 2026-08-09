@@ -303,7 +303,6 @@ public class WorldSimulator
         CleanUpDeadNPCMarriages();
 
         // v0.65.6: Brain v2 cohort backfill. The goal-driven scorer (BrainV2Scorer,
-        // LLM strategic goals, target-steering) was gated on IsAIDriven, which only
         // ever got set at NPC-creation sites (immigrants / graduating children /
         // orphans) -- the original v0.64.0 A/B-cohort design. With ~91% of the
         // population organically converted and the legacy picker adding nothing
@@ -778,13 +777,6 @@ public class WorldSimulator
             QueueNPCForRespawn(npc.Id ?? npc.Name);
             NewsSystem.Instance.WriteDeathNews(npc.Name, killerName, location);
         }
-
-        // Death epitaphs disabled: budget review showed they were the single
-        // largest LLM cost driver (~676 calls / 123k tokens per 24h, ~73%
-        // success rate) for marginal flavor return. WriteDeathNews above
-        // already posts the death; the supplemental dramatic line was not
-        // worth the spend. LLMMoments.PostDeathEpitaphAsync kept in code +
-        // tests for future re-enable; just no call site.
 
         // v0.64.1 audit fix: the spouse-death notification fires ONLY inside
         // the permadeath branch above (before HandleSpouseBereavement clears
@@ -2479,7 +2471,6 @@ public class WorldSimulator
     // v0.64.1: case-insensitive lookup of a living NPC by display or first name.
     // Used by TryTargetSteerToTarget to resolve Goal.TargetCharacter strings
     // (which are populated by family-memory promotion in Slice 3 and by the
-    // LLM strategic-goals generator in Slice 12a) into actual NPC references.
     // Returns null if no match or the target is dead/permadead -- caller falls
     // through to normal verb dispatch in those cases.
     internal NPC? FindLivingNPCByName(string? name)
@@ -2497,7 +2488,6 @@ public class WorldSimulator
     }
 
     // v0.64.1 Brain v2 Slice 13: target-aware dispatch. When the NPC's
-    // priority goal has a TargetCharacter (LLM-populated for revenge,
     // romance, rivalry, mentorship, etc., or set by family-memory promotion
     // for Avenge goals) and that target is alive, steer the NPC to the
     // target's current location instead of running the normal verb. This

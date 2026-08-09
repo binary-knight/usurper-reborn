@@ -328,7 +328,7 @@ public class Character
 
     // v0.64.1 Brain v2 Slice 18: PvP NPC surrender mechanic. When a player
     // brings an NPC to 0 HP in PvP combat, the NPC may beg for mercy instead
-    // of dying outright. LLM-fork picks fight-to-the-death vs beg based on
+    // of dying outright. A courage/aggression heuristic picks fight-to-the-death vs beg based on
     // Courage / Aggression / Vengefulness. Beg path lets the player choose
     // [1] Spare (NPC reduced to 1 HP, walks away, alignment + relationship
     // swing) or [2] Finish (standard kill). HasSurrenderedThisCombat tracks

@@ -307,7 +307,6 @@ namespace UsurperRemake.Systems
 
             // v0.64.1 Brain v2 Slice 14b: when this NPC's priority strategic
             // goal names the player as its target, replace the templated
-            // greeting with an LLM-generated opener that acknowledges the
             // standing arc. Slice 13b surfaced "Magnus watches you with
             // hostility" when Magnus walks in with a Crush-Lumina goal; this
             // closes the loop -- when Lumina actually clicks Talk to Magnus,
@@ -328,9 +327,6 @@ namespace UsurperRemake.Systems
                         && string.Equals(priorityGoal.TargetCharacter.Trim(), playerKey.Trim(),
                             System.StringComparison.OrdinalIgnoreCase))
                     {
-                        greeting = await UsurperRemake.Systems.LLMMoments.GenerateGoalAwareGreetingAsync(
-                            npc, player, priorityGoal.Name, priorityGoal.Type.ToString(),
-                            greeting, System.Threading.CancellationToken.None);
                     }
                 }
             }
@@ -357,180 +353,8 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  \"{greeting}\"");
             terminal.WriteLine("");
 
-            // v0.64.1 Brain v2 Slice 21: news-driven follow-up line. ~18%
-            // chance per conversation, gated on a recent "major" news entry
-            // existing. NPC emits a one-sentence in-character reaction so the
-            // player feels the world is responding to events both of them
-            // see in the news feed.
-            if (player != null && random.NextDouble() < 0.18)
-            {
-                await TryEmitNewsCommentLine(npc);
-            }
-
-            // v0.64.1 Brain v2 Slice 22: NPC-initiated flirt. ~14% per-greeting
-            // gate, plus eligibility filter (Romanticism > 0.6, single, attracted,
-            // warm relationship, not adult child, not already spouse/lover). When
-            // it fires, NPC volunteers an opening flirt as a supplementary beat
-            // -- they make the first move. Player can respond with the standard
-            // Flirt menu option (Slice 17 handles reciprocate / awkward branches)
-            // or simply move on. NEW pattern: the player is the one being
-            // approached, not the approacher.
-            if (player != null && romanceType != RomanceRelationType.Spouse
-                && romanceType != RomanceRelationType.Lover
-                && random.NextDouble() < 0.14)
-            {
-                await TryEmitNPCFlirtLine(npc, relationLevel);
-            }
-
             await Task.Delay(500);
         }
-
-        /// <summary>
-        /// v0.64.1 Brain v2 Slice 22: try to render an LLM NPC-flirt line as a
-        /// supplementary greeting beat. Eligibility-gated: NPC must be single,
-        /// attracted to player's gender, warmly disposed (relation <= 40),
-        /// high-Romanticism (> 0.6), not the player's adult child. Silent skip
-        /// if any check fails or LLM unavailable / generation fails.
-        /// </summary>
-        private async Task TryEmitNPCFlirtLine(NPC npc, int relationLevel)
-        {
-            try
-            {
-                if (npc.IsDead || player == null) return;
-
-                // Don't flirt at your own kids.
-                var family = UsurperRemake.Systems.FamilySystem.Instance;
-                if (family?.IsAdultChildOf(npc, player) ?? false) return;
-
-                var profile = npc.Brain?.Personality;
-                if (profile == null) return;
-
-                // Romanticism gate. Below this and the NPC isn't a flirt-initiator
-                // personality regardless of relationship state.
-                if (profile.Romanticism <= 0.6f) return;
-
-                // Attraction gate -- has to be attracted to player's gender.
-                var playerGender = player.Sex == CharacterSex.Female
-                    ? GenderIdentity.Female : GenderIdentity.Male;
-                if (!profile.IsAttractedTo(playerGender)) return;
-
-                // v0.64.1 audit fix: respect the player's orientation too --
-                // an asexual player shouldn't receive unsolicited flirts.
-                if (player.Orientation == SexualOrientation.Asexual) return;
-
-                // Relationship gate -- needs at least warm friendship territory
-                // for an unsolicited flirt to land plausibly rather than read
-                // creepy.
-                if (relationLevel > 40) return;
-
-                // Marriage / commitment gate. Married NPCs with high Commitment
-                // refuse flirts via Slice 16 -- they wouldn't initiate either.
-                // Use the authoritative marriage-registry check (matches the
-                // gossip screen / refusal logic).
-                bool npcIsMarried = NPCMarriageRegistry.Instance?.IsMarriedToNPC(npc.ID) == true;
-                if (npcIsMarried && profile.Commitment > 0.6f) return;
-
-                // v0.64.1 audit fix: the romanceType Spouse/Lover gate at the
-                // 14% roll rides on RomanceTracker.GetRelationType(npc.ID),
-                // which returns None under the known id-drift class (legacy
-                // npc_<name> restores, raw-name NPCIds). Name-fallback check
-                // (the v0.57.7 pattern): if this NPC's SpouseName IS the
-                // player, they're already married -- don't "first move" flirt
-                // at your own spouse.
-                if (!string.IsNullOrWhiteSpace(npc.SpouseName)
-                    && IsNameMatchForPlayer(npc.SpouseName, player)) return;
-
-                string? flirtLine = await UsurperRemake.Systems.LLMMoments.GenerateNPCFlirtAsync(
-                    npc, player, npcIsMarried, System.Threading.CancellationToken.None);
-                if (string.IsNullOrWhiteSpace(flirtLine)) return;
-
-                terminal!.SetColor("dark_magenta");
-                terminal.WriteLine($"  {Loc.Get("dialogue.npc_initiated_flirt_intro", npc.Name2 ?? npc.Name1)}");
-                terminal.SetColor("bright_magenta");
-                terminal.WriteLine($"  \"{flirtLine}\"");
-                terminal.WriteLine("");
-                terminal.SetColor("white");
-            }
-            catch (Exception ex)
-            {
-                UsurperRemake.Systems.DebugLogger.Instance.LogError("DIALOGUE",
-                    $"[TryEmitNPCFlirtLine] failed: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// v0.64.1 Brain v2 Slice 21: try to render an LLM news-comment line
-        /// as a supplementary greeting beat. Pulls recent news, filters to
-        /// "major" categories, picks the freshest, generates (or reads from
-        /// cache) an in-character reaction. Silent skip if LLM unavailable,
-        /// no qualifying news, or generation fails.
-        /// </summary>
-        private async Task TryEmitNewsCommentLine(NPC npc)
-        {
-            try
-            {
-                // Read recent news from the world state. Only available in
-                // online mode (single-player has no shared news stream
-                // worth quoting).
-                if (!UsurperRemake.BBS.DoorMode.IsOnlineMode) return;
-
-                var stateMgr = UsurperRemake.Systems.OnlineStateManager.Instance;
-                if (stateMgr == null) return;
-
-                var recent = await stateMgr.GetRecentNews(15);
-                if (recent == null || recent.Count == 0) return;
-
-                // Filter to major events. Category strings vary across the
-                // codebase; combine a category whitelist with a keyword scan
-                // on the headline so we catch death/boss/kingship news
-                // regardless of which write path it came from.
-                var majorCategories = new System.Collections.Generic.HashSet<string>(
-                    StringComparer.OrdinalIgnoreCase)
-                { "death", "boss", "kingship", "throne", "marriage", "world_event", "war" };
-                bool IsMajor(UsurperRemake.Systems.NewsEntry e)
-                {
-                    if (e == null) return false;
-                    if (!string.IsNullOrEmpty(e.Category) && majorCategories.Contains(e.Category)) return true;
-                    string msg = (e.Message ?? "").ToLowerInvariant();
-                    if (msg.Contains("slain")
-                        || msg.Contains("killed")
-                        || msg.Contains("defeated")
-                        || msg.Contains("king ")
-                        || msg.Contains("queen ")
-                        || msg.Contains("throne")
-                        || msg.Contains("world boss")
-                        || msg.Contains("wed ")
-                        || msg.Contains("married")) return true;
-                    return false;
-                }
-
-                var pick = recent.FirstOrDefault(IsMajor);
-                if (pick == null) return;
-
-                // Skip news older than 36h -- by that point it's stale and
-                // commenting feels out of step.
-                if ((DateTime.UtcNow - pick.CreatedAt.ToUniversalTime()).TotalHours > 36) return;
-
-                string? comment = await UsurperRemake.Systems.LLMMoments.GenerateNewsCommentAsync(
-                    npc, player!, pick.Id, pick.Message ?? "",
-                    System.Threading.CancellationToken.None);
-
-                if (string.IsNullOrWhiteSpace(comment)) return;
-
-                terminal!.SetColor("gray");
-                terminal.WriteLine($"  {Loc.Get("dialogue.npc_news_aside", npc.Name2 ?? npc.Name1)}");
-                terminal.SetColor("yellow");
-                terminal.WriteLine($"  \"{comment}\"");
-                terminal.WriteLine("");
-                terminal.SetColor("white");
-            }
-            catch (Exception ex)
-            {
-                UsurperRemake.Systems.DebugLogger.Instance.LogError("DIALOGUE",
-                    $"[TryEmitNewsCommentLine] failed: {ex.Message}");
-            }
-        }
-
         /// <summary>
         /// Generate a contextual greeting based on relationship
         /// </summary>
@@ -796,7 +620,6 @@ namespace UsurperRemake.Systems
             // v0.64.1 Brain v2 Slice 20: NPC-issued quest option. Surfaces
             // when this NPC has a priority Combat goal with a named
             // TargetCharacter that resolves to a living NPC. Player picking
-            // this hears the NPC's in-character ask (LLM-generated) and
             // gets Y/N to accept a real DefeatNPC bounty quest. Quest
             // completion (player kills target) advances the NPC's goal via
             // Slice 3's IsTargetCharacterDead completion check.
@@ -1341,34 +1164,20 @@ namespace UsurperRemake.Systems
             string response = GenerateTopicResponse(npc, topicId ?? "generic", relationLevel);
 
             // v0.64.1 Brain v2 Slice 14: for select high-value topics, replace
-            // the templated response with an LLM-generated paragraph grounded
             // in the NPC's actual goals + personality + relationship to this
             // specific player. Per-(NPC, topic, player) cached so re-asks are
-            // instant. Falls through to the template above when LLM is off /
             // call fails / single-player.
             //
-            // Latency optimization: kick the LLM call BEFORE the "considers..."
             // narration + 500ms pause, then await it after. The pause runs
             // concurrently with the HTTP round-trip, hiding up to ~500ms of
             // perceived latency on the first ask. On cached re-asks the task
             // completes near-instantly so the await is a no-op.
-            Task<string>? llmTopicTask = null;
-            if (player != null && IsLLMTopicResponseEnabled(topicId))
-            {
-                llmTopicTask = UsurperRemake.Systems.LLMMoments.GenerateTopicResponseAsync(
-                    npc, topicId!, player, response, System.Threading.CancellationToken.None);
-            }
 
             terminal!.SetColor("yellow");
             terminal.WriteLine($"  {Loc.Get("dialogue.narr_considers", npc.Name2)}");
             terminal.WriteLine("");
 
             await Task.Delay(500);
-
-            if (llmTopicTask != null)
-            {
-                response = await llmTopicTask;
-            }
 
             // Phase 1.5 dialogue enhancer: layer contextual flavor on the NPC's
             // topic reply. Language-gated inside Enhance().
@@ -1405,14 +1214,12 @@ namespace UsurperRemake.Systems
 
         /// <summary>
         /// v0.64.1 Brain v2 Slice 14: whitelist of topics that route through
-        /// the LLM topic-response generator instead of the template switch in
         /// GenerateTopicResponse. Ships with the 5 high-value relational
         /// topics that benefit most from grounding in the NPC's actual goals,
         /// personality, and relationship to the asking player. Topics outside
         /// the whitelist keep the existing templated response (still gets
         /// Slice 11 dialogue-enhancer flavor decoration). Class-specific
         /// topics (warrior_training, mage_magic, etc.) stay on templates --
-        /// they're not deep enough to need LLM personalization.
         /// </summary>
         private static bool IsLLMTopicResponseEnabled(string? topicId)
         {
@@ -1701,17 +1508,9 @@ namespace UsurperRemake.Systems
             if (npcIsMarried && profile != null && profile.Commitment > 0.7f)
             {
                 // v0.64.1 Slice 16: replace hardcoded English refusal array with
-                // LLM-generated in-character refusal grounded in this NPC's
                 // commitment + relationship history. Kick the call before the
                 // 500ms narration pause so latency hides behind it.
                 string templatedRefusal = Loc.Get("dialogue.vn.flirt.married_refuse"); // v0.64.1 audit: loc-keyed (was hardcoded English)
-                Task<string>? llmRefusalTask = UsurperRemake.Systems.LLMMoments.GenerateRomanceReactionAsync(
-                    npc, player!, "flirt", "married_refuse",
-                    $"{player!.Name1 ?? player.Name} has just flirted with you. You are HAPPILY MARRIED " +
-                    $"to {npc.SpouseName ?? "your spouse"} and your Commitment trait is high " +
-                    $"({profile.Commitment:F2}). Refuse firmly and unambiguously -- make clear the answer " +
-                    $"is no, your marriage matters, this conversation is over.",
-                    templatedRefusal, System.Threading.CancellationToken.None);
 
                 terminal.WriteLine($"  {Loc.Get("dialogue.narr_catch_eye", npc.Name2)}");
                 terminal.WriteLine("");
@@ -1719,7 +1518,7 @@ namespace UsurperRemake.Systems
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  {Loc.Get("dialogue.narr_stops_you", npc.Name2)}");
                 terminal.SetColor("red");
-                string refusal = await llmRefusalTask;
+                string refusal = templatedRefusal;
                 terminal.WriteLine($"  \"{refusal}\"");
                 RelationshipSystem.UpdateRelationship(player!, npc, -2);
                 // v0.64.1 audit fix: removed in-handler flirtCountThisSession++
@@ -1734,16 +1533,8 @@ namespace UsurperRemake.Systems
             if (npcHasLover && profile != null && (profile.Jealousy > 0.7f || profile.Commitment > 0.65f))
             {
                 // v0.64.1 Slice 16: replace hardcoded English "taken" refusal array
-                // with LLM-generated refusal grounded in jealousy + commitment +
                 // relationship history.
                 string templatedRefusal = Loc.Get("dialogue.vn.flirt.taken_refuse"); // v0.64.1 audit: loc-keyed (was hardcoded English)
-                Task<string>? llmRefusalTask = UsurperRemake.Systems.LLMMoments.GenerateRomanceReactionAsync(
-                    npc, player!, "flirt", "taken_refuse",
-                    $"{player!.Name1 ?? player.Name} has just flirted with you. You are with " +
-                    $"{npc.SpouseName ?? "someone you love"} (not formally married but deeply " +
-                    $"committed). Your Jealousy is {profile.Jealousy:F2}, Commitment {profile.Commitment:F2}. " +
-                    $"Refuse with dignity -- your heart isn't free to take, and the player should know that.",
-                    templatedRefusal, System.Threading.CancellationToken.None);
 
                 terminal.WriteLine($"  {Loc.Get("dialogue.narr_catch_eye", npc.Name2)}");
                 terminal.WriteLine("");
@@ -1751,7 +1542,7 @@ namespace UsurperRemake.Systems
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  {Loc.Get("dialogue.narr_shakes_head", npc.Name2)}");
                 terminal.SetColor("dark_red");
-                string refusal = await llmRefusalTask;
+                string refusal = templatedRefusal;
                 terminal.WriteLine($"  \"{refusal}\"");
                 // v0.64.1 audit fix: removed double-count (see married branch).
                 terminal.WriteLine("");
@@ -1907,7 +1698,6 @@ namespace UsurperRemake.Systems
                 state.LastFlirtWasPositive = true;
                 if (!flirtSuccessRecorded) { state.FlirtSuccessCount++; flirtSuccessRecorded = true; }
 
-                // v0.64.1 Slice 17: LLM-generated flirt success line grounded
                 // in this specific NPC's Romanticism + relationship. Falls
                 // through to templated tier-keyed line on any failure path.
                 // Audit fix: the warmth TIER is part of the cache bucket
@@ -1945,18 +1735,11 @@ namespace UsurperRemake.Systems
                 }
                 string templatedFlirtSuccess = Loc.Get(templateKey);
                 float romanticism = profile?.Romanticism ?? 0.5f;
-                Task<string> llmFlirtSuccessTask = UsurperRemake.Systems.LLMMoments.GenerateRomanceReactionAsync(
-                    npc, player!, "flirt", $"success_{warmthTier}",
-                    $"{player!.Name1 ?? player.Name} has just flirted with you and it LANDED. " +
-                    $"Warmth level: {warmthDesc}. Your Romanticism trait is {romanticism:F2}. " +
-                    $"Respond with warmth, charm, or pleased interest matching the warmth level " +
-                    $"and your personality.",
-                    templatedFlirtSuccess, System.Threading.CancellationToken.None);
 
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  {Loc.Get("dialogue.narr_responds_warmly", npc.Name2)}");
                 terminal.SetColor("bright_magenta");
-                string flirtSuccessLine = await llmFlirtSuccessTask;
+                string flirtSuccessLine = templatedFlirtSuccess;
                 terminal.WriteLine($"  {flirtSuccessLine}");
                 RelationshipSystem.UpdateRelationship(player!, npc, 1, relBoost, false, true);
             }
@@ -1965,21 +1748,13 @@ namespace UsurperRemake.Systems
                 // Neutral response (narrower range now)
                 state.LastFlirtWasPositive = false;
 
-                // v0.64.1 Slice 17: LLM-generated awkward/uncertain response.
                 int idx = random.Next(3) + 1;
                 string templatedFlirtNeutral = Loc.Get($"dialogue.vn.flirt.neutral_{idx}");
-                Task<string> llmFlirtNeutralTask = UsurperRemake.Systems.LLMMoments.GenerateRomanceReactionAsync(
-                    npc, player!, "flirt", "awkward",
-                    $"{player!.Name1 ?? player.Name} has just flirted with you and it landed AWKWARDLY. " +
-                    $"You don't feel a clear yes or a clear no -- maybe surprise, maybe gentle uncertainty, " +
-                    $"maybe deflection. Respond with politeness or hesitation rather than enthusiasm or " +
-                    $"rejection.",
-                    templatedFlirtNeutral, System.Threading.CancellationToken.None);
 
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  {Loc.Get("dialogue.narr_unsure", npc.Name2)}");
                 terminal.SetColor("gray");
-                string flirtNeutralLine = await llmFlirtNeutralTask;
+                string flirtNeutralLine = templatedFlirtNeutral;
                 terminal.WriteLine($"  {flirtNeutralLine}");
             }
             else
@@ -2034,22 +1809,11 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  {Loc.Get("dialogue.narr_offer_compliment", npc.Name2)}");
             terminal.WriteLine("");
 
-            // v0.64.1 Brain v2 Slice 16: kick LLM reaction in the background while
             // the existing 500ms narration pause runs, so first-ask latency is
             // hidden. Cached per-(NPC, player) for the "pleased" bucket so
             // subsequent compliments from the same player to the same NPC reuse
             // the same in-character thanks. Cheap-tier (Haiku).
             string templatedReply = Loc.Get("dialogue.compliment_reply");
-            Task<string>? llmReactionTask = null;
-            if (player != null)
-            {
-                llmReactionTask = UsurperRemake.Systems.LLMMoments.GenerateRomanceReactionAsync(
-                    npc, player, "compliment", "pleased",
-                    $"{player.Name1 ?? player.Name} has just paid you a compliment. " +
-                    $"Respond with warmth or grace appropriate to your personality and your " +
-                    $"relationship with them.",
-                    templatedReply, System.Threading.CancellationToken.None);
-            }
 
             await Task.Delay(500);
 
@@ -2059,8 +1823,6 @@ namespace UsurperRemake.Systems
             terminal.SetColor("white");
 
             string complimentReply = templatedReply;
-            if (llmReactionTask != null)
-                complimentReply = await llmReactionTask;
             terminal.WriteLine($"  \"{complimentReply}\"");
 
             RelationshipSystem.UpdateRelationship(player!, npc, 1);
@@ -2102,11 +1864,8 @@ namespace UsurperRemake.Systems
 
             float roll = (float)random.NextDouble();
 
-            // v0.65.0 Brain v2 Slice 12b extension: LLM-arbitrated dramatic fork
             // for love confession. Same shape as marriage proposal fork. Heuristic
-            // roll above is the deterministic fallback when LLM is disabled /
             // single-player / BBS / timeout / parse-error. Choice 0 = reciprocate,
-            // 1 = need time, 2 = reject. Blocks on LLM (~2-3s) -- acceptable
             // because player is on a UI screen waiting for NPC's reaction.
             float romanticismVal = profile?.Romanticism ?? 0.5f;
             int heuristicConfessChoice = roll < successChance ? 0
@@ -2126,9 +1885,7 @@ namespace UsurperRemake.Systems
                 "Need time -- you're moved but not ready to commit; stay open.",
                 "Reject -- you don't feel the same way; let them down.",
             };
-            int confessChoice = await UsurperRemake.Systems.LLMMoments.DecideForkAsync(
-                npc, "confession", confessSituation, confessChoices,
-                deterministicFallback: heuristicConfessChoice, System.Threading.CancellationToken.None);
+            int confessChoice = heuristicConfessChoice;
 
             if (confessChoice == 0)
             {
@@ -2327,7 +2084,6 @@ namespace UsurperRemake.Systems
             float aggression = profile?.Aggression ?? 0.5f;
             bool isAggressive = aggression > 0.6f;
 
-            // v0.64.1 Brain v2 Slice 16: kick LLM reaction in background during
             // the 500ms narration pause. Two buckets: "aggressive" (NPC bristles
             // and threatens back) vs "dismissive" (NPC laughs it off cold).
             // Cached per-(NPC, player) for each bucket. Cheap-tier (Haiku).
@@ -2343,15 +2099,10 @@ namespace UsurperRemake.Systems
                 : $"{provokerName} has just tried to provoke you. Your Aggression is " +
                   $"low ({aggression:F2}). Brush it off with cold disdain, a cutting jest, or weary " +
                   $"contempt. They're beneath your reaction.";
-            Task<string>? llmReactionTask = player != null
-                ? UsurperRemake.Systems.LLMMoments.GenerateRomanceReactionAsync(
-                    npc, player, "provocation", bucket, situation,
-                    templatedReply, System.Threading.CancellationToken.None)
-                : null;
 
             await Task.Delay(500);
 
-            string reply = llmReactionTask != null ? await llmReactionTask : templatedReply;
+            string reply = templatedReply;
 
             if (isAggressive)
             {
@@ -2423,13 +2174,10 @@ namespace UsurperRemake.Systems
 
             baseChance = Math.Clamp(baseChance, 0.05f, 0.85f);
 
-            // v0.65.0 Brain v2 Slice 12b extension: LLM-arbitrated dramatic fork
             // for leave-spouse-for-affair-partner decision. This is a high-stakes
-            // narrative moment that breaks an existing marriage; letting an LLM
             // weigh the NPC's commitment, current affair depth, and spouse
             // suspicion produces more character-grounded outcomes than the
             // single deterministic roll. Choice 0 = leave spouse, 1 = decline.
-            // Heuristic roll above is the fallback when LLM disabled / fails.
             float affairRoll = (float)random.NextDouble();
             int heuristicLeaveChoice = affairRoll < baseChance ? 0 : 1;
             string leaveSituation =
@@ -2446,13 +2194,10 @@ namespace UsurperRemake.Systems
                 "Agree to leave your spouse and commit to your lover.",
                 // v0.64.1 audit fix: choice text matched to actual mechanics --
                 // the decline path advances AffairProgress and keeps the affair
-                // alive; telling the LLM "the affair ends here" made it weigh a
                 // consequence that doesn't exist.
                 "Decline for now -- you cannot yet break your marriage; the affair continues in secret.",
             };
-            int leaveChoice = await UsurperRemake.Systems.LLMMoments.DecideForkAsync(
-                npc, "affair_leave_spouse", leaveSituation, leaveChoices,
-                deterministicFallback: heuristicLeaveChoice, System.Threading.CancellationToken.None);
+            int leaveChoice = heuristicLeaveChoice;
 
             if (leaveChoice == 0)
             {
@@ -2622,8 +2367,6 @@ namespace UsurperRemake.Systems
             await Task.Delay(1500);
 
             // Calculate acceptance chance based on relationship and personality.
-            // This still computes -- it's the deterministic fallback the LLM
-            // fork below routes to when the LLM is unavailable / times out /
             // returns an unparseable response.
             var profile = npc.Brain?.Personality;
             float commitment = profile?.Commitment ?? 0.5f;
@@ -2642,15 +2385,11 @@ namespace UsurperRemake.Systems
 
             float roll = (float)random.NextDouble();
 
-            // v0.64.0 Brain v2 Slice 12b: LLM-arbitrated dramatic fork.
-            // When LLM is active and online, the NPC makes a character-driven
             // decision (accept / hesitate / refuse) grounded in their full
             // personality + relationship history rather than a pure random
             // roll against the computed acceptChance. The roll above is still
-            // used as the deterministic fallback for LLM-disabled / single-
             // player / BBS / timeout / parse-error cases.
             //
-            // Forks block on the LLM response (~2-3s typical) because the
             // decision is needed NOW; the player is on a UI screen waiting
             // for the NPC's answer. Acceptable latency for a one-shot
             // narrative moment of this weight.
@@ -2670,9 +2409,7 @@ namespace UsurperRemake.Systems
                 "Hesitate -- say you're not ready yet, but stay open to the future.",
                 "Refuse -- pull away and decline the proposal.",
             };
-            int proposalChoice = await UsurperRemake.Systems.LLMMoments.DecideForkAsync(
-                npc, "marriage_proposal", proposalSituation, proposalChoices,
-                deterministicFallback: heuristicChoice, System.Threading.CancellationToken.None);
+            int proposalChoice = heuristicChoice;
 
             if (proposalChoice == 0)
             {
@@ -2742,7 +2479,6 @@ namespace UsurperRemake.Systems
         }
 
         // v0.64.1 Brain v2 Slice 20: player picks the NPC-issued quest option.
-        // Surfaces the NPC's in-character ask (LLM-generated), prompts the
         // player Y/N, and on accept creates + claims a real DefeatNPC bounty
         // for the named target. Quest completion (player kills target) then
         // naturally satisfies the NPC's `IsTargetCharacterDead` completion
@@ -2791,18 +2527,14 @@ namespace UsurperRemake.Systems
 
             string targetName2 = target.Name2 ?? target.Name1 ?? target.Name ?? "your mark";
 
-            // Kick LLM ask in background during the 500ms narration pause.
             string templatedAsk = Loc.Get("dialogue.npc_quest_ask_default", targetName2);
-            Task<string> llmAskTask = UsurperRemake.Systems.LLMMoments.GenerateQuestRequestAsync(
-                npc, player, goal.Name, targetName2, templatedAsk,
-                System.Threading.CancellationToken.None);
 
             terminal!.SetColor("yellow");
             terminal.WriteLine($"  {Loc.Get("dialogue.narr_considers", npc.Name2)}");
             terminal.WriteLine("");
             await Task.Delay(500);
 
-            string ask = await llmAskTask;
+            string ask = templatedAsk;
             terminal.SetColor("white");
             terminal.WriteLine($"  \"{ask}\"");
             terminal.WriteLine("");
@@ -3152,7 +2884,6 @@ namespace UsurperRemake.Systems
         // v0.64.1 Slice 20: NPC-issued quest. Surfaces when the NPC has a
         // priority Combat goal with a named TargetCharacter that's a living
         // NPC. Player picking this option hears the NPC's in-character ask
-        // (LLM-generated) and gets a Y/N to accept a real DefeatNPC bounty.
         AcceptQuest
     }
 

@@ -216,8 +216,7 @@ public abstract class BaseLocation
         // just the NPC's name in a generic "also here" list. This emits a
         // tone-keyed line so a hunted player gets the warning, a courted
         // player gets the openness, etc. Pure mechanical read of state
-        // already populated by Slice 12a (LLM strategic goals) + Slice 13
-        // (target steering); no new save data, no LLM cost.
+        // already populated by Slice 13
         WriteTargetingNPCNotifications(player, term);
 
         // Check for achievements on location entry (catches non-combat achievements)
@@ -375,7 +374,6 @@ public abstract class BaseLocation
     // whose top strategic goal names the current player as its target. Lines
     // are tone-keyed to goal type (Combat=hostile, Social=watchful or
     // welcoming depending on goal name, Personal=guarded, other=neutral).
-    // Pure read of state populated by Slice 12a (LLM strategic goals,
     // populates Goal.TargetCharacter) + Slice 13 (steers NPC to target's
     // location). Skipped in single-player and BBS modes since strategic goals
     // are online-only. Failure is swallowed -- this is decoration.
@@ -383,7 +381,6 @@ public abstract class BaseLocation
     {
         try
         {
-            // Skip in offline modes: strategic goals are LLM-driven and only
             // populated for online Brain v2 NPCs. Reading goals out of band
             // is cheap, but the lines would never fire in single-player.
             if (!UsurperRemake.BBS.DoorMode.IsOnlineMode) return;
@@ -433,25 +430,6 @@ public abstract class BaseLocation
 
                 term.SetColor(color);
                 term.WriteLine($"  {Loc.Get(flavorKey, npcName)}");
-
-                // v0.64.1 Slice 19: surface cached goal-aware greeting (Slice
-                // 14b) as a hail on subsequent entries. If the player has
-                // previously initiated Talk with this NPC about this goal,
-                // the LLM-generated opener is in NPC.LLMGoalGreetingCache;
-                // re-emit it here so the NPC's "voice" carries across
-                // re-encounters without requiring another Talk click. Cache
-                // miss is silent -- first-time entries just show the threat
-                // line above; the hail appears after the first conversation
-                // populates the cache. Zero LLM cost (read-only cache lookup).
-                {
-                    string greetCacheKey = $"{goal.Name}|{playerKey}";
-                    if (npc.LLMGoalGreetingCache.TryGetValue(greetCacheKey, out var cachedHail)
-                        && !string.IsNullOrWhiteSpace(cachedHail))
-                    {
-                        term.SetColor("yellow");
-                        term.WriteLine($"  {Loc.Get("base.target_npc_calls_out", npcName, cachedHail)}");
-                    }
-                }
 
                 term.SetColor("white");
             }
@@ -3428,7 +3406,6 @@ public abstract class BaseLocation
     /// contracts / companion quests), READY TO SPEND (training points,
     /// banked level-ups, claimable blessing), THE WORLD (seals, next Old
     /// God, remembered dungeon floor). Pure read over existing state via
-    /// JournalSystem -- zero save fields, no LLM, works in single-player /
     /// online / BBS / screen reader.
     /// </summary>
     protected virtual async Task ShowJournal()
@@ -6181,8 +6158,6 @@ public abstract class BaseLocation
             terminal.WriteLine($"  {Loc.Get("base.executioner_axe")}");
             terminal.WriteLine("");
             await Task.Delay(3000);
-
-
 
             // Broadcast the execution
             if (DoorMode.IsOnlineMode)
@@ -10415,7 +10390,6 @@ public abstract class BaseLocation
 
         return null;
     }
-
 
     // v0.64.2: promoted from InnLocation so Home / Team Corner / Dungeon
     // party menus can offer the same auto-equip-best flow (player request:

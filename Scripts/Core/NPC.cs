@@ -33,14 +33,6 @@ public enum NPCActionType
 /// </summary>
 public partial class NPC : Character
 {
-    // NPC-specific properties
-    // v0.64.0 Brain v2 Slice 9b: cache for the LLM-generated personality
-    // summary shown on first-contact (Team Corner examine, dialogue intro).
-    // Generated lazily by LLMMoments.GeneratePersonalitySummaryAsync; cleared
-    // on major personality shift (not currently triggered; Slice 9b ships
-    // permanent caching). Transient -- not saved; regenerated on demand.
-    [System.Text.Json.Serialization.JsonIgnore]
-    public string? PersonalitySummaryCache { get; set; }
 
     // v0.64.0 post-Brain-v2 hygiene: timestamp set when an NPC enters a
     // PERMANENT death state (IsAgedDeath or IsPermaDead). Used by
@@ -53,115 +45,6 @@ public partial class NPC : Character
     // its next pass (null DeathDate is interpreted as "old enough to prune").
     [System.Text.Json.Serialization.JsonIgnore]
     public System.DateTime? DeathDate { get; set; }
-
-    // v0.64.0 Brain v2 Slice 11a: per-NPC cache of LLM-rendered dialogue
-    // flavor lines, keyed by `{layer}|{tone}` (e.g. "mood_anger|Negative").
-    // DialogueEnhancer's sync rendering path consults this first; on a miss
-    // it returns the existing localized template AND kicks a background
-    // Task.Run to generate the LLM variant. Subsequent enhances of the same
-    // (layer, tone) for this NPC use the cached value -- a player who chats
-    // the same NPC twice in a session sees the personalized voice from the
-    // second exchange onward. Transient (JsonIgnore) so server restarts
-    // re-warm naturally, no save bloat.
-    [System.Text.Json.Serialization.JsonIgnore]
-    // v0.64.1 audit fix: ConcurrentDictionary -- shared NPC objects are read/
-    // written by multiple sessions concurrently in MUD mode; the plain Dictionary
-    // risked corruption (the in-flight HashSet lock guarded generation dedup,
-    // not the cache dict itself).
-    public System.Collections.Concurrent.ConcurrentDictionary<string, string> LLMDialogueFlavorCache { get; set; } = new(System.StringComparer.Ordinal);
-
-    // In-flight guard so multiple Enhance() hits while one generation is
-    // already queued don't fire N parallel HTTP calls for the same key.
-    // v0.64.1 audit fix: initialized at declaration -- this set doubles as a
-    // lock object in DialogueEnhancer, and the previous lazy `??=` init was
-    // itself racy (two threads could briefly hold two different locks).
-    [System.Text.Json.Serialization.JsonIgnore]
-    public System.Collections.Generic.HashSet<string> LLMDialogueFlavorInFlight { get; set; } = new();
-
-    // v0.64.1 Brain v2 Slice 14: per-NPC cache of full LLM-rendered topic
-    // response paragraphs, keyed by `{topicId}|{playerKey}` so the response
-    // can be relational (what the NPC says about their goals to player A may
-    // differ from what they tell player B). VisualNovelDialogueSystem.
-    // HandleChatOption awaits this on the first ask for a given (topic, player)
-    // pair (player is already on a "considers..." pause, latency 2-3s is fine);
-    // subsequent asks of the same topic by the same player return the cached
-    // line instantly. Transient (JsonIgnore) so saves stay clean and post-
-    // restart caches rebuild naturally on first contact.
-    [System.Text.Json.Serialization.JsonIgnore]
-    public System.Collections.Concurrent.ConcurrentDictionary<string, string> LLMTopicResponseCache { get; set; } = new(System.StringComparer.Ordinal);
-
-    // v0.64.1 Brain v2 Slice 14b: per-NPC cache of LLM-rendered goal-aware
-    // GREETINGS keyed by `{goalName}|{playerKey}`. When the NPC's priority
-    // goal targets the conversation partner (player), the standard
-    // relationship-tier greeting template is replaced with an LLM line that
-    // opens the conversation in the voice of someone who has a reason to
-    // remember this specific player. Re-keyed on goalName so when the goal
-    // changes (Slice 12a 6-hour refresh, or goal completion), the next
-    // greeting regenerates. Transient (JsonIgnore).
-    [System.Text.Json.Serialization.JsonIgnore]
-    public System.Collections.Concurrent.ConcurrentDictionary<string, string> LLMGoalGreetingCache { get; set; } = new(System.StringComparer.Ordinal);
-
-    // v0.64.1 Brain v2 Slice 16: per-NPC cache of LLM-rendered romance /
-    // social reaction lines keyed by `{interactionType}|{bucket}|{playerKey}`.
-    // Replaces templated reactions in HandleComplimentOption (single bucket
-    // "pleased"), HandleProvocationOption (buckets "aggressive" / "dismissive"),
-    // and HandleFlirtOption's hardcoded English refusal arrays (buckets
-    // "married_refuse" / "taken_refuse"). Each (NPC, player, interaction,
-    // bucket) generates one personalized line on first encounter and reuses
-    // it forever after for that pair. Transient (JsonIgnore).
-    [System.Text.Json.Serialization.JsonIgnore]
-    public System.Collections.Concurrent.ConcurrentDictionary<string, string> LLMRomanceReactionCache { get; set; } = new(System.StringComparer.Ordinal);
-
-    // v0.64.1 Brain v2 Slice 20: per-NPC cache of LLM-rendered quest-request
-    // lines, keyed by `{goalName}|{playerKey}`. When the NPC has a priority
-    // Combat goal with a named TargetCharacter, the conversation menu surfaces
-    // an "Is there something you need?" option; selecting it plays this
-    // cached in-character ask. Re-keyed on goalName so when the strategic
-    // goal changes (Slice 12a 6-hour refresh or completion), a re-ask
-    // regenerates against the new arc. Transient (JsonIgnore).
-    [System.Text.Json.Serialization.JsonIgnore]
-    public System.Collections.Concurrent.ConcurrentDictionary<string, string> LLMQuestRequestCache { get; set; } = new(System.StringComparer.Ordinal);
-
-    // v0.64.1 Brain v2 Slice 21: per-NPC cache of LLM-rendered news-comment
-    // lines, keyed by `{newsId}|{playerKey}`. When the NPC's greeting fires
-    // and a recent major news event qualifies, the NPC emits a one-line
-    // in-character comment on it ("Hear about the king dying? Strange days.").
-    // Cached so the same NPC doesn't keep regenerating commentary on the
-    // same news entry to the same player across multiple conversations
-    // within the news window. Transient (JsonIgnore).
-    [System.Text.Json.Serialization.JsonIgnore]
-    public System.Collections.Concurrent.ConcurrentDictionary<string, string> LLMNewsCommentCache { get; set; } = new(System.StringComparer.Ordinal);
-
-    // v0.64.1 Brain v2 Slice 22: per-NPC cache of LLM-rendered NPC-initiated
-    // flirt lines, keyed by `{playerKey}`. When a high-Romanticism NPC who is
-    // single, attracted to the player's gender, and warmly disposed (relation
-    // <= 40) greets the player, there's a probability gate to emit a one-line
-    // opening flirt as a supplementary greeting beat. Cached so the same NPC
-    // doesn't keep regenerating different flirt openers to the same player --
-    // their "first move" is consistent. Transient (JsonIgnore).
-    [System.Text.Json.Serialization.JsonIgnore]
-    public System.Collections.Concurrent.ConcurrentDictionary<string, string> LLMNPCFlirtCache { get; set; } = new(System.StringComparer.Ordinal);
-
-    // v0.64.0 Brain v2 Slice 12a: per-NPC throttle state for the LLM
-    // strategic-goal refresh. The refresh adds 1-3 long-arc personality-
-    // driven goals to the NPC's goal stack alongside the existing reactive
-    // goals (heal, earn money, become ruler). Throttled to once per
-    // wall-clock window (default 6 hours) to keep cost bounded -- the
-    // reactive system covers short-term necessity, the LLM goals shape
-    // long-arc trajectory.
-    //
-    // LastLLMGoalRefreshUtc: when the most recent refresh fired (DateTime.MinValue
-    //   means never -- triggers immediate refresh on first eligible tick).
-    // LLMGoalRefreshInFlight: prevents two concurrent ticks from kicking
-    //   parallel HTTP calls for the same NPC.
-    // Both transient (JsonIgnore) -- restart re-evaluates the refresh
-    // window naturally and the existing LLM goals (un-tagged after restart
-    // because IsLLMGenerated is also JsonIgnore) decay/complete normally.
-    [System.Text.Json.Serialization.JsonIgnore]
-    public System.DateTime LastLLMGoalRefreshUtc { get; set; } = System.DateTime.MinValue;
-
-    [System.Text.Json.Serialization.JsonIgnore]
-    public bool LLMGoalRefreshInFlight { get; set; }
 
     public NPCBrain? Brain { get; set; }
     public PersonalityProfile? Personality { get; set; }

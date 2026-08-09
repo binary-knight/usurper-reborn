@@ -8,7 +8,7 @@ namespace UsurperRemake.Data
     /// Pre-generated NPC dialogue database. Contains thousands of Opus-quality dialogue lines
     /// organized by personality type, relationship tier, emotion, and context.
     /// At runtime, the existing NPC AI brain determines context and this system selects
-    /// the best-matching pre-generated line. Zero runtime LLM cost, instant lookup.
+    /// the best-matching authored line. Instant lookup, no network.
     /// </summary>
     public static class NPCDialogueDatabase
     {

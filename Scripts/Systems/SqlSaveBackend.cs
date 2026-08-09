@@ -736,27 +736,6 @@ namespace UsurperRemake.Systems
                     );
                     CREATE INDEX IF NOT EXISTS idx_pending_gold_transfers_recipient ON pending_gold_transfers(recipient_username);
 
-                    -- v0.64.0 Brain v2 Slice 10: LLM moment telemetry. One row
-                    -- per LLM call attempt (success OR fallback). Powers the
-                    -- balance dashboard's LLM stats card so the sysop can
-                    -- watch token spend, success rate, and rendered output
-                    -- without grepping the debug log. Pruned to last 30 days.
-                    -- moment_type values: 'avenge' | 'death_epitaph' | 'personality_summary'
-                    CREATE TABLE IF NOT EXISTS llm_usage (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        moment_type TEXT NOT NULL,
-                        npc_name TEXT,
-                        succeeded INTEGER NOT NULL DEFAULT 0,
-                        prompt_tokens INTEGER DEFAULT 0,
-                        completion_tokens INTEGER DEFAULT 0,
-                        total_tokens INTEGER DEFAULT 0,
-                        response_ms INTEGER DEFAULT 0,
-                        rendered_text TEXT,
-                        failure_reason TEXT,
-                        created_at TEXT DEFAULT (datetime('now'))
-                    );
-                    CREATE INDEX IF NOT EXISTS idx_llm_usage_created ON llm_usage(created_at DESC);
-                    CREATE INDEX IF NOT EXISTS idx_llm_usage_moment ON llm_usage(moment_type, created_at DESC);
 
                     -- v1.0 release prep (B1a): onboarding funnel telemetry.
                     -- One row per (username, milestone), written fire-and-forget
@@ -2274,57 +2253,6 @@ namespace UsurperRemake.Systems
                 DebugLogger.Instance.LogError("SQL", $"Failed to log NPC decision: {ex.Message}");
             }
         }
-
-        /// <summary>
-        /// v0.64.0 Brain v2 Slice 10: persist one LLM call attempt to llm_usage
-        /// for the balance dashboard's LLM stats card. Captures both successes
-        /// (with token counts + rendered text + latency) and fallbacks (with
-        /// failure_reason). Fire-and-forget from LLMMoments call sites so a
-        /// write failure doesn't break the moment generator.
-        /// </summary>
-        public void RecordLLMUsage(
-            string momentType,
-            string? npcName,
-            bool succeeded,
-            int promptTokens,
-            int completionTokens,
-            int totalTokens,
-            int responseMs,
-            string? renderedText,
-            string? failureReason)
-        {
-            try
-            {
-                using var connection = OpenConnection();
-                using var cmd = connection.CreateCommand();
-                cmd.CommandText = @"
-                    INSERT INTO llm_usage (
-                        moment_type, npc_name, succeeded,
-                        prompt_tokens, completion_tokens, total_tokens,
-                        response_ms, rendered_text, failure_reason
-                    ) VALUES (
-                        @moment, @npc, @ok,
-                        @ptok, @ctok, @ttok,
-                        @ms, @text, @reason
-                    );
-                ";
-                cmd.Parameters.AddWithValue("@moment", momentType ?? "unknown");
-                cmd.Parameters.AddWithValue("@npc", (object?)npcName ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@ok", succeeded ? 1 : 0);
-                cmd.Parameters.AddWithValue("@ptok", promptTokens);
-                cmd.Parameters.AddWithValue("@ctok", completionTokens);
-                cmd.Parameters.AddWithValue("@ttok", totalTokens);
-                cmd.Parameters.AddWithValue("@ms", responseMs);
-                cmd.Parameters.AddWithValue("@text", (object?)renderedText ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@reason", (object?)failureReason ?? DBNull.Value);
-                cmd.ExecuteNonQuery();
-            }
-            catch (Exception ex)
-            {
-                DebugLogger.Instance.LogError("SQL", $"Failed to log LLM usage: {ex.Message}");
-            }
-        }
-
         /// <summary>
         /// Prune npc_decision_log rows older than the cutoff so the table stays
         /// bounded. Called from the daily maintenance pass.
@@ -2344,53 +2272,6 @@ namespace UsurperRemake.Systems
                 DebugLogger.Instance.LogError("SQL", $"Failed to prune npc_decision_log: {ex.Message}");
             }
         }
-
-        /// <summary>
-        /// v1.0 release prep (B5): prune llm_usage rows older than the cutoff.
-        /// The table's own creation comment claimed "Pruned to last 30 days"
-        /// since v0.64.0 but no prune ever existed -- with Slice 11 dialogue
-        /// flavor writing one row per LLM attempt per (NPC, cache key), the
-        /// production DB grew without bound. Called from the same maintenance
-        /// pass as PruneOldNPCDecisionLog.
-        /// </summary>
-        public async Task PruneOldLLMUsage(int daysToKeep = 30)
-        {
-            try
-            {
-                using var connection = OpenConnection();
-                using var cmd = connection.CreateCommand();
-                cmd.CommandText = @"DELETE FROM llm_usage WHERE created_at < datetime('now', @cutoff);";
-                cmd.Parameters.AddWithValue("@cutoff", $"-{daysToKeep} days");
-                await cmd.ExecuteNonQueryAsync();
-            }
-            catch (Exception ex)
-            {
-                DebugLogger.Instance.LogError("SQL", $"Failed to prune llm_usage: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// v0.65.0 (1.0-prep SR): total LLM tokens recorded today (UTC) --
-        /// used by LLMBudget.RehydrateFromBackend so a server restart no
-        /// longer resets the daily cap. Synchronous single SUM on an indexed
-        /// column; called once at startup.
-        /// </summary>
-        public long GetLLMTokensUsedTodayUtc()
-        {
-            try
-            {
-                using var connection = OpenConnection();
-                using var cmd = connection.CreateCommand();
-                cmd.CommandText = @"SELECT COALESCE(SUM(total_tokens), 0) FROM llm_usage WHERE created_at >= date('now');";
-                return Convert.ToInt64(cmd.ExecuteScalar());
-            }
-            catch (Exception ex)
-            {
-                DebugLogger.Instance.LogError("SQL", $"GetLLMTokensUsedTodayUtc failed: {ex.Message}");
-                return 0;
-            }
-        }
-
         public async Task PruneOldNews(string category, int hoursToKeep = 24)
         {
             try

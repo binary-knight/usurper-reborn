@@ -25,40 +25,13 @@ public partial class GoalSystem
     // A static registry survives reloads (resets only on true process
     // restart) and is consulted BOTH at goal-add time (stops the loop at the
     // source: a revenge already settled is never re-added) AND at the news-
-    // fire seam (belt and braces). ConcurrentDictionary because the LLM
-    // strategic-goal callback runs on a background thread.
+    // fire seam (belt and braces).
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte>
         SettledRevengeTargets = new(StringComparer.OrdinalIgnoreCase);
 
     // Owner name captured at the top of UpdateGoals so AddGoal (which has no
-    // owner parameter) can key the settled-revenge registry. Set before any
-    // AddGoal can run for this tick; the LLM background callback enqueues
-    // rather than calling AddGoal directly (see _pendingLlmGoals), so it
-    // never races this field.
+    // owner parameter) can key the settled-revenge registry.
     private string _ownerName = "";
-
-    // v0.64.1 audit fix: handoff queue from the LLM strategic-goal background
-    // callback to the tick thread. The callback must NOT touch `goals`
-    // directly (plain List<Goal>, concurrently iterated by UpdateGoals).
-    private readonly System.Collections.Concurrent.ConcurrentQueue<Goal>
-        _pendingLlmGoals = new();
-
-    // v0.64.0 Brain v2 Slice 12a: how often the LLM strategic-goal
-    // generator runs per NPC. Reactive goals (heal/earn money/etc) keep
-    // firing every tick from their concrete triggers; the LLM layer
-    // refreshes long-arc trajectory periodically.
-    private static readonly TimeSpan StrategicGoalRefreshInterval = TimeSpan.FromHours(6);
-
-    // Shared stagger RNG for the post-restart "first refresh ever" path.
-    // Without staggering, every NPC's LastLLMGoalRefreshUtc starts at
-    // MinValue after a process restart (transient JsonIgnore field), so
-    // the first eligibility tick would fire LLM calls for the entire
-    // population simultaneously -- hundreds of HTTP requests, daily token
-    // cap blown in a single burst, Anthropic rate-limit rejections.
-    // Stagger spreads initial refreshes uniformly across the refresh
-    // interval (~6 hours), so the population's daily LLM goal cost is
-    // smooth instead of bursty.
-    private static readonly Random _staggerRandom = new Random();
 
     // Public accessor for serialization
     public List<Goal> AllGoals => goals;
@@ -76,7 +49,6 @@ public partial class GoalSystem
 
         // v0.64.1 audit fix: stop the avenge-loop at the SOURCE. Two parts:
         // (1) a revenge already settled (per the process-wide registry) is
-        // never re-added -- this is what actually breaks the LLM-refresh /
         // family-memory re-promotion churn, since both in-list dedups get
         // erased by UpdateGoals' per-tick RemoveAll prune; (2) a revenge goal
         // that would be BORN COMPLETE (target already dead) is refused --
@@ -152,17 +124,6 @@ public partial class GoalSystem
         // revenge registry key (AddGoal has no owner parameter).
         _ownerName = owner?.Name2 ?? owner?.Name1 ?? owner?.Name ?? "";
 
-        // v0.64.1 audit fix: drain LLM-generated goals enqueued by the
-        // background refresh callback. Pre-fix the Task.Run called AddGoal
-        // directly from the callback thread, mutating the plain List<Goal>
-        // concurrently with this method's RemoveAll/foreach -- a swallowed
-        // InvalidOperationException at best, silent list corruption at worst.
-        // The queue moves all goal-list mutation onto the tick thread.
-        while (_pendingLlmGoals.TryDequeue(out var pending))
-        {
-            AddGoal(pending);
-        }
-
         // Prune completed/inactive goals to prevent unbounded list growth
         goals.RemoveAll(g => g.IsCompleted || !g.IsActive);
 
@@ -190,115 +151,11 @@ public partial class GoalSystem
         // Add new goals based on current situation
         GenerateNewGoals(owner, world, memory, emotions);
 
-        // v0.64.0 Brain v2 Slice 12a: opportunistic LLM strategic-goal
-        // refresh. Cheap when LLM is unavailable (early-out in
-        // TryRefreshStrategicGoals). Fire-and-forget when it does run --
-        // any added goals land on the next tick via AddGoal's name dedup.
-        TryRefreshStrategicGoals(owner);
-
         // Adjust priorities based on personality and emotions
         AdjustGoalPriorities(emotions);
     }
-
     /// <summary>
-    /// v0.64.0 Brain v2 Slice 12a: throttled LLM strategic-goal refresh.
-    /// Gated on:
-    ///   - LLM provider available (online + configured + has budget)
-    ///   - Refresh interval has elapsed since last refresh for this NPC
-    ///   - No refresh currently in flight for this NPC
-    /// All checks are cheap. The actual LLM call runs on a background
-    /// Task.Run so the calling tick doesn't block.
-    ///
-    /// Cohort note: Slice 12a initially gated on `npc.IsAIDriven` to match
-    /// the rest of Brain v2 (cohort split between scorer-driven and legacy
-    /// picker). But the cohort split was about picker comparability -- this
-    /// layer is purely ADDITIVE (LLM goals augment the reactive goal stack
-    /// alongside existing reactive triggers; both go into the same
-    /// GetPriorityGoal lookup). All NPCs benefit from strategic goals
-    /// regardless of which picker drives their verbs, and live audit
-    /// surfaced that the cohort grew to zero across hundreds of NPCs,
-    /// shutting this off in practice. Gate dropped.
-    /// </summary>
-    private void TryRefreshStrategicGoals(NPC owner)
-    {
-        if (owner == null) return;
-        if (UsurperRemake.Systems.LLMProvider.Get() == null) return;
-        if (owner.LLMGoalRefreshInFlight) return;
-
-        var now = DateTime.UtcNow;
-
-        // First-time stagger: initialize the per-NPC refresh anchor to a
-        // uniformly random point within the past interval window. Effect:
-        // (now - LastLLMGoalRefreshUtc) is uniformly distributed in
-        // [0, interval], so the eligibility check below fires uniformly
-        // across the next interval for the population instead of all at
-        // once. Spreads ~244 NPCs over 6 hours = ~40 calls/hr at peak,
-        // not 244 simultaneous calls. Skip kicking this tick; the next
-        // tick checks the staggered anchor naturally.
-        if (owner.LastLLMGoalRefreshUtc == DateTime.MinValue)
-        {
-            int minutesAgo = _staggerRandom.Next(0, (int)StrategicGoalRefreshInterval.TotalMinutes);
-            owner.LastLLMGoalRefreshUtc = now - TimeSpan.FromMinutes(minutesAgo);
-            return;
-        }
-
-        if (now - owner.LastLLMGoalRefreshUtc < StrategicGoalRefreshInterval)
-            return;
-
-        // Stamp the refresh time BEFORE kicking so a thundering herd of
-        // concurrent ticks doesn't all fire LLM calls before the first
-        // one returns. In-flight bool is the second guard for the rare
-        // case where two ticks hit this line within the same microsecond.
-        owner.LastLLMGoalRefreshUtc = now;
-        owner.LLMGoalRefreshInFlight = true;
-
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                var candidates = await UsurperRemake.Systems.LLMMoments.GenerateStrategicGoalsAsync(
-                    owner, CancellationToken.None);
-
-                if (candidates == null || candidates.Count == 0) return;
-
-                foreach (var c in candidates)
-                {
-                    if (string.IsNullOrWhiteSpace(c.Name)) continue;
-                    GoalType gt = ParseGoalTypeSafe(c.Type);
-                    var g = new Goal(c.Name, gt, c.Priority);
-                    if (!string.IsNullOrWhiteSpace(c.TargetCharacter))
-                        g.TargetCharacter = c.TargetCharacter;
-                    // Tag this goal as LLM-generated for future telemetry /
-                    // potential per-cycle replacement. IsLLMGenerated is
-                    // transient (JsonIgnore) so it resets on restart -- the
-                    // goal itself persists via the normal Goal serialization.
-                    g.IsLLMGenerated = true;
-                    // v0.64.1 audit fix: enqueue instead of AddGoal -- this
-                    // callback runs on a background thread and must not mutate
-                    // the plain List<Goal> the tick thread iterates. UpdateGoals
-                    // drains the queue at the top of the next tick (where
-                    // AddGoal's dedups also see a stable list).
-                    _pendingLlmGoals.Enqueue(g);
-                }
-
-                UsurperRemake.Systems.DebugLogger.Instance.LogInfo("GOALS",
-                    $"LLM strategic refresh for {owner.Name2 ?? owner.Name}: queued " +
-                    $"{candidates.Count} candidate goal(s)");
-            }
-            catch (Exception ex)
-            {
-                UsurperRemake.Systems.DebugLogger.Instance.LogError("GOALS",
-                    $"LLM strategic refresh failed for {owner.Name2 ?? owner.Name}: {ex.Message}");
-            }
-            finally
-            {
-                owner.LLMGoalRefreshInFlight = false;
-            }
-        });
-    }
-
-    /// <summary>
-    /// Parse the LLM's free-form Type string into a GoalType enum, defaulting
+    /// Parse a free-form Type string into a GoalType enum, defaulting
     /// to Personal if the model emitted something unexpected. The system
     /// prompt restricts to {Personal, Social, Economic, Combat, Exploration};
     /// case-insensitive and tolerant of stray whitespace.
@@ -433,7 +290,7 @@ public partial class GoalSystem
             // add-time dedup in AddGoal is the primary loop-breaker; this
             // catches any path that reaches completion through a goal that
             // predates the registry entry. Gossip / emotion still fire
-            // (cheap); only the news entry + LLM call are throttled.
+            // (cheap); only the news entry is throttled.
             string settledKey = !string.IsNullOrEmpty(goal.TargetCharacter)
                 ? $"{npcName}|{goal.TargetCharacter}" : null;
             bool alreadyAvengedTarget = settledKey != null
@@ -460,15 +317,15 @@ public partial class GoalSystem
             bool isFamilyVengeance = goal.Name.StartsWith("Avenge");
             if (isFamilyVengeance)
             {
-                // v0.64.0 Brain v2 Slice 5: LLMMoments.PostAvengeNewsAsync handles
-                // both the templated fallback (always works) AND the LLM-rendered
-                // dramatic version (when configured + budget allows + online mode).
-                // Fire-and-forget -- world-sim tick continues, news lands within
-                // a few seconds. The previous inline NewsSystem.Newsy is now
-                // inside PostAvengeNewsAsync's fallback path.
                 if (!alreadyAvengedTarget)
                 {
-                    _ = UsurperRemake.Systems.LLMMoments.PostAvengeNewsAsync(owner, targetName);
+                    string avengerName = owner.Name2 ?? owner.Name1 ?? "An unknown soul";
+                    try
+                    {
+                        NewsSystem.Instance?.Newsy(
+                            $"{avengerName} has avenged the blood of their kin. {targetName} is dead.");
+                    }
+                    catch { }
                     WorldSimulator.AddGossip($"{npcName} took blood for blood from {targetName}");
                     if (settledKey != null)
                         SettledRevengeTargets.TryAdd(settledKey, 1);
@@ -739,13 +596,6 @@ public class Goal
     public float TargetValue { get; set; } = 1f;
     public float CurrentValue { get; set; } = 0f;
 
-    // v0.64.0 Brain v2 Slice 12a: marker for LLM-generated strategic
-    // goals. Transient (JsonIgnore) -- after a restart these revert to
-    // false and become indistinguishable from reactive goals; they then
-    // continue to live their normal lifecycle (complete / decay / get
-    // pruned) and the next LLM refresh adds new strategic goals on top.
-    [System.Text.Json.Serialization.JsonIgnore]
-    public bool IsLLMGenerated { get; set; }
     
     public Goal(string name, GoalType type, float priority)
     {

@@ -23,7 +23,6 @@ namespace UsurperRemake.Systems;
 /// singletons). ZERO new save fields -- same derived-live pattern as
 /// Dread/Renown/Dynasty standing. Every rung and section builder is
 /// independently guarded so a broken subsystem degrades to a missing line,
-/// never a broken journal. Works in single-player, online, and BBS (no LLM,
 /// no DB reads on this path).
 /// </summary>
 public static class JournalSystem

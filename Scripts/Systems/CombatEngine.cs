@@ -376,7 +376,6 @@ public partial class CombatEngine
                     // v0.64.1 Slice 18: if the attacker (player) just dropped
                     // an NPC defender to 0 HP this turn AND the NPC entered
                     // the round with > 35% HP, offer the surrender path.
-                    // OfferNPCSurrenderAsync runs the LLM fork + UI prompt.
                     // Returns true if the player spared the NPC (we break the
                     // loop with result.Outcome = OpponentSpared already set);
                     // returns false in every other case (NPC chose to fight,
@@ -10636,7 +10635,6 @@ public partial class CombatEngine
         terminal.Write(Loc.Get("combat.comparison_header", character.Name, slotDisplayName));
         terminal.WriteLine("");
 
-
         // Weapon requirement warning — warn if equipping this would break ability/spell requirements
         if (lootItem.Type == global::ObjType.Weapon)
         {
@@ -15197,7 +15195,6 @@ public partial class CombatEngine
                 terminal.WriteLine(Loc.Get("combat.ability_grand_finale_inspire"));
                 break;
             }
-
 
             case "harmonic_shield":
                 // +40 DEF + 15% reflection to entire party (including caster)
@@ -25089,14 +25086,12 @@ public partial class CombatEngine
     // round with > 35% MaxHP (prevents nibble kills from triggering -- only
     // a "fighting chance" -> sudden brink moment qualifies).
     //
-    // If gates pass: LLM fork decides fight-to-the-death vs beg-for-mercy
     // based on Courage / Aggression / Vengefulness. If fight: NPC dies
     // normally, no UI change. If beg: NPC is revived to 1 HP, an in-character
     // begging line plays, the player gets a Spare/Finish prompt.
     //
     // Returns true if the player spared the NPC (caller breaks the combat
     // loop with result.Outcome already set to OpponentSpared); returns false
-    // in every other case (NPC chose to fight, player chose to finish, LLM
     // unavailable, gates failed, etc) -- caller proceeds with normal death.
     private async Task<bool> OfferNPCSurrenderAsync(Character attacker, Character defender, CombatResult result)
     {
@@ -25129,21 +25124,9 @@ public partial class CombatEngine
         float fightScore = (courage + aggression + vengefulness) / 3f;
         int heuristicChoice = fightScore >= 0.55f ? 0 : 1;
 
-        string situation =
-            $"You have just been brought to 0 HP in combat by " +
-            $"{attacker.DisplayName ?? attacker.Name1 ?? "an attacker"}. " +
-            $"You entered this round at {startPct:P0} of your max HP -- the killing " +
-            $"blow was sudden. Your Courage is {courage:F2}, Aggression {aggression:F2}, " +
-            $"Vengefulness {vengefulness:F2}. Decide whether YOU, this specific NPC, " +
-            $"meet death on your feet or beg for your life in the dust.";
-        var choices = new System.Collections.Generic.List<string>
-        {
-            "Fight to the death -- spit defiance, die with your weapon raised.",
-            "Beg for mercy -- drop to your knees, plead for your life.",
-        };
-        int chosen = await UsurperRemake.Systems.LLMMoments.DecideForkAsync(
-            npc, "combat_surrender", situation, choices,
-            deterministicFallback: heuristicChoice, System.Threading.CancellationToken.None);
+        // Courage / aggression / vengefulness decide it. This used to be routed
+        // now the whole decision.
+        int chosen = heuristicChoice;
 
         if (chosen == 0)
         {
@@ -25160,19 +25143,11 @@ public partial class CombatEngine
         }
 
         // Beg-for-mercy path. Revive to 1 HP so the combat loop doesn't
-        // immediately exit, generate an in-character begging line via LLM
         // (mirrors Slice 16 reaction pattern), prompt the player Y/N.
         npc.HP = 1;
         npc.HasSurrenderedThisCombat = true;
 
         string templatedPlea = Loc.Get("combat.npc_begs_mercy_default");
-        Task<string> llmPleaTask = UsurperRemake.Systems.LLMMoments.GenerateRomanceReactionAsync(
-            npc, attacker, "combat_surrender", "begs_mercy",
-            $"You have been beaten to within an inch of your life by " +
-            $"{attacker.DisplayName ?? attacker.Name1 ?? "the attacker"}. You have chosen to " +
-            $"beg for mercy rather than die. Write your plea -- pride wounded, voice " +
-            $"cracking, hand raised in surrender. One or two sentences of spoken speech.",
-            templatedPlea, System.Threading.CancellationToken.None);
 
         terminal.WriteLine("");
         terminal.SetColor("bright_yellow");
@@ -25180,7 +25155,7 @@ public partial class CombatEngine
         terminal.WriteLine("");
         await Task.Delay(GetCombatDelay(600));
 
-        string plea = await llmPleaTask;
+        string plea = templatedPlea;
         terminal.SetColor("yellow");
         terminal.WriteLine($"  \"{plea}\"");
         terminal.WriteLine("");

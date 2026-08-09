@@ -142,9 +142,7 @@ public class MudServer
         SaveSystem.InitializeWithBackend(sqlBackend);
         Console.Error.WriteLine($"[MUD] SQLite backend initialized: {_databasePath}");
 
-        // v0.65.0 (1.0-prep SR): rehydrate the LLM daily token budget from
         // the llm_usage telemetry so deploy-restarts no longer reset the cap.
-        UsurperRemake.Systems.LLMBudget.RehydrateFromBackend(sqlBackend);
 
         // v0.60.5: wire SqlSaveBackend's kick hook so BanPlayer can drop the
         // target's TCP session immediately. Lookup is by lowercased username

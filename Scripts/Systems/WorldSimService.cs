@@ -2093,11 +2093,6 @@ namespace UsurperRemake.Systems
                 // column).
                 _ = sqlBackend.PruneOldNPCDecisionLog(daysToKeep: 30);
 
-                // v1.0 release prep (B5): llm_usage claimed 30-day pruning in
-                // its table comment since v0.64.0 but no prune ever ran --
-                // unbounded growth on the production DB.
-                _ = sqlBackend.PruneOldLLMUsage(daysToKeep: 30);
-
                 NewsSystem.Instance?.Newsy(false, "A new day dawns in the realm...");
             }
             catch (Exception ex)
