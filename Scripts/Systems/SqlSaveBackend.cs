@@ -5167,7 +5167,17 @@ namespace UsurperRemake.Systems
         return teams;
     }
 
-    public async Task<List<PlayerSummary>> GetPlayerTeamMembers(string teamName, string? excludeUsername = null)
+    /// <summary>
+    /// Roster of PLAYER members of a team. Membership is read from each player's own
+    /// save blob (player_data.player.team), so a member is only visible here once
+    /// their save row has been written -- see TeamCornerLocation.PersistTeamMembershipChange.
+    ///
+    /// The exclude parameter is matched against display_name, NOT the account username.
+    /// It is named accordingly: passing an account key here would silently fail to
+    /// exclude the viewer, which is the same defect that produced the v0.57.7 arena
+    /// "you can fight yourself" bug.
+    /// </summary>
+    public async Task<List<PlayerSummary>> GetPlayerTeamMembers(string teamName, string? excludeDisplayName = null)
     {
         var members = new List<PlayerSummary>();
         try
@@ -5195,7 +5205,7 @@ namespace UsurperRemake.Systems
             while (reader.Read())
             {
                 var name = reader.GetString(0);
-                if (excludeUsername != null && name.Equals(excludeUsername, StringComparison.OrdinalIgnoreCase))
+                if (excludeDisplayName != null && name.Equals(excludeDisplayName, StringComparison.OrdinalIgnoreCase))
                     continue;
                 members.Add(new PlayerSummary
                 {

@@ -702,6 +702,35 @@ public class TeamCornerLocation : BaseLocation
     /// <summary>
     /// Show members of a team
     /// </summary>
+    /// <summary>
+    /// Persists a just-changed team membership to the player's save row immediately.
+    ///
+    /// Player report: "friend says he sees me as part of the team, when I check it
+    /// says I'm the only one in the team." Team membership for players lives in the
+    /// player's own save blob (player_data.player.team), and the roster screen builds
+    /// its list by querying that column across all players. Joining or creating a team
+    /// only set Character.Team in memory, so until the joiner's next autosave (or
+    /// logout) every OTHER player's roster query still read their old value -- each
+    /// side saw a different team. Remaking the team did not help, because the remake
+    /// had exactly the same problem.
+    ///
+    /// Single-player needs nothing here: the roster is built from the in-memory NPC
+    /// list, and there is no second client reading a stale row.
+    /// </summary>
+    private async Task PersistTeamMembershipChange()
+    {
+        if (!DoorMode.IsOnlineMode) return;
+        try
+        {
+            await GameEngine.Instance.SaveCurrentGame();
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("TEAM",
+                $"Failed to persist team membership change: {ex.Message}");
+        }
+    }
+
     private async Task ShowTeamMembers(string teamName, bool detailed)
     {
         WriteSectionHeader(Loc.Get("team_corner.members"), "cyan");
@@ -935,6 +964,7 @@ public class TeamCornerLocation : BaseLocation
         currentPlayer.TeamPW = password;
         currentPlayer.CTurf = false;
         currentPlayer.TeamRec = 0;
+        await PersistTeamMembershipChange();
 
         // Register so WorldSimulator protects this team from NPC AI
         WorldSimulator.RegisterPlayerTeam(teamName);
@@ -1022,6 +1052,7 @@ public class TeamCornerLocation : BaseLocation
                     currentPlayer.Team = teamName;
                     currentPlayer.TeamPW = password;
                     currentPlayer.CTurf = false;
+                    await PersistTeamMembershipChange();
 
                     WorldSimulator.RegisterPlayerTeam(teamName);
                     await backend.UpdatePlayerTeamMemberCount(teamName);
@@ -1076,6 +1107,7 @@ public class TeamCornerLocation : BaseLocation
             currentPlayer.Team = teamName;
             currentPlayer.TeamPW = npcPassword;
             currentPlayer.CTurf = teamMember.CTurf;
+            await PersistTeamMembershipChange();
 
             WorldSimulator.RegisterPlayerTeam(teamName);
 
@@ -1130,6 +1162,7 @@ public class TeamCornerLocation : BaseLocation
             currentPlayer.TeamPW = "";
             currentPlayer.CTurf = false;
             currentPlayer.TeamRec = 0;
+            await PersistTeamMembershipChange();
 
             WorldSimulator.UnregisterPlayerTeam(oldTeam);
 
