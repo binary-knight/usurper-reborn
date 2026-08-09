@@ -4182,7 +4182,6 @@ public abstract class BaseLocation
                 terminal.WriteLine($"  {Loc.Get("prefs.disable_char_monster_art")}: {(currentPlayer.DisableCharacterMonsterArt ? Loc.Get("prefs.enabled") : Loc.Get("prefs.disabled"))}");
                 if (UsurperRemake.BBS.DoorMode.IsMudServerMode)
                     terminal.WriteLine($"  {Loc.Get("prefs.auto_look")}: {(currentPlayer.AutoLook ? Loc.Get("prefs.enabled") : Loc.Get("prefs.disabled"))}");
-                terminal.WriteLine($"  {Loc.Get("prefs.dungeon_automap")}: {(currentPlayer.DungeonAutoMap ? Loc.Get("prefs.enabled") : Loc.Get("prefs.disabled"))}");
                 terminal.WriteLine($"  {Loc.Get("prefs.auto_equip")}: {(currentPlayer.AutoEquipDisabled ? Loc.Get("prefs.disabled") : Loc.Get("prefs.enabled"))}");
                 terminal.WriteLine("");
 
@@ -4271,7 +4270,11 @@ public abstract class BaseLocation
                 WriteMenuOption("P", $"{Loc.Get("prefs.disable_char_monster_art")}: {onOff(currentPlayer.DisableCharacterMonsterArt)}");
                 if (UsurperRemake.BBS.DoorMode.IsMudServerMode)
                     WriteMenuOption("L", $"{Loc.Get("prefs.auto_look")}: {onOff(currentPlayer.AutoLook)}");
-                WriteMenuOption("M", $"{Loc.Get("prefs.dungeon_automap")}: {onOff(currentPlayer.DungeonAutoMap)}");
+                // Visual-mode only: the BBS/compact room view and the screen-reader
+                // navigator never call RenderMiniMap, so offering the toggle there
+                // is a switch that does nothing.
+                if (!IsBBSSession && !GameConfig.ScreenReaderMode)
+                    WriteMenuOption("M", $"{Loc.Get("prefs.dungeon_automap")}: {onOff(currentPlayer.DungeonAutoMap)}");
                 WriteMenuOption("D", $"{Loc.Get("base.prefs_date_format")}: {dateFormatName}");
                 if (IsRunningInWezTerm())
                     WriteMenuOption("7", $"{Loc.Get("prefs.terminal_font")}: {ReadCurrentFont()}");

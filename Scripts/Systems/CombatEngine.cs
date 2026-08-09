@@ -5499,7 +5499,7 @@ public partial class CombatEngine
                 // v0.65.8 (R3): failed flee this round -> guarded half-round
                 actualDamage = ApplyFleeGrace(player, actualDamage);
 
-                player.HP -= actualDamage;
+                player.HP = Math.Max(0, player.HP - actualDamage);
 
                 // v0.56.1 Divine Mandate thorn reflect: reflect % back at attacker for ability damage too
                 if (player.TempThornReflectPercent > 0 && player.TempThornReflectDuration > 0 && monster.IsAlive && actualDamage > 0)
@@ -5791,7 +5791,7 @@ public partial class CombatEngine
         // Failed flee this round -> guarded half-round
         actualDamage = ApplyFleeGrace(player, actualDamage);
 
-        player.HP -= actualDamage;
+        player.HP = Math.Max(0, player.HP - actualDamage);
 
         // Divine Mandate thorn reflect
         if (player.TempThornReflectPercent > 0 && player.TempThornReflectDuration > 0 && monster.IsAlive && actualDamage > 0)
@@ -7799,6 +7799,78 @@ public partial class CombatEngine
     /// Consolidates lifesteal, elemental procs, sunforged healing, and poison coating.
     /// Set isSpellDamage=true to skip weapon-based enchantments (lifedrinker, elemental procs, poison coating).
     /// </summary>
+    /// <summary>
+    /// Damage pipeline for class-ability case handlers that compute and apply their
+    /// OWN damage (Consume Soul, Execute/Reap, Lightning Bolt, Annihilation, ...).
+    ///
+    /// Those handlers sit in the isAoEAbility skip list so the base damage block does
+    /// not double-apply their damage. That part is correct. But the skip also bypassed
+    /// the crit roll, the Hidden (Umbral Step / stealth) guaranteed crit and its
+    /// consumption, the Marked +30% bonus, damage statistics, and
+    /// ApplyPostHitEnchantments -- so these abilities silently stopped critting,
+    /// silently wasted Hidden, and silently stopped proccing Lifedrinker / Siphon /
+    /// elemental enchants. Same bug class as the v0.60.9 Marked fix and the v0.61.7
+    /// enchant fix, reintroduced for eleven prestige abilities.
+    ///
+    /// Routing those handlers through here restores the full pipeline without
+    /// reinstating the double-apply. Returns the damage actually dealt so the handler
+    /// can report the real number.
+    ///
+    /// Deliberately does NOT apply the base block's defence reduction: these handlers
+    /// never applied it before this change either, and folding it in here would be a
+    /// balance change riding along with a regression fix.
+    /// </summary>
+    private long ApplyHandlerAbilityDamage(Character player, Monster target, long rawDamage,
+        CombatResult result, ClassAbilityResult abilityResult)
+    {
+        if (target == null || rawDamage <= 0) return 0;
+
+        long actualDamage = rawDamage;
+        bool alreadyCrit = false;
+
+        // Hidden guarantees a crit on the next ability, and is consumed by it.
+        if (player.HasStatus(StatusEffect.Hidden))
+        {
+            player.RemoveStatus(StatusEffect.Hidden);
+            alreadyCrit = true;
+            float stealthMult = StatEffectsSystem.GetCriticalDamageMultiplier(
+                player.Dexterity, player.GetEquipmentCritDamageBonus());
+            actualDamage = (long)(actualDamage * stealthMult);
+            terminal.WriteLine(Loc.Get("combat.stealth_crit"), "bright_yellow");
+        }
+
+        bool crit = !alreadyCrit && StatEffectsSystem.RollCriticalHit(player);
+        if (!crit && !alreadyCrit && player.Class == CharacterClass.Wavecaller
+            && player.TempAttackBonus > 0 && player.TempAttackBonusDuration > 0)
+        {
+            crit = random.Next(100) < (int)(GameConfig.WavecallerOceansVoiceCritBonus * 100);
+        }
+        if (crit)
+        {
+            float critMult = StatEffectsSystem.GetCriticalDamageMultiplier(
+                player.Dexterity, player.GetEquipmentCritDamageBonus());
+            actualDamage = (long)(actualDamage * critMult);
+            terminal.WriteLine(Loc.Get("combat.ability_critical"), "bright_yellow");
+        }
+
+        if (target.IsMarked)
+        {
+            long markedBonus = (long)(actualDamage * 0.3);
+            actualDamage += markedBonus;
+            terminal.SetColor("bright_red");
+            terminal.WriteLine(Loc.Get("combat.marked_bonus", markedBonus));
+        }
+
+        target.HP -= actualDamage;
+        result.TotalDamageDealt += actualDamage;
+        result.Player?.Statistics.RecordDamageDealt(actualDamage, crit || alreadyCrit);
+
+        ApplyPostHitEnchantments(player, target, actualDamage, result,
+            isSpellDamage: IsMagicalAbilityEffect(abilityResult.SpecialEffect));
+
+        return actualDamage;
+    }
+
     private void ApplyPostHitEnchantments(Character attacker, Monster target, long damage, CombatResult result, bool isSpellDamage = false, EquipmentSlot weaponSlot = EquipmentSlot.MainHand)
     {
         if (damage <= 0 || target == null) return;
@@ -13828,6 +13900,10 @@ public partial class CombatEngine
         // Throw Bomb. Base block has its own kill check; the "fire" case below also
         // gets a kill check for the edge case where base damage doesn't kill but
         // the fire bonus does.
+        // v1.0.4 (PR #114 follow-up): see ApplyHandlerAbilityDamage below. The
+        // single-target entries in this list apply their own damage, so the base
+        // block must not also apply it -- but they still need the crit / Marked /
+        // enchant pipeline, which they now get by routing through that helper.
         bool isAoEAbility = abilityResult.SpecialEffect is "crescendo_aoe"
             or "aoe_holy" or "void_rupture"
             or "dissonant_wave" or "aoe_taunt" or "grand_finale_jester" or "execute_all"
@@ -15239,7 +15315,7 @@ public partial class CombatEngine
                     }
                     else
                     {
-                        target.HP -= dmg;
+                        dmg = (int)ApplyHandlerAbilityDamage(player, target, dmg, result, abilityResult);
                         terminal.SetColor("bright_cyan");
                         terminal.WriteLine(Loc.Get("combat.ability_wrath_deep", target.Name, dmg));
                     }
@@ -15543,7 +15619,7 @@ public partial class CombatEngine
                 if (target != null && target.IsAlive)
                 {
                     int dmg = abilityResult.Damage;
-                    target.HP -= dmg;
+                    dmg = (int)ApplyHandlerAbilityDamage(player, target, dmg, result, abilityResult);
                     terminal.SetColor("magenta");
                     terminal.WriteLine(Loc.Get("combat.ability_echo_25", target.Name, dmg));
                     if (random.Next(100) < 25)
@@ -15683,7 +15759,7 @@ public partial class CombatEngine
                     int dmg = abilityResult.Damage + cycleBonus;
                     // Ignore 50% defense by adding back half the defense reduction
                     dmg += (int)(target.Defence * 0.25);
-                    target.HP -= dmg;
+                    dmg = (int)ApplyHandlerAbilityDamage(player, target, dmg, result, abilityResult);
                     terminal.SetColor("bright_magenta");
                     terminal.WriteLine(Loc.Get("combat.ability_cycles_end", target.Name, dmg));
                     if (cycleBonus > 0)
@@ -15750,7 +15826,7 @@ public partial class CombatEngine
                 if (target != null && target.IsAlive)
                 {
                     int dmg = abilityResult.Damage;
-                    target.HP -= dmg;
+                    dmg = (int)ApplyHandlerAbilityDamage(player, target, dmg, result, abilityResult);
                     terminal.SetColor("dark_red");
                     terminal.WriteLine(Loc.Get("combat.ability_overflow_aoe", target.Name, dmg));
                     if (target.HP <= 0 && monsters != null)
@@ -15792,7 +15868,7 @@ public partial class CombatEngine
                 if (target != null && target.IsAlive)
                 {
                     int dmg = abilityResult.Damage;
-                    target.HP -= dmg;
+                    dmg = (int)ApplyHandlerAbilityDamage(player, target, dmg, result, abilityResult);
                     bool isPoisoned = target.Poisoned;
                     float leechRate = isPoisoned ? 0.60f : 0.40f;
                     int heal = (int)(dmg * leechRate);
@@ -15869,7 +15945,7 @@ public partial class CombatEngine
                 if (target != null && target.IsAlive)
                 {
                     int dmg = abilityResult.Damage;
-                    target.HP -= dmg;
+                    dmg = (int)ApplyHandlerAbilityDamage(player, target, dmg, result, abilityResult);
                     terminal.SetColor("dark_red");
                     terminal.WriteLine(Loc.Get("combat.ability_consume_soul", target.Name, dmg));
                     if (target.HP <= 0)
@@ -15964,7 +16040,7 @@ public partial class CombatEngine
                     int dmg = abilityResult.Damage;
                     bool canReap = target.HP < (int)(target.MaxHP * 0.30);
                     if (canReap) dmg *= 3;
-                    target.HP -= dmg;
+                    dmg = (int)ApplyHandlerAbilityDamage(player, target, dmg, result, abilityResult);
                     terminal.SetColor("red");
                     terminal.WriteLine(Loc.Get(canReap ? "combat.ability_execute_reap_triple" : "combat.ability_execute_reap", target.Name, dmg));
                     if (target.HP <= 0)
@@ -16015,7 +16091,7 @@ public partial class CombatEngine
                 {
                     int dmg = abilityResult.Damage;
                     if (player.HP < (int)(player.MaxHP * 0.30)) dmg = (int)(dmg * 1.5);
-                    target.HP -= dmg;
+                    dmg = (int)ApplyHandlerAbilityDamage(player, target, dmg, result, abilityResult);
                     int heal = (int)(dmg * 0.30);
                     player.HP = Math.Min(player.MaxHP, player.HP + heal);
                     terminal.SetColor("red");
@@ -16038,7 +16114,7 @@ public partial class CombatEngine
                 if (target != null && target.IsAlive)
                 {
                     int dmg = abilityResult.Damage + (int)(target.Defence * 0.5);
-                    target.HP -= dmg;
+                    dmg = (int)ApplyHandlerAbilityDamage(player, target, dmg, result, abilityResult);
                     terminal.SetColor("bright_red");
                     terminal.WriteLine(Loc.Get("combat.ability_entropic_blade", target.Name, dmg, hpCost));
                     if (target.HP <= 0)
@@ -16138,7 +16214,7 @@ public partial class CombatEngine
                     else
                     {
                         int dmg = abilityResult.Damage;
-                        target.HP -= dmg;
+                        dmg = (int)ApplyHandlerAbilityDamage(player, target, dmg, result, abilityResult);
                         terminal.SetColor("bright_red");
                         terminal.WriteLine(Loc.Get("combat.ability_annihilation", target.Name, dmg, hpCost));
                         if (target.HP <= 0)
@@ -16233,8 +16309,8 @@ public partial class CombatEngine
                 long boltDamage = abilityResult.Damage > 0 ? abilityResult.Damage : 80 + player.Intelligence * 3;
                 if (target != null && target.IsAlive)
                 {
-                    target.HP -= (int)boltDamage;
-                    result.TotalDamageDealt += boltDamage;
+                    boltDamage = ApplyHandlerAbilityDamage(player, target, boltDamage, result, abilityResult);
+                    // TotalDamageDealt recorded inside ApplyHandlerAbilityDamage
                     terminal.WriteLine(Loc.Get("combat.shaman_lightning_bolt", target.Name, boltDamage), "bright_yellow");
                 }
                 break;
@@ -20734,6 +20810,11 @@ public partial class CombatEngine
         // truth fixes the "player can log straight back into permadied
         // character" report.
         string actualKiller = result.Monster?.Name ?? "an unknown end";
+        // The victory-pipeline guard added with the combat audit reads
+        // result.IsPermadeath, but only the single-player Veil-of-Death path ever
+        // set it -- this online path erased the character and returned without
+        // stamping the flag, so the guard was inert exactly where groups exist.
+        result.IsPermadeath = true;
         await UsurperRemake.Systems.PermadeathHelper.ExecutePermadeath(result.Player, terminal, actualKiller);
         return;
 
