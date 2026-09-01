@@ -1,0 +1,42 @@
+[h1]Usurper Reborn 1.0.4 - Bug Fixes[/h1]
+
+Six fixes for bugs you reported, plus one change to how the world names its people. Nothing new to learn. Update and play.
+
+[h2]Party XP split no longer resets[/h2]
+
+If you set your party to share XP evenly and later found your character quietly taking all of it, this was the game, not you. Any fight without your party present, and any teammate death, was rewriting your setting. It now remembers what you asked for. Even split means even across whoever is alive that fight, no matter how your party changes.
+
+One thing to do once: if your split is already stuck on 100% for you, open Party Management in the dungeon, press X for the XP screen, then press E. That resets it to even and it will stay that way.
+
+[h2]Gambling can no longer put you in debt[/h2]
+
+High-Low dice at the Inn could take you far below zero gold if you doubled down and lost. The stake now leaves your purse when you sit down, and losing costs nothing more. The most a run can cost you is what you bet. If you are already in the negatives from this bug, ask an admin for a gold correction.
+
+[h2]What you need to do[/h2]
+
+[list]
+[*]If your party XP split is stuck on 100% for you: Party Management in the dungeon, press X, then E. Once.
+[*]If High-Low dice left you below zero gold: ask an admin for a gold correction. The fix stops it happening again but does not refund the old loss.
+[/list]
+
+[h2]Dead spouses no longer come back as strangers[/h2]
+
+When a spouse died for good, a new NPC could later be born or arrive with the same name and inherit your whole relationship with them. Also, logging in during the short window after a spouse was knocked down, before they came back, could widow you by mistake. Both fixed. Only a permanent death ends a marriage now.
+
+[h2]No more duplicate names[/h2]
+
+The world keeps a record of every name it has ever given out, so you will not meet a second Halvar Copperfield after the first one is gone, and children are far less likely to end up as "the seventh." Names already in your world stay as they are.
+
+[h2]Smaller fixes[/h2]
+
+[list]
+[*]The dungeon pixie now asks again if you press a key other than C or L instead of treating it as "leave her alone." Italian players pressing S for yes were hitting this.
+[*]The /who list is now in your language. Class codes and admin ranks stay as they are.
+[*]If you connect with a MUD client or plain telnet, you can now see what you type on the login screen. Passwords show as stars. Browser, SSH, and Steam logins were never affected.
+[/list]
+
+[h2]Reported but not changed yet[/h2]
+
+One player sees box borders double-spacing in an 80-column terminal. Which terminal program is still unknown, so that one stays open until it can be reproduced.
+
+Thanks to everyone who used the in-game bug reporter. Almost every fix above started as one of those reports, and the login one came in on GitHub.

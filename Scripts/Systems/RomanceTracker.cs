@@ -358,7 +358,7 @@ namespace UsurperRemake.Systems
         /// cleaned up correctly by the same cascade.
         ///
         /// A MISSING npc counts as dead. A spouse culled from the population
-        /// is just as gone as one flagged IsDead, and the pre-existing checks
+        /// is just as gone as one flagged IsPermaDead, and the pre-existing checks
         /// that tested `npc != null && npc.IsDead` treated "vanished" as
         /// "alive", which is what let this survive every login.
         ///
@@ -407,14 +407,18 @@ namespace UsurperRemake.Systems
                 {
                     if (string.IsNullOrEmpty(id)) continue;
                     var npc = NPCSpawnSystem.ResolvePartnerNpc(pool, id, name);
-                    bool goneOrDead = npc == null || npc.IsDead;
+                    // v1.0.4: only a PERMANENT death retires a partner. IsDead is
+                    // set by every death and cleared by the ~10-minute respawn, so
+                    // gating on it widowed a player who relogged inside that window
+                    // and their spouse then respawned as an unmarried stranger.
+                    bool goneOrDead = npc == null || npc.IsPermaDead || npc.IsAgedDeath;
                     if (!goneOrDead) continue;
 
                     OnNPCPermadied(id);
                     healed++;
                     DebugLogger.Instance?.LogInfo("ROMANCE",
                         $"SyncDeadPartners: retired {kind} '{(string.IsNullOrEmpty(name) ? id : name)}' " +
-                        $"({(npc == null ? "no longer in the world" : "dead")})");
+                        $"({(npc == null ? "no longer in the world" : "permanently dead")})");
                 }
             }
             catch (Exception ex)

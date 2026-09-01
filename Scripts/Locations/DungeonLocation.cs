@@ -10306,7 +10306,7 @@ public class DungeonLocation : BaseLocation
         }
         // XP distribution percentages (only count non-grouped, non-echo teammates)
         int xpEligibleCount = teammates.Count(t => t != null && !t.IsGroupedPlayer && !t.IsEcho);
-        int totalPct = player.TeamXPPercent.Take(1 + xpEligibleCount).Sum();
+        int totalPct = CombatEngine.ResolveTeamXPShares(player, teammates).Take(1 + xpEligibleCount).Sum();
         terminal.Write("  [");
         terminal.SetColor("bright_yellow");
         terminal.Write("X");
@@ -11216,15 +11216,17 @@ public class DungeonLocation : BaseLocation
     {
         var player = GetCurrentPlayer();
 
-        // Self-heal an orphaned slot (a teammate died/left, leaving their share stranded) the moment
-        // the screen opens, honoring the [R] auto-redistribute-on-death toggle, so the player never
-        // sees XP silently stuck on an empty slot or runs around losing it before the next fight.
-        CombatEngine.ReclaimOrphanedTeamXP(player, teammates);
-
         while (true)
         {
             // Build list of XP-eligible teammates (skip grouped players and echoes — they have their own XP)
             var xpTeammates = teammates.Where(t => t != null && !t.IsGroupedPlayer && !t.IsEcho).ToList();
+
+            // v1.0.4: even mode shows the even split over the party (a dead member's share is
+            // redistributed at combat time, see ResolveTeamXPShares); custom mode shows the
+            // player's own numbers. Combat never writes these back.
+            bool evenMode = player.TeamXPEvenSplit || !player.TeamXPIsExplicit;
+            var partyEven = CombatEngine.PartyEvenXPSplit(1 + xpTeammates.Count);
+            var shown = evenMode ? partyEven : player.TeamXPPercent;
 
             terminal.ClearScreen();
             WriteSectionHeader(Loc.Get("dungeon.section_xp_dist"), "bright_cyan");
@@ -11248,13 +11250,13 @@ public class DungeonLocation : BaseLocation
             string youLabel = "  " + Loc.Get("dungeon.xp_label_you", player.ClassName, player.Level);
             terminal.Write(youLabel.PadRight(40));
             terminal.SetColor("bright_green");
-            terminal.WriteLine($": {player.TeamXPPercent[0],3}%");
+            terminal.WriteLine($": {shown[0],3}%");
 
             // Slots 1-4 — XP-eligible teammates only
             for (int i = 0; i < 4; i++)
             {
                 int slotIndex = i + 1;
-                int pct = slotIndex < player.TeamXPPercent.Length ? player.TeamXPPercent[slotIndex] : 0;
+                int pct = slotIndex < shown.Length ? shown[slotIndex] : 0;
 
                 if (i < xpTeammates.Count)
                 {
@@ -11278,7 +11280,7 @@ public class DungeonLocation : BaseLocation
 
             // Total across occupied slots
             int occupiedSlots = 1 + xpTeammates.Count;
-            int total = player.TeamXPPercent.Take(Math.Min(occupiedSlots, player.TeamXPPercent.Length)).Sum();
+            int total = shown.Take(Math.Min(occupiedSlots, shown.Length)).Sum();
             terminal.SetColor("white");
             terminal.Write("".PadRight(40));
             string totalColor = total > 100 ? "red" : total == 100 ? "bright_green" : "yellow";
@@ -11295,6 +11297,7 @@ public class DungeonLocation : BaseLocation
             terminal.SetColor("gray");
             string autoRedistStatus = currentPlayer.AutoRedistributeXP ? Loc.Get("ui.on") : Loc.Get("ui.off");
             terminal.WriteLine($"  {Loc.Get("dungeon.xp_auto_redist", autoRedistStatus)}");
+            terminal.WriteLine($"  {Loc.Get(evenMode ? "dungeon.xp_mode_even" : "dungeon.xp_mode_custom")}");
             terminal.WriteLine("");
             terminal.SetColor("white");
             terminal.WriteLine(Loc.Get("dungeon.xp_adjust_prompt"));
@@ -11317,19 +11320,12 @@ public class DungeonLocation : BaseLocation
             }
             else if (input == "E")
             {
-                // Even split across occupied slots
-                int evenShare = 100 / occupiedSlots;
-                int remainder = 100 - (evenShare * occupiedSlots);
-                for (int s = 0; s < player.TeamXPPercent.Length; s++)
-                {
-                    if (s < occupiedSlots)
-                        player.TeamXPPercent[s] = evenShare + (s == 0 ? remainder : 0);
-                    else
-                        player.TeamXPPercent[s] = 0;
-                }
-                player.TeamXPIsExplicit = true;  // v0.57.2: player touched the UI — honor going forward
+                // v1.0.4: even split is a MODE, not numbers. It is recomputed every combat from
+                // whoever is alive in the party, so it survives recruits, deaths, and solo fights.
+                player.TeamXPEvenSplit = true;
+                player.TeamXPIsExplicit = true;
                 terminal.SetColor("green");
-                terminal.WriteLine(Loc.Get("dungeon.xp_even_split", evenShare + remainder, evenShare));
+                terminal.WriteLine(Loc.Get("dungeon.xp_even_split", partyEven[0], xpTeammates.Count > 0 ? partyEven[1] : 0));
                 await GameEngine.Instance.SaveCurrentGame();
                 await Task.Delay(1500);
             }
@@ -11345,6 +11341,12 @@ public class DungeonLocation : BaseLocation
                 }
 
                 string slotName = slot == 0 ? Loc.Get("dungeon.xp_you") : (slot <= xpTeammates.Count ? xpTeammates[slot - 1].DisplayName : Loc.Get("dungeon.xp_empty_name"));
+
+                // v1.0.4: editing a slot means custom numbers. Start from what the player was
+                // looking at (the party split), so the other slots keep the values shown on
+                // screen and a currently-dead teammate keeps their share for when they revive.
+                if (evenMode)
+                    Array.Copy(partyEven, player.TeamXPPercent, Math.Min(partyEven.Length, player.TeamXPPercent.Length));
 
                 // Calculate how much room is left (excluding this slot's current value)
                 int currentSlotPct = player.TeamXPPercent[slot];
@@ -11373,6 +11375,7 @@ public class DungeonLocation : BaseLocation
                     {
                         player.TeamXPPercent[slot] = newPct;
                         player.TeamXPIsExplicit = true;  // v0.57.2: player touched the UI — honor going forward
+                        player.TeamXPEvenSplit = false;  // v1.0.4: custom numbers from here on
                         terminal.SetColor("green");
                         terminal.WriteLine(Loc.Get("dungeon.xp_set_to", slotName, newPct));
                         await GameEngine.Instance.SaveCurrentGame();
@@ -13777,8 +13780,23 @@ public class DungeonLocation : BaseLocation
                 terminal.SetColor("white");
                 terminal.WriteLine(Loc.Get("dungeon.pixie_leave"));
 
-                var pixieChoice = await terminal.GetInput(Loc.Get("ui.choice"));
-                if (pixieChoice.ToUpper() == "C")
+                // Only C and L are advertised, so don't let a stray key silently commit
+                // to "leave" (Italian players press S for "Si"). Re-prompt on anything
+                // else, capped so a disconnected session that returns "" can't spin.
+                string pixieChoice = "";
+                for (int pixieTry = 0; pixieTry < 3; pixieTry++)
+                {
+                    pixieChoice = (await terminal.GetInput(Loc.Get("ui.choice"))).Trim().ToUpper();
+                    if (pixieChoice == "C" || pixieChoice == "L" || pixieChoice == "")
+                        break;
+                    terminal.SetColor("red");
+                    terminal.WriteLine(Loc.Get("ui.invalid_choice"));
+                    await Task.Delay(1000);
+                }
+                // Exhausted tries cancel rather than letting the last bad key pick "leave".
+                if (pixieChoice != "C" && pixieChoice != "L")
+                    pixieChoice = "";
+                if (pixieChoice == "C")
                 {
                     // DEX-based catch chance: 35% base + 1% per DEX, capped at 85%
                     int catchChance = Math.Min(85, 35 + (int)player.Dexterity);

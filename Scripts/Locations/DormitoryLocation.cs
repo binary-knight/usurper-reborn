@@ -499,7 +499,7 @@ public class DormitoryLocation : BaseLocation
                 continue;
             // Don't allow attacking your spouse or lover
             if (npc != null && (npc.SpouseName.Equals(playerName, StringComparison.OrdinalIgnoreCase)
-                || RelationshipSystem.IsMarriedOrLover(npcName, playerName)))
+                || RelationshipSystem.IsMarriedOrLover(npc, playerName)))
                 continue;
             if (npc != null && Math.Abs(npc.Level - attackerLevel) > 5)
                 continue;

@@ -205,6 +205,7 @@ namespace UsurperRemake.Systems
                 {
                     var npc = CreateNPCFromTemplate(template);
                     spawnedNPCs.Add(npc);
+                    NPCNameRegistry.Reserve(npc.Name2);
                 }
 
                 // Ensure minimum orientation diversity for viable romance options
@@ -1052,6 +1053,7 @@ namespace UsurperRemake.Systems
                 spawnedNPCs.Clear();
                 npcsInitialized = false;
                 _listVersion++;
+                NPCNameRegistry.Reset(); // new game / world reset, not a roster rebuild
             }
             finally
             {
@@ -1143,6 +1145,9 @@ namespace UsurperRemake.Systems
         {
             if (npc == null)
                 return;
+
+            // v1.0.4: every name that ever enters the roster is retired for good
+            NPCNameRegistry.Reserve(npc.Name2);
 
             _npcLock.EnterWriteLock();
             try
@@ -1288,33 +1293,51 @@ namespace UsurperRemake.Systems
                 _listVersion++;
         }
 
-        // Fantasy name pools for immigrant NPCs (shared with FamilySystem)
-        private static readonly string[] ImmigrantMaleNames = new[]
+        // Fantasy name pools for immigrant NPCs and NPC children (FamilySystem reads
+        // these). v1.0.4: doubled so NPCNameRegistry rarely has to fall back to a
+        // Roman-numeral suffix -- 80 first names x 60 surnames per sex.
+        internal static readonly string[] ImmigrantMaleNames = new[]
         {
             "Aldric", "Bram", "Caelum", "Dorin", "Eldric", "Fenris", "Gareth", "Hadwin",
             "Ivar", "Jorund", "Kael", "Leoric", "Magnus", "Noric", "Osric", "Perrin",
             "Quillan", "Rowan", "Soren", "Theron", "Ulric", "Varen", "Wulfric", "Xander",
             "Yorick", "Zephyr", "Alaric", "Brandt", "Cedric", "Darian", "Erland", "Finnian",
-            "Gideon", "Halvar", "Iskander", "Jarek", "Korbin", "Lysander", "Malakai", "Nolan"
+            "Gideon", "Halvar", "Iskander", "Jarek", "Korbin", "Lysander", "Malakai", "Nolan",
+            "Ansel", "Baldric", "Corwin", "Dathan", "Emeric", "Falk", "Godric", "Hollis",
+            "Ingram", "Jasper", "Kendrick", "Lorcan", "Merrick", "Niall", "Orrin", "Piers",
+            "Quentin", "Rurik", "Stellan", "Tobias", "Ulf", "Vidar", "Wendel", "Xavier",
+            "Yannick", "Zoran", "Ambrose", "Benedek", "Cormac", "Dunstan", "Evander", "Garrick",
+            "Hamish", "Idris", "Joran", "Kaspar", "Lucan", "Marek", "Oswin", "Rafe"
         };
 
-        private static readonly string[] ImmigrantFemaleNames = new[]
+        internal static readonly string[] ImmigrantFemaleNames = new[]
         {
             "Aelara", "Brielle", "Calista", "Darina", "Elara", "Freya", "Gwyneth", "Helena",
             "Isolde", "Jocelyn", "Kira", "Lyria", "Mirena", "Nessa", "Orina", "Petra",
             "Rhiannon", "Seraphina", "Thalia", "Ursula", "Vesper", "Wren", "Ysolde", "Zara",
             "Astrid", "Brianna", "Celeste", "Dahlia", "Elowen", "Fiora", "Guinevere", "Hilda",
-            "Ingrid", "Juliana", "Katarina", "Lucinda", "Morgana", "Nerissa", "Ondine", "Rosalind"
+            "Ingrid", "Juliana", "Katarina", "Lucinda", "Morgana", "Nerissa", "Ondine", "Rosalind",
+            "Adela", "Beatrix", "Cassia", "Delphine", "Edith", "Fenna", "Greta", "Hesper",
+            "Imogen", "Jessamine", "Kerrin", "Liesel", "Maren", "Nadia", "Oriel", "Philippa",
+            "Quenby", "Rosamund", "Sabine", "Tamsin", "Una", "Verity", "Wilhelmina", "Xenia",
+            "Yvaine", "Zelda", "Annika", "Bryony", "Clemence", "Delia", "Eirlys", "Faye",
+            "Giselle", "Honora", "Ilse", "Josephine", "Kolfinna", "Linnea", "Marisol", "Odalys"
         };
 
-        private static readonly string[] ImmigrantSurnames = new[]
+        internal static readonly string[] ImmigrantSurnames = new[]
         {
             "Ashford", "Blackthorn", "Copperfield", "Dunmore", "Everhart",
             "Fairwind", "Greymane", "Holloway", "Ironwood", "Kettleburn",
             "Larkwood", "Mossgrove", "Northgate", "Oakshield", "Pennywhistle",
             "Quickwater", "Ravenswood", "Silverbrook", "Thornbury", "Underhill",
             "Whitmore", "Yarrow", "Ashwick", "Bramblewood", "Coldstream",
-            "Dewberry", "Emberglow", "Foxglove", "Greystone", "Hawkridge"
+            "Dewberry", "Emberglow", "Foxglove", "Greystone", "Hawkridge",
+            "Ashcombe", "Brightwater", "Caskwell", "Dunhollow", "Elderbranch",
+            "Fernsby", "Goldleaf", "Harrowgate", "Ivorlake", "Jessop",
+            "Kirkbride", "Lambourne", "Marchbank", "Nettlefold", "Oakhurst",
+            "Pemberly", "Quarrington", "Redfern", "Stonebridge", "Thistlewood",
+            "Umberfell", "Vanmere", "Wexley", "Yardley", "Zellerhart",
+            "Amberlyn", "Birchwood", "Crestfall", "Duskmere", "Frostvale"
         };
 
         /// <summary>
@@ -1325,15 +1348,8 @@ namespace UsurperRemake.Systems
         {
             try
             {
-                // Pick a random name
-                string firstName = sex == CharacterSex.Male
-                    ? ImmigrantMaleNames[random.Next(ImmigrantMaleNames.Length)]
-                    : ImmigrantFemaleNames[random.Next(ImmigrantFemaleNames.Length)];
-                string surname = ImmigrantSurnames[random.Next(ImmigrantSurnames.Length)];
-                string fullName = $"{firstName} {surname}";
-
-                // Check for duplicate name — append Roman numeral if needed
-                fullName = DisambiguateNPCName(fullName);
+                // v1.0.4: a name no NPC has ever carried (reserved on pick)
+                string fullName = PickUnusedImmigrantName(sex);
 
                 // Class selection weighted by current population — underrepresented classes
                 // get higher spawn chance to maintain diversity (especially healers)
@@ -1364,7 +1380,7 @@ namespace UsurperRemake.Systems
 
                 var npc = new NPC
                 {
-                    ID = $"npc_imm_{firstName.ToLower()}_{Guid.NewGuid().ToString("N").Substring(0, 8)}",
+                    ID = $"npc_imm_{fullName.Split(' ')[0].ToLower()}_{Guid.NewGuid().ToString("N").Substring(0, 8)}",
                     Name1 = fullName,
                     Name2 = fullName,
                     Sex = sex,
@@ -1555,25 +1571,73 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Pick a display name that doesn't collide with any living NPC. If
-        /// the candidate already exists, append a Roman-numeral suffix (II
-        /// through X). Used by both immigrant generation and child / orphan
-        /// graduation (v0.63.0 -- previously only immigrants did this,
-        /// graduating children could silently shadow living NPCs by name).
+        /// Is this display name carried by anyone in the live roster, or has it ever
+        /// been reserved in NPCNameRegistry?
         /// </summary>
-        public string DisambiguateNPCName(string candidate)
+        public bool IsNameInUse(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return false;
+            return NPCNameRegistry.IsTaken(name)
+                || spawnedNPCs.Any(n => n.Name2.Equals(name, StringComparison.OrdinalIgnoreCase));
+        }
+
+        /// <summary>
+        /// Return a display name no NPC has ever carried, and reserve it. If the
+        /// candidate is taken, append a Roman-numeral suffix (II through X), then a
+        /// short unique fragment. Used by immigrant generation and child / orphan
+        /// graduation (v0.63.0 -- previously only immigrants did this, graduating
+        /// children could silently shadow living NPCs by name).
+        /// v1.0.4: checks NPCNameRegistry as well as the live roster, so a permadead
+        /// NPC's name stays retired after the corpse is pruned. Pass
+        /// <paramref name="alreadyReserved"/> when the candidate was reserved for
+        /// this very character at birth (children, royal orphans): the registry hit
+        /// is its own, so only the live roster is checked for the exact candidate.
+        /// </summary>
+        public string DisambiguateNPCName(string candidate, bool alreadyReserved = false)
         {
             if (string.IsNullOrEmpty(candidate)) return candidate;
-            if (!spawnedNPCs.Any(n => n.Name2.Equals(candidate, StringComparison.OrdinalIgnoreCase)))
+
+            bool inRoster = spawnedNPCs.Any(n => n.Name2.Equals(candidate, StringComparison.OrdinalIgnoreCase));
+            if (!inRoster && (alreadyReserved || !NPCNameRegistry.IsTaken(candidate)))
+            {
+                NPCNameRegistry.Reserve(candidate);
                 return candidate;
+            }
             for (int suffix = 2; suffix <= 10; suffix++)
             {
                 string suffixed = $"{candidate} {ToRomanNumeral(suffix)}";
-                if (!spawnedNPCs.Any(n => n.Name2.Equals(suffixed, StringComparison.OrdinalIgnoreCase)))
+                if (!IsNameInUse(suffixed))
+                {
+                    NPCNameRegistry.Reserve(suffixed);
                     return suffixed;
+                }
             }
             // Bail at X+1; appending a guid fragment is uglier but unique.
-            return $"{candidate} {Guid.NewGuid().ToString("N").Substring(0, 4)}";
+            while (true)
+            {
+                string tagged = $"{candidate} {Guid.NewGuid().ToString("N").Substring(0, 4)}";
+                if (!IsNameInUse(tagged))
+                {
+                    NPCNameRegistry.Reserve(tagged);
+                    return tagged;
+                }
+            }
+        }
+
+        /// <summary>
+        /// v1.0.4: roll immigrant names until one has never been used, then reserve it.
+        /// Only falls back to a suffix if forty rolls all collide (pools exhausted).
+        /// </summary>
+        private string PickUnusedImmigrantName(CharacterSex sex)
+        {
+            var firstNames = sex == CharacterSex.Male ? ImmigrantMaleNames : ImmigrantFemaleNames;
+            string candidate = "";
+            for (int attempt = 0; attempt < 40; attempt++)
+            {
+                candidate = $"{firstNames[random.Next(firstNames.Length)]} {ImmigrantSurnames[random.Next(ImmigrantSurnames.Length)]}";
+                if (!IsNameInUse(candidate)) break;
+            }
+            return DisambiguateNPCName(candidate);
         }
     }
 }

@@ -4878,6 +4878,16 @@ public class InnLocation : BaseLocation
             return;
         }
 
+        // v1.0.4: the stake leaves the purse now, and the running pot is house money until the
+        // player collects it. Before, nothing was debited up front and a loss after a double-down
+        // subtracted the WHOLE pot (stake plus winnings the player had never been paid) from real
+        // gold, so betting everything and losing after two doubles left a player at -2.24x their
+        // purse. Reported live at almost -1,000,000 gold. Now the most a round can cost is the
+        // stake, so doubling never needs an affordability check and gold cannot go negative.
+        long stake = bet;
+        currentPlayer.Gold -= stake;
+        long pot = stake;
+
         var rng = Random.Shared;
         int doubleDownCount = 0;
 
@@ -4905,8 +4915,7 @@ public class InnLocation : BaseLocation
             {
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("inn.invalid_forfeited"));
-                currentPlayer.Gold -= bet;
-                currentPlayer.Statistics?.RecordGoldSpent(bet);
+                currentPlayer.Statistics?.RecordGoldSpent(stake); // the stake is already gone
                 break;
             }
 
@@ -4919,6 +4928,7 @@ public class InnLocation : BaseLocation
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine(Loc.Get("inn.tie_returned"));
+                currentPlayer.Gold += pot; // push: whatever was riding comes back
                 break;
             }
 
@@ -4927,17 +4937,17 @@ public class InnLocation : BaseLocation
 
             if (guessedHigher == wasHigher)
             {
-                long winnings = (long)(bet * GameConfig.HighLowPayoutMultiplier) - bet;
+                long winnings = (long)(pot * GameConfig.HighLowPayoutMultiplier) - pot;
+                pot += winnings;
                 terminal.SetColor("bright_green");
                 terminal.WriteLine(Loc.Get("inn.you_win", winnings.ToString("N0")));
                 doubleDownCount++;
 
                 if (doubleDownCount < GameConfig.GamblingMaxDoubleDown)
                 {
-                    long totalPot = bet + winnings;
                     terminal.WriteLine("");
                     terminal.SetColor("cyan");
-                    terminal.Write(Loc.Get("inn.double_nothing", totalPot.ToString("N0")));
+                    terminal.Write(Loc.Get("inn.double_nothing", pot.ToString("N0")));
                     terminal.SetColor("bright_yellow");
                     terminal.Write("[Y]");
                     terminal.SetColor("cyan");
@@ -4950,19 +4960,14 @@ public class InnLocation : BaseLocation
                     string dd = (await terminal.ReadLineAsync()).ToUpper().Trim();
 
                     if (GameConfig.IsAffirmative(dd))
-                    {
-                        bet = totalPot;
-                        continue;
-                    }
-                    else
-                    {
-                        currentPlayer.Gold += winnings;
-                        break;
-                    }
+                        continue; // the pot rides; only the stake was ever real money
+
+                    currentPlayer.Gold += pot;
+                    break;
                 }
                 else
                 {
-                    currentPlayer.Gold += winnings;
+                    currentPlayer.Gold += pot;
                     terminal.SetColor("yellow");
                     terminal.WriteLine(Loc.Get("inn.max_double_down"));
                     break;
@@ -4971,9 +4976,8 @@ public class InnLocation : BaseLocation
             else
             {
                 terminal.SetColor("red");
-                terminal.WriteLine(Loc.Get("inn.you_lose", bet.ToString("N0")));
-                currentPlayer.Gold -= bet;
-                currentPlayer.Statistics?.RecordGoldSpent(bet);
+                terminal.WriteLine(Loc.Get("inn.you_lose", pot.ToString("N0"))); // the figure the player was just asked to risk
+                currentPlayer.Statistics?.RecordGoldSpent(stake); // the pot is gone; the purse already paid the stake
                 break;
             }
         }
@@ -5530,7 +5534,7 @@ public class InnLocation : BaseLocation
                 playerTeam.Equals(npc.Team, StringComparison.OrdinalIgnoreCase))
                 continue;
             if (npc != null && (npc.SpouseName.Equals(playerName, StringComparison.OrdinalIgnoreCase)
-                || RelationshipSystem.IsMarriedOrLover(npcName, playerName)))
+                || RelationshipSystem.IsMarriedOrLover(npc, playerName)))
                 continue;
             if (npc != null && Math.Abs(npc.Level - attackerLevel) > 5)
                 continue;

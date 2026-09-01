@@ -566,7 +566,7 @@ public class MudServer
 
                 // Interactive mode: present login/register menu directly over TCP
                 Console.Error.WriteLine($"[MUD] Interactive connection from {client.Client.RemoteEndPoint}");
-                var result = await InteractiveAuthAsync(stream, sqlBackend, ct, isPlainText, isCp437, effectiveIp);
+                var result = await InteractiveAuthAsync(stream, sqlBackend, ct, isPlainText, isCp437, effectiveIp, echoInput: !probeResult.clientRefusedEcho);
                 if (result == null)
                 {
                     client.Close();
@@ -788,7 +788,7 @@ public class MudServer
     /// and raw telnet connections that don't send an AUTH header.
     /// </summary>
     private async Task<(string username, string connectionType)?> InteractiveAuthAsync(
-        Stream stream, SqlSaveBackend sqlBackend, CancellationToken ct, bool isPlainText = false, bool isCp437 = false, string? effectiveIp = null)
+        Stream stream, SqlSaveBackend sqlBackend, CancellationToken ct, bool isPlainText = false, bool isCp437 = false, string? effectiveIp = null, bool echoInput = true)
     {
         const int MAX_ATTEMPTS = 5;
 
@@ -862,7 +862,14 @@ public class MudServer
                 await WriteAnsiAsync(stream, $"\r\n  {L("auth.choice")} ", isCp437);
             }
 
-            var choice = (await ReadLineAsync(stream, ct))?.Trim().ToUpperInvariant();
+            // v1.0.4 (issue #115): echo what the player types at the login gate. The server
+            // sends IAC WILL ECHO on connect, so compliant clients stop local echo, and in-game
+            // input on these same direct connections is already echoed by the server
+            // (PlayerSession sets Terminal.ServerEchoes for ConnectionType "MUD"). The login
+            // menu was the one place that stayed silent, so players typed blind until they
+            // were in the game. Passwords echo as '*'. A client that answered IAC DONT ECHO
+            // keeps its local echo and is left alone (echoInput false).
+            var choice = (await ReadLineAsync(stream, ct, echo: echoInput))?.Trim().ToUpperInvariant();
             if (string.IsNullOrEmpty(choice)) continue;
             if (choice == "Q") return null;
             if (choice == "G")
@@ -883,19 +890,19 @@ public class MudServer
                 if (isPlainText)
                 {
                     await WriteAnsiAsync(stream, $"{L("auth.username")} ", isCp437);
-                    username = (await ReadLineAsync(stream, ct))?.Trim();
+                    username = (await ReadLineAsync(stream, ct, echo: echoInput))?.Trim();
                     if (string.IsNullOrEmpty(username)) continue;
                     await WriteAnsiAsync(stream, $"{L("auth.password")} ", isCp437);
-                    password = (await ReadLineAsync(stream, ct))?.Trim();
+                    password = (await ReadLineAsync(stream, ct, echo: echoInput, maskChar: '*'))?.Trim();
                     if (string.IsNullOrEmpty(password)) continue;
                 }
                 else
                 {
                     await WriteAnsiAsync(stream, $"\r\n\u001b[1;37m  {L("auth.username")} \u001b[0m", isCp437);
-                    username = (await ReadLineAsync(stream, ct))?.Trim();
+                    username = (await ReadLineAsync(stream, ct, echo: echoInput))?.Trim();
                     if (string.IsNullOrEmpty(username)) continue;
                     await WriteAnsiAsync(stream, $"\u001b[1;37m  {L("auth.password")} \u001b[0m", isCp437);
-                    password = (await ReadLineAsync(stream, ct))?.Trim();
+                    password = (await ReadLineAsync(stream, ct, echo: echoInput, maskChar: '*'))?.Trim();
                     if (string.IsNullOrEmpty(password)) continue;
                 }
             }
@@ -904,7 +911,7 @@ public class MudServer
                 if (isPlainText)
                 {
                     await WriteAnsiAsync(stream, $"{L("auth.reg_username")} ", isCp437);
-                    username = (await ReadLineAsync(stream, ct))?.Trim();
+                    username = (await ReadLineAsync(stream, ct, echo: echoInput))?.Trim();
                     if (string.IsNullOrEmpty(username)) continue;
                     if (username.Length < 2 || username.Length > 20)
                     {
@@ -912,7 +919,7 @@ public class MudServer
                         continue;
                     }
                     await WriteAnsiAsync(stream, $"{L("auth.reg_password")} ", isCp437);
-                    password = (await ReadLineAsync(stream, ct))?.Trim();
+                    password = (await ReadLineAsync(stream, ct, echo: echoInput, maskChar: '*'))?.Trim();
                     if (string.IsNullOrEmpty(password)) continue;
                     if (password.Length < 4)
                     {
@@ -920,7 +927,7 @@ public class MudServer
                         continue;
                     }
                     await WriteAnsiAsync(stream, $"{L("auth.reg_confirm")} ", isCp437);
-                    var confirm = (await ReadLineAsync(stream, ct))?.Trim();
+                    var confirm = (await ReadLineAsync(stream, ct, echo: echoInput, maskChar: '*'))?.Trim();
                     if (password != confirm)
                     {
                         await WriteAnsiAsync(stream, $"{L("auth.err_password_match")}\r\n\r\n", isCp437);
@@ -930,7 +937,7 @@ public class MudServer
                 else
                 {
                     await WriteAnsiAsync(stream, $"\r\n\u001b[1;32m  {L("auth.reg_username")} \u001b[0m", isCp437);
-                    username = (await ReadLineAsync(stream, ct))?.Trim();
+                    username = (await ReadLineAsync(stream, ct, echo: echoInput))?.Trim();
                     if (string.IsNullOrEmpty(username)) continue;
                     if (username.Length < 2 || username.Length > 20)
                     {
@@ -938,7 +945,7 @@ public class MudServer
                         continue;
                     }
                     await WriteAnsiAsync(stream, $"\u001b[1;32m  {L("auth.reg_password")} \u001b[0m", isCp437);
-                    password = (await ReadLineAsync(stream, ct))?.Trim();
+                    password = (await ReadLineAsync(stream, ct, echo: echoInput, maskChar: '*'))?.Trim();
                     if (string.IsNullOrEmpty(password)) continue;
                     if (password.Length < 4)
                     {
@@ -946,7 +953,7 @@ public class MudServer
                         continue;
                     }
                     await WriteAnsiAsync(stream, $"\u001b[1;32m  {L("auth.reg_confirm")} \u001b[0m", isCp437);
-                    var confirm = (await ReadLineAsync(stream, ct))?.Trim();
+                    var confirm = (await ReadLineAsync(stream, ct, echo: echoInput, maskChar: '*'))?.Trim();
                     if (password != confirm)
                     {
                         await WriteAnsiAsync(stream, $"\r\n\u001b[1;31m  {L("auth.err_password_match")}\u001b[0m\r\n\r\n", isCp437);
@@ -1080,9 +1087,10 @@ public class MudServer
     /// gmcpEnabled=true if the client responded IAC DO GMCP to our IAC WILL GMCP offer.
     /// Called only for interactive (non-AUTH) connections after the 500ms AUTH timeout.
     /// </summary>
-    private static async Task<(bool isPlainText, bool isCp437, string? ttype, bool gmcpEnabled)> ProbeTtypeAsync(Stream stream, CancellationToken ct)
+    private static async Task<(bool isPlainText, bool isCp437, string? ttype, bool gmcpEnabled, bool clientRefusedEcho)> ProbeTtypeAsync(Stream stream, CancellationToken ct)
     {
         bool gmcpEnabled = false;
+        bool clientRefusedEcho = false;
         try
         {
             using var ttypeCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -1116,6 +1124,11 @@ public class MudServer
                     // IAC DONT GMCP (0xFE + 0xC9) explicitly leaves it disabled.
                     if (buf[0] == 0xC9 && cmd == 0xFD)
                         gmcpEnabled = true;
+                    // v1.0.4 (issue #115): IAC DONT ECHO (0xFE + 0x01) is a client that keeps
+                    // its own local echo; the login gate must not echo on top of it. Silence
+                    // still means "echo" so a slow reply cannot turn the login blind again.
+                    if (buf[0] == 0x01 && cmd == 0xFE)
+                        clientRefusedEcho = true;
                 }
                 else if (cmd == 0xFA) // SB — subnegotiation (TTYPE IS "..." IAC SE)
                 {
@@ -1166,7 +1179,7 @@ public class MudServer
                 bool isCp437 = ttypeStr.Contains("SYNCTERM") || ttypeStr.Contains("NETRUNNER")
                     || ttypeStr.Contains("MTELNET") || ttypeStr.Contains("FTELNET")
                     || ttypeStr.Contains("CTERM") || ttypeStr.Contains("ANSI-BBS");
-                return (isPlain, isCp437, ttypeStr, gmcpEnabled);
+                return (isPlain, isCp437, ttypeStr, gmcpEnabled, clientRefusedEcho);
             }
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested) { }
@@ -1175,7 +1188,7 @@ public class MudServer
             Console.Error.WriteLine($"[MUD] TTYPE probe error: {ex.Message}");
         }
 
-        return (false, false, null, gmcpEnabled);
+        return (false, false, null, gmcpEnabled, clientRefusedEcho);
     }
 
     /// <summary>Read a single line from a network stream (up to \n, strips \r).
@@ -1231,10 +1244,12 @@ public class MudServer
             // doesn't leak into the NEXT ReadLineAsync call as an empty-string return.
             if (c == '\n')
             {
+                if (echo) await stream.WriteAsync(new byte[] { (byte)'\r', (byte)'\n' }, 0, 2, ct);
                 return line.ToString();
             }
             if (c == '\r')
             {
+                if (echo) await stream.WriteAsync(new byte[] { (byte)'\r', (byte)'\n' }, 0, 2, ct);
                 // Drain trailing \n if it's already in the buffer (sent as \r\n packet).
                 // v0.64.0: DataAvailable is NetworkStream-specific; pattern-match
                 // so we work with both NetworkStream and PrependedStream wrapper.

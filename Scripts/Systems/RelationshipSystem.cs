@@ -90,24 +90,12 @@ public partial class RelationshipSystem
     /// </summary>
     public static int GetRelationshipStatus(Character character1, Character character2)
     {
-        var key1 = GetRelationshipKey(character1.Name, character2.Name);
-        var key2 = GetRelationshipKey(character2.Name, character1.Name);
+        var relation = FindRecord(character1, character2, out _);
+        if (relation == null)
+            return GameConfig.RelationNormal;
 
-        // Check (char1, char2) ordering — Relation1 is char1's feeling toward char2
-        if (_relationships.ContainsKey(key1) && _relationships[key1].ContainsKey(key2))
-        {
-            return _relationships[key1][key2].Relation1;
-        }
-
-        // Check reverse ordering — if record was created as (char2, char1),
-        // then Relation2 is char1's feeling toward char2
-        if (_relationships.ContainsKey(key2) && _relationships[key2].ContainsKey(key1))
-        {
-            return _relationships[key2][key1].Relation2;
-        }
-
-        // Default relationship is normal
-        return GameConfig.RelationNormal;
+        // Relation1 is Name1's feeling toward Name2, so orient by which side character1 is on
+        return relation.Name1 == character1.Name ? relation.Relation1 : relation.Relation2;
     }
     
     /// <summary>
@@ -252,16 +240,17 @@ public partial class RelationshipSystem
                     relation.Relation2 != GameConfig.RelationMarried)
                     continue;
 
+                // v1.0.4: a namesake who inherited the dead spouse's name is not the spouse
                 if (relation.Name1 == character.Name)
                 {
-                    var spouse = NPCSpawnSystem.Instance?.GetNPCByName(relation.Name2);
-                    if (rosterTrusted && (spouse == null || spouse.IsDead)) continue; // skip dead/gone, don't mutate
+                    var spouse = NPCSpawnSystem.Instance?.GetNPCByName(relation.Name2, includeDead: true);
+                    if (rosterTrusted && (IsPermanentlyGone(spouse) || !IsSameParty(relation.IdTag2, spouse!))) continue; // skip dead/gone, don't mutate
                     return relation.Name2;
                 }
                 if (relation.Name2 == character.Name)
                 {
-                    var spouse = NPCSpawnSystem.Instance?.GetNPCByName(relation.Name1);
-                    if (rosterTrusted && (spouse == null || spouse.IsDead)) continue;
+                    var spouse = NPCSpawnSystem.Instance?.GetNPCByName(relation.Name1, includeDead: true);
+                    if (rosterTrusted && (IsPermanentlyGone(spouse) || !IsSameParty(relation.IdTag1, spouse!))) continue;
                     return relation.Name1;
                 }
             }
@@ -295,12 +284,15 @@ public partial class RelationshipSystem
                     relation.Name1 == character.Name || relation.Name2 == character.Name;
                 if (!involves) continue;
 
-                string otherName = relation.Name1 == character.Name ? relation.Name2 : relation.Name1;
-                var spouse = NPCSpawnSystem.Instance?.GetNPCByName(otherName);
+                bool characterIsFirst = relation.Name1 == character.Name;
+                string otherName = characterIsFirst ? relation.Name2 : relation.Name1;
+                string otherId = characterIsFirst ? relation.IdTag2 : relation.IdTag1;
+                var spouse = NPCSpawnSystem.Instance?.GetNPCByName(otherName, includeDead: true);
                 // v1.0.2: missing counts as dead (see GetSpouseName). Guarded on
                 // a loaded roster so an early call can never mass-widow.
+                // v1.0.4: so does a namesake whose id differs from the record's.
                 if (spouse == null && !rosterLoaded) continue;
-                if (spouse == null || spouse.IsDead)
+                if (IsPermanentlyGone(spouse) || !IsSameParty(otherId, spouse!))
                 {
                     relation.Relation1 = GameConfig.RelationNormal;
                     relation.Relation2 = GameConfig.RelationNormal;
@@ -329,7 +321,7 @@ public partial class RelationshipSystem
         if (rosterLoaded && (character.IsMarried || character.Married))
         {
             bool spouseNameStillResolves = !string.IsNullOrEmpty(character.SpouseName)
-                && NPCSpawnSystem.Instance?.GetNPCByName(character.SpouseName) != null;
+                && !IsPermanentlyGone(NPCSpawnSystem.Instance?.GetNPCByName(character.SpouseName, includeDead: true));
             bool romanceStillSaysMarried =
                 (RomanceTracker.Instance?.Spouses?.Count ?? 0) > 0;
 
@@ -740,26 +732,116 @@ public partial class RelationshipSystem
         return false;
     }
 
+    /// <summary>
+    /// v1.0.4: identity-aware form for callers that hold the NPC (the sleeping-
+    /// attack eligibility checks). The name-only overload cannot tell a namesake
+    /// from the departed NPC whose record it inherited, and bereavement leaves
+    /// that record at Love, so a stranger was being shielded as the player's lover.
+    /// </summary>
+    public static bool IsMarriedOrLover(Character character, string otherName)
+    {
+        if (character == null || string.IsNullOrEmpty(otherName)) return false;
+
+        var key1 = GetRelationshipKey(character.Name, otherName);
+        var key2 = GetRelationshipKey(otherName, character.Name);
+
+        if (_relationships.TryGetValue(key1, out var group1) && group1.TryGetValue(key2, out var forward)
+            && !forward.Deleted && IsSameParty(forward.IdTag1, character)
+            && (forward.Relation1 == GameConfig.RelationMarried || forward.Relation1 == GameConfig.RelationLove))
+            return true;
+
+        if (_relationships.TryGetValue(key2, out var group2) && group2.TryGetValue(key1, out var reverse)
+            && !reverse.Deleted && IsSameParty(reverse.IdTag2, character)
+            && (reverse.Relation2 == GameConfig.RelationMarried || reverse.Relation2 == GameConfig.RelationLove))
+            return true;
+
+        return false;
+    }
+
     private static string GetRelationshipKey(string name1, string name2)
     {
         return $"{name1}_{name2}";
     }
-    
-    internal static RelationshipRecord GetOrCreateRelationship(Character character1, Character character2)
+
+    /// <summary>
+    /// v1.0.4: only a PERMANENT death ends a marriage. IsDead is set by every
+    /// death and cleared again by the ~10-minute respawn, so the v1.0.2 heals
+    /// that gated on it retired a spouse whenever the player relogged inside
+    /// that window -- the spouse then walked back into town as an unmarried
+    /// stranger. Missing from a trusted roster still counts as gone (v1.0.2).
+    /// </summary>
+    private static bool IsPermanentlyGone(NPC? npc)
+        => npc == null || npc.IsPermaDead || npc.IsAgedDeath;
+
+    /// <summary>
+    /// v1.0.4: records are keyed by display name, so a newcomer who takes a
+    /// departed NPC's name inherited that NPC's whole record. Immigrant names
+    /// come from a small pool and are only disambiguated against the live
+    /// roster, which drops permadead corpses after 7 days, so a player's dead
+    /// wife "came back" as a stranger already in love with them. IdTag1/IdTag2
+    /// have carried Character.ID since v0.27; an NPC party whose stored id no
+    /// longer matches is a different person, and the record is reported as
+    /// absent (<paramref name="stale"/> = true so GetOrCreateRelationship can
+    /// replace it). Player parties are never id-checked: GameEngine restores a
+    /// missing player Id as Name2, so a player's id can legitimately differ
+    /// from the one recorded. Empty ids (legacy records) are trusted and get
+    /// stamped on the next write.
+    /// </summary>
+    private static RelationshipRecord? FindRecord(Character character1, Character character2, out bool stale)
     {
+        stale = false;
         var key1 = GetRelationshipKey(character1.Name, character2.Name);
         var key2 = GetRelationshipKey(character2.Name, character1.Name);
 
-        // Check if record exists in (char1, char2) ordering
-        if (_relationships.ContainsKey(key1) && _relationships[key1].ContainsKey(key2))
+        // Both orderings can hold a record (ImportAllRelationships restores whichever
+        // order was saved), so check both and only call it stale when neither matches
+        bool found = false;
+        if (_relationships.TryGetValue(key1, out var group1) && group1.TryGetValue(key2, out var forward))
         {
-            return _relationships[key1][key2];
+            found = true;
+            if (IsSameParty(forward.IdTag1, character1) && IsSameParty(forward.IdTag2, character2))
+                return forward;
+        }
+        if (_relationships.TryGetValue(key2, out var group2) && group2.TryGetValue(key1, out var reverse))
+        {
+            found = true;
+            if (IsSameParty(reverse.IdTag1, character2) && IsSameParty(reverse.IdTag2, character1))
+                return reverse;
         }
 
-        // Check reverse ordering — record may have been created as (char2, char1)
-        if (_relationships.ContainsKey(key2) && _relationships[key2].ContainsKey(key1))
+        stale = found;
+        return null;
+    }
+
+    private static bool IsSameParty(string storedId, Character current)
+    {
+        if (current is not NPC) return true;
+        if (string.IsNullOrEmpty(storedId) || string.IsNullOrEmpty(current.ID)) return true;
+        return storedId == current.ID;
+    }
+    
+    internal static RelationshipRecord GetOrCreateRelationship(Character character1, Character character2)
+    {
+        var existing = FindRecord(character1, character2, out bool stale);
+        if (existing != null)
         {
-            return _relationships[key2][key1];
+            // Legacy records predate persisted ids; stamp them so the namesake check can bite next time
+            bool oriented = existing.Name1 == character1.Name;
+            var first = oriented ? character1 : character2;
+            var second = oriented ? character2 : character1;
+            if (string.IsNullOrEmpty(existing.IdTag1)) existing.IdTag1 = first.ID ?? "";
+            if (string.IsNullOrEmpty(existing.IdTag2)) existing.IdTag2 = second.ID ?? "";
+            return existing;
+        }
+
+        var key1 = GetRelationshipKey(character1.Name, character2.Name);
+        var key2 = GetRelationshipKey(character2.Name, character1.Name);
+
+        if (stale)
+        {
+            // A namesake of a departed NPC: drop the dead record so the newcomer starts fresh
+            if (_relationships.TryGetValue(key1, out var group1)) group1.Remove(key2);
+            if (_relationships.TryGetValue(key2, out var group2)) group2.Remove(key1);
         }
 
         // No existing record — create new one
@@ -794,21 +876,7 @@ public partial class RelationshipSystem
     
     private static RelationshipRecord GetRelationship(Character character1, Character character2)
     {
-        var key1 = GetRelationshipKey(character1.Name, character2.Name);
-        var key2 = GetRelationshipKey(character2.Name, character1.Name);
-
-        if (_relationships.ContainsKey(key1) && _relationships[key1].ContainsKey(key2))
-        {
-            return _relationships[key1][key2];
-        }
-
-        // Check reverse ordering — record may have been created as (char2, char1)
-        if (_relationships.ContainsKey(key2) && _relationships[key2].ContainsKey(key1))
-        {
-            return _relationships[key2][key1];
-        }
-
-        return null;
+        return FindRecord(character1, character2, out _);
     }
 
     /// <summary>

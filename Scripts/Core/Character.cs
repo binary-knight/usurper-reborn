@@ -149,6 +149,7 @@ public class Character
     public bool AutoRedistributeXP { get; set; } = true; // auto-redistribute XP when teammates die in combat
     public int[] TeamXPPercent { get; set; } = new int[] { 100, 0, 0, 0, 0 };  // per-slot XP percentage (player + 4 teammates, aggregate <= 100)
     public bool TeamXPIsExplicit { get; set; } = false;  // v0.57.2: true once the player has manually set their XP split, so AutoDistributeTeamXP doesn't override intentional 100/0 (keep-all-xp) configs
+    public bool TeamXPEvenSplit { get; set; } = false;   // v1.0.4: [E] chosen -- split evenly across whoever is alive in the party each combat, so TeamXPPercent is not consulted
     public CharacterClass Class { get; set; }       // class
 
     // v0.65.4: class specialization moved from NPC to Character so PLAYERS can specialize too (was

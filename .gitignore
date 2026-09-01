@@ -58,6 +58,9 @@ CLAUDE.md
 # Claude Code local data
 .claude/
 
+# Codex local agent configs
+.codex/
+
 # Telemetry config (contains webhook URLs - never commit)
 telemetry_config.txt
 nul

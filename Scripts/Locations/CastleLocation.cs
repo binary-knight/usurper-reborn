@@ -3973,11 +3973,16 @@ public class CastleLocation : BaseLocation
         var sex = random.Next(2) == 0 ? CharacterSex.Male : CharacterSex.Female;
         var namePool = sex == CharacterSex.Male ? OrphanNamesMale : OrphanNamesFemale;
         var usedNames = new HashSet<string>(currentKing.Orphans.Select(o => o.Name));
-        var availableNames = namePool.Where(n => !usedNames.Contains(n)).ToArray();
+        // v1.0.4: prefer a name no NPC has ever carried, then any not among current orphans
+        var availableNames = namePool.Where(n => !usedNames.Contains(n) && !NPCNameRegistry.IsTaken(n)).ToArray();
         if (availableNames.Length == 0)
-            availableNames = namePool; // All used — allow duplicates as fallback
+            availableNames = namePool.Where(n => !usedNames.Contains(n)).ToArray();
+        if (availableNames.Length == 0)
+            availableNames = namePool; // All used — suffixed below
 
         string name = availableNames[random.Next(availableNames.Length)];
+        // Reserve for life; suffixed if the pool is exhausted
+        name = NPCSpawnSystem.Instance?.DisambiguateNPCName(name) ?? name;
 
         var orphan = new RoyalOrphan
         {

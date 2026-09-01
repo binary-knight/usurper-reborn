@@ -157,13 +157,15 @@ public class CharacterTests
 
     // v0.65.3: a teammate who died/left leaves an orphaned XP slot. With auto-redistribute ON,
     // its share splits among the player and surviving teammates; nothing strands on the empty slot.
+    // v1.0.4: resolved per combat instead of written back -- the stored split must survive untouched.
     [Fact]
-    public void ReclaimOrphanedTeamXP_RedistributeOn_SplitsDeadShareAndStrandsNothing()
+    public void ResolveTeamXPShares_RedistributeOn_SplitsDeadShareAndStrandsNothing()
     {
         var player = new Character
         {
             HP = 100,
             AutoRedistributeXP = true,
+            TeamXPIsExplicit = true,
             // player 34, teammate-slot-1 33, teammate-slot-2 33 (the slot-2 teammate has since died/left)
             TeamXPPercent = new[] { 34, 33, 33, 0, 0 }
         };
@@ -173,23 +175,25 @@ public class CharacterTests
             new Character { HP = 100, Level = 10 }
         };
 
-        CombatEngine.ReclaimOrphanedTeamXP(player, teammates);
+        var shares = CombatEngine.ResolveTeamXPShares(player, teammates);
 
-        player.TeamXPPercent[2].Should().Be(0, "the orphaned slot's share must be reclaimed, not stranded");
-        player.TeamXPPercent.Sum().Should().Be(100, "no XP percentage may be lost");
-        player.TeamXPPercent[0].Should().BeGreaterThan(34, "player shares in the redistributed amount");
-        player.TeamXPPercent[1].Should().BeGreaterThan(33, "the surviving teammate shares in the redistributed amount");
+        shares[2].Should().Be(0, "the orphaned slot's share must be reclaimed, not stranded");
+        shares.Sum().Should().Be(100, "no XP percentage may be lost");
+        shares[0].Should().BeGreaterThan(34, "player shares in the redistributed amount");
+        shares[1].Should().BeGreaterThan(33, "the surviving teammate shares in the redistributed amount");
+        player.TeamXPPercent.Should().Equal(new[] { 34, 33, 33, 0, 0 }, "the stored preference is never rewritten by a party change");
     }
 
     // v0.65.3: with auto-redistribute OFF the orphaned share is banked entirely on the player
     // (still no silent loss), and the surviving teammate's deliberate split is preserved.
     [Fact]
-    public void ReclaimOrphanedTeamXP_RedistributeOff_BanksOnPlayer()
+    public void ResolveTeamXPShares_RedistributeOff_BanksOnPlayer()
     {
         var player = new Character
         {
             HP = 100,
             AutoRedistributeXP = false,
+            TeamXPIsExplicit = true,
             TeamXPPercent = new[] { 34, 33, 33, 0, 0 }
         };
         var teammates = new System.Collections.Generic.List<Character>
@@ -197,12 +201,13 @@ public class CharacterTests
             new Character { HP = 100, Level = 10 }
         };
 
-        CombatEngine.ReclaimOrphanedTeamXP(player, teammates);
+        var shares = CombatEngine.ResolveTeamXPShares(player, teammates);
 
-        player.TeamXPPercent[2].Should().Be(0, "the orphaned slot must be cleared");
-        player.TeamXPPercent[0].Should().Be(67, "player banks the dead slot's share when auto-redistribute is off");
-        player.TeamXPPercent[1].Should().Be(33, "the surviving teammate's share is untouched when off");
-        player.TeamXPPercent.Sum().Should().Be(100);
+        shares[2].Should().Be(0, "the orphaned slot must be cleared");
+        shares[0].Should().Be(67, "player banks the dead slot's share when auto-redistribute is off");
+        shares[1].Should().Be(33, "the surviving teammate's share is untouched when off");
+        shares.Sum().Should().Be(100);
+        player.TeamXPPercent.Should().Equal(34, 33, 33, 0, 0);
     }
 
     [Fact]
