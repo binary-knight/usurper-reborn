@@ -6916,26 +6916,13 @@ public partial class CombatEngine
 
         // Session XP diminishing returns removed in v0.54.7 — wasn't working as intended.
 
-        // Auto-reset XP distribution when fighting solo — prevents 0% XP trap
-        bool hasXPTeammates = result.Teammates != null && result.Teammates.Any(t => t != null && !t.IsGroupedPlayer);
-        if (!hasXPTeammates && result.Player.TeamXPPercent[0] < 100)
-        {
-            result.Player.TeamXPPercent[0] = 100;
-        }
-
-        // Clear stale teammate XP slots when no teammates present (prevents >100% total)
-        if (!hasXPTeammates)
-        {
-            for (int s = 1; s < result.Player.TeamXPPercent.Length; s++)
-                result.Player.TeamXPPercent[s] = 0;
-        }
-
-        // Auto-distribute XP when teammates exist but all teammate slots are at 0%
-        AutoDistributeTeamXP(result.Player, result.Teammates);
+        // v1.0.4: resolve this combat's split from the stored preference and the party present.
+        // Combat never writes the preference back (see ResolveTeamXPShares).
+        var xpShares = ResolveTeamXPShares(result.Player, result.Teammates);
 
         // Apply per-slot XP percentage distribution
         long totalXPPot = expReward;
-        long playerXP = (long)(totalXPPot * result.Player.TeamXPPercent[0] / 100.0);
+        long playerXP = (long)(totalXPPot * xpShares[0] / 100.0);
 
         result.Player.Experience += playerXP;
         result.Player.Gold += goldReward;
@@ -6945,7 +6932,7 @@ public partial class CombatEngine
         RecordFirstKillFunnel(result.Player); // v1.0 B1a funnel
 
         // Award per-slot XP to teammates based on percentage allocation
-        DistributeTeamSlotXP(result.Player, result.Teammates, totalXPPot, terminal);
+        DistributeTeamSlotXP(result.Player, result.Teammates, totalXPPot, terminal, xpShares);
         // Sync companion level-ups to active Character wrappers so stats update mid-dungeon
         CompanionSystem.Instance?.SyncCompanionLevelToWrappers(result.Teammates);
 
@@ -7034,10 +7021,10 @@ public partial class CombatEngine
         }
 
         // Show XP distribution percentage if teammates present
-        if (result.Teammates != null && result.Teammates.Count > 0 && result.Player.TeamXPPercent[0] < 100)
+        if (result.Teammates != null && result.Teammates.Count > 0 && xpShares[0] < 100)
         {
             terminal.SetColor("cyan");
-            terminal.WriteLine($"  {Loc.Get("combat.xp_share", result.Player.TeamXPPercent[0].ToString(), totalXPPot.ToString())}");
+            terminal.WriteLine($"  {Loc.Get("combat.xp_share", xpShares[0].ToString(), totalXPPot.ToString())}");
         }
 
         // First kill bonus for brand new players
@@ -20130,26 +20117,13 @@ public partial class CombatEngine
 
         // Session XP diminishing returns removed in v0.54.7.
 
-        // Auto-reset XP distribution when fighting solo — prevents 0% XP trap
-        bool hasXPTeammatesMM = result.Teammates != null && result.Teammates.Any(t => t != null && !t.IsGroupedPlayer);
-        if (!hasXPTeammatesMM && result.Player.TeamXPPercent[0] < 100)
-        {
-            result.Player.TeamXPPercent[0] = 100;
-        }
-
-        // Clear stale teammate XP slots when no teammates present (prevents >100% total)
-        if (!hasXPTeammatesMM)
-        {
-            for (int s = 1; s < result.Player.TeamXPPercent.Length; s++)
-                result.Player.TeamXPPercent[s] = 0;
-        }
-
-        // Auto-distribute XP when teammates exist but all teammate slots are at 0%
-        AutoDistributeTeamXP(result.Player, result.Teammates);
+        // v1.0.4: resolve this combat's split from the stored preference and the party present.
+        // Combat never writes the preference back (see ResolveTeamXPShares).
+        var xpSharesMM = ResolveTeamXPShares(result.Player, result.Teammates);
 
         // Apply per-slot XP percentage distribution
         long totalXPPotMM = adjustedExp;
-        long playerXPmm = (long)(totalXPPotMM * result.Player.TeamXPPercent[0] / 100.0);
+        long playerXPmm = (long)(totalXPPotMM * xpSharesMM[0] / 100.0);
 
         // Apply rewards (player's percentage share)
         result.Player.Experience += playerXPmm;
@@ -20171,7 +20145,7 @@ public partial class CombatEngine
         LogCombatEventToDb(result, "victory", playerXPmm, adjustedGold);
 
         // Award per-slot XP to teammates based on percentage allocation
-        DistributeTeamSlotXP(result.Player, result.Teammates, totalXPPotMM, terminal);
+        DistributeTeamSlotXP(result.Player, result.Teammates, totalXPPotMM, terminal, xpSharesMM);
         // Sync companion level-ups to active Character wrappers so stats update mid-dungeon
         CompanionSystem.Instance?.SyncCompanionLevelToWrappers(result.Teammates);
 
@@ -20217,10 +20191,10 @@ public partial class CombatEngine
         }
 
         // Show XP distribution percentage if teammates present
-        if (result.Teammates != null && result.Teammates.Count > 0 && result.Player.TeamXPPercent[0] < 100)
+        if (result.Teammates != null && result.Teammates.Count > 0 && xpSharesMM[0] < 100)
         {
             terminal.SetColor("cyan");
-            terminal.WriteLine($"  {Loc.Get("combat.xp_share", result.Player.TeamXPPercent[0].ToString(), totalXPPotMM.ToString())}");
+            terminal.WriteLine($"  {Loc.Get("combat.xp_share", xpSharesMM[0].ToString(), totalXPPotMM.ToString())}");
         }
 
         terminal.WriteLine(Loc.Get("combat.gold_label", $"{adjustedGold:N0}"));
@@ -20716,26 +20690,13 @@ public partial class CombatEngine
             adjustedExp = (long)(adjustedExp * earlyGameMultPV);
         }
 
-        // Auto-reset XP distribution when fighting solo — prevents 0% XP trap
-        bool hasXPTeammatesPV = result.Teammates != null && result.Teammates.Any(t => t != null && !t.IsGroupedPlayer);
-        if (!hasXPTeammatesPV && result.Player.TeamXPPercent[0] < 100)
-        {
-            result.Player.TeamXPPercent[0] = 100;
-        }
-
-        // Clear stale teammate XP slots when no teammates present (prevents >100% total)
-        if (!hasXPTeammatesPV)
-        {
-            for (int s = 1; s < result.Player.TeamXPPercent.Length; s++)
-                result.Player.TeamXPPercent[s] = 0;
-        }
-
-        // Auto-distribute XP when teammates exist but all teammate slots are at 0%
-        AutoDistributeTeamXP(result.Player, result.Teammates);
+        // v1.0.4: resolve this combat's split from the stored preference and the party present.
+        // Combat never writes the preference back (see ResolveTeamXPShares).
+        var xpSharesPV = ResolveTeamXPShares(result.Player, result.Teammates);
 
         // Apply per-slot XP percentage distribution
         long totalXPPotPV = adjustedExp;
-        long playerXPpv = (long)(totalXPPotPV * result.Player.TeamXPPercent[0] / 100.0);
+        long playerXPpv = (long)(totalXPPotPV * xpSharesPV[0] / 100.0);
 
         result.Player.Experience += playerXPpv;
         result.Player.Gold += adjustedGold;
@@ -20747,7 +20708,7 @@ public partial class CombatEngine
         GrantGodKillXP(result.Player, playerXPpv, pvMonsterDesc);
 
         // Award per-slot XP to teammates based on percentage allocation
-        DistributeTeamSlotXP(result.Player, result.Teammates, totalXPPotPV, terminal);
+        DistributeTeamSlotXP(result.Player, result.Teammates, totalXPPotPV, terminal, xpSharesPV);
         // Sync companion level-ups to active Character wrappers so stats update mid-dungeon
         CompanionSystem.Instance?.SyncCompanionLevelToWrappers(result.Teammates);
 
@@ -26889,66 +26850,82 @@ public partial class CombatEngine
     }
 
     /// <summary>
-    /// Reclaim XP percentage sitting on any slot not backed by a living teammate (dead, max-level,
-    /// or orphaned because the teammate left the party) so it is never silently lost. When
-    /// <paramref name="redistribute"/> is true (the player's [R] auto-redistribute-on-death toggle),
-    /// the reclaimed share is split evenly among the player and surviving teammates; when false, the
-    /// player banks all of it (no loss, manual reallocation preserved).
+    /// v1.0.4: resolve what each XP slot is paid THIS combat from the player's stored preference
+    /// and the party that is actually present. Pure: never writes player.TeamXPPercent. Before,
+    /// combat mutated the stored split (a fight with no teammates zeroed every slot, a dead
+    /// teammate's share was moved onto the player for good, and [E] stored fixed numbers for
+    /// that day's party size), so the split "kept resetting" and a player who had chosen an even
+    /// split found their character at 100% with the party left out until they noticed.
+    /// Even mode (TeamXPEvenSplit, or the player never set a split): even across the player and
+    /// the living teammates, player takes the remainder. Custom mode: the stored percentages on
+    /// living slots; a dead / max-level / vacated slot's share goes to the player, or is split
+    /// across the player and living teammates when AutoRedistributeXP is on. Unallocated
+    /// percentage stays unallocated, as the player set it. No living teammates: the player gets 100%.
     /// </summary>
-    private static void ReclaimOrphanedXP(Character player, bool[] slotLive, bool redistribute)
+    /// <summary>
+    /// v1.0.4: the even split over a party of <paramref name="occupiedSlots"/> members (player
+    /// included), player taking the remainder. What the XP menu shows in even mode and what a
+    /// custom edit starts from: it is the PARTY split, not the living split, so a teammate who
+    /// happens to be dead when the player edits a slot keeps their even share in the custom
+    /// numbers and ResolveTeamXPShares handles their absence at combat time.
+    /// </summary>
+    public static int[] PartyEvenXPSplit(int occupiedSlots)
     {
-        int reclaimed = 0;
-        for (int s = 1; s < player.TeamXPPercent.Length; s++)
+        var split = new int[TeamXPConfig.MaxTeamSlots];
+        int recipients = Math.Clamp(occupiedSlots, 1, split.Length);
+        int each = 100 / recipients;
+        split[0] = each + (100 - each * recipients);
+        for (int s = 1; s < recipients; s++) split[s] = each;
+        return split;
+    }
+
+    public static int[] ResolveTeamXPShares(Character player, List<Character>? teammates)
+    {
+        var stored = player.TeamXPPercent;
+        var shares = new int[stored.Length];
+        var slotLive = BuildSlotLiveMap(player, teammates);
+        int liveTeammates = 0;
+        for (int s = 1; s < slotLive.Length; s++)
+            if (slotLive[s]) liveTeammates++;
+
+        if (liveTeammates == 0)
         {
-            if (!slotLive[s] && player.TeamXPPercent[s] > 0)
+            shares[0] = 100;
+            return shares;
+        }
+
+        int recipients = 1 + liveTeammates;
+        if (player.TeamXPEvenSplit || !player.TeamXPIsExplicit)
+        {
+            int each = 100 / recipients;
+            shares[0] = each + (100 - each * recipients);
+            for (int s = 1; s < shares.Length; s++)
+                shares[s] = slotLive[s] ? each : 0;
+            return shares;
+        }
+
+        int orphaned = 0;
+        shares[0] = stored[0];
+        for (int s = 1; s < shares.Length; s++)
+        {
+            if (slotLive[s]) shares[s] = stored[s];
+            else orphaned += stored[s];
+        }
+        if (orphaned > 0)
+        {
+            if (!player.AutoRedistributeXP)
             {
-                reclaimed += player.TeamXPPercent[s];
-                player.TeamXPPercent[s] = 0;
+                shares[0] += orphaned; // the player banks it; the stored split is untouched
+            }
+            else
+            {
+                int each = orphaned / recipients;
+                shares[0] += each + (orphaned - each * recipients);
+                for (int s = 1; s < shares.Length; s++)
+                    if (slotLive[s]) shares[s] += each;
             }
         }
-        if (reclaimed <= 0) return;
-
-        if (!redistribute)
-        {
-            player.TeamXPPercent[0] += reclaimed; // bank it on the player; no even split
-            return;
-        }
-
-        int liveTeammateSlots = 0;
-        for (int s = 1; s < slotLive.Length; s++)
-            if (slotLive[s]) liveTeammateSlots++;
-
-        int recipients = 1 + liveTeammateSlots; // player + living teammates
-        int shareEach = reclaimed / recipients;
-        int remainder = reclaimed - (shareEach * recipients);
-
-        player.TeamXPPercent[0] += shareEach + remainder; // player gets the remainder
-        for (int s = 1; s < player.TeamXPPercent.Length; s++)
-            if (slotLive[s]) player.TeamXPPercent[s] += shareEach;
-    }
-
-    /// <summary>
-    /// Public entry point so the Party Management screen can self-heal an orphaned XP slot the
-    /// instant it is opened (honoring the auto-redistribute-on-death toggle), instead of leaving the
-    /// dead member's share stranded on an empty slot until the next combat victory.
-    /// </summary>
-    public static void ReclaimOrphanedTeamXP(Character player, List<Character>? teammates)
-    {
-        if (player == null) return;
-        var slotLive = BuildSlotLiveMap(player, teammates);
-        ReclaimOrphanedXP(player, slotLive, player.AutoRedistributeXP);
-    }
-
-    /// <summary>
-    /// Defensive net inside the payout path. AutoDistributeTeamXP already normalizes before the
-    /// player's share is computed, so this is normally a no-op; it guarantees no orphaned slot
-    /// survives into the actual teammate payout.
-    /// </summary>
-    private static void RedistributeDeadTeammateXP(Character player, List<Character>? teammates)
-    {
-        if (teammates == null) return;
-        var slotLive = BuildSlotLiveMap(player, teammates);
-        ReclaimOrphanedXP(player, slotLive, player.AutoRedistributeXP);
+        return shares;
     }
 
     /// <summary>
@@ -26984,56 +26961,6 @@ public partial class CombatEngine
         player.SessionCombatCount++;
 
         return expReward;
-    }
-
-    private static void AutoDistributeTeamXP(Character player, List<Character>? teammates)
-    {
-        if (teammates == null || teammates.Count == 0) return;
-
-        // Canonical slot->teammate mapping (matches DistributeTeamSlotXP's payout walk).
-        var slotLive = BuildSlotLiveMap(player, teammates);
-        int eligibleSlots = 0;
-        for (int s = 1; s < slotLive.Length; s++)
-            if (slotLive[s]) eligibleSlots++;
-
-        if (eligibleSlots == 0)
-        {
-            // All teammates dead/gone — player gets 100%
-            player.TeamXPPercent[0] = 100;
-            for (int s = 1; s < player.TeamXPPercent.Length; s++)
-                player.TeamXPPercent[s] = 0;
-            return;
-        }
-
-        // v0.57.2 — if the player has explicitly set their XP split via the UI (flag set on any
-        // edit in DungeonLocation.ShowXPDistribution), honor it regardless of shape. This fixes
-        // the 100/0/0/0 case Mystic reported: before, the code couldn't distinguish "I want 100%
-        // of the XP even with teammates" from "stale solo-mode default", so it always overrode
-        // to 50/50. With the explicit flag, first-time-with-teammate still gets the friendly
-        // auto-distribute, and deliberate settings stick.
-        bool hasCustomDistribution = false;
-        for (int s = 1; s < player.TeamXPPercent.Length; s++)
-        {
-            if (player.TeamXPPercent[s] > 0) { hasCustomDistribution = true; break; }
-        }
-
-        if (player.TeamXPIsExplicit || hasCustomDistribution)
-        {
-            // Reclaim any slot not backed by a living teammate (dead, max-level, or orphaned
-            // because the teammate left the party). Honors the player's [R] auto-redistribute-on-
-            // death toggle: ON -> dead share split among player + survivors; OFF -> player banks it.
-            // Either way nothing strands on an empty slot, which was the reported silent-XP-loss bug.
-            ReclaimOrphanedXP(player, slotLive, player.AutoRedistributeXP);
-            return;
-        }
-
-        // No custom distribution — friendly first-time auto even split among player + living teammates
-        int totalSlots = 1 + eligibleSlots; // player + living teammates
-        int evenShare = 100 / totalSlots;
-        int remainder = 100 - (evenShare * totalSlots);
-        player.TeamXPPercent[0] = evenShare + remainder; // player gets remainder
-        for (int s = 1; s < player.TeamXPPercent.Length; s++)
-            player.TeamXPPercent[s] = slotLive[s] ? evenShare : 0;
     }
 
     /// <summary>
@@ -27148,14 +27075,11 @@ public partial class CombatEngine
 
     /// <summary>
     /// Distribute XP to teammates based on per-slot percentage allocation.
-    /// Each teammate's slot index (1-4) maps to TeamXPPercent[1-4].
+    /// Each teammate's slot index (1-4) maps to shares[1-4], as resolved by ResolveTeamXPShares.
     /// </summary>
-    private void DistributeTeamSlotXP(Character player, List<Character>? teammates, long totalXPPot, TerminalEmulator terminal)
+    private void DistributeTeamSlotXP(Character player, List<Character>? teammates, long totalXPPot, TerminalEmulator terminal, int[] shares)
     {
         if (teammates == null || teammates.Count == 0 || totalXPPot <= 0) return;
-
-        // Redistribute dead/max-level teammates' XP shares to surviving members
-        RedistributeDeadTeammateXP(player, teammates);
 
         bool headerShown = false;
         int xpSlot = 0; // Tracks which XP slot we're on (1-4), skipping grouped players/echoes
@@ -27168,11 +27092,11 @@ public partial class CombatEngine
             if (teammate.IsEcho || teammate.IsGroupedPlayer) continue;
 
             xpSlot++; // Next eligible teammate gets the next XP slot (1, 2, 3, 4)
-            if (xpSlot >= player.TeamXPPercent.Length) break;
+            if (xpSlot >= shares.Length) break;
 
             if (!teammate.IsAlive || teammate.Level >= 100) continue;
 
-            int percent = player.TeamXPPercent[xpSlot];
+            int percent = shares[xpSlot];
             if (percent <= 0) continue;
 
             long baseSlotXP = (long)(totalXPPot * percent / 100.0);

@@ -620,21 +620,27 @@ public static class MudChatSystem
             .ThenBy(s => s.Username)
             .ToList();
 
+        // v1.0.4: localized (reported: the whole /who screen was English for a Hungarian player).
+        // Class abbreviations and wizard / god rank names stay as-is: they are fixed codes.
+        const int whoWidth = 75;
+        string whoHeader = Systems.Loc.Get("main_street.whos_online");
         if (GameConfig.ScreenReaderMode)
         {
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine("Who's Online");
+            terminal.WriteLine(whoHeader);
         }
         else
         {
+            int padLeft = Math.Max(1, (whoWidth - whoHeader.Length - 2) / 2);
+            int padRight = Math.Max(1, whoWidth - whoHeader.Length - 2 - padLeft);
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ Who's Online ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            terminal.WriteLine($"{new string('━', padLeft)} {whoHeader} {new string('━', padRight)}");
         }
 
         if (sessions.Count == 0)
         {
             terminal.SetColor("gray");
-            terminal.WriteLine("  No players online.");
+            terminal.WriteLine($"  {Systems.Loc.Get("chat.who_none")}");
         }
         else
         {
@@ -676,11 +682,11 @@ public static class MudChatSystem
                 if (!string.IsNullOrEmpty(player?.MudTitle))
                     title = " " + player.MudTitle;
                 else if (wizLevel > WizardLevel.Mortal)
-                    title = $" the {WizardConstants.GetTitle(wizLevel)}";
+                    title = " " + Systems.Loc.Get("chat.who_title_the", WizardConstants.GetTitle(wizLevel));
                 else if (isPlayerGod)
                 {
                     int godIdx = Math.Clamp(player!.GodLevel - 1, 0, GameConfig.GodTitles.Length - 1);
-                    title = $" the {GameConfig.GodTitles[godIdx]}";
+                    title = " " + Systems.Loc.Get("chat.who_title_the", GameConfig.GodTitles[godIdx]);
                 }
 
                 // Extra tags
@@ -700,7 +706,7 @@ public static class MudChatSystem
                 terminal.SetColor(color);
                 terminal.Write($" [{tag}] ");
                 if (isPlayerGod)
-                    terminal.Write(GameConfig.ScreenReaderMode ? "(Immortal) " : "★ ", "bright_yellow");
+                    terminal.Write(GameConfig.ScreenReaderMode ? Systems.Loc.Get("chat.who_immortal_tag") + " " : "★ ", "bright_yellow");
                 terminal.Write(name, color);
                 if (!string.IsNullOrEmpty(title))
                     terminal.WriteRawAnsi(title);
@@ -718,21 +724,21 @@ public static class MudChatSystem
         if (!GameConfig.ScreenReaderMode)
         {
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            terminal.WriteLine(new string('━', whoWidth));
         }
         int wizCount = sessions.Count(s => s.WizardLevel > WizardLevel.Mortal);
         int immortalCount = sessions.Count(s => s.Context?.Engine?.CurrentPlayer?.IsImmortal == true && s.WizardLevel == WizardLevel.Mortal);
-        string summary = $"  {sessions.Count} player(s) online";
-        if (wizCount > 0) summary += $",  {wizCount} admin";
-        if (immortalCount > 0) summary += $",  {immortalCount} immortal";
+        string summary = "  " + Systems.Loc.Get("chat.who_summary", sessions.Count);
+        if (wizCount > 0) summary += Systems.Loc.Get("chat.who_admins", wizCount);
+        if (immortalCount > 0) summary += Systems.Loc.Get("chat.who_immortals", immortalCount);
         terminal.SetColor("gray");
         terminal.WriteLine(summary);
         if (!GameConfig.ScreenReaderMode)
         {
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            terminal.WriteLine(new string('━', whoWidth));
         }
-        terminal.WriteLine("  Tip: /title <text>  to set your title  |  ANSI color codes supported");
+        terminal.WriteLine($"  {Systems.Loc.Get("chat.who_tip")}");
 
         return true;
     }

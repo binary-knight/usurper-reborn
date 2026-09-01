@@ -43,7 +43,10 @@ namespace UsurperRemake.Tests
             var npc = new NPC();
             npc.ID = id;
             npc.Name2 = name;
+            // v1.0.4: "dead" here means permanently dead. IsDead alone is the
+            // transient knockdown state that the world sim respawns.
             npc.IsDead = dead;
+            npc.IsPermaDead = dead;
             return npc;
         }
 
@@ -94,6 +97,25 @@ namespace UsurperRemake.Tests
             t.SyncDeadPartners(roster).Should().Be(1);
             t.Spouses.Should().BeEmpty();
             t.ExSpouses.Should().ContainSingle(e => e.NPCId == "npc_dead");
+        }
+
+        /// <summary>
+        /// v1.0.4: a spouse knocked down by the world sim (IsDead, not
+        /// IsPermaDead) respawns in about ten minutes and is still married.
+        /// Retiring them on a relog inside that window produced a respawned
+        /// spouse who was suddenly a stranger.
+        /// </summary>
+        [Fact]
+        public void SpouseTemporarilyDead_AwaitingRespawn_IsNotRetired()
+        {
+            var t = TrackerWithSpouse("npc_downed", "Downed Spouse");
+            var downed = MakeNpc("npc_downed", "Downed Spouse", dead: false);
+            downed.IsDead = true;
+            var roster = PlausibleRoster(downed);
+
+            t.SyncDeadPartners(roster).Should().Be(0);
+            t.Spouses.Should().ContainSingle(s => s.NPCId == "npc_downed");
+            t.ExSpouses.Should().BeEmpty();
         }
 
         [Fact]

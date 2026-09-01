@@ -51,6 +51,11 @@ namespace UsurperRemake.Systems
                 && c.Name == child.Name);
             if (isDuplicate) return;
 
+            // v1.0.4: a child's name is reserved for life at birth, so no immigrant or
+            // other child can take it before graduation. Suffixed if already in use.
+            if (!string.IsNullOrEmpty(child.Name) && NPCSpawnSystem.Instance != null)
+                child.Name = NPCSpawnSystem.Instance.DisambiguateNPCName(child.Name);
+
             _children.Add(child);
 
             // v0.63.0 follow-up: record FamilyMemberBorn in the memory of every
@@ -912,7 +917,8 @@ namespace UsurperRemake.Systems
             // of the same name already exists ends up with two NPCs sharing Name2 --
             // RomanceTracker / NPCMarriageRegistry name-fallback lookups (per the
             // recurring v0.54 ID-drift fix) become ambiguous.
-            string displayName = NPCSpawnSystem.Instance?.DisambiguateNPCName(child.Name) ?? child.Name;
+            // v1.0.4: the name was reserved at birth; only the live roster can still collide
+            string displayName = NPCSpawnSystem.Instance?.DisambiguateNPCName(child.Name, alreadyReserved: true) ?? child.Name;
 
             int level = 1;
             int strength = 10 + Random.Shared.Next(5);
@@ -1208,24 +1214,10 @@ namespace UsurperRemake.Systems
 
         #region NPC-NPC Children
 
-        // Fantasy name pools for NPC children
-        private static readonly string[] MaleNames = new[]
-        {
-            "Aldric", "Bram", "Caelum", "Dorin", "Eldric", "Fenris", "Gareth", "Hadwin",
-            "Ivar", "Jorund", "Kael", "Leoric", "Magnus", "Noric", "Osric", "Perrin",
-            "Quillan", "Rowan", "Soren", "Theron", "Ulric", "Varen", "Wulfric", "Xander",
-            "Yorick", "Zephyr", "Alaric", "Brandt", "Cedric", "Darian", "Erland", "Finnian",
-            "Gideon", "Halvar", "Iskander", "Jarek", "Korbin", "Lysander", "Malakai", "Nolan"
-        };
-
-        private static readonly string[] FemaleNames = new[]
-        {
-            "Aelara", "Brielle", "Calista", "Darina", "Elara", "Freya", "Gwyneth", "Helena",
-            "Isolde", "Jocelyn", "Kira", "Lyria", "Mirena", "Nessa", "Orina", "Petra",
-            "Rhiannon", "Seraphina", "Thalia", "Ursula", "Vesper", "Wren", "Ysolde", "Zara",
-            "Astrid", "Brianna", "Celeste", "Dahlia", "Elowen", "Fiora", "Guinevere", "Hilda",
-            "Ingrid", "Juliana", "Katarina", "Lucinda", "Morgana", "Nerissa", "Ondine", "Rosalind"
-        };
+        // Fantasy first-name pools for NPC children. v1.0.4: shared with immigrant
+        // generation (one expanded pool) so NPCNameRegistry rarely needs a suffix.
+        private static string[] MaleNames => NPCSpawnSystem.ImmigrantMaleNames;
+        private static string[] FemaleNames => NPCSpawnSystem.ImmigrantFemaleNames;
 
         // Fantasy surnames for children whose fathers have no extractable surname
         // (alias NPCs, single-name NPCs, title-only NPCs, etc.)
@@ -1251,12 +1243,18 @@ namespace UsurperRemake.Systems
             var rng = Random.Shared;
             var sex = rng.Next(2) == 0 ? CharacterSex.Male : CharacterSex.Female;
 
-            var firstName = GenerateNPCChildFirstName(sex);
             var fatherSurname = ExtractSurname(father.Name2 ?? father.Name);
             // If father has no extractable surname, generate one deterministically
             if (fatherSurname == null)
                 fatherSurname = GenerateSurnameForParent(father.Name2 ?? father.Name);
-            var childName = $"{firstName} {fatherSurname}";
+            // v1.0.4: the surname is fixed, so roll first names until the full name
+            // has never been used (RegisterChild suffixes if every roll collides)
+            string childName = "";
+            for (int attempt = 0; attempt < 40; attempt++)
+            {
+                childName = $"{GenerateNPCChildFirstName(sex)} {fatherSurname}";
+                if (NPCSpawnSystem.Instance?.IsNameInUse(childName) != true) break;
+            }
 
             var child = new Child
             {
@@ -1442,12 +1440,19 @@ namespace UsurperRemake.Systems
 
             // Migration: add father's surname to children who don't have one yet
             MigrateChildSurnames();
+
+            // v1.0.4: restored children keep their names reserved (merge-only)
+            NPCNameRegistry.ReserveAll(_children.Select(c => c.Name));
         }
 
         /// <summary>
         /// Migration: compute correct name for each child — first name + father's
-        /// surname (extracted or generated). Strips all Roman numerals. Every child
-        /// ends up with a two-part name. Safe to run multiple times (idempotent).
+        /// surname (extracted or generated). Safe to run multiple times (idempotent).
+        /// v1.0.4: a name that already carries the right surname is left alone,
+        /// whatever follows it -- a Roman numeral or the short fragment
+        /// DisambiguateNPCName falls back to are deliberate uniqueness suffixes from
+        /// NPCNameRegistry, and stripping one would recreate the duplicate it exists
+        /// to prevent. Only a wrong surname is rewritten, and through the registry.
         /// </summary>
         private void MigrateChildSurnames()
         {
@@ -1464,7 +1469,12 @@ namespace UsurperRemake.Systems
                 // Compute the correct surname from father (extract or generate)
                 var surname = ExtractSurname(child.Father) ?? GenerateSurnameForParent(child.Father);
 
-                var correctName = $"{firstName} {surname}";
+                var baseName = $"{firstName} {surname}";
+                if (child.Name.Equals(baseName, StringComparison.Ordinal)
+                    || child.Name.StartsWith(baseName + " ", StringComparison.Ordinal))
+                    continue;
+
+                var correctName = NPCSpawnSystem.Instance?.DisambiguateNPCName(baseName) ?? baseName;
 
                 if (!child.Name.Equals(correctName, StringComparison.Ordinal))
                 {

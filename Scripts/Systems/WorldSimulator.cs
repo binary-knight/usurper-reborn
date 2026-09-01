@@ -1807,7 +1807,8 @@ public class WorldSimulator
         int aliveCount = npcs.Count(n => n.IsAlive && !n.IsDead && !n.IsAgedDeath && !n.IsPermaDead);
         if (aliveCount >= GameConfig.MaxNPCPopulation) return;
 
-        string displayName = NPCSpawnSystem.Instance?.DisambiguateNPCName(orphan.Name) ?? orphan.Name;
+        // v1.0.4: the name was reserved when the orphan was created; only the live roster can still collide
+        string displayName = NPCSpawnSystem.Instance?.DisambiguateNPCName(orphan.Name, alreadyReserved: true) ?? orphan.Name;
 
         int level = 1;
         int strength = 12 + random.Next(5);
@@ -7438,7 +7439,7 @@ public class WorldSimulator
                          || alignmentSystem.GetAlignment(n) == UsurperRemake.Systems.AlignmentSystem.AlignmentType.Evil)
                         && (string.IsNullOrEmpty(sleeperTeam) || !sleeperTeam.Equals(n.Team, StringComparison.OrdinalIgnoreCase))
                         && !n.SpouseName.Equals(sleeperName, StringComparison.OrdinalIgnoreCase)
-                        && !RelationshipSystem.IsMarriedOrLover(n.Name2, sleeperName))
+                        && !RelationshipSystem.IsMarriedOrLover(n, sleeperName))
                     .ToList();
 
                 if (eligibleNPCs.Count == 0) continue;

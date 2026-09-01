@@ -728,6 +728,7 @@ namespace UsurperRemake.Systems
                 Specialization = (int)player.Specialization,
                 TeamXPPercent = player.TeamXPPercent,
                 TeamXPIsExplicit = player.TeamXPIsExplicit,
+                TeamXPEvenSplit = player.TeamXPEvenSplit,
                 Loyalty = player.Loyalty,
                 Haunt = player.Haunt,
                 Master = player.Master,
@@ -1457,7 +1458,12 @@ namespace UsurperRemake.Systems
                 MarketplaceListings = MarketplaceSystem.Instance.ToSaveData(),
 
                 // NPC Settlement state (v0.49.5)
-                Settlement = UsurperRemake.Systems.SettlementSystem.Instance?.ToSaveData()
+                Settlement = UsurperRemake.Systems.SettlementSystem.Instance?.ToSaveData(),
+
+                // v1.0.4: names ever used by NPCs. Online keeps this in world_state instead.
+                UsedNPCNames = UsurperRemake.BBS.DoorMode.IsOnlineMode
+                    ? new List<string>()
+                    : UsurperRemake.Systems.NPCNameRegistry.Export()
             };
         }
         

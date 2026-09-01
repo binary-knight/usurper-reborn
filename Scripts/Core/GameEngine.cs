@@ -5459,6 +5459,7 @@ public partial class GameEngine
             Specialization = (ClassSpecialization)playerData.Specialization,
             TeamXPPercent = playerData.TeamXPPercent ?? TeamXPConfig.DefaultTeamXPPercent.ToArray(),
             TeamXPIsExplicit = playerData.TeamXPIsExplicit,
+            TeamXPEvenSplit = playerData.TeamXPEvenSplit,
             Loyalty = playerData.Loyalty,
             Haunt = playerData.Haunt,
             Master = playerData.Master,
@@ -6326,6 +6327,11 @@ public partial class GameEngine
         {
             // Set current ruler if applicable
         }
+
+        // v1.0.4: names ever used by NPCs. Merge-only, so it does not matter whether
+        // this runs before or after RestoreNPCs. Online keeps the registry in world_state.
+        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
+            UsurperRemake.Systems.NPCNameRegistry.ReserveAll(worldState.UsedNPCNames);
 
         // Restore active world events from save data
         var currentDay = dailyManager?.CurrentDay ?? 1;
@@ -8420,6 +8426,7 @@ public partial class GameEngine
                         npc.UpdateLocation(startLoc); // keep textual for AI compatibility
 
                         worldNPCs.Add(npc);
+                        UsurperRemake.Systems.NPCNameRegistry.Reserve(npc.Name2);
 
                         // Add to LocationManager so they show up to the player
                         LocationManager.Instance.AddNPCToLocation(locId, npc);

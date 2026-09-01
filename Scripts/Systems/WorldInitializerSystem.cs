@@ -545,7 +545,7 @@ public class WorldInitializerSystem
             var newNPC = CreateReplacementNPC();
             if (newNPC != null)
             {
-                NPCSpawnSystem.Instance.ActiveNPCs.Add(newNPC);
+                NPCSpawnSystem.Instance.AddRestoredNPC(newNPC); // reserves the name too
                 worldHistory.Add($"A new adventurer named {newNPC.Name} arrived in town");
             }
         }
@@ -570,6 +570,8 @@ public class WorldInitializerSystem
             ? maleFirstNames[random.Next(maleFirstNames.Length)]
             : femaleFirstNames[random.Next(femaleFirstNames.Length)];
         string name = $"{firstName} {lastNames[random.Next(lastNames.Length)]}";
+        // v1.0.4: never reuse a name any NPC has carried
+        name = NPCSpawnSystem.Instance.DisambiguateNPCName(name);
 
         // Start at level 1-3
         int level = random.Next(1, 4);

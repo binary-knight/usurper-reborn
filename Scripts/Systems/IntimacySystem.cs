@@ -482,7 +482,8 @@ namespace UsurperRemake.Systems
                 string surname = "";
                 int spaceIdx = child.Name.IndexOf(' ');
                 if (spaceIdx > 0) surname = child.Name.Substring(spaceIdx);
-                child.Name = nameInput + surname;
+                // v1.0.4: reserve the chosen name for life; suffixed if an NPC ever carried it
+                child.Name = NPCSpawnSystem.Instance?.DisambiguateNPCName(nameInput + surname) ?? nameInput + surname;
             }
 
             // Persist the new child to world_state immediately. Without this the

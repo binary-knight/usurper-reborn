@@ -90,6 +90,7 @@ namespace UsurperRemake.Systems
             LoadMarriageRegistryState();
             LoadWorldEventsState();
             LoadSettlementState();
+            LoadUsedNamesState();
 
             // Load last world daily reset time from world_state
             LoadLastWorldDailyReset();
@@ -551,6 +552,9 @@ namespace UsurperRemake.Systems
 
                 // Save NPC settlement state
                 await SaveSettlementState();
+
+                // v1.0.4: names ever used by NPCs (survives corpse pruning and restarts)
+                await SaveUsedNamesState();
 
                 // Prune old news with per-category caps (NPC news doesn't evict player news)
                 await sqlBackend.PruneAllNews(hoursToKeep: 48, maxNpcNews: 500, maxPlayerNews: 200);
@@ -1332,6 +1336,42 @@ namespace UsurperRemake.Systems
         /// <summary>
         /// Load NPC settlement state from world_state on startup.
         /// </summary>
+        private const string KEY_NPC_NAMES = "npc_names";
+
+        /// <summary>
+        /// v1.0.4: names ever used by NPCs. Merge-only: the roster restore has already
+        /// reserved every living and recently-dead name; this adds the pruned ones back.
+        /// </summary>
+        private void LoadUsedNamesState()
+        {
+            try
+            {
+                var json = sqlBackend.LoadWorldState(KEY_NPC_NAMES).GetAwaiter().GetResult();
+                if (string.IsNullOrEmpty(json)) return;
+
+                var names = JsonSerializer.Deserialize<List<string>>(json, jsonOptions);
+                NPCNameRegistry.ReserveAll(names);
+                DebugLogger.Instance.LogInfo("WORLDSIM", $"Loaded NPC name registry: {NPCNameRegistry.Count} names reserved");
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("WORLDSIM", $"Failed to load NPC name registry: {ex.Message}");
+            }
+        }
+
+        private async Task SaveUsedNamesState()
+        {
+            try
+            {
+                var json = JsonSerializer.Serialize(NPCNameRegistry.Export(), jsonOptions);
+                await sqlBackend.SaveWorldState(KEY_NPC_NAMES, json);
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("WORLDSIM", $"Failed to save NPC name registry: {ex.Message}");
+            }
+        }
+
         private void LoadSettlementState()
         {
             try

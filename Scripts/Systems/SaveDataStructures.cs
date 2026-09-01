@@ -432,6 +432,7 @@ namespace UsurperRemake.Systems
         public int Specialization { get; set; }  // v0.65.4: player class specialization (ClassSpecialization as int; 0 = None)
         public int[]? TeamXPPercent { get; set; }  // Per-slot XP percentage distribution (player + 4 teammates)
         public bool TeamXPIsExplicit { get; set; }  // v0.57.2: player has explicitly set their XP split, so auto-distribute won't override it
+        public bool TeamXPEvenSplit { get; set; }   // v1.0.4: even split that follows party changes (see CombatEngine.ResolveTeamXPShares)
         public int Loyalty { get; set; }    // Loyalty percentage (0-100)
         public int Haunt { get; set; }      // How many demons haunt player
         public char Master { get; set; }    // Level master player uses
@@ -1210,6 +1211,9 @@ namespace UsurperRemake.Systems
 
         // NPC Settlement state (v0.49.5)
         public UsurperRemake.Systems.SettlementSaveData? Settlement { get; set; }
+
+        // v1.0.4: every display name ever given to an NPC (see NPCNameRegistry)
+        public List<string> UsedNPCNames { get; set; } = new();
     }
 
     /// <summary>
