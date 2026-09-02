@@ -30,7 +30,7 @@ presses Enter and prints what the server made of the input.
 |------|---------|------------------------------------|
 | MUD client (Mudlet, TinTin++; answers DO ECHO) | `python3 stomp.py MUD` | `\r\x1b[2K` + message + real prompt line + `hello wor` |
 | Web terminal (raw TCP, `X-Client:Web`, keystrokes streamed) | `python3 stomp.py WEB` | same as MUD; typing must echo (`bytes while typing` = `hello wor`) |
-| SyncTerm / CP437 (TTYPE reply `SYNCTERM`) | `python3 stomp.py SYNCTERM` | same as MUD. Known gap: the scripted TTYPE reply does not currently trigger CP437 detection in `ProbeTtypeAsync`, so this case exercises the MUD path; CP437 translation is the shared `WriteRawAnsi` path |
+| SyncTerm / CP437 (TTYPE reply `SYNCTERM`, answered after the server's TTYPE SEND) | `python3 stomp.py SYNCTERM` | same as MUD, and the box art after Enter must be CP437 bytes (the case prints a check) |
 | Desktop / Steam / BBS door client (AUTH on TCP, whole lines, local echo) | `python3 stomp.py DESKTOP` | `\r\n` + message + real prompt line, no typed text, no erase. Server side only: the real client's re-echo of its own buffer (OnlinePlaySystem) is hand-verified, not driven here |
 | SSH through `--mud-relay` under a real PTY | `python3 relay_stomp.py` | same as MUD; PTY attrs must show ICANON and ECHO off |
 
@@ -38,6 +38,14 @@ Pass criteria for every case: the message is on its own line, the prompt that wa
 on screen before the message is redrawn exactly, and the typed text appears at most
 once (exactly once on echo transports, zero times on the desktop path, where the
 client re-shows its own buffer).
+
+Two more cases were run by hand for v1.0.6 and are worth repeating when the relay
+or the desktop client changes: an SSH terminal through a real sshd ForceCommand
+relay, and the real desktop binary through the same SSH gateway. A throwaway
+Docker image (dotnet runtime + openssh-server, `usurper:play`, ForceCommand
+`--mud-relay --mud-port 4999`, MUD server in the same container) is enough; drive
+the desktop binary under a PTY, choose Online, custom server, host 127.0.0.1,
+port 4000.
 
 The real web page can be driven too: run `web/ssh-proxy.js` with
 `MUD_MODE=1 MUD_PORT=4999 DB_PATH=/tmp/usurper-harness/test.db`, add your origin to

@@ -53,6 +53,17 @@ always wrong for them.
 - The web proxy now drops the browser's window-resize control message, which
   was being typed into the player's input buffer.
 
+## Terminal-type detection was being thrown away
+
+Found while making the SyncTerm harness case pass. The telnet probe that asks a
+client for its terminal type gives it 250 ms to answer. When that window closed,
+the cancellation escaped past the block that reads the answer, so a reply that
+had already arrived was discarded. CP437 terminals (SyncTerm, NetRunner,
+mTelnet, fTelnet) were therefore being sent UTF-8 box glyphs, and GMCP was never
+negotiated for MUD clients that offered it. Both now take effect. This is the
+likely cause of the garbled-box-art reports from BBS terminals (issue #102 is the
+open one; please retest).
+
 ## Not changed
 
 - The 500 ms typing grace stays; it only delays a message while a key was
@@ -73,12 +84,13 @@ tracking writer, AUTH parameter parsing).
 The reproduction harness is in `Tests/Harness/input-stomping` with a README.
 It runs a local server and scripted clients for the MUD, web, SyncTerm,
 desktop, and SSH-under-a-PTY cases, types mid-line, sends a tell from a second
-account, and prints the bytes the first player's screen received. Four of the
-five cases are green on this release: message on its own line, exact prompt
-restored, typed text present exactly once (zero on the desktop path, where the
-client re-shows its own buffer). The SyncTerm case runs but its scripted
-terminal-type reply does not trigger CP437 detection; the desktop case measures
-the server side only, and the client's re-echo was checked by hand.
+account, and prints the bytes the first player's screen received. All five
+cases are green on this release: message on its own line, exact prompt restored,
+typed text present exactly once (zero on the scripted desktop case, which
+measures the server side only). Two further cases were run by hand against a
+local sshd gateway container: an SSH terminal through the real ForceCommand
+relay, and the actual desktop binary through the SSH gateway, which re-showed
+its half-typed text once and submitted the full line on Enter.
 
 ## Files Changed
 

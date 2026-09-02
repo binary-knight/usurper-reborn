@@ -1110,6 +1110,13 @@ public class MudServer
             var ttype = new System.Text.StringBuilder();
             bool gotTtype = false;
 
+            // v1.0.6: the probe window closing throws OperationCanceledException out of
+            // ReadAsync. That used to escape to the outer catch and skip the result block
+            // below, so a terminal type or GMCP answer that had already arrived was
+            // discarded: CP437 terminals (SyncTerm, NetRunner) got UTF-8 box glyphs and
+            // GMCP never negotiated. The window closing is the normal end of the probe.
+            try
+            {
             while (!ttypeCts.Token.IsCancellationRequested)
             {
                 int read = await stream.ReadAsync(buf, 0, 1, ttypeCts.Token);
@@ -1171,6 +1178,11 @@ public class MudServer
                         }
                     }
                 }
+            }
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                // Probe window closed; evaluate whatever arrived before it did.
             }
 
             if (gotTtype && ttype.Length > 0)
