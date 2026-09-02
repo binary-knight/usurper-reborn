@@ -93,6 +93,9 @@ public partial class TerminalEmulator
     /// </summary>
     public bool ServerEchoes { get; set; } = false;
 
+    /// <summary>v1.0.6: the text on the current output line, used to redraw the real prompt after a mid-input message.</summary>
+    private readonly OutputLineTracker _lineTracker = new();
+
     /// <summary>Returns true when this terminal is backed by a TCP stream (MUD mode).</summary>
     public bool IsStreamBacked => _streamWriter != null;
 
@@ -232,6 +235,7 @@ public partial class TerminalEmulator
     /// </summary>
     private void WriteCp437ToStream(string ansi, string? spectatorAnsi = null)
     {
+        _lineTracker.Track(ansi); // bypasses the tracking writer, so track here
         var translated = PreTranslateCp437(ansi);
         var bytes = Cp437Encoding.GetBytes(translated);
         _streamWriter!.BaseStream.Write(bytes, 0, bytes.Length);
@@ -262,7 +266,7 @@ public partial class TerminalEmulator
     public TerminalEmulator(System.IO.Stream inputStream, System.IO.Stream outputStream)
     {
         _streamReader = new StreamReader(inputStream, System.Text.Encoding.UTF8);
-        _streamWriter = new StreamWriter(outputStream, new System.Text.UTF8Encoding(false))
+        _streamWriter = new LineTrackingStreamWriter(outputStream, new System.Text.UTF8Encoding(false), _lineTracker)
         {
             AutoFlush = true,
             NewLine = "\r\n" // Telnet/terminal convention
@@ -2106,6 +2110,25 @@ public partial class TerminalEmulator
         }
         catch { }
 
+        // v1.0.6: what is on the prompt line right now (status prompt, "Press any
+        // key...", etc.) is what a mid-input redraw must restore. Snapshot it once;
+        // nothing written during the read (echo, the redraw itself) counts as prompt.
+        string promptLine = _lineTracker.CurrentLine;
+        _lineTracker.Suppress = true;
+        try
+        {
+            return await ReadLineInteractiveCore(promptLine);
+        }
+        finally
+        {
+            _lineTracker.Suppress = false;
+        }
+    }
+
+    private async Task<string> ReadLineInteractiveCore(string promptLine)
+    {
+        if (_streamReader == null || _streamWriter == null) return string.Empty;
+
         var buffer = new System.Text.StringBuilder();
         var charBuf = new char[1];
         int escState = 0; // 0 = normal, 1 = after ESC, 2 = inside CSI (ESC [)
@@ -2128,7 +2151,7 @@ public partial class TerminalEmulator
                 bool userIsTyping = buffer.Length > 0
                     && (DateTime.Now - lastKeystrokeTime).TotalMilliseconds < 500;
                 if (!userIsTyping)
-                    DeliverPendingMessagesWithRedraw(prompt, buffer);
+                    DeliverPendingMessagesWithRedraw(promptLine, buffer);
                 continue; // readTask is still the same pending call
             }
 
@@ -2239,38 +2262,44 @@ public partial class TerminalEmulator
     /// current input line, print all messages, then redraw prompt + typed buffer.
     /// Called from ReadLineInteractiveAsync on every 50 ms poll tick.
     /// </summary>
-    private void DeliverPendingMessagesWithRedraw(string prompt, System.Text.StringBuilder currentBuffer)
+    private void DeliverPendingMessagesWithRedraw(string promptLine, System.Text.StringBuilder currentBuffer)
     {
         if (MessageSource == null || _streamWriter == null) return;
 
-        bool anyMessages = false;
+        var pending = new List<string>();
         string? msg;
-        while ((msg = MessageSource()) != null)
-        {
-            if (!anyMessages)
-            {
-                // Erase the entire current line (prompt + whatever the player typed)
-                lock (_streamWriterLock)
-                    _streamWriter.Write("\r\x1b[2K");
-                anyMessages = true;
-            }
-            lock (_streamWriterLock)
-            {
-                _streamWriter.Write(msg);
-                _streamWriter.Write("\r\n\x1b[0m");
-            }
-        }
+        while ((msg = MessageSource()) != null) pending.Add(msg);
+        if (pending.Count == 0) return;
 
-        if (anyMessages)
+        // v1.0.6: two delivery modes, chosen by who owns the input line.
+        //  - Server-echo transports (MUD clients, the web terminal, the raw-mode SSH
+        //    relay): the server drew the prompt and every typed character, so it can
+        //    erase the line, print the messages, and redraw prompt + buffer exactly.
+        //  - Everything else (desktop/Steam client, BBS door, Electron): the client
+        //    holds and displays the typed text and the server has never seen it.
+        //    Erasing the line wiped text the client still held -- the "input
+        //    stomping" players reported -- and Enter then submitted the invisible
+        //    text. Now the server leaves that line alone, moves to a fresh line,
+        //    prints the messages, and redraws the prompt only; the desktop client
+        //    re-shows its own pending text underneath.
+        //  Screen-reader (plain text) sessions never receive erase sequences.
+        // The prompt line is the tracked output line, not GetInput's prompt argument,
+        // which was usually empty or "Your choice:" while the real prompt was lost.
+        bool eraseLine = ServerEchoes && !IsPlainText;
+        var sb = new System.Text.StringBuilder();
+        sb.Append(eraseLine ? "\r\x1b[2K" : "\r\n");
+        foreach (var m in pending)
         {
-            // Redraw prompt and restore the player's typed text
-            lock (_streamWriterLock)
-            {
-                _streamWriter.Write($"\x1b[{GetAnsiColorCode("bright_white")}m{prompt}\x1b[0m");
-                if (currentBuffer.Length > 0)
-                    _streamWriter.Write(currentBuffer.ToString());
-                _streamWriter.Flush();
-            }
+            sb.Append(m);
+            sb.Append("\r\n\x1b[0m");
+        }
+        sb.Append("\x1b[0m").Append(promptLine);
+        if (ServerEchoes && currentBuffer.Length > 0)
+            sb.Append(currentBuffer);
+
+        lock (_streamWriterLock)
+        {
+            WriteRawAnsi(sb.ToString()); // honours plain-text and CP437 modes, forwards to spectators
         }
     }
 

@@ -35,6 +35,13 @@ namespace UsurperRemake.Systems
         // Shared
         private CancellationTokenSource? cancellationSource;
         private bool vtProcessingEnabled = false;
+
+        // v1.0.6: the line being typed locally (Local/Steam mode). When server output
+        // lands mid-line the server no longer erases it (it never saw it); after the
+        // output goes quiet we re-show it under the fresh prompt.
+        private readonly StringBuilder _pendingInput = new();
+        private volatile bool _redrawPending;
+        private DateTime _lastOutputUtc;
         private bool useTcpMode = false;
         private string? _authLeftover; // Game data that arrived in the same chunk as the auth OK response
 
@@ -948,6 +955,11 @@ namespace UsurperRemake.Systems
                             {
                                 WriteAnsiToConsole(text);
                             }
+                            if (!UsurperRemake.BBS.DoorMode.IsInDoorMode && _pendingInput.Length > 0)
+                            {
+                                _lastOutputUtc = DateTime.UtcNow;
+                                _redrawPending = true; // input loop re-shows the line once output is quiet
+                            }
                         }
                     }
                 }
@@ -1023,7 +1035,9 @@ namespace UsurperRemake.Systems
                 {
                     // Local/Steam mode: poll Console.KeyAvailable for non-blocking char-by-char input.
                     // Ctrl+] disconnects (classic telnet escape).
-                    var inputBuffer = new StringBuilder();
+                    var inputBuffer = _pendingInput;
+                    inputBuffer.Clear();
+                    _redrawPending = false;
                     while (!ct.IsCancellationRequested)
                     {
                         if (readTask.IsCompleted || serverDead[0])
@@ -1051,6 +1065,7 @@ namespace UsurperRemake.Systems
                                 }
                                 Console.Write("\r\n"); // Local newline echo
                                 inputBuffer.Clear();
+                                _redrawPending = false;
                             }
                             else if (keyInfo.Key == ConsoleKey.Backspace)
                             {
@@ -1069,6 +1084,15 @@ namespace UsurperRemake.Systems
                         }
                         else
                         {
+                            // v1.0.6: server output (a room render arrives in several TCP
+                            // reads) has been quiet for a moment and we have a half-typed
+                            // line: print it again after the prompt the server just drew.
+                            if (_redrawPending && (DateTime.UtcNow - _lastOutputUtc).TotalMilliseconds >= 60)
+                            {
+                                _redrawPending = false;
+                                if (inputBuffer.Length > 0)
+                                    Console.Write(inputBuffer.ToString());
+                            }
                             await Task.Delay(10, ct);
                         }
                     }

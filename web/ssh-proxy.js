@@ -46,6 +46,15 @@ const DB_PATH = process.env.DB_PATH || '/var/usurper/usurper_online.db';
 // Connects to 4001 directly (bypassing sslh on 4000) so X-IP forwarding works.
 // Set MUD_MODE=0 to fall back to legacy SSH mode if needed.
 const MUD_MODE = process.env.MUD_MODE !== '0';
+
+// v1.0.6: index.html sends xterm's resize notification as a JSON control message
+// on the same websocket as keystrokes. Neither branch below ever handled it, so a
+// browser resize typed '{"type":"resize",...}' into the player's input buffer.
+function isResizeControlMessage(data) {
+  if (data == null || data.length === 0 || data.length > 200) return false;
+  const s = data.toString();
+  return s.startsWith('{"type":"resize"');
+}
 const MUD_HOST = process.env.MUD_HOST || '127.0.0.1';
 const MUD_PORT = parseInt(process.env.MUD_PORT || '4001', 10);
 const CACHE_TTL = 120000; // 2 minutes (uncached query takes ~20s with 275 players)
@@ -4103,6 +4112,7 @@ wss.on('connection', (ws, req) => {
 
     // WebSocket → TCP
     ws.on('message', (data) => {
+      if (isResizeControlMessage(data)) return;
       if (!tcp.destroyed) {
         tcp.write(data);
       }
@@ -4164,6 +4174,7 @@ wss.on('connection', (ws, req) => {
 
     // WebSocket data → SSH stdin
     ws.on('message', (data) => {
+      if (isResizeControlMessage(data)) return;
       if (sshStream) {
         sshStream.write(data);
       }

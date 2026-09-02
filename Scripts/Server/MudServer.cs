@@ -538,6 +538,7 @@ public class MudServer
             bool isPlainText = false;
             bool isCp437 = false;
             bool gmcpEnabled = false;
+            bool wantsServerEcho = false;
 
             if (isInteractive)
             {
@@ -616,6 +617,8 @@ public class MudServer
                     username = parts[1].Trim();
                     connectionType = parts[2].Trim();
                 }
+
+                connectionType = ParseConnectionTypeParams(connectionType, out wantsServerEcho);
 
                 var usernameKey = username.ToLowerInvariant();
                 Console.Error.WriteLine($"[MUD] Connection from {client.Client.RemoteEndPoint}: user={username}, type={connectionType}, auth={( password != null ? (isRegistration ? "register" : "password") : "trusted" )}");
@@ -730,7 +733,8 @@ public class MudServer
                     isPlainText: isPlainText,
                     isCp437: isCp437,
                     gmcpEnabled: gmcpEnabled,
-                    forwardedIP: forwardedIP
+                    forwardedIP: forwardedIP,
+                    wantsServerEcho: wantsServerEcho
                 );
                 session.ClientVersion = clientVersion;
 
@@ -1509,6 +1513,28 @@ public class MudServer
     }
 
     /// <summary>Send a message to a specific player by username.</summary>
+    /// <summary>
+    /// v1.0.6: the AUTH connection type may carry ";key=value" parameters after the
+    /// type name, e.g. "SSH;echo=1" from a relay that has put its PTY in raw mode and
+    /// wants the server to echo. Parameters ride inside the existing field so an older
+    /// server just stores the odd type string and keeps working; only "echo" is known.
+    /// </summary>
+    internal static string ParseConnectionTypeParams(string? connectionType, out bool wantsServerEcho)
+    {
+        wantsServerEcho = false;
+        if (string.IsNullOrEmpty(connectionType)) return "";
+        int semi = connectionType.IndexOf(';');
+        if (semi < 0) return connectionType.Trim();
+        var parts = connectionType.Split(';');
+        for (int i = 1; i < parts.Length; i++)
+        {
+            var kv = parts[i].Split('=', 2);
+            if (kv.Length == 2 && kv[0].Trim().Equals("echo", StringComparison.OrdinalIgnoreCase) && kv[1].Trim() == "1")
+                wantsServerEcho = true;
+        }
+        return parts[0].Trim();
+    }
+
     public bool SendToPlayer(string username, string message)
     {
         if (ActiveSessions.TryGetValue(username.ToLowerInvariant(), out var session))
