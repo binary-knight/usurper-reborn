@@ -85,7 +85,7 @@ public static class MudChatSystem
 
             case "tell":
             case "t":
-                return HandleTell(username, args, terminal);
+                return await HandleTell(username, args, terminal);
 
             case "emote":
             case "me":
@@ -354,7 +354,7 @@ public static class MudChatSystem
         return true;
     }
 
-    private static bool HandleTell(string username, string args, TerminalEmulator terminal)
+    private static async Task<bool> HandleTell(string username, string args, TerminalEmulator terminal)
     {
         // v0.57.14: completely empty args toggles incoming-tell mute (anti-harassment).
         if (string.IsNullOrWhiteSpace(args))
@@ -414,8 +414,25 @@ public static class MudChatSystem
         }
         else
         {
+            // v1.0.5: an offline recipient used to swallow the tell with "X is not
+            // online." Drop it in their mailbox instead, under the same daily cap as
+            // the mailbox's own compose flow. Unknown names still get a plain error.
+            var backend = UsurperRemake.Systems.SaveSystem.Instance.Backend as UsurperRemake.Systems.SqlSaveBackend;
+            string? mailName = backend?.ResolvePlayerDisplayName(targetName);
             terminal.SetColor("gray");
-            terminal.WriteLine($"  {targetName} is not online.");
+            if (backend == null || mailName == null)
+            {
+                terminal.WriteLine($"  {UsurperRemake.Systems.Loc.Get("chat.tell_offline_unknown", targetName)}");
+            }
+            else if (backend.GetMailsSentToday(displayName) >= 20)
+            {
+                terminal.WriteLine($"  {UsurperRemake.Systems.Loc.Get("chat.tell_mail_limit", mailName)}");
+            }
+            else
+            {
+                await backend.SendMessage(displayName, mailName, "mail", message);
+                terminal.WriteLine($"  {UsurperRemake.Systems.Loc.Get("chat.tell_offline_mailed", mailName)}");
+            }
         }
 
         return true;

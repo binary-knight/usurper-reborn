@@ -220,9 +220,20 @@ public class ArenaLocation : BaseLocation
                     .Select(s => s.Username),
             StringComparer.OrdinalIgnoreCase);
 
+        // v1.0.5: never target a player who is online right now. Gold theft is
+        // applied to the saved row (DeductGoldFromPlayer); an online defender's
+        // next autosave writes their in-memory gold back over it, so they lose
+        // nothing while the attacker keeps the gold -- duplication. Only offline
+        // snapshots are safe targets. Checked against both the heartbeat table
+        // (IsOnline) and the in-process session list, since the heartbeat lags.
+        var onlineNow = new HashSet<string>(
+            UsurperRemake.Server.MudServer.Instance?.GetOnlinePlayerNames() ?? Array.Empty<string>(),
+            StringComparer.OrdinalIgnoreCase);
+
         // Determine this account's base username (strip __alt suffix if present)
         string myAccount = SqlSaveBackend.GetAccountUsername(myUsername);
         var eligible = allPlayers
+            .Where(p => !p.IsOnline && !onlineNow.Contains(p.Username))
             .Where(p => !string.Equals(p.Username, myUsername, StringComparison.OrdinalIgnoreCase))
             // Block same-account PvP (main vs alt)
             .Where(p => !string.Equals(SqlSaveBackend.GetAccountUsername(p.Username), myAccount, StringComparison.OrdinalIgnoreCase))
