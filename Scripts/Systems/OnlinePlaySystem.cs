@@ -284,9 +284,12 @@ namespace UsurperRemake.Systems
         private void FlushPendingRedraw(StringBuilder inputBuffer)
         {
             if (!_redrawPending) return;
-            _redrawPending = false;
-            if (inputBuffer.Length == 0) return;
-            lock (_consoleLock) Console.Write(inputBuffer.ToString());
+            lock (_consoleLock)
+            {
+                if (!_redrawPending) return;
+                if (inputBuffer.Length > 0) Console.Write(inputBuffer.ToString());
+                _redrawPending = false; // cleared after the write, under the same lock the receive side sets it
+            }
         }
 
         private static readonly System.Text.RegularExpressions.Regex AnsiSequence =
@@ -973,15 +976,17 @@ namespace UsurperRemake.Systems
                                 {
                                     if (vtProcessingEnabled) Console.Write(text);
                                     else WriteAnsiToConsole(text);
-                                }
-                                if (_pendingInput.Length > 0)
-                                {
-                                    // Re-show the half-typed line only when a prompt is showing,
-                                    // i.e. the visible text of this chunk does not end in a
-                                    // newline. The game pauses inside its own output (combat
-                                    // beats), so "output went quiet" alone is not a prompt.
-                                    _lastOutputUtc = DateTime.UtcNow;
-                                    _redrawPending = !VisibleTextEndsWithNewline(text);
+                                    if (_pendingInput.Length > 0)
+                                    {
+                                        // Re-show the half-typed line only when a prompt is showing,
+                                        // i.e. the visible text of this chunk does not end in a
+                                        // newline. The game pauses inside its own output (combat
+                                        // beats), so "output went quiet" alone is not a prompt.
+                                        // Flag is set under the console lock so a flush in progress
+                                        // on the input thread cannot be followed by a second print.
+                                        _lastOutputUtc = DateTime.UtcNow;
+                                        _redrawPending = !VisibleTextEndsWithNewline(text);
+                                    }
                                 }
                             }
                         }

@@ -77,7 +77,9 @@ public sealed class OutputLineTracker
                     if (clearAll) _line.Clear();
                 }
                 return;
-            case 3: // OSC: runs to BEL or ESC \ ; never part of a prompt, drop it whole
+            case 3: // OSC: runs to BEL or ESC \ ; never part of a prompt, drop it whole.
+                    // An unterminated OSC would swallow text through newlines; nothing in
+                    // the game writes OSC to the stream, and Reset() at each read end bounds it.
                 if (c == '\x07' || (_oscEsc && c == '\\'))
                 {
                     _line.Length = _csiStart; _csiStart = -1; _escMode = 0;
@@ -96,7 +98,9 @@ public sealed class OutputLineTracker
         if (_line.Length > MaxLength)
         {
             // Trim from the front, but never inside an escape sequence: cut at the
-            // first ESC on or after the cut point when there is one.
+            // first ESC on or after the cut point when there is one. (A cut that
+            // lands inside a sequence with no later ESC would still leave a broken
+            // head; unreachable at this cap for any real prompt line.)
             int cut = _line.Length - MaxLength;
             for (int k = cut; k < _line.Length; k++)
             {
