@@ -8610,9 +8610,13 @@ public abstract class BaseLocation
 
         await backend.SendMessage(currentPlayer.DisplayName, recipient, "mail", message);
 
-        // Real-time notification in MUD mode
-        UsurperRemake.Server.MudServer.Instance?.SendToPlayer(recipient,
-            $"\u001b[35m  [Mail] {currentPlayer.DisplayName}: {message}\u001b[0m");
+        // Real-time notification in MUD mode. v1.0.5: sessions are keyed by login
+        // username and `recipient` is the character name, so this push never
+        // delivered for anyone whose two names differ.
+        string? recipientUser = backend.ResolvePlayerUsername(recipient);
+        if (recipientUser != null)
+            UsurperRemake.Server.MudServer.Instance?.SendToPlayer(recipientUser,
+                $"\u001b[35m  [Mail] {currentPlayer.DisplayName}: {message}\u001b[0m");
 
         terminal.SetColor("bright_green");
         terminal.WriteLine(Loc.Get("base.mail_sent", recipient));

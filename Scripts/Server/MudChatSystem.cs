@@ -424,7 +424,25 @@ public static class MudChatSystem
             var backend = UsurperRemake.Systems.SaveSystem.Instance.Backend as UsurperRemake.Systems.SqlSaveBackend;
             string mailFrom = MudServer.Instance?.ActiveSessions.GetValueOrDefault(username.ToLowerInvariant())
                 ?.Context?.Engine?.CurrentPlayer?.DisplayName ?? displayName;
-            string? mailName = backend?.ResolvePlayerDisplayName(targetName);
+            // ResolveTargetAndMessage only matched live sessions and fell back to the
+            // first word. Retry the same longest-prefix-first split against the
+            // database so "/tell Halvar Copperfield hi" reaches an offline
+            // "Halvar Copperfield" instead of mailing "Copperfield hi" to Halvar.
+            string? mailName = null;
+            if (backend != null)
+            {
+                var words = args.Trim().Split(' ', System.StringSplitOptions.RemoveEmptyEntries);
+                for (int n = words.Length - 1; n >= 1 && mailName == null; n--)
+                {
+                    string candidate = string.Join(' ', words, 0, n);
+                    mailName = backend.ResolvePlayerDisplayName(candidate);
+                    if (mailName != null)
+                    {
+                        targetName = candidate;
+                        message = string.Join(' ', words, n, words.Length - n);
+                    }
+                }
+            }
             terminal.SetColor("gray");
             if (backend == null || mailName == null)
             {

@@ -391,6 +391,7 @@ public class ArenaLocation : BaseLocation
         string winnerUsername = attackerWon ? myUsername : defenderUsername;
 
         long goldStolen = 0;
+        bool theftVoided = false;
         // XP and kill tracking are handled by CombatEngine.DeterminePvPOutcome()
         long xpGained = result.ExperienceGained;
 
@@ -407,6 +408,7 @@ public class ArenaLocation : BaseLocation
             {
                 DebugLogger.Instance.LogInfo("GOLD", $"ARENA: {target.DisplayName} logged in mid-fight; gold theft of {goldStolen:N0}g voided");
                 goldStolen = 0;
+                theftVoided = true;
             }
             goldStolen = Math.Max(0, goldStolen);
 
@@ -452,6 +454,11 @@ public class ArenaLocation : BaseLocation
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  {Loc.Get("arena.gold_stolen_from", target.DisplayName, $"{goldStolen:N0}")}");
+            }
+            else if (theftVoided)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine($"  {Loc.Get("arena.theft_voided", target.DisplayName)}");
             }
             if (bountyReward > 0)
             {

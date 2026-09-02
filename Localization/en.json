@@ -7307,6 +7307,7 @@
   "arena.victory": "Victory!",
   "arena.victory_box": "═══ VICTORY! ═══",
   "arena.gold_stolen_from": "Gold stolen from {0}: {1}",
+  "arena.theft_voided": "{0} logged in during the fight, so no gold changed hands.",
   "arena.bounty_collected": "BOUNTY COLLECTED: {0} gold!",
   "arena.defeat": "You have been defeated!",
   "arena.defeat_box": "═══ DEFEAT! ═══",

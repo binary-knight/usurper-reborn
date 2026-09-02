@@ -2187,9 +2187,11 @@ public class TeamCornerLocation : BaseLocation
                 foreach (var member in members)
                 {
                     await backend.SendMessage(currentPlayer.DisplayName, member.DisplayName, "mail", body);
-                    // Same live push the mailbox compose flow sends.
-                    if (member.IsOnline)
-                        UsurperRemake.Server.MudServer.Instance?.SendToPlayer(member.DisplayName,
+                    // Live push for online members. Sessions are keyed by login
+                    // username, not character name, so resolve first.
+                    var memberUser = member.IsOnline ? backend.ResolvePlayerUsername(member.DisplayName) : null;
+                    if (memberUser != null)
+                        UsurperRemake.Server.MudServer.Instance?.SendToPlayer(memberUser,
                             $"\u001b[35m  [Mail] {currentPlayer.DisplayName}: {body}\u001b[0m");
                 }
                 terminal.SetColor("bright_green");
