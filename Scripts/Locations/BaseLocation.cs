@@ -2229,9 +2229,11 @@ public abstract class BaseLocation
             }
             // v0.65.6: show remaining lives in online permadeath mode so the
             // stake is always visible, not just on death screens.
-            string livesInfo = "";
-            if (UsurperRemake.BBS.DoorMode.IsOnlineMode && GameConfig.OnlinePermadeathEnabled)
-                livesInfo = $", {Loc.Get("status.lives")}: {Math.Max(0, currentPlayer.Resurrections)}/{Math.Max(1, currentPlayer.MaxResurrections)}";
+            // v1.0.5: single-player consumes the same counter (free revive at the death
+            // prompt) but running out means the Veil of Death penalties, not deletion, so
+            // it gets its own label rather than "Lives".
+            bool permadeathLives = UsurperRemake.BBS.DoorMode.IsOnlineMode && GameConfig.OnlinePermadeathEnabled;
+            string livesInfo = $", {Loc.Get(permadeathLives ? "status.lives" : "status.revives")}: {Math.Max(0, currentPlayer.Resurrections)}/{Math.Max(1, currentPlayer.MaxResurrections)}";
             terminal.SetColor("white");
             terminal.WriteLine($"{Loc.Get("status.hp")}: {currentPlayer.HP}/{currentPlayer.MaxHP}, {Loc.Get("status.gold_label")}: {currentPlayer.Gold:N0}, {resource}, {Loc.Get("ui.level")} {currentPlayer.Level}{xpInfo}{livesInfo}");
             terminal.WriteLine("");
@@ -2286,17 +2288,17 @@ public abstract class BaseLocation
             // v0.65.6: remaining lives, visible at all times in online permadeath
             // mode. Color escalates as the counter drops -- informed risk feels
             // fair; an invisible countdown feels like betrayal.
-            if (UsurperRemake.BBS.DoorMode.IsOnlineMode && GameConfig.OnlinePermadeathEnabled)
-            {
-                int livesLeft = Math.Max(0, currentPlayer.Resurrections);
-                int livesMax = Math.Max(1, currentPlayer.MaxResurrections);
-                terminal.SetColor("gray");
-                terminal.Write($" | {Loc.Get("status.lives")}: ");
-                terminal.SetColor(livesLeft == 0 ? "bright_red" : livesLeft == 1 ? "yellow" : "bright_green");
-                terminal.Write($"{livesLeft}");
-                terminal.SetColor("gray");
-                terminal.Write($"/{livesMax}");
-            }
+            // v1.0.5: also shown in single-player under a "Revives" label; see the
+            // screen-reader branch above for why the label differs.
+            bool permadeathLives = UsurperRemake.BBS.DoorMode.IsOnlineMode && GameConfig.OnlinePermadeathEnabled;
+            int livesLeft = Math.Max(0, currentPlayer.Resurrections);
+            int livesMax = Math.Max(1, currentPlayer.MaxResurrections);
+            terminal.SetColor("gray");
+            terminal.Write($" | {Loc.Get(permadeathLives ? "status.lives" : "status.revives")}: ");
+            terminal.SetColor(livesLeft == 0 ? "bright_red" : livesLeft == 1 ? "yellow" : "bright_green");
+            terminal.Write($"{livesLeft}");
+            terminal.SetColor("gray");
+            terminal.Write($"/{livesMax}");
 
             // XP progress to next level
             if (currentPlayer.Level < GameConfig.MaxLevel)
@@ -3063,6 +3065,7 @@ public abstract class BaseLocation
         WriteCmdAlias("/inventory", "*", Loc.Get("base.help_inventory"));
         WriteCmdAlias("/quests", "/q", Loc.Get("base.help_quests"));
         WriteCmdAlias("/journal", "/next", Loc.Get("journal.help")); // v0.64.2
+        WriteCmdAlias("/path", "/roadmap", Loc.Get("base.help_path")); // v1.0.5: was only reachable by knowing the command
         if (UsurperRemake.BBS.DoorMode.IsMudServerMode)
             WriteCmd("look", Loc.Get("base.help_look")); // v0.64.2: prompt hint removed; documented here instead
         WriteCmdAlias("/gold", "/g", Loc.Get("base.help_gold"));
@@ -3071,7 +3074,12 @@ public abstract class BaseLocation
         WriteCmdAlias("/potion", "/pot", Loc.Get("base.help_potion"));
         WriteCmdAlias("/herb", "/j", Loc.Get("base.help_herb"));
         WriteCmdAlias("/materials", "/mat", Loc.Get("base.help_materials"));
-        WriteCmdAlias("/time", "/t", Loc.Get("base.help_time"));
+        // v1.0.5: on the MUD server chat dispatch runs first and /t is tell, so
+        // advertising /t as time there sent players a "Usage: /tell" error.
+        if (UsurperRemake.Server.SessionContext.IsActive)
+            WriteCmd("/time", Loc.Get("base.help_time"));
+        else
+            WriteCmdAlias("/time", "/t", Loc.Get("base.help_time"));
         WriteCmdAlias("/prefs", "/p", Loc.Get("base.help_prefs"));
         WriteCmd("/mail", Loc.Get("base.help_mail"));
         WriteCmd("/trade", Loc.Get("base.help_trade"));

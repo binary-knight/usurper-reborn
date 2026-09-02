@@ -245,6 +245,24 @@ public class MainStreetLocation : BaseLocation
             HintSystem.Instance.TryShowHint(HintSystem.HINT_LOW_HP, terminal, currentPlayer.HintsShown);
         }
 
+        // v1.0.5: three hints that were defined and localized when the hint system shipped but
+        // never had a trigger. The level-up nudge only matters with auto-level off (on by
+        // default); the inventory nudge fires the first time the player carries anything; the
+        // save hint is single-player only (online autosaves and has no quit-to-save flow).
+        if (!currentPlayer.AutoLevelUp && currentPlayer.Level < GameConfig.MaxLevel
+            && currentPlayer.Experience >= GameConfig.GetExperienceForLevel(currentPlayer.Level + 1))
+        {
+            HintSystem.Instance.TryShowHint(HintSystem.HINT_FIRST_LEVEL_UP, terminal, currentPlayer.HintsShown);
+        }
+        if (currentPlayer.Inventory.Count > 0)
+        {
+            HintSystem.Instance.TryShowHint(HintSystem.HINT_INVENTORY, terminal, currentPlayer.HintsShown);
+        }
+        if (!DoorMode.IsOnlineMode && currentPlayer.MKills > 0)
+        {
+            HintSystem.Instance.TryShowHint(HintSystem.HINT_SAVE_GAME, terminal, currentPlayer.HintsShown);
+        }
+
         // Show mana/spells hint if player's class has spells but none learned yet
         // Exclude Mystic Shaman — they use mana for abilities, not spells, and can't learn spells at the Magic Shop
         if (currentPlayer.MaxMana > 0 && currentPlayer.Class != CharacterClass.MysticShaman
