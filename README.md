@@ -2,7 +2,7 @@
 
 ## A Persistent Online Text RPG with a Living World
 
-**v1.0.4 "Coronation"** | **FREE AND OPEN SOURCE** | **GPL v2**
+**v1.0.5 "Coronation"** | **FREE AND OPEN SOURCE** | **GPL v2**
 
 130+ autonomous NPCs wake up, go to work, visit taverns, fall in love, get married, have children, age, and eventually die of old age, all while you're offline. Log back in, read the news feed, and discover that the blacksmith married the barmaid, the king was assassinated, or a new generation just came of age. The world doesn't wait for you.
 
@@ -330,7 +330,7 @@ Join Discord for discussions, feedback, and updates: **https://discord.gg/EZhwgD
 
 *"You are not a wave fighting the ocean. You ARE the ocean, dreaming of being a wave."*
 
-## Known Issues (v1.0.4)
+## Known Issues (v1.0.5)
 
 - Save files from the earliest alpha versions may not be fully compatible.
 - BBS FOSSIL mode not natively supported (use `--stdio` flag for FOSSIL-based BBSes via host pipe).
@@ -343,4 +343,4 @@ Join Discord for discussions, feedback, and updates: **https://discord.gg/EZhwgD
 
 ---
 
-**Status:** v1.0.4 "Coronation". The world is running. [Watch it live.](https://usurper-reborn.net)
+**Status:** v1.0.5 "Coronation". The world is running. [Watch it live.](https://usurper-reborn.net)
