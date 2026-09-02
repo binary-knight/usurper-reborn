@@ -1112,9 +1112,12 @@ public class MudServer
 
             // v1.0.6: the probe window closing throws OperationCanceledException out of
             // ReadAsync. That used to escape to the outer catch and skip the result block
-            // below, so a terminal type or GMCP answer that had already arrived was
-            // discarded: CP437 terminals (SyncTerm, NetRunner) got UTF-8 box glyphs and
-            // GMCP never negotiated. The window closing is the normal end of the probe.
+            // below, so a terminal type that had already arrived was discarded:
+            // CP437 terminals (SyncTerm, NetRunner) got UTF-8 box glyphs and screen
+            // readers never got plain-text mode. (GMCP and DONT ECHO were unaffected;
+            // they live outside the try and ride the fallback return.) The window
+            // closing is the normal end of the probe; the two SB drain loops read on
+            // the same token so a client that never sends IAC SE cannot park the probe.
             try
             {
             while (!ttypeCts.Token.IsCancellationRequested)
@@ -1148,12 +1151,12 @@ public class MudServer
                     {
                         if (await stream.ReadAsync(buf, 0, 1, ttypeCts.Token) == 0) break;
                         // buf[0] should be 0x00 (IS) — consume and read the type string
-                        while (!ct.IsCancellationRequested)
+                        while (!ttypeCts.Token.IsCancellationRequested)
                         {
-                            if (await stream.ReadAsync(buf, 0, 1, ct) == 0) break;
+                            if (await stream.ReadAsync(buf, 0, 1, ttypeCts.Token) == 0) break;
                             if (buf[0] == 0xFF) // IAC inside SB
                             {
-                                if (await stream.ReadAsync(buf, 0, 1, ct) == 0) break;
+                                if (await stream.ReadAsync(buf, 0, 1, ttypeCts.Token) == 0) break;
                                 if (buf[0] == 0xF0) break; // SE — end of subneg
                             }
                             else
@@ -1167,12 +1170,12 @@ public class MudServer
                     else
                     {
                         // Different option in SB — drain until IAC SE
-                        while (!ct.IsCancellationRequested)
+                        while (!ttypeCts.Token.IsCancellationRequested)
                         {
-                            if (await stream.ReadAsync(buf, 0, 1, ct) == 0) break;
+                            if (await stream.ReadAsync(buf, 0, 1, ttypeCts.Token) == 0) break;
                             if (buf[0] == 0xFF)
                             {
-                                if (await stream.ReadAsync(buf, 0, 1, ct) == 0) break;
+                                if (await stream.ReadAsync(buf, 0, 1, ttypeCts.Token) == 0) break;
                                 if (buf[0] == 0xF0) break;
                             }
                         }

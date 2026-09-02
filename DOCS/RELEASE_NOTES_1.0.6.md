@@ -59,10 +59,14 @@ Found while making the SyncTerm harness case pass. The telnet probe that asks a
 client for its terminal type gives it 250 ms to answer. When that window closed,
 the cancellation escaped past the block that reads the answer, so a reply that
 had already arrived was discarded. CP437 terminals (SyncTerm, NetRunner,
-mTelnet, fTelnet) were therefore being sent UTF-8 box glyphs, and GMCP was never
-negotiated for MUD clients that offered it. Both now take effect. This is the
-likely cause of the garbled-box-art reports from BBS terminals (issue #102 is the
-open one; please retest).
+mTelnet, fTelnet) were therefore being sent UTF-8 box glyphs, and screen-reader
+clients that identify as VIP, DUMB, or UNKNOWN never got plain-text mode. This
+has been the case since v0.47.1. GMCP and echo negotiation were not affected.
+Both detections now take effect for the first time, so watch the
+`[MUD] TTYPE detected:` server log line on deploy day for client strings that
+should not be treated as plain text. This is the likely cause of issue #102
+(garbled box art on a Mystic BBS terminal); the reporter should retest on 1.0.6
+before it is closed.
 
 ## Not changed
 
