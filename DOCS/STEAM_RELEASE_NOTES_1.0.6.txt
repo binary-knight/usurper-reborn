@@ -1,0 +1,22 @@
+[h1]Usurper Reborn 1.0.6 - Typing Fix[/h1]
+
+One fix, and it is the one I have been chasing since the online server opened. When a chat message, a tell, or a world event landed while you were in the middle of typing, it would wipe out what you had typed. Every time I fixed it for one way of connecting it broke for another.
+
+This time I stopped guessing. I built a test rig that connects to the server every way the game supports, types half a line, sends a message from a second account, and records exactly what shows up on the screen. It turned out there were four different problems, one per kind of connection.
+
+[h2]What you will notice[/h2]
+
+[list]
+[*][b]Browser players:[/b] you can now see what you type in game. You could not before. That was not a display glitch on your end, the server simply never sent your keystrokes back.
+[*][b]SSH players:[/b] a message arriving mid-line no longer erases your text and then submits it invisibly.
+[*][b]Mudlet, TinTin++, telnet:[/b] after a message the real prompt comes back, not a blank line or "Your choice:".
+[*][b]Steam and desktop client:[/b] a message goes on its own line and your half-typed text is shown again underneath the prompt.
+[*][b]Screen readers:[/b] no more erase codes in the stream.
+[*][b]SyncTerm, NetRunner and other BBS terminals:[/b] the server was throwing away your terminal type, so you were getting the wrong box-drawing characters. Fixed while testing this release. If your box art was garbage before, try again.
+[/list]
+
+[h2]Still on the list[/h2]
+
+If your typed line is long enough to wrap, the earlier rows are not cleared when a message lands. BBS door players see their partial text again only after pressing Enter. If you play through a BBS or a client I have not named here and something still looks off, use /bug in game and tell me which program you use.
+
+The test rig ships with the game, so this stays fixed.

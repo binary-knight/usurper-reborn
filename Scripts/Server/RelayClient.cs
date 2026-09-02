@@ -32,7 +32,7 @@ public static class RelayClient
         // If the user is pre-authenticated (e.g. --user flag), connect directly
         if (!string.IsNullOrEmpty(username) && username != "anonymous")
         {
-            await ConnectAndBridge(username, null, port, connectionType, ct);
+            await ConnectAndBridge(username, null, port, connectionType, ct, rawTerminal: true);
             return;
         }
 
@@ -129,7 +129,7 @@ public static class RelayClient
             // ConnectAndBridge returns true if successfully connected and played,
             // false if auth failed (we should retry)
             bool isReg = choiceUpper == "R";
-            bool connected = await ConnectAndBridge(authUsername!, authPassword, port, connectionType, ct, isRegistration: isReg);
+            bool connected = await ConnectAndBridge(authUsername!, authPassword, port, connectionType, ct, isRegistration: isReg, rawTerminal: true);
             if (connected)
                 return; // Session completed (player quit or disconnected)
 
@@ -200,11 +200,22 @@ public static class RelayClient
     /// Connect to the MUD server, authenticate, and bridge stdin/stdout.
     /// Returns true if the session ran (even if it ended), false if auth failed.
     /// </summary>
+    /// <param name="rawTerminal">
+    /// v1.0.6: true for a human at the auth menu (or --user). If stdin is a real
+    /// terminal the relay switches it to raw, no-echo mode, forwards keystrokes one
+    /// at a time, and asks the server to echo (";echo=1"). The server then owns the
+    /// input line and can redraw it correctly when a message lands mid-typing.
+    /// Before this, .NET's console reader held each line locally until Enter and
+    /// echoed it itself; the server's erase-and-redraw wiped text it had never seen.
+    /// False for the AUTH: passthrough used by the desktop and BBS clients, which
+    /// keep their own line editors.
+    /// </param>
     private static async Task<bool> ConnectAndBridge(
         string username, string? password, int port, string connectionType, CancellationToken ct,
-        bool isRegistration = false)
+        bool isRegistration = false, bool rawTerminal = false)
     {
         TcpClient? client = null;
+        IDisposable? rawMode = null;
         try
         {
             client = new TcpClient();
@@ -212,6 +223,16 @@ public static class RelayClient
             client.NoDelay = true;
 
             var stream = client.GetStream();
+
+            if (rawTerminal && !Console.IsInputRedirected)
+            {
+                rawMode = TerminalRawMode.TryEnter();
+                if (rawMode != null)
+                {
+                    connectionType += ";echo=1";
+                    Console.Error.WriteLine("[RELAY] Terminal in raw mode; server-side echo requested");
+                }
+            }
 
             // Forward real client IP from SSH_CLIENT env var (format: "client_ip client_port server_port")
             var sshClient = Environment.GetEnvironmentVariable("SSH_CLIENT");
@@ -277,7 +298,12 @@ public static class RelayClient
                 try
                 {
                     var buffer = new byte[4096];
-                    var stdin = Console.OpenStandardInput();
+                    // Console.OpenStandardInput() on a terminal is .NET's line-mode reader
+                    // (holds the line, echoes locally). In raw mode read fd 0 directly so
+                    // each keystroke goes straight to the server.
+                    using Stream stdin = rawMode != null
+                        ? new FileStream(new Microsoft.Win32.SafeHandles.SafeFileHandle((IntPtr)0, ownsHandle: false), FileAccess.Read, bufferSize: 1, isAsync: false)
+                        : Console.OpenStandardInput();
                     while (!linkedCts.Token.IsCancellationRequested)
                     {
                         int read = await stdin.ReadAsync(buffer, 0, buffer.Length, linkedCts.Token);
@@ -335,6 +361,7 @@ public static class RelayClient
         }
         finally
         {
+            rawMode?.Dispose();
             client?.Close();
         }
     }

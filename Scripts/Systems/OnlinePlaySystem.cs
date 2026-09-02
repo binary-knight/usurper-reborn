@@ -35,6 +35,14 @@ namespace UsurperRemake.Systems
         // Shared
         private CancellationTokenSource? cancellationSource;
         private bool vtProcessingEnabled = false;
+
+        // v1.0.6: the line being typed locally (Local/Steam mode). When server output
+        // lands mid-line the server no longer erases it (it never saw it); after the
+        // output goes quiet we re-show it under the fresh prompt.
+        private readonly StringBuilder _pendingInput = new();
+        private volatile bool _redrawPending;
+        private DateTime _lastOutputUtc;
+        private readonly object _consoleLock = new(); // receive thread and input thread both write the console
         private bool useTcpMode = false;
         private string? _authLeftover; // Game data that arrived in the same chunk as the auth OK response
 
@@ -272,6 +280,28 @@ namespace UsurperRemake.Systems
         /// <summary>
         /// Write a string to the active connection (SSH shell stream or TCP stream).
         /// </summary>
+        /// <summary>v1.0.6: print the half-typed line again after the prompt the server just drew.</summary>
+        private void FlushPendingRedraw(StringBuilder inputBuffer)
+        {
+            if (!_redrawPending) return;
+            lock (_consoleLock)
+            {
+                if (!_redrawPending) return;
+                if (inputBuffer.Length > 0) Console.Write(inputBuffer.ToString());
+                _redrawPending = false; // cleared after the write, under the same lock the receive side sets it
+            }
+        }
+
+        private static readonly System.Text.RegularExpressions.Regex AnsiSequence =
+            new(@"\x1b\[[0-9;?]*[A-Za-z]", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+        /// <summary>True when the last visible character of a server chunk is a newline (no prompt showing).</summary>
+        private static bool VisibleTextEndsWithNewline(string chunk)
+        {
+            var visible = AnsiSequence.Replace(chunk, "").TrimEnd(' ');
+            return visible.Length == 0 || visible[^1] == '\n';
+        }
+
         private void WriteToServer(string text)
         {
             if (useTcpMode && tcpStream != null)
@@ -940,13 +970,24 @@ namespace UsurperRemake.Systems
                             {
                                 terminal.WriteRawAnsi(text);
                             }
-                            else if (vtProcessingEnabled)
-                            {
-                                Console.Write(text);
-                            }
                             else
                             {
-                                WriteAnsiToConsole(text);
+                                lock (_consoleLock)
+                                {
+                                    if (vtProcessingEnabled) Console.Write(text);
+                                    else WriteAnsiToConsole(text);
+                                    if (_pendingInput.Length > 0)
+                                    {
+                                        // Re-show the half-typed line only when a prompt is showing,
+                                        // i.e. the visible text of this chunk does not end in a
+                                        // newline. The game pauses inside its own output (combat
+                                        // beats), so "output went quiet" alone is not a prompt.
+                                        // Flag is set under the console lock so a flush in progress
+                                        // on the input thread cannot be followed by a second print.
+                                        _lastOutputUtc = DateTime.UtcNow;
+                                        _redrawPending = !VisibleTextEndsWithNewline(text);
+                                    }
+                                }
                             }
                         }
                     }
@@ -1023,7 +1064,9 @@ namespace UsurperRemake.Systems
                 {
                     // Local/Steam mode: poll Console.KeyAvailable for non-blocking char-by-char input.
                     // Ctrl+] disconnects (classic telnet escape).
-                    var inputBuffer = new StringBuilder();
+                    var inputBuffer = _pendingInput;
+                    inputBuffer.Clear();
+                    _redrawPending = false;
                     while (!ct.IsCancellationRequested)
                     {
                         if (readTask.IsCompleted || serverDead[0])
@@ -1051,24 +1094,34 @@ namespace UsurperRemake.Systems
                                 }
                                 Console.Write("\r\n"); // Local newline echo
                                 inputBuffer.Clear();
+                                _redrawPending = false;
                             }
                             else if (keyInfo.Key == ConsoleKey.Backspace)
                             {
                                 if (inputBuffer.Length > 0)
                                 {
+                                    FlushPendingRedraw(inputBuffer);
                                     inputBuffer.Remove(inputBuffer.Length - 1, 1);
-                                    Console.Write("\b \b");
+                                    lock (_consoleLock) Console.Write("\b \b");
                                 }
                             }
                             else if (keyInfo.KeyChar >= ' ' && keyInfo.KeyChar != '\x7f')
                             {
+                                // A key inside the redraw window: show the old text first so
+                                // the line does not read "> lhello worl".
+                                FlushPendingRedraw(inputBuffer);
                                 inputBuffer.Append(keyInfo.KeyChar);
-                                Console.Write(keyInfo.KeyChar);
+                                lock (_consoleLock) Console.Write(keyInfo.KeyChar);
                             }
                             // Non-printable keys (arrows, escape, tab) are ignored
                         }
                         else
                         {
+                            // v1.0.6: server output (a room render arrives in several TCP
+                            // reads) has been quiet for a moment and we have a half-typed
+                            // line: print it again after the prompt the server just drew.
+                            if (_redrawPending && (DateTime.UtcNow - _lastOutputUtc).TotalMilliseconds >= 60)
+                                FlushPendingRedraw(inputBuffer);
                             await Task.Delay(10, ct);
                         }
                     }

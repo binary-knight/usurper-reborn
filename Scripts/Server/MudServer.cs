@@ -538,6 +538,7 @@ public class MudServer
             bool isPlainText = false;
             bool isCp437 = false;
             bool gmcpEnabled = false;
+            bool wantsServerEcho = false;
 
             if (isInteractive)
             {
@@ -616,6 +617,8 @@ public class MudServer
                     username = parts[1].Trim();
                     connectionType = parts[2].Trim();
                 }
+
+                connectionType = ParseConnectionTypeParams(connectionType, out wantsServerEcho);
 
                 var usernameKey = username.ToLowerInvariant();
                 Console.Error.WriteLine($"[MUD] Connection from {client.Client.RemoteEndPoint}: user={username}, type={connectionType}, auth={( password != null ? (isRegistration ? "register" : "password") : "trusted" )}");
@@ -730,7 +733,8 @@ public class MudServer
                     isPlainText: isPlainText,
                     isCp437: isCp437,
                     gmcpEnabled: gmcpEnabled,
-                    forwardedIP: forwardedIP
+                    forwardedIP: forwardedIP,
+                    wantsServerEcho: wantsServerEcho
                 );
                 session.ClientVersion = clientVersion;
 
@@ -1106,6 +1110,16 @@ public class MudServer
             var ttype = new System.Text.StringBuilder();
             bool gotTtype = false;
 
+            // v1.0.6: the probe window closing throws OperationCanceledException out of
+            // ReadAsync. That used to escape to the outer catch and skip the result block
+            // below, so a terminal type that had already arrived was discarded:
+            // CP437 terminals (SyncTerm, NetRunner) got UTF-8 box glyphs and screen
+            // readers never got plain-text mode. (GMCP and DONT ECHO were unaffected;
+            // they live outside the try and ride the fallback return.) The window
+            // closing is the normal end of the probe; the two SB drain loops read on
+            // the same token so a client that never sends IAC SE cannot park the probe.
+            try
+            {
             while (!ttypeCts.Token.IsCancellationRequested)
             {
                 int read = await stream.ReadAsync(buf, 0, 1, ttypeCts.Token);
@@ -1137,12 +1151,12 @@ public class MudServer
                     {
                         if (await stream.ReadAsync(buf, 0, 1, ttypeCts.Token) == 0) break;
                         // buf[0] should be 0x00 (IS) — consume and read the type string
-                        while (!ct.IsCancellationRequested)
+                        while (!ttypeCts.Token.IsCancellationRequested)
                         {
-                            if (await stream.ReadAsync(buf, 0, 1, ct) == 0) break;
+                            if (await stream.ReadAsync(buf, 0, 1, ttypeCts.Token) == 0) break;
                             if (buf[0] == 0xFF) // IAC inside SB
                             {
-                                if (await stream.ReadAsync(buf, 0, 1, ct) == 0) break;
+                                if (await stream.ReadAsync(buf, 0, 1, ttypeCts.Token) == 0) break;
                                 if (buf[0] == 0xF0) break; // SE — end of subneg
                             }
                             else
@@ -1156,17 +1170,22 @@ public class MudServer
                     else
                     {
                         // Different option in SB — drain until IAC SE
-                        while (!ct.IsCancellationRequested)
+                        while (!ttypeCts.Token.IsCancellationRequested)
                         {
-                            if (await stream.ReadAsync(buf, 0, 1, ct) == 0) break;
+                            if (await stream.ReadAsync(buf, 0, 1, ttypeCts.Token) == 0) break;
                             if (buf[0] == 0xFF)
                             {
-                                if (await stream.ReadAsync(buf, 0, 1, ct) == 0) break;
+                                if (await stream.ReadAsync(buf, 0, 1, ttypeCts.Token) == 0) break;
                                 if (buf[0] == 0xF0) break;
                             }
                         }
                     }
                 }
+            }
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                // Probe window closed; evaluate whatever arrived before it did.
             }
 
             if (gotTtype && ttype.Length > 0)
@@ -1509,6 +1528,28 @@ public class MudServer
     }
 
     /// <summary>Send a message to a specific player by username.</summary>
+    /// <summary>
+    /// v1.0.6: the AUTH connection type may carry ";key=value" parameters after the
+    /// type name, e.g. "SSH;echo=1" from a relay that has put its PTY in raw mode and
+    /// wants the server to echo. Parameters ride inside the existing field so an older
+    /// server just stores the odd type string and keeps working; only "echo" is known.
+    /// </summary>
+    internal static string ParseConnectionTypeParams(string? connectionType, out bool wantsServerEcho)
+    {
+        wantsServerEcho = false;
+        if (string.IsNullOrEmpty(connectionType)) return "";
+        int semi = connectionType.IndexOf(';');
+        if (semi < 0) return connectionType.Trim();
+        var parts = connectionType.Split(';');
+        for (int i = 1; i < parts.Length; i++)
+        {
+            var kv = parts[i].Split('=', 2);
+            if (kv.Length == 2 && kv[0].Trim().Equals("echo", StringComparison.OrdinalIgnoreCase) && kv[1].Trim() == "1")
+                wantsServerEcho = true;
+        }
+        return parts[0].Trim();
+    }
+
     public bool SendToPlayer(string username, string message)
     {
         if (ActiveSessions.TryGetValue(username.ToLowerInvariant(), out var session))

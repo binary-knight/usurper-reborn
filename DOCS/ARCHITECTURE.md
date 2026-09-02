@@ -1370,7 +1370,7 @@ Output modes (auto-detected):
 
 **Spectator forwarding**: `_spectatorStreams` set; output methods call `ForwardToSpectators(text)`. Markup is rendered to a string before duplication.
 
-**ServerEchoes flag**: controls server-side echo for ReadLineInteractiveAsync. True only for direct raw TCP MUD clients (Mudlet, TinTin++, VIP Mud); false for all relay connections (Web, SSH) where the PTY handles echo.
+**ServerEchoes flag**: controls whether the server owns the input line in ReadLineInteractiveAsync (echoes keystrokes, and erases-and-redraws the line when a message lands mid-typing). v1.0.6: true for direct raw TCP MUD clients (Mudlet, TinTin++, VIP Mud), the web terminal (`X-Client:Web`; xterm.js streams keystrokes and never echoes locally), and the SSH relay when it has put its PTY in raw mode (AUTH type `SSH;echo=1`, see `TerminalRawMode`). False for the desktop/Steam, BBS door, and Electron clients, which keep their own line editor; for those the server never erases the line and delivers messages on a fresh line followed by the redrawn prompt. The prompt redrawn is the tracked output line (`OutputLineTracker`), not GetInput's prompt argument. Reproduction harness: `Tests/Harness/input-stomping/`.
 
 ### UIHelper
 **File**: `Scripts/UI/UIHelper.cs`

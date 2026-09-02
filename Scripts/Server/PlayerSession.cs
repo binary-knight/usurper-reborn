@@ -94,6 +94,9 @@ public class PlayerSession : IDisposable
     /// <summary>True while this session is in spectator mode (no game loaded).</summary>
     public bool IsSpectating { get; set; }
 
+    /// <summary>v1.0.6: the relay put its terminal in raw mode and asked the server to echo (AUTH type ";echo=1").</summary>
+    public bool WantsServerEcho { get; }
+
     /// <summary>Pending spectate request awaiting this player's /accept or /deny.</summary>
     public SpectateRequest? PendingSpectateRequest { get; set; }
 
@@ -127,9 +130,11 @@ public class PlayerSession : IDisposable
         bool isPlainText = false,
         bool isCp437 = false,
         bool gmcpEnabled = false,
-        string? forwardedIP = null)
+        string? forwardedIP = null,
+        bool wantsServerEcho = false)
     {
         Username = username;
+        WantsServerEcho = wantsServerEcho;
         ActiveCharacterName = username;
         ConnectionType = connectionType;
         _tcpClient = tcpClient;
@@ -202,11 +207,15 @@ public class PlayerSession : IDisposable
             // see the framing bytes.
             ctx.GmcpEnabled = _gmcpEnabled;
 
-            // ServerEchoes: true only for direct raw-TCP MUD connections (Mudlet, etc.)
-            // where we sent IAC WILL ECHO and the client disabled its local echo.
-            // SSH relay connections (web terminal, direct SSH) use PTY echo — server
-            // must not double-echo or every character appears twice in the terminal.
-            ctx.Terminal.ServerEchoes = (ConnectionType == "MUD");
+            // ServerEchoes: the server owns the input line (echoes keystrokes, and can
+            // erase-and-redraw the line when a message lands mid-typing) for:
+            //  - direct raw-TCP MUD clients (Mudlet etc.), which answered IAC WILL ECHO;
+            //  - the web terminal (v1.0.6): xterm.js streams keystrokes and never echoes
+            //    locally, so web players were typing blind in game until now;
+            //  - the SSH relay when it has put its PTY in raw mode (v1.0.6, ";echo=1").
+            // Desktop/Steam, BBS door, and Electron clients keep their own line editor
+            // and local echo; the server must not echo for them or text doubles.
+            ctx.Terminal.ServerEchoes = ConnectionType == "MUD" || ConnectionType == "Web" || WantsServerEcho;
 
             // Enable real-time message delivery: terminal polls this during GetInput()
             ctx.Terminal.MessageSource = () =>
