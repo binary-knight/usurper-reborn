@@ -20,7 +20,6 @@ public sealed class OutputLineTracker
     private readonly StringBuilder _line = new();
     private readonly object _lock = new();
     private int _csiStart = -1;   // index in _line of a pending ESC, -1 when not inside a sequence
-    private bool _csiHasBracket;
 
     /// <summary>When true, writes are not tracked (server echo of keystrokes, the redraw itself).</summary>
     public bool Suppress { get; set; }
@@ -32,7 +31,7 @@ public sealed class OutputLineTracker
 
     public void Reset()
     {
-        lock (_lock) { _line.Clear(); _csiStart = -1; }
+        lock (_lock) { _line.Clear(); _csiStart = -1; _escMode = 0; }
     }
 
     public void Track(char c)
@@ -50,32 +49,61 @@ public sealed class OutputLineTracker
         }
     }
 
+    // Escape-sequence state: 0 = text, 1 = after ESC, 2 = CSI (ESC [), 3 = OSC (ESC ]),
+    // 4 = one-byte intermediate (ESC ( / ESC ) charset selects and similar).
+    private int _escMode;
+    private bool _oscEsc; // inside OSC, previous char was ESC (looking for the ST terminator ESC \)
+
     private void TrackCore(char c)
     {
-        if (_csiStart >= 0)
+        switch (_escMode)
         {
-            _line.Append(c);
-            if (!_csiHasBracket)
-            {
-                if (c == '[') { _csiHasBracket = true; return; }
-                // ESC followed by something other than '[' (e.g. ESC 7): not a CSI, drop it.
-                _line.Length = _csiStart; _csiStart = -1; return;
-            }
-            if (c >= '@' && c <= '~')
-            {
-                // Final byte. Keep colour (m), drop everything else; 2J / 2K also empty the line.
-                bool clearAll = (c == 'J' || c == 'K') && _line.Length - _csiStart == 4 && _line[_csiStart + 2] == '2';
-                if (c != 'm') _line.Length = _csiStart;
-                _csiStart = -1;
-                if (clearAll) _line.Clear();
-            }
-            return;
+            case 1: // after ESC
+                _line.Append(c);
+                if (c == '[') { _escMode = 2; return; }
+                if (c == ']') { _escMode = 3; _oscEsc = false; return; }
+                if (c == '(' || c == ')' || c == '#' || c == '%') { _escMode = 4; return; }
+                // Two-byte escape (ESC 7, ESC =, ...): drop it whole.
+                _line.Length = _csiStart; _csiStart = -1; _escMode = 0;
+                return;
+            case 2: // CSI
+                _line.Append(c);
+                if (c >= '@' && c <= '~')
+                {
+                    // Final byte. Keep colour (m), drop everything else; 2J / 2K also empty the line.
+                    bool clearAll = (c == 'J' || c == 'K') && _line.Length - _csiStart == 4 && _line[_csiStart + 2] == '2';
+                    if (c != 'm') _line.Length = _csiStart;
+                    _csiStart = -1; _escMode = 0;
+                    if (clearAll) _line.Clear();
+                }
+                return;
+            case 3: // OSC: runs to BEL or ESC \ ; never part of a prompt, drop it whole
+                if (c == '\x07' || (_oscEsc && c == '\\'))
+                {
+                    _line.Length = _csiStart; _csiStart = -1; _escMode = 0;
+                    return;
+                }
+                _oscEsc = c == '\x1b';
+                return;
+            case 4: // one intermediate byte then done
+                _line.Length = _csiStart; _csiStart = -1; _escMode = 0;
+                return;
         }
 
         if (c == '\n' || c == '\r') { _line.Clear(); return; }
-        if (c == '\x1b') { _csiStart = _line.Length; _csiHasBracket = false; _line.Append(c); return; }
+        if (c == '\x1b') { _csiStart = _line.Length; _escMode = 1; _line.Append(c); return; }
         _line.Append(c);
-        if (_line.Length > MaxLength) _line.Remove(0, _line.Length - MaxLength);
+        if (_line.Length > MaxLength)
+        {
+            // Trim from the front, but never inside an escape sequence: cut at the
+            // first ESC on or after the cut point when there is one.
+            int cut = _line.Length - MaxLength;
+            for (int k = cut; k < _line.Length; k++)
+            {
+                if (_line[k] == '\x1b') { cut = k; break; }
+            }
+            _line.Remove(0, cut);
+        }
     }
 }
 

@@ -2122,6 +2122,10 @@ public partial class TerminalEmulator
         finally
         {
             _lineTracker.Suppress = false;
+            // The Enter echo moved the cursor to a fresh line while tracking was
+            // suppressed; without this the old prompt would prefix whatever the
+            // game prints next without its own leading newline.
+            _lineTracker.Reset();
         }
     }
 

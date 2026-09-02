@@ -30,8 +30,8 @@ presses Enter and prints what the server made of the input.
 |------|---------|------------------------------------|
 | MUD client (Mudlet, TinTin++; answers DO ECHO) | `python3 stomp.py MUD` | `\r\x1b[2K` + message + real prompt line + `hello wor` |
 | Web terminal (raw TCP, `X-Client:Web`, keystrokes streamed) | `python3 stomp.py WEB` | same as MUD; typing must echo (`bytes while typing` = `hello wor`) |
-| SyncTerm / CP437 (TTYPE reply `SYNCTERM`) | `python3 stomp.py SYNCTERM` | same as MUD |
-| Desktop / Steam / BBS door client (AUTH on TCP, whole lines, local echo) | `python3 stomp.py DESKTOP` | `\r\n` + message + real prompt line, no typed text, no erase |
+| SyncTerm / CP437 (TTYPE reply `SYNCTERM`) | `python3 stomp.py SYNCTERM` | same as MUD. Known gap: the scripted TTYPE reply does not currently trigger CP437 detection in `ProbeTtypeAsync`, so this case exercises the MUD path; CP437 translation is the shared `WriteRawAnsi` path |
+| Desktop / Steam / BBS door client (AUTH on TCP, whole lines, local echo) | `python3 stomp.py DESKTOP` | `\r\n` + message + real prompt line, no typed text, no erase. Server side only: the real client's re-echo of its own buffer (OnlinePlaySystem) is hand-verified, not driven here |
 | SSH through `--mud-relay` under a real PTY | `python3 relay_stomp.py` | same as MUD; PTY attrs must show ICANON and ECHO off |
 
 Pass criteria for every case: the message is on its own line, the prompt that was

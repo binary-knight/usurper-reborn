@@ -64,6 +64,38 @@ public class OutputLineTrackerTests
     }
 
     [Fact]
+    public void Drops_osc_and_charset_escapes_whole()
+    {
+        var t = new OutputLineTracker();
+        t.Track("\x1b]0;Usurper Reborn\x07\x1b(BPrompt> ");
+        t.CurrentLine.Should().Be("Prompt> ");
+        t.Track("\x1b]2;title\x1b\\more");
+        t.CurrentLine.Should().Be("Prompt> more");
+    }
+
+    [Fact]
+    public void Front_trim_never_cuts_inside_an_escape_sequence()
+    {
+        var t = new OutputLineTracker();
+        t.Track(new string('x', 1020));
+        t.Track("\x1b[32mtail");
+        var line = t.CurrentLine;
+        line.Length.Should().BeLessOrEqualTo(1024 + 4);
+        line.Should().EndWith("\x1b[32mtail");
+        line.IndexOf('\x1b').Should().Be(line.IndexOf("\x1b[32m"), "no partial sequence may survive at the head");
+    }
+
+    [Fact]
+    public void Reset_clears_state_mid_sequence()
+    {
+        var t = new OutputLineTracker();
+        t.Track("abc\x1b[3");
+        t.Reset();
+        t.Track("1m");
+        t.CurrentLine.Should().Be("1m");
+    }
+
+    [Fact]
     public void Tracking_writer_sees_every_write_path_once()
     {
         var tracker = new OutputLineTracker();
