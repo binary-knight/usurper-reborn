@@ -2234,6 +2234,10 @@ public abstract class BaseLocation
             // it gets its own label rather than "Lives".
             // Nightmare difficulty offers no resurrection at all, so the counter is
             // hidden there rather than shown as a promise the death screen will not keep.
+            // (DifficultySystem.CurrentDifficulty is process-wide; on the MUD server it
+            // reflects the last character loaded. permadeathLives short-circuits it there
+            // while online permadeath is on, and the same global already drives the
+            // XP/gold multipliers, so this is no worse than the existing behaviour.)
             bool permadeathLives = UsurperRemake.BBS.DoorMode.IsOnlineMode && GameConfig.OnlinePermadeathEnabled;
             bool showLives = permadeathLives || !DifficultySystem.IsPermadeath();
             string livesInfo = showLives

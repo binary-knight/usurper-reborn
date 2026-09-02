@@ -20355,7 +20355,7 @@
   "hint.inventory.title": "Astuce d'inventaire",
   "hint.inventory.msg": "Appuie sur '*' dans la Grand-Rue pour voir ton inventaire. Tu peux y équiper le butin des donjons !",
   "hint.save_game.title": "Rappel de sauvegarde",
-  "hint.save_game.msg": "Ta progression est sauvegardée automatiquement. Quitter [Q] depuis la Grand-Rue sauvegarde aussi et te laisse choisir où dormir cette nuit.",
+  "hint.save_game.msg": "Ta progression est sauvegardée automatiquement. Quitter [Q] depuis la Grand-Rue sauvegarde aussi ta partie.",
   "hint.team_combat.title": "Astuce de combat en équipe",
   "hint.team_combat.msg": "Combattre avec des compagnons te donne un bonus de 15% d'XP et d'or !",
   "hint.first_purchase_tax.title": "Info sur les taxes",

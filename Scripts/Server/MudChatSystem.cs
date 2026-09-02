@@ -417,20 +417,27 @@ public static class MudChatSystem
             // v1.0.5: an offline recipient used to swallow the tell with "X is not
             // online." Drop it in their mailbox instead, under the same daily cap as
             // the mailbox's own compose flow. Unknown names still get a plain error.
+            // The chat display name omits the family surname (and reads "X the Title"
+            // for immortals); the mailbox keys its daily cap and sender column on
+            // Character.DisplayName, so use that here or the two paths count separate
+            // caps and show two sender names for one player.
             var backend = UsurperRemake.Systems.SaveSystem.Instance.Backend as UsurperRemake.Systems.SqlSaveBackend;
+            string mailFrom = MudServer.Instance?.ActiveSessions.GetValueOrDefault(username.ToLowerInvariant())
+                ?.Context?.Engine?.CurrentPlayer?.DisplayName ?? displayName;
             string? mailName = backend?.ResolvePlayerDisplayName(targetName);
             terminal.SetColor("gray");
             if (backend == null || mailName == null)
             {
                 terminal.WriteLine($"  {UsurperRemake.Systems.Loc.Get("chat.tell_offline_unknown", targetName)}");
             }
-            else if (backend.GetMailsSentToday(displayName) >= 20)
+            else if (backend.GetMailsSentToday(mailFrom) >= 20)
             {
                 terminal.WriteLine($"  {UsurperRemake.Systems.Loc.Get("chat.tell_mail_limit", mailName)}");
             }
             else
             {
-                await backend.SendMessage(displayName, mailName, "mail", message);
+                if (message.Length > 200) message = message.Substring(0, 200);
+                await backend.SendMessage(mailFrom, mailName, "mail", message);
                 terminal.WriteLine($"  {UsurperRemake.Systems.Loc.Get("chat.tell_offline_mailed", mailName)}");
             }
         }

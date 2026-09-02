@@ -20355,7 +20355,7 @@
   "hint.inventory.title": "Consiglio sull'inventario",
   "hint.inventory.msg": "Premi '*' nella Via Principale per vedere il tuo inventario. Lì puoi equipaggiare il bottino dei sotterranei!",
   "hint.save_game.title": "Promemoria di salvataggio",
-  "hint.save_game.msg": "I tuoi progressi vengono salvati automaticamente. Uscire [Q] dalla Via Principale salva anche e ti lascia scegliere dove dormire stanotte.",
+  "hint.save_game.msg": "I tuoi progressi vengono salvati automaticamente. Uscire [Q] dalla Via Principale salva anche la partita.",
   "hint.team_combat.title": "Consiglio di combattimento di squadra",
   "hint.team_combat.msg": "Combattere con i compagni ti dà un bonus del 15% di XP e oro!",
   "hint.first_purchase_tax.title": "Informazioni sulle tasse",

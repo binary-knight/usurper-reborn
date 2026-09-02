@@ -2174,15 +2174,24 @@ public class TeamCornerLocation : BaseLocation
                 terminal.SetColor("yellow");
                 terminal.WriteLine(Loc.Get("team.message_no_recipients"));
             }
-            else if (backend!.GetMailsSentToday(currentPlayer.DisplayName) >= 20)
+            else if (backend!.GetMailsSentToday(currentPlayer.DisplayName) + members.Count > 20)
             {
+                // One row per member counts against the cap, same as sending each by hand.
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("base.mail_daily_limit"));
             }
             else
             {
+                if (message.Length > 200) message = message.Substring(0, 200);
+                string body = $"[{currentPlayer.Team}] {message}";
                 foreach (var member in members)
-                    await backend.SendMessage(currentPlayer.DisplayName, member.DisplayName, "mail", $"[{currentPlayer.Team}] {message}");
+                {
+                    await backend.SendMessage(currentPlayer.DisplayName, member.DisplayName, "mail", body);
+                    // Same live push the mailbox compose flow sends.
+                    if (member.IsOnline)
+                        UsurperRemake.Server.MudServer.Instance?.SendToPlayer(member.DisplayName,
+                            $"\u001b[35m  [Mail] {currentPlayer.DisplayName}: {body}\u001b[0m");
+                }
                 terminal.SetColor("bright_green");
                 terminal.WriteLine(Loc.Get("team.message_mailed", members.Count));
                 terminal.SetColor("white");

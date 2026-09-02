@@ -398,6 +398,16 @@ public class ArenaLocation : BaseLocation
         {
             // Calculate gold theft (10% of defender's ACTUAL gold from save)
             goldStolen = (long)(defenderGold * GameConfig.PvPGoldStealPercent);
+
+            // v1.0.5: the eligible list excluded online players, but a fight can run
+            // for minutes and the defender may have logged in since. Their autosave
+            // would overwrite the deduction below, so the theft is voided rather
+            // than duplicated. The win, XP, and bounty still stand.
+            if (UsurperRemake.Server.MudServer.Instance?.ActiveSessions.ContainsKey(defenderUsername) == true)
+            {
+                DebugLogger.Instance.LogInfo("GOLD", $"ARENA: {target.DisplayName} logged in mid-fight; gold theft of {goldStolen:N0}g voided");
+                goldStolen = 0;
+            }
             goldStolen = Math.Max(0, goldStolen);
 
             // v0.60.0 alpha balance review: alt-account gold-steal cap. Stops

@@ -379,7 +379,9 @@ public class DungeonLocation : BaseLocation
         }
         else
         {
-            HintSystem.Instance.TryShowHint(HintSystem.HINT_FIRST_DUNGEON, term, player.HintsShown);
+            // v1.0.5: same hold as the decline path; DisplayLocation clears the screen.
+            if (HintSystem.Instance.TryShowHint(HintSystem.HINT_FIRST_DUNGEON, term, player.HintsShown))
+                await term.PressAnyKey();
         }
 
         // Captain Aldric's Mission — dungeon entry objective

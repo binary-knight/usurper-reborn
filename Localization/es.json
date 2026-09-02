@@ -20366,7 +20366,7 @@
   "hint.inventory.title": "Consejo de inventario",
   "hint.inventory.msg": "Pulsa '*' en la Calle Mayor para ver tu inventario. ¡Allí puedes equipar el botín de las mazmorras!",
   "hint.save_game.title": "Recordatorio de guardado",
-  "hint.save_game.msg": "Tu progreso se guarda automáticamente. Salir [Q] desde la Calle Mayor también guarda y te deja elegir dónde dormir esta noche.",
+  "hint.save_game.msg": "Tu progreso se guarda automáticamente. Salir [Q] desde la Calle Mayor también guarda la partida.",
   "hint.team_combat.title": "Consejo de combate en equipo",
   "hint.team_combat.msg": "¡Luchar con compañeros te da un 15% extra de XP y oro!",
   "hint.first_purchase_tax.title": "Información de impuestos",

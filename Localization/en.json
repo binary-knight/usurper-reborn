@@ -20798,7 +20798,7 @@
   "hint.inventory.title": "Inventory Tip",
   "hint.inventory.msg": "Press '*' on Main Street to view your inventory. You can equip dungeon loot there!",
   "hint.save_game.title": "Save Reminder",
-  "hint.save_game.msg": "Your progress is saved automatically. Quitting [Q] from Main Street also saves and lets you choose where to sleep for the night.",
+  "hint.save_game.msg": "Your progress is saved automatically. Quitting [Q] from Main Street also saves your game.",
   "hint.team_combat.title": "Team Combat Tip",
   "hint.team_combat.msg": "Fighting with companions gives you a 15% bonus to XP and gold!",
   "hint.first_purchase_tax.title": "Tax Info",

@@ -20659,7 +20659,7 @@
   "hint.inventory.title": "Felszerelés-tipp",
   "hint.inventory.msg": "Nyomd meg a '*'-ot a Fő utcán a felszerelésed megtekintéséhez. Ott felveheted a tömlöcben szerzett zsákmányt is!",
   "hint.save_game.title": "Mentési emlékeztető",
-  "hint.save_game.msg": "A haladásod automatikusan mentődik. A Kilépés [Q] a Fő utcáról szintén ment, és megválaszthatod, hol töltöd az éjszakát.",
+  "hint.save_game.msg": "A haladásod automatikusan mentődik. A Kilépés [Q] a Fő utcáról szintén menti a játékot.",
   "hint.team_combat.title": "Csapatharci tipp",
   "hint.team_combat.msg": "Társakkal harcolva 15% bónuszt kapsz tapasztalatból és aranyból!",
   "hint.first_purchase_tax.title": "Adóinformáció",
