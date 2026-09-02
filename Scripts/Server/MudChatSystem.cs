@@ -85,7 +85,7 @@ public static class MudChatSystem
 
             case "tell":
             case "t":
-                return HandleTell(username, args, terminal);
+                return await HandleTell(username, args, terminal);
 
             case "emote":
             case "me":
@@ -354,7 +354,7 @@ public static class MudChatSystem
         return true;
     }
 
-    private static bool HandleTell(string username, string args, TerminalEmulator terminal)
+    private static async Task<bool> HandleTell(string username, string args, TerminalEmulator terminal)
     {
         // v0.57.14: completely empty args toggles incoming-tell mute (anti-harassment).
         if (string.IsNullOrWhiteSpace(args))
@@ -414,8 +414,50 @@ public static class MudChatSystem
         }
         else
         {
+            // v1.0.5: an offline recipient used to swallow the tell with "X is not
+            // online." Drop it in their mailbox instead, under the same daily cap as
+            // the mailbox's own compose flow. Unknown names still get a plain error.
+            // The chat display name omits the family surname (and reads "X the Title"
+            // for immortals); the mailbox keys its daily cap and sender column on
+            // Character.DisplayName, so use that here or the two paths count separate
+            // caps and show two sender names for one player.
+            var backend = UsurperRemake.Systems.SaveSystem.Instance.Backend as UsurperRemake.Systems.SqlSaveBackend;
+            string mailFrom = MudServer.Instance?.ActiveSessions.GetValueOrDefault(username.ToLowerInvariant())
+                ?.Context?.Engine?.CurrentPlayer?.DisplayName ?? displayName;
+            // ResolveTargetAndMessage only matched live sessions and fell back to the
+            // first word. Retry the same longest-prefix-first split against the
+            // database so "/tell Halvar Copperfield hi" reaches an offline
+            // "Halvar Copperfield" instead of mailing "Copperfield hi" to Halvar.
+            string? mailName = null;
+            if (backend != null)
+            {
+                var words = args.Trim().Split(' ', System.StringSplitOptions.RemoveEmptyEntries);
+                for (int n = words.Length - 1; n >= 1 && mailName == null; n--)
+                {
+                    string candidate = string.Join(' ', words, 0, n);
+                    mailName = backend.ResolvePlayerDisplayName(candidate);
+                    if (mailName != null)
+                    {
+                        targetName = candidate;
+                        message = string.Join(' ', words, n, words.Length - n);
+                    }
+                }
+            }
             terminal.SetColor("gray");
-            terminal.WriteLine($"  {targetName} is not online.");
+            if (backend == null || mailName == null)
+            {
+                terminal.WriteLine($"  {UsurperRemake.Systems.Loc.Get("chat.tell_offline_unknown", targetName)}");
+            }
+            else if (backend.GetMailsSentToday(mailFrom) >= 20)
+            {
+                terminal.WriteLine($"  {UsurperRemake.Systems.Loc.Get("chat.tell_mail_limit", mailName)}");
+            }
+            else
+            {
+                if (message.Length > 200) message = message.Substring(0, 200);
+                await backend.SendMessage(mailFrom, mailName, "mail", message);
+                terminal.WriteLine($"  {UsurperRemake.Systems.Loc.Get("chat.tell_offline_mailed", mailName)}");
+            }
         }
 
         return true;

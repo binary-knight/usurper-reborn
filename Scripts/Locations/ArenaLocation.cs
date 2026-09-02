@@ -220,9 +220,20 @@ public class ArenaLocation : BaseLocation
                     .Select(s => s.Username),
             StringComparer.OrdinalIgnoreCase);
 
+        // v1.0.5: never target a player who is online right now. Gold theft is
+        // applied to the saved row (DeductGoldFromPlayer); an online defender's
+        // next autosave writes their in-memory gold back over it, so they lose
+        // nothing while the attacker keeps the gold -- duplication. Only offline
+        // snapshots are safe targets. Checked against both the heartbeat table
+        // (IsOnline) and the in-process session list, since the heartbeat lags.
+        var onlineNow = new HashSet<string>(
+            UsurperRemake.Server.MudServer.Instance?.GetOnlinePlayerNames() ?? Array.Empty<string>(),
+            StringComparer.OrdinalIgnoreCase);
+
         // Determine this account's base username (strip __alt suffix if present)
         string myAccount = SqlSaveBackend.GetAccountUsername(myUsername);
         var eligible = allPlayers
+            .Where(p => !p.IsOnline && !onlineNow.Contains(p.Username))
             .Where(p => !string.Equals(p.Username, myUsername, StringComparison.OrdinalIgnoreCase))
             // Block same-account PvP (main vs alt)
             .Where(p => !string.Equals(SqlSaveBackend.GetAccountUsername(p.Username), myAccount, StringComparison.OrdinalIgnoreCase))
@@ -380,6 +391,7 @@ public class ArenaLocation : BaseLocation
         string winnerUsername = attackerWon ? myUsername : defenderUsername;
 
         long goldStolen = 0;
+        bool theftVoided = false;
         // XP and kill tracking are handled by CombatEngine.DeterminePvPOutcome()
         long xpGained = result.ExperienceGained;
 
@@ -387,6 +399,17 @@ public class ArenaLocation : BaseLocation
         {
             // Calculate gold theft (10% of defender's ACTUAL gold from save)
             goldStolen = (long)(defenderGold * GameConfig.PvPGoldStealPercent);
+
+            // v1.0.5: the eligible list excluded online players, but a fight can run
+            // for minutes and the defender may have logged in since. Their autosave
+            // would overwrite the deduction below, so the theft is voided rather
+            // than duplicated. The win, XP, and bounty still stand.
+            if (UsurperRemake.Server.MudServer.Instance?.ActiveSessions.ContainsKey(defenderUsername) == true)
+            {
+                DebugLogger.Instance.LogInfo("GOLD", $"ARENA: {target.DisplayName} logged in mid-fight; gold theft of {goldStolen:N0}g voided");
+                goldStolen = 0;
+                theftVoided = true;
+            }
             goldStolen = Math.Max(0, goldStolen);
 
             // v0.60.0 alpha balance review: alt-account gold-steal cap. Stops
@@ -431,6 +454,11 @@ public class ArenaLocation : BaseLocation
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  {Loc.Get("arena.gold_stolen_from", target.DisplayName, $"{goldStolen:N0}")}");
+            }
+            else if (theftVoided)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine($"  {Loc.Get("arena.theft_voided", target.DisplayName)}");
             }
             if (bountyReward > 0)
             {

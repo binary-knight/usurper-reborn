@@ -1,0 +1,35 @@
+[h1]Usurper Reborn 1.0.5 - Polish[/h1]
+
+I walked through the whole game after 1.0.4 looking for things that get in the way of new players. This release is the result. Nothing new to learn. Update and play.
+
+[h2]The game was telling you the wrong keys[/h2]
+
+Five hints pointed at keys that do something else. The low health warning sent you to [H] for the Healer, which is actually Home. The Healer is [1]. In combat it told you to drink a potion with [I], which is Disarm. Potions are [H]. The level-up hint named the wrong key for the Level Master, which is [V]. And every caster was told to cast spells with 'C'. There is no C. Spells are on the quickbar, number keys. All fixed, in all five languages.
+
+[h2]Dungeon rooms with monsters said CLEARED[/h2]
+
+The tag in the room header for a room that still has monsters in it read [CLEARED], same as an empty one. It has been that way since 0.60. It now says DANGER.
+
+[h2]Hints that never showed up[/h2]
+
+Three tips were written and translated a long time ago and never had a trigger: the first level-up nudge, the inventory tip, and the save tip. They show now. If you skipped the dungeon tutorial you also got nothing at all about how to move around. You get the short version now, and it waits for a keypress instead of being wiped by the room drawing over it. Main Street will only show one new tip per visit so they never stack up and push the menu off screen.
+
+[h2]Single-player shows your revives[/h2]
+
+The status bar now shows how many free revives you have left in single-player, the same way the online server shows lives. It is hidden on Nightmare, where there are none.
+
+[h2]Online fixes[/h2]
+
+[list]
+[*]Sending a /tell to someone who is offline used to throw the message away. It now lands in their mailbox.
+[*]The team message option in the Team Corner said "sent" and did nothing. It now mails your whole team.
+[*]The in-game "[Mail]" notice when someone mails you while you are online never actually arrived for most people. It does now.
+[*]Group dungeon messages showed account names instead of character names.
+[*]Attacking someone in the Arena while they were online could give you gold that they never lost. Online players are no longer valid targets, and if your target logs in mid-fight the gold part is cancelled and the game tells you so.
+[/list]
+
+[h2]Not in this one[/h2]
+
+The typing problem where a chat message lands on top of what you are writing is still open. It behaves differently on every kind of connection and needs a careful fix, so it gets its own release.
+
+The two open terminal reports, boxes double-spacing at 80 columns and garbled output on one BBS setup, are still waiting on which terminal program was being used. If that is you, tell me and I can chase it.

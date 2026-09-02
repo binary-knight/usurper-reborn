@@ -240,21 +240,43 @@ public class MainStreetLocation : BaseLocation
         }
 
         // Show low HP hint if player is below 25% health
+        // v1.0.5: at most one newly shown hint per render. Each box is eight lines; a
+        // first return from the dungeon at low HP with loot could otherwise stack four
+        // boxes and push the menu off a 24-row screen. The rest fire on later visits.
+        bool hintShown = false;
         if (currentPlayer.HP < currentPlayer.MaxHP * 0.25)
         {
-            HintSystem.Instance.TryShowHint(HintSystem.HINT_LOW_HP, terminal, currentPlayer.HintsShown);
+            hintShown = HintSystem.Instance.TryShowHint(HintSystem.HINT_LOW_HP, terminal, currentPlayer.HintsShown);
+        }
+
+        // v1.0.5: three hints that were defined and localized when the hint system shipped but
+        // never had a trigger. The level-up nudge only matters with auto-level off (on by
+        // default); the inventory nudge fires the first time the player carries anything; the
+        // save hint is single-player only (online autosaves and has no quit-to-save flow).
+        if (!hintShown && !currentPlayer.AutoLevelUp && currentPlayer.Level < GameConfig.MaxLevel
+            && currentPlayer.Experience >= GameConfig.GetExperienceForLevel(currentPlayer.Level + 1))
+        {
+            hintShown = HintSystem.Instance.TryShowHint(HintSystem.HINT_FIRST_LEVEL_UP, terminal, currentPlayer.HintsShown);
+        }
+        if (!hintShown && currentPlayer.Inventory.Count > 0)
+        {
+            hintShown = HintSystem.Instance.TryShowHint(HintSystem.HINT_INVENTORY, terminal, currentPlayer.HintsShown);
+        }
+        if (!hintShown && !DoorMode.IsOnlineMode && currentPlayer.MKills > 0)
+        {
+            hintShown = HintSystem.Instance.TryShowHint(HintSystem.HINT_SAVE_GAME, terminal, currentPlayer.HintsShown);
         }
 
         // Show mana/spells hint if player's class has spells but none learned yet
         // Exclude Mystic Shaman — they use mana for abilities, not spells, and can't learn spells at the Magic Shop
-        if (currentPlayer.MaxMana > 0 && currentPlayer.Class != CharacterClass.MysticShaman
+        if (!hintShown && currentPlayer.MaxMana > 0 && currentPlayer.Class != CharacterClass.MysticShaman
             && SpellSystem.GetAvailableSpells(currentPlayer).Count == 0)
         {
-            HintSystem.Instance.TryShowHint(HintSystem.HINT_MANA_SPELLS, terminal, currentPlayer.HintsShown);
+            hintShown = HintSystem.Instance.TryShowHint(HintSystem.HINT_MANA_SPELLS, terminal, currentPlayer.HintsShown);
         }
 
         // Show quest system hint for early players who have started fighting
-        if (currentPlayer.Level <= 3 && currentPlayer.Statistics.TotalMonstersKilled >= 1)
+        if (!hintShown && currentPlayer.Level <= 3 && currentPlayer.Statistics.TotalMonstersKilled >= 1)
         {
             HintSystem.Instance.TryShowHint(HintSystem.HINT_QUEST_SYSTEM, terminal, currentPlayer.HintsShown);
         }

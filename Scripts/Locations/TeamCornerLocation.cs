@@ -2160,14 +2160,46 @@ public class TeamCornerLocation : BaseLocation
 
         if (!string.IsNullOrEmpty(message))
         {
-            terminal.WriteLine("");
-            terminal.SetColor("bright_green");
-            terminal.WriteLine(Loc.Get("team.message_sent"));
-            terminal.SetColor("white");
-            terminal.WriteLine(Loc.Get("team.your_message", message));
-            terminal.WriteLine("");
+            // v1.0.5: this printed "message sent!" and dropped the text. It now goes to
+            // every other team member's mailbox (online-only menu entry, so the backend
+            // is the SQL one), under the mailbox's daily send cap.
+            var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
+            var members = backend != null
+                ? await backend.GetPlayerTeamMembers(currentPlayer.Team, excludeDisplayName: currentPlayer.DisplayName)
+                : new List<PlayerSummary>();
 
-            // Could integrate with mail system here
+            terminal.WriteLine("");
+            if (members.Count == 0)
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine(Loc.Get("team.message_no_recipients"));
+            }
+            else if (backend!.GetMailsSentToday(currentPlayer.DisplayName) + members.Count > 20)
+            {
+                // One row per member counts against the cap, same as sending each by hand.
+                terminal.SetColor("red");
+                terminal.WriteLine(Loc.Get("base.mail_daily_limit"));
+            }
+            else
+            {
+                if (message.Length > 200) message = message.Substring(0, 200);
+                string body = $"[{currentPlayer.Team}] {message}";
+                foreach (var member in members)
+                {
+                    await backend.SendMessage(currentPlayer.DisplayName, member.DisplayName, "mail", body);
+                    // Live push for online members. Sessions are keyed by login
+                    // username, not character name, so resolve first.
+                    var memberUser = member.IsOnline ? backend.ResolvePlayerUsername(member.DisplayName) : null;
+                    if (memberUser != null)
+                        UsurperRemake.Server.MudServer.Instance?.SendToPlayer(memberUser,
+                            $"\u001b[35m  [Mail] {currentPlayer.DisplayName}: {body}\u001b[0m");
+                }
+                terminal.SetColor("bright_green");
+                terminal.WriteLine(Loc.Get("team.message_mailed", members.Count));
+                terminal.SetColor("white");
+                terminal.WriteLine(Loc.Get("team.your_message", message));
+            }
+            terminal.WriteLine("");
         }
 
         await Task.Delay(2000);

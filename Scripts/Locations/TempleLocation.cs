@@ -1005,8 +1005,10 @@ public partial class TempleLocation : BaseLocation
 
     /// <summary>
     /// v0.65.6: whether the Rite of Return menu entry should render. Online
-    /// permadeath mode only (single-player death never consults Resurrections),
-    /// and hidden while the player's lives are full.
+    /// permadeath mode only, and hidden while the player's lives are full.
+    /// (Single-player death does consume Resurrections via the free-revive
+    /// prompt; the rite is simply not offered there, since running out costs
+    /// the Veil of Death penalties rather than the character.)
     /// </summary>
     private bool CanShowRiteOfReturn()
     {

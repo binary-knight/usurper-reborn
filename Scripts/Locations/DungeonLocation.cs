@@ -367,11 +367,21 @@ public class DungeonLocation : BaseLocation
         bool willRunTutorial = currentDungeonLevel == 1 && !player.HintsShown.Contains(DUNGEON_TUTORIAL_FLAG);
         if (willRunTutorial)
         {
-            await RunDungeonTutorial(player, term);
+            bool accepted = await RunDungeonTutorial(player, term);
+            if (!accepted)
+            {
+                // v1.0.5: a player who declines the tutorial used to get no movement guidance
+                // at all (the flag was set and the hint branch below never ran). Show the short
+                // hint and hold it, since the room render that follows clears the screen.
+                if (HintSystem.Instance.TryShowHint(HintSystem.HINT_FIRST_DUNGEON, term, player.HintsShown))
+                    await term.PressAnyKey();
+            }
         }
         else
         {
-            HintSystem.Instance.TryShowHint(HintSystem.HINT_FIRST_DUNGEON, term, player.HintsShown);
+            // v1.0.5: same hold as the decline path; DisplayLocation clears the screen.
+            if (HintSystem.Instance.TryShowHint(HintSystem.HINT_FIRST_DUNGEON, term, player.HintsShown))
+                await term.PressAnyKey();
         }
 
         // Captain Aldric's Mission — dungeon entry objective
@@ -452,7 +462,8 @@ public class DungeonLocation : BaseLocation
     /// Guided dungeon tutorial for new players — one-time, skippable.
     /// Teaches floor navigation, rooms, combat, potions, events, features, and rest.
     /// </summary>
-    private async Task RunDungeonTutorial(Character player, TerminalEmulator term)
+    /// <returns>True if the player accepted and completed the tutorial, false if they declined.</returns>
+    private async Task<bool> RunDungeonTutorial(Character player, TerminalEmulator term)
     {
         bool isSR = GameConfig.ScreenReaderMode;
         bool isBBS = IsBBSSession;
@@ -490,7 +501,7 @@ public class DungeonLocation : BaseLocation
         {
             term.WriteLine(Loc.Get("dungeon.tut.declined"), "gray");
             await Task.Delay(1200);
-            return;
+            return false;
         }
 
         // Helper to show a tutorial page and wait for the player to continue
@@ -653,6 +664,7 @@ public class DungeonLocation : BaseLocation
 
         term.WriteLine(Loc.Get("dungeon.tut.complete"), "bright_green");
         await Task.Delay(1500);
+        return true;
     }
 
     /// <summary>
@@ -17789,7 +17801,7 @@ public class DungeonLocation : BaseLocation
 
         // Notify group followers that leader has entered the dungeon
         GroupSystem.Instance!.NotifyGroup(group,
-            $"\u001b[1;33m  * Your group leader {ctx.Username} has entered the dungeon (Floor {currentDungeonLevel})!\u001b[0m" +
+            $"\u001b[1;33m  * Your group leader {currentPlayer?.DisplayName ?? ctx.Username} has entered the dungeon (Floor {currentDungeonLevel})!\u001b[0m" +
             $"\n\u001b[1;33m  * Go to the Dungeons to join them!\u001b[0m",
             excludeUsername: ctx.Username);
 
@@ -17879,14 +17891,20 @@ public class DungeonLocation : BaseLocation
         mySession.IsGroupFollower = true;
         mySession.GroupLeaderSession = leaderSession;
 
+        // v1.0.5: every player-visible string here uses character names. The
+        // footer already did; the join notices and the /who location string
+        // leaked the raw account username.
+        string leaderName = leaderSession.Context?.Engine?.CurrentPlayer?.DisplayName ?? group.LeaderUsername;
+        string myName = player.DisplayName;
+
         // Update online location
-        ctx.OnlineState?.UpdateLocation($"Dungeon (Group: {group.LeaderUsername})");
+        ctx.OnlineState?.UpdateLocation($"Dungeon (Group: {leaderName})");
 
         // Notify leader and group
         leaderSession.EnqueueMessage(
-            $"\u001b[1;32m  * {ctx.Username} has joined your dungeon group!\u001b[0m");
+            $"\u001b[1;32m  * {myName} has joined your dungeon group!\u001b[0m");
         GroupSystem.Instance?.NotifyGroup(group,
-            $"\u001b[1;32m  * {ctx.Username} has entered the dungeon with the group.\u001b[0m",
+            $"\u001b[1;32m  * {myName} has entered the dungeon with the group.\u001b[0m",
             excludeUsername: ctx.Username);
 
         // Show the current room the leader is in (so follower immediately feels "in" the dungeon)
@@ -17894,14 +17912,14 @@ public class DungeonLocation : BaseLocation
         if (leaderRoom != null)
         {
             string roomAnsi = leaderDungeon.BuildRoomAnsi(leaderRoom, group.LeaderUsername);
-            PushRoomToSingleFollower(player, roomAnsi, group.LeaderUsername);
+            PushRoomToSingleFollower(player, roomAnsi, leaderName);
         }
         else
         {
             // Fallback if room not available
             term.ClearScreen();
             term.SetColor("gray");
-            term.WriteLine($"  You join {group.LeaderUsername}'s group in the dungeon...");
+            term.WriteLine($"  You join {leaderName}'s group in the dungeon...");
             term.WriteLine("");
         }
 
@@ -18033,7 +18051,7 @@ public class DungeonLocation : BaseLocation
         if (room != null)
         {
             string roomAnsi = leaderDungeon.BuildRoomAnsi(room, group.LeaderUsername);
-            PushRoomToSingleFollower(follower, roomAnsi, group.LeaderUsername);
+            PushRoomToSingleFollower(follower, roomAnsi, leaderDungeon.currentPlayer?.DisplayName ?? group.LeaderUsername);
         }
     }
 
