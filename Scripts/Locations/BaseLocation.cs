@@ -2232,8 +2232,13 @@ public abstract class BaseLocation
             // v1.0.5: single-player consumes the same counter (free revive at the death
             // prompt) but running out means the Veil of Death penalties, not deletion, so
             // it gets its own label rather than "Lives".
+            // Nightmare difficulty offers no resurrection at all, so the counter is
+            // hidden there rather than shown as a promise the death screen will not keep.
             bool permadeathLives = UsurperRemake.BBS.DoorMode.IsOnlineMode && GameConfig.OnlinePermadeathEnabled;
-            string livesInfo = $", {Loc.Get(permadeathLives ? "status.lives" : "status.revives")}: {Math.Max(0, currentPlayer.Resurrections)}/{Math.Max(1, currentPlayer.MaxResurrections)}";
+            bool showLives = permadeathLives || !DifficultySystem.IsPermadeath();
+            string livesInfo = showLives
+                ? $", {Loc.Get(permadeathLives ? "status.lives" : "status.revives")}: {Math.Max(0, currentPlayer.Resurrections)}/{Math.Max(1, currentPlayer.MaxResurrections)}"
+                : "";
             terminal.SetColor("white");
             terminal.WriteLine($"{Loc.Get("status.hp")}: {currentPlayer.HP}/{currentPlayer.MaxHP}, {Loc.Get("status.gold_label")}: {currentPlayer.Gold:N0}, {resource}, {Loc.Get("ui.level")} {currentPlayer.Level}{xpInfo}{livesInfo}");
             terminal.WriteLine("");
@@ -2288,17 +2293,21 @@ public abstract class BaseLocation
             // v0.65.6: remaining lives, visible at all times in online permadeath
             // mode. Color escalates as the counter drops -- informed risk feels
             // fair; an invisible countdown feels like betrayal.
-            // v1.0.5: also shown in single-player under a "Revives" label; see the
-            // screen-reader branch above for why the label differs.
+            // v1.0.5: also shown in single-player under a "Revives" label, except on
+            // Nightmare where no resurrection is offered; see the screen-reader branch
+            // above for why the label differs.
             bool permadeathLives = UsurperRemake.BBS.DoorMode.IsOnlineMode && GameConfig.OnlinePermadeathEnabled;
-            int livesLeft = Math.Max(0, currentPlayer.Resurrections);
-            int livesMax = Math.Max(1, currentPlayer.MaxResurrections);
-            terminal.SetColor("gray");
-            terminal.Write($" | {Loc.Get(permadeathLives ? "status.lives" : "status.revives")}: ");
-            terminal.SetColor(livesLeft == 0 ? "bright_red" : livesLeft == 1 ? "yellow" : "bright_green");
-            terminal.Write($"{livesLeft}");
-            terminal.SetColor("gray");
-            terminal.Write($"/{livesMax}");
+            if (permadeathLives || !DifficultySystem.IsPermadeath())
+            {
+                int livesLeft = Math.Max(0, currentPlayer.Resurrections);
+                int livesMax = Math.Max(1, currentPlayer.MaxResurrections);
+                terminal.SetColor("gray");
+                terminal.Write($" | {Loc.Get(permadeathLives ? "status.lives" : "status.revives")}: ");
+                terminal.SetColor(livesLeft == 0 ? "bright_red" : livesLeft == 1 ? "yellow" : "bright_green");
+                terminal.Write($"{livesLeft}");
+                terminal.SetColor("gray");
+                terminal.Write($"/{livesMax}");
+            }
 
             // XP progress to next level
             if (currentPlayer.Level < GameConfig.MaxLevel)
