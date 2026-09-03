@@ -393,17 +393,7 @@ namespace UsurperRemake.Systems
         {
             return Listings.Select(l => new MarketListingData
             {
-                Item = new MarketItemData
-                {
-                    ItemName = l.Item.Name,
-                    ItemValue = l.Item.Value,
-                    ItemType = l.Item.Type,
-                    Attack = l.Item.Attack,
-                    Armor = l.Item.Armor,
-                    Strength = l.Item.Strength,
-                    Defence = l.Item.Defence,
-                    IsCursed = l.Item.IsCursed
-                },
+                Item = MarketItemData.FromItem(l.Item),
                 Seller = l.Seller,
                 IsNPCSeller = l.IsNPCSeller,
                 SellerNPCId = l.SellerNPCId,
@@ -421,17 +411,7 @@ namespace UsurperRemake.Systems
 
             foreach (var d in data)
             {
-                var item = new global::Item
-                {
-                    Name = d.Item.ItemName,
-                    Value = d.Item.ItemValue,
-                    Type = d.Item.ItemType,
-                    Attack = d.Item.Attack,
-                    Armor = d.Item.Armor,
-                    Strength = d.Item.Strength,
-                    Defence = d.Item.Defence,
-                    IsCursed = d.Item.IsCursed
-                };
+                var item = d.Item.ToItem();
 
                 var listing = new MarketListing
                 {
