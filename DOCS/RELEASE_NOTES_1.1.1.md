@@ -57,9 +57,8 @@ new to learn. Some things you were used to living with are gone.
 - Team wars loaded both fighters by display name, so a name that differed from
   the login loaded nothing, no round ran, and the challenger lost the wager.
 - Listing an item on the marketplace and having it sell, to a player or an NPC,
-  paid you nothing; the
-  item was gone and so was the gold. Sellers now receive the gold as a bank
-  transfer on their next login.
+  paid you nothing; the item was gone and so was the gold. Sellers now receive
+  the gold as a bank transfer on their next login.
 - Selling an accessory paid for the one you chose and deleted the first item of
   the same name, which could be the better one.
 - Fence Stolen Goods always had nothing to fence. It reads your backpack now.
