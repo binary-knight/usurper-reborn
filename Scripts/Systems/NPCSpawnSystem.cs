@@ -821,9 +821,13 @@ namespace UsurperRemake.Systems
 
             // v1.1: some NPCs dress as gear-set wearers (GameConfig.NPCSetWearerChance). Pick a
             // set that has an affordable body piece and prefer its pieces in every slot.
+            // A wearer aims for a random tier (2, 4 or 6 pieces) so high-level NPCs are not all in
+            // full sets: the probe without this put every level-50+ wearer at six pieces.
             GearSet? targetSet = null;
+            int targetPieces = 0, setPieces = 0;
             if (random.NextDouble() < GameConfig.NPCSetWearerChance)
             {
+                targetPieces = new[] { 2, 4, 6 }[random.Next(3)];
                 long bodyBudget = (long)(goldBudget * slotBudgetPercent[0]);
                 var candidates = GearSetRegistry.Sets
                     .Where(s => EquipmentDatabase.GetBestAffordableInFamilies(EquipmentSlot.Body, bodyBudget, s.Families) != null)
@@ -837,10 +841,13 @@ namespace UsurperRemake.Systems
                 var slot = armorSlots[i];
                 long slotBudget = (long)(goldBudget * slotBudgetPercent[i]);
 
-                var armor = targetSet != null
-                    ? EquipmentDatabase.GetBestAffordableInFamilies(slot, slotBudget, targetSet.Families)
-                        ?? EquipmentDatabase.GetBestAffordable(slot, slotBudget)
-                    : EquipmentDatabase.GetBestAffordable(slot, slotBudget);
+                Equipment? armor = null;
+                if (targetSet != null && setPieces < targetPieces)
+                {
+                    armor = EquipmentDatabase.GetBestAffordableInFamilies(slot, slotBudget, targetSet.Families);
+                    if (armor != null) setPieces++;
+                }
+                armor ??= EquipmentDatabase.GetBestAffordable(slot, slotBudget);
                 if (armor != null)
                 {
                     npc.EquippedItems[slot] = armor.Id;
