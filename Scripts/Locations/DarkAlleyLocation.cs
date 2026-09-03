@@ -1402,16 +1402,13 @@ namespace UsurperRemake.Locations
                 for (int i = 0; i < stock.Count; i++)
                 {
                     long price = ComputeBlackMarketGearPrice(stock[i], rankDiscount, isFreelance);
-                    // LootGenerator encodes rarity in the item NAME PREFIX (Epic / Legendary etc.),
-                    // not in item.Rarity directly (slice 5b will populate item.Rarity properly).
-                    // Use a flat color for now; the name carries the rarity signal.
                     terminal.SetColor("darkgray");
                     terminal.Write("  [");
                     terminal.SetColor("bright_yellow");
                     terminal.Write((4 + i).ToString());
                     terminal.SetColor("darkgray");
                     terminal.Write("] ");
-                    terminal.SetColor("bright_magenta");
+                    terminal.SetColor(LootGenerator.GetRarityColor(LootGenerator.GetItemRarity(stock[i]))); // v1.1: rarity is stored now
                     terminal.Write(stock[i].Name);
                     terminal.SetColor("gray");
                     terminal.WriteLine($"  -- {price} {GameConfig.MoneyType}");
@@ -1498,15 +1495,7 @@ namespace UsurperRemake.Locations
             WriteBoxHeader(Loc.Get("dark_alley.bm_inspect_header"), "bright_magenta", 66);
             terminal.WriteLine("");
 
-            string rarityColor = item.Rarity switch
-            {
-                EquipmentRarity.Uncommon => "green",
-                EquipmentRarity.Rare => "cyan",
-                EquipmentRarity.Epic => "magenta",
-                EquipmentRarity.Legendary => "yellow",
-                EquipmentRarity.Artifact => "bright_yellow",
-                _ => "bright_magenta"
-            };
+            string rarityColor = item.Rarity == EquipmentRarity.Common ? "bright_magenta" : Equipment.ColorFor(item.Rarity);
             terminal.SetColor(rarityColor);
             terminal.WriteLine($"  {item.Name}");
             terminal.WriteLine("");

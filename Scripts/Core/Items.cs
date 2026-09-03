@@ -40,6 +40,14 @@ public class Item
     // boost every cycle (reforge -> unequip -> re-equip -> reforge...), letting weapon power and
     // value compound into the billions. Carrying rarity here closes that loop.
     public EquipmentRarity Rarity { get; set; } = EquipmentRarity.Common;
+
+    /// <summary>
+    /// v1.1: the English template name this item was generated from ("Reinforced Helm"),
+    /// stored at creation because the display Name is localized at generation time and
+    /// cannot be parsed back. Empty for hand-authored and legacy items. Set membership
+    /// for gear set bonuses keys on this, never on Name.
+    /// </summary>
+    public string Family { get; set; } = "";
     
     // Descriptions (from Pascal: array[1..5] of s70)
     public List<string> Description { get; set; }       // normal description
@@ -518,6 +526,7 @@ public static class ItemManager
             ItemID = id,
             Name = name,
             Type = type,
+            Rarity = artifact ? EquipmentRarity.Artifact : EquipmentRarity.Legendary, // v1.1: was Common with IsArtifact set
             Value = 999999,
             Attack = type == ObjType.Weapon ? 50 : 0,
             Armor = type != ObjType.Weapon ? 50 : 0,
@@ -715,6 +724,8 @@ public class Equipment
     public ArmorType ArmorType { get; set; } = ArmorType.None;
     public ArmorWeightClass WeightClass { get; set; } = ArmorWeightClass.None;
     public EquipmentRarity Rarity { get; set; } = EquipmentRarity.Common;
+    /// <summary>v1.1: English template name this piece was generated from; see Item.Family.</summary>
+    public string Family { get; set; } = "";
 
     // Economics
     public long Value { get; set; }         // Buy price
@@ -1122,7 +1133,14 @@ public class Equipment
     /// <summary>
     /// Get color for rarity display
     /// </summary>
-    public string GetRarityColor() => Rarity switch
+    public string GetRarityColor() => ColorFor(Rarity);
+
+    /// <summary>
+    /// v1.1: the one rarity colour table. LootGenerator, the inventory screen, /gear and
+    /// the Black Market each had their own copy and two of them disagreed (Rare was blue
+    /// and Artifact bright red in /gear).
+    /// </summary>
+    public static string ColorFor(EquipmentRarity rarity) => rarity switch
     {
         EquipmentRarity.Common => "white",
         EquipmentRarity.Uncommon => "green",

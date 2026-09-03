@@ -1404,7 +1404,8 @@ public class Character
             IsCursed = equipment.IsCursed,
             Cursed = equipment.IsCursed,
             MinLevel = equipment.MinLevel,
-            Rarity = equipment.Rarity // issue #112: carry rarity so re-equip doesn't reset reforged quality
+            Rarity = equipment.Rarity, // issue #112: carry rarity so re-equip doesn't reset reforged quality
+            Family = equipment.Family ?? ""
         };
 
         // Preserve CON/INT as LootEffects for re-equip
@@ -1497,7 +1498,8 @@ public class Character
             IsCursed = item.IsCursed,
             IsIdentified = item.IsIdentified,
             MinLevel = item.MinLevel,
-            Rarity = item.Rarity
+            Rarity = item.Rarity,
+            Family = item.Family ?? ""
         };
         ApplyItemLootEffectsToEquipment(item, equipment);
         return equipment;

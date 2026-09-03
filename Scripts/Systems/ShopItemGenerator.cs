@@ -159,6 +159,7 @@ public static class ShopItemGenerator
             {
                 Id = nextId++,
                 Name = template.Name,
+                Family = template.Name, // v1.1: set membership key
                 Slot = slot,
                 Handedness = handedness,
                 WeaponType = weaponType,
@@ -193,6 +194,7 @@ public static class ShopItemGenerator
             {
                 Id = nextId++,
                 Name = template.Name,
+                Family = template.Name, // v1.1: set membership key
                 Slot = EquipmentSlot.OffHand,
                 Handedness = WeaponHandedness.OffHandOnly,
                 WeaponType = weaponType,
@@ -228,6 +230,7 @@ public static class ShopItemGenerator
             {
                 Id = nextId++,
                 Name = template.Name,
+                Family = template.Name, // v1.1: set membership key
                 Slot = slot,
                 ArmorType = armorType,
                 WeightClass = InferArmorWeightClass(template.Name),
@@ -262,6 +265,7 @@ public static class ShopItemGenerator
             {
                 Id = nextId++,
                 Name = template.Name,
+                Family = template.Name, // v1.1: set membership key
                 Slot = slot,
                 ArmorClass = power,
                 Value = price,

@@ -997,6 +997,7 @@ namespace UsurperRemake.Systems
         public int Stamina { get; set; }
         public int MinLevel { get; set; }
         public int Rarity { get; set; }  // EquipmentRarity enum as int (issue #112: carry rarity through save/load + trades)
+        public string Family { get; set; } = "";  // v1.1: English template name (set membership)
         public bool IsCursed { get; set; }
         // Cursed is now an alias for IsCursed for backwards compatibility
         public bool Cursed
@@ -1039,6 +1040,7 @@ namespace UsurperRemake.Systems
             Stamina = item.Stamina,
             MinLevel = item.MinLevel,
             Rarity = (int)item.Rarity, // issue #112
+            Family = item.Family ?? "",
             // IsCursed (the flag decurse/warnings/loot checks read) is authoritative; Item also
             // carries a legacy Cursed bool, so OR them to never drop a curse in transit.
             IsCursed = item.IsCursed || item.Cursed,
@@ -1076,6 +1078,7 @@ namespace UsurperRemake.Systems
                 Stamina = Stamina,
                 MinLevel = MinLevel,
                 Rarity = (EquipmentRarity)Rarity, // issue #112
+                Family = Family ?? "",
                 IsCursed = IsCursed,
                 Cursed = IsCursed, // keep Item's legacy curse bool consistent with IsCursed
                 IsIdentified = IsIdentified,
@@ -1124,6 +1127,7 @@ namespace UsurperRemake.Systems
         public long Value { get; set; }
         public bool IsCursed { get; set; }
         public int Rarity { get; set; }  // EquipmentRarity enum as int
+        public string Family { get; set; } = "";  // v1.1: English template name (set membership)
         public int WeaponType { get; set; }  // WeaponType enum as int
         public int Handedness { get; set; }  // WeaponHandedness enum as int
         public int ArmorType { get; set; }  // ArmorType enum as int

@@ -470,6 +470,8 @@ internal static class PlayerSaveEditor
         p.Inventory.Add(new InventoryItemData
         {
             Name = eq.Name,
+            Rarity = (int)eq.Rarity, // v1.1: was dropped, so a Legendary template became a Common bag item
+            Family = eq.Family ?? "",
             Value = eq.Value,
             Attack = eq.WeaponPower,
             Armor = eq.ArmorClass,
@@ -643,6 +645,7 @@ internal static class PlayerSaveEditor
                     Value = equipData.Value,
                     IsCursed = equipData.IsCursed,
                     Rarity = (EquipmentRarity)equipData.Rarity,
+                    Family = equipData.Family ?? "",
                     WeaponType = (WeaponType)equipData.WeaponType,
                     Handedness = (WeaponHandedness)equipData.Handedness,
                     ArmorType = (ArmorType)equipData.ArmorType,

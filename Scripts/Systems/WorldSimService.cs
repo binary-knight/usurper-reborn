@@ -1888,6 +1888,7 @@ namespace UsurperRemake.Systems
                             Value = equipData.Value,
                             IsCursed = equipData.IsCursed,
                             Rarity = (EquipmentRarity)equipData.Rarity,
+                    Family = equipData.Family ?? "",
                             WeaponType = (WeaponType)equipData.WeaponType,
                             Handedness = (WeaponHandedness)equipData.Handedness,
                             ArmorType = (ArmorType)equipData.ArmorType,

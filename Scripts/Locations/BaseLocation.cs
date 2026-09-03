@@ -7936,19 +7936,7 @@ public abstract class BaseLocation
     /// <summary>
     /// Get color based on equipment rarity
     /// </summary>
-    private static string GetEquipmentRarityColor(EquipmentRarity rarity)
-    {
-        return rarity switch
-        {
-            EquipmentRarity.Common => "white",
-            EquipmentRarity.Uncommon => "green",
-            EquipmentRarity.Rare => "blue",
-            EquipmentRarity.Epic => "magenta",
-            EquipmentRarity.Legendary => "yellow",
-            EquipmentRarity.Artifact => "bright_red",
-            _ => "white"
-        };
-    }
+    private static string GetEquipmentRarityColor(EquipmentRarity rarity) => Equipment.ColorFor(rarity); // v1.1: shared table
 
     /// <summary>
     /// Get a short summary of equipment stats

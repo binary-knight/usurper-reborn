@@ -536,7 +536,12 @@ namespace UsurperRemake.Systems
 
                 if (item.IsIdentified)
                 {
-                    string itemColor = item.Type switch
+                    // v1.1: rarity colours the backpack line once it is above Common;
+                    // plain items keep the old per-type colours.
+                    var bagRarity = LootGenerator.GetItemRarity(item);
+                    string itemColor = bagRarity > LootGenerator.ItemRarity.Common
+                        ? LootGenerator.GetRarityColor(bagRarity)
+                        : item.Type switch
                     {
                         ObjType.Weapon => "bright_yellow",
                         ObjType.Body or ObjType.Head or ObjType.Arms or ObjType.Legs => "bright_cyan",
@@ -672,19 +677,7 @@ namespace UsurperRemake.Systems
             }
         }
 
-        private string GetRarityColor(EquipmentRarity rarity)
-        {
-            return rarity switch
-            {
-                EquipmentRarity.Common => "white",
-                EquipmentRarity.Uncommon => "green",
-                EquipmentRarity.Rare => "cyan",
-                EquipmentRarity.Epic => "magenta",
-                EquipmentRarity.Legendary => "yellow",
-                EquipmentRarity.Artifact => "bright_yellow",
-                _ => "white"
-            };
-        }
+        private string GetRarityColor(EquipmentRarity rarity) => Equipment.ColorFor(rarity);
 
         private string GetItemStatSummary(Equipment item)
         {

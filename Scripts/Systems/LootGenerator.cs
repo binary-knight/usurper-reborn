@@ -80,16 +80,7 @@ public static class LootGenerator
             return ItemRarity.Common;
         }
 
-        public static string GetRarityColor(ItemRarity rarity) => rarity switch
-        {
-            ItemRarity.Common => "white",
-            ItemRarity.Uncommon => "green",
-            ItemRarity.Rare => "cyan",
-            ItemRarity.Epic => "magenta",
-            ItemRarity.Legendary => "yellow",
-            ItemRarity.Artifact => "bright_yellow",
-            _ => "white"
-        };
+        public static string GetRarityColor(ItemRarity rarity) => Equipment.ColorFor((EquipmentRarity)(int)rarity);
 
         public static string GetRarityPrefix(ItemRarity rarity)
         {
@@ -1233,6 +1224,8 @@ public static class LootGenerator
             var item = new Item
             {
                 Name = name,
+                Rarity = (EquipmentRarity)(int)rarity, // v1.1: stored, no longer only in the name prefix
+                Family = template.Name,
                 Type = ObjType.Weapon,
                 Value = value,
                 Attack = finalPower,
@@ -1288,6 +1281,8 @@ public static class LootGenerator
             var item = new Item
             {
                 Name = name,
+                Rarity = (EquipmentRarity)(int)rarity, // v1.1: stored, no longer only in the name prefix
+                Family = template.Name,
                 Type = armorType,
                 Value = value,
                 Armor = finalPower,
@@ -1550,6 +1545,8 @@ public static class LootGenerator
             var item = new Item
             {
                 Name = name,
+                Rarity = (EquipmentRarity)(int)rarity, // v1.1: stored, no longer only in the name prefix
+                Family = template.Name,
                 Type = accessoryType,
                 Value = value,
                 MinLevel = Math.Max(1, level - 10),
@@ -1796,6 +1793,8 @@ public static class LootGenerator
             var item = new Item
             {
                 Name = name,
+                Rarity = (EquipmentRarity)(int)rarity, // v1.1: stored, no longer only in the name prefix
+                Family = template.Name,
                 Type = ObjType.Shield,
                 Value = value,
                 MinLevel = Math.Max(1, level - 10),
@@ -1966,6 +1965,7 @@ public static class LootGenerator
             return new Item
             {
                 Name = $"{GetRarityPrefix(rarity)}{Loc.Get("item.slot.weapon")}",
+                Rarity = (EquipmentRarity)(int)rarity,
                 Type = ObjType.Weapon,
                 Value = power * 15,
                 Attack = power,
@@ -1996,6 +1996,7 @@ public static class LootGenerator
             return new Item
             {
                 Name = $"{GetRarityPrefix(rarity)}{slotName}",
+                Rarity = (EquipmentRarity)(int)rarity,
                 Type = armorType,
                 Value = power * 20,
                 Armor = power,
@@ -2301,6 +2302,14 @@ public static class LootGenerator
         /// </summary>
         public static ItemRarity GetItemRarity(Item item)
         {
+            // v1.1: every generator now stores the rolled rarity on the item, so a stored
+            // value above Common is authoritative. The name/power heuristic below survives
+            // only for legacy items that carry Common with a rarity prefix in their name.
+            // (It is language-dependent: an item named under one language and read under
+            // another falls through to the power thresholds. Do not persist its result.)
+            if (item.Rarity > EquipmentRarity.Common)
+                return (ItemRarity)(int)item.Rarity;
+
             // Determine rarity based on name or power (check localized prefixes)
             string mythic = Loc.Get("item.rarity.mythic");
             string legendary = Loc.Get("item.rarity.legendary");
