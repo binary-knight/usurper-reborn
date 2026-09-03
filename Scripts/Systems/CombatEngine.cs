@@ -208,6 +208,121 @@ public partial class CombatEngine
     /// non-Victory outcome as a loss (gold penalties, war forfeit, defeat
     /// broadcasts), so a player choosing mercy would be punished. Default
     /// true preserves surrender for open-world PvP (street, dormitory, inn).</param>
+    /// <summary>
+    /// v1.1.1: consume one combat from every per-combat buff. Called at the END of a fight.
+    /// It used to run at the start, before the buffs were read, so a buff bought as "3
+    /// combats" worked for 2 and a 1-combat buff for none.
+    /// </summary>
+    private static void ConsumeCombatBuffs(Character c)
+    {
+        if (c.PoisonCoatingCombats > 0)
+        {
+            c.PoisonCoatingCombats--;
+            if (c.PoisonCoatingCombats <= 0) c.ActivePoisonType = PoisonType.None;
+        }
+        if (c.WellRestedCombats > 0) c.WellRestedCombats--;
+        if (c.WorkshopBuffCombats > 0) c.WorkshopBuffCombats--;
+        if (c.LoversBlissCombats > 0) c.LoversBlissCombats--;
+        if (c.DivineBlessingCombats > 0) c.DivineBlessingCombats--;
+        if (c.HerbBuffCombats > 0)
+        {
+            c.HerbBuffCombats--;
+            if (c.HerbBuffCombats <= 0)
+            {
+                c.HerbBuffType = 0;
+                c.HerbBuffValue = 0f;
+                c.HerbExtraAttacks = 0;
+            }
+        }
+        if (c.GodSlayerCombats > 0)
+        {
+            c.GodSlayerCombats--;
+            if (c.GodSlayerCombats <= 0)
+            {
+                c.GodSlayerDamageBonus = 0f;
+                c.GodSlayerDefenseBonus = 0f;
+            }
+        }
+        if (c.DarkPactCombats > 0)
+        {
+            c.DarkPactCombats--;
+            if (c.DarkPactCombats <= 0)
+            {
+                c.DarkPactDamageBonus = 0f;
+            }
+        }
+        if (c.SongBuffCombats > 0)
+        {
+            c.SongBuffCombats--;
+            if (c.SongBuffCombats <= 0)
+            {
+                c.SongBuffType = 0;
+                c.SongBuffValue = 0f;
+                c.SongBuffValue2 = 0f;
+            }
+        }
+        if (c.FoodBuffCombats > 0)
+        {
+            c.FoodBuffCombats--;
+            if (c.FoodBuffCombats <= 0)
+            {
+                c.FoodBuffType = 0;
+                c.FoodBuffValue = 0f;
+            }
+        }
+        if (c.SettlementBuffCombats > 0)
+        {
+            // TrapResist buff counts down per trap encounter, not per combat
+            if (c.SettlementBuffType != (int)UsurperRemake.Systems.SettlementBuffType.TrapResist)
+            {
+                c.SettlementBuffCombats--;
+                if (c.SettlementBuffCombats <= 0)
+                {
+                    c.SettlementBuffType = 0;
+                    c.SettlementBuffValue = 0f;
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// v1.1.1: clear transient per-fight state. PvE already did this for the player and
+    /// every teammate at start and end; PvP reset the attacker only and neither side at
+    /// the end, so a stun or freeze from one duel carried into the next.
+    /// </summary>
+    private static void ScrubTransientCombatState(Character c)
+    {
+        c.TempAttackBonus = 0; c.TempAttackBonusDuration = 0;
+        c.TempDefenseBonus = 0; c.TempDefenseBonusDuration = 0;
+        c.MagicACBonus = 0;
+        c.DodgeNextAttack = false;
+        c.HasBloodlust = false;
+        c.HasStatusImmunity = false; c.StatusImmunityDuration = 0;
+        c.DeathsEmbraceActive = false;
+        c.StatusLifestealPercent = 0;
+        c.CalmWatersRounds = 0;
+        c.TempDamageReductionPercent = 0; c.TempDamageReductionDuration = 0;
+        c.TempThornReflectPercent = 0; c.TempThornReflectDuration = 0;
+        c.TempPercentRegenPerRound = 0; c.TempPercentRegenDuration = 0;
+        foreach (var st in new[] { StatusEffect.Protected, StatusEffect.Blessed, StatusEffect.Haste, StatusEffect.Reflecting,
+                                   StatusEffect.Stunned, StatusEffect.Paralyzed, StatusEffect.Sleeping, StatusEffect.Frozen, StatusEffect.Slow })
+            c.RemoveStatus(st);
+    }
+
+    // v1.1.1: PvP disarm halves the defender's WeapPow for the fight; the original is kept
+    // here and restored when the duel ends. Before this the halving was permanent on live
+    // NPC defenders (sleeping NPCs, the king), so repeated disarms drove them to zero.
+    private readonly Dictionary<Character, long> _pvpDisarmedWeapPow = new();
+
+    private void EndPvPCombat(Character attacker, Character defender)
+    {
+        foreach (var kv in _pvpDisarmedWeapPow) kv.Key.WeapPow = kv.Value;
+        _pvpDisarmedWeapPow.Clear();
+        ConsumeCombatBuffs(attacker);
+        ScrubTransientCombatState(attacker);
+        ScrubTransientCombatState(defender);
+    }
+
     public async Task<CombatResult> PlayerVsPlayer(Character attacker, Character defender, bool allowSurrender = true)
     {
         // Wizard godmode: save HP/Mana before combat to restore after
@@ -222,6 +337,7 @@ public partial class CombatEngine
         // Reset temporary combat flags (matches PlayerVsMonsters initialization)
         attacker.IsRaging = false;
         defender.IsRaging = false;
+        ScrubTransientCombatState(defender); // v1.1.1: the defender got a partial reset; the attacker a full one
         attacker.TempAttackBonus = 0;
         attacker.TempAttackBonusDuration = 0;
         attacker.TempDefenseBonus = 0;
@@ -281,44 +397,7 @@ public partial class CombatEngine
 
         // Reset per-combat faction flags
         attacker.DivineFavorTriggeredThisCombat = false;
-        if (attacker.PoisonCoatingCombats > 0)
-        {
-            attacker.PoisonCoatingCombats--;
-            if (attacker.PoisonCoatingCombats <= 0) attacker.ActivePoisonType = PoisonType.None;
-        }
-        if (attacker.WellRestedCombats > 0) attacker.WellRestedCombats--;
-        if (attacker.WorkshopBuffCombats > 0) attacker.WorkshopBuffCombats--;
-        if (attacker.LoversBlissCombats > 0) attacker.LoversBlissCombats--;
-        if (attacker.DivineBlessingCombats > 0) attacker.DivineBlessingCombats--;
-        if (attacker.HerbBuffCombats > 0)
-        {
-            attacker.HerbBuffCombats--;
-            if (attacker.HerbBuffCombats <= 0)
-            {
-                attacker.HerbBuffType = 0;
-                attacker.HerbBuffValue = 0;
-                attacker.HerbExtraAttacks = 0;
-            }
-        }
-        if (attacker.SongBuffCombats > 0)
-        {
-            attacker.SongBuffCombats--;
-            if (attacker.SongBuffCombats <= 0)
-            {
-                attacker.SongBuffType = 0;
-                attacker.SongBuffValue = 0f;
-                attacker.SongBuffValue2 = 0f;
-            }
-        }
-        if (attacker.FoodBuffCombats > 0)
-        {
-            attacker.FoodBuffCombats--;
-            if (attacker.FoodBuffCombats <= 0)
-            {
-                attacker.FoodBuffType = 0;
-                attacker.FoodBuffValue = 0f;
-            }
-        }
+        // v1.1.1: per-combat buffs are consumed at the end of the duel (EndPvPCombat)
 
         // Iron Rations food buff: temporarily increase max HP by 15%
         long ironRationsHPBonus = 0;
@@ -357,6 +436,7 @@ public partial class CombatEngine
 
         while (attacker.IsAlive && defender.IsAlive && !globalEscape)
         {
+            result.CurrentRound++; // v1.1.1: was never incremented in PvP (no game-time advance, 0 rounds logged)
             // v0.64.1 Slice 18: snapshot round-start HP so the surrender
             // threshold check can tell "killed from a fighting chance" apart
             // from "nibble-killed at low HP". Captured at the top of every
@@ -506,7 +586,7 @@ public partial class CombatEngine
                 attacker, result.CurrentRound * GameConfig.MinutesPerCombatRound);
         }
 
-        return result;
+        EndPvPCombat(attacker, defender); return result;
     }
 
     /// <summary>
@@ -643,74 +723,7 @@ public partial class CombatEngine
         // Reset per-combat faction flags
         player.DivineFavorTriggeredThisCombat = false;
         // Decrement poison coating and well-rested (per combat, not per round)
-        if (player.PoisonCoatingCombats > 0)
-        {
-            player.PoisonCoatingCombats--;
-            if (player.PoisonCoatingCombats <= 0) player.ActivePoisonType = PoisonType.None;
-        }
-        if (player.WellRestedCombats > 0) player.WellRestedCombats--;
-        if (player.WorkshopBuffCombats > 0) player.WorkshopBuffCombats--;
-        if (player.LoversBlissCombats > 0) player.LoversBlissCombats--;
-        if (player.DivineBlessingCombats > 0) player.DivineBlessingCombats--;
-        if (player.HerbBuffCombats > 0)
-        {
-            player.HerbBuffCombats--;
-            if (player.HerbBuffCombats <= 0)
-            {
-                player.HerbBuffType = 0;
-                player.HerbBuffValue = 0f;
-                player.HerbExtraAttacks = 0;
-            }
-        }
-        if (player.GodSlayerCombats > 0)
-        {
-            player.GodSlayerCombats--;
-            if (player.GodSlayerCombats <= 0)
-            {
-                player.GodSlayerDamageBonus = 0f;
-                player.GodSlayerDefenseBonus = 0f;
-            }
-        }
-        if (player.DarkPactCombats > 0)
-        {
-            player.DarkPactCombats--;
-            if (player.DarkPactCombats <= 0)
-            {
-                player.DarkPactDamageBonus = 0f;
-            }
-        }
-        if (player.SongBuffCombats > 0)
-        {
-            player.SongBuffCombats--;
-            if (player.SongBuffCombats <= 0)
-            {
-                player.SongBuffType = 0;
-                player.SongBuffValue = 0f;
-                player.SongBuffValue2 = 0f;
-            }
-        }
-        if (player.FoodBuffCombats > 0)
-        {
-            player.FoodBuffCombats--;
-            if (player.FoodBuffCombats <= 0)
-            {
-                player.FoodBuffType = 0;
-                player.FoodBuffValue = 0f;
-            }
-        }
-        if (player.SettlementBuffCombats > 0)
-        {
-            // TrapResist buff counts down per trap encounter, not per combat
-            if (player.SettlementBuffType != (int)UsurperRemake.Systems.SettlementBuffType.TrapResist)
-            {
-                player.SettlementBuffCombats--;
-                if (player.SettlementBuffCombats <= 0)
-                {
-                    player.SettlementBuffType = 0;
-                    player.SettlementBuffValue = 0f;
-                }
-            }
-        }
+        // v1.1.1: per-combat buffs are consumed at the end of the fight (ConsumeCombatBuffs)
 
         // Iron Rations food buff: temporarily increase max HP by 15%
         long mmIronRationsHPBonus = 0;
@@ -1702,6 +1715,11 @@ public partial class CombatEngine
                     $"\u001b[1;33m  {player.DisplayName} fell in battle, but the party prevails!\u001b[0m");
                 await HandlePlayerDeath(result);
                 CheckGroupLeaderDeath(result);
+                // v1.1.1: Last Stand / Death's Door can rescue the player to 1 HP and rewrite the
+                // outcome to Victory on a mutual kill; runVictory was decided before that, so the
+                // win paid nothing.
+                if (player.IsAlive && result.Outcome == CombatOutcome.Victory && !result.IsPermadeath)
+                    runVictory = true;
                 // Permadeath just erased the save (or, online, queued the disconnect).
                 // Running the victory pipeline afterwards re-created the save via its
                 // unconditional AutoSave and showed loot prompts on a dying socket.
@@ -1832,6 +1850,7 @@ public partial class CombatEngine
         player.RemoveStatus(StatusEffect.Sleeping);
         player.RemoveStatus(StatusEffect.Frozen);
         player.RemoveStatus(StatusEffect.Slow);
+        ConsumeCombatBuffs(player); // v1.1.1: buffs count the fight that just happened
         // Mirror cleanup to every teammate (companions and NPC teammates both) so they
         // leave combat free of action-preventing statuses too.
         if (result.Teammates != null)
@@ -17627,7 +17646,7 @@ public partial class CombatEngine
             {
                 var spell = healSpells[i];
                 terminal.SetColor("cyan");
-                terminal.WriteLine($"  [{i + 1}] {spell.Name} - {Loc.Get("combat.mana_label")}: {spell.ManaCost}");
+                terminal.WriteLine($"  [{i + 1}] {spell.Name} - {Loc.Get("combat.mana_label")}: {SpellSystem.CalculateManaCost(spell, player)}"); // v1.1.1: real cost, not the table cost
             }
             terminal.SetColor("gray");
             terminal.WriteLine($"  {Loc.Get("combat.cancel_option")}");
@@ -17652,7 +17671,7 @@ public partial class CombatEngine
             var selectedSpell = healSpells[spellChoice - 1];
 
             // Check mana
-            if (player.Mana < selectedSpell.ManaCost)
+            if (player.Mana < SpellSystem.CalculateManaCost(selectedSpell, player)) // v1.1.1: the list used the real cost; this check did not
             {
                 terminal.WriteLine(Loc.Get("combat.not_enough_mana"), "red");
                 await Task.Delay(GetCombatDelay(1000));
@@ -19905,7 +19924,7 @@ public partial class CombatEngine
             expReward = Math.Max(10, expReward); // Never less than 10 XP
 
             // Calculate gold reward
-            long goldReward = monster.Gold + random.Next(0, (int)(monster.Gold * 0.5));
+            long goldReward = monster.Gold + random.Next(0, (int)Math.Min(int.MaxValue - 1L, (long)(monster.Gold * 0.5))); // v1.1.1: no int overflow on huge purses
 
             totalExp += expReward;
             totalGold += goldReward;
@@ -20579,6 +20598,14 @@ public partial class CombatEngine
 
             totalExp += baseExp;
             totalGold += goldReward;
+
+            // v1.1.1: kills made before a retreat counted for nothing: no kill total, no
+            // statistics, no quest progress. Mirrors HandleVictoryMultiMonster.
+            bool isBossPV = monster.IsBoss;
+            result.Player.MKills++;
+            result.Player.Statistics?.RecordMonsterKill(baseExp, goldReward, isBossPV, monster.IsUnique);
+            QuestSystem.OnMonsterKilled(result.Player, monster.Name, isBossPV, monster.TierName);
+            ArchetypeTracker.Instance.RecordMonsterKill(monster.Level, monster.IsUnique);
         }
 
         // Apply world event modifiers
@@ -20700,6 +20727,8 @@ public partial class CombatEngine
 
         result.Player.Experience += playerXPpv;
         result.Player.Gold += adjustedGold;
+        result.ExperienceGained = playerXPpv; // v1.1.1: pets and telemetry read these; they stayed 0 after a retreat
+        result.GoldGained = adjustedGold;
 
         // Grant god XP share from believer kill (based on player's actual XP)
         string pvMonsterDesc = result.DefeatedMonsters.Count == 1
@@ -25220,7 +25249,7 @@ public partial class CombatEngine
         if (random.Next(100) < successChance)
         {
             // Successful disarm - temporarily reduce weapon power
-            long oldWeapPow = defender.WeapPow;
+            _pvpDisarmedWeapPow.TryAdd(defender, defender.WeapPow); // restored in EndPvPCombat
             defender.WeapPow = Math.Max(0, defender.WeapPow / 2);
             terminal.SetColor("bright_green");
             terminal.WriteLine(Loc.Get("combat.pvp_disarm_success", defender.DisplayName));

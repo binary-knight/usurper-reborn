@@ -3299,8 +3299,11 @@ public class TeamCornerLocation : BaseLocation
             var enemySummary = enemyMembers[i];
 
             // Load characters from save data
-            var myData = await backend.ReadGameData(mySummary.DisplayName);
-            var enemyData = await backend.ReadGameData(enemySummary.DisplayName);
+            // v1.1.1: saves are keyed by login username; a display name that differed from it
+            // loaded nothing, every round was skipped, and the challenger lost the wager on a
+            // war that never ran.
+            var myData = await backend.ReadGameData(backend.ResolvePlayerUsername(mySummary.DisplayName) ?? mySummary.Username ?? mySummary.DisplayName);
+            var enemyData = await backend.ReadGameData(backend.ResolvePlayerUsername(enemySummary.DisplayName) ?? enemySummary.Username ?? enemySummary.DisplayName);
             if (myData?.Player == null || enemyData?.Player == null) continue;
 
             var myFighter = PlayerCharacterLoader.CreateFromSaveData(myData.Player, mySummary.DisplayName);
