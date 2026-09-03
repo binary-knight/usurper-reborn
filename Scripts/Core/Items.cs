@@ -1168,6 +1168,7 @@ public class Equipment
             ArmorType = this.ArmorType,
             WeightClass = this.WeightClass,
             Rarity = this.Rarity,
+            Family = this.Family, // v1.1: an enchanted or reforged copy stays in its set
             // Economics
             Value = this.Value,
             // Combat stats

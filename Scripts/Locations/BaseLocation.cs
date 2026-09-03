@@ -7858,6 +7858,20 @@ public abstract class BaseLocation
             }
         }
 
+        // v1.1: gear sets
+        var gearSetLines = UsurperRemake.Systems.GearSetRegistry.DescribeActive(player);
+        if (gearSetLines.Count > 0)
+        {
+            terminal.WriteLine("");
+            terminal.SetColor("bright_cyan");
+            terminal.WriteLine($"  {Loc.Get("item.set.header")}");
+            foreach (var (text, active) in gearSetLines)
+            {
+                terminal.SetColor(active ? "bright_green" : "darkgray");
+                terminal.WriteLine($"    {text}");
+            }
+        }
+
         // Totals
         terminal.WriteLine("");
         terminal.SetColor("bright_yellow");
