@@ -428,6 +428,10 @@ public partial class CombatEngine
             Opponent = defender,
             CombatLog = new List<string>()
         };
+        // v1.1.1: EndPvPCombat (buff consumption, disarm restore, scrub) runs in the finally
+        // so a thrown disconnect mid-duel cannot leave either side with stale combat state.
+        try
+        {
 
         // PvP combat introduction
         await ShowPvPIntroduction(attacker, defender, result);
@@ -586,7 +590,12 @@ public partial class CombatEngine
                 attacker, result.CurrentRound * GameConfig.MinutesPerCombatRound);
         }
 
-        EndPvPCombat(attacker, defender); return result;
+        }
+        finally
+        {
+            EndPvPCombat(attacker, defender);
+        }
+        return result;
     }
 
     /// <summary>
@@ -750,6 +759,11 @@ public partial class CombatEngine
             Teammates = currentTeammates,
             CombatLog = new List<string>()
         };
+        // v1.1.1: per-combat buffs are consumed in the finally below so that every exit
+        // (victory, defeat, retreat, rescue, and a thrown disconnect) counts the fight.
+        // The body is deliberately not re-indented to keep the diff reviewable.
+        try
+        {
 
         // Log all monster stats at combat start for diagnosis
         foreach (var m in monsters)
@@ -1850,7 +1864,6 @@ public partial class CombatEngine
         player.RemoveStatus(StatusEffect.Sleeping);
         player.RemoveStatus(StatusEffect.Frozen);
         player.RemoveStatus(StatusEffect.Slow);
-        ConsumeCombatBuffs(player); // v1.1.1: buffs count the fight that just happened
         // Mirror cleanup to every teammate (companions and NPC teammates both) so they
         // leave combat free of action-preventing statuses too.
         if (result.Teammates != null)
@@ -1941,6 +1954,11 @@ public partial class CombatEngine
             // client's wealth and progression display updates without waiting for
             // the next location transition.
             UsurperRemake.Server.GmcpBridge.EmitStatusIfChanged(player);
+        }
+        }
+        finally
+        {
+            ConsumeCombatBuffs(player);
         }
 
         return result;
@@ -9701,7 +9719,9 @@ public partial class CombatEngine
                     // Fallback for non-grouped or missing channel
                     var inputTask = followerTerm.GetKeyInput();
                     var completed = await Task.WhenAny(inputTask, Task.Delay(30000));
-                    if (completed == inputTask)
+                    // v1.1.1: a follower whose connection dropped now faults the read instead of
+                    // returning ""; treat that like a timeout rather than crashing the leader's fight.
+                    if (completed == inputTask && inputTask.IsCompletedSuccessfully)
                     {
                         followerChoice = inputTask.Result.ToUpper();
                         if (followerChoice == "L") followerChoice = "P";
