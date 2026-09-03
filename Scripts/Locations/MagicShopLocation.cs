@@ -185,11 +185,11 @@ public partial class MagicShopLocation : BaseLocation
 
         // 1-line description + gold
         terminal.SetColor("gray");
-        terminal.Write($" {Loc.Get("magic_shop.run_by", _ownerName)} {Loc.Get("shop.you_have")} ");
+        // v1.1.1: shop.you_have carries the amount ("You have {0} gold crowns."); it was printed
+        // with a raw {0} followed by the gold and a hard-coded " gold.".
+        terminal.Write($" {Loc.Get("magic_shop.run_by", _ownerName)} ");
         terminal.SetColor("yellow");
-        terminal.Write($"{currentPlayer.Gold:N0}");
-        terminal.SetColor("gray");
-        terminal.WriteLine(" gold.");
+        terminal.WriteLine(Loc.Get("shop.you_have", $"{currentPlayer.Gold:N0}"));
 
         // NPCs
         ShowBBSNPCs();

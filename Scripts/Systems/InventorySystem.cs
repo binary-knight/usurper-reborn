@@ -250,7 +250,7 @@ namespace UsurperRemake.Systems
                                     }
                                     else
                                     {
-                                        resultMessage = equipMsg != "" ? equipMsg : Loc.Get("inventory.cannot_equip");
+                                        resultMessage = equipMsg != "" ? equipMsg : Loc.Get("inventory.cannot_equip", item.Name); // v1.1.1: template has {0}
                                         resultType = "error";
                                     }
                                 }

@@ -10011,7 +10011,7 @@ public partial class CombatEngine
                     if (lootItem.IsCursed)
                     {
                         winnerTerm.SetColor("red");
-                        winnerTerm.WriteLine(Loc.Get("combat.cursed_bind"));
+                        winnerTerm.WriteLine(Loc.Get("combat.cursed_bind", winner.DisplayName)); // v1.1.1: missing name arg showed raw {0}
                     }
                     else
                     {
@@ -13613,7 +13613,7 @@ public partial class CombatEngine
         holyDamage = DifficultySystem.ApplyPlayerDamageMultiplier(holyDamage);
 
         terminal.SetColor("bright_yellow");
-        terminal.WriteLine(Loc.Get("combat.soul_strike_damage", holyDamage));
+        terminal.WriteLine(Loc.Get("combat.soul_strike_damage", holyDamage, target.Name)); // v1.1.1: missing target arg showed raw {1}
 
         await ApplySingleMonsterDamage(target, holyDamage, result, "soul strike", player, isSpellDamage: true);
     }
@@ -13634,7 +13634,7 @@ public partial class CombatEngine
         smiteDamage = DifficultySystem.ApplyPlayerDamageMultiplier(smiteDamage);
 
         terminal.SetColor("bright_white");
-        terminal.WriteLine(Loc.Get("combat.smite_damage", smiteDamage));
+        terminal.WriteLine(Loc.Get("combat.smite_damage", smiteDamage, target.Name)); // v1.1.1: missing target arg showed raw {1}
 
         await ApplySingleMonsterDamage(target, smiteDamage, result, "smite", player);
     }
@@ -13672,7 +13672,7 @@ public partial class CombatEngine
         rangedDamage = DifficultySystem.ApplyPlayerDamageMultiplier(rangedDamage);
 
         terminal.SetColor("green");
-        terminal.WriteLine(Loc.Get("combat.ranged_hit", rangedDamage));
+        terminal.WriteLine(Loc.Get("combat.ranged_hit", target.Name, rangedDamage)); // v1.1.1: multi-monster path drifted from the single-monster one (missing target arg)
 
         await ApplySingleMonsterDamage(target, rangedDamage, result, "ranged attack", player);
     }
