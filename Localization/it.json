@@ -23228,6 +23228,7 @@
   "merc.contract.faith_escort_pilgrim.objective": "Sconfiggi {0} mostri proteggendo il pellegrino.",
   "dark_alley.bm_section_utility": "Utilità:",
   "dark_alley.bm_section_gear": "Merce a rotazione:",
+  "dark_alley.bm_section_gear_floor": "Merce a rotazione ({0} o superiore):",
   "dark_alley.bm_freelance_surcharge": "Sovrapprezzo per indipendenti: +{0}% (nessun giuramento alle Ombre).",
   "dark_alley.bm_refresh_hint": "(I ricettatori cambieranno la merce entro mattina.)",
   "dark_alley.bm_gear_inventory_full": "Il tuo zaino è pieno. I ricettatori la tengono da parte, ma non puoi portarne di più.",

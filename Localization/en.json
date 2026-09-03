@@ -23671,6 +23671,7 @@
   "merc.contract.faith_escort_pilgrim.objective": "Defeat {0} monsters while protecting the pilgrim.",
   "dark_alley.bm_section_utility": "Utility:",
   "dark_alley.bm_section_gear": "Rotating merchandise:",
+  "dark_alley.bm_section_gear_floor": "Rotating merchandise ({0} and better):",
   "dark_alley.bm_freelance_surcharge": "Freelance surcharge: +{0}% (no Shadows oath sworn).",
   "dark_alley.bm_refresh_hint": "(The fences will turn over the merchandise by morning.)",
   "dark_alley.bm_gear_inventory_full": "Your pack is full. The fences will hold it, but you cannot carry more.",

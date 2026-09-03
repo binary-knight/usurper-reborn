@@ -23532,6 +23532,7 @@
   "merc.contract.faith_escort_pilgrim.objective": "Győzz le {0} szörnyet a zarándok védelme közben.",
   "dark_alley.bm_section_utility": "Felszerelés:",
   "dark_alley.bm_section_gear": "Forgó árukészlet:",
+  "dark_alley.bm_section_gear_floor": "Változó áru ({0} vagy jobb):",
   "dark_alley.bm_freelance_surcharge": "Szabadúszó felár: +{0}% (nem tettél esküt az Árnyaknak).",
   "dark_alley.bm_refresh_hint": "(Az orgazdák reggelre lecserélik az árut.)",
   "dark_alley.bm_gear_inventory_full": "A hátizsákod tele van. Az orgazdák megtartják neked, de többet nem cipelhetsz.",
