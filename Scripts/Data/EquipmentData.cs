@@ -287,6 +287,24 @@ public static class EquipmentDatabase
     /// <summary>
     /// Find best base equipment by power/AC within budget (excludes dynamic/loot items)
     /// </summary>
+    /// <summary>
+    /// v1.1: best affordable piece for a slot drawn only from the given gear-set
+    /// families (shop-generated band, which is the only NPC-reachable band that
+    /// carries Family). Null when the set has nothing affordable for that slot.
+    /// </summary>
+    public static Equipment? GetBestAffordableInFamilies(EquipmentSlot slot, long maxGold, IReadOnlyList<string> families)
+    {
+        EnsureInitialized();
+        lock (_lock)
+        {
+            return _allEquipment.Values
+                .Where(e => e.Slot == slot && e.Value <= maxGold && e.Id < DynamicEquipmentStart
+                            && !string.IsNullOrEmpty(e.Family) && families.Contains(e.Family))
+                .OrderByDescending(e => e.ArmorClass + e.WeaponPower + e.ShieldBonus)
+                .FirstOrDefault();
+        }
+    }
+
     public static Equipment? GetBestAffordable(EquipmentSlot slot, long maxGold)
     {
         EnsureInitialized();

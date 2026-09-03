@@ -966,7 +966,12 @@ public static partial class GameConfig
     // tracks every dialogue line + game event the player has triggered.
     public const int MaxSerializedEncounterHistory = 100;          // RomanceTracker.EncounterHistory (most recent)
     public const int MaxSerializedCompanionInventory = 30;         // per-companion bag cap on save
-    public const int MaxSerializedNPCInventory = 30;               // v0.65.5: per-NPC-teammate bag + market-stock cap on save (was uncapped)
+    public const int MaxSerializedNPCInventory = 30;
+    // v1.1: share of spawned NPCs outfitted as gear-set wearers (maintainer decision: NPCs get set
+    // bonuses). A set wearer picks a random set that has an affordable piece for its body slot and
+    // prefers that set's pieces slot by slot, falling back to the best affordable item. Without this
+    // NPCs picked every slot independently and none of 200 spawned at any level reached two pieces.
+    public const float NPCSetWearerChance = 0.5f;               // v0.65.5: per-NPC-teammate bag + market-stock cap on save (was uncapped)
     public const int MaxSerializedStrangerDialogueIds = 50;        // StrangerEncounter.UsedDialogueIds (most recent)
     public const int MaxSerializedStrangerRecentEvents = 20;       // StrangerEncounter.RecentGameEvents (most recent)
     // Third-round v0.57.18 audit: per-NPC conversation states + RoyalCourt collections
