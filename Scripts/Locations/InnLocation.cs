@@ -5268,6 +5268,7 @@ public class InnLocation : BaseLocation
             terminal.WriteLine(Loc.Get("inn.aw_you_slam", opponent.DisplayName));
             terminal.WriteLine(Loc.Get("inn.aw_you_win", wagerAmount.ToString("N0")));
             currentPlayer.Gold += wagerAmount;
+            opponent.Gold = Math.Max(0, opponent.Gold - wagerAmount); // v1.1.1: the wager was minted, not transferred
 
             // Positive impression
             if (opponent.Brain?.Memory != null && currentPlayer.Name2 != null)
@@ -5282,6 +5283,7 @@ public class InnLocation : BaseLocation
             terminal.WriteLine(Loc.Get("inn.aw_they_slam", opponent.DisplayName));
             terminal.WriteLine(Loc.Get("inn.aw_you_lose", wagerAmount.ToString("N0")));
             currentPlayer.Gold -= wagerAmount;
+            opponent.Gold += wagerAmount; // v1.1.1: the loss was destroyed, not paid
             currentPlayer.Statistics?.RecordGoldSpent(wagerAmount);
 
             // Slightly negative impression
@@ -5608,7 +5610,20 @@ public class InnLocation : BaseLocation
         npc.Defence = (long)(npc.Defence * (1.0 + GameConfig.InnDefenseBoost));
 
         var combatEngine = new CombatEngine(terminal);
-        var result = await combatEngine.PlayerVsPlayer(currentPlayer, npc);
+        // v1.1.1 (review): PlayerVsPlayer already takes half the defender's gold on a win and
+        // this path then took its own cut, so an inn sleeper was robbed twice. Same shield as
+        // the dormitory: the duel sees no gold, the theft below is the only one.
+        long npcGoldBeforeFight = npc.Gold;
+        npc.Gold = 0;
+        CombatResult result;
+        try
+        {
+            result = await combatEngine.PlayerVsPlayer(currentPlayer, npc);
+        }
+        finally
+        {
+            npc.Gold = npcGoldBeforeFight;
+        }
 
         // Restore NPC stats
         npc.Strength = origStr;

@@ -1662,7 +1662,7 @@ public partial class TerminalEmulator
                 while (true)
                 {
                     int read = await _streamReader.ReadAsync(charBuf, 0, 1);
-                    if (read == 0) break; // EOF
+                    if (read == 0) throw new IOException("connection closed by peer"); // v1.1.1: see ReadLineInteractiveCore
 
                     char ch = charBuf[0];
                     if (ch == '\r' || ch == '\n')
@@ -2163,9 +2163,12 @@ public partial class TerminalEmulator
             int read = await readTask;
             if (read == 0) // EOF / disconnected
             {
-                // Update idle tracker before returning
+                // v1.1.1: a closed peer used to come back as an empty line forever. Every
+                // "re-prompt on empty input" loop in the game (combat menu, loot prompt, ...)
+                // then spun at full CPU until a write finally failed. Surface it the same way
+                // a failed write does so PlayerSession's IOException handler ends the session.
                 UpdateMudIdleTimeout(force: true);
-                return buffer.ToString();
+                throw new IOException("connection closed by peer");
             }
 
             char c = charBuf[0];

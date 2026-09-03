@@ -559,7 +559,7 @@ public static class SpellSystem
         // Deduct mana cost regardless of success (casting attempt uses mana)
         var manaCost = CalculateManaCost(spellInfo, caster);
         result.ManaCost = manaCost;
-        caster.Mana -= manaCost;
+        caster.Mana = Math.Max(0, caster.Mana - manaCost); // v1.1.1: a drug mana bonus can make the cast legal above real mana
 
         // v0.60.0 alpha audit: track spell casts. Stat field existed since
         // forever but no code ever incremented it -- entire alpha cohort

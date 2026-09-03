@@ -951,7 +951,7 @@ namespace UsurperRemake.Systems
                 using var connection = OpenConnection();
                 using var cmd = connection.CreateCommand();
                 // ORDER BY LENGTH DESC to prefer the record with actual save data over empty '{}' registration records
-                cmd.CommandText = "SELECT player_data FROM players WHERE LOWER(username) = LOWER(@username) AND is_banned = 0 ORDER BY LENGTH(player_data) DESC LIMIT 1;";
+                cmd.CommandText = "SELECT player_data FROM players WHERE LOWER(username) = LOWER(@username) AND is_banned = 0 ORDER BY (username = LOWER(@username)) DESC, LENGTH(player_data) DESC LIMIT 1;";
                 cmd.Parameters.AddWithValue("@username", playerName);
 
                 var result = await cmd.ExecuteScalarAsync();
@@ -1006,7 +1006,7 @@ namespace UsurperRemake.Systems
                     SELECT json_extract(player_data, '$.Player.Team')
                     FROM players
                     WHERE LOWER(username) = LOWER(@username) AND is_banned = 0
-                    ORDER BY LENGTH(player_data) DESC LIMIT 1;";
+                    ORDER BY (username = LOWER(@username)) DESC, LENGTH(player_data) DESC LIMIT 1;";
                 cmd.Parameters.AddWithValue("@username", username);
                 var result = cmd.ExecuteScalar();
                 return result as string ?? "";
@@ -1478,8 +1478,10 @@ namespace UsurperRemake.Systems
                     return false;
                 }
 
+                using var restoreTx = connection.BeginTransaction(); // v1.1.1: restore and archive removal apply together
                 using (var updateCmd = connection.CreateCommand())
                 {
+                    updateCmd.Transaction = restoreTx;
                     updateCmd.CommandText = @"
                         UPDATE players SET player_data = @data
                          WHERE LOWER(username) = LOWER(@username);";
@@ -1496,10 +1498,17 @@ namespace UsurperRemake.Systems
                 // Remove the archive entry now that it's been claimed.
                 using (var deleteCmd = connection.CreateCommand())
                 {
+                    deleteCmd.Transaction = restoreTx;
                     deleteCmd.CommandText = "DELETE FROM deleted_characters WHERE id = @id;";
                     deleteCmd.Parameters.AddWithValue("@id", info.Id);
                     deleteCmd.ExecuteNonQuery();
                 }
+                restoreTx.Commit();
+
+                // v1.1.1: permadeath marked the username erased so a late autosave could not
+                // resurrect it. A restored character kept that mark, so every save it made
+                // afterwards was silently refused for the rest of the server's uptime.
+                ClearErasedMark(username);
 
                 DebugLogger.Instance.LogInfo("SAVE",
                     $"Restored '{username}' (display: '{info.DisplayName}') from deleted_characters archive.");
@@ -1578,7 +1587,7 @@ namespace UsurperRemake.Systems
                 using var connection = OpenConnection();
                 using var cmd = connection.CreateCommand();
                 // ORDER BY LENGTH DESC to prefer actual save data over empty '{}' registration records
-                cmd.CommandText = "SELECT player_data FROM players WHERE LOWER(username) = LOWER(@username) AND is_banned = 0 ORDER BY LENGTH(player_data) DESC LIMIT 1;";
+                cmd.CommandText = "SELECT player_data FROM players WHERE LOWER(username) = LOWER(@username) AND is_banned = 0 ORDER BY (username = LOWER(@username)) DESC, LENGTH(player_data) DESC LIMIT 1;";
                 cmd.Parameters.AddWithValue("@username", playerName);
 
                 var result = cmd.ExecuteScalar();
@@ -3985,6 +3994,10 @@ namespace UsurperRemake.Systems
 
         public async Task<(bool success, string message)> RegisterPlayer(string username, string password, string? ipAddress = null)
         {
+            // v1.1.1: the relay and desktop clients send AUTH:user:password:type; a colon in the
+            // password split that line wrong and locked the account out of every relay login.
+            if (password != null && password.Contains(':'))
+                return (false, "Password cannot contain ':'.");
             // v0.60.5: full ban means no new accounts from this IP either. Same
             // defense-in-depth pattern as AuthenticatePlayer.
             if (!string.IsNullOrWhiteSpace(ipAddress) && IsIpBanned(ipAddress))
@@ -4279,6 +4292,8 @@ namespace UsurperRemake.Systems
         {
             try
             {
+                if (newPassword != null && newPassword.Contains(':'))
+                    return (false, "Password cannot contain ':'."); // v1.1.1: the relay/desktop AUTH line splits on ':'
                 // Verify old password first
                 var (authenticated, _, _, _, _) = await AuthenticatePlayer(username, oldPassword);
                 if (!authenticated)
@@ -4312,6 +4327,8 @@ namespace UsurperRemake.Systems
         {
             try
             {
+                if (newPassword.Contains(':'))
+                    return (false, "Password cannot contain ':'."); // v1.1.1: the relay/desktop AUTH line splits on ':'
                 if (newPassword.Length < 4)
                     return (false, "New password must be at least 4 characters.");
 
@@ -5190,7 +5207,8 @@ namespace UsurperRemake.Systems
                        CAST(json_extract(p.player_data, '$.player.class') AS INTEGER) as class_id,
                        CAST(json_extract(p.player_data, '$.player.experience') AS INTEGER) as xp,
                        p.last_login,
-                       CASE WHEN op.username IS NOT NULL THEN 1 ELSE 0 END as is_online
+                       CASE WHEN op.username IS NOT NULL THEN 1 ELSE 0 END as is_online,
+                       p.username
                 FROM players p
                 LEFT JOIN online_players op ON LOWER(p.username) = LOWER(op.username)
                     AND op.last_heartbeat > datetime('now', '-120 seconds')
@@ -5209,6 +5227,7 @@ namespace UsurperRemake.Systems
                     continue;
                 members.Add(new PlayerSummary
                 {
+                    Username = reader.GetString(6), // v1.1.1: team wars load saves by username
                     DisplayName = name,
                     Level = reader.IsDBNull(1) ? 1 : reader.GetInt32(1),
                     ClassId = reader.IsDBNull(2) ? 0 : reader.GetInt32(2),
@@ -5350,10 +5369,34 @@ namespace UsurperRemake.Systems
         {
             using var connection = OpenConnection();
             using var cmd = connection.CreateCommand();
-            cmd.CommandText = "SELECT username FROM players WHERE (LOWER(username) = LOWER(@name) OR LOWER(display_name) = LOWER(@name)) AND is_banned = 0 AND username NOT LIKE 'emergency_%' LIMIT 1;";
+            // v1.1.1 (review): a username can equal another account's display name, so prefer the
+            // exact username, then the exact display name.
+            cmd.CommandText = "SELECT username FROM players WHERE (LOWER(username) = LOWER(@name) OR LOWER(display_name) = LOWER(@name)) AND is_banned = 0 AND username NOT LIKE 'emergency_%' ORDER BY (LOWER(username) = LOWER(@name)) DESC, (LOWER(display_name) = LOWER(@name)) DESC LIMIT 1;";
             cmd.Parameters.AddWithValue("@name", nameOrDisplay);
             var result = cmd.ExecuteScalar();
             return result?.ToString();
+        }
+        catch { return null; }
+    }
+
+    /// <summary>
+    /// v1.1.1: resolve a character's Name2 to a username for mail. Exact username or display
+    /// name first; otherwise a display name of the form "Name2 Surname" (a player with a family
+    /// surname). Only for notifications: the surname prefix is too loose for anything that moves
+    /// gold or leadership, which keep using ResolvePlayerUsername.
+    /// </summary>
+    public string? ResolvePlayerUsernameForMail(string characterName)
+    {
+        var exact = ResolvePlayerUsername(characterName);
+        if (!string.IsNullOrEmpty(exact)) return exact;
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT username FROM players WHERE LOWER(display_name) LIKE LOWER(@prefix) ESCAPE '\\' AND is_banned = 0 LIMIT 1";
+            var escaped = characterName.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
+            cmd.Parameters.AddWithValue("@prefix", escaped + " %");
+            return cmd.ExecuteScalar()?.ToString();
         }
         catch { return null; }
     }

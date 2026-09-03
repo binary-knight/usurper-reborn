@@ -471,7 +471,7 @@ public class WorldSimulator
 
         // Track dead NPCs for respawn (check both HP <= 0 and IsDead flag)
         // Skip age-dead and perma-dead NPCs - they don't come back
-        foreach (var npc in npcs.Where(n => (!n.IsAlive || n.IsDead) && !n.IsAgedDeath && !n.IsPermaDead))
+        foreach (var npc in npcs.Where(n => (!n.IsAlive || n.IsDead) && !n.IsAgedDeath && !n.IsPermaDead).ToList()) // v1.1.1: snapshot; sessions add NPCs mid-tick
         {
             var respawnKey = npc.Id ?? npc.Name;
             if (!deadNPCRespawnTimers.ContainsKey(respawnKey))
@@ -830,7 +830,7 @@ public class WorldSimulator
             // Online: if the spouse name resolves to a real player, send mail.
             if (UsurperRemake.BBS.DoorMode.IsOnlineMode && SqlBackend != null)
             {
-                var username = SqlBackend.ResolvePlayerUsername(spouseName);
+                var username = SqlBackend.ResolvePlayerUsernameForMail(spouseName); // SpouseName is a bare Name2; a family surname widens the display name
                 if (!string.IsNullOrEmpty(username))
                 {
                     _ = SqlBackend.SendMessage("The Town Crier", username, "death", body);
@@ -934,7 +934,7 @@ public class WorldSimulator
 
         // Find all dead NPCs and add them to the respawn queue
         // Skip permanently dead NPCs (aged death and permadeath)
-        foreach (var npc in npcs.Where(n => (!n.IsAlive || n.IsDead) && !n.IsAgedDeath && !n.IsPermaDead))
+        foreach (var npc in npcs.Where(n => (!n.IsAlive || n.IsDead) && !n.IsAgedDeath && !n.IsPermaDead).ToList()) // v1.1.1: snapshot; sessions add NPCs mid-tick
         {
             var respawnKey = npc.Id ?? npc.Name;
             if (!deadNPCRespawnTimers.ContainsKey(respawnKey))
@@ -1137,7 +1137,7 @@ public class WorldSimulator
     /// </summary>
     private void ProcessNPCAging()
     {
-        foreach (var npc in npcs.Where(n => n.IsAlive && !n.IsDead && !n.IsAgedDeath).ToList())
+        foreach (var npc in npcs.Where(n => n.IsAlive && !n.IsDead && !n.IsAgedDeath && !n.IsPermaDead).ToList()) // v1.1.1: never age a permadead corpse
         {
             // Skip story NPCs - they're needed for narrative quests
             if (npc.IsStoryNPC) continue;
@@ -1358,7 +1358,8 @@ public class WorldSimulator
 
             // Equipped items: walk EquippedItems dict, resolve each ID to an Item,
             // queue. EquipmentDatabase has the full item registry.
-            foreach (var kvp in deceased.EquippedItems)
+            var queuedSlots = new List<EquipmentSlot>();
+            foreach (var kvp in deceased.EquippedItems.ToList())
             {
                 if (kvp.Value <= 0) continue;
                 var eq = global::EquipmentDatabase.GetById(kvp.Value);
@@ -1368,10 +1369,14 @@ public class WorldSimulator
                 if (item == null) continue;
                 string itemJson = System.Text.Json.JsonSerializer.Serialize(item, jsonOpts);
                 if (backend.QueueInheritance(leaderUsername, deceased.Name2 ?? deceased.Name1 ?? "Unknown", itemJson, 0))
+                {
                     queued++;
+                    queuedSlots.Add(kvp.Key);
+                }
             }
 
             // Inventory items
+            var queuedItems = new List<Item>();
             if (deceased.Inventory != null)
             {
                 foreach (var item in deceased.Inventory)
@@ -1379,19 +1384,28 @@ public class WorldSimulator
                     if (item == null) continue;
                     string itemJson = System.Text.Json.JsonSerializer.Serialize(item, jsonOpts);
                     if (backend.QueueInheritance(leaderUsername, deceased.Name2 ?? deceased.Name1 ?? "Unknown", itemJson, 0))
+                    {
                         queued++;
+                        queuedItems.Add(item);
+                    }
                 }
             }
 
             // Gold (single row with no item, just gold_amount)
+            bool goldQueued = false;
             if (deceased.Gold > 0)
             {
-                if (backend.QueueInheritance(leaderUsername, deceased.Name2 ?? deceased.Name1 ?? "Unknown", null, deceased.Gold))
-                    queued++;
+                goldQueued = backend.QueueInheritance(leaderUsername, deceased.Name2 ?? deceased.Name1 ?? "Unknown", null, deceased.Gold);
+                if (goldQueued) queued++;
             }
 
             if (queued > 0)
             {
+                // v1.1.1: the estate left on the corpse could be queued again. Only what was
+                // actually queued leaves the corpse; a row that failed keeps its item for a re-fire.
+                if (goldQueued) deceased.Gold = 0;
+                foreach (var item in queuedItems) deceased.Inventory?.Remove(item);
+                foreach (var slot in queuedSlots) deceased.EquippedItems.Remove(slot);
                 UsurperRemake.Systems.DebugLogger.Instance.LogInfo("LIFECYCLE",
                     $"Bequeathed {queued} items/gold from {deceased.Name2} (team '{deceased.Team}') to leader '{leaderUsername}'.");
             }
@@ -1409,8 +1423,9 @@ public class WorldSimulator
     /// </summary>
     private void HandleSpouseBereavement(NPC deceased)
     {
-        var spouse = npcs.FirstOrDefault(n =>
-            n.Name2 == deceased.SpouseName && (n.Married || n.IsMarried) && !n.IsDead);
+        // v1.1.1: resolve by marriage-registry id first (namesake-safe), then by name; a
+        // spouse who is merely knocked down this tick is still the spouse.
+        var spouse = FindNpcSpouse(deceased);
         if (spouse != null)
         {
             spouse.Married = false;
@@ -1455,6 +1470,25 @@ public class WorldSimulator
         // Clear deceased's own marriage flags
         deceased.Married = false;
         deceased.IsMarried = false;
+        deceased.SpouseName = ""; // v1.1.1: was left set, so the corpse still reported a spouse
+    }
+
+    /// <summary>
+    /// v1.1.1: the NPC married to <paramref name="npc"/>, resolved through the marriage
+    /// registry's ids first so a namesake of the real spouse is never picked, falling
+    /// back to the stored spouse name for marriages that predate the registry.
+    /// </summary>
+    private NPC? FindNpcSpouse(NPC npc)
+    {
+        var spouseId = NPCMarriageRegistry.Instance?.GetSpouseId(npc.ID);
+        if (!string.IsNullOrEmpty(spouseId))
+        {
+            // The registry knows the spouse; if that id is not a pool NPC it is a player (or
+            // gone), and a Name2 fallback would pick a namesake NPC instead.
+            return npcs.FirstOrDefault(n => n.ID == spouseId);
+        }
+        if (string.IsNullOrEmpty(npc.SpouseName)) return null;
+        return npcs.FirstOrDefault(n => n.Name2 == npc.SpouseName && (n.Married || n.IsMarried) && !n.IsPermaDead && !n.IsAgedDeath);
     }
 
     /// <summary>
@@ -1474,8 +1508,10 @@ public class WorldSimulator
             var npc1 = npcs.FirstOrDefault(n => n.ID == marriage.Npc1Id);
             var npc2 = npcs.FirstOrDefault(n => n.ID == marriage.Npc2Id);
 
-            bool npc1Dead = npc1 == null || npc1.IsDead || npc1.IsPermaDead;
-            bool npc2Dead = npc2 == null || npc2.IsDead || npc2.IsPermaDead;
+            // v1.1.1: IsDead is the transient respawn flag; a restart inside that window ended
+            // marriages whose partner came back ten minutes later.
+            bool npc1Dead = npc1 == null || npc1.IsPermaDead || npc1.IsAgedDeath;
+            bool npc2Dead = npc2 == null || npc2.IsPermaDead || npc2.IsAgedDeath;
 
             if (npc1Dead || npc2Dead)
             {
@@ -1508,13 +1544,13 @@ public class WorldSimulator
 
         // Reverse check: NPCs flagged as married but not in the registry
         int flagsCleaned = 0;
-        foreach (var npc in npcs.Where(n => (n.Married || n.IsMarried) && n.IsAlive && !n.IsDead))
+        foreach (var npc in npcs.Where(n => (n.Married || n.IsMarried) && n.IsAlive && !n.IsDead).ToList()) // v1.1.1: snapshot; sessions add NPCs mid-tick
         {
             if (registry.IsMarriedToNPC(npc.ID) != true)
             {
                 // Check if spouse exists and is alive — if not, clear the stale flag
                 var spouse = !string.IsNullOrEmpty(npc.SpouseName)
-                    ? npcs.FirstOrDefault(n => n.Name2 == npc.SpouseName && n.IsAlive && !n.IsDead)
+                    ? npcs.FirstOrDefault(n => n.Name2 == npc.SpouseName && !n.IsPermaDead && !n.IsAgedDeath) // v1.1.1: IsDead is the respawn window
                     : null;
                 if (spouse == null)
                 {
@@ -2154,7 +2190,7 @@ public class WorldSimulator
     private void ProcessNPCPregnancies()
     {
         // Process existing pregnancies - check for births
-        foreach (var npc in npcs.Where(n => n.IsAlive && !n.IsDead && n.PregnancyDueDate.HasValue).ToList())
+        foreach (var npc in npcs.Where(n => n.IsAlive && !n.IsDead && !n.IsPermaDead && n.PregnancyDueDate.HasValue).ToList())
         {
             if (DateTime.Now >= npc.PregnancyDueDate.Value)
             {
@@ -2187,7 +2223,10 @@ public class WorldSimulator
                     // Father completely gone from the game - create child with mother only
                     UsurperRemake.Systems.DebugLogger.Instance.LogWarning("LIFECYCLE",
                         $"Birth: father '{fatherName}' not found for {npc.Name2}'s pregnancy. Creating child anyway.");
-                    FamilySystem.Instance?.CreateNPCChild(npc, npc); // Use mother as both parents
+                    // v1.1.1: a child whose Mother == Father corrupted the family/incest checks;
+                    // an unresolvable father now ends the pregnancy without a birth.
+                    npc.PregnancyDueDate = null;
+                    npc.PregnancyFatherName = "";
                 }
                 npc.PregnancyDueDate = null;
             }
@@ -7429,7 +7468,20 @@ public class WorldSimulator
                 // from trivially killing lower-level players through all their guards
                 var alignmentSystem = new UsurperRemake.Systems.AlignmentSystem();
                 string sleeperTeam = SqlBackend.GetPlayerTeamName(sleeper.Username);
-                string sleeperName = sleeper.Username;
+                // v1.1.1: the guard below compared the NPC's stored spouse name (a character
+                // name) with the login username, and consulted RelationshipSystem.Instance,
+                // which on the world-sim thread is an empty instance no player ever writes.
+                // Read the sleeper's own save: its character name and its romance lists are
+                // the only source of that player's spouse and lovers here.
+                var sleeperSave = SqlBackend.ReadGameData(sleeper.Username).GetAwaiter().GetResult();
+                if (sleeperSave?.Player == null) continue;
+                string sleeperName = string.IsNullOrEmpty(sleeperSave.Player.Name2) ? sleeper.Username : sleeperSave.Player.Name2;
+                var sleeperRomance = sleeperSave.Player.RomanceData;
+                bool IsSleepersPartner(NPC n) =>
+                    sleeperRomance != null && (
+                        sleeperRomance.Spouses.Any(s => s.NPCId == n.ID) ||
+                        sleeperRomance.CurrentLovers.Any(l => l.NPCId == n.ID) ||
+                        sleeperRomance.FriendsWithBenefits.Contains(n.ID));
                 int sleeperLevel = GetSleeperLevel(sleeper.Username);
                 int minAttackerLevel = Math.Max(GameConfig.MinNPCLevelForSleeperAttack, sleeperLevel - 5);
                 int maxAttackerLevel = sleeperLevel + 5;
@@ -7439,6 +7491,7 @@ public class WorldSimulator
                          || alignmentSystem.GetAlignment(n) == UsurperRemake.Systems.AlignmentSystem.AlignmentType.Evil)
                         && (string.IsNullOrEmpty(sleeperTeam) || !sleeperTeam.Equals(n.Team, StringComparison.OrdinalIgnoreCase))
                         && !n.SpouseName.Equals(sleeperName, StringComparison.OrdinalIgnoreCase)
+                        && !IsSleepersPartner(n)
                         && !RelationshipSystem.IsMarriedOrLover(n, sleeperName))
                     .ToList();
 

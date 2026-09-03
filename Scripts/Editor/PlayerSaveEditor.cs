@@ -46,6 +46,7 @@ internal static class PlayerSaveEditor
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         IncludeFields = true,
+        MaxDepth = 256, // v1.1.1: matches FileSaveBackend; the default 64 fails on a full NPC roster
     };
 
     public static async Task RunAsync()

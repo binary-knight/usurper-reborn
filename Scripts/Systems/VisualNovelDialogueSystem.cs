@@ -2712,7 +2712,7 @@ namespace UsurperRemake.Systems
             // Update NPC married status
             npc.IsMarried = true;
             npc.Married = true;
-            npc.SpouseName = player.DisplayName;
+            npc.SpouseName = player.Name2; // v1.1.1: identity key, see RelationshipSystem
             npc.MarriedTimes++;
 
             // Add to RomanceTracker as spouse

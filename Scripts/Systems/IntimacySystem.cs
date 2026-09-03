@@ -454,7 +454,9 @@ namespace UsurperRemake.Systems
                     // Approximate gestation = NpcLifecycleHoursPerYear * 0.75
                     // (3/4 of a year in game time). Real birth fires from the
                     // world sim daily aging tick when the due date passes.
-                    npcPartner.PregnancyDueDate = DateTime.UtcNow.AddHours(
+                    // v1.1.1: the world sim sets and compares this field with DateTime.Now;
+                    // UtcNow here made the due date land hours early or late by time zone.
+                    npcPartner.PregnancyDueDate = DateTime.Now.AddHours(
                         GameConfig.NpcLifecycleHoursPerYear * 0.75);
                 }
             }

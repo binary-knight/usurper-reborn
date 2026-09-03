@@ -1222,7 +1222,10 @@ public class MudServer
         bool echo = false, char? maskChar = null)
     {
         var buffer = new byte[1];
-        var line = new System.Text.StringBuilder();
+        // v1.1.1: bytes are collected and decoded as UTF-8 at the end of the line. Each byte
+        // used to be cast to a char, so a name like José was stored and echoed as mojibake
+        // while output went out as UTF-8.
+        var line = new List<byte>();
 
         while (!ct.IsCancellationRequested)
         {
@@ -1255,7 +1258,7 @@ public class MudServer
                 continue; // skip the entire IAC sequence
             }
 
-            char c = (char)b;
+            char c = b < 0x80 ? (char)b : '\u0080'; // non-ASCII bytes are data, never control
 
             // Handle line endings: \r, \n, or \r\n
             // MUD clients (Mudlet, MUSHclient) typically send \r\n as a single packet.
@@ -1264,7 +1267,7 @@ public class MudServer
             if (c == '\n')
             {
                 if (echo) await stream.WriteAsync(new byte[] { (byte)'\r', (byte)'\n' }, 0, 2, ct);
-                return line.ToString();
+                return System.Text.Encoding.UTF8.GetString(line.ToArray());
             }
             if (c == '\r')
             {
@@ -1283,15 +1286,17 @@ public class MudServer
                     int peek = await stream.ReadAsync(buffer, 0, 1, ct);
                     // If it wasn't \n, we lost a byte — but \r without \n is extremely rare
                 }
-                return line.ToString();
+                return System.Text.Encoding.UTF8.GetString(line.ToArray());
             }
 
             // Handle backspace (BS 0x08 or DEL 0x7F)
             if (c == '\b' || c == 0x7F)
             {
-                if (line.Length > 0)
+                if (line.Count > 0)
                 {
-                    line.Remove(line.Length - 1, 1);
+                    // drop one whole UTF-8 character: continuation bytes, then the lead byte
+                    while (line.Count > 0 && (line[^1] & 0xC0) == 0x80) line.RemoveAt(line.Count - 1);
+                    if (line.Count > 0) line.RemoveAt(line.Count - 1);
                     if (echo)
                         await stream.WriteAsync(new byte[] { (byte)'\b', (byte)' ', (byte)'\b' }, 0, 3, ct);
                 }
@@ -1301,16 +1306,20 @@ public class MudServer
             // Skip non-printable control characters
             if (c < ' ') continue;
 
-            line.Append(c);
+            if (line.Count >= 1024) continue; // v1.1.1: clip a pasted flood; returning null here dropped the connection
+            line.Add(b);
 
             // Echo the character (or mask for passwords)
             if (echo)
             {
-                byte echoChar = (byte)(maskChar ?? c);
-                await stream.WriteAsync(new byte[] { echoChar }, 0, 1, ct);
+                // mask once per character (lead byte or ASCII), never per continuation byte
+                if (maskChar == null)
+                    await stream.WriteAsync(new byte[] { b }, 0, 1, ct);
+                else if ((b & 0xC0) != 0x80)
+                    await stream.WriteAsync(new byte[] { (byte)maskChar.Value }, 0, 1, ct);
             }
 
-            if (line.Length > 1024) return null; // Safety limit
+            // v1.1.1: length is clipped at the append above instead of closing the connection // Safety limit
         }
 
         return null;
@@ -1687,6 +1696,7 @@ public class MudServer
                     {
                         Console.Error.WriteLine($"[MUD] [{session.Username}] Idle timeout ({idleTime.TotalMinutes:F0} min) — disconnecting");
                         await session.DisconnectAsync($"Disconnected: idle for {(int)idleTime.TotalMinutes} minutes.");
+                        session.LastActivityTime = DateTime.UtcNow; // v1.1.1: removal happens in the session's own finally; without this the next tick disconnected it again and stalled the watchdog
                     }
                 }
             }

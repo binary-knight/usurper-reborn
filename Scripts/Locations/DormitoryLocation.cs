@@ -581,8 +581,20 @@ public class DormitoryLocation : BaseLocation
         npc.Strength = (long)(npc.Strength * 0.7); // 30% weaker while sleeping
         npc.Defence = (long)(npc.Defence * 0.7);
 
+        // v1.1.1: PlayerVsPlayer already takes half the defender's gold on a win; this path
+        // then took its own cut, so a sleeping NPC was robbed twice. Same shield the arena uses.
+        long npcGoldBeforeFight = npc.Gold;
+        npc.Gold = 0;
         var combatEngine = new CombatEngine(terminal);
-        var result = await combatEngine.PlayerVsPlayer(currentPlayer, npc);
+        CombatResult result;
+        try
+        {
+            result = await combatEngine.PlayerVsPlayer(currentPlayer, npc);
+        }
+        finally
+        {
+            npc.Gold = npcGoldBeforeFight; // a dropped connection must not save the NPC broke
+        }
 
         // Restore NPC stats (if they survived)
         npc.Strength = origStr;

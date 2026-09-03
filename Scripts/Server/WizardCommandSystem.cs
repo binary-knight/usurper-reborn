@@ -1220,6 +1220,14 @@ public static class WizardCommandSystem
             return true;
         }
 
+        // v1.1.1: same rank rule as /force; a fresh Wizard could read an Implementor's screen
+        if (!targetSession.SnoopedBy.Contains(mySession) && targetSession.WizardLevel >= FindSession(username)?.WizardLevel)
+        {
+            terminal.SetColor("bright_red");
+            terminal.WriteLine($"  You cannot snoop a wizard of equal or higher rank.");
+            return true;
+        }
+
         // Toggle snoop on this target
         if (targetSession.SnoopedBy.Contains(mySession))
         {

@@ -2499,7 +2499,7 @@ public abstract class BaseLocation
             if (liveNPCs.Count > 2)
             {
                 terminal.SetColor("gray");
-                terminal.Write($", +{liveNPCs.Count - 2} {Loc.Get("base.more")}");
+                terminal.Write(Loc.Get("base.more", liveNPCs.Count - 2)); // v1.1.1: template carries the count; the count was printed twice
             }
             terminal.WriteLine("");
         }
@@ -3859,7 +3859,7 @@ public abstract class BaseLocation
             // Online: show real time (server time)
             var now = DateTime.Now;
             terminal.SetColor("white");
-            terminal.WriteLine($"  {Loc.Get("base.server_time")}: {now:h:mm tt}");
+            terminal.WriteLine(Loc.Get("base.server_time", now.ToString("h:mm tt"))); // v1.1.1: template has the {0}
         }
         terminal.WriteLine("");
     }
@@ -9877,6 +9877,7 @@ public abstract class BaseLocation
 
     private static (long fee, int basePct, int taxPct) CalculateAuctionFee(long price, int durationHours)
     {
+        price = Math.Clamp(price, 0, 1_000_000_000_000L); // v1.1.1: a hand-typed price near long.MaxValue/5 wrapped the fee negative
         int basePct = durationHours switch
         {
             12 => 5,

@@ -3240,6 +3240,13 @@ public partial class GameEngine
             // load save" (a false alarm that paged the server-monitor Discord) and flashed an
             // "error loading" screen for 3 seconds. Let the session end normally and silently.
         }
+        catch (System.IO.IOException) when (UsurperRemake.Server.SessionContext.IsActive)
+        {
+            // v1.1.1: an online player's connection dropped (a failed write, or since 1.1.1 a
+            // read at EOF). Not a crash: let PlayerSession log it as "Connection lost" and clean
+            // up, instead of paging the monitor with "Failed to load save".
+            throw;
+        }
         catch (Exception ex)
         {
             terminal.WriteLine(Loc.Get("engine.error_loading", ex.Message), "red");
@@ -5254,6 +5261,14 @@ public partial class GameEngine
             Loan = playerData.BankLoan,
             Interest = playerData.BankInterest,
             BankRobberyAttempts = playerData.BankRobberyAttempts,
+            MarryActions = playerData.MarryActions,
+            WolfFeed = playerData.WolfFeed,
+            RoyalAdoptions = playerData.RoyalAdoptions,
+            Wrestlings = (byte)playerData.Wrestlings,
+            GymSessions = (byte)playerData.GymSessions,
+            PickPocketAttempts = playerData.PickPocketAttempts,
+            Massage = (byte)playerData.Massage,
+            UmanBearTries = (byte)playerData.UmanBearTries,
             TempleResurrectionsUsed = playerData.TempleResurrectionsUsed,
 
             // Resurrection & Church
@@ -6010,6 +6025,11 @@ public partial class GameEngine
         // v0.62.x Phase 5 (Black Market rotation)
         player.BlackMarketStockSeed = playerData.BlackMarketStockSeed;
         player.LastBlackMarketRefreshUtc = playerData.LastBlackMarketRefreshUtc;
+        // v1.1.1: restore the day's rotation. A null cache meant "re-roll", so every relog
+        // rolled a fresh Black Market and, since 1.1, a fresh guaranteed Legendary.
+        // An empty list is a sold-out rotation and must stay empty; only a legacy save (null)
+        // re-rolls, otherwise buying every slot and relogging was a fresh Legendary.
+        player.CachedBlackMarketStock = playerData.BlackMarketStock?.Select(d => d.ToItem()).ToList();
         // v0.62.x Phase 6 (Sanctum)
         player.AlmsGivenToday = playerData.AlmsGivenToday;
         player.OrphanageGiftsToday = playerData.OrphanageGiftsToday;
@@ -6453,6 +6473,9 @@ public partial class GameEngine
                 BaseIntelligence = data.BaseIntelligence > 0 ? data.BaseIntelligence : 10,
                 BaseWisdom = data.BaseWisdom > 0 ? data.BaseWisdom : 10,
                 BaseCharisma = data.BaseCharisma > 0 ? data.BaseCharisma : 10,
+                // v1.1.1: innate power; saves from before this carry 0, so fall back to the spawn formula
+                BaseWeapPow = data.BaseWeapPow > 0 ? data.BaseWeapPow : data.Level * 5,
+                BaseArmPow = data.BaseArmPow > 0 ? data.BaseArmPow : data.Level * 4,
 
                 // Class and race
                 Class = data.Class,

@@ -39,6 +39,13 @@ public static class PlayerCharacterLoader
             Sex = playerData.Sex == 'F' ? CharacterSex.Female : CharacterSex.Male,
             Gold = playerData.Gold,
             Poison = playerData.Poison,
+            // v1.1.1: fought without these, so defenders were weaker than the live character
+            Specialization = (ClassSpecialization)playerData.Specialization,
+            PermanentDamageBonus = playerData.PermanentDamageBonus,
+            PermanentDefenseBonus = playerData.PermanentDefenseBonus,
+            BonusMaxHP = playerData.BonusMaxHP,
+            BonusWeapPow = playerData.BonusWeapPow,
+            BonusArmPow = playerData.BonusArmPow,
             AI = CharacterAI.Computer,
             IsEcho = isEcho,
             // Restore base stats for RecalculateStats

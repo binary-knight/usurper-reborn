@@ -185,11 +185,11 @@ public partial class MagicShopLocation : BaseLocation
 
         // 1-line description + gold
         terminal.SetColor("gray");
-        terminal.Write($" {Loc.Get("magic_shop.run_by", _ownerName)} {Loc.Get("shop.you_have")} ");
+        // v1.1.1: shop.you_have carries the amount ("You have {0} gold crowns."); it was printed
+        // with a raw {0} followed by the gold and a hard-coded " gold.".
+        terminal.Write($" {Loc.Get("magic_shop.run_by", _ownerName)} ");
         terminal.SetColor("yellow");
-        terminal.Write($"{currentPlayer.Gold:N0}");
-        terminal.SetColor("gray");
-        terminal.WriteLine(" gold.");
+        terminal.WriteLine(Loc.Get("shop.you_have", $"{currentPlayer.Gold:N0}"));
 
         // NPCs
         ShowBBSNPCs();
@@ -2806,6 +2806,7 @@ public partial class MagicShopLocation : BaseLocation
 
         // Find sellable accessories in inventory (non-equipped items)
         var sellable = new List<(Equipment item, long sellPrice)>();
+        var sellableSource = new List<Item>(); // v1.1.1: the backpack item each row came from
         var fenceModifier = FactionSystem.Instance.GetFencePriceModifier();
 
         foreach (var invItem in player.Inventory)
@@ -2813,11 +2814,15 @@ public partial class MagicShopLocation : BaseLocation
             // Check if this is an accessory (ring, necklace, or magic item)
             if (invItem.Type == ObjType.Magic || invItem.Type == ObjType.Fingers || invItem.Type == ObjType.Neck)
             {
+                // v1.1.1: cursed and unidentified accessories were sellable at full appraisal
+                // here while the weapon and armor shops refuse them.
+                if (invItem.IsCursed || invItem.Cursed || !invItem.IsIdentified) continue;
                 // Convert Item to Equipment for price calculation
                 long sellPrice = (long)(Math.Max(1, invItem.Value / 2) * fenceModifier);
                 // Use a temporary Equipment for display
                 var equip = new Equipment { Name = invItem.Name, Value = invItem.Value };
                 sellable.Add((equip, sellPrice));
+                sellableSource.Add(invItem);
             }
         }
 
@@ -2897,12 +2902,13 @@ public partial class MagicShopLocation : BaseLocation
         else if (int.TryParse(input, out int idx) && idx >= 1 && idx <= sellable.Count)
         {
             var (item, sellPrice) = sellable[idx - 1];
-            // Find and remove the actual inventory item
+            var source = sellableSource[idx - 1];
+            // v1.1.1: matched by name, so with two same-named rings it paid for the one
+            // selected and removed the first, which could be the other one.
             for (int i = 0; i < player.Inventory.Count; i++)
             {
                 var invItem = player.Inventory[i];
-                if ((invItem.Type == ObjType.Magic || invItem.Type == ObjType.Fingers || invItem.Type == ObjType.Neck)
-                    && invItem.Name == item.Name)
+                if (ReferenceEquals(invItem, source))
                 {
                     player.Gold += sellPrice;
                     player.Statistics?.RecordSale(sellPrice);

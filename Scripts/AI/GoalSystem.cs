@@ -215,7 +215,7 @@ public partial class GoalSystem
         var match = pool.FirstOrDefault(n =>
             (n.Name2 ?? n.Name1 ?? "").Equals(targetName, StringComparison.OrdinalIgnoreCase));
         if (match == null) return true;  // no longer in the world -> consider settled
-        return match.IsDead;
+        return match.IsPermaDead || match.IsAgedDeath; // v1.1.1: IsDead is the ten-minute respawn flag
     }
 
     /// <summary>
@@ -232,7 +232,7 @@ public partial class GoalSystem
         if (pool == null) return false;
         var match = pool.FirstOrDefault(n =>
             (n.Name2 ?? n.Name1 ?? "").Equals(targetName, StringComparison.OrdinalIgnoreCase));
-        return match != null && match.IsDead;
+        return match != null && (match.IsPermaDead || match.IsAgedDeath); // v1.1.1: IsDead is the respawn window
     }
     
     /// <summary>

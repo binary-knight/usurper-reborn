@@ -5,8 +5,12 @@ using System.Threading.Tasks;
 
 public class Player : Character
 {
+    // v1.1.1: LastLogin, TurnsRemaining, PrisonsLeft, ExecuteLeft, MarryActions, WolfFeed,
+    // RoyalAdoptions, DaysInPower and CompactMode used to be redeclared here with `new`. The
+    // save path reads a Character reference and the game logic holds a Player reference, so
+    // each field existed twice on one object and the copy that was saved was never the copy
+    // that was played. They now live on Character only.
     public new string RealName { get; set; } = ""; // Player's real name vs character name
-    public new DateTime LastLogin { get; set; }
     public DateTime AccountCreated { get; set; }
     public int TotalLogins { get; set; }
     public TimeSpan TotalPlayTime { get; set; }
@@ -24,7 +28,6 @@ public class Player : Character
 
     // Player preferences
     public bool AutoFight { get; set; } = false;
-    public bool CompactMode { get; set; } = false;
     public string ColorScheme { get; set; } = "classic";
     
     // Special player abilities/unlocks
@@ -37,13 +40,6 @@ public class Player : Character
     public int TurnsThisSession { get; set; } = 0;
     
     // Missing properties for API compatibility
-    public new int TurnsRemaining { get; set; } = GameConfig.TurnsPerDay;
-    public new int PrisonsLeft { get; set; } = 0;
-    public new int ExecuteLeft { get; set; } = 0;
-    public new int MarryActions { get; set; } = 5;
-    public new int WolfFeed { get; set; } = 0;
-    public new int RoyalAdoptions { get; set; } = 0;
-    public new int DaysInPower { get; set; } = 0;
     
     // Additional missing properties for API compatibility
     public override string CurrentLocation { get; set; } = "Main Street";

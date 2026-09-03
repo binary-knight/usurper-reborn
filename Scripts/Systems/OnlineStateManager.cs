@@ -1306,6 +1306,7 @@ namespace UsurperRemake.Systems
                             IsCursed = equip.IsCursed,
                             Rarity = (int)equip.Rarity,
                         Family = equip.Family ?? "",
+                        IsIdentified = equip.IsIdentified, // v1.1.1: defaulted true on reload
                             WeaponType = (int)equip.WeaponType,
                             Handedness = (int)equip.Handedness,
                             ArmorType = (int)equip.ArmorType,
