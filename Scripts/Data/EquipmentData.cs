@@ -10,7 +10,7 @@ using System.Threading;
 public static class EquipmentDatabase
 {
     private static Dictionary<int, Equipment> _allEquipment = new();
-    private static bool _initialized = false;
+    private static volatile bool _initialized = false; // v1.1: read outside the lock as the fast path; volatile so the flag cannot be seen before the dictionary writes on ARM
 
     // ID ranges for different equipment types
     private const int OneHandedWeaponStart = 1000;
