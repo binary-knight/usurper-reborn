@@ -1575,26 +1575,44 @@ namespace UsurperRemake.Locations
 
             var floor = (LootGenerator.ItemRarity)(int)BlackMarketRarityFloor(dreadTier);
             bool nightmare = dreadTier == (int)AlignmentSystem.DreadTier.Nightmare;
-            int legendaryCap = nightmare ? GameConfig.BlackMarketLegendarySlotCap : 0;
+            int level = currentPlayer.Level; var cls = currentPlayer.Class;
+            currentPlayer.CachedBlackMarketStock = FillBlackMarketSlots(slotCount, floor, nightmare,
+                GameConfig.BlackMarketLegendarySlotCap,
+                (min, forced) => LootGenerator.GenerateDungeonLootWithMinRarity(level, cls, min, forced));
+        }
+
+        /// <summary>
+        /// v1.1: fills the rotation. Every slot is at or above <paramref name="floor"/>. At
+        /// Nightmare the first slot is forced Legendary and any further Legendary-or-better
+        /// roll is replaced by a forced Epic so the rotation never exceeds
+        /// <paramref name="legendaryCap"/> (forced rather than re-rolled: bounded, and the
+        /// inflated Epic share at Nightmare is by design, see GameConfig). A generator that
+        /// returns null yields no item for that slot; the returned list never contains null.
+        /// Static and generator-injected so the cap logic is testable without a terminal.
+        /// </summary>
+        internal static List<Item> FillBlackMarketSlots(int slotCount, LootGenerator.ItemRarity floor, bool nightmare,
+            int legendaryCap, Func<LootGenerator.ItemRarity, LootGenerator.ItemRarity?, Item?> generate)
+        {
+            var stock = new List<Item>();
+            int cap = nightmare ? legendaryCap : 0;
             int legendaryCount = 0;
             for (int i = 0; i < slotCount; i++)
             {
-                LootGenerator.ItemRarity? forced = null;
-                if (nightmare && i == 0 && legendaryCap > 0)
-                    forced = LootGenerator.ItemRarity.Legendary; // the guaranteed one
-                var loot = LootGenerator.GenerateDungeonLootWithMinRarity(currentPlayer.Level, currentPlayer.Class, floor, forced);
+                LootGenerator.ItemRarity? forced = (nightmare && i == 0 && cap > 0) ? LootGenerator.ItemRarity.Legendary : null;
+                var loot = generate(floor, forced);
                 if (loot == null) continue;
                 if (loot.Rarity >= EquipmentRarity.Legendary)
                 {
-                    if (legendaryCount >= legendaryCap)
-                        loot = LootGenerator.GenerateDungeonLootWithMinRarity(currentPlayer.Level, currentPlayer.Class, floor, LootGenerator.ItemRarity.Epic);
-                    else
-                        legendaryCount++;
+                    if (legendaryCount >= cap)
+                    {
+                        loot = generate(floor, LootGenerator.ItemRarity.Epic);
+                        if (loot == null) continue;
+                    }
+                    else legendaryCount++;
                 }
                 stock.Add(loot);
             }
-
-            currentPlayer.CachedBlackMarketStock = stock;
+            return stock;
         }
 
         /// <summary>v1.1: rarity floor for the player's Dread tier; Common when the tier is out of range.</summary>

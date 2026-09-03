@@ -847,6 +847,9 @@ public static partial class GameConfig
     // v1.1: rarity floor per Dread tier (indexed like BlackMarketGearSlotsByDreadTier). Deeper standing
     // stops the market rolling Common gear at all; Nightmare guarantees one Legendary per refresh
     // (BlackMarketLegendarySlotCap) and never more than that many Legendary-or-better in a rotation.
+    // Rolls above the cap are replaced by forced Epics, so the Epic share at Nightmare is inflated
+    // by design; a balance pass should read it as such. The cached rotation lives until the day
+    // rolls, so a Dread tier change mid-day does not re-floor it.
     public static readonly EquipmentRarity[] BlackMarketRarityFloorByDreadTier =
         { EquipmentRarity.Common, EquipmentRarity.Uncommon, EquipmentRarity.Rare, EquipmentRarity.Epic, EquipmentRarity.Epic };
     // v1.1: price multiplier by rarity on top of BlackMarketGearMarkup, indexed by EquipmentRarity.
