@@ -87,6 +87,13 @@ here. Nothing new to learn. Some things you were used to living with are gone.
 
 ## Online server
 
+- A MUD, web, or SSH client that closed its connection read as an endless stream
+  of empty lines, so any prompt that re-asks on empty input (the combat menu, a
+  loot drop, the monk's potions, the resurrection choice) spun at full CPU until a
+  write finally failed. A closed peer now ends the session the way a failed write
+  always has.
+- Per-combat buffs are consumed when the fight ends, in a block that runs on every
+  exit including a dropped connection, so a disconnect mid-fight cannot keep a buff.
 - `/snoop` had no rank guard and a disconnecting snooper stayed wired into the
   target's output.
 - The idle watchdog disconnected the same session every tick until its cleanup

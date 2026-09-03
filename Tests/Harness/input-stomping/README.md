@@ -34,6 +34,12 @@ presses Enter and prints what the server made of the input.
 | Desktop / Steam / BBS door client (AUTH on TCP, whole lines, local echo) | `python3 stomp.py DESKTOP` | `\r\n` + message + real prompt line, no typed text, no erase. Server side only: the real client's re-echo of its own buffer (OnlinePlaySystem) is hand-verified, not driven here |
 | SSH through `--mud-relay` under a real PTY | `python3 relay_stomp.py` | same as MUD; PTY attrs must show ICANON and ECHO off |
 
+`utf8_name.py` is a separate case for multi-byte names (v1.1.1, when the MUD line
+reader started decoding UTF-8 itself): `python3 utf8_name.py jose José MUD register`
+creates the account, then `WEB` and `SSH` log the same character in over the other
+transports. Each run checks the name in `/who`, a tell addressed by the accented
+name, a tell by username, and a `/say`, and prints True for each.
+
 Pass criteria for every case: the message is on its own line, the prompt that was
 on screen before the message is redrawn exactly, and the typed text appears at most
 once (exactly once on echo transports, zero times on the desktop path, where the
