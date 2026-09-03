@@ -1196,11 +1196,9 @@ public class BankLocation : BaseLocation
             return;
         }
 
-        // Initialize robbery attempts if not yet set (reset daily by MaintenanceSystem)
-        if (currentPlayer.BankRobberyAttempts <= 0 && _robberyAttemptsToday == 0)
-        {
-            currentPlayer.BankRobberyAttempts = GameConfig.DefaultBankRobberyAttempts;
-        }
+        // v1.1.1: no refill here. BankRobberyAttempts is persisted and reset by the daily
+        // maintenance tick; this block refilled it whenever the process-wide counter was 0,
+        // which is every restart, so burn three attempts, relaunch, get three more.
 
         // Check daily robbery limit
         if (currentPlayer.BankRobberyAttempts <= 0)

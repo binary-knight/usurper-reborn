@@ -870,6 +870,7 @@ public class ArmorShopLocation : BaseLocation
 
             foreach (var (item, invIndex) in inventoryArmor)
             {
+                if (!item.IsIdentified || item.IsCursed) continue; // v1.1.1: [A] sells only these; the list used to show more than it sold
                 sellableItems.Add((false, null, invIndex, item.Name, item.Value, item.IsCursed));
                 long displayPrice = (long)((item.Value / 2) * fenceModifier);
                 terminal.SetColor("bright_cyan");
@@ -1116,12 +1117,10 @@ public class ArmorShopLocation : BaseLocation
                         AchievementSystem.CheckAchievements(currentPlayer); // v0.61.3: immediate achievement check
                         totalSpent += abItemTotal;
 
-                        // Process city tax share from this sale
-                        CityControlSystem.Instance.ProcessSaleTax(itemPrice);
-
                         if (currentPlayer.EquipItem(armor, out string equipMsg))
                         {
                             purchased++;
+                            CityControlSystem.Instance.ProcessSaleTax(itemPrice); // v1.1.1: after the equip check; a failed equip refunded the price but kept the tax
                             terminal.SetColor("bright_green");
                             terminal.WriteLine(Loc.Get("armor_shop.autobuy_purchased", armor.Name));
 

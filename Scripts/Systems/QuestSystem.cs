@@ -774,6 +774,7 @@ public partial class QuestSystem
         // Bookkeeping: career counter + mark the quest complete (matches existing Bounty Board pattern).
         player.MercContractsCompleted++;
         quest.Deleted = true;
+        player.ActiveQuests?.Remove(quest); // v1.1.1: stale entries accumulated across sessions
 
         return (true, gold, allowedAward, "ok");
     }

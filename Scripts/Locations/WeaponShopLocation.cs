@@ -990,6 +990,7 @@ public class WeaponShopLocation : BaseLocation
 
             foreach (var (item, invIndex) in inventoryWeapons)
             {
+                if (!item.IsIdentified || item.IsCursed) continue; // v1.1.1: [A] sells only these; the list used to show more than it sold
                 sellableItems.Add((false, null, invIndex, item.Name, item.Value, item.IsCursed));
                 long displayPrice = (long)((item.Value / 2) * fenceModifier);
                 terminal.SetColor("bright_cyan");
@@ -1438,7 +1439,9 @@ public class WeaponShopLocation : BaseLocation
                     currentPlayer.Gold -= abTotal;
                     currentPlayer.Statistics.RecordPurchase(abTotal);
                     AchievementSystem.CheckAchievements(currentPlayer); // v0.61.3: immediate achievement check
-                    CityControlSystem.Instance.ProcessSaleTax(adjustedPrice);
+                    // v1.1.1: the city tax used to be forwarded here, before the slot prompt and
+                    // the equip check; a cancel refunded the price but the tax (which can land in
+                    // the player's own bank) stayed. It is processed on success only, below.
 
                     // For one-handed weapons, ask which slot to use
                     EquipmentSlot? targetSlot = null;
@@ -1469,6 +1472,7 @@ public class WeaponShopLocation : BaseLocation
                         }
                         purchased = true;
                         currentPlayer.RecalculateStats();
+                        CityControlSystem.Instance.ProcessSaleTax(adjustedPrice);
 
                         // Check for equipment quest completion
                         QuestSystem.OnEquipmentPurchased(currentPlayer, weapon);

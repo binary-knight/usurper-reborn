@@ -2149,7 +2149,7 @@ namespace UsurperRemake.Locations
 
             // 33% base + DEX/500 bonus
             float dexBonus = currentPlayer.Dexterity / 500f;
-            float chance = 0.33f + dexBonus;
+            float chance = Math.Min(0.75f, 0.33f + dexBonus); // v1.1.1: uncapped, DEX 335 made the roll certain
             float roll = (float)Random.Shared.NextDouble();
 
             int queenPosition = Random.Shared.Next(1, 4);
@@ -2189,6 +2189,7 @@ namespace UsurperRemake.Locations
 
             // WIS-based insight bonus (unique mechanic for Skull & Bones)
             float wisBonus = currentPlayer.Wisdom / 300f;
+            wisBonus = Math.Min(wisBonus, 0.25f); // v1.1.1: uncapped, WIS 165 made the safe bet certain
 
             float winChance;
             float multiplier;
@@ -2887,17 +2888,16 @@ namespace UsurperRemake.Locations
                 terminal.WriteLine("");
             }
 
-            // Gather items from player's Item/ItemType lists
+            // v1.1.1: this read the legacy Item/ItemType id lists, which nothing has written
+            // since character creation, so the fence always said "nothing to fence". It now
+            // sells from the real backpack.
             var itemsForSale = new List<(int index, string name, long value, bool cursed)>();
-            if (currentPlayer.Item != null && currentPlayer.ItemType != null)
+            if (currentPlayer.Inventory != null)
             {
-                for (int i = 0; i < currentPlayer.Item.Count && i < currentPlayer.ItemType.Count; i++)
+                for (int i = 0; i < currentPlayer.Inventory.Count; i++)
                 {
-                    int itemId = currentPlayer.Item[i];
-                    if (itemId <= 0) continue;
-                    var item = ItemManager.GetItem(itemId);
+                    var item = currentPlayer.Inventory[i];
                     if (item == null) continue;
-
                     long fenceValue = Math.Max(1, (long)(item.Value * fenceRate));
                     itemsForSale.Add((i, item.Name, fenceValue, item.Cursed || item.IsCursed));
                 }
@@ -2935,8 +2935,7 @@ namespace UsurperRemake.Locations
             if (!GameConfig.IsAffirmative(confirm)) return;
 
             // Remove item from inventory
-            currentPlayer.Item.RemoveAt(selected.index);
-            currentPlayer.ItemType.RemoveAt(selected.index);
+            currentPlayer.Inventory.RemoveAt(selected.index);
             currentPlayer.Gold += selected.value;
             currentPlayer.Statistics?.RecordSale(selected.value);
             AlignmentSystem.Instance.ChangeAlignment(currentPlayer, 1, isGood: false, "dark_alley.fence_goods"); // v0.57.12: paired movement

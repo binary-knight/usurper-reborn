@@ -394,34 +394,9 @@ public class MarketplaceLocation : BaseLocation
             currentPlayer.Inventory.Add(purchasedItem);
             terminal.WriteLine(Loc.Get("marketplace.transaction_complete"), "bright_green");
 
-            // Auto-equip if it's better than current weapon/armor (legacy system compatibility)
-            bool equipped = false;
-            if (purchasedItem.Type == global::ObjType.Weapon && purchasedItem.Attack > currentPlayer.WeapPow)
-            {
-                currentPlayer.WeapPow = purchasedItem.Attack;
-                terminal.WriteLine(Loc.Get("marketplace.equipped_weapon", purchasedItem.Name, purchasedItem.Attack), "bright_cyan");
-                equipped = true;
-            }
-            else if ((purchasedItem.Type == global::ObjType.Body || purchasedItem.Type == global::ObjType.Head ||
-                      purchasedItem.Type == global::ObjType.Arms || purchasedItem.Type == global::ObjType.Legs)
-                     && purchasedItem.Armor > currentPlayer.ArmPow)
-            {
-                currentPlayer.ArmPow = purchasedItem.Armor;
-                terminal.WriteLine(Loc.Get("marketplace.equipped_armor", purchasedItem.Name, purchasedItem.Armor), "bright_cyan");
-                equipped = true;
-            }
-
-            // Apply any stat bonuses from the item
-            if (purchasedItem.Strength > 0) currentPlayer.Strength += purchasedItem.Strength;
-            if (purchasedItem.Defence > 0) currentPlayer.Defence += purchasedItem.Defence;
-            if (purchasedItem.HP > 0) { currentPlayer.MaxHP += purchasedItem.HP; currentPlayer.HP += purchasedItem.HP; }
-            if (purchasedItem.Mana > 0) { currentPlayer.MaxMana += purchasedItem.Mana; currentPlayer.Mana += purchasedItem.Mana; }
-
-            // Recalculate stats if item was equipped or had bonuses
-            if (equipped || purchasedItem.Strength > 0 || purchasedItem.Defence > 0 || purchasedItem.HP > 0)
-            {
-                currentPlayer.RecalculateStats();
-            }
+            // v1.1.1: this block told the player the item was equipped and added its stats,
+            // then RecalculateStats reset every one of them; nothing was equipped. The item
+            // is in the backpack; equip it from the inventory screen.
 
             // Generate news for NPC seller transactions
             if (listing.IsNPCSeller)

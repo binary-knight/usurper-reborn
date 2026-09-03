@@ -5268,6 +5268,7 @@ public class InnLocation : BaseLocation
             terminal.WriteLine(Loc.Get("inn.aw_you_slam", opponent.DisplayName));
             terminal.WriteLine(Loc.Get("inn.aw_you_win", wagerAmount.ToString("N0")));
             currentPlayer.Gold += wagerAmount;
+            opponent.Gold = Math.Max(0, opponent.Gold - wagerAmount); // v1.1.1: the wager was minted, not transferred
 
             // Positive impression
             if (opponent.Brain?.Memory != null && currentPlayer.Name2 != null)
@@ -5282,6 +5283,7 @@ public class InnLocation : BaseLocation
             terminal.WriteLine(Loc.Get("inn.aw_they_slam", opponent.DisplayName));
             terminal.WriteLine(Loc.Get("inn.aw_you_lose", wagerAmount.ToString("N0")));
             currentPlayer.Gold -= wagerAmount;
+            opponent.Gold += wagerAmount; // v1.1.1: the loss was destroyed, not paid
             currentPlayer.Statistics?.RecordGoldSpent(wagerAmount);
 
             // Slightly negative impression

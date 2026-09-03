@@ -1759,7 +1759,7 @@ public static partial class GameConfig
 
     // Gambling Den (v0.30.9)
     public const int GamblingMaxDoubleDown = 3;               // Max double-or-nothing rounds in High-Low
-    public const double HighLowPayoutMultiplier = 1.8;        // High-Low correct guess payout
+    public const double HighLowPayoutMultiplier = 1.2;        // High-Low correct guess payout. v1.1.1: was 1.8; with optimal play (P(win)=2/3, P(push)=1/6) that paid 1.37x per round with no daily cap. 1.2 pays 0.97x.
     public const double BlackjackPayoutMultiplier = 2.0;      // Skull & Bones normal win payout
     public const double BlackjackBonusPayout = 2.5;           // Skull & Bones blackjack (21 in 2) payout
     public const int ArmWrestleBetPerLevel = 200;             // Arm wrestling bet = NPC level * this
