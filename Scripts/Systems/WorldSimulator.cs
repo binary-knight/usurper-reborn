@@ -830,7 +830,7 @@ public class WorldSimulator
             // Online: if the spouse name resolves to a real player, send mail.
             if (UsurperRemake.BBS.DoorMode.IsOnlineMode && SqlBackend != null)
             {
-                var username = SqlBackend.ResolvePlayerUsername(spouseName);
+                var username = SqlBackend.ResolvePlayerUsernameForMail(spouseName); // SpouseName is a bare Name2; a family surname widens the display name
                 if (!string.IsNullOrEmpty(username))
                 {
                     _ = SqlBackend.SendMessage("The Town Crier", username, "death", body);

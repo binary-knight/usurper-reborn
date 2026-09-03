@@ -5370,13 +5370,33 @@ namespace UsurperRemake.Systems
             using var connection = OpenConnection();
             using var cmd = connection.CreateCommand();
             // v1.1.1 (review): a username can equal another account's display name, so prefer the
-            // exact username, then the exact display name. A display name is "Name2 Surname" for a
-            // player with a family surname, so a bare Name2 (what SpouseName stores) matches as a
-            // prefix last.
-            cmd.CommandText = "SELECT username FROM players WHERE (LOWER(username) = LOWER(@name) OR LOWER(display_name) = LOWER(@name) OR LOWER(display_name) LIKE LOWER(@name) || ' %') AND is_banned = 0 AND username NOT LIKE 'emergency_%' ORDER BY (LOWER(username) = LOWER(@name)) DESC, (LOWER(display_name) = LOWER(@name)) DESC LIMIT 1;";
+            // exact username, then the exact display name.
+            cmd.CommandText = "SELECT username FROM players WHERE (LOWER(username) = LOWER(@name) OR LOWER(display_name) = LOWER(@name)) AND is_banned = 0 AND username NOT LIKE 'emergency_%' ORDER BY (LOWER(username) = LOWER(@name)) DESC, (LOWER(display_name) = LOWER(@name)) DESC LIMIT 1;";
             cmd.Parameters.AddWithValue("@name", nameOrDisplay);
             var result = cmd.ExecuteScalar();
             return result?.ToString();
+        }
+        catch { return null; }
+    }
+
+    /// <summary>
+    /// v1.1.1: resolve a character's Name2 to a username for mail. Exact username or display
+    /// name first; otherwise a display name of the form "Name2 Surname" (a player with a family
+    /// surname). Only for notifications: the surname prefix is too loose for anything that moves
+    /// gold or leadership, which keep using ResolvePlayerUsername.
+    /// </summary>
+    public string? ResolvePlayerUsernameForMail(string characterName)
+    {
+        var exact = ResolvePlayerUsername(characterName);
+        if (!string.IsNullOrEmpty(exact)) return exact;
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT username FROM players WHERE LOWER(display_name) LIKE LOWER(@prefix) ESCAPE '\\' AND is_banned = 0 LIMIT 1";
+            var escaped = characterName.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
+            cmd.Parameters.AddWithValue("@prefix", escaped + " %");
+            return cmd.ExecuteScalar()?.ToString();
         }
         catch { return null; }
     }
