@@ -5,7 +5,8 @@ persistence, world simulation and relationships, locations and economy,
 server and terminal) and a mechanical scan checked every localized string
 against the code that formats it. About sixty-five findings came back; each
 was verified against the source before it was fixed, and sixty-three are fixed
-here. Nothing new to learn. Some things you were used to living with are gone.
+here, along with three more that proving the combat change turned up. Nothing
+new to learn. Some things you were used to living with are gone.
 
 ## The ones that matter most
 
@@ -94,6 +95,8 @@ here. Nothing new to learn. Some things you were used to living with are gone.
   always has.
 - Per-combat buffs are consumed when the fight ends, in a block that runs on every
   exit including a dropped connection, so a disconnect mid-fight cannot keep a buff.
+- A dropped connection was logged as a crash ("Failed to load save") and paged the
+  server monitor. It is now logged as a connection loss.
 - `/snoop` had no rank guard and a disconnecting snooper stayed wired into the
   target's output.
 - The idle watchdog disconnected the same session every tick until its cleanup
@@ -118,4 +121,13 @@ here. Nothing new to learn. Some things you were used to living with are gone.
 
 ## Tests
 
-1,010 passing, up from 1,009. New: `LocalizationFormatTests`.
+1,016 passing, up from 1,009. New: `LocalizationFormatTests` (every `Loc.Get`
+call has at least as many arguments as its template has placeholders, and every
+key exists) and `CombatBuffConsumptionTests` (real fights driven through a
+scripted terminal: victory, retreat, defeat, a thrown disconnect, a closed peer,
+and a PvP disconnect each consume exactly one fight of every buff).
+
+Harness cases added under `Tests/Harness/input-stomping/`: `utf8_name.py` (a
+multi-byte character name through MUD, web, and SSH relay: `/who`, tells, `/say`)
+and `hardclose.py` (a socket dropped at a town or combat prompt ends the session
+as a connection loss with the server idle).

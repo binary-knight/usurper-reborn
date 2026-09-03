@@ -1,0 +1,58 @@
+[h1]Usurper Reborn 1.1.1 - A Bug Pass[/h1]
+
+Regalia added systems. This one fixes things. I put five reviewers on the codebase, one per domain, and had a scan check every line of game text against the code that fills it in. About seventy problems came back, and each one was checked against the source before it was fixed. Nothing new to learn here. Some things you were used to living with are gone.
+
+[h2]The ones that matter most[/h2]
+
+[list]
+[*]Every NPC lost its innate weapon and armor power when a single-player save loaded. The fields were only ever written by the online server. NPCs hit as hard as they were meant to now.
+[*]The world simulator could edit the wrong player's marriages and lovers, and the guard that stops your spouse from attacking you while you slept read the wrong save. Fixed.
+[*]On the online server, a character brought back with /restore could not save until the next restart, one player's autosave could starve everyone else's, and nine daily counters were played on one copy of your character and saved from another.
+[*]The Black Market re-rolled its stock every time you logged in, which made Nightmare's daily Legendary a farm. Stock now persists.
+[*]A client that dropped its connection could leave the server spinning at full CPU on that session. A dropped connection now ends the session cleanly, and it is logged as a connection loss instead of a crash.
+[/list]
+
+[h2]Exploits closed[/h2]
+
+[list]
+[*]The bank's robbery gold refilled on every restart.
+[*]High-Low paid out at a 37 percent edge for the player. Now 1.2 to 1.
+[*]Monte and Skull odds were uncapped; Wisdom could push them past certainty.
+[*]Cancelling a shop's auto-buy still charged the tax.
+[*]Robbing a sleeping NPC paid their gold twice.
+[*]A disarm in a duel was permanent.
+[/list]
+
+[h2]Rewards that were wrong[/h2]
+
+[list]
+[*]Buffs from food, rest, herbs, the workshop, and the temple were consumed at the start of a fight, so a fight you fled or lost still burned them. They now count the fight that actually happened.
+[*]Retreating after killing some of a group counted none of the kills.
+[*]Players who sold on the marketplace were never paid.
+[*]Team wars never actually ran.
+[*]Arm wrestling at the inn did not take the loser's gold.
+[/list]
+
+[h2]Text and terminal[/h2]
+
+[list]
+[*]Ten messages showed a raw {0} instead of a name or number. Two more were rewritten in all five languages.
+[*]The true ending and the dissolution ending had no header text.
+[*]Typing accented characters on a MUD client came through as garbage. Names like José now survive login, /who, tells, and say.
+[*]BBS door clients saw ?? during telnet negotiation.
+[/list]
+
+[h2]Online server[/h2]
+
+[list]
+[*]/snoop had no rank guard, and a snooper who disconnected stayed wired into the target's output.
+[*]The idle watchdog disconnected the same session every tick until its cleanup finished.
+[*]/gkick and /gtransfer could not find offline players by their display name.
+[*]Sixteen chat messages were English-only.
+[/list]
+
+[h2]Not fixed yet[/h2]
+
+Grouped players share the leader's ability cooldowns, and a grouped player who dies skips the death sequence. Both need a design pass rather than a patch. Haggling still has no entry point. The bank safe is shared across a server and resets on restart.
+
+If something here made your game worse rather than better, /bug in game with what you were doing and I will look.
