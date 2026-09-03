@@ -56,24 +56,25 @@ public class GearSetTests
     }
 
     [Fact]
-    public void Npcs_and_companions_get_nothing_from_the_same_gear()
+    public void Npcs_get_the_same_bonus_from_the_same_gear()
     {
+        // Maintainer decision 2026-09-03: sets apply to every character, not only players.
         var npc = new Character { AI = CharacterAI.Computer, Level = 30, BaseMaxHP = 100 };
         npc.RecalculateStats();
         long baseArm = npc.ArmPow;
         Wear(npc, ("Steel Helm", EquipmentSlot.Head), ("Steel Greaves", EquipmentSlot.Legs), ("Steel Gauntlets", EquipmentSlot.Hands), ("Steel Sabatons", EquipmentSlot.Feet));
-        npc.ArmPow.Should().Be(baseArm + 4, "four items, no set bonus");
-        npc.Strength.Should().Be(npc.BaseStrength);
+        npc.ArmPow.Should().Be(baseArm + 4 + 3, "four items plus the two-piece armor bonus");
+        npc.Strength.Should().Be(npc.BaseStrength + 4, "four-piece strength bonus");
     }
 
     [Fact]
-    public void A_player_snapshot_used_as_a_pvp_defender_gets_the_bonus()
+    public void A_bare_character_such_as_a_companion_or_pvp_snapshot_gets_the_bonus()
     {
-        var snap = new Character { AI = CharacterAI.Computer, IsPlayerSnapshot = true, Level = 30, BaseMaxHP = 100 };
-        snap.RecalculateStats();
-        long baseArm = snap.ArmPow;
-        Wear(snap, ("Steel Helm", EquipmentSlot.Head), ("Steel Greaves", EquipmentSlot.Legs));
-        snap.ArmPow.Should().Be(baseArm + 2 + 3);
+        var c = new Character { Level = 30, BaseMaxHP = 100 };
+        c.RecalculateStats();
+        long baseArm = c.ArmPow;
+        Wear(c, ("Steel Helm", EquipmentSlot.Head), ("Steel Greaves", EquipmentSlot.Legs));
+        c.ArmPow.Should().Be(baseArm + 2 + 3);
     }
 
     [Theory]

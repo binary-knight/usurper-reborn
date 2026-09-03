@@ -40,7 +40,6 @@ public static class PlayerCharacterLoader
             Gold = playerData.Gold,
             Poison = playerData.Poison,
             AI = CharacterAI.Computer,
-            IsPlayerSnapshot = !isEcho, // v1.1: PvP defenders get gear set bonuses; the dungeon ally echo is a companion and does not
             IsEcho = isEcho,
             // Restore base stats for RecalculateStats
             BaseStrength = playerData.BaseStrength > 0 ? playerData.BaseStrength : playerData.Strength,
