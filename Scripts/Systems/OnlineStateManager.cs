@@ -1373,17 +1373,7 @@ namespace UsurperRemake.Systems
                     // Market inventory for NPC trading. v0.65.5: capped for parity with SaveSystem.
                     MarketInventory = (npc.MarketInventory ?? new List<Item>())
                         .Take(GameConfig.MaxSerializedNPCInventory)
-                        .Select(item => new MarketItemData
-                    {
-                        ItemName = item.Name,
-                        ItemValue = item.Value,
-                        ItemType = item.Type,
-                        Attack = item.Attack,
-                        Armor = item.Armor,
-                        Strength = item.Strength,
-                        Defence = item.Defence,
-                        IsCursed = item.IsCursed
-                    }).ToList(),
+                        .Select(MarketItemData.FromItem).ToList(),
 
                     // v0.57.4: personal bag — items the player transferred to this
                     // NPC via combat [T] / Home / Team Corner / dungeon viewer.

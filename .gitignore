@@ -75,3 +75,4 @@ tools/
 DOCS/FEEDBACK_PLAN_0.56.0.md
 AGENTS.md
 __pycache__/
+supervision_log.md
