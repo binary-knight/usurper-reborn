@@ -821,8 +821,11 @@ namespace UsurperRemake.Systems
 
             // v1.1: some NPCs dress as gear-set wearers (GameConfig.NPCSetWearerChance). Pick a
             // set that has an affordable body piece and prefer its pieces in every slot.
-            // A wearer aims for a random tier (2, 4 or 6 pieces) so high-level NPCs are not all in
-            // full sets: the probe without this put every level-50+ wearer at six pieces.
+            // A wearer is capped at a random tier (2, 4 or 6 armour pieces) so high-level NPCs
+            // are not all in full sets: the probe without this put every level-50+ wearer at six.
+            // Whether the cap is reached is decided by affordability. The cap counts armour slots
+            // only; a matching weapon or off-hand (also drawn from the shop band) counts toward
+            // the set in the registry, so a wearer capped at four can show as six.
             GearSet? targetSet = null;
             int targetPieces = 0, setPieces = 0;
             if (random.NextDouble() < GameConfig.NPCSetWearerChance)
