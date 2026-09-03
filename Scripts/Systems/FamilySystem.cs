@@ -48,7 +48,7 @@ namespace UsurperRemake.Systems
                 c.BirthDate == child.BirthDate
                 && c.MotherID == child.MotherID && c.FatherID == child.FatherID
                 && c.Mother == child.Mother && c.Father == child.Father
-                && c.Name == child.Name);
+                && (c.Name == child.Name || ReferenceEquals(c, child))); // v1.1.1: the same object re-registered must not be re-suffixed
             if (isDuplicate) return;
 
             // v1.0.4: a child's name is reserved for life at birth, so no immigrant or

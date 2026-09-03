@@ -452,13 +452,13 @@ public partial class RelationshipSystem
         // Update character marriage status (use DisplayName for consistent lookups)
         character1.Married = true;
         character1.IsMarried = true;
-        character1.SpouseName = character2.DisplayName;
+        character1.SpouseName = character2.Name2; // v1.1.1: identity key; DisplayName carries the family surname and never matched Name2 lookups
         character1.MarriedTimes++;
         character1.IntimacyActs--;
 
         character2.Married = true;
         character2.IsMarried = true;
-        character2.SpouseName = character1.DisplayName;
+        character2.SpouseName = character1.Name2;
         character2.MarriedTimes++;
         
         SaveRelationship(relation);

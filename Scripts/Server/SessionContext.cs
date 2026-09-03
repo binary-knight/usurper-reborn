@@ -212,7 +212,7 @@ public class SessionContext : IDisposable
         MetaProgression = new MetaProgressionSystem(Username);
         DivineBlessing = new DivineBlessingSystem();
         PrisonActivity = new PrisonActivitySystem();
-        Romance = new RomanceTracker();
+        Romance = new RomanceTracker(sessionScoped: true); // v1.1.1: never the world sim's fallback
         Intimacy = new IntimacySystem();
         Relationships = new RelationshipSystem();
     }

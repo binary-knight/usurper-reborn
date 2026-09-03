@@ -4289,7 +4289,7 @@ public class CastleLocation : BaseLocation
 
             candidate.Married = true;
             candidate.IsMarried = true;
-            candidate.SpouseName = currentPlayer.DisplayName;
+            candidate.SpouseName = currentPlayer.Name2; // v1.1.1: identity key, see RelationshipSystem
             candidate.MarriedTimes++;
 
             // Register with marriage registry and romance tracker
@@ -7946,24 +7946,20 @@ public class CastleLocation : BaseLocation
         var npcs = NPCSpawnSystem.Instance?.ActiveNPCs;
         if (npcs != null && npcs.Count > 0)
         {
+            // v1.1.1: same candidate rules and the same setter as every other NPC coronation.
+            // This path built its own King with DisplayName and never set npc.King, so the
+            // world sim could not match the ruler on death and a second NPC could keep a stale
+            // King flag from an earlier reign.
             var candidates = npcs
-                .Where(npc => npc.IsAlive && npc.Level >= GameConfig.MinLevelKing)
+                .Where(npc => npc.IsAlive && !npc.IsDead && !npc.IsPermaDead && !npc.IsAgedDeath
+                              && npc.DaysInPrison <= 0 && npc.Level >= GameConfig.MinLevelKing)
                 .OrderByDescending(npc => npc.Level * 10 + (int)(npc.Charisma / 2))
                 .ToList();
 
             if (candidates.Count > 0)
             {
                 var newMonarch = candidates.First();
-                currentKing = new King
-                {
-                    Name = newMonarch.DisplayName,
-                    AI = CharacterAI.Computer,
-                    Sex = newMonarch.Sex,
-                    IsActive = true,
-                    CoronationDate = DateTime.Now,
-                    Treasury = Math.Max(10000, newMonarch.Gold / 2),
-                    TotalReign = 0
-                };
+                SetCurrentKing(newMonarch);
                 NewsSystem.Instance?.Newsy(true, $"{newMonarch.DisplayName} has claimed the throne!");
             }
         }

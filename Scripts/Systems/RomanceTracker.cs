@@ -39,9 +39,13 @@ namespace UsurperRemake.Systems
         public List<CuckoldArrangement> CuckArrangements { get; set; } = new();
         public List<PolyNetwork> PolyNetworks { get; set; } = new();
 
-        public RomanceTracker()
+        /// <param name="sessionScoped">v1.1.1: true for the per-session tracker SessionContext
+        /// builds. Only the single-player / world-sim tracker may become the static fallback;
+        /// before this every login on the MUD server overwrote the fallback, so the world sim
+        /// (which runs with no session) mutated the romance data of whoever logged in last.</param>
+        public RomanceTracker(bool sessionScoped = false)
         {
-            _fallbackInstance = this;
+            if (!sessionScoped) _fallbackInstance = this;
         }
 
         /// <summary>
