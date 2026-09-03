@@ -972,6 +972,45 @@ namespace UsurperRemake.Systems
         public int Strength { get; set; }
         public int Defence { get; set; }
         public bool IsCursed { get; set; }
+
+        /// <summary>
+        /// v1.0.7: the full item record. The eight legacy fields above were the whole
+        /// record, so an item that went through an NPC's market stock or a marketplace
+        /// listing came back stripped: rarity, level requirement, loot effects,
+        /// identification, shield bonus, and the secondary stats were all lost.
+        /// New saves carry the complete InventoryItemData here; the legacy fields are
+        /// still written so an older binary reads the same save. Null on old saves.
+        /// </summary>
+        public InventoryItemData? Detail { get; set; }
+
+        public static MarketItemData FromItem(Item item) => new MarketItemData
+        {
+            ItemName = item.Name,
+            ItemValue = item.Value,
+            ItemType = item.Type,
+            Attack = item.Attack,
+            Armor = item.Armor,
+            Strength = item.Strength,
+            Defence = item.Defence,
+            IsCursed = item.IsCursed,
+            Detail = InventoryItemData.FromItem(item)
+        };
+
+        public Item ToItem()
+        {
+            if (Detail != null) return Detail.ToItem();
+            return new Item
+            {
+                Name = ItemName,
+                Value = ItemValue,
+                Type = ItemType,
+                Attack = Attack,
+                Armor = Armor,
+                Strength = Strength,
+                Defence = Defence,
+                IsCursed = IsCursed
+            };
+        }
     }
 
     /// <summary>
