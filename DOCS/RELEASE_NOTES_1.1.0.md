@@ -58,10 +58,9 @@ Agility and +4 weapon power.
 Two things to know. Sets count gear generated after this update; an item you
 found or bought before it does not know its family and will not count until it
 is replaced. Nobody had a set before, so this is a delayed start rather than a
-loss. And sets are for players only, including your saved character when it
-defends in the arena or while asleep. NPCs, companions, and the dungeon echo of
-yourself wear the same families and would have grown stronger everywhere at
-once; they stay as they are until they get their own pass. A Constitution bonus
-from a set also raises HP the usual way, on top of the HP figure listed.
+loss. And sets apply to everyone who wears the gear: NPCs, companions, your
+dungeon echo, and your saved character when it defends in the arena or while
+asleep all get the same bonuses you do. A Constitution bonus from a set also
+raises HP the usual way, on top of the HP figure listed.
 
 Not yet sets: Runed, Plate, Titan's, Dragon, and Holy. They are the next slice.

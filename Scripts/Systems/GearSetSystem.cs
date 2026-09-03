@@ -34,8 +34,8 @@ namespace UsurperRemake.Systems
     /// each generated item at creation (never on the localized display name, and never
     /// on a prefix parse: "Forged-Thread Cape" and "Cloak of Shadows" are not set pieces).
     /// Bonuses are applied in Character.RecalculateStats after the equipped-item loop,
-    /// for players and player snapshots only; NPCs and companions wear the same families
-    /// and are deliberately excluded until they get a design pass.
+    /// for every character: NPCs, companions, echoes and PvP snapshots wear the same
+    /// families and get the same bonuses (maintainer decision, 2026-09-03).
     /// Numbers are a first pass, tuned per level band, and are meant to be revisited
     /// with live data: modest at two pieces, meaningful at four, build-defining at six.
     /// The block runs before the Constitution-to-HP line, so a Constitution bonus also
