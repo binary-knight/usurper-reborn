@@ -814,7 +814,9 @@ public class DormitoryLocation : BaseLocation
                 MaxManaBonus = stolenEquip.MaxManaBonus,
                 Value = stolenEquip.Value,
                 IsIdentified = true,
-                MinLevel = stolenEquip.MinLevel
+                MinLevel = stolenEquip.MinLevel,
+                Rarity = (EquipmentRarity)stolenEquip.Rarity, // v1.1: was dropped; a stolen Legendary arrived Common
+                Family = stolenEquip.Family ?? ""
             };
 
             // Also remove from equipped slots if this item is equipped
