@@ -35,16 +35,23 @@ namespace UsurperRemake.Systems
         /// Throttle autosaves in online/MUD mode to avoid serializing ~23 MB of JSON on every location change.
         /// Local/single-player mode is unthrottled (saves are fast to disk).
         /// </summary>
-        private DateTime _lastAutoSaveTime = DateTime.MinValue;
+        // v1.1.1: keyed by character. This was one DateTime on the process-wide singleton, so
+        // on the MUD server any player's autosave reset the clock for every other player and
+        // at most one autosave landed per minute server-wide; a starved player who dropped
+        // lost everything since login.
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, DateTime> _lastAutoSaveByKey = new();
         private const int AutoSaveIntervalSeconds = 60;
 
+        private static string AutoSaveThrottleKey(Character? player) =>
+            (UsurperRemake.BBS.DoorMode.GetPlayerName()?.ToLowerInvariant() ?? player?.Name2 ?? player?.Name1 ?? "").ToLowerInvariant();
+
         /// <summary>
-        /// Reset the auto-save throttle so the next AutoSave() call saves immediately.
-        /// Call after critical state changes (e.g. chest deposit/withdraw) that must persist.
+        /// Reset the auto-save throttle for the current character so the next AutoSave() call
+        /// saves immediately. Call after critical state changes (e.g. chest deposit/withdraw).
         /// </summary>
         public void ResetAutoSaveThrottle()
         {
-            _lastAutoSaveTime = DateTime.MinValue;
+            _lastAutoSaveByKey.TryRemove(AutoSaveThrottleKey(null), out _);
         }
 
         /// <summary>
@@ -227,9 +234,11 @@ namespace UsurperRemake.Systems
             // Throttle autosaves in online/MUD mode — the full save serializes ~5 MB of player data
             // plus ~18 MB of NPC data and writes to SQLite, taking several seconds.
             // Only save every 60 seconds instead of on every location redraw.
+            string throttleKey = AutoSaveThrottleKey(player);
             if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
             {
-                var elapsed = (DateTime.UtcNow - _lastAutoSaveTime).TotalSeconds;
+                var last = _lastAutoSaveByKey.GetValueOrDefault(throttleKey, DateTime.MinValue);
+                var elapsed = (DateTime.UtcNow - last).TotalSeconds;
                 if (elapsed < AutoSaveIntervalSeconds)
                     return true; // Pretend success, save will happen soon
             }
@@ -272,7 +281,7 @@ namespace UsurperRemake.Systems
             // The world sim is the authority for NPC state in online mode.
 
             if (success)
-                _lastAutoSaveTime = DateTime.UtcNow;
+                _lastAutoSaveByKey[throttleKey] = DateTime.UtcNow;
 
             return success;
         }
@@ -415,6 +424,14 @@ namespace UsurperRemake.Systems
                 BankLoan = player.Loan,
                 BankInterest = player.Interest,
                 BankRobberyAttempts = player.BankRobberyAttempts,
+                MarryActions = player.MarryActions,
+                WolfFeed = player.WolfFeed,
+                RoyalAdoptions = player.RoyalAdoptions,
+                Wrestlings = player.Wrestlings,
+                GymSessions = player.GymSessions,
+                PickPocketAttempts = player.PickPocketAttempts,
+                Massage = player.Massage,
+                UmanBearTries = player.UmanBearTries,
                 TempleResurrectionsUsed = player.TempleResurrectionsUsed,
 
                 // Resurrection & Church
@@ -953,6 +970,7 @@ namespace UsurperRemake.Systems
                 // v0.62.x Phase 5 (Black Market rotation)
                 BlackMarketStockSeed = player.BlackMarketStockSeed,
                 LastBlackMarketRefreshUtc = player.LastBlackMarketRefreshUtc,
+                BlackMarketStock = player.CachedBlackMarketStock?.Select(InventoryItemData.FromItem).ToList() ?? new List<InventoryItemData>(),
                 // v0.62.x Phase 6 (Sanctum)
                 AlmsGivenToday = player.AlmsGivenToday,
                 OrphanageGiftsToday = player.OrphanageGiftsToday,
@@ -1200,6 +1218,8 @@ namespace UsurperRemake.Systems
                     BaseIntelligence = npc.BaseIntelligence > 0 ? npc.BaseIntelligence : npc.Intelligence,
                     BaseWisdom = npc.BaseWisdom > 0 ? npc.BaseWisdom : npc.Wisdom,
                     BaseCharisma = npc.BaseCharisma > 0 ? npc.BaseCharisma : npc.Charisma,
+                    BaseWeapPow = npc.BaseWeapPow, // v1.1.1: only the online path wrote these; RecalculateStats zeroed WeapPow/ArmPow on every single-player load
+                    BaseArmPow = npc.BaseArmPow,
 
                     // Class and race
                     Class = npc.Class,

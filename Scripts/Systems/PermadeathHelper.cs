@@ -179,7 +179,7 @@ namespace UsurperRemake.Systems
                     {
                         var session = UsurperRemake.Server.MudServer.Instance?.ActiveSessions
                             .TryGetValue(sessionLookupKey.ToLowerInvariant(), out var s) == true ? s : null;
-                        if (session != null) session.SuppressDisconnectSave = true;
+                        if (session != null) { session.SuppressDisconnectSave = true; session.SuppressDisconnectSaveKey = username.ToLowerInvariant(); }
                     }
                     catch (Exception ex) { DebugLogger.Instance.LogWarning("DEATH_CAP", $"SuppressDisconnectSave set failed: {ex.Message}"); }
                 }

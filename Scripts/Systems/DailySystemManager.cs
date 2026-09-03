@@ -331,6 +331,15 @@ public class DailySystemManager
         HagglingEngine.ResetDailyHaggling(player);
 
         // Reset Dark Alley daily counters (v0.41.0)
+        // v1.1.1: these were memory-only (refilled by relog); now persisted, so reset here too
+        player.Wrestlings = (byte)GameConfig.ModDefaultMaxWrestlings;
+        player.GymSessions = (byte)GameConfig.ModDefaultGymSessions;
+        player.PickPocketAttempts = GameConfig.ModDefaultPickPocketAttempts;
+        player.Massage = 0;
+        player.UmanBearTries = 0;
+        player.MarryActions = GameConfig.DefaultMarryActions;
+        player.WolfFeed = GameConfig.DefaultWolfFeeding;
+        player.RoyalAdoptions = GameConfig.DefaultRoyalAdoptions;
         player.GamblingRoundsToday = 0;
         player.PitFightsToday = 0;
         player.DesecrationsToday = 0;

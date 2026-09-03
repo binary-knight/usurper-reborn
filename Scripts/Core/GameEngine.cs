@@ -5254,6 +5254,14 @@ public partial class GameEngine
             Loan = playerData.BankLoan,
             Interest = playerData.BankInterest,
             BankRobberyAttempts = playerData.BankRobberyAttempts,
+            MarryActions = playerData.MarryActions,
+            WolfFeed = playerData.WolfFeed,
+            RoyalAdoptions = playerData.RoyalAdoptions,
+            Wrestlings = (byte)playerData.Wrestlings,
+            GymSessions = (byte)playerData.GymSessions,
+            PickPocketAttempts = playerData.PickPocketAttempts,
+            Massage = (byte)playerData.Massage,
+            UmanBearTries = (byte)playerData.UmanBearTries,
             TempleResurrectionsUsed = playerData.TempleResurrectionsUsed,
 
             // Resurrection & Church
@@ -6010,6 +6018,11 @@ public partial class GameEngine
         // v0.62.x Phase 5 (Black Market rotation)
         player.BlackMarketStockSeed = playerData.BlackMarketStockSeed;
         player.LastBlackMarketRefreshUtc = playerData.LastBlackMarketRefreshUtc;
+        // v1.1.1: restore the day's rotation. A null cache meant "re-roll", so every relog
+        // rolled a fresh Black Market and, since 1.1, a fresh guaranteed Legendary.
+        player.CachedBlackMarketStock = playerData.BlackMarketStock != null && playerData.BlackMarketStock.Count > 0
+            ? playerData.BlackMarketStock.Select(d => d.ToItem()).ToList()
+            : null;
         // v0.62.x Phase 6 (Sanctum)
         player.AlmsGivenToday = playerData.AlmsGivenToday;
         player.OrphanageGiftsToday = playerData.OrphanageGiftsToday;
@@ -6453,6 +6466,9 @@ public partial class GameEngine
                 BaseIntelligence = data.BaseIntelligence > 0 ? data.BaseIntelligence : 10,
                 BaseWisdom = data.BaseWisdom > 0 ? data.BaseWisdom : 10,
                 BaseCharisma = data.BaseCharisma > 0 ? data.BaseCharisma : 10,
+                // v1.1.1: innate power; saves from before this carry 0, so fall back to the spawn formula
+                BaseWeapPow = data.BaseWeapPow > 0 ? data.BaseWeapPow : data.Level * 5,
+                BaseArmPow = data.BaseArmPow > 0 ? data.BaseArmPow : data.Level * 4,
 
                 // Class and race
                 Class = data.Class,

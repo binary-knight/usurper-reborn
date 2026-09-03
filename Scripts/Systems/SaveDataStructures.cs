@@ -224,6 +224,15 @@ namespace UsurperRemake.Systems
         public long BankLoan { get; set; }
         public long BankInterest { get; set; }
         public int BankRobberyAttempts { get; set; }
+        // v1.1.1: daily counters that lived only in memory, so a relog refilled them
+        public int MarryActions { get; set; }
+        public int WolfFeed { get; set; }
+        public int RoyalAdoptions { get; set; }
+        public int Wrestlings { get; set; }
+        public int GymSessions { get; set; }
+        public int PickPocketAttempts { get; set; }
+        public int Massage { get; set; }
+        public int UmanBearTries { get; set; }
         public int TempleResurrectionsUsed { get; set; }
 
         // Resurrection & Church
@@ -667,6 +676,7 @@ namespace UsurperRemake.Systems
         // v0.62.x Phase 5 (Black Market rotation)
         public int BlackMarketStockSeed { get; set; }
         public DateTime LastBlackMarketRefreshUtc { get; set; }
+        public List<InventoryItemData> BlackMarketStock { get; set; } = new(); // v1.1.1: the rotation itself; relog used to re-roll it
         // v0.62.x Phase 6 (Sanctum -- Light activity hub)
         public int AlmsGivenToday { get; set; }
         public int OrphanageGiftsToday { get; set; }

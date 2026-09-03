@@ -94,6 +94,11 @@ public class PlayerSession : IDisposable
     /// <summary>True while this session is in spectator mode (no game loaded).</summary>
     public bool IsSpectating { get; set; }
 
+    /// <summary>v1.1.1: the save key whose disconnect save is suppressed (the character that was
+    /// deleted). The session is shared by a main and its alts; a bare flag suppressed the main's
+    /// emergency save after an alt permadied.</summary>
+    public string? SuppressDisconnectSaveKey { get; set; }
+
     /// <summary>v1.0.6: the relay put its terminal in raw mode and asked the server to echo (AUTH type ";echo=1").</summary>
     public bool WantsServerEcho { get; }
 
@@ -298,14 +303,16 @@ public class PlayerSession : IDisposable
             try
             {
                 var player = ctx.Engine?.CurrentPlayer;
-                if (player != null && !SuppressDisconnectSave)
+                var currentKey = (Context?.CharacterKey ?? Username).ToLowerInvariant();
+                bool suppress = SuppressDisconnectSave && (SuppressDisconnectSaveKey == null || SuppressDisconnectSaveKey == currentKey);
+                if (player != null && !suppress)
                 {
-                    var saveKey = (Context?.CharacterKey ?? Username).ToLowerInvariant();
+                    var saveKey = currentKey;
                     Console.Error.WriteLine($"[MUD] [{Username}] Performing emergency save (key: {saveKey})...");
                     await SaveSystem.Instance.SaveGame(saveKey, player);
                     Console.Error.WriteLine($"[MUD] [{Username}] Emergency save completed");
                 }
-                else if (SuppressDisconnectSave)
+                else if (suppress)
                 {
                     Console.Error.WriteLine($"[MUD] [{Username}] Disconnect save suppressed (character deleted)");
                 }

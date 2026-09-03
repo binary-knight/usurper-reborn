@@ -951,7 +951,7 @@ namespace UsurperRemake.Systems
                 using var connection = OpenConnection();
                 using var cmd = connection.CreateCommand();
                 // ORDER BY LENGTH DESC to prefer the record with actual save data over empty '{}' registration records
-                cmd.CommandText = "SELECT player_data FROM players WHERE LOWER(username) = LOWER(@username) AND is_banned = 0 ORDER BY LENGTH(player_data) DESC LIMIT 1;";
+                cmd.CommandText = "SELECT player_data FROM players WHERE LOWER(username) = LOWER(@username) AND is_banned = 0 ORDER BY (username = LOWER(@username)) DESC, LENGTH(player_data) DESC LIMIT 1;";
                 cmd.Parameters.AddWithValue("@username", playerName);
 
                 var result = await cmd.ExecuteScalarAsync();
@@ -1006,7 +1006,7 @@ namespace UsurperRemake.Systems
                     SELECT json_extract(player_data, '$.Player.Team')
                     FROM players
                     WHERE LOWER(username) = LOWER(@username) AND is_banned = 0
-                    ORDER BY LENGTH(player_data) DESC LIMIT 1;";
+                    ORDER BY (username = LOWER(@username)) DESC, LENGTH(player_data) DESC LIMIT 1;";
                 cmd.Parameters.AddWithValue("@username", username);
                 var result = cmd.ExecuteScalar();
                 return result as string ?? "";
@@ -1478,8 +1478,10 @@ namespace UsurperRemake.Systems
                     return false;
                 }
 
+                using var restoreTx = connection.BeginTransaction(); // v1.1.1: restore and archive removal apply together
                 using (var updateCmd = connection.CreateCommand())
                 {
+                    updateCmd.Transaction = restoreTx;
                     updateCmd.CommandText = @"
                         UPDATE players SET player_data = @data
                          WHERE LOWER(username) = LOWER(@username);";
@@ -1496,10 +1498,17 @@ namespace UsurperRemake.Systems
                 // Remove the archive entry now that it's been claimed.
                 using (var deleteCmd = connection.CreateCommand())
                 {
+                    deleteCmd.Transaction = restoreTx;
                     deleteCmd.CommandText = "DELETE FROM deleted_characters WHERE id = @id;";
                     deleteCmd.Parameters.AddWithValue("@id", info.Id);
                     deleteCmd.ExecuteNonQuery();
                 }
+                restoreTx.Commit();
+
+                // v1.1.1: permadeath marked the username erased so a late autosave could not
+                // resurrect it. A restored character kept that mark, so every save it made
+                // afterwards was silently refused for the rest of the server's uptime.
+                ClearErasedMark(username);
 
                 DebugLogger.Instance.LogInfo("SAVE",
                     $"Restored '{username}' (display: '{info.DisplayName}') from deleted_characters archive.");
@@ -1578,7 +1587,7 @@ namespace UsurperRemake.Systems
                 using var connection = OpenConnection();
                 using var cmd = connection.CreateCommand();
                 // ORDER BY LENGTH DESC to prefer actual save data over empty '{}' registration records
-                cmd.CommandText = "SELECT player_data FROM players WHERE LOWER(username) = LOWER(@username) AND is_banned = 0 ORDER BY LENGTH(player_data) DESC LIMIT 1;";
+                cmd.CommandText = "SELECT player_data FROM players WHERE LOWER(username) = LOWER(@username) AND is_banned = 0 ORDER BY (username = LOWER(@username)) DESC, LENGTH(player_data) DESC LIMIT 1;";
                 cmd.Parameters.AddWithValue("@username", playerName);
 
                 var result = cmd.ExecuteScalar();

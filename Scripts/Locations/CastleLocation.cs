@@ -1860,9 +1860,16 @@ public class CastleLocation : BaseLocation
             if (DoorMode.IsOnlineMode)
             {
                 // Suppress the emergency save on disconnect so it doesn't overwrite the deletion
-                string sessionUser = currentPlayer.Name2?.ToLowerInvariant() ?? "";
+                // v1.1.1: sessions are keyed by login username, not character name, so this
+                // lookup missed whenever the two differed and the deleted character was
+                // re-saved on disconnect. Suppression is scoped to the deleted character's key.
+                var sctx = UsurperRemake.Server.SessionContext.Current;
+                string sessionUser = (sctx?.Username ?? currentPlayer.Name2 ?? "").ToLowerInvariant();
                 if (UsurperRemake.Server.MudServer.Instance?.ActiveSessions.TryGetValue(sessionUser, out var session) == true)
+                {
                     session.SuppressDisconnectSave = true;
+                    session.SuppressDisconnectSaveKey = (sctx?.CharacterKey ?? sessionUser).ToLowerInvariant();
+                }
 
                 var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
                 if (backend != null)
