@@ -6545,20 +6545,7 @@ public partial class GameEngine
                     npc.MarketInventory = new List<Item>();
                 }
                 foreach (var itemData in data.MarketInventory)
-                {
-                    var item = new global::Item
-                    {
-                        Name = itemData.ItemName,
-                        Value = itemData.ItemValue,
-                        Type = itemData.ItemType,
-                        Attack = itemData.Attack,
-                        Armor = itemData.Armor,
-                        Strength = itemData.Strength,
-                        Defence = itemData.Defence,
-                        IsCursed = itemData.IsCursed
-                    };
-                    npc.MarketInventory.Add(item);
-                }
+                    npc.MarketInventory.Add(itemData.ToItem());
             }
 
             // v0.57.4: restore the NPC's personal bag (transferred via combat [T] /

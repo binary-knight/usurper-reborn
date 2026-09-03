@@ -23263,6 +23263,7 @@
   "merc.contract.faith_escort_pilgrim.objective": "Derrota a {0} monstruos protegiendo al peregrino.",
   "dark_alley.bm_section_utility": "Utilidad:",
   "dark_alley.bm_section_gear": "Mercancía rotatoria:",
+  "dark_alley.bm_section_gear_floor": "Mercancía rotativa ({0} o mejor):",
   "dark_alley.bm_freelance_surcharge": "Recargo por independiente: +{0}% (no has jurado lealtad a las Sombras).",
   "dark_alley.bm_refresh_hint": "(Los peristas habrán renovado la mercancía para la mañana.)",
   "dark_alley.bm_gear_inventory_full": "Tu mochila está llena. Los peristas te lo guardarán, pero no puedes cargar más.",
