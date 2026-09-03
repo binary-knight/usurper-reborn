@@ -1324,11 +1324,25 @@ namespace UsurperRemake.BBS
 
                 byte b = charBuffer[0];
 
-                // Handle telnet IAC commands (255 = IAC)
+                // Handle telnet IAC commands (255 = IAC). v1.1.1: same parsing as the socket path;
+                // this used to skip exactly two bytes, so subnegotiations leaked into the line.
                 if (b == 255)
                 {
-                    // Skip next 2 bytes (simplified telnet handling)
-                    await _rawHandleStream.ReadAsync(new byte[2], 0, 2);
+                    var one = new byte[1];
+                    if (await _rawHandleStream.ReadAsync(one, 0, 1) < 1) continue;
+                    if (one[0] == 0xFA)
+                    {
+                        bool sawIac = false;
+                        while (await _rawHandleStream.ReadAsync(one, 0, 1) == 1)
+                        {
+                            if (sawIac && one[0] == 0xF0) break;
+                            sawIac = one[0] == 0xFF;
+                        }
+                    }
+                    else if (one[0] >= 0xFB)
+                    {
+                        await _rawHandleStream.ReadAsync(one, 0, 1); // option byte
+                    }
                     continue;
                 }
 
@@ -1402,17 +1416,46 @@ namespace UsurperRemake.BBS
             }
         }
 
+        /// <summary>
+        /// v1.1.1: send telnet negotiation bytes verbatim. WriteRawAsync encodes as ASCII, which
+        /// turns every byte above 0x7F into '?', so IAC DO ECHO went out as "??" and appeared
+        /// on the client's screen while negotiation never completed.
+        /// </summary>
+        private async Task WriteRawBytesAsync(byte[] bytes)
+        {
+            try
+            {
+                if (_usingNativeIO && _rawSocketHandle != IntPtr.Zero) { send(_rawSocketHandle, bytes, bytes.Length, 0); return; }
+                if (_usingRawHandle && _rawHandleStream != null) { await _rawHandleStream.WriteAsync(bytes, 0, bytes.Length); await _rawHandleStream.FlushAsync(); return; }
+                if (_stream != null) { await _stream.WriteAsync(bytes, 0, bytes.Length); await _stream.FlushAsync(); }
+            }
+            catch { DoorMode.IsDisconnected = true; }
+        }
+
         private async Task HandleTelnetCommandAsync()
         {
             if (_stream == null) return;
 
-            var cmdBuffer = new byte[2];
-            var bytesRead = await _stream.ReadAsync(cmdBuffer, 0, 2);
-
-            if (bytesRead < 2) return;
-
+            // v1.1.1: read the command first; only WILL/WONT/DO/DONT carry an option byte.
+            // Subnegotiations (NAWS, TTYPE from PuTTY, SyncTERM, NetRunner) run to IAC SE and
+            // used to spill into the input line as keystrokes; an escaped IAC (0xFF 0xFF) is a
+            // data byte that is dropped rather than stealing the byte after it.
+            var cmdBuffer = new byte[1];
+            if (await _stream.ReadAsync(cmdBuffer, 0, 1) < 1) return;
             byte cmd = cmdBuffer[0];
-            byte option = cmdBuffer[1];
+            if (cmd == 0xFA)
+            {
+                bool sawIac = false;
+                while (await _stream.ReadAsync(cmdBuffer, 0, 1) == 1)
+                {
+                    if (sawIac && cmdBuffer[0] == 0xF0) break;
+                    sawIac = cmdBuffer[0] == 0xFF;
+                }
+                return;
+            }
+            if (cmd < 0xFB) return; // NOP, GA, escaped IAC, and other option-less commands
+            if (await _stream.ReadAsync(cmdBuffer, 0, 1) < 1) return;
+            byte option = cmdBuffer[0];
 
             // Respond to common telnet negotiations
             // 251 = WILL, 252 = WON'T, 253 = DO, 254 = DON'T
@@ -1423,22 +1466,22 @@ namespace UsurperRemake.BBS
                     if (option == TELOPT_SGA)
                     {
                         // Accept SGA from client (character-at-a-time mode)
-                        await WriteRawAsync($"\xff\xfd{(char)option}"); // IAC DO option
+                        await WriteRawBytesAsync(new byte[] { 0xFF, 0xFD, option }); // IAC DO option
                     }
                     else
                     {
-                        await WriteRawAsync($"\xff\xfe{(char)option}"); // IAC DON'T option
+                        await WriteRawBytesAsync(new byte[] { 0xFF, 0xFE, option }); // IAC DON'T option
                     }
                     break;
                 case 253: // DO - client asks us to do something
                     if (option == TELOPT_ECHO || option == TELOPT_SGA)
                     {
                         // Accept ECHO and SGA - we handle these
-                        await WriteRawAsync($"\xff\xfb{(char)option}"); // IAC WILL option
+                        await WriteRawBytesAsync(new byte[] { 0xFF, 0xFB, option }); // IAC WILL option
                     }
                     else
                     {
-                        await WriteRawAsync($"\xff\xfc{(char)option}"); // IAC WON'T option
+                        await WriteRawBytesAsync(new byte[] { 0xFF, 0xFC, option }); // IAC WON'T option
                     }
                     break;
             }

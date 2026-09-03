@@ -3994,6 +3994,10 @@ namespace UsurperRemake.Systems
 
         public async Task<(bool success, string message)> RegisterPlayer(string username, string password, string? ipAddress = null)
         {
+            // v1.1.1: the relay and desktop clients send AUTH:user:password:type; a colon in the
+            // password split that line wrong and locked the account out of every relay login.
+            if (password != null && password.Contains(':'))
+                return (false, "Password cannot contain ':'.");
             // v0.60.5: full ban means no new accounts from this IP either. Same
             // defense-in-depth pattern as AuthenticatePlayer.
             if (!string.IsNullOrWhiteSpace(ipAddress) && IsIpBanned(ipAddress))

@@ -55,7 +55,7 @@ public static class MudChatSystem
                 if (wizHandled) return true;
             }
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine("  You are frozen solid! You can do nothing!");
+            terminal.WriteLine($"  {UsurperRemake.Systems.Loc.Get("chat.frozen")}");
             return true;
         }
 
@@ -70,7 +70,7 @@ public static class MudChatSystem
         if (session?.IsMuted == true && Array.IndexOf(ChatCommands, command) >= 0)
         {
             terminal.SetColor("bright_red");
-            terminal.WriteLine("  You have been silenced by the gods. You cannot speak.");
+            terminal.WriteLine($"  {UsurperRemake.Systems.Loc.Get("chat.silenced")}");
             return true;
         }
 
@@ -182,6 +182,15 @@ public static class MudChatSystem
             s.ActiveCharacterName?.Equals(name, StringComparison.OrdinalIgnoreCase) == true);
         if (session != null) return session;
 
+        // v1.1.1: /who prints "<title> <name>"; accept that form too so it can be pasted into /tell
+        session = server.ActiveSessions.Values.FirstOrDefault(s =>
+        {
+            var p = s.Context?.Engine?.CurrentPlayer;
+            if (p == null || string.IsNullOrEmpty(p.NobleTitle) || string.IsNullOrEmpty(s.ActiveCharacterName)) return false;
+            return $"{p.NobleTitle} {s.ActiveCharacterName}".Equals(name, StringComparison.OrdinalIgnoreCase);
+        });
+        if (session != null) return session;
+
         // Fall back to login username
         return server.ActiveSessions.Values.FirstOrDefault(s =>
             s.Username.Equals(name, StringComparison.OrdinalIgnoreCase));
@@ -285,7 +294,7 @@ public static class MudChatSystem
         {
             player.MutedChannels.Remove(channelKey);
             terminal.SetColor("bright_green");
-            terminal.WriteLine($"  {friendlyName} channel UNMUTED. You will receive {friendlyName.ToLowerInvariant()} messages again.");
+            terminal.WriteLine($"  {UsurperRemake.Systems.Loc.Get("chat.channel_unmuted", friendlyName)}");
             terminal.SetColor("gray");
             terminal.WriteLine($"  ({sendUsage}; type the command alone to mute again.)");
         }
@@ -293,7 +302,7 @@ public static class MudChatSystem
         {
             player.MutedChannels.Add(channelKey);
             terminal.SetColor("bright_yellow");
-            terminal.WriteLine($"  {friendlyName} channel MUTED. You will no longer see {friendlyName.ToLowerInvariant()} messages.");
+            terminal.WriteLine($"  {UsurperRemake.Systems.Loc.Get("chat.channel_muted", friendlyName)}");
             terminal.SetColor("gray");
             terminal.WriteLine($"  ({sendUsage}; type the command alone to unmute.)");
         }
@@ -317,7 +326,7 @@ public static class MudChatSystem
 
         // Show to sender
         terminal.SetColor("bright_white");
-        terminal.WriteLine($"  You say: {message}");
+        terminal.WriteLine($"  {UsurperRemake.Systems.Loc.Get("chat.you_say", message)}");
 
         // Broadcast to others in the room
         var displayName = GetChatDisplayName(username);
@@ -339,7 +348,7 @@ public static class MudChatSystem
 
         // Show to sender
         terminal.SetColor("bright_yellow");
-        terminal.WriteLine($"  You shout: {message}");
+        terminal.WriteLine($"  {UsurperRemake.Systems.Loc.Get("chat.you_shout", message)}");
 
         // Broadcast to ALL connected players
         var displayName = GetChatDisplayName(username);
@@ -371,7 +380,7 @@ public static class MudChatSystem
         if (string.IsNullOrWhiteSpace(targetName) || string.IsNullOrWhiteSpace(message))
         {
             terminal.SetColor("gray");
-            terminal.WriteLine("  Usage: /tell <player> <message>");
+            terminal.WriteLine($"  {UsurperRemake.Systems.Loc.Get("chat.usage_tell")}");
             return true;
         }
 
@@ -392,7 +401,7 @@ public static class MudChatSystem
             targetSession.EnqueueMessage($"\u001b[35m  {displayName} tells you: {message}\u001b[0m");
             var targetDisplayName = GetSessionDisplayName(targetSession, targetName);
             terminal.SetColor("magenta");
-            terminal.WriteLine($"  You tell {targetDisplayName}: {message}");
+            terminal.WriteLine($"  {UsurperRemake.Systems.Loc.Get("chat.you_tell", targetDisplayName, message)}");
 
             // v0.57.21: GMCP single-target tell to the recipient. Channel "tell"
             // matches Achaea convention so off-the-shelf Mudlet scripts pick it up.
@@ -468,7 +477,7 @@ public static class MudChatSystem
         if (string.IsNullOrWhiteSpace(action))
         {
             terminal.SetColor("gray");
-            terminal.WriteLine("  Usage: /emote <action> (e.g., /emote waves hello)");
+            terminal.WriteLine($"  {UsurperRemake.Systems.Loc.Get("chat.usage_emote")}");
             return true;
         }
 
@@ -500,7 +509,7 @@ public static class MudChatSystem
 
         // Show to sender
         terminal.SetColor("bright_green");
-        terminal.WriteLine($"  [Gossip] You: {message}");
+        terminal.WriteLine($"  {UsurperRemake.Systems.Loc.Get("chat.gossip_you", message)}");
 
         // Broadcast to ALL connected players (global out-of-character channel)
         var displayName = GetChatDisplayName(username);
@@ -802,7 +811,7 @@ public static class MudChatSystem
             if (invite.IsExpired)
             {
                 terminal.SetColor("gray");
-                terminal.WriteLine("  That group invite has expired.");
+                terminal.WriteLine($"  {UsurperRemake.Systems.Loc.Get("chat.invite_expired")}");
                 session.PendingGroupInvite = null;
                 invite.Response.TrySetResult(false);
                 return true;
@@ -844,7 +853,7 @@ public static class MudChatSystem
             if (request.IsExpired)
             {
                 terminal.SetColor("gray");
-                terminal.WriteLine("  That spectate request has expired.");
+                terminal.WriteLine($"  {UsurperRemake.Systems.Loc.Get("chat.spectate_expired")}");
                 session.PendingSpectateRequest = null;
                 request.Response.TrySetResult(false);
                 return true;
@@ -858,7 +867,7 @@ public static class MudChatSystem
         }
 
         terminal.SetColor("gray");
-        terminal.WriteLine("  No pending request to accept.");
+        terminal.WriteLine($"  {UsurperRemake.Systems.Loc.Get("chat.no_pending_accept")}");
         return true;
     }
 
@@ -905,7 +914,7 @@ public static class MudChatSystem
         }
 
         terminal.SetColor("gray");
-        terminal.WriteLine("  No pending request to deny.");
+        terminal.WriteLine($"  {UsurperRemake.Systems.Loc.Get("chat.no_pending_deny")}");
         return true;
     }
 
@@ -1064,7 +1073,7 @@ public static class MudChatSystem
             if (existingGroup == null)
             {
                 terminal.SetColor("gray");
-                terminal.WriteLine("  You are not in a group.");
+                terminal.WriteLine($"  {UsurperRemake.Systems.Loc.Get("chat.not_in_group")}");
                 terminal.SetColor("bright_cyan");
                 terminal.WriteLine("  Usage: /group <player> — invite a player to your group");
                 terminal.WriteLine("  All group members must be on the same team.");
@@ -1122,7 +1131,7 @@ public static class MudChatSystem
         if (targetName.Equals(username, StringComparison.OrdinalIgnoreCase))
         {
             terminal.SetColor("gray");
-            terminal.WriteLine("  You can't invite yourself.");
+            terminal.WriteLine($"  {UsurperRemake.Systems.Loc.Get("chat.cannot_invite_self")}");
             return true;
         }
 
@@ -1339,7 +1348,7 @@ public static class MudChatSystem
         if (group == null)
         {
             terminal.SetColor("gray");
-            terminal.WriteLine("  You are not in a group.");
+            terminal.WriteLine($"  {UsurperRemake.Systems.Loc.Get("chat.not_in_group")}");
             return true;
         }
 
@@ -1365,7 +1374,7 @@ public static class MudChatSystem
         if (group == null)
         {
             terminal.SetColor("gray");
-            terminal.WriteLine("  You are not in a group.");
+            terminal.WriteLine($"  {UsurperRemake.Systems.Loc.Get("chat.not_in_group")}");
             return true;
         }
 
@@ -1590,7 +1599,10 @@ public static class MudChatSystem
         // v0.60.0 beta (Coosh report): accept display name OR account name.
         string target = args.Trim();
         var resolved = FindSessionByNameOrUsername(target);
-        string targetUsername = resolved?.Username ?? target.ToLowerInvariant();
+        // v1.1.1: an offline member typed by display name resolves to their login username
+        string targetUsername = resolved?.Username
+            ?? (UsurperRemake.Systems.SaveSystem.Instance.Backend as UsurperRemake.Systems.SqlSaveBackend)?.ResolvePlayerUsername(target)
+            ?? target.ToLowerInvariant();
 
         if (string.Equals(targetUsername, username, StringComparison.OrdinalIgnoreCase))
         {
@@ -2057,7 +2069,10 @@ public static class MudChatSystem
         // v0.60.0 beta (Coosh report): accept display name OR account name.
         string target = args.Trim();
         var resolved = FindSessionByNameOrUsername(target);
-        string targetUsername = resolved?.Username ?? target.ToLowerInvariant();
+        // v1.1.1: an offline member typed by display name resolves to their login username
+        string targetUsername = resolved?.Username
+            ?? (UsurperRemake.Systems.SaveSystem.Instance.Backend as UsurperRemake.Systems.SqlSaveBackend)?.ResolvePlayerUsername(target)
+            ?? target.ToLowerInvariant();
 
         var error = guild.TransferLeadership(username, targetUsername);
         if (error != null) { terminal.WriteLine($"  {error}", "yellow"); return true; }

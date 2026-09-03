@@ -358,6 +358,16 @@ public class PlayerSession : IDisposable
                         Context?.Terminal?.RemoveSpectatorStream(snooper.Context.Terminal);
                 }
                 SnoopedBy.Clear();
+
+                // v1.1.1: and drop this session from anyone it was snooping; the target kept a
+                // closed stream in its spectator list for the rest of its session.
+                var myTerminal = Context?.Terminal;
+                foreach (var other in MudServer.Instance?.ActiveSessions.Values.ToArray() ?? Array.Empty<PlayerSession>())
+                {
+                    if (other == this) continue;
+                    if (other.SnoopedBy.Remove(this) && myTerminal != null)
+                        other.Context?.Terminal?.RemoveSpectatorStream(myTerminal);
+                }
             }
             catch { }
 
