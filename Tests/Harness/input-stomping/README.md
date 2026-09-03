@@ -40,6 +40,11 @@ creates the account, then `WEB` and `SSH` log the same character in over the oth
 transports. Each run checks the name in `/who`, a tell addressed by the accented
 name, a tell by username, and a `/say`, and prints True for each.
 
+`hardclose.py town|fight` drops the socket at a prompt without logging out and
+checks the server log for "Connection lost" and "Session ended" with no CRASH line,
+then that server CPU is back at zero (v1.1.1: a closed peer used to read as empty
+lines forever and spin every re-prompt loop).
+
 Pass criteria for every case: the message is on its own line, the prompt that was
 on screen before the message is redrawn exactly, and the typed text appears at most
 once (exactly once on echo transports, zero times on the desktop path, where the

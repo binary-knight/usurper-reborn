@@ -3240,6 +3240,13 @@ public partial class GameEngine
             // load save" (a false alarm that paged the server-monitor Discord) and flashed an
             // "error loading" screen for 3 seconds. Let the session end normally and silently.
         }
+        catch (System.IO.IOException) when (UsurperRemake.Server.SessionContext.IsActive)
+        {
+            // v1.1.1: an online player's connection dropped (a failed write, or since 1.1.1 a
+            // read at EOF). Not a crash: let PlayerSession log it as "Connection lost" and clean
+            // up, instead of paging the monitor with "Failed to load save".
+            throw;
+        }
         catch (Exception ex)
         {
             terminal.WriteLine(Loc.Get("engine.error_loading", ex.Message), "red");
