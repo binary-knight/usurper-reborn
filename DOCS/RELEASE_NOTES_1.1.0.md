@@ -60,7 +60,9 @@ found or bought before it does not know its family and will not count until it
 is replaced. Nobody had a set before, so this is a delayed start rather than a
 loss. And sets apply to everyone who wears the gear: NPCs, companions, your
 dungeon echo, and your saved character when it defends in the arena or while
-asleep all get the same bonuses you do. A Constitution bonus from a set also
+asleep all get the same bonuses you do. About half of newly spawned NPCs now
+dress in a matching set where they can afford one, so expect some of them to
+hit harder or hold up longer than their level alone suggests. A Constitution bonus from a set also
 raises HP the usual way, on top of the HP figure listed.
 
 Not yet sets: Runed, Plate, Titan's, Dragon, and Holy. They are the next slice.

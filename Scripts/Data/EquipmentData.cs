@@ -210,10 +210,13 @@ public static class EquipmentDatabase
     public static List<Equipment> GetBySlot(EquipmentSlot slot, bool includesDynamic = false)
     {
         EnsureInitialized();
-        return _allEquipment.Values
-            .Where(e => e.Slot == slot && (includesDynamic || e.Id < DynamicEquipmentStart))
-            .OrderBy(e => e.Value)
-            .ToList();
+        lock (_lock)
+        {
+            return _allEquipment.Values
+                .Where(e => e.Slot == slot && (includesDynamic || e.Id < DynamicEquipmentStart))
+                .OrderBy(e => e.Value)
+                .ToList();
+        }
     }
 
     /// <summary>
@@ -222,10 +225,13 @@ public static class EquipmentDatabase
     public static List<Equipment> GetWeaponsByHandedness(WeaponHandedness handedness, bool includeDynamic = false)
     {
         EnsureInitialized();
-        return _allEquipment.Values
-            .Where(e => e.Handedness == handedness && (includeDynamic || e.Id < DynamicEquipmentStart))
-            .OrderBy(e => e.Value)
-            .ToList();
+        lock (_lock)
+        {
+            return _allEquipment.Values
+                .Where(e => e.Handedness == handedness && (includeDynamic || e.Id < DynamicEquipmentStart))
+                .OrderBy(e => e.Value)
+                .ToList();
+        }
     }
 
     /// <summary>
@@ -246,10 +252,13 @@ public static class EquipmentDatabase
     public static List<Equipment> GetShields()
     {
         EnsureInitialized();
-        return _allEquipment.Values
-            .Where(e => e.WeaponType == WeaponType.Shield)
-            .OrderBy(e => e.Value)
-            .ToList();
+        lock (_lock)
+        {
+            return _allEquipment.Values
+                .Where(e => e.WeaponType == WeaponType.Shield)
+                .OrderBy(e => e.Value)
+                .ToList();
+        }
     }
 
     /// <summary>
@@ -265,11 +274,14 @@ public static class EquipmentDatabase
     public static List<Equipment> GetAllArmor()
     {
         EnsureInitialized();
-        return _allEquipment.Values
-            .Where(e => e.Slot.IsArmorSlot())
-            .OrderBy(e => e.Slot)
-            .ThenBy(e => e.Value)
-            .ToList();
+        lock (_lock)
+        {
+            return _allEquipment.Values
+                .Where(e => e.Slot.IsArmorSlot())
+                .OrderBy(e => e.Slot)
+                .ThenBy(e => e.Value)
+                .ToList();
+        }
     }
 
     /// <summary>
@@ -278,22 +290,49 @@ public static class EquipmentDatabase
     public static List<Equipment> GetAccessories()
     {
         EnsureInitialized();
-        return _allEquipment.Values
-            .Where(e => e.Slot.IsAccessorySlot() && e.Id < DynamicEquipmentStart)
-            .OrderBy(e => e.Value)
-            .ToList();
+        lock (_lock)
+        {
+            return _allEquipment.Values
+                .Where(e => e.Slot.IsAccessorySlot() && e.Id < DynamicEquipmentStart)
+                .OrderBy(e => e.Value)
+                .ToList();
+        }
     }
 
     /// <summary>
     /// Find best base equipment by power/AC within budget (excludes dynamic/loot items)
     /// </summary>
+    /// <summary>
+    /// v1.1: best affordable piece for a slot drawn only from the given gear-set
+    /// families (shop-generated band, which is the only NPC-reachable band that
+    /// carries Family). Null when the set has nothing affordable for that slot.
+    /// </summary>
+    public static Equipment? GetBestAffordableInFamilies(EquipmentSlot slot, long maxGold, IReadOnlyList<string> families)
+    {
+        EnsureInitialized();
+        lock (_lock)
+        {
+            return _allEquipment.Values
+                .Where(e => e.Slot == slot && e.Value <= maxGold && e.Id < DynamicEquipmentStart
+                            && !string.IsNullOrEmpty(e.Family) && families.Contains(e.Family))
+                .OrderByDescending(e => e.ArmorClass + e.WeaponPower + e.ShieldBonus)
+                .FirstOrDefault();
+        }
+    }
+
+    // v1.1: every read that enumerates _allEquipment takes the registry lock. Reads ran unlocked
+    // while sessions register dungeon loot on other threads, and a spawn during a registration
+    // threw "Collection was modified" (seen in the suite; possible on the MUD server).
     public static Equipment? GetBestAffordable(EquipmentSlot slot, long maxGold)
     {
         EnsureInitialized();
-        return _allEquipment.Values
-            .Where(e => e.Slot == slot && e.Value <= maxGold && e.Id < DynamicEquipmentStart)
-            .OrderByDescending(e => e.ArmorClass + e.WeaponPower + e.ShieldBonus)
-            .FirstOrDefault();
+        lock (_lock)
+        {
+            return _allEquipment.Values
+                .Where(e => e.Slot == slot && e.Value <= maxGold && e.Id < DynamicEquipmentStart)
+                .OrderByDescending(e => e.ArmorClass + e.WeaponPower + e.ShieldBonus)
+                .FirstOrDefault();
+        }
     }
 
     /// <summary>
@@ -302,10 +341,13 @@ public static class EquipmentDatabase
     public static Equipment? FindByPower(long power, EquipmentSlot slot)
     {
         EnsureInitialized();
-        return _allEquipment.Values
-            .Where(e => e.Slot == slot && e.Id < DynamicEquipmentStart)
-            .OrderBy(e => Math.Abs((e.WeaponPower + e.ArmorClass + e.ShieldBonus) - power))
-            .FirstOrDefault();
+        lock (_lock)
+        {
+            return _allEquipment.Values
+                .Where(e => e.Slot == slot && e.Id < DynamicEquipmentStart)
+                .OrderBy(e => Math.Abs((e.WeaponPower + e.ArmorClass + e.ShieldBonus) - power))
+                .FirstOrDefault();
+        }
     }
 
     /// <summary>
@@ -314,11 +356,14 @@ public static class EquipmentDatabase
     public static List<Equipment> GetShopWeapons(WeaponHandedness handedness)
     {
         EnsureInitialized();
-        return _allEquipment.Values
-            .Where(e => e.Handedness == handedness && IsShopGenerated(e.Id))
-            .OrderBy(e => e.MinLevel)
-            .ThenBy(e => e.Value)
-            .ToList();
+        lock (_lock)
+        {
+            return _allEquipment.Values
+                .Where(e => e.Handedness == handedness && IsShopGenerated(e.Id))
+                .OrderBy(e => e.MinLevel)
+                .ThenBy(e => e.Value)
+                .ToList();
+        }
     }
 
     /// <summary>
@@ -327,11 +372,14 @@ public static class EquipmentDatabase
     public static List<Equipment> GetShopWeaponsByType(WeaponType weaponType)
     {
         EnsureInitialized();
-        return _allEquipment.Values
-            .Where(e => e.WeaponType == weaponType && IsShopGenerated(e.Id))
-            .OrderBy(e => e.MinLevel)
-            .ThenBy(e => e.Value)
-            .ToList();
+        lock (_lock)
+        {
+            return _allEquipment.Values
+                .Where(e => e.WeaponType == weaponType && IsShopGenerated(e.Id))
+                .OrderBy(e => e.MinLevel)
+                .ThenBy(e => e.Value)
+                .ToList();
+        }
     }
 
     /// <summary>
@@ -340,11 +388,14 @@ public static class EquipmentDatabase
     public static List<Equipment> GetShopArmor(EquipmentSlot slot)
     {
         EnsureInitialized();
-        return _allEquipment.Values
-            .Where(e => e.Slot == slot && IsShopGenerated(e.Id))
-            .OrderBy(e => e.MinLevel)
-            .ThenBy(e => e.Value)
-            .ToList();
+        lock (_lock)
+        {
+            return _allEquipment.Values
+                .Where(e => e.Slot == slot && IsShopGenerated(e.Id))
+                .OrderBy(e => e.MinLevel)
+                .ThenBy(e => e.Value)
+                .ToList();
+        }
     }
 
     /// <summary>
@@ -353,12 +404,15 @@ public static class EquipmentDatabase
     public static List<Equipment> GetShopShields()
     {
         EnsureInitialized();
-        return _allEquipment.Values
-            .Where(e => (e.WeaponType == WeaponType.Shield || e.WeaponType == WeaponType.Buckler || e.WeaponType == WeaponType.TowerShield)
-                     && IsShopGenerated(e.Id))
-            .OrderBy(e => e.MinLevel)
-            .ThenBy(e => e.Value)
-            .ToList();
+        lock (_lock)
+        {
+            return _allEquipment.Values
+                .Where(e => (e.WeaponType == WeaponType.Shield || e.WeaponType == WeaponType.Buckler || e.WeaponType == WeaponType.TowerShield)
+                         && IsShopGenerated(e.Id))
+                .OrderBy(e => e.MinLevel)
+                .ThenBy(e => e.Value)
+                .ToList();
+        }
     }
 
     /// <summary>
@@ -367,11 +421,14 @@ public static class EquipmentDatabase
     public static List<Equipment> GetShopRings()
     {
         EnsureInitialized();
-        return _allEquipment.Values
-            .Where(e => e.Slot == EquipmentSlot.LFinger && IsShopGenerated(e.Id))
-            .OrderBy(e => e.MinLevel)
-            .ThenBy(e => e.Value)
-            .ToList();
+        lock (_lock)
+        {
+            return _allEquipment.Values
+                .Where(e => e.Slot == EquipmentSlot.LFinger && IsShopGenerated(e.Id))
+                .OrderBy(e => e.MinLevel)
+                .ThenBy(e => e.Value)
+                .ToList();
+        }
     }
 
     /// <summary>
@@ -380,11 +437,14 @@ public static class EquipmentDatabase
     public static List<Equipment> GetShopNecklaces()
     {
         EnsureInitialized();
-        return _allEquipment.Values
-            .Where(e => e.Slot == EquipmentSlot.Neck && IsShopGenerated(e.Id))
-            .OrderBy(e => e.MinLevel)
-            .ThenBy(e => e.Value)
-            .ToList();
+        lock (_lock)
+        {
+            return _allEquipment.Values
+                .Where(e => e.Slot == EquipmentSlot.Neck && IsShopGenerated(e.Id))
+                .OrderBy(e => e.MinLevel)
+                .ThenBy(e => e.Value)
+                .ToList();
+        }
     }
 
     private static void EnsureInitialized()
