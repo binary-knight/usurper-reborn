@@ -2304,9 +2304,11 @@ public static class LootGenerator
         {
             // v1.1: every generator now stores the rolled rarity on the item, so a stored
             // value above Common is authoritative. The name/power heuristic below survives
-            // only for legacy items that carry Common with a rarity prefix in their name.
-            // (It is language-dependent: an item named under one language and read under
-            // another falls through to the power thresholds. Do not persist its result.)
+            // only for stored Common, which is either a real Common or a legacy item whose
+            // tier lived only in its name prefix; the two are indistinguishable by design.
+            // The heuristic is language-dependent (an item named under one language and
+            // read under another falls through to the power thresholds), so its result is
+            // display-only and must never be written back to the item.
             if (item.Rarity > EquipmentRarity.Common)
                 return (ItemRarity)(int)item.Rarity;
 
