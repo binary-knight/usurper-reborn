@@ -29,7 +29,7 @@ new to learn. Some things you were used to living with are gone.
   guaranteed Legendary each time. The day's rotation is saved with you.
 - **Nine daily counters were being played on one copy and saved from another.**
   The Player class redeclared them; the copy the game changed was never the
-  copy the save wrote. Eight more daily counters were never saved at all.
+  copy the save wrote.
 
 ## Exploits closed
 
@@ -40,7 +40,8 @@ new to learn. Some things you were used to living with are gone.
   or Wisdom made them certain.
 - Auto-buy forwarded the city tax before you chose a hand; cancelling refunded
   the price and kept the tax, which can land in your own bank.
-- Attacking a sleeping NPC took its gold twice.
+- Attacking a sleeping NPC, in the dormitory or at the inn, took its gold twice.
+- Buying every Black Market slot and relogging rolled a fresh stock.
 - PvP disarm halved a live defender's weapon power permanently. Repeated duels
   against the king or a sleeping NPC drove it to zero.
 - A monster purse above two billion gold crashed the victory roll.
@@ -55,7 +56,8 @@ new to learn. Some things you were used to living with are gone.
 - A Last Stand rescue on a mutual kill paid no victory rewards.
 - Team wars loaded both fighters by display name, so a name that differed from
   the login loaded nothing, no round ran, and the challenger lost the wager.
-- Listing an item on the marketplace and having it sell paid you nothing; the
+- Listing an item on the marketplace and having it sell, to a player or an NPC,
+  paid you nothing; the
   item was gone and so was the gold. Sellers now receive the gold as a bank
   transfer on their next login.
 - Selling an accessory paid for the one you chose and deleted the first item of

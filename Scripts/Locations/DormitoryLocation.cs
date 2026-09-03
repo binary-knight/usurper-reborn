@@ -586,8 +586,15 @@ public class DormitoryLocation : BaseLocation
         long npcGoldBeforeFight = npc.Gold;
         npc.Gold = 0;
         var combatEngine = new CombatEngine(terminal);
-        var result = await combatEngine.PlayerVsPlayer(currentPlayer, npc);
-        npc.Gold = npcGoldBeforeFight;
+        CombatResult result;
+        try
+        {
+            result = await combatEngine.PlayerVsPlayer(currentPlayer, npc);
+        }
+        finally
+        {
+            npc.Gold = npcGoldBeforeFight; // a dropped connection must not save the NPC broke
+        }
 
         // Restore NPC stats (if they survived)
         npc.Strength = origStr;

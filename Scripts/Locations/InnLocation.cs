@@ -5610,7 +5610,20 @@ public class InnLocation : BaseLocation
         npc.Defence = (long)(npc.Defence * (1.0 + GameConfig.InnDefenseBoost));
 
         var combatEngine = new CombatEngine(terminal);
-        var result = await combatEngine.PlayerVsPlayer(currentPlayer, npc);
+        // v1.1.1 (review): PlayerVsPlayer already takes half the defender's gold on a win and
+        // this path then took its own cut, so an inn sleeper was robbed twice. Same shield as
+        // the dormitory: the duel sees no gold, the theft below is the only one.
+        long npcGoldBeforeFight = npc.Gold;
+        npc.Gold = 0;
+        CombatResult result;
+        try
+        {
+            result = await combatEngine.PlayerVsPlayer(currentPlayer, npc);
+        }
+        finally
+        {
+            npc.Gold = npcGoldBeforeFight;
+        }
 
         // Restore NPC stats
         npc.Strength = origStr;

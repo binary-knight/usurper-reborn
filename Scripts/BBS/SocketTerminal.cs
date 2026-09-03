@@ -1339,7 +1339,7 @@ namespace UsurperRemake.BBS
                             sawIac = one[0] == 0xFF;
                         }
                     }
-                    else if (one[0] >= 0xFB)
+                    else if (one[0] >= 0xFB && one[0] != 0xFF) // IAC IAC is an escaped data byte, no option follows
                     {
                         await _rawHandleStream.ReadAsync(one, 0, 1); // option byte
                     }
@@ -1453,7 +1453,7 @@ namespace UsurperRemake.BBS
                 }
                 return;
             }
-            if (cmd < 0xFB) return; // NOP, GA, escaped IAC, and other option-less commands
+            if (cmd < 0xFB || cmd == 0xFF) return; // NOP, GA, escaped IAC, and other option-less commands
             if (await _stream.ReadAsync(cmdBuffer, 0, 1) < 1) return;
             byte option = cmdBuffer[0];
 

@@ -20623,6 +20623,7 @@ public partial class CombatEngine
             // statistics, no quest progress. Mirrors HandleVictoryMultiMonster.
             bool isBossPV = monster.IsBoss;
             result.Player.MKills++;
+            RecordFirstKillFunnel(result.Player);
             result.Player.Statistics?.RecordMonsterKill(baseExp, goldReward, isBossPV, monster.IsUnique);
             QuestSystem.OnMonsterKilled(result.Player, monster.Name, isBossPV, monster.TierName);
             ArchetypeTracker.Instance.RecordMonsterKill(monster.Level, monster.IsUnique);

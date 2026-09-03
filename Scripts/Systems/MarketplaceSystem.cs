@@ -199,10 +199,26 @@ namespace UsurperRemake.Systems
                 var sellerNPC = NPCSpawnSystem.Instance?.ActiveNPCs?
                     .FirstOrDefault(n => n.Id == listing.SellerNPCId);
                 sellerNPC?.GainGold(listing.Price);
-
-                NewsSystem.Instance?.Newsy(false,
-                    $"{npc.Name} bought {listing.Item.Name} from {listing.Seller} at the Auction House.");
             }
+            else
+            {
+                // v1.1.1 (review): an NPC buying a player's listing paid nobody either.
+                // Online: queue a bank transfer the seller collects on login. Single-player:
+                // the only player is the seller.
+                var backend = SaveSystem.Instance?.Backend as SqlSaveBackend;
+                if (backend != null)
+                {
+                    var sellerUser = backend.ResolvePlayerUsername(listing.Seller) ?? listing.Seller;
+                    backend.QueueGoldTransfer(sellerUser, npc.Name, listing.Price, $"Marketplace sale: {listing.Item.Name}");
+                }
+                else
+                {
+                    var seller = GameEngine.Instance.CurrentPlayer;
+                    if (seller != null) seller.Gold += listing.Price;
+                }
+            }
+            NewsSystem.Instance?.Newsy(false,
+                $"{npc.Name} bought {listing.Item.Name} from {listing.Seller} at the Auction House.");
 
             // Equip or store the item
             EquipOrStoreItem(npc, listing.Item);

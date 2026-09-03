@@ -676,7 +676,7 @@ namespace UsurperRemake.Systems
         // v0.62.x Phase 5 (Black Market rotation)
         public int BlackMarketStockSeed { get; set; }
         public DateTime LastBlackMarketRefreshUtc { get; set; }
-        public List<InventoryItemData> BlackMarketStock { get; set; } = new(); // v1.1.1: the rotation itself; relog used to re-roll it
+        public List<InventoryItemData>? BlackMarketStock { get; set; } // v1.1.1: the rotation itself; relog used to re-roll it. Null = legacy save (re-roll); empty = sold out today
         // v0.62.x Phase 6 (Sanctum -- Light activity hub)
         public int AlmsGivenToday { get; set; }
         public int OrphanageGiftsToday { get; set; }

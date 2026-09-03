@@ -1358,7 +1358,8 @@ public class WorldSimulator
 
             // Equipped items: walk EquippedItems dict, resolve each ID to an Item,
             // queue. EquipmentDatabase has the full item registry.
-            foreach (var kvp in deceased.EquippedItems)
+            var queuedSlots = new List<EquipmentSlot>();
+            foreach (var kvp in deceased.EquippedItems.ToList())
             {
                 if (kvp.Value <= 0) continue;
                 var eq = global::EquipmentDatabase.GetById(kvp.Value);
@@ -1368,10 +1369,14 @@ public class WorldSimulator
                 if (item == null) continue;
                 string itemJson = System.Text.Json.JsonSerializer.Serialize(item, jsonOpts);
                 if (backend.QueueInheritance(leaderUsername, deceased.Name2 ?? deceased.Name1 ?? "Unknown", itemJson, 0))
+                {
                     queued++;
+                    queuedSlots.Add(kvp.Key);
+                }
             }
 
             // Inventory items
+            var queuedItems = new List<Item>();
             if (deceased.Inventory != null)
             {
                 foreach (var item in deceased.Inventory)
@@ -1379,21 +1384,28 @@ public class WorldSimulator
                     if (item == null) continue;
                     string itemJson = System.Text.Json.JsonSerializer.Serialize(item, jsonOpts);
                     if (backend.QueueInheritance(leaderUsername, deceased.Name2 ?? deceased.Name1 ?? "Unknown", itemJson, 0))
+                    {
                         queued++;
+                        queuedItems.Add(item);
+                    }
                 }
             }
 
             // Gold (single row with no item, just gold_amount)
+            bool goldQueued = false;
             if (deceased.Gold > 0)
             {
-                if (backend.QueueInheritance(leaderUsername, deceased.Name2 ?? deceased.Name1 ?? "Unknown", null, deceased.Gold))
-                    queued++;
+                goldQueued = backend.QueueInheritance(leaderUsername, deceased.Name2 ?? deceased.Name1 ?? "Unknown", null, deceased.Gold);
+                if (goldQueued) queued++;
             }
 
             if (queued > 0)
             {
-                deceased.Gold = 0;           // v1.1.1: the estate left on the corpse could be queued again
-                deceased.Inventory?.Clear();
+                // v1.1.1: the estate left on the corpse could be queued again. Only what was
+                // actually queued leaves the corpse; a row that failed keeps its item for a re-fire.
+                if (goldQueued) deceased.Gold = 0;
+                foreach (var item in queuedItems) deceased.Inventory?.Remove(item);
+                foreach (var slot in queuedSlots) deceased.EquippedItems.Remove(slot);
                 UsurperRemake.Systems.DebugLogger.Instance.LogInfo("LIFECYCLE",
                     $"Bequeathed {queued} items/gold from {deceased.Name2} (team '{deceased.Team}') to leader '{leaderUsername}'.");
             }
@@ -1471,8 +1483,9 @@ public class WorldSimulator
         var spouseId = NPCMarriageRegistry.Instance?.GetSpouseId(npc.ID);
         if (!string.IsNullOrEmpty(spouseId))
         {
-            var byId = npcs.FirstOrDefault(n => n.ID == spouseId);
-            if (byId != null) return byId;
+            // The registry knows the spouse; if that id is not a pool NPC it is a player (or
+            // gone), and a Name2 fallback would pick a namesake NPC instead.
+            return npcs.FirstOrDefault(n => n.ID == spouseId);
         }
         if (string.IsNullOrEmpty(npc.SpouseName)) return null;
         return npcs.FirstOrDefault(n => n.Name2 == npc.SpouseName && (n.Married || n.IsMarried) && !n.IsPermaDead && !n.IsAgedDeath);
@@ -1537,7 +1550,7 @@ public class WorldSimulator
             {
                 // Check if spouse exists and is alive — if not, clear the stale flag
                 var spouse = !string.IsNullOrEmpty(npc.SpouseName)
-                    ? npcs.FirstOrDefault(n => n.Name2 == npc.SpouseName && n.IsAlive && !n.IsDead)
+                    ? npcs.FirstOrDefault(n => n.Name2 == npc.SpouseName && !n.IsPermaDead && !n.IsAgedDeath) // v1.1.1: IsDead is the respawn window
                     : null;
                 if (spouse == null)
                 {

@@ -4292,6 +4292,8 @@ namespace UsurperRemake.Systems
         {
             try
             {
+                if (newPassword != null && newPassword.Contains(':'))
+                    return (false, "Password cannot contain ':'."); // v1.1.1: the relay/desktop AUTH line splits on ':'
                 // Verify old password first
                 var (authenticated, _, _, _, _) = await AuthenticatePlayer(username, oldPassword);
                 if (!authenticated)
@@ -4325,6 +4327,8 @@ namespace UsurperRemake.Systems
         {
             try
             {
+                if (newPassword.Contains(':'))
+                    return (false, "Password cannot contain ':'."); // v1.1.1: the relay/desktop AUTH line splits on ':'
                 if (newPassword.Length < 4)
                     return (false, "New password must be at least 4 characters.");
 
@@ -5203,7 +5207,8 @@ namespace UsurperRemake.Systems
                        CAST(json_extract(p.player_data, '$.player.class') AS INTEGER) as class_id,
                        CAST(json_extract(p.player_data, '$.player.experience') AS INTEGER) as xp,
                        p.last_login,
-                       CASE WHEN op.username IS NOT NULL THEN 1 ELSE 0 END as is_online
+                       CASE WHEN op.username IS NOT NULL THEN 1 ELSE 0 END as is_online,
+                       p.username
                 FROM players p
                 LEFT JOIN online_players op ON LOWER(p.username) = LOWER(op.username)
                     AND op.last_heartbeat > datetime('now', '-120 seconds')
@@ -5222,6 +5227,7 @@ namespace UsurperRemake.Systems
                     continue;
                 members.Add(new PlayerSummary
                 {
+                    Username = reader.GetString(6), // v1.1.1: team wars load saves by username
                     DisplayName = name,
                     Level = reader.IsDBNull(1) ? 1 : reader.GetInt32(1),
                     ClassId = reader.IsDBNull(2) ? 0 : reader.GetInt32(2),
@@ -5363,7 +5369,11 @@ namespace UsurperRemake.Systems
         {
             using var connection = OpenConnection();
             using var cmd = connection.CreateCommand();
-            cmd.CommandText = "SELECT username FROM players WHERE (LOWER(username) = LOWER(@name) OR LOWER(display_name) = LOWER(@name)) AND is_banned = 0 AND username NOT LIKE 'emergency_%' LIMIT 1;";
+            // v1.1.1 (review): a username can equal another account's display name, so prefer the
+            // exact username, then the exact display name. A display name is "Name2 Surname" for a
+            // player with a family surname, so a bare Name2 (what SpouseName stores) matches as a
+            // prefix last.
+            cmd.CommandText = "SELECT username FROM players WHERE (LOWER(username) = LOWER(@name) OR LOWER(display_name) = LOWER(@name) OR LOWER(display_name) LIKE LOWER(@name) || ' %') AND is_banned = 0 AND username NOT LIKE 'emergency_%' ORDER BY (LOWER(username) = LOWER(@name)) DESC, (LOWER(display_name) = LOWER(@name)) DESC LIMIT 1;";
             cmd.Parameters.AddWithValue("@name", nameOrDisplay);
             var result = cmd.ExecuteScalar();
             return result?.ToString();

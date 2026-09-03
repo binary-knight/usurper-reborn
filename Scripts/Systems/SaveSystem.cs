@@ -970,7 +970,7 @@ namespace UsurperRemake.Systems
                 // v0.62.x Phase 5 (Black Market rotation)
                 BlackMarketStockSeed = player.BlackMarketStockSeed,
                 LastBlackMarketRefreshUtc = player.LastBlackMarketRefreshUtc,
-                BlackMarketStock = player.CachedBlackMarketStock?.Select(InventoryItemData.FromItem).ToList() ?? new List<InventoryItemData>(),
+                BlackMarketStock = player.CachedBlackMarketStock?.Select(InventoryItemData.FromItem).ToList(),
                 // v0.62.x Phase 6 (Sanctum)
                 AlmsGivenToday = player.AlmsGivenToday,
                 OrphanageGiftsToday = player.OrphanageGiftsToday,

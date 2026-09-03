@@ -6027,9 +6027,9 @@ public partial class GameEngine
         player.LastBlackMarketRefreshUtc = playerData.LastBlackMarketRefreshUtc;
         // v1.1.1: restore the day's rotation. A null cache meant "re-roll", so every relog
         // rolled a fresh Black Market and, since 1.1, a fresh guaranteed Legendary.
-        player.CachedBlackMarketStock = playerData.BlackMarketStock != null && playerData.BlackMarketStock.Count > 0
-            ? playerData.BlackMarketStock.Select(d => d.ToItem()).ToList()
-            : null;
+        // An empty list is a sold-out rotation and must stay empty; only a legacy save (null)
+        // re-rolls, otherwise buying every slot and relogging was a fresh Legendary.
+        player.CachedBlackMarketStock = playerData.BlackMarketStock?.Select(d => d.ToItem()).ToList();
         // v0.62.x Phase 6 (Sanctum)
         player.AlmsGivenToday = playerData.AlmsGivenToday;
         player.OrphanageGiftsToday = playerData.OrphanageGiftsToday;
