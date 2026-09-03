@@ -313,7 +313,9 @@ public static class EquipmentDatabase
         lock (_lock)
         {
             return _allEquipment.Values
-                .Where(e => e.Slot == slot && e.Value <= maxGold && e.Id < DynamicEquipmentStart
+                // Shop band by name, not by "has a Family": if built-ins ever gain families
+                // (say, to let low-level NPCs wear sets) this must not start handing them out.
+                .Where(e => e.Slot == slot && e.Value <= maxGold && IsShopGenerated(e.Id)
                             && !string.IsNullOrEmpty(e.Family) && families.Contains(e.Family))
                 .OrderByDescending(e => e.ArmorClass + e.WeaponPower + e.ShieldBonus)
                 .FirstOrDefault();
