@@ -1626,6 +1626,11 @@ public class Character
             item?.ApplyToCharacter(this);
         }
 
+        // v1.1: gear set bonuses, players and player snapshots (PvP defenders) only.
+        // Placed before the CON-to-HP line so a set CON bonus flows into MaxHP.
+        if (IsPlayer || IsPlayerSnapshot)
+            UsurperRemake.Systems.GearSetRegistry.Apply(this);
+
         // Apply stat-based bonuses AFTER equipment (stats may have been modified)
         // Constitution bonus to HP
         MaxHP += StatEffectsSystem.GetConstitutionHPBonus(Constitution, Level);
@@ -2441,6 +2446,9 @@ public class Character
     // Helper properties for commonly used calculations
     public bool IsAlive => HP > 0;
     public bool IsPlayer => AI == CharacterAI.Human;
+    /// <summary>v1.1: a player's saved character rebuilt for PvP/sleeper/arena use (PlayerCharacterLoader).
+    /// Runs with AI = Computer but must get the same gear set bonuses as the live player. Transient.</summary>
+    public bool IsPlayerSnapshot { get; set; }
     public bool IsNPC => AI == CharacterAI.Computer;
     // v0.65.1: append the optional family surname (set only on the player, via the
     // marriage ceremony). Name2 stays the stable identity key; this is the display layer.

@@ -397,6 +397,20 @@ namespace UsurperRemake.Systems
             DisplaySlot(Loc.Get("inventory.slot_right_ring"), EquipmentSlot.RFinger, "R");
             terminal.WriteLine("");
 
+            // v1.1: gear set progress and bonuses
+            var setLines = GearSetRegistry.DescribeActive(player);
+            if (setLines.Count > 0)
+            {
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine($"[ {Loc.Get("item.set.header")} ]");
+                foreach (var (text, active) in setLines)
+                {
+                    terminal.SetColor(active ? "bright_green" : "darkgray");
+                    terminal.WriteLine($"  {text}");
+                }
+                terminal.WriteLine("");
+            }
+
             // Stats summary
             DisplayStatsSummary();
 
@@ -1603,6 +1617,13 @@ namespace UsurperRemake.Systems
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  {Loc.Get("inventory.requires")}: {string.Join(", ", reqs)}");
+            }
+
+            var itemSet = GearSetRegistry.ForFamily(item.Family);
+            if (itemSet != null)
+            {
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine($"  {Loc.Get("item.set.member", GearSetRegistry.SetName(itemSet), itemSet.MaxPieces)}");
             }
 
             terminal.SetColor("gray");
