@@ -23228,6 +23228,7 @@
   "merc.contract.faith_escort_pilgrim.objective": "Vaincs {0} monstres en protégeant le pèlerin.",
   "dark_alley.bm_section_utility": "Utilitaire :",
   "dark_alley.bm_section_gear": "Marchandise tournante :",
+  "dark_alley.bm_section_gear_floor": "Marchandise tournante ({0} ou mieux) :",
   "dark_alley.bm_freelance_surcharge": "Surtaxe d'indépendant : +{0}% (aucun serment aux Ombres prêté).",
   "dark_alley.bm_refresh_hint": "(Les receleurs renouvelleront la marchandise d'ici le matin.)",
   "dark_alley.bm_gear_inventory_full": "Ton sac est plein. Les receleurs te le garderont, mais tu ne peux rien porter de plus.",

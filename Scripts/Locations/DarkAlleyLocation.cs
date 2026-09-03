@@ -1397,7 +1397,10 @@ namespace UsurperRemake.Locations
             if (stock.Count > 0)
             {
                 terminal.SetColor("cyan");
-                terminal.WriteLine(Loc.Get("dark_alley.bm_section_gear"));
+                var headerFloor = BlackMarketRarityFloor((int)AlignmentSystem.Instance.GetDreadTier(currentPlayer));
+                terminal.WriteLine(headerFloor > EquipmentRarity.Common
+                    ? Loc.Get("dark_alley.bm_section_gear_floor", RarityWord(headerFloor))
+                    : Loc.Get("dark_alley.bm_section_gear"));
                 terminal.SetColor("white");
                 for (int i = 0; i < stock.Count; i++)
                 {
@@ -1551,10 +1554,11 @@ namespace UsurperRemake.Locations
         /// <summary>
         /// v0.62.x Phase 5: rebuild the rotating gear slots based on the player's Dread tier. Slot
         /// count by tier comes from GameConfig.BlackMarketGearSlotsByDreadTier[] (None=0 / Cutthroat=2
-        /// / Marauder=3 / Terror=4 / Nightmare=5). Items roll via LootGenerator's natural rarity curve
-        /// at the player's level. Rarity-floor biasing was deferred to slice 5b (see LootGenerator
-        /// note). Called from VisitBlackMarket when the day has changed since LastBlackMarketRefreshUtc
-        /// or the per-session cache is null.
+        /// / Marauder=3 / Terror=4 / Nightmare=5). v1.1: each tier also sets a rarity floor
+        /// (GameConfig.BlackMarketRarityFloorByDreadTier); Nightmare guarantees one Legendary and
+        /// holds Legendary-or-better to BlackMarketLegendarySlotCap per refresh. Called from
+        /// VisitBlackMarket when the day has changed since LastBlackMarketRefreshUtc or the
+        /// per-session cache is null.
         /// </summary>
         private void RebuildBlackMarketStock()
         {
@@ -1569,14 +1573,47 @@ namespace UsurperRemake.Locations
                 return;
             }
 
+            var floor = (LootGenerator.ItemRarity)(int)BlackMarketRarityFloor(dreadTier);
+            bool nightmare = dreadTier == (int)AlignmentSystem.DreadTier.Nightmare;
+            int legendaryCap = nightmare ? GameConfig.BlackMarketLegendarySlotCap : 0;
+            int legendaryCount = 0;
             for (int i = 0; i < slotCount; i++)
             {
-                var loot = LootGenerator.GenerateDungeonLoot(currentPlayer.Level, currentPlayer.Class);
-                if (loot != null) stock.Add(loot);
+                LootGenerator.ItemRarity? forced = null;
+                if (nightmare && i == 0 && legendaryCap > 0)
+                    forced = LootGenerator.ItemRarity.Legendary; // the guaranteed one
+                var loot = LootGenerator.GenerateDungeonLootWithMinRarity(currentPlayer.Level, currentPlayer.Class, floor, forced);
+                if (loot == null) continue;
+                if (loot.Rarity >= EquipmentRarity.Legendary)
+                {
+                    if (legendaryCount >= legendaryCap)
+                        loot = LootGenerator.GenerateDungeonLootWithMinRarity(currentPlayer.Level, currentPlayer.Class, floor, LootGenerator.ItemRarity.Epic);
+                    else
+                        legendaryCount++;
+                }
+                stock.Add(loot);
             }
 
             currentPlayer.CachedBlackMarketStock = stock;
         }
+
+        /// <summary>v1.1: rarity floor for the player's Dread tier; Common when the tier is out of range.</summary>
+        private static EquipmentRarity BlackMarketRarityFloor(int dreadTier)
+        {
+            var table = GameConfig.BlackMarketRarityFloorByDreadTier;
+            return dreadTier >= 0 && dreadTier < table.Length ? table[dreadTier] : EquipmentRarity.Common;
+        }
+
+        /// <summary>v1.1: the localized prefix word for a rarity ("Superior"), used in the merchandise header.</summary>
+        private static string RarityWord(EquipmentRarity rarity) => rarity switch
+        {
+            EquipmentRarity.Uncommon => Loc.Get("item.rarity.fine"),
+            EquipmentRarity.Rare => Loc.Get("item.rarity.superior"),
+            EquipmentRarity.Epic => Loc.Get("item.rarity.exquisite"),
+            EquipmentRarity.Legendary => Loc.Get("item.rarity.legendary"),
+            EquipmentRarity.Artifact => Loc.Get("item.rarity.mythic"),
+            _ => ""
+        };
 
         /// <summary>
         /// Composes the final Black Market price for a gear item across all the discount layers.
@@ -1588,6 +1625,9 @@ namespace UsurperRemake.Locations
         private long ComputeBlackMarketGearPrice(Item item, float rankDiscount, bool isFreelance)
         {
             float price = item.Value * GameConfig.BlackMarketGearMarkup;
+            // v1.1: rarity premium; this is the level 20-40 gold sink.
+            int rarityIdx = Math.Clamp((int)item.Rarity, 0, GameConfig.BlackMarketRarityMarkup.Length - 1);
+            price *= GameConfig.BlackMarketRarityMarkup[rarityIdx];
             price *= AlignmentSystem.Instance.GetPriceModifier(currentPlayer, isShadyShop: true);
             price *= (1.0f - rankDiscount);
             if (isFreelance) price *= GameConfig.BlackMarketFreelanceSurcharge;

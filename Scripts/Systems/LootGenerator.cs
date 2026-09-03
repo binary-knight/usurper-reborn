@@ -973,13 +973,20 @@ public static class LootGenerator
                 return GenerateArmor(dungeonLevel, playerClass);
         }
 
-        // v0.62.x Phase 5 first-slice note: a `GenerateDungeonLootWithMinRarity` helper was drafted
-        // here but deferred to slice 5b. LootGenerator currently encodes rarity in the item's NAME
-        // PREFIX rather than populating `Item.Rarity` (which stays at default EquipmentRarity.Common),
-        // so a min-rarity floor would require touching ~5 Create*FromTemplate / CreateBasic* sites
-        // to also set `item.Rarity = (EquipmentRarity)(int)rarity`. The Black Market rotation ships
-        // without the rarity floor; slot count scaling with Dread tier already delivers the
-        // headline "deeper standing = more merchandise" loop. Slice 5b can revisit.
+        /// <summary>
+        /// v1.1: dungeon-style loot with a rarity floor (Black Market rotation). The natural
+        /// curve is rolled first so deeper standing still sees the occasional better roll; the
+        /// floor only lifts the low end. <paramref name="forcedRarity"/> pins the tier outright.
+        /// Possible only since generators stamp Item.Rarity (the v0.62 note that deferred this).
+        /// </summary>
+        public static Item GenerateDungeonLootWithMinRarity(int dungeonLevel, CharacterClass playerClass,
+            ItemRarity minRarity, ItemRarity? forcedRarity = null)
+        {
+            var rarity = forcedRarity ?? (ItemRarity)Math.Max((int)RollRarity(dungeonLevel), (int)minRarity);
+            if (random.NextDouble() < 0.45)
+                return GenerateWeaponWithRarity(dungeonLevel, playerClass, rarity);
+            return GenerateArmorWithRarity(dungeonLevel, playerClass, rarity);
+        }
 
         /// <summary>
         /// Generate a ring drop for dungeon loot

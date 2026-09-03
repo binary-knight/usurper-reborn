@@ -844,6 +844,16 @@ public static partial class GameConfig
     public const float BlackMarketGearMarkup = 1.5f;                  // base price = item.Value * this. Premium for unsanctioned access.
     public const float BlackMarketFreelanceSurcharge = 1.10f;         // freelance evil (non-Shadows) pays this extra at Marauder+ Dread.
     public const int BlackMarketLegendarySlotCap = 1;                 // Nightmare-only; max Legendaries in rotation per refresh.
+    // v1.1: rarity floor per Dread tier (indexed like BlackMarketGearSlotsByDreadTier). Deeper standing
+    // stops the market rolling Common gear at all; Nightmare guarantees one Legendary per refresh
+    // (BlackMarketLegendarySlotCap) and never more than that many Legendary-or-better in a rotation.
+    public static readonly EquipmentRarity[] BlackMarketRarityFloorByDreadTier =
+        { EquipmentRarity.Common, EquipmentRarity.Uncommon, EquipmentRarity.Rare, EquipmentRarity.Epic, EquipmentRarity.Epic };
+    // v1.1: price multiplier by rarity on top of BlackMarketGearMarkup, indexed by EquipmentRarity.
+    // This is the gold sink for levels 20-40, where income outruns shop gear about six to one.
+    // Measured medians at level 30 before faction and Dread discounts: Rare ~5k, Epic ~17k,
+    // Legendary ~80k, Artifact ~330k (200 rolls each; see Tests/BlackMarketFloorTests).
+    public static readonly float[] BlackMarketRarityMarkup = { 1.0f, 1.0f, 1.35f, 1.8f, 2.5f, 3.0f };
 
     // v0.62.x "Light and Dark" Phase 6 (Light activity hub -- "The Sanctum").
     // Structural yin/yang mirror of the Dark Alley as a Good/Holy player's home. Gated at the
