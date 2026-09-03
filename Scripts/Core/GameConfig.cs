@@ -10,8 +10,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "1.0.6";
-    public const string VersionName = "Coronation"; // 1.0 release
+    public const string Version = "1.1.0";
+    public const string VersionName = "Regalia"; // 1.1 line: the gear and reward loop
 
     // v0.57.12: Alignment scale cap. Character.Chivalry and Character.Darkness setters clamp to [0, AlignmentCap]
     // as defense in depth against direct-mutation bypass sites that don't route through AlignmentSystem.ChangeAlignment.

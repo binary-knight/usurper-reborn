@@ -1,0 +1,33 @@
+[h1]Usurper Reborn 1.1 "Regalia" - Gear Sets and a Black Market Worth Visiting[/h1]
+
+Coronation put you on the throne. Regalia is about what you wear once you are there. This is the first release since 1.0 that adds systems instead of fixing them, and it is aimed squarely at the stretch from level 20 to 40, where the gear ladder ran thin and the gold piled up with nowhere to go.
+
+[h2]Gear sets[/h2]
+
+Wear pieces from the same family and you get bonuses at two, four, and six pieces. Eight families are sets in this release: Leather, Chain, Silk, Shadow, Steel, Reinforced, Forged, and Mithril. Shops and dungeon drops both produce them, so you can put a set together either way. The equipment screen and /gear show what you are wearing, how many pieces you have, and which bonuses are on. An item's detail view tells you which set it belongs to.
+
+The bonuses are modest at two pieces, meaningful at four, and build-defining at six. Reinforced, for example, gives armor at two, HP and Constitution at four, Defence and more armor at six.
+
+Sets are not just for you. NPCs, companions, and your dungeon echo get the same bonuses from the same gear, and about half of new NPCs now dress in a matching set where they can afford one. Some of them will hit harder than their level suggests.
+
+One thing to know: gear you already own does not know its family. Sets count items found or bought from this update on. Nobody had a set before, so nobody loses one.
+
+[h2]The Black Market sells to your standing[/h2]
+
+If you have earned your way into the Black Market, it no longer sells you the same Common junk a beginner finds on floor one. Each Dread tier sets a floor on what shows up. Nightmare guarantees one Legendary piece per day. Prices carry a premium by rarity, so a Legendary at level 30 runs around 80,000 gold before your Shadows rank and Dread discounts. That is deliberate. This is where the gold you earn in your twenties and thirties is meant to go.
+
+[h2]Items keep their rarity[/h2]
+
+Until now an item's tier lived only in its name, in whatever language you were playing in. Switch languages, or sell to an NPC and buy back, and the tier could quietly vanish. Items now store their rarity and their family. Backpack and Black Market lists are colored by rarity.
+
+[h2]Fixes that came along[/h2]
+
+[list]
+[*]Selling an item to an NPC's market stock or listing it on the marketplace stripped its rarity, level requirement, and effects. Fixed.
+[*]Two old races in the equipment catalog that could drop a freshly found item or crash an NPC spawn on the online server. Fixed.
+[*]Stealing gear from a dormitory sleeper kept the item but lost its rarity. Fixed.
+[/list]
+
+[h2]Still to come[/h2]
+
+Runed, Plate, Titan's, Dragon, and Holy are not sets yet; they are next. Set bonuses beyond plain stats, like critical chance and life steal, are also next. The balance numbers here are a first pass. If a set feels too strong or the Black Market feels too cheap or too dear, use /bug in game and tell me your level and what you paid.

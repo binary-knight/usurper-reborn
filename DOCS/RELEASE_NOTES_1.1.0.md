@@ -1,4 +1,11 @@
-# Usurper Reborn v1.1.0 (draft, accumulating per merged slice)
+# Usurper Reborn v1.1.0 "Regalia"
+
+The 1.0 line was Coronation. Regalia is what the crown wears. This release is
+the gear and reward loop the 1.0 audit named as the thin midgame track: items
+that know what they are, eight gear sets, a Black Market that sells to your
+standing, and the gold sink between the shops and the home upgrades that the
+July retention analysis found missing. It was built as five reviewed slices
+(PRs #119 through #125) and measured where it could be, with the numbers below.
 
 ## Items keep their rarity and know their family
 
@@ -66,3 +73,82 @@ hit harder or hold up longer than their level alone suggests. A Constitution bon
 raises HP the usual way, on top of the HP figure listed.
 
 Not yet sets: Runed, Plate, Titan's, Dragon, and Holy. They are the next slice.
+
+## The NPC market no longer strips what it holds
+
+Selling an item to an NPC's market stock or listing it on the marketplace ran
+it through an eight-field record and handed it back without its rarity, level
+requirement, loot effects, identification, or shield bonus. A reforged
+Legendary sold and bought back came back Common. The record now carries the
+complete item alongside the old fields, which are still written so an older
+binary reads the same save.
+
+## Two races in the equipment catalog
+
+Both are old and both were found by the new tests, which made them easy to
+hit. The catalog's first-time build ran without the registry lock and started
+by clearing the dictionary, so a session registering loot on another thread
+while the first caller was still building it lost its items. And thirteen
+catalog queries enumerated the dictionary without the lock, so an NPC spawn
+overlapping a loot drop could throw. Every read and the initial build now take
+the lock, and the initialized flag is volatile for the ARM builds.
+
+## Balance numbers and what is still open
+
+Every number in this release is a first pass. The set bonuses are tuned per
+level band and marked as such in code. The Black Market prices were measured
+at level 30 (medians over 200 rolls per tier, before discounts) and are
+listed above. The one figure that could not be measured from a development
+machine is gold earned per day at level 30, which decides whether a Nightmare
+player's roughly 150,000 gold of possible daily spend actually absorbs their
+income. If it falls short, the lever is slot count or refresh cadence, not the
+premium. Set bonuses beyond plain stats (critical chance, life steal, regen)
+and the Runed, Plate, Titan's, Dragon, and Holy sets are the next slice.
+
+## Tests
+
+1,009 passing, up from 977 at v1.0.6. New: `MarketItemDataTests`,
+`RarityPlumbingTests`, `BlackMarketFloorTests`, `GearSetTests`,
+`NPCSetOutfittingTests`.
+
+## Files Changed
+
+**New**
+
+- `DOCS/RELEASE_NOTES_1.1.0.md`
+- `Scripts/Systems/GearSetSystem.cs`
+- `Tests/BlackMarketFloorTests.cs`
+- `Tests/GearSetTests.cs`
+- `Tests/MarketItemDataTests.cs`
+- `Tests/NPCSetOutfittingTests.cs`
+- `Tests/RarityPlumbingTests.cs`
+- `DOCS/STEAM_RELEASE_NOTES_1.1.0.txt`
+
+**Modified**
+
+- `.gitignore`
+- `Localization/en.json`
+- `Localization/es.json`
+- `Localization/fr.json`
+- `Localization/hu.json`
+- `Localization/it.json`
+- `README.md`
+- `Scripts/Core/Character.cs`
+- `Scripts/Core/GameConfig.cs`
+- `Scripts/Core/GameEngine.cs`
+- `Scripts/Core/Items.cs`
+- `Scripts/Data/EquipmentData.cs`
+- `Scripts/Editor/PlayerSaveEditor.cs`
+- `Scripts/Locations/BaseLocation.cs`
+- `Scripts/Locations/DarkAlleyLocation.cs`
+- `Scripts/Locations/DormitoryLocation.cs`
+- `Scripts/Systems/InventorySystem.cs`
+- `Scripts/Systems/LootGenerator.cs`
+- `Scripts/Systems/MarketplaceSystem.cs`
+- `Scripts/Systems/NPCSpawnSystem.cs`
+- `Scripts/Systems/OnlineStateManager.cs`
+- `Scripts/Systems/PlayerCharacterLoader.cs`
+- `Scripts/Systems/SaveDataStructures.cs`
+- `Scripts/Systems/SaveSystem.cs`
+- `Scripts/Systems/ShopItemGenerator.cs`
+- `Scripts/Systems/WorldSimService.cs`
