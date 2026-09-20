@@ -350,6 +350,7 @@ public class DailySystemManager
         player.DesecrationsToday = 0;
         player.ConfessionsToday = 0;  // v0.57.0
         player.MurdersToday = 0;      // v0.57.6: non-bounty murder daily cap
+        player.ReforgesToday = 0;     // v1.1.7: daily reforge cap
         player.SparesToday = 0;       // v0.64.1: PvP-spare alignment-reward cap
         player.TeamWarsToday = 0;     // v0.57.17: Team Corner team-war daily cap
         player.DrinkingGamesToday = 0; // v0.57.17: Inn drinking-game daily cap

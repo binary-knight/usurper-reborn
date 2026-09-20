@@ -668,6 +668,7 @@ namespace UsurperRemake.Systems
         public int DesecrationsToday { get; set; }
         public int ConfessionsToday { get; set; }
         public int MurdersToday { get; set; }
+        public int ReforgesToday { get; set; }   // v1.1.7
         public int SparesToday { get; set; }
         public int TeamWarsToday { get; set; }
         public int DrinkingGamesToday { get; set; }

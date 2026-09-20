@@ -6036,6 +6036,7 @@ public partial class GameEngine
         player.DesecrationsToday = playerData.DesecrationsToday;
         player.ConfessionsToday = playerData.ConfessionsToday;
         player.MurdersToday = playerData.MurdersToday;
+        player.ReforgesToday = playerData.ReforgesToday;   // v1.1.7
         player.SparesToday = playerData.SparesToday;
         player.TeamWarsToday = playerData.TeamWarsToday;
         player.DrinkingGamesToday = playerData.DrinkingGamesToday;

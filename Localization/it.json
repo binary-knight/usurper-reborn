@@ -3570,6 +3570,8 @@
   "weapon_shop.reforge_cost": "Costo di riforgiatura: {0} oro",
   "weapon_shop.reforge_gold": "Il tuo oro: {0}",
   "weapon_shop.reforge_warning": "Le statistiche saranno ricalcolate entro +/-15% dei valori attuali. C'e' il 20% di probabilita' che la rarita' dell'arma migliori. ATTENZIONE: la riforgiatura e' definitiva una volta pagata: tieni le statistiche che il martello ti da'.",
+  "weapon_shop.reforge_daily_limit": "Il fabbro scuote la testa. 'L'acciaio non regge altre riforgiature per oggi.' (limite: {0} al giorno)",
+  "weapon_shop.reforge_beyond_skill": "{0} rigira l'arma e te la restituisce. 'È un lavoro più fine di quanto io possa migliorare per qualcuno del tuo rango. Torna quando sarai cresciuto.'",
   "weapon_shop.reforge_confirm": "Pagare l'oro e riforgiare (definitivo)? (S/N): ",
   "weapon_shop.reforge_working": "{0} immerge la tua arma nella forgia. Le scintille volano mentre il metallo diventa incandescente...",
   "weapon_shop.reforge_rarity_up": "Il metallo brilla di nuovo splendore! Rarità migliorata a {0}!",

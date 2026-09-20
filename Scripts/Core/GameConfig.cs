@@ -725,6 +725,11 @@ public static partial class GameConfig
     public const int MaxItemVitalBonus = 20000;      // max HP and max mana bonuses
     public const int MaxItemPercent = 100;           // block, crit chance, resistances, steals, piercing, thorns
     public const long MaxItemValue = 20_000_000;     // five times the most valuable authored item
+    public const int MaxReforgesPerDay = 3;                  // v1.1.7 (council, starting value)
+    public const long ReforgeMinCost = 5_000;                // v1.1.7: level 1 paid 50 gold (starting value)
+    public const double ReforgePowerBoundFactor = 1.5;       // v1.1.7: over the strongest legitimate drop at the player's level
+    public const double LootTopWeaponBasePower = 135;        // LootGenerator's strongest weapon template (Blade of the Righteous)
+    public const double LootArtifactPowerMult = 4.0;         // LootGenerator RarityStats[Artifact].PowerMult
     public const double ReforgeUpgradeChance = 0.20;   // 20% chance to upgrade rarity
     public const double ReforgeVariance = 0.15;        // +/-15% stat variance on reroll
 

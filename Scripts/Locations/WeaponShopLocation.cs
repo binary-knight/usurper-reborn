@@ -1172,11 +1172,26 @@ public class WeaponShopLocation : BaseLocation
             return;
         }
 
-        long cost = (long)currentPlayer.Level * currentPlayer.Level * GameConfig.ReforgeCostMultiplier;
-        // v0.60.0 alpha balance review: endgame surcharge so reforging is an
-        // actual sink for rich high-level players. Below Lv.80 unchanged.
-        if (currentPlayer.Level > GameConfig.ReforgeEndgameThreshold)
-            cost += (currentPlayer.Level - GameConfig.ReforgeEndgameThreshold) * GameConfig.ReforgeEndgameSurchargePerLevel;
+        long cost = ReforgeCost(currentPlayer.Level);
+
+        // v1.1.7: three reforges a day. The anvil was unlimited and nearly free at low level.
+        if (currentPlayer.ReforgesToday >= GameConfig.MaxReforgesPerDay)
+        {
+            terminal.WriteLine(Loc.Get("weapon_shop.reforge_daily_limit", GameConfig.MaxReforgesPerDay), "yellow");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        // v1.1.7: a reforge cannot push a weapon past what a smith could do for someone of this
+        // level. A weapon already beyond it (a lucky drop carried by a lower-level character) is
+        // refused, never shrunk.
+        int powerBound = ReforgePowerBound(currentPlayer.Level);
+        if (weapon.WeaponPower > powerBound)
+        {
+            terminal.WriteLine(Loc.Get("weapon_shop.reforge_beyond_skill", shopkeeperName), "yellow");
+            await terminal.PressAnyKey();
+            return;
+        }
 
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("weapon_shop.reforge_desc", shopkeeperName));
@@ -1219,46 +1234,16 @@ public class WeaponShopLocation : BaseLocation
             return;
         }
 
-        // Deduct gold
+        // v1.1.7: the roll is computed and committed as one step, before any awaited animation, so a
+        // disconnect cannot separate the payment, the daily count, and the result.
+        var before = weapon.Clone();
+        var reforged = RollReforge(weapon, currentPlayer.Level, Random.Shared, out bool rarityUpgraded);
         currentPlayer.Gold -= cost;
         currentPlayer.Statistics?.RecordGoldSpent(cost);
-
-        // Clone the weapon and reroll stats
-        var reforged = weapon.Clone();
-        reforged.Id = weapon.Id; // Keep the same ID so the equipped reference stays valid
-
-        // Determine if rarity upgrades
-        bool rarityUpgraded = false;
-        if (weapon.Rarity < EquipmentRarity.Artifact && Random.Shared.NextDouble() < GameConfig.ReforgeUpgradeChance)
-        {
-            reforged.Rarity = weapon.Rarity + 1;
-            rarityUpgraded = true;
-        }
-
-        // Reroll stat bonuses with +/-15% variance
-        double variance = GameConfig.ReforgeVariance;
-        double rarityBoost = rarityUpgraded ? 1.15 : 1.0; // Rarity upgrade gives +15% to all stats
-
-        reforged.WeaponPower = RerollStat(weapon.WeaponPower, variance, rarityBoost, minValue: 1);
-        reforged.StrengthBonus = RerollStat(weapon.StrengthBonus, variance, rarityBoost);
-        reforged.DexterityBonus = RerollStat(weapon.DexterityBonus, variance, rarityBoost);
-        reforged.ConstitutionBonus = RerollStat(weapon.ConstitutionBonus, variance, rarityBoost);
-        reforged.IntelligenceBonus = RerollStat(weapon.IntelligenceBonus, variance, rarityBoost);
-        reforged.WisdomBonus = RerollStat(weapon.WisdomBonus, variance, rarityBoost);
-        reforged.CharismaBonus = RerollStat(weapon.CharismaBonus, variance, rarityBoost);
-        reforged.AgilityBonus = RerollStat(weapon.AgilityBonus, variance, rarityBoost);
-        reforged.MaxHPBonus = RerollStat(weapon.MaxHPBonus, variance, rarityBoost);
-        reforged.MaxManaBonus = RerollStat(weapon.MaxManaBonus, variance, rarityBoost);
-        reforged.DefenceBonus = RerollStat(weapon.DefenceBonus, variance, rarityBoost);
-        reforged.StaminaBonus = RerollStat(weapon.StaminaBonus, variance, rarityBoost);
-        reforged.CriticalChanceBonus = RerollStat(weapon.CriticalChanceBonus, variance, rarityBoost);
-        reforged.CriticalDamageBonus = RerollStat(weapon.CriticalDamageBonus, variance, rarityBoost);
-        reforged.LifeSteal = RerollStat(weapon.LifeSteal, variance, rarityBoost);
-        reforged.MagicResistance = RerollStat(weapon.MagicResistance, variance, rarityBoost);
-        reforged.PoisonDamage = RerollStat(weapon.PoisonDamage, variance, rarityBoost);
-
-        // Recalculate value based on new stats
-        reforged.Value = Math.Max(weapon.Value, (long)(reforged.WeaponPower * 15 * (1.0 + (int)reforged.Rarity * 0.5)));
+        currentPlayer.ReforgesToday++;
+        ApplyReforge(weapon, reforged);
+        currentPlayer.RecalculateStats();
+        DebugLogger.Instance.LogInfo("GOLD", $"REFORGE: {currentPlayer.DisplayName} Lv{currentPlayer.Level} paid {cost:N0}g, power {before.WeaponPower:N0}->{weapon.WeaponPower:N0}, value {before.Value:N0}->{weapon.Value:N0}, rarity {before.Rarity}->{weapon.Rarity}, today {currentPlayer.ReforgesToday}/{GameConfig.MaxReforgesPerDay}");
 
         // Show reforging animation
         terminal.WriteLine("");
@@ -1287,26 +1272,108 @@ public class WeaponShopLocation : BaseLocation
         terminal.WriteLine("");
 
         // Show stat changes
-        ShowStatChange(Loc.Get("ui.stat_wp"), weapon.WeaponPower, reforged.WeaponPower);
-        ShowStatChange(Loc.Get("ui.stat_str"), weapon.StrengthBonus, reforged.StrengthBonus);
-        ShowStatChange(Loc.Get("ui.stat_dex"), weapon.DexterityBonus, reforged.DexterityBonus);
-        ShowStatChange(Loc.Get("ui.stat_con"), weapon.ConstitutionBonus, reforged.ConstitutionBonus);
-        ShowStatChange(Loc.Get("ui.stat_int"), weapon.IntelligenceBonus, reforged.IntelligenceBonus);
-        ShowStatChange(Loc.Get("ui.stat_wis"), weapon.WisdomBonus, reforged.WisdomBonus);
-        ShowStatChange(Loc.Get("ui.stat_cha"), weapon.CharismaBonus, reforged.CharismaBonus);
-        ShowStatChange(Loc.Get("ui.stat_agi"), weapon.AgilityBonus, reforged.AgilityBonus);
-        ShowStatChange(Loc.Get("ui.stat_crit"), weapon.CriticalChanceBonus, reforged.CriticalChanceBonus);
-        ShowStatChange(Loc.Get("ui.stat_leech"), weapon.LifeSteal, reforged.LifeSteal);
+        ShowStatChange(Loc.Get("ui.stat_wp"), before.WeaponPower, reforged.WeaponPower);
+        ShowStatChange(Loc.Get("ui.stat_str"), before.StrengthBonus, reforged.StrengthBonus);
+        ShowStatChange(Loc.Get("ui.stat_dex"), before.DexterityBonus, reforged.DexterityBonus);
+        ShowStatChange(Loc.Get("ui.stat_con"), before.ConstitutionBonus, reforged.ConstitutionBonus);
+        ShowStatChange(Loc.Get("ui.stat_int"), before.IntelligenceBonus, reforged.IntelligenceBonus);
+        ShowStatChange(Loc.Get("ui.stat_wis"), before.WisdomBonus, reforged.WisdomBonus);
+        ShowStatChange(Loc.Get("ui.stat_cha"), before.CharismaBonus, reforged.CharismaBonus);
+        ShowStatChange(Loc.Get("ui.stat_agi"), before.AgilityBonus, reforged.AgilityBonus);
+        ShowStatChange(Loc.Get("ui.stat_crit"), before.CriticalChanceBonus, reforged.CriticalChanceBonus);
+        ShowStatChange(Loc.Get("ui.stat_leech"), before.LifeSteal, reforged.LifeSteal);
         terminal.WriteLine("");
 
-        // v0.60.11: reforge commits unconditionally. Pre-fix the player was prompted to
-        // accept or keep the original AFTER seeing the rerolled stats -- meaning they
-        // could pay the cost, peek at the result, and roll back if the new stats were
-        // worse than the old. That made reforging risk-free scouting instead of the
-        // gamble it's meant to be. Now: once the pre-reforge confirmation is given and
-        // gold is deducted, the reforge sticks. The pre-confirm prompt at line ~1165
-        // is the commit point; the player saw the cost and the warning, that's their
-        // decision moment.
+        // v0.60.11: a reforge commits unconditionally; v1.1.7: it was committed above, before the animation.
+
+
+        terminal.WriteLine("");
+        terminal.SetColor("bright_green");
+        terminal.WriteLine(Loc.Get("weapon_shop.reforge_accepted", shopkeeperName));
+
+        await terminal.PressAnyKey();
+    }
+
+    /// <summary>
+    /// Reroll a stat value with +/-variance around the original, multiplied by rarityBoost.
+    /// For stats that are 0, they stay 0 (no new stats are invented).
+    /// Negative stats (from cursed items) can become more or less negative.
+    /// </summary>
+    /// <summary>v1.1.7: level squared times the multiplier, the endgame surcharge, and a floor so level 1 is not free.</summary>
+    internal static long ReforgeCost(int level)
+    {
+        long cost = (long)level * level * GameConfig.ReforgeCostMultiplier;
+        if (level > GameConfig.ReforgeEndgameThreshold)
+            cost += (long)(level - GameConfig.ReforgeEndgameThreshold) * GameConfig.ReforgeEndgameSurchargePerLevel;
+        return Math.Max(GameConfig.ReforgeMinCost, cost);
+    }
+
+    /// <summary>
+    /// v1.1.7: the most weapon power a reforge may produce for a character of this level: one and a
+    /// half times the strongest weapon the loot tables can drop at that level (LootGenerator: top
+    /// template 135 x (1 + level/80) x Artifact 4.0 x 1.15 variance), never above the item bound.
+    /// 815 x 1.5 at level 25, 1,397 x 1.5 at level 100.
+    /// </summary>
+    internal static int ReforgePowerBound(int level)
+    {
+        double legit = GameConfig.LootTopWeaponBasePower * (1.0 + Math.Max(1, level) / 80.0) * GameConfig.LootArtifactPowerMult * 1.15;
+        return (int)Math.Min(GameConfig.MaxItemPower, legit * GameConfig.ReforgePowerBoundFactor);
+    }
+
+    /// <summary>
+    /// v1.1.7: the reforge as a pure function of the weapon, the level and the dice. Inputs are
+    /// clamped first; every roll is bounded before its cast to int; power is bounded by level; value
+    /// follows the formula in long arithmetic (the old int multiply overflowed, and a running
+    /// maximum ratcheted value upward on every lucky roll).
+    /// </summary>
+    internal static Equipment RollReforge(Equipment weapon, int level, Random rng, out bool rarityUpgraded)
+    {
+        var reforged = weapon.Clone();
+        reforged.Id = weapon.Id; // same ID so the equipped reference stays valid
+        reforged.ClampStats();
+
+        rarityUpgraded = false;
+        if (weapon.Rarity < EquipmentRarity.Artifact && rng.NextDouble() < GameConfig.ReforgeUpgradeChance)
+        {
+            reforged.Rarity = weapon.Rarity + 1;
+            rarityUpgraded = true;
+        }
+        double variance = GameConfig.ReforgeVariance;
+        double boost = rarityUpgraded ? 1.15 : 1.0;
+        int stat = GameConfig.MaxItemStatBonus, pct = GameConfig.MaxItemPercent;
+
+        reforged.WeaponPower = RerollStat(reforged.WeaponPower, variance, boost, rng, Math.Min(ReforgePowerBound(level), GameConfig.MaxItemPower), minValue: 1);
+        reforged.StrengthBonus = RerollStat(reforged.StrengthBonus, variance, boost, rng, stat);
+        reforged.DexterityBonus = RerollStat(reforged.DexterityBonus, variance, boost, rng, stat);
+        reforged.ConstitutionBonus = RerollStat(reforged.ConstitutionBonus, variance, boost, rng, stat);
+        reforged.IntelligenceBonus = RerollStat(reforged.IntelligenceBonus, variance, boost, rng, stat);
+        reforged.WisdomBonus = RerollStat(reforged.WisdomBonus, variance, boost, rng, stat);
+        reforged.CharismaBonus = RerollStat(reforged.CharismaBonus, variance, boost, rng, stat);
+        reforged.AgilityBonus = RerollStat(reforged.AgilityBonus, variance, boost, rng, stat);
+        reforged.MaxHPBonus = RerollStat(reforged.MaxHPBonus, variance, boost, rng, GameConfig.MaxItemVitalBonus);
+        reforged.MaxManaBonus = RerollStat(reforged.MaxManaBonus, variance, boost, rng, GameConfig.MaxItemVitalBonus);
+        reforged.DefenceBonus = RerollStat(reforged.DefenceBonus, variance, boost, rng, stat);
+        reforged.StaminaBonus = RerollStat(reforged.StaminaBonus, variance, boost, rng, stat);
+        reforged.CriticalChanceBonus = RerollStat(reforged.CriticalChanceBonus, variance, boost, rng, pct);
+        reforged.CriticalDamageBonus = RerollStat(reforged.CriticalDamageBonus, variance, boost, rng, stat);
+        reforged.LifeSteal = RerollStat(reforged.LifeSteal, variance, boost, rng, pct);
+        reforged.MagicResistance = RerollStat(reforged.MagicResistance, variance, boost, rng, pct);
+        reforged.PoisonDamage = RerollStat(reforged.PoisonDamage, variance, boost, rng, stat);
+
+        reforged.Value = ReforgeValue(reforged.WeaponPower, reforged.Rarity);
+        reforged.ClampStats();
+        return reforged;
+    }
+
+    /// <summary>v1.1.7: power x 15 x (1 + rarity/2) in long arithmetic, at least 1, at most the value bound. No running maximum.</summary>
+    internal static long ReforgeValue(int weaponPower, EquipmentRarity rarity)
+    {
+        double value = (long)Math.Max(0, weaponPower) * 15L * (1.0 + (int)rarity * 0.5);
+        return (long)Math.Clamp(value, 1, GameConfig.MaxItemValue);
+    }
+
+    internal static void ApplyReforge(Equipment weapon, Equipment reforged)
+    {
         weapon.WeaponPower = reforged.WeaponPower;
         weapon.Rarity = reforged.Rarity;
         weapon.StrengthBonus = reforged.StrengthBonus;
@@ -1326,37 +1393,25 @@ public class WeaponShopLocation : BaseLocation
         weapon.MagicResistance = reforged.MagicResistance;
         weapon.PoisonDamage = reforged.PoisonDamage;
         weapon.Value = reforged.Value;
-
-        // Recalculate player stats with new weapon values
-        currentPlayer.RecalculateStats();
-
-        terminal.WriteLine("");
-        terminal.SetColor("bright_green");
-        terminal.WriteLine(Loc.Get("weapon_shop.reforge_accepted", shopkeeperName));
-
-        await terminal.PressAnyKey();
+        weapon.ClampStats();
     }
 
-    /// <summary>
-    /// Reroll a stat value with +/-variance around the original, multiplied by rarityBoost.
-    /// For stats that are 0, they stay 0 (no new stats are invented).
-    /// Negative stats (from cursed items) can become more or less negative.
-    /// </summary>
-    private static int RerollStat(int original, double variance, double rarityBoost, int minValue = int.MinValue)
+    internal static int RerollStat(int original, double variance, double rarityBoost, Random rng, int bound, int minValue = int.MinValue)
     {
         if (original == 0) return 0;
 
         double baseValue = original * rarityBoost;
         double range = Math.Abs(baseValue) * variance;
-        double rolled = baseValue + (Random.Shared.NextDouble() * 2 - 1) * range;
+        double rolled = baseValue + (rng.NextDouble() * 2 - 1) * range;
 
-        int result = (int)Math.Round(rolled);
+        // v1.1.7: bound the double before the cast; a cast of an out-of-range double is undefined
+        int result = (int)Math.Round(Math.Clamp(rolled, -(double)bound, bound));
 
         // Preserve sign: positive stays positive, negative stays negative
         if (original > 0 && result < 1) result = 1;
         if (original < 0 && result > -1) result = -1;
-
-        return Math.Max(result, minValue);
+        if (minValue != int.MinValue && result < minValue) result = minValue;
+        return result;
     }
 
     /// <summary>
