@@ -3570,7 +3570,7 @@
   "weapon_shop.reforge_cost": "Reforging cost: {0} gold",
   "weapon_shop.reforge_gold": "Your gold: {0}",
   "weapon_shop.reforge_warning": "Stats will be rerolled within +/-15% of current values. There is a 20% chance the weapon's rarity will improve. WARNING: the reforge is final once you pay -- you keep whatever stats the hammer gives you.",
-  "weapon_shop.reforge_daily_limit": "The smith shakes his head. 'Three reforges a day is all the steel can take.' (limit: {0} per day)",
+  "weapon_shop.reforge_daily_limit": "The smith shakes his head. 'The steel has taken all the reforging it can for one day.' (limit: {0} per day)",
   "weapon_shop.reforge_beyond_skill": "{0} turns the weapon over and hands it back. 'This is finer work than I can better for someone of your standing. Come back when you have grown.'",
   "weapon_shop.reforge_confirm": "Pay the gold and reforge (final)? (Y/N): ",
   "weapon_shop.reforge_working": "{0} thrusts your weapon into the forge. Sparks fly as the metal glows white-hot...",

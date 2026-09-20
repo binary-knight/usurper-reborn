@@ -2807,6 +2807,11 @@ Mystic Shaman - Tribal caster who summons totems and enchants weapons. Troll/Orc
     // Alt accounts caught stealing gold are capped to this much per attack.
     // Stops the alt-as-gold-mule strategy (alts dealt 25 attacks for 141k
     // gold in alpha, no level penalty).
+    // v1.1.7: what one PvP fight can move into the winner's purse, whoever the winner is: the ten
+    // percent steal and the equipment salvage together, by the recipient's level (council, starting
+    // value). 195,000 at level 39, 500,000 at level 100. The alt cap below stays layered under it.
+    public const long PvPGoldPerFightCapPerLevel = 5000;
+    public static long PvPGoldPerFightCap(int recipientLevel) => PvPGoldPerFightCapPerLevel * Math.Max(1, recipientLevel);
     public const long PvPAltGoldStealBase = 1000;
     public const long PvPAltGoldStealPerLevel = 100;
 

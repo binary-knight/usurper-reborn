@@ -4591,6 +4591,52 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
+        /// v1.1.7: take up to an amount from a player's saved gold and report what was actually
+        /// taken, in one transaction. The arena credits the winner with this figure, so a depleted
+        /// balance, a missing row, or a failed write cannot mint gold. Zero on any failure.
+        /// </summary>
+        public async Task<long> TakeGoldFromPlayer(string username, long goldAmount)
+        {
+            if (goldAmount <= 0) return 0;
+            try
+            {
+                return await Task.Run(() =>
+                {
+                    using var connection = OpenConnection();
+                    using var transaction = connection.BeginTransaction();
+                    const string who = "(LOWER(username) = LOWER(@username) OR LOWER(display_name) = LOWER(@username)) AND player_data != '{}' AND LENGTH(player_data) > 2";
+                    long held;
+                    using (var read = connection.CreateCommand())
+                    {
+                        read.Transaction = transaction;
+                        read.CommandText = $"SELECT CAST(json_extract(player_data, '$.player.gold') AS INTEGER) FROM players WHERE {who} LIMIT 1;";
+                        read.Parameters.AddWithValue("@username", username);
+                        var v = read.ExecuteScalar();
+                        if (v == null || v is DBNull) { transaction.Rollback(); return 0L; }
+                        held = Math.Max(0, Convert.ToInt64(v));
+                    }
+                    long taken = Math.Min(held, goldAmount);
+                    if (taken <= 0) { transaction.Rollback(); return 0L; }
+                    using (var write = connection.CreateCommand())
+                    {
+                        write.Transaction = transaction;
+                        write.CommandText = $"UPDATE players SET player_data = json_set(player_data, '$.player.gold', @left) WHERE {who};";
+                        write.Parameters.AddWithValue("@username", username);
+                        write.Parameters.AddWithValue("@left", held - taken);
+                        if (write.ExecuteNonQuery() == 0) { transaction.Rollback(); return 0L; }
+                    }
+                    transaction.Commit();
+                    return taken;
+                });
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to take gold from {username}: {ex.Message}");
+                return 0;
+            }
+        }
+
+        /// <summary>
         /// Deduct gold from a player's save data atomically.
         /// Uses json_set to update without loading the full save blob.
         /// </summary>

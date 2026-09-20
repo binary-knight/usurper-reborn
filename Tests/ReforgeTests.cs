@@ -174,6 +174,9 @@ public class ReforgeTests
         sword.WeaponPower.Should().Be(1_397); hero.Gold.Should().Be(goldBefore); hero.ReforgesToday.Should().Be(0);
     }
 
+    // Reads the source on purpose: the daily reset is a private method with wide side effects (turns,
+    // quests, the world), and calling it would test far more than this counter. Persistence is covered
+    // by the save round-trip test.
     [Fact]
     public void TheDailyReset_ClearsTheCounter()
     {

@@ -26013,45 +26013,49 @@ public partial class CombatEngine
                 terminal.WriteLine(Loc.Get("combat.gold_gained", $"{goldReward:N0}"));
             }
 
-            // === BONUS LOOT FROM NPC EQUIPMENT ===
-            // Chance to salvage value from opponent's equipment
+            // === BONUS LOOT FROM THE OPPONENT'S EQUIPMENT ===
+            // v1.1.7: priced from what the opponent actually wears, never by name. The old lookup took
+            // the first name match across the shared registry, so it could price one player's item off
+            // another's, and it paid half of an uncapped Value as newly made gold. The payout now sits
+            // under the same per-fight cap as the gold steal, by the winner's level.
             long equipmentLootValue = 0;
 
             if (result.Opponent != null)
             {
-                // 30% chance to salvage weapon value
-                string opponentWeaponName = result.Opponent.WeaponName;
-                if (!string.IsNullOrEmpty(opponentWeaponName) &&
-                    opponentWeaponName != "Fist" &&
-                    opponentWeaponName != "None" &&
-                    random.Next(100) < 30)
+                long SalvageOf(Equipment? worn, string fallbackName)
                 {
-                    // Find weapon value and give a portion as loot
-                    var weapon = EquipmentDatabase.GetByName(opponentWeaponName);
-                    if (weapon != null)
+                    var piece = worn;
+                    if (piece == null && !string.IsNullOrEmpty(fallbackName))
                     {
-                        long weaponValue = (long)(weapon.Value * 0.5); // 50% of item value
-                        equipmentLootValue += weaponValue;
-                        result.ItemsFound.Add($"{opponentWeaponName} (salvaged for {weaponValue:N0}g)");
+                        // an NPC with a named weapon and nothing equipped: shop templates only
+                        var byName = EquipmentDatabase.GetByName(fallbackName);
+                        if (byName != null && !EquipmentDatabase.IsDynamic(byName.Id)) piece = byName;
                     }
+                    if (piece == null) return 0;
+                    return (long)(Math.Clamp(piece.Value, 0, GameConfig.MaxItemValue) * 0.5);
                 }
 
-                // 25% chance to salvage armor value
-                string opponentArmorName = result.Opponent.ArmorName;
-                if (!string.IsNullOrEmpty(opponentArmorName) &&
-                    opponentArmorName != "None" &&
-                    opponentArmorName != "Clothes" &&
-                    random.Next(100) < 25)
+                string opponentWeaponName = result.Opponent.WeaponName;
+                if (!string.IsNullOrEmpty(opponentWeaponName) && opponentWeaponName != "Fist" && opponentWeaponName != "None" && random.Next(100) < 30)
                 {
-                    // Find armor value and give a portion as loot
-                    var armor = EquipmentDatabase.GetByName(opponentArmorName);
-                    if (armor != null)
-                    {
-                        long armorValue = (long)(armor.Value * 0.5); // 50% of item value
-                        equipmentLootValue += armorValue;
-                        result.ItemsFound.Add($"{opponentArmorName} (salvaged for {armorValue:N0}g)");
-                    }
+                    long weaponValue = SalvageOf(result.Opponent.GetEquipment(EquipmentSlot.MainHand), opponentWeaponName);
+                    if (weaponValue > 0) { equipmentLootValue += weaponValue; result.ItemsFound.Add($"{opponentWeaponName} (salvaged for {weaponValue:N0}g)"); }
                 }
+
+                string opponentArmorName = result.Opponent.ArmorName;
+                if (!string.IsNullOrEmpty(opponentArmorName) && opponentArmorName != "None" && opponentArmorName != "Clothes" && random.Next(100) < 25)
+                {
+                    long armorValue = SalvageOf(result.Opponent.GetEquipment(EquipmentSlot.Body), opponentArmorName);
+                    if (armorValue > 0) { equipmentLootValue += armorValue; result.ItemsFound.Add($"{opponentArmorName} (salvaged for {armorValue:N0}g)"); }
+                }
+
+                long salvageCap = GameConfig.PvPGoldPerFightCap(result.Player?.Level ?? 1);
+                if (equipmentLootValue > salvageCap)
+                {
+                    DebugLogger.Instance.LogInfo("GOLD", $"PVP SALVAGE CAP: '{result.Player?.DisplayName}' salvage capped {equipmentLootValue:N0} -> {salvageCap:N0}g");
+                    equipmentLootValue = salvageCap;
+                }
+                result.EquipmentSalvageGold = equipmentLootValue;
             }
 
             // Apply equipment loot value
@@ -30457,6 +30461,8 @@ public class CombatAction
 public class CombatResult
 {
     public Character Player { get; set; }
+    /// <summary>v1.1.7: gold made from the opponent's gear this fight; the arena counts it against the per-fight cap.</summary>
+    public long EquipmentSalvageGold { get; set; }
 
     // Multi-monster combat support
     public List<Monster> Monsters { get; set; } = new();
