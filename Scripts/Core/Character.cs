@@ -1457,6 +1457,7 @@ public class Character
         if (equipment.HasTitanResolve)
             item.LootEffects.Add(((int)LootGenerator.SpecialEffect.TitanResolve, 5));
 
+        item.EnchantMarkers = equipment.ExtractEnchantMarkers();   // v1.1.7: the enchant count survives the bag
         item.ClampStats();   // v1.1.7
         return item;
     }
@@ -1506,6 +1507,7 @@ public class Character
             Family = item.Family ?? ""
         };
         ApplyItemLootEffectsToEquipment(item, equipment);
+        equipment.RestoreEnchantMarkers(item.EnchantMarkers);   // v1.1.7
         equipment.ClampStats();   // v1.1.7
         return equipment;
     }

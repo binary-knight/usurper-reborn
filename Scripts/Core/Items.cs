@@ -81,6 +81,14 @@ public class Item
     // Loot enchantment effects (v0.40.5) - tracks actual enchantment types from LootGenerator
     // Each entry is (SpecialEffect enum as int, value)
     public List<(int EffectType, int Value)> LootEffects { get; set; } = new();
+
+    /// <summary>
+    /// v1.1.7: the enchant markers of the Equipment this Item was converted from (`[E:n]` count and
+    /// `[ES:kinds]`). They lived only in Equipment.Description, which no converter carried, so an
+    /// item in the backpack (or any unequipped item) forgot how often it had been enchanted: the
+    /// five-enchant limit and the one-of-each-kind rule reset on every conversion.
+    /// </summary>
+    public string EnchantMarkers { get; set; } = "";
     
     /// <summary>
     /// Constructor for creating items
@@ -1325,6 +1333,20 @@ public class Equipment
     /// Get the number of enchantments applied to this item.
     /// Tracked via [E:N] marker in the Description field.
     /// </summary>
+    private static readonly System.Text.RegularExpressions.Regex EnchantMarkerRegex = new(@"\[E:\d+\]|\[ES:[a-z,]+\]");
+
+    /// <summary>v1.1.7: just the enchant markers of this equipment, for carrying through an Item.</summary>
+    public string ExtractEnchantMarkers() =>
+        string.IsNullOrEmpty(Description) ? "" : string.Join(" ", EnchantMarkerRegex.Matches(Description).Select(m => m.Value));
+
+    /// <summary>v1.1.7: restore carried markers onto a rebuilt equipment (no duplicates if already present).</summary>
+    public void RestoreEnchantMarkers(string markers)
+    {
+        if (string.IsNullOrEmpty(markers)) return;
+        string clean = EnchantMarkerRegex.Replace(Description ?? "", "").Trim();
+        Description = (clean + " " + string.Join(" ", EnchantMarkerRegex.Matches(markers).Select(m => m.Value))).Trim();
+    }
+
     public int GetEnchantmentCount()
     {
         if (string.IsNullOrEmpty(Description)) return 0;

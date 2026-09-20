@@ -1068,6 +1068,7 @@ namespace UsurperRemake.Systems
         public bool Dungeon { get; set; }
         public List<string> Description { get; set; } = new();
         public List<LootEffectData>? LootEffects { get; set; }
+        public string? EnchantMarkers { get; set; }   // v1.1.7: enchant count and kinds, carried through the bag
 
         /// <summary>
         /// Full Item -> DTO conversion: every stat field, MinLevel, the cursed/identified flags,
@@ -1097,6 +1098,7 @@ namespace UsurperRemake.Systems
             Agility = item.Agility,
             Stamina = item.Stamina,
             MinLevel = item.MinLevel,
+            EnchantMarkers = string.IsNullOrEmpty(item.EnchantMarkers) ? null : item.EnchantMarkers,
             Rarity = (int)item.Rarity, // issue #112
             Family = item.Family ?? "",
             // IsCursed (the flag decurse/warnings/loot checks read) is authoritative; Item also
@@ -1135,6 +1137,7 @@ namespace UsurperRemake.Systems
                 Agility = Agility,
                 Stamina = Stamina,
                 MinLevel = MinLevel,
+                EnchantMarkers = EnchantMarkers ?? "",
                 Rarity = (EquipmentRarity)Rarity, // issue #112
                 Family = Family ?? "",
                 IsCursed = IsCursed,
