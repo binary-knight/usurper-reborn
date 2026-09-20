@@ -2103,6 +2103,9 @@ public partial class MagicShopLocation : BaseLocation
                     string newMarker = oldCount > 1 ? $"[E:{oldCount - 1}]" : "";
                     damaged.Description = System.Text.RegularExpressions.Regex.Replace(
                         damaged.Description ?? "", @"\[E:\d+\]", newMarker).Trim();
+                    // v1.1.7: the lost enchant frees its kind too. The markers persist now, so a kind
+                    // list left behind would bar the player from ever replacing what the failure took.
+                    damaged.TrimEnchantedKindsTo(oldCount - 1);
 
                     // Reduce a random stat bonus as if one enchant was lost
                     var rngStat = rng.Next(6);
@@ -2354,7 +2357,7 @@ public partial class MagicShopLocation : BaseLocation
 
         // Create a clean clone and reset enchantment tracking
         var stripped = rmEquip.Clone();
-        stripped.Description = System.Text.RegularExpressions.Regex.Replace(stripped.Description ?? "", @"\s*\[E:\d+\]", "");
+        stripped.ClearEnchantMarkers();   // v1.1.7: the count and the kinds, so paid removal really frees the item
 
         // Strip name suffixes
         string[] suffixes = { " (Blessed)", " (Ocean-Touched)", " (Warded)", " (Predator)", " (Lifedrinker)" };

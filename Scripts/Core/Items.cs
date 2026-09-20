@@ -1358,6 +1358,28 @@ public class Equipment
         Description = (clean + " " + string.Join(" ", EnchantMarkerRegex.Matches(markers).Select(m => m.Value))).Trim();
     }
 
+    /// <summary>
+    /// v1.1.7: drop both enchant markers, the count and the kinds. Paid removal strips an item back
+    /// to nothing, so the kinds must go with the count: while the markers were lost on every
+    /// conversion this did not show, but they persist now, and a stale kind list would bar a player
+    /// from ever re-applying a kind they had paid to remove.
+    /// </summary>
+    public void ClearEnchantMarkers()
+    {
+        if (string.IsNullOrEmpty(Description)) return;
+        Description = EnchantMarkerRegex.Replace(Description, "").Replace("  ", " ").Trim();
+    }
+
+    /// <summary>v1.1.7: keep at most this many kinds, so a lost enchant frees its kind again.</summary>
+    public void TrimEnchantedKindsTo(int count)
+    {
+        var kinds = GetEnchantedKinds();
+        if (kinds.Count <= Math.Max(0, count)) return;
+        var kept = kinds.Take(Math.Max(0, count)).ToList();
+        string marker = kept.Count > 0 ? $"[ES:{string.Join(",", kept)}]" : "";
+        Description = System.Text.RegularExpressions.Regex.Replace(Description ?? "", @"\s*\[ES:[a-z,]+\]", marker.Length > 0 ? " " + marker : "").Trim();
+    }
+
     public int GetEnchantmentCount()
     {
         if (string.IsNullOrEmpty(Description)) return 0;

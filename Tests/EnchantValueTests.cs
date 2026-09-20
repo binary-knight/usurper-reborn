@@ -57,8 +57,10 @@ public class EnchantValueTests
     {
         var hero = new Character { Name1 = "ench", Name2 = "Ench", Class = CharacterClass.Warrior, Level = 40 };
         var worn = new Equipment { Name = "Long Sword", Slot = EquipmentSlot.MainHand, Handedness = WeaponHandedness.OneHanded, WeaponType = WeaponType.Sword, WeaponPower = 40, Value = 5_000, Description = "A fine blade." };
-        for (int i = 0; i < 5; i++) worn.IncrementEnchantmentCount();
+        string[] kinds = { "str", "dex", "fire", "holy", "crit" };
+        foreach (var k in kinds) { worn.IncrementEnchantmentCount(); worn.AddEnchantedKind(k); }
         worn.GetEnchantmentCount().Should().Be(5);
+        worn.GetEnchantedKinds().Should().BeEquivalentTo(kinds);
 
         // into the bag (the unequip and the Magic Shop's bag write-back both use this converter)
         var inBag = hero.ConvertEquipmentToLegacyItem(worn);
@@ -71,6 +73,7 @@ public class EnchantValueTests
         // back out of the bag, the way the Magic Shop reads a bag item and the way an equip does
         var again = Character.BuildEquipmentFromItem(reloaded, EquipmentSlot.MainHand, WeaponHandedness.OneHanded, WeaponType.Sword);
         again.GetEnchantmentCount().Should().Be(5, "a sixth enchant is refused for a bag item too");
+        again.GetEnchantedKinds().Should().BeEquivalentTo(kinds, "the kinds ride along, so the same kind is still refused twice");
         (again.GetEnchantmentCount() >= GameConfig.MaxEnchantments).Should().BeTrue();
 
         // and it does not double up on a second trip
@@ -87,5 +90,28 @@ public class EnchantValueTests
         hero.ConvertEquipmentToLegacyItem(plain).EnchantMarkers.Should().BeEmpty();
         InventoryItemData.FromItem(hero.ConvertEquipmentToLegacyItem(plain)).EnchantMarkers.Should().BeNull("nothing written for an unenchanted item");
         new InventoryItemData { Name = "Old", Type = ObjType.Weapon, Attack = 5 }.ToItem().EnchantMarkers.Should().BeEmpty("a save from before 1.1.7 has no field");
+    }
+
+    [Fact]
+    public void LosingOrPayingToRemoveAnEnchant_FreesItsKindAgain()
+    {
+        var e = new Equipment { Name = "Blade", WeaponPower = 40, Value = 5_000, Description = "A fine blade." };
+        foreach (var k in new[] { "str", "dex", "fire" }) { e.IncrementEnchantmentCount(); e.AddEnchantedKind(k); }
+
+        // a failed enchant destroys one: the count drops and the kind is freed with it
+        e.TrimEnchantedKindsTo(2);
+        e.GetEnchantedKinds().Should().HaveCount(2, "the lost enchant's kind can be applied again");
+
+        // paid removal strips the item back to nothing: both markers go
+        e.ClearEnchantMarkers();
+        e.GetEnchantmentCount().Should().Be(0);
+        e.GetEnchantedKinds().Should().BeEmpty("a player who paid to clear the item is not barred from re-enchanting it");
+        e.Description.Should().Be("A fine blade.", "the item's own text survives");
+
+        // and the cleared state persists, rather than being hidden by a conversion
+        var hero = new Character { Name1 = "clear", Name2 = "Clear", Class = CharacterClass.Warrior, Level = 40 };
+        var round = Character.BuildEquipmentFromItem(InventoryItemData.FromItem(hero.ConvertEquipmentToLegacyItem(e)).ToItem(), EquipmentSlot.MainHand, WeaponHandedness.OneHanded, WeaponType.Sword);
+        round.GetEnchantmentCount().Should().Be(0);
+        round.GetEnchantedKinds().Should().BeEmpty();
     }
 }
