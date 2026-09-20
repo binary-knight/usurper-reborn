@@ -1,0 +1,15 @@
+[h1]Usurper Reborn 1.1.8[/h1]
+
+A performance release for anyone running a server. Nothing in the game changes; the website and its dashboards stop stalling.
+
+The statistics page read every player's save, about 84 KB of JSON each, asking for a handful of fields from each one across seven passes of the whole table, with nothing indexed. On a 400-player server that stalled the entire web service for up to 83 seconds out of every 115, around the clock, whether or not anyone was looking, and froze the news feed, the API and the browser terminal with it.
+
+[list]
+[*]Seven indexes now carry the fields those pages read. The worst stall fell from 83 seconds to 7, and the service went from burning 68 percent of a CPU core continuously to under 4 percent.
+[*]Servers upgrading from an older release have their indexes rebuilt once, so every install matches.
+[*]API responses are compressed: the dashboard's largest payload drops from 2.2 MB to 400 KB. The live news feed stays uncompressed so it is not delayed.
+[*]The web service's memory ceiling now matches what it needs.
+[*]Releases now deploy the website itself. Until this version they shipped only the game, so the site was whatever had last been copied across by hand; ours was six weeks stale and included a fault where resizing a browser window typed machine text into your input.
+[/list]
+
+The indexes are applied automatically on first start, and no save data is touched. If you run your own server, the web service unit and the nginx config in scripts-server/ also changed, and no deploy step copies those.
