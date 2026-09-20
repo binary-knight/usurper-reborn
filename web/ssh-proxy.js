@@ -59,8 +59,9 @@ const MUD_HOST = process.env.MUD_HOST || '127.0.0.1';
 const MUD_PORT = parseInt(process.env.MUD_PORT || '4001', 10);
 // v1.1.8: the rebuild is forced on a timer below, so no visitor ever waits for it; what the
 // wait costs is the whole process, which is single threaded. Before the player indexes landed
-// this rebuild took 75 seconds with 410 players and froze the feed, the API and the browser
-// terminal for that whole time. With them it is a few seconds. Measure before changing it.
+// this rebuild stalled everything for up to 83 seconds with 410 players, so the feed, the API
+// and the browser terminal were frozen for most of every two minutes. With them the worst
+// stall measured 7.4 seconds. Measure before changing it.
 const CACHE_TTL = 120000; // 2 minutes
 let _ghReleasesCache = null;
 let _ghReleasesCacheTime = 0;

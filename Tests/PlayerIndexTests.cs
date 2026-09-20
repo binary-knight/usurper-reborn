@@ -14,16 +14,20 @@ namespace UsurperReborn.Tests;
 /// <summary>
 /// v1.1.8: the website reads player statistics out of a JSON blob that averages 84 KB. Without
 /// indexes on the hot paths SQLite re-parses every blob for every json_extract call, and on the
-/// live server the stats rebuild burned 75 seconds of CPU every 115 seconds, freezing the news
-/// feed, the API and the browser terminal for that whole time. These tests hold the schema to the
+/// live server the stats rebuild stalled the whole process for up to 83 seconds every 115, so the
+/// news feed, the API and the browser terminal were frozen for most of that. These tests hold the schema to the
 /// indexes that fix it, prove the planner uses them once a table has rows, and cover the two
 /// hazards the fix introduces: an expression index is also a constraint on what may be written,
-/// and a server upgrading from an older release must converge on one spelling of the index.
+/// and a server upgrading from an older release, or from indexes added by hand, must converge on
+/// one definition.
 /// </summary>
 [Collection("SharedGameSingletons")]
 public class PlayerIndexTests : IDisposable
 {
     private readonly List<string> _paths = new();
+    private readonly Xunit.Abstractions.ITestOutputHelper _out;
+
+    public PlayerIndexTests(Xunit.Abstractions.ITestOutputHelper output) { _out = output; }
 
     public void Dispose()
     {
@@ -114,7 +118,7 @@ public class PlayerIndexTests : IDisposable
         foreach (var name in Required)
             found.Should().ContainKey(name, "without it every operator gets the slow website");
         foreach (var (name, sql) in found)
-            sql.Should().NotContain("\"$.", $"{name}: a double-quoted JSON path is a string in one SQLite build and an identifier in another");
+            sql.Should().NotContain("\"$.", $"{name}: one spelling has to win so servers do not drift; both builds accept either");
     }
 
     [Fact]
@@ -162,12 +166,14 @@ public class PlayerIndexTests : IDisposable
     [Fact]
     public void AnUpgradedServer_ConvergesOnTheSameSchemaAsAFreshOne()
     {
-        // a server from before this release: the three hand-made indexes, double-quoted
+        // A server as it really is before this release: the three hand-made indexes in the older
+        // double-quoted spelling, and the four added by hand during the incident, typed across
+        // several lines. Both differ from this release's definitions, the second only in layout.
         var old = NewDbPath();
         _ = new SqlSaveBackend(old);
         using (var c = Open(old))
         {
-            foreach (var name in new[] { "idx_players_level", "idx_players_class", "idx_players_xp" })
+            foreach (var name in Required)
             {
                 using var drop = c.CreateCommand();
                 drop.CommandText = $"DROP INDEX IF EXISTS {name};";
@@ -177,11 +183,25 @@ public class PlayerIndexTests : IDisposable
             make.CommandText = @"
                 CREATE INDEX idx_players_level ON players(json_extract(player_data, ""$.player.level"") DESC);
                 CREATE INDEX idx_players_class ON players(json_extract(player_data, ""$.player.class""));
-                CREATE INDEX idx_players_xp ON players(json_extract(player_data, ""$.player.experience"") DESC);";
+                CREATE INDEX idx_players_xp ON players(json_extract(player_data, ""$.player.experience"") DESC);
+                CREATE INDEX idx_players_stats_cover ON players(
+                  is_banned, username,
+                  json_extract(player_data,'$.player.level'),
+                  json_extract(player_data,'$.player.gold'),
+                  json_extract(player_data,'$.player.bankGold'),
+                  json_extract(player_data,'$.player.statistics.totalMonstersKilled'),
+                  json_extract(player_data,'$.player.statistics.deepestDungeonLevel'),
+                  json_extract(player_data,'$.player.class')
+                );
+                CREATE INDEX idx_players_immortal ON players(json_extract(player_data, '$.player.isImmortal'));
+                CREATE INDEX idx_players_murder_weight ON players(json_extract(player_data, '$.player.murderWeight'));
+                CREATE INDEX idx_players_worshipped_god ON players(json_extract(player_data, '$.player.worshippedGod'));";
             make.ExecuteNonQuery();
         }
         Seed(old, 50);
-        PlayerIndexes(old).Values.Count(sql => sql.Contains("\"$.")).Should().Be(3, "the legacy spelling is in place");
+        var before = PlayerIndexes(old);
+        before.Values.Count(sql => sql.Contains("\"$.")).Should().Be(3, "the legacy spelling is in place");
+        before["idx_players_stats_cover"].Should().Contain("\n", "and the hand-typed one spans several lines");
 
         SqliteConnection.ClearAllPools();
         _ = new SqlSaveBackend(old);   // upgrade: open it again with this release
@@ -234,31 +254,52 @@ public class PlayerIndexTests : IDisposable
     [Fact]
     public void MaintainingTheIndexes_DoesNotMakeSavingExpensive()
     {
-        // the fix moves work from the read path to the write path: every save now updates eleven
-        // index entries over an 84 KB blob. This runs under the same SQLite the game server uses.
+        // The fix moves work from the read path to the write path: a save now maintains seven index
+        // entries, twelve json_extract evaluations, over an 84 KB blob. Measured here against the
+        // same database with the indexes dropped, under the SQLite the game server itself uses.
         var path = NewDbPath();
         _ = new SqlSaveBackend(path);
         Seed(path, 100);
-        using var c = Open(path);
         var blob = PlayerJson(77, 3, 123456);
         blob.Length.Should().BeGreaterThan(80_000, "the live server averages 84 KB per player");
 
-        var sw = Stopwatch.StartNew();
-        using (var tx = c.BeginTransaction())
+        double Time100Saves(string db)
         {
-            for (int i = 0; i < 100; i++)
+            using var c = Open(db);
+            var sw = Stopwatch.StartNew();
+            using (var tx = c.BeginTransaction())
             {
-                using var cmd = c.CreateCommand();
-                cmd.Transaction = tx;
-                cmd.CommandText = "UPDATE players SET player_data = @p WHERE username = @u;";
-                cmd.Parameters.AddWithValue("@p", blob);
-                cmd.Parameters.AddWithValue("@u", $"player{i}");
-                cmd.ExecuteNonQuery();
+                for (int i = 0; i < 100; i++)
+                {
+                    using var cmd = c.CreateCommand();
+                    cmd.Transaction = tx;
+                    cmd.CommandText = "UPDATE players SET player_data = @p WHERE username = @u;";
+                    cmd.Parameters.AddWithValue("@p", blob);
+                    cmd.Parameters.AddWithValue("@u", $"player{i}");
+                    cmd.ExecuteNonQuery();
+                }
+                tx.Commit();
             }
-            tx.Commit();
+            sw.Stop();
+            return sw.Elapsed.TotalMilliseconds / 100;
         }
-        sw.Stop();
-        var perSave = sw.Elapsed.TotalMilliseconds / 100;
-        perSave.Should().BeLessThan(50, $"a save costs {perSave:F1} ms with the indexes; the autosave writes a few hundred of these every five minutes");
+
+        double withIndexes = Time100Saves(path);
+
+        var bare = NewDbPath();
+        File.Copy(path, bare);
+        using (var c = Open(bare))
+            foreach (var name in Required)
+            {
+                using var drop = c.CreateCommand();
+                drop.CommandText = $"DROP INDEX IF EXISTS {name};";
+                drop.ExecuteNonQuery();
+            }
+        double withoutIndexes = Time100Saves(bare);
+
+        _out.WriteLine($"save of an {blob.Length / 1024} KB player: {withIndexes:F2} ms with the seven indexes, " +
+                       $"{withoutIndexes:F2} ms without, cost {withIndexes - withoutIndexes:F2} ms per save");
+        withIndexes.Should().BeLessThan(50, $"a save costs {withIndexes:F2} ms with the indexes and {withoutIndexes:F2} ms without; " +
+                                            "the autosave writes a few hundred of these every five minutes");
     }
 }
