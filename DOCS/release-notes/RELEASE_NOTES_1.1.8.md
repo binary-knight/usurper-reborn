@@ -38,17 +38,27 @@ it rebuilt, the news feed, the API and the browser terminal were all frozen.
   limit it spent its life evicting the very data it was about to read again:
   nearly eleven thousand times in a single measurement. That was a genuine
   fault, though fixing it alone did not make the site fast.
+- **Releases now deploy the website itself.** Until this version the release
+  shipped only the game, so the site and its dashboards were whatever had
+  last been copied across by hand. On our own server that was six weeks
+  stale, and included a fault where resizing a browser window typed a line of
+  machine text into the player's input. The web files now travel with the
+  release; passwords and installed packages on the server are left alone.
 
 ## For server operators
 
 The indexes are applied automatically the first time this version starts.
-Nothing else is required, and no save data is touched.
+Nothing else is required, and no save data is touched. The website is
+deployed with the release from this version on.
 
-Two files in `scripts-server/` changed and are not copied by any deploy
-step: the web service unit, which now sets a 384 MB ceiling, and the nginx
-config, which now compresses JSON. Copy them if you run your own server. If
-you raised the ceiling by hand on a running service, persist it in the unit
-file and drop the temporary override.
+Two files in `scripts-server/` changed and are still not copied by any
+deploy step, on purpose: the web service unit, which now sets a 384 MB
+ceiling, and the nginx config, which now compresses JSON. Copy those
+yourself. They are left out because the nginx file here carries no
+certificate directives, since certbot writes those on the server, and
+because a unit file in this repository can be older than one you have tuned
+by hand. If you raised the ceiling on a running service, persist it in the
+unit file and drop the temporary override.
 
 The release notes for this version also record a difference worth knowing
 about: the deployed configuration files on a long-running server can drift
