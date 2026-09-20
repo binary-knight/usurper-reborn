@@ -1803,7 +1803,7 @@ public static class MudChatSystem
                 // Show item stats from stored JSON
                 try
                 {
-                    var item = System.Text.Json.JsonSerializer.Deserialize<Item>(items[i].ItemJson);
+                    var item = System.Text.Json.JsonSerializer.Deserialize<Item>(items[i].ItemJson); ItemLimits.Heal(item, "guild bank");
                     if (item != null)
                     {
                         var stats = new System.Collections.Generic.List<string>();
@@ -1961,7 +1961,7 @@ public static class MudChatSystem
 
         try
         {
-            var item = System.Text.Json.JsonSerializer.Deserialize<global::Item>(itemJson);
+            var item = System.Text.Json.JsonSerializer.Deserialize<global::Item>(itemJson); ItemLimits.Heal(item, "guild bank");
             if (item != null)
             {
                 player.Inventory.Add(item);

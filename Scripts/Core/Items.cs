@@ -100,6 +100,59 @@ public class Item
     /// gets bumped up later at equip time (v0.57.9 Lumina report: staff
     /// showed "Requires Level 80" on drop but rejected at 100 on equip).
     /// </summary>
+    /// <summary>
+    /// v1.1.7: bound every numeric stat to the corruption limits in GameConfig. Signed, so a cursed
+    /// item keeps its penalties. Duplicate loot effects of one kind are merged before bounding, so a
+    /// list of many small entries cannot sum past the limit. Idempotent; returns true when anything
+    /// changed, with a description for the audit log.
+    /// </summary>
+    public bool ClampStats() => ClampStats(out _);
+
+    public bool ClampStats(out string changes)
+    {
+        var log = new List<string>();
+        int P(string n, int v, int max) { int c = Math.Clamp(v, -max, max); if (c != v) log.Add($"{n} {v:N0}->{c:N0}"); return c; }
+        Attack = P("attack", Attack, GameConfig.MaxItemPower);
+        Armor = P("armor", Armor, GameConfig.MaxItemPower);
+        ShieldBonus = P("shield", ShieldBonus, GameConfig.MaxItemPower);
+        BlockChance = P("block", BlockChance, GameConfig.MaxItemPercent);
+        Strength = P("str", Strength, GameConfig.MaxItemStatBonus);
+        Defence = P("def", Defence, GameConfig.MaxItemStatBonus);
+        Dexterity = P("dex", Dexterity, GameConfig.MaxItemStatBonus);
+        Wisdom = P("wis", Wisdom, GameConfig.MaxItemStatBonus);
+        Charisma = P("cha", Charisma, GameConfig.MaxItemStatBonus);
+        Agility = P("agi", Agility, GameConfig.MaxItemStatBonus);
+        Stamina = P("sta", Stamina, GameConfig.MaxItemStatBonus);
+        HP = P("hp", HP, GameConfig.MaxItemVitalBonus);
+        Mana = P("mana", Mana, GameConfig.MaxItemVitalBonus);
+        if (MagicProperties != null)
+        {
+            MagicProperties.Mana = P("magic.mana", MagicProperties.Mana, GameConfig.MaxItemVitalBonus);
+            MagicProperties.Wisdom = P("magic.wis", MagicProperties.Wisdom, GameConfig.MaxItemStatBonus);
+            MagicProperties.Dexterity = P("magic.dex", MagicProperties.Dexterity, GameConfig.MaxItemStatBonus);
+            MagicProperties.MagicResistance = P("magic.resist", MagicProperties.MagicResistance, GameConfig.MaxItemPercent);
+        }
+        long value = Math.Clamp(Value, 0, GameConfig.MaxItemValue);
+        if (value != Value) { log.Add($"value {Value:N0}->{value:N0}"); Value = value; }
+
+        if (LootEffects != null && LootEffects.Count > 0)
+        {
+            var merged = new List<(int EffectType, int Value)>();
+            foreach (var group in LootEffects.GroupBy(e => e.EffectType))
+            {
+                long sum = group.Sum(e => (long)e.Value);
+                int max = ItemLimits.LootEffectLimit(group.Key);
+                int bounded = (int)Math.Clamp(sum, -max, max);
+                if (group.Count() > 1 || bounded != sum) { if (bounded != sum) log.Add($"effect{group.Key} {sum:N0}->{bounded:N0}"); }
+                merged.Add((group.Key, bounded));
+            }
+            if (merged.Count != LootEffects.Count || log.Any(l => l.StartsWith("effect")))
+                LootEffects = merged;
+        }
+        changes = string.Join(", ", log);
+        return log.Count > 0;
+    }
+
     public void EnforceMinLevelFromPower()
     {
         int power = Math.Max(Attack, Armor);
@@ -917,6 +970,44 @@ public class Equipment
     /// Ensure MinLevel is at least as high as the power-based floor.
     /// Call this after creating Equipment to prevent overpowered gear at low levels.
     /// </summary>
+    /// <summary>v1.1.7: the Equipment twin of Item.ClampStats. Signed, idempotent, true when anything changed.</summary>
+    public bool ClampStats() => ClampStats(out _);
+
+    public bool ClampStats(out string changes)
+    {
+        var log = new List<string>();
+        int P(string n, int v, int max) { int c = Math.Clamp(v, -max, max); if (c != v) log.Add($"{n} {v:N0}->{c:N0}"); return c; }
+        WeaponPower = P("power", WeaponPower, GameConfig.MaxItemPower);
+        ArmorClass = P("ac", ArmorClass, GameConfig.MaxItemPower);
+        ShieldBonus = P("shield", ShieldBonus, GameConfig.MaxItemPower);
+        BlockChance = P("block", BlockChance, GameConfig.MaxItemPercent);
+        StrengthBonus = P("str", StrengthBonus, GameConfig.MaxItemStatBonus);
+        DexterityBonus = P("dex", DexterityBonus, GameConfig.MaxItemStatBonus);
+        ConstitutionBonus = P("con", ConstitutionBonus, GameConfig.MaxItemStatBonus);
+        IntelligenceBonus = P("int", IntelligenceBonus, GameConfig.MaxItemStatBonus);
+        WisdomBonus = P("wis", WisdomBonus, GameConfig.MaxItemStatBonus);
+        CharismaBonus = P("cha", CharismaBonus, GameConfig.MaxItemStatBonus);
+        DefenceBonus = P("def", DefenceBonus, GameConfig.MaxItemStatBonus);
+        StaminaBonus = P("sta", StaminaBonus, GameConfig.MaxItemStatBonus);
+        AgilityBonus = P("agi", AgilityBonus, GameConfig.MaxItemStatBonus);
+        MaxHPBonus = P("hp", MaxHPBonus, GameConfig.MaxItemVitalBonus);
+        MaxManaBonus = P("mana", MaxManaBonus, GameConfig.MaxItemVitalBonus);
+        CriticalChanceBonus = P("crit", CriticalChanceBonus, GameConfig.MaxItemPercent);
+        CriticalDamageBonus = P("critdmg", CriticalDamageBonus, GameConfig.MaxItemStatBonus);
+        MagicResistance = P("resist", MagicResistance, GameConfig.MaxItemPercent);
+        PoisonDamage = P("poison", PoisonDamage, GameConfig.MaxItemStatBonus);
+        LifeSteal = P("lifesteal", LifeSteal, GameConfig.MaxItemPercent);
+        ManaSteal = P("manasteal", ManaSteal, GameConfig.MaxItemPercent);
+        ArmorPiercing = P("pierce", ArmorPiercing, GameConfig.MaxItemPercent);
+        Thorns = P("thorns", Thorns, GameConfig.MaxItemPercent);
+        HPRegen = P("hpregen", HPRegen, GameConfig.MaxItemStatBonus);
+        ManaRegen = P("manaregen", ManaRegen, GameConfig.MaxItemStatBonus);
+        long value = Math.Clamp(Value, 0, GameConfig.MaxItemValue);
+        if (value != Value) { log.Add($"value {Value:N0}->{value:N0}"); Value = value; }
+        changes = string.Join(", ", log);
+        return log.Count > 0;
+    }
+
     public void EnforceMinLevelFromPower()
     {
         int powerMinLevel = CalculateMinLevelFromPower(this);
@@ -1343,3 +1434,62 @@ public class Equipment
 
     #endregion
 } 
+
+/// <summary>v1.1.7: which bound applies to a loot effect, by its kind.</summary>
+public static class ItemLimits
+{
+    public static int LootEffectLimit(int effectType)
+    {
+        switch ((LootGenerator.SpecialEffect)effectType)
+        {
+            case LootGenerator.SpecialEffect.LifeSteal:
+            case LootGenerator.SpecialEffect.ManaSteal:
+            case LootGenerator.SpecialEffect.CriticalStrike:
+            case LootGenerator.SpecialEffect.ArmorPiercing:
+            case LootGenerator.SpecialEffect.FireResist:
+            case LootGenerator.SpecialEffect.IceResist:
+            case LootGenerator.SpecialEffect.LightningResist:
+            case LootGenerator.SpecialEffect.PoisonResist:
+            case LootGenerator.SpecialEffect.MagicResist:
+            case LootGenerator.SpecialEffect.Thorns:
+            case LootGenerator.SpecialEffect.BlockChance:
+            case LootGenerator.SpecialEffect.BossSlayer:
+            case LootGenerator.SpecialEffect.TitanResolve:
+                return GameConfig.MaxItemPercent;
+            case LootGenerator.SpecialEffect.MaxHP:
+            case LootGenerator.SpecialEffect.MaxMana:
+                return GameConfig.MaxItemVitalBonus;
+            default:
+                return GameConfig.MaxItemStatBonus;
+        }
+    }
+
+    // Whose save is being restored on this async flow, so a heal deep inside a converter can name
+    // the account in the local audit log. AsyncLocal: sessions in the online server do not share it.
+    private static readonly System.Threading.AsyncLocal<string?> _owner = new();
+
+    /// <summary>Name the account for every heal until the returned scope is disposed.</summary>
+    public static IDisposable OwnerScope(string owner) { var prev = _owner.Value; _owner.Value = owner; return new Scope(prev); }
+    private sealed class Scope : IDisposable { private readonly string? _prev; public Scope(string? prev) { _prev = prev; } public void Dispose() { _owner.Value = _prev; } }
+
+    /// <summary>Items clamped since the process started; the tests and the save-time audit read it.</summary>
+    public static long HealedCount => System.Threading.Interlocked.Read(ref _healed);
+    private static long _healed;
+
+    /// <summary>Clamp and, when something changed, write one GOLD_AUDIT line naming where the item was and whose it is. Local log only.</summary>
+    public static bool Heal(global::Item? item, string where)
+    {
+        if (item == null || !item.ClampStats(out var changes)) return false;
+        System.Threading.Interlocked.Increment(ref _healed);
+        UsurperRemake.Systems.DebugLogger.Instance.LogInfo("GOLD_AUDIT", $"ITEM CLAMPED ({where}) owner='{_owner.Value ?? ""}' item='{item.Name}': {changes}");
+        return true;
+    }
+
+    public static bool Heal(Equipment? equip, string where)
+    {
+        if (equip == null || !equip.ClampStats(out var changes)) return false;
+        System.Threading.Interlocked.Increment(ref _healed);
+        UsurperRemake.Systems.DebugLogger.Instance.LogInfo("GOLD_AUDIT", $"ITEM CLAMPED ({where}) owner='{_owner.Value ?? ""}' item='{equip.Name}': {changes}");
+        return true;
+    }
+}

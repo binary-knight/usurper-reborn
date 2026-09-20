@@ -1146,6 +1146,7 @@ namespace UsurperRemake.Systems
             };
             if (LootEffects != null && LootEffects.Count > 0)
                 item.LootEffects = LootEffects.Select(e => (e.EffectType, e.Value)).ToList();
+            ItemLimits.Heal(item, "saved item");   // v1.1.7: heal inflated items wherever they were stored
             return item;
         }
     }

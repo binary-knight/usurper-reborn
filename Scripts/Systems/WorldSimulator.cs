@@ -5667,7 +5667,7 @@ public class WorldSimulator
                     var chosen = affordable[random.Next(affordable.Count)];
 
                     // Deserialize the item to check if NPC wants it
-                    var item = JsonSerializer.Deserialize<Item>(chosen.ItemJson);
+                    var item = JsonSerializer.Deserialize<Item>(chosen.ItemJson); ItemLimits.Heal(item, "auction");
                     if (item == null) return;
 
                     var tempListing = new MarketplaceSystem.MarketListing

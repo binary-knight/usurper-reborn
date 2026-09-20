@@ -1457,6 +1457,7 @@ public class Character
         if (equipment.HasTitanResolve)
             item.LootEffects.Add(((int)LootGenerator.SpecialEffect.TitanResolve, 5));
 
+        item.ClampStats();   // v1.1.7
         return item;
     }
 
@@ -1505,6 +1506,7 @@ public class Character
             Family = item.Family ?? ""
         };
         ApplyItemLootEffectsToEquipment(item, equipment);
+        equipment.ClampStats();   // v1.1.7
         return equipment;
     }
 
