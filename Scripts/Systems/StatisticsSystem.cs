@@ -330,11 +330,13 @@ public class PlayerStatistics
     /// <summary>
     /// Record item sold
     /// </summary>
-    public void RecordSale(long amount)
+    public void RecordSale(long amount, int itemsSold = 1)
     {
         TotalGoldEarned += amount;
         TotalGoldFromSelling += amount;
-        TotalItemsSold++;
+        // v1.1.7: a bulk sale counted as one item, so gold-per-item read as impossible for honest
+        // players and hid the real thing. The three bulk callers pass their count.
+        TotalItemsSold += Math.Max(1, itemsSold);
     }
 
     /// <summary>

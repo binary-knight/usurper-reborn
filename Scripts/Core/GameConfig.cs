@@ -10,7 +10,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "1.1.6";
+    public const string Version = "1.1.7";
     public const string VersionName = "Regalia"; // 1.1 line: the gear and reward loop
 
     // v0.57.12: Alignment scale cap. Character.Chivalry and Character.Darkness setters clamp to [0, AlignmentCap]
@@ -715,6 +715,21 @@ public static partial class GameConfig
     // 500k + 1M = 1.5M -- meaningful at the top end without hurting mid-tier.
     public const long ReforgeEndgameSurchargePerLevel = 50_000;
     public const int ReforgeEndgameThreshold = 80;
+    // v1.1.7: corruption bounds on item stats (council tally 2026-09-20). These are not balance
+    // ceilings: the strongest legitimate drop is an Artifact near 1,400 power at level 100
+    // (LootGenerator: 135 base x (1 + level/80) x 4.0 rarity x 1.15 variance) and the most valuable
+    // authored item is 4,000,000. Anything beyond these bounds was made by a bug, and is clamped at
+    // every place an item enters play: load, conversion, enchant, reforge, storage reads, sale.
+    public const int MaxItemPower = 5000;            // attack, armor, weapon power, armor class, shield bonus
+    public const int MaxItemStatBonus = 2000;        // every other flat bonus, elemental damage, regen, crit damage
+    public const int MaxItemVitalBonus = 20000;      // max HP and max mana bonuses
+    public const int MaxItemPercent = 100;           // block, crit chance, resistances, steals, piercing, thorns
+    public const long MaxItemValue = 20_000_000;     // five times the most valuable authored item
+    public const int MaxReforgesPerDay = 3;                  // v1.1.7 (council, starting value)
+    public const long ReforgeMinCost = 5_000;                // v1.1.7: level 1 paid 50 gold (starting value)
+    public const double ReforgePowerBoundFactor = 1.5;       // v1.1.7: over the strongest legitimate drop at the player's level
+    public const double LootTopWeaponBasePower = 135;        // LootGenerator's strongest weapon template (Blade of the Righteous)
+    public const double LootArtifactPowerMult = 4.0;         // LootGenerator RarityStats[Artifact].PowerMult
     public const double ReforgeUpgradeChance = 0.20;   // 20% chance to upgrade rarity
     public const double ReforgeVariance = 0.15;        // +/-15% stat variance on reroll
 
@@ -2792,6 +2807,11 @@ Mystic Shaman - Tribal caster who summons totems and enchants weapons. Troll/Orc
     // Alt accounts caught stealing gold are capped to this much per attack.
     // Stops the alt-as-gold-mule strategy (alts dealt 25 attacks for 141k
     // gold in alpha, no level penalty).
+    // v1.1.7: what one PvP fight can move into the winner's purse, whoever the winner is: the ten
+    // percent steal and the equipment salvage together, by the recipient's level (council, starting
+    // value). 195,000 at level 39, 500,000 at level 100. The alt cap below stays layered under it.
+    public const long PvPGoldPerFightCapPerLevel = 5000;
+    public static long PvPGoldPerFightCap(int recipientLevel) => PvPGoldPerFightCapPerLevel * Math.Max(1, recipientLevel);
     public const long PvPAltGoldStealBase = 1000;
     public const long PvPAltGoldStealPerLevel = 100;
 

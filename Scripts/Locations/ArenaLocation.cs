@@ -412,30 +412,17 @@ public class ArenaLocation : BaseLocation
             }
             goldStolen = Math.Max(0, goldStolen);
 
-            // v0.60.0 alpha balance review: alt-account gold-steal cap. Stops
-            // the alt-as-gold-mule strategy. Alpha had `__alt` accounts running
-            // 25 attacks for 141k gold with no level penalty -- alt-mains were
-            // exploiting the lack of cap to siphon mid-tier players' wealth
-            // back to their main without exposing their main's level/gear.
-            if (myUsername.EndsWith(SqlSaveBackend.GetAltKey("").TrimStart('_'), System.StringComparison.OrdinalIgnoreCase)
-                || myUsername.EndsWith("__alt", System.StringComparison.OrdinalIgnoreCase))
-            {
-                long altCap = GameConfig.PvPAltGoldStealBase + GameConfig.PvPAltGoldStealPerLevel * currentPlayer.Level;
-                if (goldStolen > altCap)
-                {
-                    DebugLogger.Instance.LogInfo("GOLD", $"ARENA ALT CAP: alt '{myUsername}' steal capped {goldStolen:N0} -> {altCap:N0}g");
-                    goldStolen = altCap;
-                }
-            }
+            // v1.1.7: one ceiling for every attacker, by the recipient's level, with the older and
+            // tighter alt cap layered under it; the salvage already paid this fight counts against it.
+            goldStolen = CapPvPGold(goldStolen, currentPlayer.Level, IsAltAccount(myUsername), result.EquipmentSalvageGold, myUsername);
 
-            // Apply gold reward (XP and kill tracking already handled by CombatEngine)
+            // The winner is credited with what was actually taken from the loser's save, so a spent
+            // balance, a missing row, or a failed write cannot mint gold.
+            if (goldStolen > 0)
+                goldStolen = await backend.TakeGoldFromPlayer(defenderUsername, goldStolen);
             currentPlayer.Gold += goldStolen;
             currentPlayer.Statistics?.RecordGoldChange(currentPlayer.Gold);
             DebugLogger.Instance.LogInfo("GOLD", $"ARENA VICTORY: {currentPlayer.DisplayName} stole {goldStolen:N0}g from {target.DisplayName} (gold now {currentPlayer.Gold:N0})");
-
-            // Deduct gold from defender's save atomically
-            if (goldStolen > 0)
-                await backend.DeductGoldFromPlayer(defenderUsername, goldStolen);
 
             // Claim any bounties on the defeated player
             long bountyReward = await backend.ClaimBounties(defenderUsername, myUsername);
@@ -480,6 +467,9 @@ public class ArenaLocation : BaseLocation
             // Defender wins - steal 10% of attacker's remaining gold (after death penalty)
             goldStolen = (long)(currentPlayer.Gold * GameConfig.PvPGoldStealPercent);
             goldStolen = Math.Max(0, goldStolen);
+            // v1.1.7: the same ceiling with the roles swapped, by the defender's level and identity.
+            // Uncapped, a rich main could throw fights to an alt and move gold the other way.
+            goldStolen = CapPvPGold(goldStolen, target.Level, IsAltAccount(defenderUsername), 0, defenderUsername);
 
             // Deduct stolen gold from attacker
             currentPlayer.Gold = Math.Max(0, currentPlayer.Gold - goldStolen);
@@ -758,5 +748,34 @@ public class ArenaLocation : BaseLocation
         ElectronBridge.EmitMenu(menu);
 
         EmitNPCsInLocationToElectron();
+    }
+
+    internal static bool IsAltAccount(string username) =>
+        !string.IsNullOrEmpty(username) && username.EndsWith(GameConfig.AltCharacterSuffix, System.StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// v1.1.7: what one fight may move to its winner: at most the per-fight cap for the recipient's
+    /// level less any salvage already paid, and at most the alt cap when the recipient is an alt.
+    /// Logs every reduction under GOLD, in the local log.
+    /// </summary>
+    internal static long CapPvPGold(long requested, int recipientLevel, bool recipientIsAlt, long alreadyPaid, string recipient)
+    {
+        long gold = Math.Max(0, requested);
+        long cap = Math.Max(0, GameConfig.PvPGoldPerFightCap(recipientLevel) - Math.Max(0, alreadyPaid));
+        if (gold > cap)
+        {
+            DebugLogger.Instance.LogInfo("GOLD", $"ARENA STEAL CAP: '{recipient}' Lv{recipientLevel} steal capped {gold:N0} -> {cap:N0}g");
+            gold = cap;
+        }
+        if (recipientIsAlt)
+        {
+            long altCap = GameConfig.PvPAltGoldStealBase + GameConfig.PvPAltGoldStealPerLevel * Math.Max(1, recipientLevel);
+            if (gold > altCap)
+            {
+                DebugLogger.Instance.LogInfo("GOLD", $"ARENA ALT CAP: alt '{recipient}' steal capped {gold:N0} -> {altCap:N0}g");
+                gold = altCap;
+            }
+        }
+        return gold;
     }
 }

@@ -1323,6 +1323,7 @@ internal static class PlayerSaveEditor
         p.BankRobberyAttempts = 0;
         p.TempleResurrectionsUsed = 0;
         p.MurdersToday = 0;
+        p.ReforgesToday = 0;
         p.SparesToday = 0;
         p.TeamWarsToday = 0;
         p.DrinkingGamesToday = 0;

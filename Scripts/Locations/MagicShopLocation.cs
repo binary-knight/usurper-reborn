@@ -1217,8 +1217,10 @@ public partial class MagicShopLocation : BaseLocation
                 targetItem.Name += suffix;
         }
 
-        // Increase item value
-        targetItem.Value = (long)(targetItem.Value * 1.5);
+        // v1.1.7: an enchant adds what it cost, never a multiple of what the item was worth. The old
+        // x1.5 compounded without limit for a flat fee. (This legacy flow has no caller; kept honest.)
+        targetItem.Value = Math.Min(GameConfig.MaxItemValue, Math.Clamp(targetItem.Value, 0, GameConfig.MaxItemValue) + Math.Clamp(cost, 0, GameConfig.MaxItemValue));
+        targetItem.ClampStats();
 
         DisplayMessage("");
         DisplayMessage(Loc.Get("magic_shop.old_enchant_complete"), "bright_green");
@@ -1550,6 +1552,16 @@ public partial class MagicShopLocation : BaseLocation
     /// Equipment fields). The resulting Equipment is used for display and for the
     /// enchantment math; writeBack converts it back to an Item before storing.
     /// </summary>
+    /// <summary>v1.1.7: an enchant adds the gold charged for it to the item's value, saturating at the bound.</summary>
+    internal static void AddEnchantValue(Equipment enchanted, long charged)
+    {
+        // bound both operands first, so a corrupt value near long.MaxValue cannot wrap
+        long value = Math.Clamp(enchanted.Value, 0, GameConfig.MaxItemValue);
+        long add = Math.Clamp(charged, 0, GameConfig.MaxItemValue);
+        enchanted.Value = Math.Min(GameConfig.MaxItemValue, value + add);
+        enchanted.ClampStats();
+    }
+
     private static Equipment ConvertInventoryItemToEquipmentForEnchant(global::Item item)
     {
         EquipmentSlot slot = item.Type switch
@@ -2091,6 +2103,9 @@ public partial class MagicShopLocation : BaseLocation
                     string newMarker = oldCount > 1 ? $"[E:{oldCount - 1}]" : "";
                     damaged.Description = System.Text.RegularExpressions.Regex.Replace(
                         damaged.Description ?? "", @"\[E:\d+\]", newMarker).Trim();
+                    // v1.1.7: the lost enchant frees its kind too. The markers persist now, so a kind
+                    // list left behind would bar the player from ever replacing what the failure took.
+                    damaged.TrimEnchantedKindsTo(oldCount - 1);
 
                     // Reduce a random stat bonus as if one enchant was lost
                     var rngStat = rng.Next(6);
@@ -2178,8 +2193,11 @@ public partial class MagicShopLocation : BaseLocation
         if (enchanted.Name.Length + suffix.Length < 40)
             enchanted.Name += suffix;
 
-        // Increase value
-        enchanted.Value = (long)(enchanted.Value * 1.5);
+        // v1.1.7: the item gains the gold actually charged (after discounts, before tax), not half
+        // again its own worth. The x1.5 compounded, and the enchant count that was meant to stop it
+        // at five was lost on every trip through the backpack. Resale is at most 0.8 of value (the
+        // best fence), so an enchant now always costs more than it adds.
+        AddEnchantValue(enchanted, enchantCost);
 
         // Apply enchanted item back to its source (equipped slot or inventory index).
         writeBack(enchanted);
@@ -2339,7 +2357,7 @@ public partial class MagicShopLocation : BaseLocation
 
         // Create a clean clone and reset enchantment tracking
         var stripped = rmEquip.Clone();
-        stripped.Description = System.Text.RegularExpressions.Regex.Replace(stripped.Description ?? "", @"\s*\[E:\d+\]", "");
+        stripped.ClearEnchantMarkers();   // v1.1.7: the count and the kinds, so paid removal really frees the item
 
         // Strip name suffixes
         string[] suffixes = { " (Blessed)", " (Ocean-Touched)", " (Warded)", " (Predator)", " (Lifedrinker)" };

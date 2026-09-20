@@ -146,6 +146,9 @@ public static class EquipmentDatabase
     public static int RegisterDynamic(Equipment equip)
     {
         EnsureInitialized();
+        // v1.1.7: no item enters the registry above the corruption bounds. The object is the caller's
+        // freshly built copy, never a shared template, so this cannot touch another session's gear.
+        ItemLimits.Heal(equip, "register");
         lock (_lock)
         {
             equip.Id = _nextDynamicId++;
@@ -161,6 +164,7 @@ public static class EquipmentDatabase
     public static void RegisterDynamicWithId(Equipment equip, int id)
     {
         EnsureInitialized();
+        ItemLimits.Heal(equip, "register");   // v1.1.7: clamp before the saved id is registered
         lock (_lock)
         {
             equip.Id = id;

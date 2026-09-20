@@ -9567,7 +9567,7 @@ public abstract class BaseLocation
         var items = new Item?[listings.Count];
         for (int i = 0; i < listings.Count; i++)
         {
-            try { items[i] = System.Text.Json.JsonSerializer.Deserialize<Item>(listings[i].ItemJson); }
+            try { items[i] = System.Text.Json.JsonSerializer.Deserialize<Item>(listings[i].ItemJson); ItemLimits.Heal(items[i], "auction"); }
             catch (Exception ex) { DebugLogger.Instance.LogError("LOCATION", $"[BrowseAuctions] Failed to deserialize auction item: {ex.Message}"); items[i] = null; }
         }
 
@@ -9821,7 +9821,7 @@ public abstract class BaseLocation
         Item? purchasedItem = null;
         try
         {
-            purchasedItem = System.Text.Json.JsonSerializer.Deserialize<Item>(listing.ItemJson);
+            purchasedItem = System.Text.Json.JsonSerializer.Deserialize<Item>(listing.ItemJson); ItemLimits.Heal(purchasedItem, "auction");
         }
         catch (Exception ex)
         {
@@ -10160,7 +10160,7 @@ public abstract class BaseLocation
                 {
                     try
                     {
-                        var item = System.Text.Json.JsonSerializer.Deserialize<Item>(l.ItemJson);
+                        var item = System.Text.Json.JsonSerializer.Deserialize<Item>(l.ItemJson); ItemLimits.Heal(item, "auction");
                         if (item != null) { currentPlayer.Inventory.Add(item); collected++; }
                     }
                     catch (Exception ex) { DebugLogger.Instance.LogError("LOCATION", $"[ShowMyAuctions] Failed to deserialize expired auction item: {ex.Message}"); }
@@ -10193,7 +10193,7 @@ public abstract class BaseLocation
             {
                 try
                 {
-                    var item = System.Text.Json.JsonSerializer.Deserialize<Item>(listing.ItemJson);
+                    var item = System.Text.Json.JsonSerializer.Deserialize<Item>(listing.ItemJson); ItemLimits.Heal(item, "auction");
                     if (item != null) currentPlayer.Inventory.Add(item);
                 }
                 catch (Exception ex) { DebugLogger.Instance.LogError("LOCATION", $"[ShowMyAuctions] Failed to deserialize collected auction item: {ex.Message}"); }
@@ -10223,7 +10223,7 @@ public abstract class BaseLocation
             // Return item to inventory
             try
             {
-                var item = System.Text.Json.JsonSerializer.Deserialize<Item>(listing.ItemJson);
+                var item = System.Text.Json.JsonSerializer.Deserialize<Item>(listing.ItemJson); ItemLimits.Heal(item, "auction");
                 if (item != null) currentPlayer.Inventory.Add(item);
             }
             catch (Exception ex) { DebugLogger.Instance.LogError("LOCATION", $"[ShowMyAuctions] Failed to deserialize cancelled auction item: {ex.Message}"); }
@@ -11073,7 +11073,7 @@ public abstract class BaseLocation
             foreach (var item in filtered)
                 currentPlayer.Inventory.Remove(item);
             currentPlayer.Gold += totalGold;
-            currentPlayer.Statistics.RecordSale(totalGold);
+            currentPlayer.Statistics.RecordSale(totalGold, filtered.Count);
             DebugLogger.Instance.LogInfo("GOLD", $"FILTERED SELL: {currentPlayer.DisplayName} sold {filtered.Count} items for {totalGold:N0}g (gold now {currentPlayer.Gold:N0})");
             currentPlayer.RecalculateStats();
 

@@ -668,6 +668,7 @@ namespace UsurperRemake.Systems
         public int DesecrationsToday { get; set; }
         public int ConfessionsToday { get; set; }
         public int MurdersToday { get; set; }
+        public int ReforgesToday { get; set; }   // v1.1.7
         public int SparesToday { get; set; }
         public int TeamWarsToday { get; set; }
         public int DrinkingGamesToday { get; set; }
@@ -1068,6 +1069,7 @@ namespace UsurperRemake.Systems
         public bool Dungeon { get; set; }
         public List<string> Description { get; set; } = new();
         public List<LootEffectData>? LootEffects { get; set; }
+        public string? EnchantMarkers { get; set; }   // v1.1.7: enchant count and kinds, carried through the bag
 
         /// <summary>
         /// Full Item -> DTO conversion: every stat field, MinLevel, the cursed/identified flags,
@@ -1097,6 +1099,7 @@ namespace UsurperRemake.Systems
             Agility = item.Agility,
             Stamina = item.Stamina,
             MinLevel = item.MinLevel,
+            EnchantMarkers = string.IsNullOrEmpty(item.EnchantMarkers) ? null : item.EnchantMarkers,
             Rarity = (int)item.Rarity, // issue #112
             Family = item.Family ?? "",
             // IsCursed (the flag decurse/warnings/loot checks read) is authoritative; Item also
@@ -1135,6 +1138,7 @@ namespace UsurperRemake.Systems
                 Agility = Agility,
                 Stamina = Stamina,
                 MinLevel = MinLevel,
+                EnchantMarkers = EnchantMarkers ?? "",
                 Rarity = (EquipmentRarity)Rarity, // issue #112
                 Family = Family ?? "",
                 IsCursed = IsCursed,
@@ -1146,6 +1150,7 @@ namespace UsurperRemake.Systems
             };
             if (LootEffects != null && LootEffects.Count > 0)
                 item.LootEffects = LootEffects.Select(e => (e.EffectType, e.Value)).ToList();
+            ItemLimits.Heal(item, "saved item");   // v1.1.7: heal inflated items wherever they were stored
             return item;
         }
     }

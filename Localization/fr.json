@@ -3570,6 +3570,8 @@
   "weapon_shop.reforge_cost": "Coût du reforgeage : {0} pièces d'or",
   "weapon_shop.reforge_gold": "Votre or : {0}",
   "weapon_shop.reforge_warning": "Les stats seront recalculées dans une fourchette de +/-15% des valeurs actuelles. Il y a 20% de chance que la rareté de l'arme s'améliore. ATTENTION : le reforgeage est définitif une fois payé ; vous gardez ce que le marteau vous donne.",
+  "weapon_shop.reforge_daily_limit": "Le forgeron secoue la tête. 'L'acier ne supporte pas plus de reforges aujourd'hui.' (limite : {0} par jour)",
+  "weapon_shop.reforge_beyond_skill": "{0} examine l'arme et vous la rend. 'C'est un travail plus fin que ce que je peux améliorer pour quelqu'un de votre rang. Revenez quand vous aurez grandi.'",
   "weapon_shop.reforge_confirm": "Payer l'or et reforger (définitif) ? (O/N) : ",
   "weapon_shop.reforge_working": "{0} plonge votre arme dans la forge. Des étincelles jaillissent tandis que le métal rougit à blanc...",
   "weapon_shop.reforge_rarity_up": "Le métal scintille d'un nouvel éclat ! Rareté améliorée à {0} !",

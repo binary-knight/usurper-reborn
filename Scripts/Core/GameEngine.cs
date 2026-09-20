@@ -4251,7 +4251,7 @@ public partial class GameEngine
 
                     try
                     {
-                        var item = System.Text.Json.JsonSerializer.Deserialize<global::Item>(row.ItemJson, jsonOpts);
+                        var item = System.Text.Json.JsonSerializer.Deserialize<global::Item>(row.ItemJson, jsonOpts); ItemLimits.Heal(item, "inheritance");
                         if (item != null)
                         {
                             currentPlayer.Inventory ??= new List<global::Item>();
@@ -5256,6 +5256,13 @@ public partial class GameEngine
     /// </summary>
     private Character RestorePlayerFromSaveData(PlayerData playerData)
     {
+        // v1.1.7: any item clamped while this save is restored is logged under this account's name
+        using var healOwner = ItemLimits.OwnerScope(playerData.Name1 ?? playerData.Name2 ?? "");
+        return RestorePlayerFromSaveDataCore(playerData);
+    }
+
+    private Character RestorePlayerFromSaveDataCore(PlayerData playerData)
+    {
         Character player = new Player
         {
             // Unique player identifier (critical for romance/family systems)
@@ -6029,6 +6036,7 @@ public partial class GameEngine
         player.DesecrationsToday = playerData.DesecrationsToday;
         player.ConfessionsToday = playerData.ConfessionsToday;
         player.MurdersToday = playerData.MurdersToday;
+        player.ReforgesToday = playerData.ReforgesToday;   // v1.1.7
         player.SparesToday = playerData.SparesToday;
         player.TeamWarsToday = playerData.TeamWarsToday;
         player.DrinkingGamesToday = playerData.DrinkingGamesToday;

@@ -749,6 +749,7 @@ public class Character
     public int DesecrationsToday { get; set; } = 0;             // Daily desecration counter (max 2)
     public int ConfessionsToday { get; set; } = 0;              // v0.57.0: Daily confession counter (max 2, matches desecration cadence)
     public int MurdersToday { get; set; } = 0;                  // v0.57.6: Daily non-bounty NPC-murder counter (cap: GameConfig.MaxMurdersPerDay)
+    public int ReforgesToday { get; set; } = 0;                 // v1.1.7: daily reforge counter (cap: GameConfig.MaxReforgesPerDay)
     public int SparesToday { get; set; } = 0;                   // v0.64.1: Daily PvP-spare counter; alignment reward only for first MaxAlignedSparesPerDay spares
     public int TeamWarsToday { get; set; } = 0;                 // v0.57.17: Team Corner team-war daily counter (cap: GameConfig.MaxTeamWarsPerDay). Plugs the "find a beatable team, spam wars for free 2x wager gold" exploit reported by a Lv.100 Barbarian.
     public int DrinkingGamesToday { get; set; } = 0;            // v0.57.17: Inn drinking-game daily counter (cap: GameConfig.MaxDrinkingGamesPerDay). Player report: high STR/CON = consistent wins for level*700 XP per ~30s, no limit, free leveling.
@@ -1457,6 +1458,8 @@ public class Character
         if (equipment.HasTitanResolve)
             item.LootEffects.Add(((int)LootGenerator.SpecialEffect.TitanResolve, 5));
 
+        item.EnchantMarkers = equipment.ExtractEnchantMarkers();   // v1.1.7: the enchant count survives the bag
+        item.ClampStats();   // v1.1.7
         return item;
     }
 
@@ -1505,6 +1508,8 @@ public class Character
             Family = item.Family ?? ""
         };
         ApplyItemLootEffectsToEquipment(item, equipment);
+        equipment.RestoreEnchantMarkers(item.EnchantMarkers);   // v1.1.7
+        equipment.ClampStats();   // v1.1.7
         return equipment;
     }
 

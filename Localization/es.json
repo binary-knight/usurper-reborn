@@ -3570,6 +3570,8 @@
   "weapon_shop.reforge_cost": "Coste de reforja: {0} oro",
   "weapon_shop.reforge_gold": "Tu oro: {0}",
   "weapon_shop.reforge_warning": "Las estadísticas se recalcularán dentro de +/-15% de los valores actuales. Hay un 20% de probabilidad de que mejore la rareza del arma. AVISO: la reforja es definitiva una vez que pagues; te quedas con las estadísticas que el martillo te dé.",
+  "weapon_shop.reforge_daily_limit": "El herrero niega con la cabeza. 'El acero no aguanta más reforjas por hoy.' (límite: {0} al día)",
+  "weapon_shop.reforge_beyond_skill": "{0} examina el arma y te la devuelve. 'Es un trabajo más fino de lo que puedo mejorar para alguien de tu rango. Vuelve cuando hayas crecido.'",
   "weapon_shop.reforge_confirm": "¿Pagar el oro y reforjar (definitivo)? (S/N): ",
   "weapon_shop.reforge_working": "{0} mete tu arma en la fragua. Saltan chispas mientras el metal brilla al rojo vivo...",
   "weapon_shop.reforge_rarity_up": "¡El metal resplandece con un nuevo brillo! ¡Rareza mejorada a {0}!",

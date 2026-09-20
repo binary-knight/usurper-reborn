@@ -1,0 +1,22 @@
+[h1]Usurper Reborn 1.1.7[/h1]
+
+A repair release for the economy. A bug closed back in v0.65.3 left a few items in the world with stats and prices in the hundreds of millions, and it turned out the ways those were made were not the only ways left open. This release puts limits on what an item can be, repairs the ones that already exist, and closes the rest.
+
+[h2]Items have limits[/h2]
+
+[list]
+[*]Every number on an item is bounded, wherever an item enters play: on load, in the shops, out of an auction, a guild bank or an inheritance. Cursed gear keeps its penalties.
+[*]Items already over the line are repaired the next time they are loaded, and every repair is written to the server's log.
+[*]Nothing legitimate is touched. The best weapon the dungeon can drop is near 1,400 power at level 100 and the most valuable item in the game's tables is 4,000,000 gold; the limits sit well above both.
+[/list]
+
+[h2]Enchanting, reforging, the arena[/h2]
+
+[list]
+[*]An enchant adds what it cost, instead of half again the item's own worth. Reselling an enchanted item now always loses gold, even at the best fence.
+[*]An item remembers its enchants even in your backpack, so the five-enchant limit and one-of-each-kind hold. An enchant that is lost or paid to remove frees its kind again.
+[*]Reforging: three a day, a real price at every level, a value that follows its formula instead of only climbing, and a ceiling tied to the best weapon the dungeon can drop for someone of your level. A weapon already beyond it is handed back untouched.
+[*]One PvP fight moves at most a capped amount of gold to its winner, on both sides of the fight, and the winner receives exactly what the loser lost. Salvage is priced from the gear the loser is actually wearing.
+[/list]
+
+The ten percent arena steal, the throne rules, and curse removal are unchanged; they were working as designed. No character's saved data was edited.

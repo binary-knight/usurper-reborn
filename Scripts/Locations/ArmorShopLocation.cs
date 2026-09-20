@@ -964,7 +964,7 @@ public class ArmorShopLocation : BaseLocation
                 foreach (var item in sellable)
                     currentPlayer.Inventory.Remove(item);
                 currentPlayer.Gold += totalGold;
-                currentPlayer.Statistics.RecordSale(totalGold);
+                currentPlayer.Statistics.RecordSale(totalGold, sellable.Count);
                 DebugLogger.Instance.LogInfo("GOLD", $"SHOP SELL: {currentPlayer.DisplayName} sold {sellable.Count} armor for {totalGold:N0}g (gold now {currentPlayer.Gold:N0})");
                 currentPlayer.RecalculateStats();
 

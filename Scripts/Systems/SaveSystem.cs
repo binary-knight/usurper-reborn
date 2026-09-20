@@ -118,13 +118,10 @@ namespace UsurperRemake.Systems
                 DebugLogger.Instance.LogSave(playerName, player.Level, player.HP, player.MaxHP, player.Gold);
                 DebugLogger.Instance.LogDebug("SAVE", $"BaseMaxHP={player.BaseMaxHP}, BaseMaxMana={player.BaseMaxMana}");
 
-                // Gold audit — flag suspicious wealth relative to level and earned gold
-                long totalWealth = player.Gold + player.BankGold;
+                // v1.1.7: the wealth-versus-earned ratio and the signatures it could not see, each
+                // reported once per player per session per subject. Alerts only, nothing corrected.
                 long totalEarned = player.Statistics?.TotalGoldEarned ?? 0;
-                if (totalWealth > 0 && totalEarned > 0 && totalWealth > totalEarned * 5)
-                {
-                    DebugLogger.Instance.LogInfo("GOLD_AUDIT", $"SUSPICIOUS: {playerName} wealth={totalWealth:N0} (gold={player.Gold:N0}, bank={player.BankGold:N0}) but totalEarned={totalEarned:N0} (ratio {totalWealth / Math.Max(1, totalEarned)}x)");
-                }
+                GoldAudit.Inspect(player);
                 DebugLogger.Instance.LogInfo("GOLD_AUDIT", $"SAVE: {playerName} Lv{player.Level} gold={player.Gold:N0} bank={player.BankGold:N0} earned={totalEarned:N0}");
 
                 // In online/MUD mode, use per-session day state to avoid shared singleton cross-contamination
@@ -962,6 +959,7 @@ namespace UsurperRemake.Systems
                 DesecrationsToday = player.DesecrationsToday,
                 ConfessionsToday = player.ConfessionsToday,
                 MurdersToday = player.MurdersToday,
+                ReforgesToday = player.ReforgesToday,
                 SparesToday = player.SparesToday,
                 TeamWarsToday = player.TeamWarsToday,
                 DrinkingGamesToday = player.DrinkingGamesToday,
