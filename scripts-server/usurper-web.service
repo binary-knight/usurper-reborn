@@ -28,7 +28,12 @@ StandardError=journal
 
 # Resource limits
 LimitNOFILE=1024
-MemoryMax=128M
+# v1.1.8: 128M starved this process. Answering /api/stats pulls about 33 MB of player
+# JSON through SQLite and V8; under the old ceiling the kernel evicted the pages it was
+# about to reread, so one cold call reclaimed roughly 478 MB, took about 2,000 major
+# faults and hit the ceiling 1,948 times, turning a 0.2 second query into 20 seconds.
+# The box has 1.9 GB and the game server sits at about 200 MB of its own 960 MB cap.
+MemoryMax=384M
 
 [Install]
 WantedBy=multi-user.target

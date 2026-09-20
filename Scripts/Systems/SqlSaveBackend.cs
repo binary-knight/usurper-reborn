@@ -648,6 +648,38 @@ namespace UsurperRemake.Systems
                     CREATE INDEX IF NOT EXISTS idx_wizard_log_created ON wizard_log(created_at DESC);
                     CREATE INDEX IF NOT EXISTS idx_wizard_log_wizard ON wizard_log(wizard_name, created_at DESC);
 
+                    -- v1.1.8: player_data is a JSON blob averaging 84 KB, and the website's stats
+                    -- page read it with json_extract five to seven times per row across about seven
+                    -- full passes, every 115 seconds. SQLite re-parses the whole blob for each call,
+                    -- so on a server with 410 players the rebuild took 75 seconds of CPU and, because
+                    -- the web service is single threaded, froze the news feed, the API and the
+                    -- browser terminal for that whole time, whether or not anyone was visiting.
+                    -- A profile of the live server put 70 percent of it in SQLite's JSON functions.
+                    -- These indexes carry the hot fields so those queries never open the blob: the
+                    -- first covers the statistics aggregate, the rest serve lookups that were full
+                    -- scans, including the one inside the per-god believer count. Measured on the
+                    -- live server: the freeze fell from 77 seconds to 7 and the service went from
+                    -- burning 68 percent of a core continuously to under 4 percent.
+                    -- Write the paths in single quotes. SQLite only uses an expression index when
+                    -- the expression matches the query exactly.
+                    CREATE INDEX IF NOT EXISTS idx_players_stats_cover ON players(
+                        is_banned, username,
+                        json_extract(player_data,'$.player.level'),
+                        json_extract(player_data,'$.player.gold'),
+                        json_extract(player_data,'$.player.bankGold'),
+                        json_extract(player_data,'$.player.statistics.totalMonstersKilled'),
+                        json_extract(player_data,'$.player.statistics.deepestDungeonLevel'),
+                        json_extract(player_data,'$.player.class')
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_players_immortal ON players(json_extract(player_data,'$.player.isImmortal'));
+                    CREATE INDEX IF NOT EXISTS idx_players_murder_weight ON players(json_extract(player_data,'$.player.murderWeight'));
+                    CREATE INDEX IF NOT EXISTS idx_players_worshipped_god ON players(json_extract(player_data,'$.player.worshippedGod'));
+
+                    -- The same three the live server had created by hand and no release carried.
+                    CREATE INDEX IF NOT EXISTS idx_players_level ON players(json_extract(player_data,'$.player.level') DESC);
+                    CREATE INDEX IF NOT EXISTS idx_players_class ON players(json_extract(player_data,'$.player.class'));
+                    CREATE INDEX IF NOT EXISTS idx_players_xp ON players(json_extract(player_data,'$.player.experience') DESC);
+
                     CREATE TABLE IF NOT EXISTS admin_commands (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         command TEXT NOT NULL,
@@ -762,6 +794,43 @@ namespace UsurperRemake.Systems
                 ";
                 cmd.ExecuteNonQuery();
             }
+
+            // v1.1.8: converge the player indexes on one spelling. Servers that predate this
+            // release carry three of them created by hand with double-quoted JSON paths. SQLite
+            // only uses an expression index when the expression matches the query, and a
+            // double-quoted path is a string in one build and an identifier in another, so the
+            // spelling decides whether the website's queries are indexed at all. Drop any legacy
+            // form and let the CREATE statements above put back the single-quoted one, so a
+            // long-running server and a fresh one end with byte-identical definitions.
+            try
+            {
+                var legacy = new List<string>();
+                using (var findCmd = connection.CreateCommand())
+                {
+                    findCmd.CommandText = @"SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='players'
+                                            AND sql IS NOT NULL AND sql LIKE '%""$.%';";
+                    using var reader = findCmd.ExecuteReader();
+                    while (reader.Read()) legacy.Add(reader.GetString(0));
+                }
+                foreach (var name in legacy)
+                {
+                    using var dropCmd = connection.CreateCommand();
+                    dropCmd.CommandText = $"DROP INDEX IF EXISTS \"{name}\";";
+                    dropCmd.ExecuteNonQuery();
+                    DebugLogger.Instance.LogInfo("SQL", $"Rebuilt player index {name} with single-quoted JSON paths");
+                }
+                if (legacy.Count > 0)
+                {
+                    using var rebuildCmd = connection.CreateCommand();
+                    rebuildCmd.CommandText = @"
+                        CREATE INDEX IF NOT EXISTS idx_players_level ON players(json_extract(player_data,'$.player.level') DESC);
+                        CREATE INDEX IF NOT EXISTS idx_players_class ON players(json_extract(player_data,'$.player.class'));
+                        CREATE INDEX IF NOT EXISTS idx_players_xp ON players(json_extract(player_data,'$.player.experience') DESC);
+                    ";
+                    rebuildCmd.ExecuteNonQuery();
+                }
+            }
+            catch (Exception ex) { DebugLogger.Instance.LogWarning("SQL", $"Player index convergence skipped: {ex.Message}"); }
 
             // Migration: add connection_type column to existing online_players tables
             try

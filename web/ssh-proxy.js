@@ -57,7 +57,11 @@ function isResizeControlMessage(data) {
 }
 const MUD_HOST = process.env.MUD_HOST || '127.0.0.1';
 const MUD_PORT = parseInt(process.env.MUD_PORT || '4001', 10);
-const CACHE_TTL = 120000; // 2 minutes (uncached query takes ~20s with 275 players)
+// v1.1.8: the rebuild is forced on a timer below, so no visitor ever waits for it; what the
+// wait costs is the whole process, which is single threaded. Before the player indexes landed
+// this rebuild took 75 seconds with 410 players and froze the feed, the API and the browser
+// terminal for that whole time. With them it is a few seconds. Measure before changing it.
+const CACHE_TTL = 120000; // 2 minutes
 let _ghReleasesCache = null;
 let _ghReleasesCacheTime = 0;
 const FEED_POLL_MS = 5000; // SSE feed polls DB every 5 seconds
@@ -1120,7 +1124,7 @@ function getStats() {
       }
     } catch (e) { /* children data may not exist yet */ }
 
-    // Marriage count (reuse cached NPC data to avoid re-parsing 19MB blob)
+    // Marriage count (reuse cached NPC data rather than re-parsing the NPC blob, about 2.3 MB)
     let marriageCount = 0;
     try {
       const npcs = getDashNpcs();
