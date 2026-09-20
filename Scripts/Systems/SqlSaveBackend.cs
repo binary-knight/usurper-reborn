@@ -300,11 +300,13 @@ namespace UsurperRemake.Systems
         /// v1.1.8: the indexes that keep the website's statistics page off the player blob.
         ///
         /// player_data averages 84 KB, and the stats page asks for five to seven fields per row
-        /// across about seven full passes. SQLite re-parses the whole blob for every json_extract
-        /// call, so on the live server with 410 players one rebuild cost 75 seconds of CPU; the web
-        /// service is single threaded and rebuilds on a timer, so the news feed, the API and the
-        /// browser terminal froze for most of every two minutes whether or not anyone was visiting.
-        /// A profile put 62 percent of that time in SQLite's jsonTranslateTextToBlob. With these
+        /// across about seven full passes. On the live server with 410 players one rebuild stalled
+        /// the whole process for up to 83 seconds; the web service is single threaded and rebuilds
+        /// on a timer, so the news feed, the API and the browser terminal froze for most of every
+        /// two minutes whether or not anyone was visiting. A profile of that stall put 62 percent
+        /// of it in SQLite's jsonTranslateTextToBlob, which is what re-translating each row's JSON
+        /// per json_extract call would look like; the same SQL in another SQLite build is fast, and
+        /// that difference is recorded as unexplained rather than guessed at. With these
         /// indexes the same aggregate answers from the index alone in 0.3 ms, measured through the
         /// web service's own SQLite. The worst stall fell from 83.3 s to 7.4 s and the service went
         /// from burning 68 percent of a core continuously to under 4 percent.
