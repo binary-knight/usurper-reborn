@@ -756,6 +756,14 @@ jobs:
       - name: Create deployment tarball
         run: cd build && tar -czf ../server.tar.gz . && cd ..
 
+      # The website and its dashboards are served from /opt/usurper/web by the usurper-web
+      # service, and until now nothing deployed them: the live copy of ssh-proxy.js was six
+      # weeks behind this repository and missing a committed fix. Secrets and installed
+      # packages live in that directory too, so .env and node_modules are excluded and the
+      # archive is unpacked over the top rather than replacing the directory.
+      - name: Create web assets tarball
+        run: tar -czf web.tar.gz -C web --exclude=node_modules --exclude=.env --exclude='*.bak' .
+
       - name: Deploy to production
         env:
           SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
@@ -781,8 +789,9 @@ jobs:
           # Probe SSH auth before doing real work
           $SSH "echo SSH_OK; whoami; hostname; uptime"
 
-          # Upload tarball
+          # Upload tarballs
           $SCP server.tar.gz "ubuntu@$HOST:/tmp/usurper-reborn-server.tar.gz"
+          $SCP web.tar.gz "ubuntu@$HOST:/tmp/usurper-web.tar.gz"
 
           # Warn players: insert shutdown command into admin_commands table (2 minute countdown)
           # The MUD server polls admin_commands every 3 seconds and will broadcast warnings
@@ -805,6 +814,25 @@ jobs:
             sudo systemctl start usurper-mud && \
             sudo systemctl start sshd-usurper && \
             echo 'Deploy complete: ${VERSION}'"
+
+          # The website, in the same window, since players are already disconnected. The web
+          # service holds the browser terminal, so restarting it at any other time would drop
+          # anyone playing in a tab.
+          $SSH "\
+            sudo tar -xzf /tmp/usurper-web.tar.gz -C /opt/usurper/web/ && \
+            sudo chown -R usurper:usurper /opt/usurper/web && \
+            sudo systemctl restart usurper-web && \
+            sleep 3 && \
+            systemctl is-active usurper-web && \
+            echo 'Web assets deployed'"
+
+          # System configuration is deliberately NOT deployed here. scripts-server/ holds the
+          # systemd units and the nginx site, and copying either onto a running server would
+          # undo work someone did on the box: the nginx file in this repository carries no TLS
+          # directives, because certbot adds those in place, so copying it would take the site
+          # off HTTPS until certbot ran again; and the units here can be older than a server
+          # that has been tuned by hand. Deploy those with scripts-server/setup-server.sh when
+          # you mean to, and reconcile the repository with the server first.
 
           # Cleanup
           rm -f ~/.ssh/deploy_key
