@@ -116,10 +116,15 @@ public class Item
     /// </summary>
     public bool ClampStats() => ClampStats(out _);
 
-    public bool ClampStats(out string changes)
+    public bool ClampStats(out string changes) => ClampStats(true, out changes);
+
+    /// <summary>v1.1.7: the same bounds, reporting only. Nothing on this item or anything it shares is changed.</summary>
+    public bool ExceedsBounds(out string over) => ClampStats(false, out over);
+
+    private bool ClampStats(bool apply, out string changes)
     {
         var log = new List<string>();
-        int P(string n, int v, int max) { int c = Math.Clamp(v, -max, max); if (c != v) log.Add($"{n} {v:N0}->{c:N0}"); return c; }
+        int P(string n, int v, int max) { int c = Math.Clamp(v, -max, max); if (c != v) log.Add($"{n} {v:N0}->{c:N0}"); return apply ? c : v; }
         Attack = P("attack", Attack, GameConfig.MaxItemPower);
         Armor = P("armor", Armor, GameConfig.MaxItemPower);
         ShieldBonus = P("shield", ShieldBonus, GameConfig.MaxItemPower);
@@ -135,13 +140,14 @@ public class Item
         Mana = P("mana", Mana, GameConfig.MaxItemVitalBonus);
         if (MagicProperties != null)
         {
+            // MagicProperties is shared by a memberwise clone, so a reporting pass must not touch it
             MagicProperties.Mana = P("magic.mana", MagicProperties.Mana, GameConfig.MaxItemVitalBonus);
             MagicProperties.Wisdom = P("magic.wis", MagicProperties.Wisdom, GameConfig.MaxItemStatBonus);
             MagicProperties.Dexterity = P("magic.dex", MagicProperties.Dexterity, GameConfig.MaxItemStatBonus);
             MagicProperties.MagicResistance = P("magic.resist", MagicProperties.MagicResistance, GameConfig.MaxItemPercent);
         }
         long value = Math.Clamp(Value, 0, GameConfig.MaxItemValue);
-        if (value != Value) { log.Add($"value {Value:N0}->{value:N0}"); Value = value; }
+        if (value != Value) { log.Add($"value {Value:N0}->{value:N0}"); if (apply) Value = value; }
 
         if (LootEffects != null && LootEffects.Count > 0)
         {
@@ -154,7 +160,7 @@ public class Item
                 if (group.Count() > 1 || bounded != sum) { if (bounded != sum) log.Add($"effect{group.Key} {sum:N0}->{bounded:N0}"); }
                 merged.Add((group.Key, bounded));
             }
-            if (merged.Count != LootEffects.Count || log.Any(l => l.StartsWith("effect")))
+            if (apply && (merged.Count != LootEffects.Count || log.Any(l => l.StartsWith("effect"))))
                 LootEffects = merged;
         }
         changes = string.Join(", ", log);
@@ -981,10 +987,15 @@ public class Equipment
     /// <summary>v1.1.7: the Equipment twin of Item.ClampStats. Signed, idempotent, true when anything changed.</summary>
     public bool ClampStats() => ClampStats(out _);
 
-    public bool ClampStats(out string changes)
+    public bool ClampStats(out string changes) => ClampStats(true, out changes);
+
+    /// <summary>v1.1.7: the same bounds, reporting only.</summary>
+    public bool ExceedsBounds(out string over) => ClampStats(false, out over);
+
+    private bool ClampStats(bool apply, out string changes)
     {
         var log = new List<string>();
-        int P(string n, int v, int max) { int c = Math.Clamp(v, -max, max); if (c != v) log.Add($"{n} {v:N0}->{c:N0}"); return c; }
+        int P(string n, int v, int max) { int c = Math.Clamp(v, -max, max); if (c != v) log.Add($"{n} {v:N0}->{c:N0}"); return apply ? c : v; }
         WeaponPower = P("power", WeaponPower, GameConfig.MaxItemPower);
         ArmorClass = P("ac", ArmorClass, GameConfig.MaxItemPower);
         ShieldBonus = P("shield", ShieldBonus, GameConfig.MaxItemPower);
@@ -1011,7 +1022,7 @@ public class Equipment
         HPRegen = P("hpregen", HPRegen, GameConfig.MaxItemStatBonus);
         ManaRegen = P("manaregen", ManaRegen, GameConfig.MaxItemStatBonus);
         long value = Math.Clamp(Value, 0, GameConfig.MaxItemValue);
-        if (value != Value) { log.Add($"value {Value:N0}->{value:N0}"); Value = value; }
+        if (value != Value) { log.Add($"value {Value:N0}->{value:N0}"); if (apply) Value = value; }
         changes = string.Join(", ", log);
         return log.Count > 0;
     }

@@ -11073,7 +11073,7 @@ public abstract class BaseLocation
             foreach (var item in filtered)
                 currentPlayer.Inventory.Remove(item);
             currentPlayer.Gold += totalGold;
-            currentPlayer.Statistics.RecordSale(totalGold);
+            currentPlayer.Statistics.RecordSale(totalGold, filtered.Count);
             DebugLogger.Instance.LogInfo("GOLD", $"FILTERED SELL: {currentPlayer.DisplayName} sold {filtered.Count} items for {totalGold:N0}g (gold now {currentPlayer.Gold:N0})");
             currentPlayer.RecalculateStats();
 
