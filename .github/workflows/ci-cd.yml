@@ -738,6 +738,11 @@ jobs:
       group: deploy-production
       cancel-in-progress: false
     steps:
+      # The web assets are packaged from the repository, so this job needs it checked out.
+      # It did not before, because it only ever shipped the build artifact.
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Download Linux x64 build
         uses: actions/download-artifact@v4
         with:
@@ -750,8 +755,17 @@ jobs:
           if [ -n "${{ github.event.release.tag_name }}" ]; then
             echo "tag=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
           else
-            echo "tag=manual-$(date +%Y%m%d-%H%M%S)" >> "$GITHUB_OUTPUT"
+            # A manual deploy should still stamp the version the server is actually running,
+            # so the admin dashboard does not report "manual-20260920-230459" for a release.
+            LATEST=$(gh release view --json tagName --jq .tagName 2>/dev/null || true)
+            if [ -n "$LATEST" ]; then
+              echo "tag=$LATEST" >> "$GITHUB_OUTPUT"
+            else
+              echo "tag=manual-$(date +%Y%m%d-%H%M%S)" >> "$GITHUB_OUTPUT"
+            fi
           fi
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       - name: Create deployment tarball
         run: cd build && tar -czf ../server.tar.gz . && cd ..
