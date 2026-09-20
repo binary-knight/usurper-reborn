@@ -28,7 +28,15 @@ StandardError=journal
 
 # Resource limits
 LimitNOFILE=1024
-MemoryMax=128M
+# v1.1.8: 128M starved this process. Answering /api/stats pulls tens of megabytes of player
+# JSON through SQLite and V8, and under the old ceiling the kernel kept evicting the pages it
+# was about to reread: across one 280-request measurement the cgroup hit its limit 10,964
+# times and took 9,408 major faults. At 384M the same run hits the limit zero times and takes
+# 4,024, and the service holds 144 MB of file cache where it held 29 MB.
+# This was a real fault but not the cause of the site being slow; that was unindexed JSON
+# reads, fixed in the schema. Raising the ceiling alone moved the worst stall from 83.3 s to
+# 77.2 s. The box has 1.9 GB and the game server sits at about 200 MB of its own 960 MB cap.
+MemoryMax=384M
 
 [Install]
 WantedBy=multi-user.target
