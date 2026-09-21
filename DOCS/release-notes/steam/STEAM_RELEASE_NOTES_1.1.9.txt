@@ -1,0 +1,13 @@
+[h1]Usurper Reborn 1.1.9[/h1]
+
+Two player reports, fixed: the feet slot offered weapons instead of boots, and gear sets ignored most of the gear people were actually wearing.
+
+[list]
+[*]Choosing the feet slot to equip from the backpack now lists your boots. It listed your weapons.
+[*]Armor, rings and weapons "of Shielding" are no longer labelled [Shield] in the backpack. Real shields still are.
+[*]Gear sets count the gear you already have. A set piece is recognised by the template it dropped as, which gear from before v1.1.0 never recorded, so the same Leather Cap could count or not depending on when it dropped. That gear now has its template read from its name, which is never written into your save. On our server 118 player set bonuses switch on or go up.
+[*]The name has to be one the game really generates for that piece, in any language, enchanted or not, and it is compared against every item so the closest match wins: a Studded Leather Cap is not a Leather Cap. A recorded template always wins.
+[*]One exception: in French the Shadow Cloak and the Cloak of Shadows share a name, so an old French Shadow Cloak does not count toward the Shadow set.
+[/list]
+
+If you run your own server: the v1.1.8 automatic deploy failed before touching the server. This release deploys normally and carries everything v1.1.8 did.

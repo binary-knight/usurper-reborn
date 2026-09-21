@@ -31,8 +31,14 @@ namespace UsurperRemake.Systems
 
     /// <summary>
     /// v1.1 gear set bonuses. Membership keys on the English template family stored on
-    /// each generated item at creation (never on the localized display name, and never
-    /// on a prefix parse: "Forged-Thread Cape" and "Cloak of Shadows" are not set pieces).
+    /// each generated item at creation; when an item has one, it is authoritative.
+    /// v1.1.9: an item without one (dropped before v1.1.0, or hand-authored) has its family
+    /// inferred from its name by GearSetFamilyResolver, at read time and never written back
+    /// (maintainer approval, 2026-09-21). The inference matches the whole localized name the
+    /// generator gives a template, never a prefix parse or a word inside a word, against every
+    /// template set or not, and within the same kind of slot, so "Forged-Thread Cape",
+    /// "Cloak of Shadows" and "Studded Leather Cap" are still not set pieces
+    /// (GearSetFamilyTests holds each of these counterexamples).
     /// Bonuses are applied in Character.RecalculateStats after the equipped-item loop,
     /// for every character: NPCs, companions, echoes and PvP snapshots wear the same
     /// families and get the same bonuses (maintainer decision, 2026-09-03).
@@ -96,7 +102,8 @@ namespace UsurperRemake.Systems
             foreach (var kvp in c.EquippedItems)
             {
                 if (kvp.Value <= 0) continue;
-                var set = ForFamily(EquipmentDatabase.GetById(kvp.Value)?.Family);
+                // v1.1.9: the stored family, or for a piece that predates v1.1.0 the one its name resolves to
+                var set = ForFamily(GearSetFamilyResolver.FamilyOf(EquipmentDatabase.GetById(kvp.Value)));
                 if (set == null) continue;
                 counts[set.Id] = counts.GetValueOrDefault(set.Id) + 1;
             }

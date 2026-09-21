@@ -790,19 +790,19 @@ public static class ShopItemGenerator
     public static bool LooksLikeShieldByName(string name)
     {
         if (string.IsNullOrEmpty(name)) return false;
-        return name.Contains("Shield")
-            || name.Contains("Buckler")
-            || name.Contains("Aegis")
-            || name.Contains("Bulwark")
-            || name.Contains("Pavise")
-            || name.Contains("Targe")
-            || name.Contains("Heater")
-            || name.Contains("Kite")
-            || name.Contains("Round Wood")
-            || name.Contains("Ward of ")
-            || name.Contains("Fortress")
-            || (name.Contains("Tower") && !name.Contains("Towering"));
+        return ShieldNameWords.IsMatch(name) || name.Contains("Ward of ");
     }
+
+    // v1.1.9: whole words. The old substring test read "Shield" inside "Shielding", the
+    // magic-resist suffix that any item can roll, so body armor, rings, amulets, boots and cloaks
+    // "of Shielding" were all labelled as shields (player report); it read "Targe" inside "Target"
+    // and "Heater" inside "Theater" the same way. Every functional use of this test is limited to
+    // the off-hand, so the harm today was the label, but a one-handed weapon rolling the suffix and
+    // held in the off-hand would have been treated as a shield. "Towering" was the one case the
+    // old code guarded by hand; a word boundary covers it and every future one.
+    private static readonly System.Text.RegularExpressions.Regex ShieldNameWords = new(
+        @"\b(Shield|Buckler|Aegis|Bulwark|Pavise|Targe|Heater|Kite|Round Wood|Fortress|Tower)\b",
+        System.Text.RegularExpressions.RegexOptions.Compiled);
 
     private static ArmorType InferArmorType(string name)
     {
