@@ -267,22 +267,25 @@ public class GearSetFamilyTests
     public void ModdedEquipment_IsACandidate_SoItsNameIsNotReadAsTheSetPieceItContains()
     {
         // Modded items (GameData/equipment.json) have IDs in the dynamic range; the catalog must still
-        // hold them as non-set candidates. The live catalog is built once per process, so this builds
-        // a fresh one with a modded item present and reads its head-slot candidates.
-        var prop = typeof(GameDataLoader).GetProperty("CustomEquipment")!;
-        var saved = prop.GetValue(null);
-        try
-        {
-            var padded = Equipment.CreateArmor(200001, "Padded Leather Cap", EquipmentSlot.Head, ArmorType.Leather, 3, 100);
-            prop.SetValue(null, new List<Equipment> { padded });
-            var build = typeof(GearSetFamilyResolver).GetMethod("BuildCatalog", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
-            var catalog = (System.Collections.IDictionary)build.Invoke(null, null)!;
-            var head = ((System.Collections.IEnumerable)catalog[GearSetSlotKind.Head]!).Cast<object>()
-                .Select(c => (string)c.GetType().GetProperty("Form")!.GetValue(c)!).ToList();
-            head.Should().Contain("Padded Leather Cap");
-            head.Should().Contain("Leather Cap");
-        }
-        finally { prop.SetValue(null, saved); }
+        // hold them as non-set candidates. The item is passed straight to the builder, so nothing
+        // global is swapped or registered.
+        var padded = Equipment.CreateArmor(200001, "Padded Leather Cap", EquipmentSlot.Head, ArmorType.Leather, 3, 100);
+        var head = GearSetFamilyResolver.BuildCatalog(new[] { padded })[GearSetSlotKind.Head].Select(c => c.Form).ToList();
+        head.Should().Contain("Padded Leather Cap");
+        head.Should().Contain("Leather Cap");
+        EquipmentDatabase.GetById(200001).Should().BeNull("the test registers nothing");
+    }
+
+    [Fact]
+    public void RejectedModdedEntries_AreNotCandidates()
+    {
+        // The equipment database refuses equipment.json entries below the modded ID range; the resolver
+        // applies the same rule and also requires the entry to be registered, so a refused
+        // "Fine Leather Cap" cannot take the set away from a real one (Codex's case).
+        var belowRange = Equipment.CreateArmor(123, "Fine Leather Cap", EquipmentSlot.Head, ArmorType.Leather, 3, 100);
+        var neverRegistered = Equipment.CreateArmor(299_999, "Fine Leather Cap", EquipmentSlot.Head, ArmorType.Leather, 3, 100);
+        GearSetFamilyResolver.Admitted(new Equipment?[] { belowRange, neverRegistered, null }).Should().BeEmpty();
+        GearSetFamilyResolver.FamilyOf(null, "Fine Leather Cap", GearSetSlotKind.Head).Should().Be("Leather Cap");
     }
 
     [Fact]

@@ -46,9 +46,9 @@ namespace UsurperRemake.Systems
     /// </summary>
     public static class GearSetFamilyResolver
     {
-        private sealed record Candidate(string English, string Form, GearSetSlotKind Kind, bool IsSet);
+        internal sealed record Candidate(string English, string Form, GearSetSlotKind Kind, bool IsSet);
 
-        private static readonly Lazy<Dictionary<GearSetSlotKind, List<Candidate>>> Catalog = new(BuildCatalog);
+        private static readonly Lazy<Dictionary<GearSetSlotKind, List<Candidate>>> Catalog = new(() => BuildCatalog(AdmittedModdedEquipment()));
 
         // Most stored names are exactly one generated form, and a candidate equal to the whole name is
         // necessarily the longest match, so an exact lookup settles them without a scan. Ties between
@@ -195,7 +195,25 @@ namespace UsurperRemake.Systems
         internal static IReadOnlyDictionary<GearSetSlotKind, List<(string English, string Form, bool IsSet)>> DescribeCatalog() =>
             Catalog.Value.ToDictionary(kv => kv.Key, kv => kv.Value.Select(c => (c.English, c.Form, c.IsSet)).ToList());
 
-        private static Dictionary<GearSetSlotKind, List<Candidate>> BuildCatalog()
+        /// <summary>
+        /// The modded items (GameData/equipment.json) the equipment database actually admitted: the same
+        /// ID rule it applies, and registered under that ID and name. A rejected entry is not an item in
+        /// the game, so it must not compete with real names.
+        /// </summary>
+        private static List<Equipment> AdmittedModdedEquipment() => Admitted(GameDataLoader.CustomEquipment);
+
+        internal static List<Equipment> Admitted(IEnumerable<Equipment?>? entries)
+        {
+            EquipmentDatabase.Initialize();
+            return (entries ?? Enumerable.Empty<Equipment?>()).OfType<Equipment>()
+                .Where(e => e != null && !string.IsNullOrWhiteSpace(e.Name)
+                            && e.Id >= GameDataLoader.ModdedEquipmentIdStart
+                            && EquipmentDatabase.GetById(e.Id)?.Name == e.Name)
+                .ToList();
+        }
+
+        /// <summary>The candidate catalog; modded items are passed in so a test can supply its own without touching global state.</summary>
+        internal static Dictionary<GearSetSlotKind, List<Candidate>> BuildCatalog(IEnumerable<Equipment> moddedEquipment)
         {
             // AvailableLanguages reads an array that stays empty until localization loads; if this ran
             // first, the catalog would silently hold English names only and miss every other player.
@@ -254,8 +272,7 @@ namespace UsurperRemake.Systems
             // Modded equipment from GameData/equipment.json is hand-authored too, but its IDs sit in the
             // dynamic range (200000 and up), so the filter above skips it; without it, a modded
             // "Padded Leather Cap" would be read as the Leather Cap it contains.
-            foreach (var e in UsurperRemake.Systems.GameDataLoader.CustomEquipment ?? new List<Equipment>())
-                if (e != null && !string.IsNullOrWhiteSpace(e.Name)) Add(e.Name, KindOf(e), new[] { e.Name });
+            foreach (var e in moddedEquipment) Add(e.Name, KindOf(e), new[] { e.Name });
             return catalog;
         }
     }
