@@ -66,7 +66,7 @@ website. Nothing extra is needed.
 
 ## Tests
 
-1,277 passing, up from 1,198. The new ones check every name the game can
+1,278 passing, up from 1,198. The new ones check every name the game can
 give each gear template, in every language and with every enchantment,
 against the set it belongs to: over 800,000 names. They also generate
 30,000 real drops, erase their recorded template and read it back from the
