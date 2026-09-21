@@ -1622,7 +1622,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine($"  {Loc.Get("inventory.requires")}: {string.Join(", ", reqs)}");
             }
 
-            var itemSet = GearSetRegistry.ForFamily(item.Family);
+            var itemSet = GearSetRegistry.ForFamily(GearSetFamilyResolver.FamilyOf(item));   // v1.1.9: old pieces too
             if (itemSet != null)
             {
                 terminal.SetColor("bright_cyan");

@@ -84,17 +84,19 @@ public static class LootGenerator
 
         public static string GetRarityPrefix(ItemRarity rarity)
         {
-            var key = rarity switch
-            {
-                ItemRarity.Uncommon => "item.rarity.fine",
-                ItemRarity.Rare => "item.rarity.superior",
-                ItemRarity.Epic => "item.rarity.exquisite",
-                ItemRarity.Legendary => "item.rarity.legendary",
-                ItemRarity.Artifact => "item.rarity.mythic",
-                _ => null
-            };
+            var key = RarityPrefixKey(rarity);
             return key == null ? "" : Loc.Get(key) + " ";
         }
+
+        private static string? RarityPrefixKey(ItemRarity rarity) => rarity switch
+        {
+            ItemRarity.Uncommon => "item.rarity.fine",
+            ItemRarity.Rare => "item.rarity.superior",
+            ItemRarity.Epic => "item.rarity.exquisite",
+            ItemRarity.Legendary => "item.rarity.legendary",
+            ItemRarity.Artifact => "item.rarity.mythic",
+            _ => null
+        };
 
         /// <summary>
         /// Convert an English template name to a localization key and look it up.
@@ -103,12 +105,65 @@ public static class LootGenerator
         /// </summary>
         private static string LocalizeTemplateName(string englishName)
         {
-            // Strip apostrophes first (Assassin's → Assassins), then convert remaining non-alphanumeric to underscores
-            string stripped = englishName.Replace("'", "").Replace("\u2019", "");
-            string key = "item." + Regex.Replace(stripped.ToLowerInvariant(), @"[^a-z0-9]+", "_").Trim('_');
+            string key = TemplateLocKey(englishName);
             string result = Loc.Get(key);
             // If Loc.Get returns the raw key, the template isn't in the localization file — use original name
             return result == key ? englishName : result;
+        }
+
+        /// <summary>
+        /// v1.1.9: every name BuildItemName can give a template in the given language: bare, each
+        /// rarity prefix, the cursed prefix, and each effect as a prefix and as a suffix. A world boss
+        /// drop puts its element prefix in front of any of these (WorldBossNamePrefixes); the gear set
+        /// resolver peels that off rather than multiply the forms by it. The language is explicit rather than the
+        /// session's, so building every language's forms never touches GameConfig.Language, which
+        /// other sessions on the server read. The gear set resolver matches against these forms,
+        /// and its table test walks all of them.
+        /// </summary>
+        internal static IEnumerable<string> AllNameFormsFor(string englishTemplate, string lang)
+        {
+            string L(string key) => Loc.GetIn(lang, key);
+            string templateKey = TemplateLocKey(englishTemplate);
+            string b = L(templateKey);
+            if (b == templateKey) b = englishTemplate;   // as LocalizeTemplateName falls back
+            yield return b;
+            yield return $"{L("item.rarity.cursed")} {b}";
+            foreach (ItemRarity r in Enum.GetValues(typeof(ItemRarity)))
+            {
+                var key = RarityPrefixKey(r);
+                yield return key == null ? b : $"{L(key)} {b}";
+            }
+            foreach (SpecialEffect e in Enum.GetValues(typeof(SpecialEffect)))
+            {
+                if (e == SpecialEffect.None) continue;
+                string effect = GetEffectKey(e);
+                yield return L($"item.effect.{effect}.prefix") + " " + b;
+                yield return b + " " + L($"item.effect.{effect}.suffix");
+            }
+        }
+
+        /// <summary>
+        /// v1.1.9: every prefix GenerateWorldBossLoot can put in front of a drop's name, one per boss
+        /// element plus the fallback for an unknown element. English in every language.
+        /// </summary>
+        internal static IReadOnlyList<string> WorldBossNamePrefixes =>
+            UsurperRemake.Data.WorldBossDatabase.GetAllBosses().Select(b => b.Element)
+                .Append("")
+                .Select(UsurperRemake.Data.WorldBossDatabase.GetElementPrefix)
+                .Where(p => !string.IsNullOrWhiteSpace(p))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+        /// <summary>
+        /// The localization key for a template's name. v1.1.9: shared with the gear set resolver, which
+        /// has to recognise a template inside a name that was localized when the item dropped.
+        /// Apostrophes are stripped first (Assassin's becomes Assassins), then every run of other
+        /// non-alphanumerics becomes one underscore.
+        /// </summary>
+        internal static string TemplateLocKey(string englishName)
+        {
+            string stripped = englishName.Replace("'", "").Replace("\u2019", "");
+            return "item." + Regex.Replace(stripped.ToLowerInvariant(), @"[^a-z0-9]+", "_").Trim('_');
         }
 
         /// <summary>

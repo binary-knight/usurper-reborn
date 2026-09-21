@@ -57,6 +57,10 @@ namespace UsurperRemake.Systems
 
         #endregion
 
+        /// <summary>v1.1.9: template names, for the gear set resolver's candidate list.</summary>
+        internal static IEnumerable<string> WeaponTemplateNames => WeaponTemplates.Keys;
+        internal static IEnumerable<string> ArmorTemplateNames => ArmorTemplates.Keys;
+
         #region Armor Templates
 
         private static readonly Dictionary<string, (int MinLevel, int MaxLevel, int BasePower, string[] Classes)> ArmorTemplates = new()
