@@ -443,6 +443,9 @@ namespace UsurperRemake.Systems
                 EquipmentSlot.LFinger => [ObjType.Fingers, ObjType.Magic],
                 EquipmentSlot.RFinger => [ObjType.Fingers, ObjType.Magic],
                 EquipmentSlot.Legs => [ObjType.Legs],
+                // v1.1.9: Feet was missing, so the feet slot fell through to the default below and
+                // offered weapons instead of the boots in the backpack (player report).
+                EquipmentSlot.Feet => [ObjType.Feet],
                 EquipmentSlot.Waist => [ObjType.Waist, ObjType.Magic],
                 EquipmentSlot.Neck => [ObjType.Neck, ObjType.Magic],
                 EquipmentSlot.Face => [ObjType.Face],
