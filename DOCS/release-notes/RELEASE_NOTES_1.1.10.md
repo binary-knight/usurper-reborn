@@ -39,9 +39,11 @@
   by character.
 - **A waiting item is never lost.** If queueing it fails, it goes into the
   pack past the usual limit.
-- **Bequests from new teams reach their leader.** Teams founded from this
-  version record the leader's character. Teams founded earlier are
-  unchanged.
+- **Bequests from teams reach their leader.** Teams founded from this
+  version record the leader's character. For teams founded earlier, the
+  online admin console has a new Fix Team Leaders screen that sets each
+  team's leader to a current member, one team at a time, with a
+  confirmation.
 - **Waiting items are delivered on /boss** when there is room, not only at
   login. With a full pack you are told how many items wait.
 
@@ -59,4 +61,4 @@
 
 ## Tests
 
-1,364 passing, up from 1,278.
+1,372 passing, up from 1,278.

@@ -6,7 +6,7 @@
 [*]A god's War Cry and similar buffs last three rounds instead of the whole fight, and the intro screen shows the HP the god really has.
 [*]Dialogue answers before a god fight now apply, and damage and defence answers count for the whole party.
 [*]Monster special attacks on companions are softened like normal hits, a god's ability aimed at a companion is its normal attack, and tanks protect themselves before they taunt.
-[*]Items waiting for room in your pack reach alt characters, can no longer be lost, and arrive when you open /boss. Bequests from newly founded teams reach the team's leader.
+[*]Items waiting for room in your pack reach alt characters, can no longer be lost, and arrive when you open /boss. Bequests from teams reach the team's leader (for older teams, once an admin has set the leader).
 [*]The Inn lists every patron, not just the first eight, and you can find someone by name.
 [*]In PvP, frost slows instead of freezing, and stuns, sleeps and freezes can no longer be chained.
 [*]Team HQ upgrades cost what the menu shows.

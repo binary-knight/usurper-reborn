@@ -5085,6 +5085,101 @@ namespace UsurperRemake.Systems
     }
 
     /// <summary>
+    /// v1.1.10: a team whose leader key (created_by) matches no character. Teams founded before
+    /// v1.1.10 recorded the founder's display name, lowercased; a dying NPC member's bequest is queued
+    /// under it, never delivered, and deleted by the orphan sweep. The saves hold no record of who
+    /// founded a team, so the admin console maps these one at a time (OnlineAdminConsole.FixTeamLeaders).
+    /// </summary>
+    public class TeamWithUnknownLeader
+    {
+        public string TeamName { get; set; } = "";
+        public string OldKey { get; set; } = "";
+        public List<PlayerSummary> Members { get; set; } = new();
+        public int QueuedBequests { get; set; }
+    }
+
+    /// <summary>v1.1.10: every team whose leader key matches no character, with its current members.</summary>
+    public async Task<List<TeamWithUnknownLeader>> GetTeamsWithUnknownLeader()
+    {
+        var teams = new List<TeamWithUnknownLeader>();
+        try
+        {
+            using (var connection = OpenConnection())
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = @"
+                    SELECT t.team_name, t.created_by,
+                           (SELECT COUNT(*) FROM pending_inheritance pi WHERE pi.player_username = t.created_by)
+                    FROM player_teams t
+                    WHERE t.created_by NOT IN (SELECT username FROM players)
+                    ORDER BY t.team_name;";
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                    teams.Add(new TeamWithUnknownLeader { TeamName = reader.GetString(0), OldKey = reader.GetString(1), QueuedBequests = reader.GetInt32(2) });
+            }
+            foreach (var team in teams)
+                team.Members = await GetPlayerTeamMembers(team.TeamName);
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to list teams with an unknown leader: {ex.Message}");
+        }
+        return teams;
+    }
+
+    /// <summary>
+    /// v1.1.10: sets a team's leader key to a character's save key, as confirmed by an admin. Only if
+    /// the team still has oldKey (nothing changed it meanwhile) and newKey is a character. Bequests
+    /// already queued under oldKey follow it, unless another team still has oldKey, since those could
+    /// be that team's. newKey must be a current member of the team. True when the team was updated.
+    /// </summary>
+    public bool SetTeamLeaderKey(string teamName, string oldKey, string newKey)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var tx = connection.BeginTransaction();
+            using (var check = connection.CreateCommand())
+            {
+                check.Transaction = tx;
+                // a current member of the team only: a stranger who takes a founder's old name is not the leader
+                check.CommandText = "SELECT COUNT(*) FROM players WHERE username = @new AND json_extract(player_data, '$.player.team') = @team;";
+                check.Parameters.AddWithValue("@new", newKey);
+                check.Parameters.AddWithValue("@team", teamName);
+                if (Convert.ToInt32(check.ExecuteScalar()) != 1) return false;
+            }
+            using (var team = connection.CreateCommand())
+            {
+                team.Transaction = tx;
+                team.CommandText = "UPDATE player_teams SET created_by = @new WHERE team_name = @team AND created_by = @old;";
+                team.Parameters.AddWithValue("@new", newKey);
+                team.Parameters.AddWithValue("@team", teamName);
+                team.Parameters.AddWithValue("@old", oldKey);
+                if (team.ExecuteNonQuery() != 1) return false;
+            }
+            using (var queued = connection.CreateCommand())
+            {
+                queued.Transaction = tx;
+                queued.CommandText = @"
+                    UPDATE pending_inheritance SET player_username = @new
+                    WHERE player_username = @old
+                    AND NOT EXISTS (SELECT 1 FROM player_teams WHERE created_by = @old);";
+                queued.Parameters.AddWithValue("@new", newKey);
+                queued.Parameters.AddWithValue("@old", oldKey);
+                queued.ExecuteNonQuery();
+            }
+            tx.Commit();
+            DebugLogger.Instance.LogInfo("SQL", $"Team '{teamName}' leader key set from '{oldKey}' to '{newKey}' by an admin");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to set the leader key of team '{teamName}': {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
     /// v0.61.5: Queue an item for delivery to a player on their next login.
     /// Used when a team NPC dies of old age — their belongings go to the team
     /// leader. Each call queues one item (or a gold amount when itemJson is null).

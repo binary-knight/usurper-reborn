@@ -122,6 +122,9 @@ namespace UsurperRemake.Systems
                     case "9":
                         await BroadcastMessage();
                         break;
+                    case "T":
+                        await FixTeamLeaders();
+                        break;
                     case "P":
                         await ResetPlayerPassword();
                         break;
@@ -192,6 +195,7 @@ namespace UsurperRemake.Systems
             {
                 terminal.WriteLine("  [8] Clear News Feed   [9] Broadcast Message");
             }
+            terminal.WriteLine(sr ? "  T. Fix Team Leaders" : "  [T] Fix Team Leaders");
             terminal.WriteLine("");
 
             terminal.SetColor("bright_cyan");
@@ -1848,6 +1852,97 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("");
             terminal.SetColor("white");
             terminal.WriteLine($"  {online.Count} player(s) online");
+            terminal.WriteLine("");
+            await ReadInput(Loc.Get("ui.press_enter"));
+        }
+
+        /// <summary>
+        /// v1.1.10: the member suggested as a team's leader: the one current member whose display name,
+        /// lowercased, is the team's old key. Null when none or several match.
+        /// </summary>
+        internal static PlayerSummary? SuggestTeamLeader(SqlSaveBackend.TeamWithUnknownLeader team)
+        {
+            var matches = team.Members.Where(m => m.DisplayName.ToLower() == team.OldKey).ToList();
+            return matches.Count == 1 ? matches[0] : null;
+        }
+
+        /// <summary>
+        /// v1.1.10: teams founded before v1.1.10 recorded their founder's display name as the leader key,
+        /// which matches no character, so a dying NPC member's bequest is never delivered and is swept.
+        /// Nothing in the saves says who founded a team, so each is set here by hand, to a current member.
+        /// </summary>
+        internal async Task FixTeamLeaders()
+        {
+            var teams = await backend.GetTeamsWithUnknownLeader();
+            int done = 0, index = 0;
+            foreach (var team in teams)
+            {
+                index++;
+                terminal.ClearScreen();
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine(GameConfig.ScreenReaderMode ? "FIX TEAM LEADERS" : "═══ FIX TEAM LEADERS ═══");
+                terminal.WriteLine("");
+                terminal.SetColor("white");
+                terminal.WriteLine($"  Team {index} of {teams.Count}: {team.TeamName}");
+                terminal.WriteLine($"  Leader key: '{team.OldKey}' (matches no character)");
+                terminal.WriteLine($"  Bequests waiting under that key: {team.QueuedBequests}");
+                terminal.WriteLine("");
+
+                if (team.Members.Count == 0)
+                {
+                    terminal.SetColor("gray");
+                    terminal.WriteLine("  The team has no player members, so there is nobody to set. Skipped.");
+                    terminal.WriteLine("");
+                    var next = await ReadInput("Enter to continue, Q to stop: ");
+                    if (next.ToUpper() == "Q") break;
+                    continue;
+                }
+
+                var suggested = SuggestTeamLeader(team);
+                terminal.SetColor("yellow");
+                terminal.WriteLine("  Members:");
+                for (int i = 0; i < team.Members.Count; i++)
+                {
+                    var m = team.Members[i];
+                    terminal.SetColor(m == suggested ? "bright_green" : "white");
+                    terminal.WriteLine($"  {i + 1,3}. {m.DisplayName} (character {m.Username}, level {m.Level}){(m == suggested ? "  <- name matches the key" : "")}");
+                }
+                terminal.WriteLine("");
+                terminal.SetColor("white");
+                terminal.WriteLine(suggested != null
+                    ? $"  Enter or Y sets {suggested.DisplayName}. A number picks another member. S skips, Q stops."
+                    : "  No single member's name matches the key. A number picks a member. S skips, Q stops.");
+                var choice = (await ReadInput("> ")).ToUpper();
+                if (choice == "Q") break;
+
+                PlayerSummary? pick = null;
+                if ((choice == "" || choice == "Y") && suggested != null) pick = suggested;
+                else if (int.TryParse(choice, out int n) && n >= 1 && n <= team.Members.Count) pick = team.Members[n - 1];
+                if (pick == null) continue;   // S, or anything else, skips this team
+
+                var confirm = await ReadInput($"Set the leader of {team.TeamName} to {pick.DisplayName} ({pick.Username})? (Y/N) ");
+                if (!GameConfig.IsAffirmative(confirm)) continue;
+
+                if (backend.SetTeamLeaderKey(team.TeamName, team.OldKey, pick.Username))
+                {
+                    done++;
+                    terminal.SetColor("green");
+                    terminal.WriteLine($"  {team.TeamName}: leader set to {pick.DisplayName}.");
+                    DebugLogger.Instance.LogInfo("ADMIN", $"Team leader key of '{team.TeamName}' changed from '{team.OldKey}' to '{pick.Username}' by {DoorMode.OnlineUsername}");
+                }
+                else
+                {
+                    terminal.SetColor("red");
+                    terminal.WriteLine($"  {team.TeamName} was not changed; it may have been changed meanwhile. Open this again to see it as it is now.");
+                }
+                await ReadInput(Loc.Get("ui.press_enter"));
+            }
+
+            terminal.ClearScreen();
+            terminal.SetColor("white");
+            terminal.WriteLine(teams.Count == 0
+                ? "  Every team's leader key matches a character. Nothing to fix."
+                : $"  Leaders set: {done} of {teams.Count} team(s) that needed one.");
             terminal.WriteLine("");
             await ReadInput(Loc.Get("ui.press_enter"));
         }
