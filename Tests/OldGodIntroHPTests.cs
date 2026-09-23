@@ -30,6 +30,17 @@ public class OldGodIntroHPTests
     }
 
     [Fact]
+    public void NocturasBetrayalData_BuildsToItsFightHP()
+    {
+        // Her betrayal fight now calls CreateBossMonster; this pins the builder for her data (driving the
+        // betrayal itself means scripting its whole dialogue).
+        var data = UsurperRemake.Data.OldGodsData.GetNocturaBetrayal();
+        var monster = (Monster)typeof(OldGodBossSystem).GetMethod("CreateBossMonster", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .Invoke(OldGodBossSystem.Instance, new object[] { data })!;
+        monster.MaxHP.Should().Be(OldGodBossSystem.FightHP(data));
+    }
+
+    [Fact]
     public async Task TheRealIntroScreen_PrintsTheFightHP()
     {
         var data = UsurperRemake.Data.OldGodsData.GetGodBossData(OldGodType.Maelketh);

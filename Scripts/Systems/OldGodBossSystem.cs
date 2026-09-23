@@ -1309,44 +1309,10 @@ namespace UsurperRemake.Systems
                 await Task.Delay(2000);
             }
 
-            // Create Noctura as a monster for combat using the same pattern as CreateBossMonster
-            // v0.56.1: Apply Divine Scaling — Noctura is an Old God and should scale with artifacts too
-            int nocturaArtifactCount = ArtifactSystem.Instance.GetCollectedCount();
-            float nocturaHpScale = 1.0f + Math.Min(0.40f, nocturaArtifactCount * GameConfig.OldGodDivineScalingHPPerArtifact);
-            float nocturaDmgScale = 1.0f + Math.Min(0.20f, nocturaArtifactCount * GameConfig.OldGodDivineScalingDamagePerArtifact);
-            // Post-beta-launch baseline difficulty correction (15%): stacks with
-            // artifact-based Divine Scaling.
-            float nocturaBaseScale = GameConfig.BaseMonsterDifficultyScale;
-            long nocturaScaledHP = (long)(betrayalData.HP * nocturaHpScale * nocturaBaseScale);
-            long nocturaScaledStrength = (long)(betrayalData.Strength * nocturaDmgScale * nocturaBaseScale);
-            long nocturaScaledDefence = (long)(betrayalData.Defence * nocturaBaseScale);
-
-            long monsterStrength = nocturaScaledStrength / 2;
-            long monsterWeapPow = nocturaScaledStrength / 2;
-            int monsterDefence = (int)(nocturaScaledDefence / 2);
-            long monsterArmPow = nocturaScaledDefence / 2;
-
-            var noctura = new Monster
-            {
-                Name = betrayalData.Name,
-                Level = betrayalData.Level,
-                HP = nocturaScaledHP,
-                MaxHP = nocturaScaledHP,
-                Strength = monsterStrength,
-                WeapPow = monsterWeapPow,
-                Defence = monsterDefence,
-                ArmPow = monsterArmPow,
-                MagicRes = (int)(50 + betrayalData.Wisdom / 10),
-                MonsterColor = betrayalData.ThemeColor,
-                FamilyName = "OldGod",
-                IsBoss = true,
-                IsActive = true,
-                CanSpeak = true,
-                Phrase = betrayalData.LocIntro().Length > 0 ? betrayalData.LocIntro()[0] : "",
-                Experience = betrayalData.Level * 2000,
-                Gold = betrayalData.Level * 500,
-            };
-            noctura.SpecialAbilities = new List<string>(betrayalData.Phase1Abilities);
+            // v1.1.10: built by CreateBossMonster itself. It used to repeat that method's arithmetic
+            // line for line (artifact scaling, base difficulty scale, the Strength and Defence
+            // splits), which a later edit to one could silently leave behind in the other.
+            var noctura = CreateBossMonster(betrayalData);
 
             // Run combat
             terminal.Clear();
