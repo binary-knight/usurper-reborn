@@ -102,6 +102,17 @@ public class CompanionSpecialMitigationTests
     }
 
     [Fact]
+    public async Task AGodsNamedAbilityAimedAtACompanion_IsItsNormalAttack_NotAPoke()
+    {
+        // v1.1.10: "War Cry" is an Old God ability written against the player, not a MonsterAbility.
+        // Aimed at a companion it became a poke of about twice the god's level (800-1,199 here) that
+        // used up the god's turn. Now the god makes its normal attack: 1.3 x 4,000 = 5,200 plus a 0-9 roll.
+        var god = Cube(boss: true, ability: "War Cry", power: 2_000);
+        long taken = await Hit(Engine(), god, Tank(maxHp: 100_000), new CombatResult { CurrentRound = 10 });
+        taken.Should().BeInRange(5_200, 5_209);
+    }
+
+    [Fact]
     public async Task ShieldWallFormation_CutsASpecial()
     {
         var tank = Tank();

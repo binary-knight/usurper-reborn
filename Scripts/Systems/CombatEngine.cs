@@ -19707,22 +19707,11 @@ public partial class CombatEngine
                     // a separate beat from the followup attack.
                     await Task.Delay(GetCombatDelay(600));
                 }
-                else if (monster.IsBoss)
-                {
-                    // Old God abilities use custom names that don't match MonsterAbilities enum.
-                    // Generate direct damage so these thematic attacks still hurt companions.
-                    long bossDmg = (long)(monster.Level * 2) + random.Next(0, monster.Level);
-                    bossDmg = CapTeammateDamageInOldGodFight(companion, bossDmg);
-                    RecordAllyHit(companion, bossDmg); // v1.1.3
-                    companion.HP = Math.Max(0, companion.HP - bossDmg);
-                    terminal.SetColor("bright_red");
-                    terminal.WriteLine($"{monster.Name} unleashes {abilityName}!");
-                    terminal.SetColor("red");
-                    terminal.WriteLine($"{companion.DisplayName} takes {bossDmg} damage! ({companion.HP}/{companion.MaxHP} HP)");
-                    result.CombatLog.Add($"{monster.Name} uses {abilityName} on {companion.DisplayName} for {bossDmg}");
-                    await Task.Delay(GetCombatDelay(800));
-                    if (companion.IsAlive) return;
-                }
+                // v1.1.10: an Old God's own named abilities (War Cry, Shield Bash and the rest) are
+                // written against the player and are not MonsterAbilities, so aimed at a companion
+                // they used to become a flat poke of about twice the god's level, which used up the
+                // god's action and never showed the real ability. Now the god makes its normal attack
+                // on the companion instead (maintainer decision, 2026-09-23).
             }
         }
 
