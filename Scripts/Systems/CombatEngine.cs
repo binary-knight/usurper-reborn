@@ -26651,9 +26651,16 @@ public partial class CombatEngine
                 break;
 
             case "freeze":
-            case "frost":
                 target.ApplyStatus(StatusEffect.Frozen, duration);
                 terminal.WriteLine(Loc.Get("combat.is_frozen", target.DisplayName), "bright_cyan");
+                break;
+
+            // v1.1.10: frost slows, as it does against a monster. Frost Touch and Ice Storm are the
+            // Magician's damage spells; in PvP only, their frost froze the target solid (a full lost
+            // turn), and one side could keep the other frozen for a whole fight (player report).
+            case "frost":
+                target.ApplyStatus(StatusEffect.Slow, duration);
+                terminal.WriteLine(Loc.Get("combat.is_slowed", target.DisplayName), "gray");
                 break;
 
             case "fear":
