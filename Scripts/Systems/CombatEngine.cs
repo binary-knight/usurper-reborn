@@ -503,7 +503,9 @@ public partial class CombatEngine
         {
             st.ImmuneRounds--;
         }
-        if (++st.RoundsSinceLast >= GameConfig.StunDRWindowRounds) st.RecentCount = 0;
+        // the window is rounds with no hold: a held round does not count towards forgetting the last one
+        // (Codex review: counting held rounds reset the returns while the fighter was still held)
+        if (!IsHeld(fighter) && ++st.RoundsSinceLast >= GameConfig.StunDRWindowRounds) st.RecentCount = 0;
     }
 
     private void EndPvPCombat(Character attacker, Character defender)

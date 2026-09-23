@@ -105,6 +105,27 @@ public class PvPFrostTests
     }
 
     [Fact]
+    public void HoldsThatComeAgainAsSoonAsTheyCan_GetShorter()
+    {
+        // Codex's case: a 2-round stun asked for every round. Rounds held and immune rounds used to count
+        // towards forgetting the last hold, so every hold that landed was a full 2 rounds. Only free
+        // rounds count now, so the second hold that lands is halved.
+        var target = Duelist("Target");
+        var (engine, cast) = Duel(target);
+        var landed = new System.Collections.Generic.List<int>();
+        for (int round = 0; round < 16; round++)
+        {
+            bool before = Held(target);
+            cast("stun", 2);
+            if (!before && target.HasStatus(StatusEffect.Stunned)) landed.Add(target.ActiveStatuses[StatusEffect.Stunned]);
+            EndRound(engine, target);
+        }
+        landed.Should().HaveCountGreaterThan(1);
+        landed[0].Should().Be(2);
+        landed[1].Should().Be(1, "the second hold within the window is halved");
+    }
+
+    [Fact]
     public void Freeze_StillFreezes()
     {
         var target = Duelist("Target");
