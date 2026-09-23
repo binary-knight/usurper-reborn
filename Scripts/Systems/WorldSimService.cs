@@ -569,6 +569,9 @@ namespace UsurperRemake.Systems
 
                 // v1.1.11: teams nobody is in any more
                 PruneEmptyTeams();
+
+                // v1.1.11: then teams whose leader has left them
+                PassLeadershipOfDepartedLeaders();
             }
             catch (Exception ex)
             {
@@ -1450,6 +1453,26 @@ namespace UsurperRemake.Systems
                 DebugLogger.Instance.LogError("WORLDSIM", $"Failed to prune empty teams: {ex.Message}");
             }
             return removed;
+        }
+
+        /// <summary>
+        /// v1.1.11: a team whose leader key is a character that is no longer on it passes to the
+        /// highest-level remaining player member (SqlSaveBackend.TryPassTeamLeadership). A key matching
+        /// no character is left to the admin's Fix Team Leaders screen.
+        /// </summary>
+        internal int PassLeadershipOfDepartedLeaders()
+        {
+            int passed = 0;
+            try
+            {
+                foreach (var (team, leader) in sqlBackend.GetTeamsLedByExMembers())
+                    if (sqlBackend.TryPassTeamLeadership(team, leader, leader, requireOldLeaderGone: true, out _)) passed++;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("TEAM", $"Failed to pass on the leadership of teams: {ex.Message}");
+            }
+            return passed;
         }
 
         private static bool IsTeamOnline(string team)

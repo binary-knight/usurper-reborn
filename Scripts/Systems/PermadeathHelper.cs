@@ -442,6 +442,17 @@ namespace UsurperRemake.Systems
 
             try
             {
+                // v1.1.11: a team or guild the character led passes to its highest-level remaining player
+                if (!string.IsNullOrWhiteSpace(username))
+                {
+                    backend?.PassTeamLeadershipOfDeleted(username!);
+                    GuildSystem.Instance?.PassLeadershipOf(username!);
+                }
+            }
+            catch (Exception lex) { DebugLogger.Instance.LogWarning("DELETE", $"Leadership succession failed for '{name}': {lex.Message}"); }
+
+            try
+            {
                 int widowed = ClearNpcSpousesOf(name);
                 if (widowed > 0)
                     DebugLogger.Instance.LogInfo("DELETE", $"Cleared the marriage of {widowed} NPC(s) to deleted '{name}'.");

@@ -5226,6 +5226,130 @@ namespace UsurperRemake.Systems
     }
 
     /// <summary>
+    /// v1.1.11: the successor to a team or guild leader: the highest level first; the same level goes
+    /// to the earliest joiner when a join time is recorded (guild_members.joined_at; teams record none,
+    /// players.created_at is the account's age and last_join_at is per team), then the username in
+    /// ordinal order. Null when there is no candidate.
+    /// </summary>
+    public static string? PickSuccessor(IEnumerable<(string Username, int Level, string? JoinedAt)> candidates) =>
+        candidates.OrderByDescending(c => c.Level)
+            .ThenBy(c => c.JoinedAt == null ? 1 : 0)
+            .ThenBy(c => c.JoinedAt ?? "", StringComparer.Ordinal)
+            .ThenBy(c => c.Username, StringComparer.Ordinal)
+            .Select(c => c.Username).FirstOrDefault();
+
+    /// <summary>
+    /// v1.1.11: passes a team's leader key (created_by) from oldKey to the highest-level remaining
+    /// player member, never excludeKey, a banned player or an emergency account. Only if the team still
+    /// has oldKey; with requireOldLeaderGone, also only if oldKey's save no longer names the team. The
+    /// key is left alone when there is no successor. True when the team was updated.
+    /// </summary>
+    public bool TryPassTeamLeadership(string teamName, string oldKey, string? excludeKey, bool requireOldLeaderGone, out string? newKey)
+    {
+        newKey = null;
+        try
+        {
+            using var connection = OpenConnection();
+            var candidates = new List<(string, int, string?)>();
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = @"
+                    SELECT p.username, CAST(json_extract(p.player_data, '$.player.level') AS INTEGER)
+                    FROM players p
+                    WHERE (CASE WHEN json_valid(p.player_data) THEN json_extract(p.player_data, '$.player.team') END) = @team
+                    AND p.player_data != '{}' AND LENGTH(p.player_data) > 2
+                    AND p.is_banned = 0 AND p.username NOT LIKE 'emergency_%'
+                    AND LOWER(p.username) != LOWER(@old);";
+                cmd.Parameters.AddWithValue("@team", teamName);
+                cmd.Parameters.AddWithValue("@old", oldKey);
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    var key = reader.GetString(0);
+                    if (excludeKey != null && string.Equals(key, excludeKey, StringComparison.OrdinalIgnoreCase)) continue;
+                    candidates.Add((key, reader.IsDBNull(1) ? 0 : reader.GetInt32(1), null));
+                }
+            }
+            var successor = PickSuccessor(candidates);
+            if (successor == null) return false;
+            using (var update = connection.CreateCommand())
+            {
+                // v1.1.11: a leader key changed meanwhile (an admin fix, another pass) wins
+                update.CommandText = "UPDATE player_teams SET created_by = @new WHERE team_name = @team AND created_by = @old" +
+                    (requireOldLeaderGone ? @"
+                    AND NOT EXISTS (SELECT 1 FROM players l WHERE l.username = @old
+                        AND (NOT json_valid(l.player_data)
+                             OR (CASE WHEN json_valid(l.player_data) THEN json_extract(l.player_data, '$.player.team') END) = @team));" : ";");
+                update.Parameters.AddWithValue("@new", successor.ToLowerInvariant());
+                update.Parameters.AddWithValue("@team", teamName);
+                update.Parameters.AddWithValue("@old", oldKey);
+                if (update.ExecuteNonQuery() != 1) return false;
+            }
+            newKey = successor.ToLowerInvariant();
+            DebugLogger.Instance.LogInfo("TEAM", $"Team '{teamName}' leadership passed from '{oldKey}' to '{newKey}'");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("TEAM", $"Failed to pass the leadership of team '{teamName}': {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>v1.1.11: passes on every team led by a character that is being deleted (its row still names the team).</summary>
+    public int PassTeamLeadershipOfDeleted(string characterKey)
+    {
+        if (string.IsNullOrWhiteSpace(characterKey)) return 0;
+        var teams = new List<(string Team, string Key)>();
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT team_name, created_by FROM player_teams WHERE LOWER(created_by) = LOWER(@key);";
+            cmd.Parameters.AddWithValue("@key", characterKey);
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read()) teams.Add((reader.GetString(0), reader.GetString(1)));
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("TEAM", $"Failed to list the teams led by '{characterKey}': {ex.Message}");
+        }
+        return teams.Count(t => TryPassTeamLeadership(t.Team, t.Key, characterKey, requireOldLeaderGone: false, out _));
+    }
+
+    /// <summary>
+    /// v1.1.11: teams whose leader key is a known character (a players row) whose valid save no longer
+    /// names the team, and that nobody joined within EmptyTeamJoinGraceMinutes (a joiner's save may not
+    /// have landed). A key that matches no character is the admin's Fix Team Leaders screen's to map,
+    /// so it is never listed here.
+    /// </summary>
+    public List<(string Team, string Leader)> GetTeamsLedByExMembers()
+    {
+        var teams = new List<(string, string)>();
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"
+                SELECT t.team_name, t.created_by FROM player_teams t
+                JOIN players l ON l.username = t.created_by
+                -- a deleted character's row stays with '{}' (DeleteGameData), which names no team
+                WHERE json_valid(l.player_data)
+                AND COALESCE((CASE WHEN json_valid(l.player_data) THEN json_extract(l.player_data, '$.player.team') END), '') != t.team_name
+                AND (t.last_join_at IS NULL OR t.last_join_at < datetime('now', '-' || @joinGrace || ' minutes'))
+                ORDER BY t.team_name;";
+            cmd.Parameters.AddWithValue("@joinGrace", GameConfig.EmptyTeamJoinGraceMinutes);
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read()) teams.Add((reader.GetString(0), reader.GetString(1)));
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("TEAM", $"Failed to list teams led by ex-members: {ex.Message}");
+        }
+        return teams;
+    }
+
+    /// <summary>
     /// v0.61.5: Queue an item for delivery to a player on their next login.
     /// Used when a team NPC dies of old age — their belongings go to the team
     /// leader. Each call queues one item (or a gold amount when itemJson is null).

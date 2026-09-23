@@ -65,12 +65,15 @@ public class GuildSystem
     public static bool RankCanKick(string rank) => rank == "Leader";
     public static bool RankCanPromote(string rank) => rank == "Leader";
 
-    public GuildSystem(string databasePath)
+    public GuildSystem(string databasePath) : this(databasePath, register: true) { }
+
+    /// <summary>v1.1.11: register false leaves Instance alone (tests on a temporary database).</summary>
+    internal GuildSystem(string databasePath, bool register)
     {
         connectionString = $"Data Source={databasePath}";
         InitializeTables();
         LoadMembershipCache();
-        Instance = this;
+        if (register) Instance = this;
     }
 
     private void InitializeTables()
@@ -167,6 +170,95 @@ public class GuildSystem
     {
         if (!string.IsNullOrWhiteSpace(username))
             membershipCache.TryRemove(username, out _);
+    }
+
+    /// <summary>
+    /// v1.1.11: passes a guild from oldLeader to the highest-level remaining member who has a character
+    /// and is neither banned nor an emergency account; ties go to the earliest joined_at, then the
+    /// username in ordinal order (SqlSaveBackend.PickSuccessor). Only if the guild is still oldLeader's.
+    /// A guild with no candidate is left as it is. Returns the new leader, or null.
+    /// </summary>
+    public string? PassLeadership(string guildName, string oldLeader)
+    {
+        try
+        {
+            using var conn = new SqliteConnection(connectionString);
+            conn.Open();
+            var candidates = new List<(string, int, string?)>();
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = @"
+                    SELECT gm.username,
+                           CAST(CASE WHEN json_valid(p.player_data) THEN json_extract(p.player_data, '$.player.level') END AS INTEGER),
+                           gm.joined_at
+                    FROM guild_members gm
+                    JOIN players p ON p.username = gm.username COLLATE NOCASE
+                    WHERE gm.guild_name = @guild COLLATE NOCASE
+                    AND p.is_banned = 0 AND p.username NOT LIKE 'emergency_%'
+                    AND LOWER(gm.username) != LOWER(@old)";
+                cmd.Parameters.AddWithValue("@guild", guildName);
+                cmd.Parameters.AddWithValue("@old", oldLeader);
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                    candidates.Add((reader.GetString(0), reader.IsDBNull(1) ? 0 : reader.GetInt32(1), reader.IsDBNull(2) ? null : reader.GetString(2)));
+            }
+            var successor = SqlSaveBackend.PickSuccessor(candidates);
+            if (successor == null) return null;
+
+            using var tx = conn.BeginTransaction();
+            using (var update = conn.CreateCommand())
+            {
+                // v1.1.11: a leader changed meanwhile (a transfer) wins
+                update.Transaction = tx;
+                update.CommandText = "UPDATE guilds SET leader_username = @new WHERE name = @guild COLLATE NOCASE AND leader_username = @old COLLATE NOCASE";
+                update.Parameters.AddWithValue("@new", successor.ToLowerInvariant());
+                update.Parameters.AddWithValue("@guild", guildName);
+                update.Parameters.AddWithValue("@old", oldLeader);
+                if (update.ExecuteNonQuery() != 1) return null;
+            }
+            using (var rank = conn.CreateCommand())
+            {
+                rank.Transaction = tx;
+                rank.CommandText = "UPDATE guild_members SET rank = 'Leader' WHERE username = @new COLLATE NOCASE AND guild_name = @guild COLLATE NOCASE";
+                rank.Parameters.AddWithValue("@new", successor);
+                rank.Parameters.AddWithValue("@guild", guildName);
+                rank.ExecuteNonQuery();
+            }
+            tx.Commit();
+            DebugLogger.Instance?.LogInfo("GUILD", $"Guild '{guildName}' leadership passed from '{oldLeader}' to '{successor.ToLowerInvariant()}'");
+            return successor.ToLowerInvariant();
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance?.LogError("GUILD", $"Failed to pass the leadership of guild '{guildName}': {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// v1.1.11: passes on every guild led by a deleted or permadead character, after the purge removed
+    /// its guild_members row. Leadership is not cached, so the membership cache needs nothing here.
+    /// </summary>
+    public int PassLeadershipOf(string username)
+    {
+        if (string.IsNullOrWhiteSpace(username)) return 0;
+        var guilds = new List<(string Name, string Leader)>();
+        try
+        {
+            using var conn = new SqliteConnection(connectionString);
+            conn.Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"SELECT g.name, g.leader_username FROM guilds g WHERE g.leader_username = @user COLLATE NOCASE
+                AND NOT EXISTS (SELECT 1 FROM guild_members gm WHERE gm.username = @user COLLATE NOCASE AND gm.guild_name = g.name COLLATE NOCASE)";
+            cmd.Parameters.AddWithValue("@user", username);
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read()) guilds.Add((reader.GetString(0), reader.GetString(1)));
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance?.LogError("GUILD", $"Failed to list the guilds led by '{username}': {ex.Message}");
+        }
+        return guilds.Count(g => PassLeadership(g.Name, g.Leader) != null);
     }
 
     /// <summary>
@@ -341,23 +433,18 @@ public class GuildSystem
             // If leader left, promote next member or disband
             if (isLeader)
             {
-                // Prefer promoting an Officer, otherwise oldest member
-                using var nextCmd = conn.CreateCommand();
-                nextCmd.CommandText = @"SELECT username FROM guild_members WHERE guild_name = @guild
-                    ORDER BY CASE rank WHEN 'Officer' THEN 0 ELSE 1 END, joined_at ASC LIMIT 1";
-                nextCmd.Parameters.AddWithValue("@guild", guildName);
-                var nextMember = nextCmd.ExecuteScalar()?.ToString();
-
-                if (nextMember != null)
+                int remaining;
+                using (var countCmd = conn.CreateCommand())
                 {
-                    // Promote next member to leader
-                    using var promoteCmd = conn.CreateCommand();
-                    promoteCmd.CommandText = @"
-                        UPDATE guilds SET leader_username = @user WHERE name = @guild;
-                        UPDATE guild_members SET rank = 'Leader' WHERE username = @user AND guild_name = @guild";
-                    promoteCmd.Parameters.AddWithValue("@user", nextMember);
-                    promoteCmd.Parameters.AddWithValue("@guild", guildName);
-                    promoteCmd.ExecuteNonQuery();
+                    countCmd.CommandText = "SELECT COUNT(*) FROM guild_members WHERE guild_name = @guild";
+                    countCmd.Parameters.AddWithValue("@guild", guildName);
+                    remaining = Convert.ToInt32(countCmd.ExecuteScalar());
+                }
+
+                if (remaining > 0)
+                {
+                    // v1.1.11: the highest-level remaining player takes over (was: an Officer, else the oldest member)
+                    PassLeadership(guildName, username);
                 }
                 else
                 {

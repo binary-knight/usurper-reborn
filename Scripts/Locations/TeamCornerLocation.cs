@@ -1188,6 +1188,11 @@ public class TeamCornerLocation : BaseLocation
                 {
                     await backend.UpdatePlayerTeamMemberCount(oldTeam);
 
+                    // v1.1.11: a leader who quits passes the team to the highest-level player left in it
+                    string myKey = GameEngine.InheritanceKey(currentPlayer);
+                    if (string.Equals(await backend.GetTeamLeaderUsername(oldTeam), myKey, StringComparison.Ordinal))
+                        backend.TryPassTeamLeadership(oldTeam, myKey, myKey, requireOldLeaderGone: true, out _);
+
                     // If team is now empty (no players AND no NPCs), delete it
                     var remainingPlayers = await backend.GetPlayerTeamMembers(oldTeam);
                     var remainingNPCs = NPCSpawnSystem.Instance.ActiveNPCs
