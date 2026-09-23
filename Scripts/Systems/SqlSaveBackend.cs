@@ -5445,7 +5445,16 @@ namespace UsurperRemake.Systems
         {
             using var connection = OpenConnection();
             using var cmd = connection.CreateCommand();
-            cmd.CommandText = "SELECT team_name, created_by, member_count, controls_turf, created_at FROM player_teams ORDER BY member_count DESC;";
+            // v1.1.11: the member count is counted here; the stored column was refreshed only when someone
+            // opened that team's roster, so the rankings showed teams with players in them as empty
+            cmd.CommandText = @"
+                SELECT t.team_name, t.created_by,
+                       (SELECT COUNT(*) FROM players p
+                        WHERE (CASE WHEN json_valid(p.player_data) THEN json_extract(p.player_data, '$.player.team') END) = t.team_name
+                        AND p.player_data != '{}' AND LENGTH(p.player_data) > 2
+                        AND p.is_banned = 0 AND p.username NOT LIKE 'emergency_%') AS members,
+                       t.controls_turf, t.created_at
+                FROM player_teams t ORDER BY members DESC;";
             using var reader = await Task.Run(() => cmd.ExecuteReader());
             while (reader.Read())
             {
@@ -5524,6 +5533,70 @@ namespace UsurperRemake.Systems
             DebugLogger.Instance.LogError("SQL", $"Failed to get player team members for '{teamName}': {ex.Message}");
         }
         return members;
+    }
+
+    /// <summary>
+    /// v1.1.11: player teams that no player's save names, banned players included (a ban can be lifted).
+    /// Whether an NPC or an online player still carries the name is for the caller to check
+    /// (WorldSimService.PruneEmptyTeams); only it knows the live roster.
+    /// </summary>
+    public List<string> GetTeamsWithoutPlayerMembers()
+    {
+        var teams = new List<string>();
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"
+                SELECT t.team_name FROM player_teams t
+                WHERE NOT EXISTS (SELECT 1 FROM players p
+                    WHERE (CASE WHEN json_valid(p.player_data) THEN json_extract(p.player_data, '$.player.team') END) = t.team_name);";
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read()) teams.Add(reader.GetString(0));
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to list teams without player members: {ex.Message}");
+        }
+        return teams;
+    }
+
+    /// <summary>
+    /// v1.1.11: removes a team nobody is in, with its upgrades and vault, in one transaction; only if no
+    /// player's save names it at the moment of the delete. True when it was removed.
+    /// </summary>
+    public bool DeleteEmptyTeam(string teamName)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var tx = connection.BeginTransaction();
+            using (var team = connection.CreateCommand())
+            {
+                team.Transaction = tx;
+                team.CommandText = @"
+                    DELETE FROM player_teams WHERE team_name = @team
+                    AND NOT EXISTS (SELECT 1 FROM players p
+                        WHERE (CASE WHEN json_valid(p.player_data) THEN json_extract(p.player_data, '$.player.team') END) = @team);";
+                team.Parameters.AddWithValue("@team", teamName);
+                if (team.ExecuteNonQuery() != 1) return false;
+            }
+            foreach (var table in new[] { "team_upgrades", "team_vault" })
+            {
+                using var rest = connection.CreateCommand();
+                rest.Transaction = tx;
+                rest.CommandText = $"DELETE FROM {table} WHERE team_name = @team;";
+                rest.Parameters.AddWithValue("@team", teamName);
+                rest.ExecuteNonQuery();
+            }
+            tx.Commit();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to remove empty team '{teamName}': {ex.Message}");
+            return false;
+        }
     }
 
     public async Task DeletePlayerTeam(string teamName)

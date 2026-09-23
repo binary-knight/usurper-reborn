@@ -566,6 +566,9 @@ namespace UsurperRemake.Systems
 
                 // Clean up orphaned data from deleted players
                 await sqlBackend.PruneOrphanedPlayerData();
+
+                // v1.1.11: teams nobody is in any more
+                PruneEmptyTeams();
             }
             catch (Exception ex)
             {
@@ -1390,6 +1393,46 @@ namespace UsurperRemake.Systems
             {
                 DebugLogger.Instance.LogError("WORLDSIM", $"Failed to load settlement state: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// v1.1.11: removes player teams that nobody is in: no player's save names the team, no NPC
+        /// (living or dead) carries it, and no player online has it in hand, e.g. between joining and
+        /// the save that records it. The team's upgrades and vault go with it.
+        /// </summary>
+        internal int PruneEmptyTeams()
+        {
+            int removed = 0;
+            try
+            {
+                var npcTeams = new HashSet<string>(NPCSpawnSystem.Instance.ActiveNPCs
+                    .Where(n => !string.IsNullOrEmpty(n.Team)).Select(n => n.Team!));
+                var sessions = UsurperRemake.Server.MudServer.Instance?.ActiveSessions.Values;
+                var onlineTeams = new HashSet<string>(sessions == null ? Enumerable.Empty<string>()
+                    : sessions.Select(s => s.Context?.Player?.Team).Where(t => !string.IsNullOrEmpty(t)).Select(t => t!));
+                var gone = new List<string>();
+                foreach (var team in sqlBackend.GetTeamsWithoutPlayerMembers())
+                {
+                    if (npcTeams.Contains(team) || onlineTeams.Contains(team)) continue;
+                    if (!sqlBackend.DeleteEmptyTeam(team)) continue;
+                    gone.Add(team);
+                    DebugLogger.Instance.LogInfo("WORLDSIM", $"Removed empty team '{team}'");
+                }
+                removed = gone.Count;
+                if (removed > 0)
+                {
+                    // the protection list ignores case: keep a name another team or an NPC still has
+                    var kept = sqlBackend.GetPlayerTeams().GetAwaiter().GetResult().Select(t => t.TeamName)
+                        .Concat(npcTeams).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                    foreach (var team in gone)
+                        if (!kept.Contains(team)) WorldSimulator.UnregisterPlayerTeam(team);
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("WORLDSIM", $"Failed to prune empty teams: {ex.Message}");
+            }
+            return removed;
         }
 
         /// <summary>
