@@ -26143,10 +26143,23 @@ public partial class CombatEngine
     /// v1.1.11: a duel won against an NPC (killed or spared) pays its bounty and meets a Defeat objective,
     /// as a street fight always did. A player loaded from a save is not an NPC and is left alone.
     /// </summary>
-    private void ReportNPCDefeat(CombatResult result)
+    private async Task ReportDuelDefeat(CombatResult result)
     {
-        if (result.Opponent is not NPC npc || result.Player == null) return;
-        long bounty = QuestSystem.RecordNPCDefeat(result.Player, npc, killed: _pvpLethal && !npc.IsAlive);
+        if (result.Player == null || result.Opponent == null) return;
+        long bounty;
+        if (result.Opponent is NPC npc)
+            bounty = QuestSystem.RecordNPCDefeat(result.Player, npc, killed: _pvpLethal && !npc.IsAlive);
+        else
+        {
+            // v1.1.11: a Crown bounty on a player is paid to the duel's winner, lethal or not (a duel won)
+            var paid = QuestSystem.CollectBountiesOnPlayer(result.Player, result.Opponent);
+            bounty = paid.Sum(QuestSystem.BountyReward);
+            if (paid.Count > 0 && UsurperRemake.BBS.DoorMode.IsOnlineMode && OnlineStateManager.IsActive)
+            {
+                var ids = paid.Select(q => q.Id).ToHashSet();
+                await OnlineStateManager.Instance!.RemoveSharedQuestsAsync(q => ids.Contains(q.Id));   // edited in place
+            }
+        }
         if (bounty > 0)
         {
             terminal.WriteLine(Loc.Get("street.fight.bounty_collected", bounty.ToString("N0")), "bright_yellow");
@@ -26210,7 +26223,7 @@ public partial class CombatEngine
             // No XP/gold reward -- sparing isn't a kill. The alignment +
             // relationship swing is the reward.
             // v1.1.11: but the NPC was beaten, so a bounty or Defeat objective on it is met
-            ReportNPCDefeat(result);
+            await ReportDuelDefeat(result);
             return;
         }
 
@@ -26296,7 +26309,7 @@ public partial class CombatEngine
             result.Player.Gold += goldReward;
             result.ExperienceGained = xpReward;
             result.GoldGained = goldReward;
-            ReportNPCDefeat(result);   // v1.1.11
+            await ReportDuelDefeat(result);   // v1.1.11
 
             // Track peak gold
             result.Player.Statistics?.RecordGoldChange(result.Player.Gold);

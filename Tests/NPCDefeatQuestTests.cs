@@ -125,4 +125,54 @@ public class NPCDefeatQuestTests
         bounty.Deleted.Should().BeFalse();
         bounty.Deleted = true;
     }
+
+    private static Quest BountyOnPlayer(string name, long gold)
+    {
+        var q = new Quest
+        {
+            Title = "WANTED: " + name, Initiator = "The Crown", QuestTarget = QuestTarget.DefeatNPC, TargetNPCName = name,
+            BountyGold = gold, IsPlayerBounty = true, Date = DateTime.Now, DaysToComplete = 30
+        };
+        QuestSystem.AddQuestToDatabase(q);
+        return q;
+    }
+
+    [Fact]
+    public async Task BeatingAPlayerWithABountyInADuel_PaysTheWinnerOnce()
+    {
+        // Jason's decision: a Crown bounty on a player is paid to whoever beats them in a duel. The
+        // Inn and Dormitory attacks on a sleeping player end in this same duel outcome.
+        var bounty = BountyOnPlayer("Wanted Rogue", 4000);
+        var winner = new Character { Name1 = "sheriff", Name2 = "Sheriff", Level = 30, Gold = 0, HP = 500, MaxHP = 500 };
+        var rogue = new Character { Name1 = "wanted_rogue", Name2 = "Wanted Rogue", Level = 30, HP = 0, MaxHP = 400 };
+        await Outcome(new CombatResult { Player = winner, Opponent = rogue });
+        winner.Gold.Should().BeGreaterThanOrEqualTo(4000);
+        bounty.Deleted.Should().BeTrue();
+
+        long after = winner.Gold;
+        rogue.HP = 0;
+        await Outcome(new CombatResult { Player = winner, Opponent = rogue });
+        (winner.Gold - after).Should().BeLessThan(4000, "the bounty is paid once");
+    }
+
+    [Fact]
+    public void APlayer_CannotCollectTheBountyOnThemselves()
+    {
+        var bounty = BountyOnPlayer("Self Collector", 3000);
+        var self = new Character { Name1 = "self_collector", Name2 = "Self Collector", Level = 30 };
+        QuestSystem.CollectBountiesOnPlayer(self, self).Should().BeEmpty();
+        bounty.Deleted.Should().BeFalse();
+        bounty.Deleted = true;
+    }
+
+    [Fact]
+    public async Task ADuelWonAgainstAnNPC_StillDoesNotPayABountyOnAPlayerOfThatName()
+    {
+        var bounty = BountyOnPlayer("Twin Name", 3000);
+        var winner = new Character { Name1 = "hunter_tn", Name2 = "Hunter TN", Level = 30, Gold = 0, HP = 500, MaxHP = 500 };
+        var npcTwin = new NPC { ID = "npc_twin_name", Name1 = "Twin Name", Name2 = "Twin Name", Level = 30, HP = 0, MaxHP = 400 };
+        await Outcome(new CombatResult { Player = winner, Opponent = npcTwin });
+        bounty.Deleted.Should().BeFalse();
+        bounty.Deleted = true;
+    }
 }

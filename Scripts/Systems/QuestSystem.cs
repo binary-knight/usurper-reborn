@@ -1550,6 +1550,43 @@ public partial class QuestSystem
     }
 
     /// <summary>
+    /// v1.1.11: a Crown bounty posted on a player is paid to whoever beats that player in a duel (the arena,
+    /// a sleeping player at the Inn or Dormitory, the Dark Alley, the throne). Nothing paid it before. The
+    /// bounty is claimed under the payout lock before it is paid, so it is paid once; a player never
+    /// collects the bounty on themselves. Returns the bounties paid, for the caller to show and persist.
+    /// </summary>
+    public static List<Quest> CollectBountiesOnPlayer(Character winner, Character loser)
+    {
+        var names = new[] { loser.Name2, loser.DisplayName }.Where(n => !string.IsNullOrWhiteSpace(n)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        if (winner == null || names.Count == 0) return new List<Quest>();
+        if (names.Any(n => n.Equals(winner.Name2, StringComparison.OrdinalIgnoreCase) || n.Equals(winner.DisplayName, StringComparison.OrdinalIgnoreCase)))
+            return new List<Quest>();
+
+        List<Quest> claimed;
+        lock (_bountyPayoutLock)
+        {
+            claimed = questDatabase.Where(q => !q.Deleted && q.IsPlayerBounty && q.Initiator == KING_BOUNTY_INITIATOR &&
+                !string.IsNullOrEmpty(q.TargetNPCName) && names.Any(n => q.TargetNPCName.Equals(n, StringComparison.OrdinalIgnoreCase))).ToList();
+            foreach (var q in claimed) { q.Deleted = true; q.Occupier = winner.Name2; q.OccupiedDays = 1; }
+        }
+
+        foreach (var bounty in claimed)
+        {
+            long reward = bounty.BountyGold > 0 ? bounty.BountyGold : bounty.Reward * 100L;
+            if (reward <= 0) reward = 500;
+            winner.Gold += reward;
+            long xpReward = TeamHQBonus.ApplyXP(winner, Math.Max(winner.Level * 50, reward / 5));
+            winner.Experience += xpReward;
+            DebugLogger.Instance.LogInfo("GOLD", $"PLAYER BOUNTY: {winner.DisplayName} +{reward:N0}g for the bounty on {bounty.TargetNPCName}");
+            StatisticsManager.Current?.RecordBountyComplete();
+            NewsSystem.Instance?.Newsy(true, Loc.Get("quest.bounty_collected_news", winner.Name2, bounty.TargetNPCName, reward));
+        }
+        return claimed;
+    }
+
+    public static long BountyReward(Quest q) => q.BountyGold > 0 ? q.BountyGold : Math.Max(500, q.Reward * 100L);
+
+    /// <summary>
     /// v1.1.11: a player beat an NPC, by any route: a street fight, a duel, the pit, the Inn challenge,
     /// or sparing one who surrendered. Pays any bounty on the NPC and records the Defeat objective.
     /// Only the street fights did this, so a WANTED target beaten anywhere else stayed at 0/1
