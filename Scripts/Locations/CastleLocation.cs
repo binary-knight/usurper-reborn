@@ -8612,6 +8612,7 @@ public class CastleLocation : BaseLocation
                 // Monster retaliates
                 long monsterDmg = Math.Max(1, monsterStr - teamDefense / memberCount);
                 monsterDmg = (long)(monsterDmg * (0.8 + random.NextDouble() * 0.4));
+                monsterDmg = TeamHQBonus.ApplyDefense(currentPlayer, monsterDmg); // v1.1.11: Team HQ Barracks, last.
                 teamHP -= monsterDmg;
 
                 terminal.SetColor("red");
@@ -8682,6 +8683,7 @@ public class CastleLocation : BaseLocation
 
                     long guardDmg = Math.Max(1, guardStr - teamDefense / memberCount);
                     guardDmg = (long)(guardDmg * (0.8 + random.NextDouble() * 0.4));
+                    guardDmg = TeamHQBonus.ApplyDefense(currentPlayer, guardDmg); // v1.1.11: Team HQ Barracks, last.
                     teamHP -= guardDmg;
 
                     terminal.SetColor("red");

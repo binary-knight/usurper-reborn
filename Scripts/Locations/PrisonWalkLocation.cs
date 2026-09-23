@@ -501,6 +501,7 @@ public partial class PrisonWalkLocation : BaseLocation
 
                 // Guard counter-attacks
                 int guardDamage = CalculateDamage(guard, player, random);
+                guardDamage = (int)TeamHQBonus.ApplyDefense(player, guardDamage); // v1.1.11: Team HQ Barracks, last.
                 player.HP = Math.Max(0, player.HP - guardDamage);
 
                 await terminal.WriteAsync(Loc.Get("prison_walk.strikes_back", guard.Name2));

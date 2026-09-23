@@ -1955,12 +1955,17 @@ namespace UsurperRemake.Systems
             double mult = focused ? GameConfig.WorldBossFocusMultiplier : GameConfig.WorldBossOffFocusMultiplier;
             for (int i = 0; i < attacks && player.HP > 0; i++)
             {
-                long bossDmg = Math.Max(1, (long)(CalculateBossBasicDamage(bossData, player, rng, defendingRounds) * mult));
+                long beforeBarracks = Math.Max(1, (long)(CalculateBossBasicDamage(bossData, player, rng, defendingRounds) * mult));
+                // v1.1.11: Team HQ Barracks last; the 20%-of-STR minimum holds where it held before.
+                long bossDmg = Math.Max(Math.Min(beforeBarracks, BossMinimumDamage(bossData)), TeamHQBonus.ApplyDefense(player, beforeBarracks));
                 player.HP = Math.Max(0, player.HP - bossDmg);
                 terminal.SetColor("bright_red");
                 terminal.WriteLine($"  {Loc.Get(focused ? "world_boss.boss_strikes_focused" : "world_boss.boss_strikes", bossDef.Name, $"{bossDmg:N0}", player.HP, player.MaxHP)}");
             }
         }
+
+        // Defense never takes a boss basic attack below 20% of the boss's strength.
+        private static long BossMinimumDamage(WorldBossRuntimeData bossData) => Math.Max(1, bossData.ScaledStrength / 5);
 
         private long CalculateBossBasicDamage(WorldBossRuntimeData bossData, Character player, Random rng,
             int defendingRounds)
@@ -1982,8 +1987,7 @@ namespace UsurperRemake.Systems
             // Defense can reduce damage but never below 20% of boss strength
             // World bosses are meant to be dangerous — pure defense stacking shouldn't trivialize them
             long raw = Math.Max(1, bossStr - playerDef / 2);
-            long minDamage = Math.Max(1, bossStr / 5);
-            raw = Math.Max(raw, minDamage);
+            raw = Math.Max(raw, BossMinimumDamage(bossData));
             double variance = 0.7 + rng.NextDouble() * 0.6;
             long final = Math.Max(1, (long)(raw * variance));
 

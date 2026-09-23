@@ -6910,7 +6910,7 @@ public abstract class BaseLocation
                 if (armory > 0)
                     terminal.WriteLine($"  - {Loc.Get("base.hq_armory", armory, (int)Math.Round(armory * TeamHQBonus.ArmoryPerLevel * 100))}");
                 if (barracks > 0)
-                    terminal.WriteLine($"  - {Loc.Get("base.hq_barracks", barracks, (int)Math.Round(barracks * TeamHQBonus.BarracksPerLevel * 100))}");
+                    terminal.WriteLine($"  - {Loc.Get("base.hq_barracks", barracks, (int)Math.Round((1.0 - 1.0 / TeamHQBonus.DefenseMultiplier(currentPlayer)) * 100))}");   // v1.1.11: the real reduction (damage / (1 + 5% per level))
                 if (training > 0)
                     terminal.WriteLine($"  - {Loc.Get("base.hq_training", training, (int)Math.Round(training * TeamHQBonus.TrainingPerLevel * 100))}");
                 if (infirmary > 0)

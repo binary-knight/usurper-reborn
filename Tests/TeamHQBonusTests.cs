@@ -154,6 +154,7 @@ public class TeamHQBonusTests : IDisposable
         var shown = System.Text.Encoding.UTF8.GetString(output.ToArray());
         shown.Should().Contain(Loc.Get("base.hq_armory", 3, 15));
         shown.Should().Contain(Loc.Get("base.hq_infirmary", 4, 40));
+        shown.Should().Contain(Loc.Get("base.hq_barracks", 2, 9), "Barracks 2 divides damage by 1.1: about 9% less");
 
         hero.Team = "";   // left the team
         output.SetLength(0);

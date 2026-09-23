@@ -1520,7 +1520,7 @@ public partial class CombatEngine
                     long drainAmount = Math.Min(drugEffects.HPDrain, player.HP - 1); // Don't kill from drain (min 1 HP)
                     if (drainAmount > 0)
                     {
-                        player.HP -= drainAmount;
+                        player.HP -= drainAmount; // hq-barracks: out (drug drain, self-inflicted)
                         terminal.SetColor("dark_red");
                         terminal.WriteLine(Loc.Get("combat.drug_drain", drainAmount));
                     }
@@ -1535,7 +1535,7 @@ public partial class CombatEngine
                 int poisonIntensity = player.Poison / 5;
                 int poisonDmg = Math.Min(poisonBase + poisonLevel + poisonIntensity,
                     (int)Math.Max(3, player.MaxHP / 10));
-                player.HP = Math.Max(0, player.HP - poisonDmg);
+                player.HP = Math.Max(0, player.HP - poisonDmg); // hq-barracks: out (trap and event poison counter)
                 terminal.SetColor("dark_green");
                 terminal.WriteLine(Loc.Get("combat.poison_courses", poisonDmg));
 
@@ -5317,12 +5317,6 @@ public partial class CombatEngine
             playerDefense += (long)(playerDefense * (player.PermanentDefenseBonus / 100.0));
         }
 
-        // Team HQ Barracks bonus: +5% defense per level
-        if (TeamHQBonus.Barracks(player) > 0)
-        {
-            playerDefense += (long)(playerDefense * (TeamHQBonus.Barracks(player) * 0.05));
-        }
-
         // Knighthood bonus: +5% defense for knighted players
         if (player.IsKnighted)
         {
@@ -5459,6 +5453,10 @@ public partial class CombatEngine
 
         // v0.65.8 (R3): failed flee this round -> guarded half-round
         actualDamage = ApplyFleeGrace(player, actualDamage);
+
+        // v1.1.11: Team HQ Barracks last, before divine intervention, sacrifice and reflect read the
+        // number; the anti-tank minimum holds where it held before.
+        actualDamage = Math.Max(Math.Min(actualDamage, minDamage), TeamHQBonus.ApplyDefense(player, actualDamage));
 
         // Invulnerable: divine shield blocks all damage. Checked BEFORE divine
         // intervention and companion sacrifice -- the sacrifice used to fire first,
@@ -5776,6 +5774,8 @@ public partial class CombatEngine
 
                 // v0.65.8 (R3): failed flee this round -> guarded half-round
                 actualDamage = ApplyFleeGrace(player, actualDamage);
+                // v1.1.11: Team HQ Barracks last; the anti-tank minimum holds where it held before.
+                actualDamage = Math.Max(Math.Min(actualDamage, GetMinIncomingDamage(player, abilityResult.DirectDamage)), TeamHQBonus.ApplyDefense(player, actualDamage));
 
                 player.HP = Math.Max(0, player.HP - actualDamage);
 
@@ -5893,6 +5893,8 @@ public partial class CombatEngine
 
                 // v0.65.8 (R3): failed flee this round -> guarded half-round
                 damage = ApplyFleeGrace(player, damage);
+                // v1.1.11: Team HQ Barracks last, before the drain heal reads it; the minimum holds where it held.
+                damage = Math.Max(Math.Min(damage, GetMinIncomingDamage(player, rawLifeStealDamage)), TeamHQBonus.ApplyDefense(player, damage));
 
                 player.HP -= damage;
                 long healAmount = damage * abilityResult.LifeStealPercent / 100;
@@ -5954,6 +5956,8 @@ public partial class CombatEngine
 
                 // v0.65.8 (R3): failed flee this round -> guarded half-round
                 damage = ApplyFleeGrace(player, damage);
+                // v1.1.11: Team HQ Barracks last; the anti-tank minimum holds where it held before.
+                damage = Math.Max(Math.Min(damage, GetMinIncomingDamage(player, rawDamage)), TeamHQBonus.ApplyDefense(player, damage));
 
                 player.HP -= damage;
                 terminal.WriteLine(Loc.Get("combat.you_take_damage", damage), "red");
@@ -6068,6 +6072,7 @@ public partial class CombatEngine
 
         // Failed flee this round -> guarded half-round
         actualDamage = ApplyFleeGrace(player, actualDamage);
+        actualDamage = TeamHQBonus.ApplyDefense(player, actualDamage); // v1.1.11: Team HQ Barracks, last
 
         player.HP = Math.Max(0, player.HP - actualDamage);
 
@@ -6443,7 +6448,7 @@ public partial class CombatEngine
 
             case "Unmake":
             {
-                long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 2.5) - player.Defence));
+                long damage = TeamHQBonus.ApplyDefense(player, Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 2.5) - player.Defence))); // v1.1.11: Team HQ Barracks, last
                 if (player.HasStatus(StatusEffect.Invulnerable))
                 {
                     terminal.WriteLine($"  {Loc.Get("combat.manwe_unmake_shield")}", "bright_white");
@@ -6473,7 +6478,7 @@ public partial class CombatEngine
                 {
                     flavor = $"  {Loc.Get("combat.manwe_judgment_normal")}";
                 }
-                long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * mult) - player.Defence));
+                long damage = TeamHQBonus.ApplyDefense(player, Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * mult) - player.Defence))); // v1.1.11: Team HQ Barracks, last
                 if (player.HasStatus(StatusEffect.Invulnerable))
                 {
                     terminal.WriteLine($"  {Loc.Get("combat.manwe_judgment_block")}", "bright_white");
@@ -6528,7 +6533,7 @@ public partial class CombatEngine
                 else if (effect == 1)
                 {
                     // 1.5x damage
-                    long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 1.5) - player.Defence));
+                    long damage = TeamHQBonus.ApplyDefense(player, Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 1.5) - player.Defence))); // v1.1.11: Team HQ Barracks, last
                     if (!player.HasStatus(StatusEffect.Invulnerable))
                     {
                         player.HP -= damage;
@@ -6556,7 +6561,7 @@ public partial class CombatEngine
                     }
                     else
                     {
-                        long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 1.5) - player.Defence));
+                        long damage = TeamHQBonus.ApplyDefense(player, Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 1.5) - player.Defence))); // v1.1.11: Team HQ Barracks, last
                         if (!player.HasStatus(StatusEffect.Invulnerable))
                         {
                             player.HP -= damage;
@@ -6603,7 +6608,7 @@ public partial class CombatEngine
                 else
                 {
                     // Already split — do a heavy damage attack instead
-                    long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 2.0) - player.Defence));
+                    long damage = TeamHQBonus.ApplyDefense(player, Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 2.0) - player.Defence))); // v1.1.11: Team HQ Barracks, last
                     if (!player.HasStatus(StatusEffect.Invulnerable))
                     {
                         player.HP -= damage;
@@ -6617,7 +6622,7 @@ public partial class CombatEngine
 
             case "Light Incarnate":
             {
-                long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 3.0) - player.Defence));
+                long damage = TeamHQBonus.ApplyDefense(player, Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 3.0) - player.Defence))); // v1.1.11: Team HQ Barracks, last
                 if (player.HasStatus(StatusEffect.Invulnerable))
                 {
                     terminal.WriteLine($"  {Loc.Get("combat.manwe_light_block")}", "bright_white");
@@ -6635,7 +6640,7 @@ public partial class CombatEngine
 
             case "Shadow Incarnate":
             {
-                long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 2.0) - player.Defence));
+                long damage = TeamHQBonus.ApplyDefense(player, Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 2.0) - player.Defence))); // v1.1.11: Team HQ Barracks, last
                 long healAmt = damage * 30 / 100;
                 if (player.HasStatus(StatusEffect.Invulnerable))
                 {
@@ -6671,7 +6676,7 @@ public partial class CombatEngine
                 else
                 {
                     // The question IS the attack
-                    long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 3.0) - player.Defence));
+                    long damage = TeamHQBonus.ApplyDefense(player, Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 3.0) - player.Defence))); // v1.1.11: Team HQ Barracks, last
                     if (!player.HasStatus(StatusEffect.Invulnerable))
                     {
                         player.HP -= damage;
@@ -6688,7 +6693,7 @@ public partial class CombatEngine
 
             case "Final Word":
             {
-                long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 4.0) - player.Defence));
+                long damage = TeamHQBonus.ApplyDefense(player, Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 4.0) - player.Defence))); // v1.1.11: Team HQ Barracks, last
                 if (player.HasStatus(StatusEffect.Invulnerable))
                 {
                     terminal.WriteLine($"  {Loc.Get("combat.manwe_final_word_block")}", "bright_white");
@@ -6712,7 +6717,7 @@ public partial class CombatEngine
                     // Check for Worldstone protection
                     if (ArtifactSystem.Instance.HasArtifact(ArtifactType.Worldstone))
                     {
-                        long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 3.0) - player.Defence));
+                        long damage = TeamHQBonus.ApplyDefense(player, Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 3.0) - player.Defence))); // v1.1.11: Team HQ Barracks, last
                         if (!player.HasStatus(StatusEffect.Invulnerable))
                         {
                             player.HP -= damage;
@@ -6735,7 +6740,7 @@ public partial class CombatEngine
                 else
                 {
                     // Player HP too high for instant kill — heavy damage instead
-                    long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 3.5) - player.Defence));
+                    long damage = TeamHQBonus.ApplyDefense(player, Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 3.5) - player.Defence))); // v1.1.11: Team HQ Barracks, last
                     if (!player.HasStatus(StatusEffect.Invulnerable))
                     {
                         player.HP -= damage;
@@ -6788,7 +6793,7 @@ public partial class CombatEngine
                 else
                 {
                     // Already offered — use Final Word instead
-                    long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 4.0) - player.Defence));
+                    long damage = TeamHQBonus.ApplyDefense(player, Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 4.0) - player.Defence))); // v1.1.11: Team HQ Barracks, last
                     if (!player.HasStatus(StatusEffect.Invulnerable))
                     {
                         player.HP -= damage;
@@ -19681,7 +19686,10 @@ public partial class CombatEngine
             }
         }
 
-        return CapTeammateDamageInOldGodFight(companion, damage);
+        damage = CapTeammateDamageInOldGodFight(companion, damage);
+        // v1.1.11: Team HQ Barracks last (0 for NPCs); the boss minimum holds where it held before.
+        long bossFloor = monster.IsBoss ? (long)(monster.Level * 1.5) : 1;
+        return Math.Max(Math.Min(damage, bossFloor), TeamHQBonus.ApplyDefense(companion, damage));
     }
 
     private async Task MonsterAttacksCompanion(Monster monster, Character companion, CombatResult result, List<Monster>? liveMonsterList = null)
@@ -19913,7 +19921,8 @@ public partial class CombatEngine
 
         // v0.57.14: companion incoming-damage floor scales with companion MaxHP for the same
         // reason it does for the player — high-tank companions can't tank indefinitely.
-        long actualDamage = Math.Max(GetMinIncomingDamage(companion, monsterAttack), monsterAttack - companionDefense);
+        long minDamage = GetMinIncomingDamage(companion, monsterAttack);
+        long actualDamage = Math.Max(minDamage, monsterAttack - companionDefense);
 
         // Show defense calculation
         if (companionDefense > 0 && companionDefense < monsterAttack)
@@ -19969,6 +19978,10 @@ public partial class CombatEngine
 
         // Old God fight cap applied last so tightest cap wins
         actualDamage = CapTeammateDamageInOldGodFight(companion, actualDamage);
+
+        // v1.1.11: Team HQ Barracks last (0 for NPCs); the floors hold where they held before.
+        long companionFloor = monster.IsBoss ? Math.Max(minDamage, (long)(monster.Level * 1.5)) : minDamage;
+        actualDamage = Math.Max(Math.Min(actualDamage, companionFloor), TeamHQBonus.ApplyDefense(companion, actualDamage));
 
         // Apply damage to companion
         RecordAllyHit(companion, actualDamage); // v1.1.3
@@ -25415,8 +25428,8 @@ public partial class CombatEngine
             defense = (long)(defense * 1.5);
         }
 
-        // v1.1.11: Team HQ Armory on the hit, inside the floor.
-        long damage = Math.Max(1, TeamHQBonus.ApplyAttack(attacker, attackPower - defense));
+        // v1.1.11: Team HQ Armory on the hit, then the defender's Barracks, inside the floor.
+        long damage = Math.Max(1, TeamHQBonus.ApplyDefense(defender, TeamHQBonus.ApplyAttack(attacker, attackPower - defense)));
         defender.HP = Math.Max(0, defender.HP - damage);
 
         // Track statistics
@@ -25518,8 +25531,8 @@ public partial class CombatEngine
             // Apply damage to defender
             if (spellResult.Damage > 0)
             {
-                // v1.1.11: Team HQ Armory, last.
-                long spellDamage = TeamHQBonus.ApplyAttack(attacker, spellResult.Damage);
+                // v1.1.11: Team HQ Armory, then the defender's Barracks, last.
+                long spellDamage = TeamHQBonus.ApplyDefense(defender, TeamHQBonus.ApplyAttack(attacker, spellResult.Damage));
                 defender.HP = Math.Max(0, defender.HP - spellDamage);
                 terminal.WriteLine(Loc.Get("combat.pvp_magical_damage", defender.DisplayName, spellDamage), "bright_magenta");
             }
@@ -25756,11 +25769,11 @@ public partial class CombatEngine
             if (abilityResult.SpecialEffect != "armor_pierce")
             {
                 long defense = defender.Defence / 2;
-                actualDamage = Math.Max(1, TeamHQBonus.ApplyAttack(attacker, actualDamage - defense));
+                actualDamage = Math.Max(1, TeamHQBonus.ApplyDefense(defender, TeamHQBonus.ApplyAttack(attacker, actualDamage - defense)));
             }
             else
             {
-                actualDamage = TeamHQBonus.ApplyAttack(attacker, actualDamage);
+                actualDamage = TeamHQBonus.ApplyDefense(defender, TeamHQBonus.ApplyAttack(attacker, actualDamage));
             }
 
             defender.HP = Math.Max(0, defender.HP - actualDamage);
@@ -25875,6 +25888,7 @@ public partial class CombatEngine
                         if (opponent.IsDefending || opponent.HasStatus(StatusEffect.Defending))
                             spellDamage = (long)Math.Ceiling(spellDamage / 2.0);
                         spellDamage = TeamHQBonus.ApplyAttack(computer, spellDamage); // v1.1.11: Team HQ Armory, last.
+                        spellDamage = TeamHQBonus.ApplyDefense(opponent, spellDamage); // v1.1.11: then the human's Barracks.
                         opponent.HP = Math.Max(0, opponent.HP - spellDamage);
                         terminal.WriteLine(Loc.Get("combat.pvp_magical_damage", opponent.DisplayName, spellDamage), "bright_magenta");
                     }
@@ -25920,6 +25934,7 @@ public partial class CombatEngine
                     if (opponent.IsDefending || opponent.HasStatus(StatusEffect.Defending))
                         actualDamage = (long)Math.Ceiling(actualDamage / 2.0);
                     actualDamage = TeamHQBonus.ApplyAttack(computer, actualDamage); // v1.1.11: Team HQ Armory, last.
+                    actualDamage = TeamHQBonus.ApplyDefense(opponent, actualDamage); // v1.1.11: then the human's Barracks.
                     opponent.HP = Math.Max(0, opponent.HP - actualDamage);
                     terminal.WriteLine(Loc.Get("combat.pvp_ai_uses_ability", computer.DisplayName, chosen.Name, actualDamage), "bright_red");
                 }
@@ -25974,6 +25989,7 @@ public partial class CombatEngine
         if (opponent.IsDefending || opponent.HasStatus(StatusEffect.Defending))
             damage = (long)Math.Ceiling(damage / 2.0);
         damage = TeamHQBonus.ApplyAttack(computer, damage); // v1.1.11: Team HQ Armory, last.
+        damage = TeamHQBonus.ApplyDefense(opponent, damage); // v1.1.11: then the human's Barracks.
         opponent.HP = Math.Max(0, opponent.HP - damage);
         terminal.WriteLine(Loc.Get("combat.pvp_ai_strikes", computer.DisplayName, damage), "red");
         result.CombatLog.Add($"{computer.DisplayName} hits {opponent.DisplayName} for {damage}");
@@ -28230,7 +28246,7 @@ public partial class CombatEngine
         if (plagueDamage > 0)
         {
             plagueDamage = Math.Max(1, plagueDamage);
-            player.HP = Math.Max(0, player.HP - plagueDamage);
+            player.HP = Math.Max(0, player.HP - plagueDamage); // hq-barracks: out (disease tick, not an enemy hit)
 
             terminal.SetColor("yellow");
             terminal.WriteLine($"  {diseaseMessage} (-{plagueDamage} HP)");
@@ -28933,6 +28949,7 @@ public partial class CombatEngine
 
         int damagePerStack = BossContext?.CorruptionDamagePerStack ?? GameConfig.ModBossCorruptionDamageBase;
         long corruptionDamage = target.CorruptionStacks * damagePerStack;
+        corruptionDamage = TeamHQBonus.ApplyDefense(target, corruptionDamage); // v1.1.11: Team HQ Barracks (a boss hit, 0 for NPCs)
         target.HP = Math.Max(0, target.HP - corruptionDamage);
 
         terminal.SetColor("dark_magenta");
@@ -29035,6 +29052,7 @@ public partial class CombatEngine
                 long playerDmg = Math.Max(1, damage - (long)(Math.Sqrt(player.Defence) * 3));
                 // v0.65.8 (R3): failed flee this round -> guarded half-round
                 playerDmg = ApplyFleeGrace(player, playerDmg);
+                playerDmg = TeamHQBonus.ApplyDefense(player, playerDmg); // v1.1.11: Team HQ Barracks, last
                 player.HP = Math.Max(0, player.HP - playerDmg);
                 terminal.WriteLine($"  {player.DisplayName} takes {playerDmg} damage!");
             }
@@ -29046,6 +29064,7 @@ public partial class CombatEngine
                 {
                     long tmDmg = Math.Max(1, damage - (long)(Math.Sqrt(tm.Defence) * 3));
                     tmDmg = CapTeammateDamageInOldGodFight(tm, tmDmg);
+                    tmDmg = TeamHQBonus.ApplyDefense(tm, tmDmg); // v1.1.11: Team HQ Barracks, last (0 for NPCs)
                     RecordAllyHit(tm, tmDmg); // v1.1.3: the channel hits everyone; not a targeting choice
                     tm.HP = Math.Max(0, tm.HP - tmDmg);
                     terminal.WriteLine($"  {tm.DisplayName} takes {tmDmg} damage!");
@@ -29149,6 +29168,7 @@ public partial class CombatEngine
             // v0.65.8 (R3): failed flee this round -> guarded half-round (player only)
             if (target == player)
                 dmg = ApplyFleeGrace(player, dmg);
+            dmg = TeamHQBonus.ApplyDefense(target, dmg); // v1.1.11: Team HQ Barracks, last (0 for NPCs)
             target.HP = Math.Max(0, target.HP - dmg);
             string tankTag = (tank != null && target == tank) ? " [ABSORBING]" : "";
             terminal.WriteLine($"  {target.DisplayName} takes {dmg} damage!{tankTag}");
