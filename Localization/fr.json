@@ -20322,6 +20322,7 @@
   "engine.inheritance_from": "  De {0} : {1} objet(s) + {2:N0} or.",
   "engine.inheritance_header": "  === LE LEGS D'UN CAMARADE TOMBÉ ===",
   "engine.inheritance_overflow": "  ({0} objet(s) n'ont pas pu entrer -- faites de la place et ils arriveront la prochaine fois que vous ouvrirez /boss ou vous connecterez.)",
+  "engine.inheritance_waiting": "  {0} objet(s) vous attendent (le legs d'un compagnon tombé ou un prix de boss mondial), mais votre sac est plein. Faites de la place et ils arriveront la prochaine fois que vous ouvrirez /boss ou vous connecterez.",
   "engine.inheritance_total": "  Total hérité : {0} objet(s) + {1:N0} or.",
   "engine.wire_header": "  === VIREMENTS REÇUS ===",
   "engine.wire_from": "  {0} vous a viré {1} d'or.",

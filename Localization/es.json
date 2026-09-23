@@ -20333,6 +20333,7 @@
   "engine.inheritance_from": "  De {0}: {1} objeto(s) + {2:N0} oro.",
   "engine.inheritance_header": "  === EL LEGADO DE UN CAMARADA CAÍDO ===",
   "engine.inheritance_overflow": "  ({0} objeto(s) no cabían -- haz sitio y llegarán la próxima vez que abras /boss o inicies sesión.)",
+  "engine.inheritance_waiting": "  {0} objeto(s) te esperan (el legado de un compañero caído o un premio de un jefe mundial), pero tu mochila está llena. Haz sitio y llegarán la próxima vez que abras /boss o inicies sesión.",
   "engine.inheritance_total": "  Total heredado: {0} objeto(s) + {1:N0} oro.",
   "engine.wire_header": "  === TRANSFERENCIAS RECIBIDAS ===",
   "engine.wire_from": "  {0} te transfirió {1} de oro.",

@@ -4246,6 +4246,21 @@ public partial class GameEngine
                 IncludeFields = true
             };
 
+            // v1.1.10: with a full pack and nothing that goes straight to gold, nothing can be handed
+            // over. The bequest header used to print anyway, followed by a small "could not fit"
+            // line, which read as a delivery that never came (maintainer report). Say plainly what
+            // waits and how to get it instead.
+            bool anythingDeliverable = (player.Inventory?.Count ?? 0) < inventoryCap
+                || pending.Any(r => r.Gold > 0 || string.IsNullOrEmpty(r.ItemJson));
+            if (!anythingDeliverable)
+            {
+                terminal.WriteLine("");
+                terminal.SetColor("yellow");
+                terminal.WriteLine(Loc.Get("engine.inheritance_waiting", pending.Count));
+                terminal.WriteLine("");
+                return 0;
+            }
+
             terminal.WriteLine("");
             terminal.SetColor("bright_magenta");
             terminal.WriteLine(Loc.Get("engine.inheritance_header"));

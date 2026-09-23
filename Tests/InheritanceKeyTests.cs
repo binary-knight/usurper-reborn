@@ -95,6 +95,26 @@ public class InheritanceKeyTests : IDisposable
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task AFullPack_IsToldWhatWaits_NotShownABequestThatNeverCame()
+    {
+        // v1.1.10: with a full pack nothing can be handed over, but the bequest header used to print
+        // anyway (maintainer report: saw the bequest, the items never arrived).
+        Playing("rage", "rage");
+        var hero = new Character { Name1 = "rage", Name2 = "Rage" };
+        for (int i = 0; i < 50; i++) hero.Inventory.Add(new Item { Name = $"junk {i}" });
+        _db.QueueInheritance("rage", "Aldric", "{\"name\":\"Aldric's sword\"}").Should().BeTrue();
+        _db.QueueInheritance("rage", "Mira", "{\"name\":\"Mira's ring\"}").Should().BeTrue();
+        var output = new MemoryStream();
+        var term = new TerminalEmulator(new MemoryStream(), output);
+
+        (await GameEngine.DeliverPendingInheritance(hero, term, _db)).Should().Be(0);
+        term.StreamWriterInternal!.Flush();
+        string shown = System.Text.Encoding.UTF8.GetString(output.ToArray());
+        shown.Should().Contain(Loc.Get("engine.inheritance_waiting", 2)).And.NotContain(Loc.Get("engine.inheritance_header"));
+        _db.GetPendingInheritance("rage").Should().HaveCount(2, "they keep waiting");
+    }
+
+    [Fact]
     public void WithoutASession_TheOldFallbacksStillApply()
     {
         SessionContext.Current = null;

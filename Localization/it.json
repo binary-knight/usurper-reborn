@@ -20322,6 +20322,7 @@
   "engine.inheritance_from": "  Da {0}: {1} oggetto/i + {2:N0} oro.",
   "engine.inheritance_header": "  === IL LASCITO DI UN COMPAGNO CADUTO ===",
   "engine.inheritance_overflow": "  ({0} oggetto/i non entravano -- fai spazio e arriveranno la prossima volta che apri /boss o accedi.)",
+  "engine.inheritance_waiting": "  {0} oggetto/i ti aspettano (il lascito di un compagno caduto o un premio di un boss mondiale), ma il tuo zaino è pieno. Fai spazio e arriveranno la prossima volta che apri /boss o accedi.",
   "engine.inheritance_total": "  Totale ereditato: {0} oggetto/i + {1:N0} oro.",
   "engine.wire_header": "  === BONIFICI IN ARRIVO ===",
   "engine.wire_from": "  {0} ti ha inviato {1} oro.",

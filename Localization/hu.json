@@ -20636,6 +20636,7 @@
   "engine.inheritance_from": "  Tőle: {0} -- {1} tárgy + {2:N0} arany.",
   "engine.inheritance_header": "  === EGY ELESETT BAJTÁRS HAGYATÉKA ===",
   "engine.inheritance_overflow": "  ({0} tárgy nem fért el -- csinálj helyet, és megkapod, amikor legközelebb megnyitod a /boss képernyőt vagy belépsz.)",
+  "engine.inheritance_waiting": "  {0} tárgy vár rád (egy elesett társ hagyatéka vagy egy világboss jutalma), de a csomagod tele van. Csinálj helyet, és megkapod, amikor legközelebb megnyitod a /boss képernyőt vagy belépsz.",
   "engine.inheritance_total": "  Örökölt összesen: {0} tárgy + {1:N0} arany.",
   "engine.wire_header": "  === BEÉRKEZŐ ÁTUTALÁSOK ===",
   "engine.wire_from": "  {0} átutalt neked {1} aranyat.",

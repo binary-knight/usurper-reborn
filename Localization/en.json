@@ -20556,6 +20556,7 @@
   "engine.wire_from": "  {0} wired you {1} gold.",
   "engine.wire_total": "  Total deposited to your bank: {0} gold.",
   "engine.inheritance_overflow": "  ({0} item(s) could not fit -- make room and they arrive the next time you open /boss or log in.)",
+  "engine.inheritance_waiting": "  {0} item(s) are waiting for you (a fallen comrade's bequest or a world boss prize), but your pack is full. Make room and they arrive the next time you open /boss or log in.",
   "engine.healing_potions": "healing potions",
   "engine.of_each_herb_type": "of each herb type",
   "engine.next_milestone": "Next milestone: Day {0} ({1} days away)",
