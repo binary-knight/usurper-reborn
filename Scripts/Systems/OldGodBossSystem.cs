@@ -816,7 +816,8 @@ namespace UsurperRemake.Systems
 
             // Apply dialogue-based stat adjustments to the monster
             ApplyModifiersToMonster(bossMonster, player);
-            AnnounceFightHP(bossMonster, boss, terminal);
+            if (AnnounceFightHP(bossMonster, boss, terminal))
+                await Task.Delay(1500);   // the fight clears the screen as it starts
 
             // v1.1.10: the player's dialogue bonuses are applied by the combat engine after its
             // fight-start reset (BossCombatContext.ApplyPlayerModifiers). Applied here, before the
@@ -963,7 +964,7 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// v1.1.10: the scheduled AoE and channelled attacks deal fixed damage set by
+        /// v1.1.10: the scheduled AoE, the channelled attacks and corruption deal fixed damage set by
         /// ConfigureBossPartyMechanics, not damage from the god's stats, so the dialogue's god-damage
         /// factor is applied to them as well (Codex review).
         /// </summary>
@@ -971,18 +972,21 @@ namespace UsurperRemake.Systems
         {
             double factor = DialogueBossDamageFactor(player);
             if (factor == 1.0) return;
+            // every fixed damage figure the context carries (Doom is a countdown to a kill, not damage)
             ctx.AoEDamage = (int)Math.Round(ctx.AoEDamage * factor);
             ctx.ChannelDamage = (int)Math.Round(ctx.ChannelDamage * factor);
+            ctx.CorruptionDamagePerStack = (int)Math.Round(ctx.CorruptionDamagePerStack * factor);
         }
 
         /// <summary>
         /// v1.1.10: the intro shows the god's HP before the dialogue, and a damage answer then lowers it,
         /// so when it has changed, say what the god enters the fight with (supervisor review).
         /// </summary>
-        private static void AnnounceFightHP(Monster bossMonster, OldGodBossData boss, TerminalEmulator terminal)
+        private static bool AnnounceFightHP(Monster bossMonster, OldGodBossData boss, TerminalEmulator terminal)
         {
-            if (bossMonster.MaxHP == FightHP(boss)) return;
+            if (bossMonster.MaxHP == FightHP(boss)) return false;
             terminal.WriteLine($"  {Loc.Get("old_god.enters_with_hp", boss.Name, $"{bossMonster.MaxHP:N0}")}", "red");
+            return true;
         }
 
         private void ApplyModifiersToMonster(Monster monster, Character player)

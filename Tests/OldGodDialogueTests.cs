@@ -135,7 +135,8 @@ public class OldGodDialogueTests
         WithModifiers(m => Set(m, "DamageMultiplier", 1.25), () => ApplyToMonster(god, Hero()));
         var output = new MemoryStream();
         var term = new TerminalEmulator(new MemoryStream(), output);
-        typeof(OldGodBossSystem).GetMethod("AnnounceFightHP", BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, new object[] { god, data, term });
+        ((bool)typeof(OldGodBossSystem).GetMethod("AnnounceFightHP", BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, new object[] { god, data, term })!)
+            .Should().BeTrue("the caller pauses on it before the fight clears the screen");
         term.StreamWriterInternal!.Flush();
         Encoding.UTF8.GetString(output.ToArray()).Should().Contain(god.MaxHP.ToString("N0"));
     }
@@ -145,11 +146,12 @@ public class OldGodDialogueTests
     {
         // Manwe's Creation's End and Unmake Reality deal fixed damage set for the fight, not damage from
         // his stats (Codex round 4). A defence answer of +20% and a -15% god answer: 0.85 / 1.2.
-        var ctx = new BossCombatContext { AoEDamage = 1500, ChannelDamage = 3000 };
+        var ctx = new BossCombatContext { AoEDamage = 1500, ChannelDamage = 3000, CorruptionDamagePerStack = 70 };
         WithModifiers(m => { Set(m, "DefenseMultiplier", 1.20); Set(m, "BossDamageMultiplier", 0.85); },
             () => typeof(OldGodBossSystem).GetMethod("ApplyDialogueToFixedBossDamage", F)!.Invoke(OldGodBossSystem.Instance, new object[] { ctx, Hero() }));
         ctx.AoEDamage.Should().Be((int)Math.Round(1500 * 0.85 / 1.20));
         ctx.ChannelDamage.Should().Be((int)Math.Round(3000 * 0.85 / 1.20));
+        ctx.CorruptionDamagePerStack.Should().Be((int)Math.Round(70 * 0.85 / 1.20), "corruption is fixed damage too (Codex round 5)");
     }
 
     [Fact]
