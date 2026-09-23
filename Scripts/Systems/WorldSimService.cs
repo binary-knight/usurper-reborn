@@ -1400,31 +1400,47 @@ namespace UsurperRemake.Systems
         /// (living or dead) carries it, and no player online has it in hand, e.g. between joining and
         /// the save that records it. The team's upgrades and vault go with it.
         /// </summary>
-        internal int PruneEmptyTeams()
+        // v1.1.11: when each candidate team was first seen empty. A team is removed only when it is still
+        // empty at least EmptyTeamGraceMinutes later, so a transient view cannot delete it: an NPC roster
+        // being rebuilt, or a player who joined and whose save has not landed yet (Codex review).
+        private readonly Dictionary<string, DateTime> _teamEmptySince = new(StringComparer.Ordinal);
+
+        internal int PruneEmptyTeams() => PruneEmptyTeams(DateTime.UtcNow);
+
+        internal int PruneEmptyTeams(DateTime now)
         {
             int removed = 0;
             try
             {
-                var npcTeams = new HashSet<string>(NPCSpawnSystem.Instance.ActiveNPCs
-                    .Where(n => !string.IsNullOrEmpty(n.Team)).Select(n => n.Team!));
-                var sessions = UsurperRemake.Server.MudServer.Instance?.ActiveSessions.Values;
-                var onlineTeams = new HashSet<string>(sessions == null ? Enumerable.Empty<string>()
-                    : sessions.Select(s => s.Context?.Player?.Team).Where(t => !string.IsNullOrEmpty(t)).Select(t => t!));
-                var gone = new List<string>();
-                foreach (var team in sqlBackend.GetTeamsWithoutPlayerMembers())
+                // an NPC roster being rebuilt (login restores clear and refill it) is not evidence of anything
+                var spawner = NPCSpawnSystem.Instance;
+                var roster = spawner.ActiveNPCs.ToList();
+                if (spawner.IsRebuilding || !spawner.IsCountPlausible(roster.Count)) return 0;
+
+                var npcTeams = new HashSet<string>(roster.Where(n => !string.IsNullOrEmpty(n.Team)).Select(n => n.Team!));
+                var candidates = new HashSet<string>(sqlBackend.GetTeamsWithoutPlayerMembers().Where(t => !npcTeams.Contains(t) && !IsTeamOnline(t)));
+
+                foreach (var gone in _teamEmptySince.Keys.Where(k => !candidates.Contains(k)).ToList())
+                    _teamEmptySince.Remove(gone);   // someone is back in it
+
+                var deleted = new List<string>();
+                foreach (var team in candidates)
                 {
-                    if (npcTeams.Contains(team) || onlineTeams.Contains(team)) continue;
+                    if (!_teamEmptySince.TryGetValue(team, out var since)) { _teamEmptySince[team] = now; continue; }
+                    if (now - since < TimeSpan.FromMinutes(GameConfig.EmptyTeamGraceMinutes)) continue;
+                    if (IsTeamOnline(team)) { _teamEmptySince.Remove(team); continue; }   // checked again right before the delete
                     if (!sqlBackend.DeleteEmptyTeam(team)) continue;
-                    gone.Add(team);
+                    _teamEmptySince.Remove(team);
+                    deleted.Add(team);
                     DebugLogger.Instance.LogInfo("WORLDSIM", $"Removed empty team '{team}'");
                 }
-                removed = gone.Count;
+                removed = deleted.Count;
                 if (removed > 0)
                 {
                     // the protection list ignores case: keep a name another team or an NPC still has
                     var kept = sqlBackend.GetPlayerTeams().GetAwaiter().GetResult().Select(t => t.TeamName)
                         .Concat(npcTeams).ToHashSet(StringComparer.OrdinalIgnoreCase);
-                    foreach (var team in gone)
+                    foreach (var team in deleted)
                         if (!kept.Contains(team)) WorldSimulator.UnregisterPlayerTeam(team);
                 }
             }
@@ -1433,6 +1449,12 @@ namespace UsurperRemake.Systems
                 DebugLogger.Instance.LogError("WORLDSIM", $"Failed to prune empty teams: {ex.Message}");
             }
             return removed;
+        }
+
+        private static bool IsTeamOnline(string team)
+        {
+            var sessions = UsurperRemake.Server.MudServer.Instance?.ActiveSessions.Values;
+            return sessions != null && sessions.ToList().Any(sess => sess.Context?.Player?.Team == team);
         }
 
         /// <summary>

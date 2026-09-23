@@ -1436,6 +1436,7 @@ namespace UsurperRemake.Systems
                 ? (answered ? GameConfig.WorldBossTelegraphUnansweredPercent / 2 : GameConfig.WorldBossTelegraphUnansweredPercent)
                 : (answered ? GameConfig.WorldBossTelegraphAnsweredPercent : GameConfig.WorldBossTelegraphUnansweredPercent);
             long dmg = Math.Max(1, (long)(player.MaxHP * pct));
+            dmg = Math.Max(1, TeamHQBonus.ApplyDefense(player, dmg));   // v1.1.11: Team HQ Barracks on a telegraphed hit too
             player.HP = Math.Max(0, player.HP - dmg);
             terminal.SetColor(answered ? "yellow" : "bright_red");
             terminal.WriteLine(landed.Kind == "channel"

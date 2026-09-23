@@ -836,7 +836,8 @@ public partial class CombatEngine
         {
             TeamHQBonus.RefreshLevels(player);
             if (teammates != null)
-                foreach (var mate in teammates.Where(t => t is not NPC)) TeamHQBonus.RefreshLevels(mate);
+                // a copy: other sessions add and remove followers from the live list (Codex review)
+                foreach (var mate in teammates.ToList().Where(t => t is not NPC)) TeamHQBonus.RefreshLevels(mate);
         }
 
         // v0.65.6 Death's Door: once-per-combat burst rescue resets at combat start.
@@ -13526,7 +13527,7 @@ public partial class CombatEngine
                         // All landed-swing on-hit effects (post-hit enchants + Shaman weapon-enchant
                         // rider + Ancestral Guidance) run through the shared helper so the [P] Power
                         // Attack fires the identical pipeline.
-                        ApplyPlayerSwingOnHitEffects(player, target, damage, isOffHandAttack, result);
+                        ApplyPlayerSwingOnHitEffects(player, target, TeamHQBonus.ApplyAttack(player, damage), isOffHandAttack, result);   // v1.1.11: riders scale from the hit, Armory included
                     }
                 }
                 break;
@@ -13847,7 +13848,7 @@ public partial class CombatEngine
         // procs, Sunforged, poison, Shaman rider). Gated on the swing landing so an evaded swing
         // (Incorporeal/Phase, ApplySingleMonsterDamage returns false) procs nothing.
         if (await ApplySingleMonsterDamage(target, powerDamage, result, "power attack", player))
-            ApplyPlayerSwingOnHitEffects(player, target, powerDamage, isOffHandAttack: false, result);
+            ApplyPlayerSwingOnHitEffects(player, target, TeamHQBonus.ApplyAttack(player, powerDamage), isOffHandAttack: false, result);   // v1.1.11
 
         // Follow up with off-hand attack if dual-wielding
         if (player.IsDualWielding)
@@ -13870,7 +13871,7 @@ public partial class CombatEngine
                 // Off-hand follow-up procs its enchants only if it actually connected (same evade
                 // gate + shared on-hit pipeline as the basic-attack off-hand swing).
                 if (await ApplySingleMonsterDamage(offHandTarget, ohDamage, result, "off-hand strike", player))
-                    ApplyPlayerSwingOnHitEffects(player, offHandTarget, ohDamage, isOffHandAttack: true, result);
+                    ApplyPlayerSwingOnHitEffects(player, offHandTarget, TeamHQBonus.ApplyAttack(player, ohDamage), isOffHandAttack: true, result);   // v1.1.11
             }
         }
     }
@@ -20482,6 +20483,9 @@ public partial class CombatEngine
                 : Math.Max(0.25, 1.0 + levelDiff * 0.15);
             long expReward = (long)(baseExp * levelMultiplier);
             expReward = Math.Max(10, expReward); // Never less than 10 XP
+            // v1.1.11: an Old God's reward is paid once by OldGodBossSystem.HandleBossDefeated; its monster
+            // carries no XP, and the 10-XP floor must not pay it here (Codex review)
+            if (monster.FamilyName == "OldGod" && monster.Experience == 0) expReward = 0;
 
             // Calculate gold reward
             long goldReward = monster.Gold + random.Next(0, (int)Math.Min(int.MaxValue - 1L, (long)(monster.Gold * 0.5))); // v1.1.1: no int overflow on huge purses
@@ -26139,7 +26143,7 @@ public partial class CombatEngine
     private void ReportNPCDefeat(CombatResult result)
     {
         if (result.Opponent is not NPC npc || result.Player == null) return;
-        long bounty = QuestSystem.RecordNPCDefeat(result.Player, npc);
+        long bounty = QuestSystem.RecordNPCDefeat(result.Player, npc, killed: !npc.IsAlive);
         if (bounty > 0)
         {
             terminal.WriteLine(Loc.Get("street.fight.bounty_collected", bounty.ToString("N0")), "bright_yellow");

@@ -1521,10 +1521,11 @@ public partial class QuestSystem
     /// Only the street fights did this, so a WANTED target beaten anywhere else stayed at 0/1
     /// (player report). Returns the bounty paid.
     /// </summary>
-    public static long RecordNPCDefeat(Character player, NPC npc)
+    public static long RecordNPCDefeat(Character player, NPC npc, bool killed)
     {
         if (player == null || npc == null) return 0;
-        long bounty = AutoCompleteBountyForNPC(player, npc.Name ?? npc.Name2 ?? "");
+        // a target beaten but left alive does not meet an assassination contract (Codex review)
+        long bounty = AutoCompleteBountyForNPC(player, npc.Name ?? npc.Name2 ?? "", includeKillContracts: killed);
         OnNPCDefeated(player, npc);
         return bounty;
     }
@@ -1572,18 +1573,28 @@ public partial class QuestSystem
     /// Gives immediate reward without needing to claim first
     /// Returns the total bounty reward collected (0 if no bounties matched)
     /// </summary>
-    public static long AutoCompleteBountyForNPC(Character player, string npcName)
+    // v1.1.11: two sessions beating the same target at once each found the bounty before either marked
+    // it done, and both were paid (Codex review). Finding and marking now happen under one lock.
+    private static readonly object _bountyPayoutLock = new();
+
+    public static long AutoCompleteBountyForNPC(Character player, string npcName, bool includeKillContracts = true)
     {
         if (string.IsNullOrEmpty(npcName)) return 0;
 
         long totalReward = 0;
+        List<Quest> matchingBounties;
 
+        lock (_bountyPayoutLock)
+        {
         // Find ALL bounties targeting this NPC (claimed or unclaimed)
-        var matchingBounties = questDatabase.Where(q =>
+        matchingBounties = questDatabase.Where(q =>
             !q.Deleted &&
             !string.IsNullOrEmpty(q.TargetNPCName) &&
-            q.TargetNPCName.Equals(npcName, StringComparison.OrdinalIgnoreCase)
+            q.TargetNPCName.Equals(npcName, StringComparison.OrdinalIgnoreCase) &&
+            (includeKillContracts || q.QuestTarget != QuestTarget.Assassin)
         ).ToList();
+        foreach (var claimed in matchingBounties) claimed.Deleted = true;   // claimed for this payout
+        }
 
         foreach (var bounty in matchingBounties)
         {

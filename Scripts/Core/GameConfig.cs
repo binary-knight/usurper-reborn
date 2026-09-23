@@ -1853,6 +1853,8 @@ public static partial class GameConfig
     // per-level amount, so a kill is worth what it was.
     public const int OldGodDefeatXPPerLevel = 6000;
     public const int OldGodDefeatGoldPerLevel = 1500;
+    // v1.1.11: a player team is removed only after it has been seen empty this long (WorldSimService.PruneEmptyTeams)
+    public const int EmptyTeamGraceMinutes = 30;
 
     // v1.1.10: regular dungeon monsters on the floors before an Old God's floor grow tougher, HP and
     // damage, by this much per floor: +5% five floors out, up to +25% on the floor before the god

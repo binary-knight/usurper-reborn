@@ -75,7 +75,7 @@ public class NPCDefeatQuestTests
         var quest = new Quest { Title = "Teach them a lesson", QuestTarget = QuestTarget.DefeatNPC, Occupier = hunter.Name2, Date = DateTime.Now, DaysToComplete = 30 };
         quest.Objectives.Add(new QuestObjective(QuestObjectiveType.DefeatNPC, "Defeat Quest Mark", 1, target.Name, target.Name));
         QuestSystem.AddQuestToDatabase(quest);
-        QuestSystem.RecordNPCDefeat(hunter, target);
+        QuestSystem.RecordNPCDefeat(hunter, target, killed: true);
         quest.Objectives[0].IsComplete.Should().BeTrue();
         quest.Deleted = true;
     }
@@ -88,6 +88,28 @@ public class NPCDefeatQuestTests
         string src = File.ReadAllText(Path.Combine(dir!.FullName, "Scripts", "Locations", "InnLocation.cs"));
         int start = src.IndexOf("private async Task ChallengeNPC(NPC npc)", StringComparison.Ordinal);
         int end = src.IndexOf("\n    private ", start + 10, StringComparison.Ordinal);
-        src.Substring(start, end - start).Should().Contain("QuestSystem.RecordNPCDefeat(currentPlayer, npc)");
+        src.Substring(start, end - start).Should().Contain("QuestSystem.RecordNPCDefeat(currentPlayer, npc, killed: false)");
+    }
+
+    [Fact]
+    public async Task SparingTheTarget_DoesNotMeetAnAssassinationContract()
+    {
+        var (hunter, target, bounty) = Wanted("Contract Mark");
+        bounty.QuestTarget = QuestTarget.Assassin;
+        target.HP = 1;
+        await Outcome(new CombatResult { Player = hunter, Opponent = target, Outcome = CombatOutcome.OpponentSpared });
+        bounty.Deleted.Should().BeFalse("the contract is for a kill; the target walked away");
+        hunter.Gold.Should().Be(0);
+        bounty.Deleted = true;
+    }
+
+    [Fact]
+    public void TwoSessionsBeatingTheTargetAtOnce_ArePaidOnce()
+    {
+        var (hunter, target, _) = Wanted("Race Mark");
+        long paid = 0;
+        System.Threading.Tasks.Parallel.For(0, 16, _ =>
+            System.Threading.Interlocked.Add(ref paid, QuestSystem.AutoCompleteBountyForNPC(new Character { Name2 = "Racer", Level = 30 }, target.Name)));
+        paid.Should().Be(5000);
     }
 }

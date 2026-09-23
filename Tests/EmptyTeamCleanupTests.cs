@@ -93,20 +93,62 @@ public class EmptyTeamCleanupTests : IDisposable
         Count("SELECT COUNT(*) FROM team_vault WHERE team_name = 'Nobody Left'").Should().Be(0);
     }
 
+    /// <summary>Runs the cleanup against a roster that is plausibly complete (NPCSpawnSystem.IsCountPlausible).</summary>
+    private static T WithRoster<T>(Func<T> run, params NPC[] members)
+    {
+        var spawner = NPCSpawnSystem.Instance;
+        var added = new System.Collections.Generic.List<NPC>(members);
+        for (int i = added.Count; i < 60; i++)
+            added.Add(new NPC { ID = $"npc_team_filler_{i}", Name1 = $"Filler {i}", Name2 = $"Filler {i}", Level = 5, HP = 50, MaxHP = 50 });
+        foreach (var n in added) spawner.ActiveNPCs.Add(n);
+        try { return run(); }
+        finally { foreach (var n in added) spawner.ActiveNPCs.Remove(n); }
+    }
+
     [Fact]
-    public void TheWorldSave_RemovesEmptyTeams_ButNotOneAnNPCIsIn()
+    public void TheWorldSave_RemovesATeamOnlyAfterItHasStayedEmpty_AndNeverOneAnNPCIsIn()
     {
         Team("Nobody Left");
         Team("NPC Held");
         var npc = new NPC { ID = "npc_empty_team_test", Name1 = "Hold", Name2 = "Hold", Team = "NPC Held", Level = 5, HP = 50, MaxHP = 50 };
-        NPCSpawnSystem.Instance.ActiveNPCs.Add(npc);
-        try
-        {
-            new WorldSimService(_db).PruneEmptyTeams().Should().Be(1);
-            Count("SELECT COUNT(*) FROM player_teams WHERE team_name = 'Nobody Left'").Should().Be(0);
-            Count("SELECT COUNT(*) FROM player_teams WHERE team_name = 'NPC Held'").Should().Be(1, "an NPC is still on the team");
-        }
-        finally { NPCSpawnSystem.Instance.ActiveNPCs.Remove(npc); }
+        var service = new WorldSimService(_db);
+        var t0 = new DateTime(2026, 9, 23, 12, 0, 0, DateTimeKind.Utc);
+
+        WithRoster(() => service.PruneEmptyTeams(t0), npc).Should().Be(0, "the first sighting only starts the clock");
+        WithRoster(() => service.PruneEmptyTeams(t0.AddMinutes(GameConfig.EmptyTeamGraceMinutes - 1)), npc).Should().Be(0);
+        WithRoster(() => service.PruneEmptyTeams(t0.AddMinutes(GameConfig.EmptyTeamGraceMinutes)), npc).Should().Be(1);
+        Count("SELECT COUNT(*) FROM player_teams WHERE team_name = 'Nobody Left'").Should().Be(0);
+        Count("SELECT COUNT(*) FROM player_teams WHERE team_name = 'NPC Held'").Should().Be(1, "an NPC is still on the team");
+    }
+
+    [Fact]
+    public void ATeamSomeoneJoinsBetweenPasses_IsKept()
+    {
+        Team("Rejoined Later");
+        var service = new WorldSimService(_db);
+        var t0 = new DateTime(2026, 9, 23, 12, 0, 0, DateTimeKind.Utc);
+        WithRoster(() => service.PruneEmptyTeams(t0));
+        Player("tomas", "Rejoined Later");   // joined and saved during the grace period
+        WithRoster(() => service.PruneEmptyTeams(t0.AddMinutes(GameConfig.EmptyTeamGraceMinutes + 5))).Should().Be(0);
+        Player("tomas2", null);
+        Exec("UPDATE players SET player_data = '{\"player\":{\"level\":10}}' WHERE username = 'tomas';");   // left again
+        WithRoster(() => service.PruneEmptyTeams(t0.AddMinutes(GameConfig.EmptyTeamGraceMinutes + 10))).Should().Be(0, "the clock starts again");
+        Count("SELECT COUNT(*) FROM player_teams WHERE team_name = 'Rejoined Later'").Should().Be(1);
+    }
+
+    [Fact]
+    public void WhileTheNPCRosterIsBeingRebuilt_NothingIsRemoved()
+    {
+        Team("Nobody Left");
+        var service = new WorldSimService(_db);
+        var t0 = new DateTime(2026, 9, 23, 12, 0, 0, DateTimeKind.Utc);
+        WithRoster(() => service.PruneEmptyTeams(t0));
+        var spawner = NPCSpawnSystem.Instance;
+        spawner.IsRebuilding = true;
+        try { WithRoster(() => service.PruneEmptyTeams(t0.AddHours(1))).Should().Be(0); }
+        finally { spawner.IsRebuilding = false; }
+        service.PruneEmptyTeams(t0.AddHours(2)).Should().Be(0, "an implausibly small roster proves nothing either");
+        Count("SELECT COUNT(*) FROM player_teams WHERE team_name = 'Nobody Left'").Should().Be(1);
     }
 
     [Fact]

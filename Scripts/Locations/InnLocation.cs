@@ -1364,7 +1364,7 @@ public class InnLocation : BaseLocation
 
             // v1.1.11: a bounty or Defeat objective on this patron is met (player report: a WANTED target
             // beaten four times stayed at 0/1)
-            long innBounty = QuestSystem.RecordNPCDefeat(currentPlayer, npc);
+            long innBounty = QuestSystem.RecordNPCDefeat(currentPlayer, npc, killed: false);   // a brawl: the patron lives
             if (innBounty > 0)
                 terminal.WriteLine(Loc.Get("street.fight.bounty_collected", innBounty.ToString("N0")), "bright_yellow");
             currentPlayer.InnDuelsToday++; // Count toward daily NPC duel limit (separate from Seth fights)
