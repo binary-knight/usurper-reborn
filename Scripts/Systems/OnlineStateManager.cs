@@ -310,6 +310,28 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
+        /// v1.1.11: remove the matching quests from the shared record itself, leaving every other quest as
+        /// stored. A delete in a fresh process has not loaded the shared quests, so pushing its own list
+        /// (SaveSharedQuestsNow) would overwrite other players' quests (review). Returns the number removed.
+        /// </summary>
+        public async Task<int> RemoveSharedQuestsAsync(Func<QuestData, bool> matches)
+        {
+            try
+            {
+                var shared = await LoadSharedQuests();
+                if (shared == null) return 0;
+                int removed = shared.RemoveAll(q => matches(q));
+                if (removed > 0) await SaveSharedQuests(shared);
+                return removed;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("ONLINE", $"RemoveSharedQuestsAsync failed: {ex.Message}");
+                return 0;
+            }
+        }
+
+        /// <summary>
         /// Save quest data to shared state.
         /// </summary>
         public async Task SaveSharedQuests(List<QuestData> quests)

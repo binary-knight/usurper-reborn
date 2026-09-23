@@ -424,18 +424,19 @@ namespace UsurperRemake.Systems
                 // the character. Pushed even when nothing was removed, since world_state may still hold
                 // a stale copy that a same-name character would merge back on load.
                 int removed = QuestSystem.RemovePlayerQuests(name) + QuestSystem.RemoveBountiesOnPlayer(name);
+                // the shared record is edited in place, not replaced by this process's list (review)
+                if (UsurperRemake.BBS.DoorMode.IsOnlineMode && OnlineStateManager.IsActive)
+                    removed += await OnlineStateManager.Instance!.RemoveSharedQuestsAsync(q => QuestLeftByCharacter(q, name));
                 if (removed > 0)
                     DebugLogger.Instance.LogInfo("DELETE", $"Removed {removed} quest(s) and bounties for deleted '{name}'.");
-                if (UsurperRemake.BBS.DoorMode.IsOnlineMode && OnlineStateManager.IsActive)
-                    await OnlineStateManager.Instance!.SaveSharedQuestsNow();
             }
             catch (Exception qex) { DebugLogger.Instance.LogWarning("DELETE", $"Quest purge failed for '{name}': {qex.Message}"); }
 
             try
             {
-                // The guild_members row went with the SQL purge; the cache is keyed by the character key.
+                // The guild_members row went with the SQL purge; the cache is keyed by the character key
+                // only (a display name can be another account's key, review)
                 if (!string.IsNullOrWhiteSpace(username)) GuildSystem.Instance?.ForgetMember(username);
-                GuildSystem.Instance?.ForgetMember(name);
             }
             catch (Exception gex) { DebugLogger.Instance.LogWarning("DELETE", $"Guild cache clear failed for '{name}': {gex.Message}"); }
 
@@ -462,6 +463,12 @@ namespace UsurperRemake.Systems
             }
             catch (Exception cex) { DebugLogger.Instance.LogWarning("DELETE", $"Child disown failed for '{name}': {cex.Message}"); }
         }
+
+        /// <summary>v1.1.11: a shared quest the character claimed, was offered, or a Crown bounty on it.</summary>
+        public static bool QuestLeftByCharacter(QuestData q, string name) =>
+            string.Equals(q.Occupier, name, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(q.OfferedTo, name, StringComparison.OrdinalIgnoreCase) ||
+            (!QuestSystem.IsNPCName(name) && QuestSystem.IsBountyOnPlayer(q.Initiator, q.TitleKey, q.TargetNPCName, name));
 
         /// <summary>
         /// v1.1.11: end the marriage of any NPC whose spouse was the deleted character, clearing the

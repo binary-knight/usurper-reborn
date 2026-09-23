@@ -1290,12 +1290,23 @@ public partial class QuestSystem
     /// </summary>
     public static int RemoveBountiesOnPlayer(string? playerName)
     {
-        if (string.IsNullOrWhiteSpace(playerName)) return 0;
-        return questDatabase.RemoveAll(q =>
-            q.Initiator == KING_BOUNTY_INITIATOR &&
-            !string.IsNullOrEmpty(q.TargetNPCName) &&
-            q.TargetNPCName.Equals(playerName, StringComparison.OrdinalIgnoreCase));
+        if (string.IsNullOrWhiteSpace(playerName) || IsNPCName(playerName)) return 0;
+        return questDatabase.RemoveAll(q => IsBountyOnPlayer(q.Initiator, q.TitleKey, q.TargetNPCName, playerName));
     }
+
+    /// <summary>
+    /// v1.1.11: a Crown bounty posted on a PLAYER (PostBountyOnPlayer), not one on an NPC of the same name.
+    /// NPC bounties always carry a TitleKey; player bounties never have (review: a character named after an
+    /// NPC removed a bounty on that NPC).
+    /// </summary>
+    public static bool IsBountyOnPlayer(string? initiator, string? titleKey, string? target, string playerName) =>
+        initiator == KING_BOUNTY_INITIATOR && string.IsNullOrEmpty(titleKey) &&
+        !string.IsNullOrEmpty(target) && target.Equals(playerName, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>v1.1.11: whether an NPC in the world carries this name.</summary>
+    public static bool IsNPCName(string name) =>
+        NPCSpawnSystem.Instance?.ActiveNPCs?.ToList().Any(n => n != null &&
+            (string.Equals(n.Name2, name, StringComparison.OrdinalIgnoreCase) || string.Equals(n.Name, name, StringComparison.OrdinalIgnoreCase))) == true;
 
     /// <summary>
     /// v0.65.0: drop any quest claimed by / offered to playerName whose Id is NOT

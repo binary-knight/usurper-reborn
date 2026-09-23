@@ -179,13 +179,17 @@ public class CharacterRecreationTests : IDisposable
         d.Should().Contain("PermadeathHelper.PurgeDeletedCharacterAsync(");
         d.IndexOf("PurgeDeletedCharacterAsync", StringComparison.Ordinal).Should().BeLessThan(d.IndexOf("DeleteSave(", StringComparison.Ordinal));
 
-        foreach (var (file, marker) in new[] { ("OnlineAdminConsole.cs", "DeleteGameData(target.Username)"), ("SysOpConsoleManager.cs", "DeleteGameData(target.Username)") })
+        foreach (var file in new[] { "OnlineAdminConsole.cs", "SysOpConsoleManager.cs" })
         {
-            var src = Source("Systems", file);
-            int del = src.IndexOf(marker, StringComparison.Ordinal);
-            del.Should().BeGreaterThan(0, file);
-            var before = src.Substring(Math.Max(0, del - 600), 600);
-            before.Should().Contain("PermadeathHelper.PurgeDeletedCharacterAsync(", $"{file} purges before it deletes");
+            // the admin deletes purge only once the delete has succeeded (review: a failed delete left a
+            // living character purged)
+            var src = CodeOnly(Source("Systems", file));
+            int del = src.IndexOf("DeleteGameData(target.Username))", StringComparison.Ordinal);
+            del.Should().BeGreaterThan(0, $"{file} checks the delete's result");
+            src.Substring(Math.Max(0, del - 40), 40).Should().Contain("if (!", file);
+            int purge = src.IndexOf("PermadeathHelper.PurgeDeletedCharacterAsync(", del, StringComparison.Ordinal);
+            purge.Should().BeGreaterThan(del, $"{file} purges after a successful delete");
+            (purge - del).Should().BeLessThan(700, file);
         }
 
         Source("Systems", "PermadeathHelper.cs").Should().Contain("await PurgeDeletedCharacterAsync(", "permadeath shares the same purge");
@@ -219,14 +223,16 @@ public class CharacterRecreationTests : IDisposable
         var problems = new System.Collections.Generic.List<string>();
         foreach (var file in Directory.EnumerateFiles(Path.Combine(dir!.FullName, "Scripts"), "*.cs", SearchOption.AllDirectories))
         {
-            string src = File.ReadAllText(file);
+            string src = CodeOnly(File.ReadAllText(file));
             string name = Path.GetFileName(file);
             foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(src, @"\.DeleteGameData\("))
             {
                 if (allowed.ContainsKey(name)) continue;
                 int methodStart = Math.Max(src.LastIndexOf("\n    private ", m.Index, StringComparison.Ordinal), Math.Max(src.LastIndexOf("\n    public ", m.Index, StringComparison.Ordinal), src.LastIndexOf("\n        public ", m.Index, StringComparison.Ordinal)));
                 string before = src.Substring(Math.Max(0, methodStart), m.Index - Math.Max(0, methodStart));
-                if (!before.Contains("PurgeDeletedCharacterAsync("))
+                int methodEnd = src.IndexOf("\n    }", m.Index, StringComparison.Ordinal);
+                string body = src.Substring(Math.Max(0, methodStart), (methodEnd < 0 ? src.Length : methodEnd) - Math.Max(0, methodStart));
+                if (!body.Contains("PurgeDeletedCharacterAsync("))
                     problems.Add($"{name}:{src.Take(m.Index).Count(c => c == '\n') + 1}");
             }
         }
@@ -243,5 +249,66 @@ public class CharacterRecreationTests : IDisposable
         start.Should().BeGreaterThan(0);
         int end = src.IndexOf("\n    private ", start + 10, StringComparison.Ordinal);
         src.Substring(start, end - start).Should().Contain("ClearLeftoversForNewCharacter(");
+    }
+
+    /// <summary>The source with // comments removed (line count kept), so a commented-out call does not count.</summary>
+    private static string CodeOnly(string src) =>
+        string.Join("\n", src.Split('\n').Select(line =>
+        {
+            int c = line.IndexOf("//", StringComparison.Ordinal);
+            return c >= 0 ? line.Substring(0, c) : line;
+        }));
+
+    [Fact]
+    public void TheGuard_DoesNotCountACommentedOutPurge()
+    {
+        // Supervisor: a purge commented out during debugging kept the guard green.
+        string src = "    public void Delete()\n    {\n        // await PermadeathHelper.PurgeDeletedCharacterAsync(b, u, n);\n        backend.DeleteGameData(u);\n    }\n";
+        CodeOnly(src).Should().NotContain("PurgeDeletedCharacterAsync(");
+        CodeOnly("        await PermadeathHelper.PurgeDeletedCharacterAsync(b, u, n); // purge first").Should().Contain("PurgeDeletedCharacterAsync(");
+    }
+
+    [Fact]
+    public void ACharacterNamedAfterAnNPC_LeavesTheBountyOnThatNPC()
+    {
+        // Review: NPC bounties are the Crown's too; a new character named after the NPC removed it.
+        var npc = new NPC { ID = "npc_bounty_namesake", Name1 = "Vexwell", Name2 = "Vexwell", Level = 20 };
+        var npcBounty = new Quest { Title = "WANTED: Vexwell", TitleKey = "quest.bounty.wanted", Initiator = "The Crown", TargetNPCName = "Vexwell", Date = DateTime.Now, DaysToComplete = 30 };
+        QuestSystem.AddQuestToDatabase(npcBounty);
+        NPCSpawnSystem.Instance.ActiveNPCs.Add(npc);
+        try
+        {
+            QuestSystem.RemoveBountiesOnPlayer("Vexwell").Should().Be(0);
+            QuestSystem.GetAllQuests(includeCompleted: true).Should().Contain(npcBounty);
+        }
+        finally { NPCSpawnSystem.Instance.ActiveNPCs.Remove(npc); npcBounty.Deleted = true; }
+
+        // a bounty on a player carries no TitleKey and is removed
+        QuestSystem.IsBountyOnPlayer("The Crown", "", "Dorn", "Dorn").Should().BeTrue();
+        QuestSystem.IsBountyOnPlayer("The Crown", "quest.bounty.wanted", "Dorn", "Dorn").Should().BeFalse();
+    }
+
+    [Fact]
+    public void TheSharedQuestRecord_IsEditedInPlace_AndOnlyForTheCharacter()
+    {
+        PermadeathHelper.QuestLeftByCharacter(new QuestData { Occupier = "Bob" }, "Bob").Should().BeTrue();
+        PermadeathHelper.QuestLeftByCharacter(new QuestData { OfferedTo = "bob" }, "Bob").Should().BeTrue();
+        PermadeathHelper.QuestLeftByCharacter(new QuestData { Initiator = "The Crown", TargetNPCName = "Bob" }, "Bob").Should().BeTrue();
+        PermadeathHelper.QuestLeftByCharacter(new QuestData { Occupier = "Alice" }, "Bob").Should().BeFalse("another player's quest stays");
+
+        // review: a delete in a fresh process pushed its own (unloaded) quest list over everyone's
+        var purge = CodeOnly(Source("Systems", "PermadeathHelper.cs"));
+        purge.Should().Contain("RemoveSharedQuestsAsync(").And.NotContain("SaveSharedQuestsNow(");
+        var engine = CodeOnly(Source("Core", "GameEngine.cs"));
+        int create = engine.IndexOf("ClearLeftoversForNewCharacter(currentPlayer.Name2);", StringComparison.Ordinal);
+        engine.Substring(create, 600).Should().Contain("RemoveSharedQuestsAsync(").And.NotContain("SaveSharedQuestsNow(");
+    }
+
+    [Fact]
+    public void TheGuildCache_IsForgottenByTheAccountKeyOnly()
+    {
+        // review: a display name can be another account's key
+        var purge = CodeOnly(Source("Systems", "PermadeathHelper.cs"));
+        purge.Should().Contain("ForgetMember(username)").And.NotContain("ForgetMember(name)");
     }
 }

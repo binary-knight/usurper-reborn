@@ -4962,11 +4962,13 @@ public partial class GameEngine
         // v1.1.11: backstop for every path, single-player included. Player report: a character
         // deleted and recreated under the same name kept the old god and quest list. Clear what the
         // shared systems still hold under this name before the first save captures it.
-        int leftoverQuests = ClearLeftoversForNewCharacter(currentPlayer.Name2);
-        if (leftoverQuests > 0 && UsurperRemake.BBS.DoorMode.IsOnlineMode && OnlineStateManager.IsActive)
+        ClearLeftoversForNewCharacter(currentPlayer.Name2);
+        if (UsurperRemake.BBS.DoorMode.IsOnlineMode && OnlineStateManager.IsActive)
         {
-            try { await OnlineStateManager.Instance!.SaveSharedQuestsNow(); }
-            catch (Exception qx) { DebugLogger.Instance.LogWarning("CREATE", $"Leftover quest push failed: {qx.Message}"); }
+            // the shared record too, edited in place (this process may not hold the other players' quests)
+            string newName = currentPlayer.Name2;
+            try { await OnlineStateManager.Instance!.RemoveSharedQuestsAsync(q => PermadeathHelper.QuestLeftByCharacter(q, newName)); }
+            catch (Exception qx) { DebugLogger.Instance.LogWarning("CREATE", $"Leftover quest removal failed: {qx.Message}"); }
         }
 
         // Apply SysOp's default color theme to new characters
