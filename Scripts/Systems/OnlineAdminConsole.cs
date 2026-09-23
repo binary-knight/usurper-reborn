@@ -1934,7 +1934,7 @@ namespace UsurperRemake.Systems
                     {
                         terminal.SetColor(keyShared ? "yellow" : "green");
                         terminal.WriteLine(keyShared
-                            ? $"  {bequests} waiting bequest(s) under the shared key cannot be attributed and will be removed at the nightly cleanup."
+                            ? $"  {bequests} waiting bequest(s) under the shared key cannot be attributed and will be removed at the next orphan cleanup (every world save, a few minutes)."
                             : $"  {bequests} waiting bequest(s) now go to {pick.DisplayName}.");
                     }
                     DebugLogger.Instance.LogInfo("ADMIN", $"Team leader key of '{team.TeamName}' changed from '{team.OldKey}' to '{pick.Username}' by {DoorMode.OnlineUsername}");
