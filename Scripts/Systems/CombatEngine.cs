@@ -1702,7 +1702,7 @@ public partial class CombatEngine
                 foreach (var tm in result.Teammates) tm._hitsThisRound = 0;
 
             // Reset per-round status tick flag so boss multi-attacks don't tick statuses multiple times
-            foreach (var m in livingMonsters) m.StatusTickedThisRound = false;
+            foreach (var m in livingMonsters) { m.StatusTickedThisRound = false; m.PowerSurgeTickedThisRound = false; }
 
             foreach (var monster in livingMonsters)
             {
@@ -1724,6 +1724,9 @@ public partial class CombatEngine
                         terminal.WriteLine("");
                         terminal.SetColor("cyan");
                         terminal.WriteLine(Loc.Get("combat.boss_confused", monster.Name));
+                        // v1.1.10: a confused skip bypasses ProcessMonsterAction, so the surge ticks here
+                        if (TickPowerSurgeOncePerRound(monster))
+                            terminal.WriteLine(Loc.Get("combat.monster_power_surge_fades", monster.Name), "gray");
                         if (hasGroup)
                             BroadcastGroupCombatEvent(result,
                                 $"\u001b[36m  {monster.Name} hesitates, confused by internal contradictions!\u001b[0m");
@@ -4676,7 +4679,7 @@ public partial class CombatEngine
         // It counts down here, before any stun, sleep or fear can skip the boss's turn: a buff that
         // paused while the boss was held would let the player's own control stretch its strongest
         // rounds, and a stun-lock on a surging god would cost nothing.
-        if (firstActionThisRound && TickPowerSurge(monster))
+        if (TickPowerSurgeOncePerRound(monster))
             terminal.WriteLine(Loc.Get("combat.monster_power_surge_fades", monster.Name), "gray");
 
         // v0.60.8: burn and poison tick INDEPENDENTLY. Pre-fix, both effects
@@ -6172,6 +6175,7 @@ public partial class CombatEngine
                     return true;
                 }
                 int buff = (int)(baseDamage * 0.3);
+                monster.PowerSurgeBase = monster.Strength;
                 monster.Strength += buff;
                 monster.PowerSurgeStrength = buff;
                 monster.PowerSurgeRounds = GameConfig.BossPowerSurgeRounds;
@@ -6372,17 +6376,31 @@ public partial class CombatEngine
     }
 
     /// <summary>
-    /// v1.1.10: one boss round off a power surge; true when this round ended it (its Strength is
-    /// taken back then).
+    /// v1.1.10: one boss round off a power surge; true when this round ended it. Its Strength is taken
+    /// back in proportion (Strength x base / (base + surge)), not as a fixed amount, so a percentage
+    /// debuff that landed while it lasted (Hemlock, Deathbane) keeps its full effect afterwards
+    /// (Codex review: subtracting the fixed amount over-weakened the boss).
     /// </summary>
     internal static bool TickPowerSurge(Monster monster)
     {
         if (monster.PowerSurgeRounds <= 0) return false;
         monster.PowerSurgeRounds--;
         if (monster.PowerSurgeRounds > 0) return false;
-        monster.Strength = Math.Max(0, monster.Strength - monster.PowerSurgeStrength);
+        long surged = monster.PowerSurgeBase + monster.PowerSurgeStrength;
+        monster.Strength = surged > 0
+            ? Math.Max(0, (long)Math.Round((double)monster.Strength * monster.PowerSurgeBase / surged))
+            : Math.Max(0, monster.Strength - monster.PowerSurgeStrength);
         monster.PowerSurgeStrength = 0;
+        monster.PowerSurgeBase = 0;
         return true;
+    }
+
+    /// <summary>v1.1.10: the surge's once-a-round tick, on whichever path the boss's round takes (including a confused skip).</summary>
+    internal static bool TickPowerSurgeOncePerRound(Monster monster)
+    {
+        if (monster.PowerSurgeTickedThisRound) return false;
+        monster.PowerSurgeTickedThisRound = true;
+        return TickPowerSurge(monster);
     }
 
     /// <summary>

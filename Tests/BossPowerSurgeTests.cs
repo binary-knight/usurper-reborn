@@ -89,10 +89,41 @@ public class BossPowerSurgeTests
         for (int round = 0; round < GameConfig.BossPowerSurgeRounds; round++)
         {
             god.StatusTickedThisRound = false;   // a new round
+            god.PowerSurgeTickedThisRound = false;
             await (Task)turn.Invoke(engine, new object?[] { god, hero, new CombatResult(), null })!;
         }
         god.StunRounds.Should().BeGreaterThan(0, "the god was held the whole time");
         god.Strength.Should().Be(start, "its surge ran out while it was held");
+    }
+
+    [Fact]
+    public async Task APercentageDebuffDuringTheSurge_KeepsItsFullEffectAfterIt()
+    {
+        // Codex's case: Strength 100 plus a surge; a 25% debuff lands on the surged value; when the
+        // surge ends the god should be at 75, a quarter off its own Strength, not lower.
+        var god = God();
+        god.Strength = 100; god.WeapPow = 100;
+        await Cast(Engine(), god, "War Cry");
+        god.Strength = (long)(god.Strength * 0.75);   // Hemlock
+        for (int i = 0; i < GameConfig.BossPowerSurgeRounds; i++) CombatEngine.TickPowerSurge(god);
+        god.Strength.Should().Be(75);
+    }
+
+    [Fact]
+    public async Task AConfusedSkip_StillCountsTheSurgeDown_OnceARound()
+    {
+        var god = God();
+        long start = god.Strength;
+        await Cast(Engine(), god, "War Cry");
+        for (int round = 0; round < GameConfig.BossPowerSurgeRounds; round++)
+        {
+            god.PowerSurgeTickedThisRound = false;                 // a new round
+            CombatEngine.TickPowerSurgeOncePerRound(god);          // the confused-skip path
+            CombatEngine.TickPowerSurgeOncePerRound(god);          // its second attack: not a second tick
+            if (round < GameConfig.BossPowerSurgeRounds - 1)
+                god.Strength.Should().BeGreaterThan(start, $"after round {round + 1} the surge still holds: one tick a round, not one per attack");
+        }
+        god.Strength.Should().Be(start, "three rounds, three ticks, however the rounds went");
     }
 
     [Fact]
