@@ -528,6 +528,8 @@ namespace UsurperRemake.Systems
             string key = RowKey(player);
             var rows = backend.GetUndeliveredWorldBossRewards(key);
             if (rows.Count == 0) return;
+            // v1.1.11: the team's current Training level; a teammate may have upgraded since it was read (review)
+            TeamHQBonus.RefreshLevels(player, backend);
             bool headerShown = false;
             foreach (var r in rows)
             {

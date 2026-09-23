@@ -114,4 +114,13 @@ public class HuntRoundOneTests
     {
         MethodBody(Source("Scripts/Locations/CastleLocation.cs"), "private async Task CastleSiegeMenu(").Should().Contain("TeamHQBonus.RefreshLevels(currentPlayer, backend);");
     }
+
+    [Fact]
+    public void WorldBossRewardDelivery_ReadsTheTeamsCurrentLevels_BeforeTheTraining()
+    {
+        var body = MethodBody(Source("Scripts/Systems/WorldBossSystem.cs"), "public async Task DeliverWorldBossRewards(");
+        int refresh = body.IndexOf("TeamHQBonus.RefreshLevels(player, backend);", StringComparison.Ordinal);
+        refresh.Should().BeGreaterThan(0);
+        body.IndexOf("TeamHQBonus.ApplyXP(", StringComparison.Ordinal).Should().BeGreaterThan(refresh);
+    }
 }
