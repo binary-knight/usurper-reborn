@@ -2491,26 +2491,65 @@ namespace UsurperRemake.Systems
         /// NPC member's bequest is queued under that value; it is not an alt's save key and a marriage
         /// changes it, so on the live server 19 of 36 teams had a key that matched no account, and
         /// the sweep below deleted their bequests. New teams record the save key (TeamCornerLocation).
-        /// This repairs the old ones, and any bequest already queued under such a key, wherever exactly
-        /// one player has that display name; anything ambiguous or unknown is left as it is. Once a
-        /// key matches an account it is never touched again, so running it every time is safe.
+        /// This repairs the old ones, and any bequest already queued under such a key, when exactly one
+        /// player both has that display name and is still on that team; a display name alone is not
+        /// proof, since it can change hands. The matching is done here in C#, with the same lowering
+        /// the key was written with, because SQLite's lower() leaves letters such as É alone. A key
+        /// that matches an account is never touched, so running it every sweep is safe.
         /// Returns (teams, queued items) repaired.
         /// </summary>
         internal static (int teams, int queued) RepairLeaderKeys(SqliteConnection conn)
         {
-            const string oneMatch = "(SELECT COUNT(*) FROM players p WHERE lower(p.display_name) = {0}) = 1";
-            const string theMatch = "(SELECT p.username FROM players p WHERE lower(p.display_name) = {0})";
-            using var teams = conn.CreateCommand();
-            teams.CommandText =
-                $"UPDATE player_teams SET created_by = {string.Format(theMatch, "player_teams.created_by")} " +
-                $"WHERE created_by NOT IN (SELECT username FROM players) AND {string.Format(oneMatch, "player_teams.created_by")};";
-            int t = teams.ExecuteNonQuery();
-            using var queued = conn.CreateCommand();
-            queued.CommandText =
-                $"UPDATE pending_inheritance SET player_username = {string.Format(theMatch, "pending_inheritance.player_username")} " +
-                $"WHERE player_username NOT IN (SELECT username FROM players) AND {string.Format(oneMatch, "pending_inheritance.player_username")};";
-            int q = queued.ExecuteNonQuery();
-            return (t, q);
+            var usernames = new HashSet<string>(StringComparer.Ordinal);
+            var players = new List<(string Username, string Lowered, string? Team)>();
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = "SELECT username, display_name, json_extract(player_data, '$.player.team') FROM players;";
+                using var r = cmd.ExecuteReader();
+                while (r.Read())
+                {
+                    string user = r.GetString(0);
+                    usernames.Add(user);
+                    string display = r.IsDBNull(1) ? "" : r.GetString(1);
+                    players.Add((user, display.ToLower(), r.IsDBNull(2) ? null : r.GetString(2)));
+                }
+            }
+
+            var repairs = new List<(string Team, string OldKey, string NewKey)>();
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = "SELECT team_name, created_by FROM player_teams;";
+                using var r = cmd.ExecuteReader();
+                while (r.Read())
+                {
+                    string team = r.GetString(0), key = r.IsDBNull(1) ? "" : r.GetString(1);
+                    if (key.Length == 0 || usernames.Contains(key)) continue;
+                    var matches = players.Where(p => p.Lowered == key && p.Team == team).ToList();
+                    if (matches.Count == 1) repairs.Add((team, key, matches[0].Username));
+                }
+            }
+
+            int teamsDone = 0, queuedDone = 0;
+            foreach (var (team, oldKey, newKey) in repairs)
+            {
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "UPDATE player_teams SET created_by = @new WHERE team_name = @team AND created_by = @old;";
+                    cmd.Parameters.AddWithValue("@new", newKey);
+                    cmd.Parameters.AddWithValue("@team", team);
+                    cmd.Parameters.AddWithValue("@old", oldKey);
+                    teamsDone += cmd.ExecuteNonQuery();
+                }
+                // bequests queued under that team's old key belong to the same leader
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "UPDATE pending_inheritance SET player_username = @new WHERE player_username = @old;";
+                    cmd.Parameters.AddWithValue("@new", newKey);
+                    cmd.Parameters.AddWithValue("@old", oldKey);
+                    queuedDone += cmd.ExecuteNonQuery();
+                }
+            }
+            return (teamsDone, queuedDone);
         }
 
         /// <summary>Remove orphaned rows from tables that reference deleted players.</summary>
