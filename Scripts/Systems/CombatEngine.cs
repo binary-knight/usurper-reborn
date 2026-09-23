@@ -26132,6 +26132,21 @@ public partial class CombatEngine
         return false;
     }
 
+    /// <summary>
+    /// v1.1.11: a duel won against an NPC (killed or spared) pays its bounty and meets a Defeat objective,
+    /// as a street fight always did. A player loaded from a save is not an NPC and is left alone.
+    /// </summary>
+    private void ReportNPCDefeat(CombatResult result)
+    {
+        if (result.Opponent is not NPC npc || result.Player == null) return;
+        long bounty = QuestSystem.RecordNPCDefeat(result.Player, npc);
+        if (bounty > 0)
+        {
+            terminal.WriteLine(Loc.Get("street.fight.bounty_collected", bounty.ToString("N0")), "bright_yellow");
+            result.GoldGained += bounty;
+        }
+    }
+
     private async Task DeterminePvPOutcome(CombatResult result)
     {
         // v0.64.1 Slice 18: spared-NPC path. OfferNPCSurrenderAsync sets
@@ -26187,6 +26202,8 @@ public partial class CombatEngine
 
             // No XP/gold reward -- sparing isn't a kill. The alignment +
             // relationship swing is the reward.
+            // v1.1.11: but the NPC was beaten, so a bounty or Defeat objective on it is met
+            ReportNPCDefeat(result);
             return;
         }
 
@@ -26272,6 +26289,7 @@ public partial class CombatEngine
             result.Player.Gold += goldReward;
             result.ExperienceGained = xpReward;
             result.GoldGained = goldReward;
+            ReportNPCDefeat(result);   // v1.1.11
 
             // Track peak gold
             result.Player.Statistics?.RecordGoldChange(result.Player.Gold);

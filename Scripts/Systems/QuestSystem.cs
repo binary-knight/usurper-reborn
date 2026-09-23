@@ -1516,6 +1516,20 @@ public partial class QuestSystem
     }
 
     /// <summary>
+    /// v1.1.11: a player beat an NPC, by any route: a street fight, a duel, the pit, the Inn challenge,
+    /// or sparing one who surrendered. Pays any bounty on the NPC and records the Defeat objective.
+    /// Only the street fights did this, so a WANTED target beaten anywhere else stayed at 0/1
+    /// (player report). Returns the bounty paid.
+    /// </summary>
+    public static long RecordNPCDefeat(Character player, NPC npc)
+    {
+        if (player == null || npc == null) return 0;
+        long bounty = AutoCompleteBountyForNPC(player, npc.Name ?? npc.Name2 ?? "");
+        OnNPCDefeated(player, npc);
+        return bounty;
+    }
+
+    /// <summary>
     /// Update quest progress when player defeats an NPC (bounty system)
     /// Call this from StreetEncounterSystem and BaseLocation.ChallengeNPC when NPC is killed
     /// </summary>
