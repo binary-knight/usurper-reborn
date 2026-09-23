@@ -463,6 +463,9 @@ public partial class CombatEngine
     // freeze: "pretty much an autowin"). Per fighter, for this duel only.
     private sealed class PvPControlState { public int ImmuneRounds; public int RecentCount; public int RoundsSinceLast; public bool Held; }
     private readonly Dictionary<Character, PvPControlState> _pvpControl = new();
+    // v1.1.10: the fighters whose turn has come this duel round. A hold put on one of them ticks once
+    // at the end of this round before it can cost a turn (Codex round 7).
+    private readonly HashSet<Character> _pvpTurnTakenThisRound = new();
 
     private static bool IsHeld(Character c) => c.ActiveStatuses.Keys.Any(s => s.PreventsAction() && s != StatusEffect.Charmed);
 
@@ -482,6 +485,10 @@ public partial class CombatEngine
         }
         int percent = st.RecentCount switch { 0 => 100, 1 => 50, _ => 25 };
         int duration = Math.Min(GameConfig.MaxStunDurationNormal, Math.Max(1, (requestedDuration * percent + 99) / 100));
+        // a fighter who has already had this round's turn loses a round of the hold at the round's end,
+        // so it must be at least 2 to cost a turn; a shortened hold otherwise cost nothing and still
+        // gave the immunity (Codex round 7: the AI defender acts after the attacker)
+        if (_pvpTurnTakenThisRound.Contains(target)) duration = Math.Max(duration, 2);
         target.ApplyStatus(status, duration);
         st.RecentCount++;
         st.RoundsSinceLast = 0;
@@ -511,6 +518,7 @@ public partial class CombatEngine
         foreach (var kv in _pvpDisarmedWeapPow) kv.Key.WeapPow = kv.Value;
         _pvpDisarmedWeapPow.Clear();
         _pvpControl.Clear();
+        _pvpTurnTakenThisRound.Clear();
         ConsumeCombatBuffs(attacker);
         ScrubTransientCombatState(attacker);
         ScrubTransientCombatState(defender);
@@ -641,10 +649,12 @@ public partial class CombatEngine
             // round; consumed only by OfferNPCSurrenderAsync.
             attacker.HpAtRoundStart = attacker.HP;
             defender.HpAtRoundStart = defender.HP;
+            _pvpTurnTakenThisRound.Clear();
 
             // Attacker's turn — check for status effects that prevent action
             if (attacker.IsAlive && defender.IsAlive)
             {
+                _pvpTurnTakenThisRound.Add(attacker);   // v1.1.10: a hold cast on them later this round
                 bool attackerCharmSkip = ResolvePvPCharm(attacker, isPlayer: true);
                 var preventingStatus = attacker.ActiveStatuses.Keys
                     .FirstOrDefault(s => s.PreventsAction() && s != StatusEffect.Charmed);
@@ -682,6 +692,7 @@ public partial class CombatEngine
             // Skip if attacker fled — no retaliation
             if (defender.IsAlive && attacker.IsAlive && !globalEscape && defender.AI == CharacterAI.Computer)
             {
+                _pvpTurnTakenThisRound.Add(defender);
                 bool defenderCharmSkip = ResolvePvPCharm(defender, isPlayer: false);
                 var defenderPreventing = defender.ActiveStatuses.Keys
                     .FirstOrDefault(s => s.PreventsAction() && s != StatusEffect.Charmed);

@@ -141,6 +141,37 @@ public class PvPFrostTests
     }
 
     [Fact]
+    public void AShortenedHold_OnAFighterWhoHasActed_StillCostsATurn()
+    {
+        // Codex round 7: the AI defender acts after the attacker, so a hold it casts on the attacker ticks
+        // once at the round's end before the attacker's next turn. A second hold, halved to one round,
+        // ran out there, cost nothing, and still gave the immunity.
+        var target = Duelist("Target");
+        var (engine, cast) = Duel(target);
+        var taken = (System.Collections.Generic.HashSet<Character>)typeof(CombatEngine)
+            .GetField("_pvpTurnTakenThisRound", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(engine)!;
+        cast("stun", 2);
+        for (int round = 1; round <= 5; round++) EndRound(engine, target);   // held, ended, three immune rounds
+        Held(target).Should().BeFalse();
+
+        taken.Add(target);                    // the target has had this round's turn
+        cast("stun", 2);                      // the second hold in the window: halved to one round
+        EndRound(engine, target);
+        Held(target).Should().BeTrue("the hold must still cost the target its next turn");
+    }
+
+    [Fact]
+    public void AShortenedHold_OnAFighterStillToAct_KeepsItsLength()
+    {
+        var target = Duelist("Target");
+        var (engine, cast) = Duel(target);
+        cast("stun", 2);
+        for (int round = 1; round <= 5; round++) EndRound(engine, target);
+        cast("stun", 2);
+        target.ActiveStatuses[StatusEffect.Stunned].Should().Be(1, "it costs this round's turn, which is still to come");
+    }
+
+    [Fact]
     public void Freeze_StillFreezes()
     {
         var target = Duelist("Target");
