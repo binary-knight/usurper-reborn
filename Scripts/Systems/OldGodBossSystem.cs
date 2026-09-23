@@ -986,9 +986,12 @@ namespace UsurperRemake.Systems
             // v1.1.10: called by the combat engine after its fight-start reset. Penalties below 1.0
             // apply too (they were skipped), flat bonuses and crit chance are applied (they never
             // were), and a penalty can take a stat down to zero, not below it.
-            long attackBase = player.Strength + player.WeapPow;
-            int attack = (int)((activeCombatModifiers.DamageMultiplier - 1.0) * attackBase) + activeCombatModifiers.BonusDamage;
-            player.DialogueAttackBonus = (int)Math.Max(attack, -attackBase);
+            // the damage answer is a share of everything the player lands (basic blows, abilities,
+            // spells), so it is kept as a fraction; a flat BonusDamage is folded in against the attack
+            // stats it would have been added to. Floored at -100%.
+            long attackBase = Math.Max(1, player.Strength + player.WeapPow);
+            double damage = (activeCombatModifiers.DamageMultiplier - 1.0) + (double)activeCombatModifiers.BonusDamage / attackBase;
+            player.DialogueDamagePercent = Math.Max(-1.0, damage);
 
             long defenceBase = player.Defence + player.ArmPow;
             int defence = (int)((activeCombatModifiers.DefenseMultiplier - 1.0) * defenceBase) + activeCombatModifiers.BonusDefense;
@@ -1020,7 +1023,7 @@ namespace UsurperRemake.Systems
             player.TempAttackBonusDuration = 0;
             player.TempDefenseBonusDuration = 0;
             player.TempCritChanceBonus = 0;
-            player.DialogueAttackBonus = 0;
+            player.DialogueDamagePercent = 0;
             player.DialogueDefenseBonus = 0;
         }
 

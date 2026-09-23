@@ -126,6 +126,21 @@ public class PvPFrostTests
     }
 
     [Fact]
+    public void AHoldAfterFourFreeRounds_IsStillShorter()
+    {
+        // Codex's round-2 case: a 2-round stun on round 1 (rounds 1 and 2 held), then rounds 3 to 6 free
+        // (the first three immune), then another stun on round 7. Only four free rounds have passed, so
+        // it is halved; counting the round the first hold ended as free reset the returns one round early.
+        var target = Duelist("Target");
+        var (engine, cast) = Duel(target);
+        cast("stun", 2);
+        for (int round = 1; round <= 6; round++) EndRound(engine, target);
+        Held(target).Should().BeFalse();
+        cast("stun", 2);
+        target.ActiveStatuses[StatusEffect.Stunned].Should().Be(1);
+    }
+
+    [Fact]
     public void Freeze_StillFreezes()
     {
         var target = Duelist("Target");

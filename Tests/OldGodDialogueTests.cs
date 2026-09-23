@@ -79,13 +79,13 @@ public class OldGodDialogueTests
         var engine = new CombatEngine(term);
         var hero = Hero();
         hero.TempAttackBonus = 777;          // leftovers the reset must clear before the hook runs
-        hero.DialogueAttackBonus = 777;
+        hero.DialogueDamagePercent = 0.77;
         hero.HasBloodlust = true;
-        int? attackSeen = null; bool? bloodlustSeen = null; int? dialogueSeen = null;
+        int? attackSeen = null; bool? bloodlustSeen = null; double? dialogueSeen = null;
         engine.BossContext = new BossCombatContext
         {
             BossData = UsurperRemake.Data.OldGodsData.GetGodBossData(OldGodType.Maelketh),
-            ApplyPlayerModifiers = p => { attackSeen = p.TempAttackBonus; bloodlustSeen = p.HasBloodlust; dialogueSeen = p.DialogueAttackBonus; },
+            ApplyPlayerModifiers = p => { attackSeen = p.TempAttackBonus; bloodlustSeen = p.HasBloodlust; dialogueSeen = p.DialogueDamagePercent; },
         };
         var rat = new Monster { Name = "Sewer Rat", Level = 1, HP = 1, MaxHP = 1, Strength = 1, Defence = 0, Experience = 5, Gold = 3 };
         try { await engine.PlayerVsMonsters(hero, new List<Monster> { rat }, offerMonkEncounter: false); }
@@ -105,7 +105,7 @@ public class OldGodDialogueTests
         WithModifiers(m => { Set(m, "DamageMultiplier", 1.25); Set(m, "DefenseMultiplier", 0.85); Set(m, "CriticalChance", 0.15); Set(m, "HasRageBoost", true); },
             () => ApplyToPlayer(hero));
 
-        hero.DialogueAttackBonus.Should().Be(50, "25% of Strength 100 + WeapPow 100");
+        hero.DialogueDamagePercent.Should().BeApproximately(0.25, 1e-9, "+25% on everything the player lands");
         hero.DialogueDefenseBonus.Should().Be(-15, "15% off Defence 50 + ArmPow 50");
 
         // an ability buff replaces the temporary defence bonus and then runs out; the answer stays
@@ -147,11 +147,48 @@ public class OldGodDialogueTests
     }
 
     [Fact]
+    public async Task TheDamageAnswer_ReachesWhatLandsThroughTheSharedDamagePath()
+    {
+        // Basic blows, spells, backstab and the other strikes all land through ApplySingleMonsterDamage
+        // with the player as the attacker; the answer is applied there (Codex round 2: it reached only
+        // the basic swing before). The same 1,000 lands as 1,250 with a +25% answer.
+        async Task<long> Lands(double answer)
+        {
+            var engine = new CombatEngine(new TerminalEmulator(new MemoryStream(), new MemoryStream()));
+            var hero = Hero(); hero.DialogueDamagePercent = answer;
+            typeof(CombatEngine).GetField("currentPlayer", F)!.SetValue(engine, hero);
+            var god = new Monster { Name = "Maelketh", Level = 28, HP = 1_000_000, MaxHP = 1_000_000, Defence = 0, IsActive = true };
+            await (Task<bool>)typeof(CombatEngine).GetMethod("ApplySingleMonsterDamage", F)!
+                .Invoke(engine, new object?[] { god, 1_000L, new CombatResult(), "a spell", hero, true })!;
+            return 1_000_000 - god.HP;
+        }
+        (await Lands(0.25)).Should().Be((long)Math.Round(await Lands(0) * 1.25));
+    }
+
+    [Fact]
+    public void TheDefenceAnswer_CountsAgainstAGodsNamedAttacks()
+    {
+        // Cleave and the other named attacks land through ApplyBossAbilityDamageToPlayer; the answer is
+        // applied there as it is to ordinary blows (Codex round 2).
+        long Taken(int answer)
+        {
+            var engine = new CombatEngine(new TerminalEmulator(new MemoryStream(), new MemoryStream()));
+            var hero = Hero(); hero.HP = hero.MaxHP = 100_000; hero.DialogueDefenseBonus = answer;
+            typeof(CombatEngine).GetField("currentPlayer", F)!.SetValue(engine, hero);
+            var god = new Monster { Name = "Maelketh", Level = 28, IsBoss = true };
+            return (long)typeof(CombatEngine).GetMethod("ApplyBossAbilityDamageToPlayer", F)!
+                .Invoke(engine, new object[] { god, hero, 1_000L, "Cleave", new CombatResult { CurrentRound = 10 } })!;
+        }
+        Taken(100).Should().Be(Taken(0) - 100, "a +100 answer softens the named attack by 100");
+        Taken(-15).Should().Be(Taken(0) + 15, "the reckless answer's penalty sharpens it");
+    }
+
+    [Fact]
     public void APenalty_CannotTakeAStatBelowZero()
     {
         var hero = Hero();
         WithModifiers(m => Set(m, "DamageMultiplier", -1.0), () => ApplyToPlayer(hero));
-        hero.DialogueAttackBonus.Should().Be(-200, "floored at minus the stat it lowers");
+        hero.DialogueDamagePercent.Should().Be(-1.0, "floored at -100%");
     }
 
     [Theory]

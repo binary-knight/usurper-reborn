@@ -440,7 +440,7 @@ public partial class CombatEngine
         c.DodgeNextAttack = false;
         c.HasBloodlust = false;
         c.TempCritChanceBonus = 0;
-        c.DialogueAttackBonus = 0; c.DialogueDefenseBonus = 0;
+        c.DialogueDamagePercent = 0; c.DialogueDefenseBonus = 0;
         c.HasStatusImmunity = false; c.StatusImmunityDuration = 0;
         c.DeathsEmbraceActive = false;
         c.StatusLifestealPercent = 0;
@@ -496,15 +496,14 @@ public partial class CombatEngine
         if (!_pvpControl.TryGetValue(fighter, out var st)) return;
         if (st.Held && !IsHeld(fighter))
         {
+            // the round a hold ends was a held round: it starts the immunity and does not count as free
             st.Held = false;
             st.ImmuneRounds = GameConfig.StunImmunityRoundsAfterRecovery;
+            return;
         }
-        else if (st.ImmuneRounds > 0)
-        {
-            st.ImmuneRounds--;
-        }
+        if (st.ImmuneRounds > 0) st.ImmuneRounds--;
         // the window is rounds with no hold: a held round does not count towards forgetting the last one
-        // (Codex review: counting held rounds reset the returns while the fighter was still held)
+        // (Codex review: counting held rounds, and then the round a hold ended, reset the returns early)
         if (!IsHeld(fighter) && ++st.RoundsSinceLast >= GameConfig.StunDRWindowRounds) st.RecentCount = 0;
     }
 
@@ -865,7 +864,7 @@ public partial class CombatEngine
         player.HasStatusImmunity = false;
         player.StatusImmunityDuration = 0;
         player.TempCritChanceBonus = 0;
-        player.DialogueAttackBonus = 0;
+        player.DialogueDamagePercent = 0;
         player.DialogueDefenseBonus = 0;
         // v1.1.10: an Old God's dialogue bonuses go on after this reset, which used to wipe them
         BossContext?.ApplyPlayerModifiers?.Invoke(player);
@@ -2051,7 +2050,7 @@ public partial class CombatEngine
         // Clean up temporary combat buffs (matches single-monster/PvP cleanup)
         player.IsRaging = false;
         player.TempCritChanceBonus = 0;   // v1.1.10
-        player.DialogueAttackBonus = 0;
+        player.DialogueDamagePercent = 0;
         player.DialogueDefenseBonus = 0;
         player.TempAttackBonus = 0;
         player.TempAttackBonusDuration = 0;
@@ -6019,7 +6018,9 @@ public partial class CombatEngine
             return 0;
         }
 
-        long actualDamage = Math.Max(1, rawDamage);
+        // v1.1.10: an Old God's dialogue answer counts against its named attacks too (a bonus
+        // softens them, a penalty sharpens them), as it does against its ordinary blows
+        long actualDamage = Math.Max(1, rawDamage - player.DialogueDefenseBonus);
 
         // Difficulty scaling (named abilities previously bypassed it entirely,
         // making the difficulty setting cosmetic in boss fights)
@@ -8128,7 +8129,7 @@ public partial class CombatEngine
     {
         if (target == null || rawDamage <= 0) return 0;
 
-        long actualDamage = rawDamage;
+        long actualDamage = WithDialogueDamage(player, rawDamage);
         bool alreadyCrit = false;
 
         // Hidden guarantees a crit on the next ability, and is consumed by it.
@@ -12387,6 +12388,7 @@ public partial class CombatEngine
     {
         var livingMonsters = monsters.Where(m => m.IsAlive).ToList();
         if (livingMonsters.Count == 0) return;
+        totalDamage = WithDialogueDamage(attacker, totalDamage);   // v1.1.10: an Old God's dialogue answer
 
         // Diminishing AoE damage: 100% → 75% → 50% → 25% (floor) per target
         // Total damage output is spread, not multiplied — prevents AoE from being
@@ -12536,6 +12538,7 @@ public partial class CombatEngine
     private async Task<bool> ApplySingleMonsterDamage(Monster target, long damage, CombatResult result, string damageSource = "attack", Character? attacker = null, bool isSpellDamage = false)
     {
         if (target == null || !target.IsAlive) return false;
+        damage = WithDialogueDamage(attacker, damage);   // v1.1.10: an Old God's dialogue answer
 
         // v0.61.2 (player report: "The monster becoming incorporeal combat ability
         // doesn't really have any effect"). When a monster has an active evasion
@@ -12868,8 +12871,8 @@ public partial class CombatEngine
                         int variationMax = Math.Max(21, player.Level / 2);
                         attackPower += random.Next(1, variationMax);
 
-                        // Temporary attack bonus from abilities, and an Old God's dialogue answer (v1.1.10)
-                        attackPower += player.TempAttackBonus + player.DialogueAttackBonus;
+                        // Temporary attack bonus from abilities
+                        attackPower += player.TempAttackBonus;
 
                         // Weapon configuration modifier (2H bonus, dual-wield off-hand penalty)
                         double damageModifier = GetWeaponConfigDamageModifier(player, isOffHandAttack);
@@ -14377,6 +14380,10 @@ public partial class CombatEngine
                     terminal.WriteLine(Loc.Get("combat.marked_bonus", markedBonus));
                 }
 
+                // v1.1.10: an Old God's dialogue answer. Applied here, where this single-target hit lands,
+                // not where the ability's damage is first read: the AoE branch above hands that damage to
+                // ApplyAoEDamage, which applies the answer itself.
+                actualDamage = WithDialogueDamage(player, actualDamage);
                 target.HP -= actualDamage;
                 result.TotalDamageDealt += actualDamage;
 
@@ -19525,6 +19532,16 @@ public partial class CombatEngine
     /// <summary>
     /// Handle monster attacking a companion instead of the player
     /// </summary>
+    /// <summary>
+    /// v1.1.10: the player's damage after an Old God's dialogue answer (Character.DialogueDamagePercent),
+    /// applied where the player's blows, abilities and spells land, so it reaches all of them. Only the
+    /// player carries a non-zero value, and only during that fight; a teammate's damage is untouched.
+    /// </summary>
+    private static long WithDialogueDamage(Character? attacker, long damage) =>
+        attacker == null || attacker.DialogueDamagePercent == 0 || damage <= 0
+            ? damage
+            : Math.Max(0, (long)Math.Round(damage * (1.0 + attacker.DialogueDamagePercent)));
+
     /// <summary>v1.1.10: taunts that also protect the taunter. Their effect names do not say "taunt".</summary>
     private static readonly HashSet<string> ProtectiveTaunts = new()
     {
