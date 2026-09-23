@@ -189,6 +189,34 @@ public class WorldBossSettleTests : IDisposable
     }
 
     [Fact]
+    public async Task AFailedQueueWrite_PutsTheItemInThePack_RatherThanLosingIt()
+    {
+        // v1.1.10: the reward row is marked delivered before the item is rolled, so when a full pack
+        // sent the item to the inheritance queue and that write failed, the item was gone.
+        var boss = await Spawn(hp: 20_000);
+        await _db.RecordWorldBossDamage(boss.Id, "Hero", 20_000, 40);
+        WorldEventSystem.Instance.ClearAllEvents();
+        try { await _sys.SettleKill(_db, (await _db.GetWorldBossById(boss.Id))!); }
+        finally { WorldEventSystem.Instance.ClearAllEvents(); }
+
+        var hero = Hero("Hero");
+        for (int i = 0; i < 50; i++) hero.Inventory.Add(new Item { Name = $"junk {i}" });
+        int saves = 0;
+        _sys.SaveHook = _ => { saves++; return Task.FromResult(true); };
+        _sys.QueueHook = (_, _, _, _) => false;
+        try
+        {
+            await _sys.DeliverWorldBossRewards(hero, _db, new TerminalEmulator(new MemoryStream(), new MemoryStream()));
+        }
+        finally { _sys.QueueHook = (db, key, source, json) => db.QueueInheritance(key, source, json); }
+
+        hero.Inventory.Count.Should().Be(51, "the item went into the pack past the soft limit");
+        _db.GetPendingInheritance("hero").Should().BeEmpty("nothing was queued");
+        _db.GetUndeliveredWorldBossRewards("hero").Should().BeEmpty();
+        saves.Should().Be(1, "the save after delivery keeps the item");
+    }
+
+    [Fact]
     public async Task Delivery_SavesThePlayerAfterTheFlagFlips_Once()
     {
         var boss = await Spawn(hp: 20_000);

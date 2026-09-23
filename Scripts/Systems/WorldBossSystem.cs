@@ -35,6 +35,9 @@ namespace UsurperRemake.Systems
         /// <summary>The save that must follow a delivery; tests replace it to observe the call.</summary>
         internal Func<Character, Task<bool>> SaveHook = p => SaveSystem.Instance.AutoSave(p, force: true);
 
+        /// <summary>v1.1.10: queues an item that does not fit the pack; tests replace it to make the write fail.</summary>
+        internal Func<SqlSaveBackend, string, string, string, bool> QueueHook = (db, key, source, json) => db.QueueInheritance(key, source, json);
+
         /// <summary>Last known active boss name for notification display. Set on spawn, cleared on death/despawn.</summary>
         public volatile string? ActiveBossName;
 
@@ -567,9 +570,21 @@ namespace UsurperRemake.Systems
                         else
                         {
                             var opts = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, IncludeFields = true };
-                            backend.QueueInheritance(key, r.BossName, JsonSerializer.Serialize(item, opts));
-                            terminal.SetColor("gray");
-                            terminal.WriteLine($"  {Loc.Get("world_boss.reward_item_queued", LootGenerator.GetUnidentifiedName(item))}");
+                            if (QueueHook(backend, key, r.BossName, JsonSerializer.Serialize(item, opts)))
+                            {
+                                terminal.SetColor("gray");
+                                terminal.WriteLine($"  {Loc.Get("world_boss.reward_item_queued", LootGenerator.GetUnidentifiedName(item))}");
+                            }
+                            else
+                            {
+                                // v1.1.10: the reward row is already marked delivered, so a failed queue
+                                // write used to lose the item. It goes in the pack past the soft limit
+                                // instead, and the save below keeps it.
+                                player.Inventory!.Add(item);
+                                DebugLogger.Instance.LogError("WORLD_BOSS", $"Inheritance queue write failed for {key}; {item.Name} put in the pack past the limit instead");
+                                terminal.SetColor("bright_cyan");
+                                terminal.WriteLine($"  {Loc.Get("world_boss.reward_loot")}: {LootGenerator.GetUnidentifiedName(item)}");
+                            }
                         }
                     }
                 }
