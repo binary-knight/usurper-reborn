@@ -1754,7 +1754,7 @@ namespace UsurperRemake.Systems
             qty = Math.Min(qty, available);
 
             long perPotion = (long)(player.MaxHP * 0.3);
-            perPotion = TeamHQBonus.ApplyPotionHeal(player, perPotion); // v1.1.11: Infirmary, before the cap
+            perPotion = PotionBonus.ApplyOwnerBonuses(player, perPotion); // v1.1.11: Infirmary, before the cap
             long totalHealed = 0;
             int drank = 0;
             for (int i = 0; i < qty && player.Healing > 0 && player.HP < player.MaxHP; i++)

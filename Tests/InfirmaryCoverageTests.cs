@@ -92,13 +92,13 @@ public class InfirmaryCoverageTests
         foreach (var (file, line, method, text, body) in hits)
         {
             if (ExcludedMethods.ContainsKey($"{file}.{method}")) continue;
-            if (body.Contains("TeamHQBonus.ApplyPotionHeal")) continue;
+            if (body.Contains("PotionBonus.ApplyOwnerBonuses")) continue;
             int comment = text.IndexOf("//", StringComparison.Ordinal);
             bool markedOut = comment >= 0 && Regex.IsMatch(text.Substring(comment), @"hq-infirmary: out \(\S[^)]*\)");
             if (!markedOut)
                 problems.Add($"{file}.cs:{line} in {method}: {text}");
         }
-        problems.Should().BeEmpty("each method that uses up a healing potion applies TeamHQBonus.ApplyPotionHeal or is marked out with a reason");
+        problems.Should().BeEmpty("each method that uses up a healing potion applies PotionBonus.ApplyOwnerBonuses (Potion Mastery then the Infirmary) or is marked out with a reason");
     }
 
     [Fact]
@@ -173,7 +173,7 @@ public class InfirmaryCoverageTests
     [InlineData("Scripts/Systems/WorldBossSystem.cs", "DrinkHealingPotions", 1)]
     public void EachSite_AppliesTheInfirmary(string file, string method, int calls)
     {
-        Count(MethodBody(file, method), "TeamHQBonus.ApplyPotionHeal(").Should().Be(calls);
+        Count(MethodBody(file, method), "PotionBonus.ApplyOwnerBonuses(").Should().Be(calls);
     }
 
     [Fact]
@@ -184,7 +184,7 @@ public class InfirmaryCoverageTests
         for (int n = 0; n < 2; n++)
         {
             int difficulty = body.IndexOf("DifficultySystem.ApplyHealingMultiplier(healAmount)", from, StringComparison.Ordinal);
-            int bonus = body.IndexOf("TeamHQBonus.ApplyPotionHeal(player, healAmount)", from, StringComparison.Ordinal);
+            int bonus = body.IndexOf("PotionBonus.ApplyOwnerBonuses(player, healAmount)", from, StringComparison.Ordinal);
             int cap = body.IndexOf("Math.Min(healAmount, player.MaxHP - player.HP)", from, StringComparison.Ordinal);
             difficulty.Should().BeGreaterThan(0);
             bonus.Should().BeGreaterThan(difficulty, "the Infirmary is the last modifier");
@@ -198,14 +198,14 @@ public class InfirmaryCoverageTests
     {
         string body = MethodBody("Scripts/Systems/CombatEngine.cs", "TeammateHealWithPotion");
         body.Should().Contain("potionOwner = owner;", "a potion from the player's belt carries the belt owner's bonus");
-        body.Should().Contain("TeamHQBonus.ApplyPotionHeal(potionOwner, healAmount)");
+        body.Should().Contain("PotionBonus.ApplyOwnerBonuses(potionOwner, healAmount)");
     }
 
     [Fact]
     public void TheHomePotion_PutsTheInfirmaryInsideTheFloor()
     {
         MethodBody("Scripts/Locations/HomeLocation.cs", "UseHealingPotion")
-            .Should().Contain("Math.Max(50, TeamHQBonus.ApplyPotionHeal(currentPlayer, currentPlayer.MaxHP / 4))");
+            .Should().Contain("Math.Max(50, PotionBonus.ApplyOwnerBonuses(currentPlayer, currentPlayer.MaxHP / 4))");
     }
 
     // Behaviour.
@@ -268,5 +268,25 @@ public class InfirmaryCoverageTests
         long boosted = await DungeonPotion(Drinker(2));
         plain.Should().Be(25_000, "a quarter of MaxHP");
         boosted.Should().Be(30_000);
+    }
+
+    [Fact]
+    public async Task AnAlchemistsDungeonPotion_HealsHalfAgainAsMuch()
+    {
+        // Potion Mastery was applied only by the combat quick-heal; every other potion missed it.
+        var alchemist = Drinker(0);
+        alchemist.Class = CharacterClass.Alchemist;
+        (await DungeonPotion(alchemist)).Should().Be(37_500, "a quarter of MaxHP, plus 50%");
+
+        var both = Drinker(2);
+        both.Class = CharacterClass.Alchemist;
+        (await DungeonPotion(both)).Should().Be(45_000, "Potion Mastery, then the Infirmary");
+    }
+
+    [Fact]
+    public void TheQuickHeal_NoLongerAppliesPotionMasteryItself()
+    {
+        // it goes through PotionBonus with every other potion; applying it inline as well would count it twice
+        Count(MethodBody("Scripts/Systems/CombatEngine.cs", "ExecuteHeal"), "AlchemistPotionMasteryBonus").Should().Be(0);
     }
 }
