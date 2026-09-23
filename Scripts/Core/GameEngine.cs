@@ -4212,13 +4212,25 @@ public partial class GameEngine
     private async Task DeliverPendingInheritance(SqlSaveBackend backend)
     {
         if (currentPlayer == null) return;
-        var username = InheritanceKey(currentPlayer);
-        if (string.IsNullOrEmpty(username)) return;
+        await DeliverPendingInheritance(currentPlayer, terminal, backend);
+    }
+
+    /// <summary>
+    /// Delivers what waits in the inheritance queue for this character: team members' bequests and
+    /// world boss items that did not fit the pack. v1.1.10: callable during play too (the /boss
+    /// screen), not only at login, so a player who makes room does not have to log out to get an
+    /// item. Returns how many queued rows were delivered; the caller saves when that is not zero.
+    /// </summary>
+    internal static async Task<int> DeliverPendingInheritance(Character player, TerminalEmulator terminal, SqlSaveBackend backend)
+    {
+        var username = InheritanceKey(player);
+        if (string.IsNullOrEmpty(username)) return 0;
+        int deliveredCount = 0;
 
         try
         {
             var pending = backend.GetPendingInheritance(username);
-            if (pending.Count == 0) return;
+            if (pending.Count == 0) return 0;
 
             // Group by source NPC for cleaner narration ("Aldric leaves you 3 items + 250 gold").
             var bySource = pending.GroupBy(p => p.SourceNpc).ToList();
@@ -4247,7 +4259,7 @@ public partial class GameEngine
                 {
                     if (row.Gold > 0)
                     {
-                        currentPlayer.Gold += row.Gold;
+                        player.Gold += row.Gold;
                         sourceGold += row.Gold;
                         goldDelivered += row.Gold;
                         deliveredIds.Add(row.Id);
@@ -4256,7 +4268,7 @@ public partial class GameEngine
                     if (string.IsNullOrEmpty(row.ItemJson)) { deliveredIds.Add(row.Id); continue; }
 
                     // Inventory cap check
-                    if ((currentPlayer.Inventory?.Count ?? 0) >= inventoryCap)
+                    if ((player.Inventory?.Count ?? 0) >= inventoryCap)
                     {
                         itemsOverflowed++;
                         // Don't add this id to deliveredIds — leave queued for next login.
@@ -4268,8 +4280,8 @@ public partial class GameEngine
                         var item = System.Text.Json.JsonSerializer.Deserialize<global::Item>(row.ItemJson, jsonOpts); ItemLimits.Heal(item, "inheritance");
                         if (item != null)
                         {
-                            currentPlayer.Inventory ??= new List<global::Item>();
-                            currentPlayer.Inventory.Add(item);
+                            player.Inventory ??= new List<global::Item>();
+                            player.Inventory.Add(item);
                             itemsDelivered++;
                             sourceItemsDelivered++;
                             deliveredIds.Add(row.Id);
@@ -4304,12 +4316,14 @@ public partial class GameEngine
             terminal.WriteLine("");
 
             backend.ClearInheritance(deliveredIds);
+            deliveredCount = deliveredIds.Count;
             await Task.Delay(1500);
         }
         catch (Exception ex)
         {
             DebugLogger.Instance.LogError("INHERITANCE", $"Failed to deliver pending inheritance: {ex.Message}");
         }
+        return deliveredCount;
     }
 
     /// <summary>

@@ -76,6 +76,25 @@ public class InheritanceKeyTests : IDisposable
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task AWaitingItem_ArrivesOnceThereIsRoom_WithoutLoggingOut()
+    {
+        // v1.1.10: delivery is callable during play (the /boss screen calls it), not only at login.
+        Playing("rage", "rage");
+        var hero = new Character { Name1 = "rage", Name2 = "Rage" };
+        _db.QueueInheritance("rage", "Abyssal Leviathan", "{\"name\":\"Tidebreaker\"}").Should().BeTrue();
+        var term = new TerminalEmulator(new MemoryStream(), new MemoryStream());
+
+        for (int i = 0; i < 50; i++) hero.Inventory.Add(new Item { Name = $"junk {i}" });
+        (await GameEngine.DeliverPendingInheritance(hero, term, _db)).Should().Be(0, "the pack is still full");
+        _db.GetPendingInheritance("rage").Should().ContainSingle("it keeps waiting");
+
+        hero.Inventory.RemoveAt(0);
+        (await GameEngine.DeliverPendingInheritance(hero, term, _db)).Should().Be(1);
+        hero.Inventory.Should().Contain(i => i.Name == "Tidebreaker");
+        _db.GetPendingInheritance("rage").Should().BeEmpty();
+    }
+
+    [Fact]
     public void WithoutASession_TheOldFallbacksStillApply()
     {
         SessionContext.Current = null;

@@ -711,6 +711,14 @@ namespace UsurperRemake.Systems
             // v1.1.4: rewards from a boss settled while this player was away, or by another session
             await DeliverWorldBossRewards(player, backend, terminal);
 
+            // v1.1.10: an item that waited for room in the pack arrives here too, not only at the next
+            // login, so a player who has made room does not have to log out for it.
+            if (await GameEngine.DeliverPendingInheritance(player, terminal, backend) > 0)
+            {
+                try { await SaveHook(player); }
+                catch (Exception ex) { DebugLogger.Instance.LogError("WORLD_BOSS", $"Save after inheritance delivery failed: {ex.Message}"); }
+            }
+
             while (true)
             {
                 terminal.ClearScreen();
