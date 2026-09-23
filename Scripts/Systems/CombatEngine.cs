@@ -19017,7 +19017,7 @@ public partial class CombatEngine
                 // Mandate, Rage Challenge, the Tidesworn stances), then the AoE taunt, then a single
                 // taunt. The picker used to look for "aoe_taunt" only, so a level-40 tank kept
                 // taunting bare with Thundering Roar and never raised its Formation.
-                var tauntAbility = PreferredTaunt(affordableAbilities);
+                var tauntAbility = OpeningTankMove(affordableAbilities);
                 if (tauntAbility != null && chosenAbility == null) // v1.2: never over a wounded teammate's shield
                     chosenAbility = tauntAbility; // v1.1.3: a Cautious ally's taunts were filtered out above
             }
@@ -19512,6 +19512,21 @@ public partial class CombatEngine
     /// </summary>
     internal static bool IsTauntAbility(ClassAbilitySystem.ClassAbility a) =>
         a.SpecialEffect != null && (a.SpecialEffect.Contains("taunt") || ProtectiveTaunts.Contains(a.SpecialEffect));
+
+    /// <summary>
+    /// v1.1.10: a tank ally's opening move while nothing is taunted. A taunt that also protects it is
+    /// taken at once; a bare taunt (Thundering Roar, or a single taunt) waits one turn behind Shield
+    /// Wall when the tank can raise it (player suggestion, maintainer decision 2026-09-23). The
+    /// defensive-spread rule drops Shield Wall from the choices while it is up, so the next turn
+    /// taunts.
+    /// </summary>
+    internal static ClassAbilitySystem.ClassAbility? OpeningTankMove(IEnumerable<ClassAbilitySystem.ClassAbility> affordable)
+    {
+        var list = affordable.ToList();
+        var taunt = PreferredTaunt(list);
+        if (taunt == null || ProtectiveTaunts.Contains(taunt.SpecialEffect ?? "")) return taunt;
+        return list.FirstOrDefault(a => a.Id == "shield_wall") ?? taunt;
+    }
 
     /// <summary>v1.1.10: the taunt a tank ally opens with: one that also protects it, then the AoE taunt, then a single taunt.</summary>
     internal static ClassAbilitySystem.ClassAbility? PreferredTaunt(IEnumerable<ClassAbilitySystem.ClassAbility> affordable)

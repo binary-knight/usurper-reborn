@@ -32,6 +32,28 @@ public class TankTauntChoiceTests
         CombatEngine.PreferredTaunt(new[] { A("shield_wall"), A("thundering_roar") })!.Id.Should().Be("thundering_roar");
     }
 
+    [Fact]
+    public void BelowLevel40_ATankRaisesShieldWallFirst_ThenTaunts()
+    {
+        // Turn one: Roar and Shield Wall both ready, so the wall goes up first.
+        CombatEngine.OpeningTankMove(new[] { A("thundering_roar"), A("shield_wall") })!.Id.Should().Be("shield_wall");
+        // Turn two: the defensive-spread rule has dropped Shield Wall while it is up, so Roar goes out.
+        CombatEngine.OpeningTankMove(new[] { A("thundering_roar") })!.Id.Should().Be("thundering_roar");
+    }
+
+    [Fact]
+    public void FromLevel40_TheProtectiveTaunt_GoesOutAtOnce()
+    {
+        CombatEngine.OpeningTankMove(new[] { A("thundering_roar"), A("shield_wall"), A("shield_wall_formation") })!.Id.Should().Be("shield_wall_formation");
+    }
+
+    [Fact]
+    public void WithNoTaunt_ThereIsNoOpeningMove()
+    {
+        // A Cautious ally's taunts are filtered out before this; Shield Wall alone is not an opening move here
+        CombatEngine.OpeningTankMove(new[] { A("shield_wall") }).Should().BeNull();
+    }
+
     [Theory]
     [InlineData("thundering_roar", true)]
     [InlineData("shield_wall_formation", true)]
