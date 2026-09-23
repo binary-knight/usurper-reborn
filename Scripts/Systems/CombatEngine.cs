@@ -18979,7 +18979,7 @@ public partial class CombatEngine
         {
             // Cautious never starts a taunt, through the tank block or the random pool
             // (Thundering Roar is a Debuff with an aoe_taunt effect and would be drawn there).
-            var withoutTaunts = affordableAbilities.Where(a => a.SpecialEffect == null || !a.SpecialEffect.Contains("taunt")).ToList();
+            var withoutTaunts = affordableAbilities.Where(a => !IsTauntAbility(a)).ToList();
             if (withoutTaunts.Count < affordableAbilities.Count)
             {
                 SayWhyOnce(teammate, "combat.teammate_holds_taunt");
@@ -19008,9 +19008,11 @@ public partial class CombatEngine
             bool anyTaunted = livingMonsters.Any(m => !string.IsNullOrEmpty(m.TauntedBy) && m.TauntRoundsLeft > 0);
             if (!anyTaunted)
             {
-                // Prefer AoE taunt (Thundering Roar), then single taunt
-                var tauntAbility = affordableAbilities.FirstOrDefault(a => a.SpecialEffect == "aoe_taunt")
-                    ?? affordableAbilities.FirstOrDefault(a => a.SpecialEffect == "taunt");
+                // v1.1.10: a taunt that also protects the tank first (Shield Wall Formation, Divine
+                // Mandate, Rage Challenge, the Tidesworn stances), then the AoE taunt, then a single
+                // taunt. The picker used to look for "aoe_taunt" only, so a level-40 tank kept
+                // taunting bare with Thundering Roar and never raised its Formation.
+                var tauntAbility = PreferredTaunt(affordableAbilities);
                 if (tauntAbility != null && chosenAbility == null) // v1.2: never over a wounded teammate's shield
                     chosenAbility = tauntAbility; // v1.1.3: a Cautious ally's taunts were filtered out above
             }
@@ -19493,6 +19495,28 @@ public partial class CombatEngine
     /// <summary>
     /// Handle monster attacking a companion instead of the player
     /// </summary>
+    /// <summary>v1.1.10: taunts that also protect the taunter. Their effect names do not say "taunt".</summary>
+    private static readonly HashSet<string> ProtectiveTaunts = new()
+    {
+        "shield_wall_formation", "divine_mandate", "rage_challenge", "undertow", "abyssal_anchor", "eternal_vigil",
+    };
+
+    /// <summary>
+    /// v1.1.10: every ability that pulls monsters onto its user. A Cautious ally holds all of them; it
+    /// used to hold only the ones whose effect name said "taunt", so it still taunted with the six above.
+    /// </summary>
+    internal static bool IsTauntAbility(ClassAbilitySystem.ClassAbility a) =>
+        a.SpecialEffect != null && (a.SpecialEffect.Contains("taunt") || ProtectiveTaunts.Contains(a.SpecialEffect));
+
+    /// <summary>v1.1.10: the taunt a tank ally opens with: one that also protects it, then the AoE taunt, then a single taunt.</summary>
+    internal static ClassAbilitySystem.ClassAbility? PreferredTaunt(IEnumerable<ClassAbilitySystem.ClassAbility> affordable)
+    {
+        var list = affordable.ToList();
+        return list.FirstOrDefault(a => ProtectiveTaunts.Contains(a.SpecialEffect ?? ""))
+            ?? list.FirstOrDefault(a => a.SpecialEffect == "aoe_taunt")
+            ?? list.FirstOrDefault(a => a.SpecialEffect == "taunt");
+    }
+
     /// <summary>
     /// v1.1.10: what a monster's special ability hit on a companion goes through after defence. It
     /// used to skip the three things that protect a companion from a basic attack and the player
