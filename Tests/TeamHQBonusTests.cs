@@ -115,4 +115,52 @@ public class TeamHQBonusTests : IDisposable
         typeof(PlayerData).GetMembers(BindingFlags.Public | BindingFlags.Instance)
             .Where(m => m.Name.StartsWith("HQ", StringComparison.Ordinal)).Should().BeEmpty();
     }
+
+    // ─── the status screen ───
+
+    private sealed class ScriptedStream : Stream
+    {
+        private readonly byte[] _data; private int _pos;
+        public ScriptedStream(string script) { _data = System.Text.Encoding.UTF8.GetBytes(script); }
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            if (_pos >= _data.Length) return 0;
+            int n = Math.Min(count, _data.Length - _pos); Array.Copy(_data, _pos, buffer, offset, n); _pos += n; return n;
+        }
+        public override System.Threading.Tasks.Task<int> ReadAsync(byte[] buffer, int offset, int count, System.Threading.CancellationToken ct) => System.Threading.Tasks.Task.FromResult(Read(buffer, offset, count));
+        public override bool CanRead => true; public override bool CanSeek => false; public override bool CanWrite => false;
+        public override long Length => _data.Length; public override long Position { get => _pos; set => throw new NotSupportedException(); }
+        public override void Flush() { }
+        public override long Seek(long o, SeekOrigin s) => throw new NotSupportedException();
+        public override void SetLength(long v) => throw new NotSupportedException();
+        public override void Write(byte[] b, int o, int c) => throw new NotSupportedException();
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task AWarriorWithOnlyTheTeamsBonus_SeesItOnTheStatusScreen()
+    {
+        // The Active Buffs section appeared only if some other buff (or certain classes) turned it on,
+        // so a Warrior whose only bonus was the team's never saw it.
+        var hero = new Character { Name1 = "hq_tester", Name2 = "HQ Tester", Class = CharacterClass.Warrior, Level = 20, HP = 300, MaxHP = 300, Team = "Iron Wolves" };
+        TeamHQBonus.RefreshLevels(hero, _db);
+        var inn = new InnLocation();
+        var output = new MemoryStream();
+        var term = new TerminalEmulator(new ScriptedStream("\n\n\n\n"), output);
+        var F = BindingFlags.NonPublic | BindingFlags.Instance;
+        typeof(BaseLocation).GetField("terminal", F)!.SetValue(inn, term);
+        typeof(BaseLocation).GetField("currentPlayer", F)!.SetValue(inn, hero);
+        await (System.Threading.Tasks.Task)typeof(BaseLocation).GetMethod("ShowStatus", F)!.Invoke(inn, null)!;
+        term.StreamWriterInternal!.Flush();
+        var shown = System.Text.Encoding.UTF8.GetString(output.ToArray());
+        shown.Should().Contain(Loc.Get("base.hq_armory", 3, 15));
+        shown.Should().Contain(Loc.Get("base.hq_infirmary", 4, 40));
+
+        hero.Team = "";   // left the team
+        output.SetLength(0);
+        term = new TerminalEmulator(new ScriptedStream("\n\n\n\n"), output);
+        typeof(BaseLocation).GetField("terminal", F)!.SetValue(inn, term);
+        await (System.Threading.Tasks.Task)typeof(BaseLocation).GetMethod("ShowStatus", F)!.Invoke(inn, null)!;
+        term.StreamWriterInternal!.Flush();
+        System.Text.Encoding.UTF8.GetString(output.ToArray()).Should().NotContain(Loc.Get("base.hq_armory", 3, 15));
+    }
 }
