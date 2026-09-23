@@ -116,17 +116,62 @@ public class TeamLeaderFixTests : IDisposable
     }
 
     [Fact]
-    public void AnOldKeyTwoTeamsShare_LeavesTheWaitingBequestsWhereTheyAre()
+    public void AnOldKeyTwoTeamsShare_NeitherTeamTakesTheOthersBequests()
     {
-        // Two teams founded under the same name: a waiting bequest could be either team's.
+        // Two teams founded under the same name: what waits under the key could be either team's. Codex
+        // round 10: leaving it there let the second team fixed take both teams' bequests.
         Player("mira__alt", "Mira Vale", "Old Guard");
+        Player("mira", "Mira Vale", "New Guard");
         Team("Old Guard", "mira vale");
         Team("New Guard", "mira vale");
         _db.QueueInheritance("mira vale", "Aldric", "{\"name\":\"Aldric's sword\"}").Should().BeTrue();
 
         _db.SetTeamLeaderKey("Old Guard", "mira vale", "mira__alt").Should().BeTrue();
-        Queued("mira vale").Should().Be(1, "New Guard still has that key");
+        Queued("mira vale").Should().Be(0, "set aside, not left for the next fix");
         Queued("mira__alt").Should().Be(0);
+
+        _db.QueueTeamInheritance("New Guard", "Bryn", "{\"name\":\"Bryn's shield\"}").Should().BeTrue();   // only New Guard's
+        _db.SetTeamLeaderKey("New Guard", "mira vale", "mira").Should().BeTrue();
+        _db.GetPendingInheritance("mira").Should().ContainSingle().Which.ItemJson.Should().Contain("Bryn", "New Guard's own bequest follows it, and only that");
+    }
+
+    [Fact]
+    public void ABequestQueuedForATeam_GoesToTheLeaderKeyAtThatMoment()
+    {
+        // Codex round 10: the estate is queued item by item after the leader was read, so an admin fix in
+        // between left the rest under the old key for the sweep. Each row now reads the key as it is queued.
+        Player("mira__alt", "Mira Vale", "Old Guard");
+        Team("Old Guard", "mira vale");
+        _db.QueueTeamInheritance("Old Guard", "Aldric", "{\"name\":\"before\"}").Should().BeTrue();
+        _db.SetTeamLeaderKey("Old Guard", "mira vale", "mira__alt").Should().BeTrue();
+        _db.QueueTeamInheritance("Old Guard", "Aldric", "{\"name\":\"after\"}").Should().BeTrue();
+
+        _db.GetPendingInheritance("mira__alt").Should().HaveCount(2, "the row from before is moved by the fix, the one after is queued under the new key");
+        _db.QueueTeamInheritance("No Such Team", "Aldric", "{}").Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task AMalformedSave_DoesNotHideTheMembersOfEveryTeam()
+    {
+        // A fresh database's expression indexes refuse a malformed blob; an upgraded one whose index build
+        // hit such a blob started without them (Codex round 10), so this drops them first.
+        using (var conn = new SqliteConnection($"Data Source={_path}"))
+        {
+            conn.Open();
+            var names = new System.Collections.Generic.List<string>();
+            using (var q = conn.CreateCommand())
+            {
+                q.CommandText = "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'players' AND sql LIKE '%json%';";
+                using var r = q.ExecuteReader();
+                while (r.Read()) names.Add(r.GetString(0));
+            }
+            foreach (var name in names) { using var d = conn.CreateCommand(); d.CommandText = $"DROP INDEX \"{name}\";"; d.ExecuteNonQuery(); }
+        }
+        Exec("INSERT INTO players (username, display_name, player_data) VALUES ('broken', 'Broken', '{not json');");
+        Player("mira__alt", "Mira Vale", "Old Guard");
+        Team("Old Guard", "mira vale");
+        var teams = await _db.GetTeamsWithUnknownLeader();
+        teams.Should().ContainSingle().Which.Members.Should().ContainSingle(m => m.Username == "mira__alt");
     }
 
     [Fact]

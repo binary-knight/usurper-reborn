@@ -5130,8 +5130,9 @@ namespace UsurperRemake.Systems
     /// <summary>
     /// v1.1.10: sets a team's leader key to a character's save key, as confirmed by an admin. Only if
     /// the team still has oldKey (nothing changed it meanwhile) and newKey is a character. Bequests
-    /// already queued under oldKey follow it, unless another team still has oldKey, since those could
-    /// be that team's. newKey must be a current member of the team. True when the team was updated.
+    /// already queued under oldKey follow it; if another team still has oldKey they could be that
+    /// team's, so they are set aside for the sweep instead. newKey must be a current member of the team.
+    /// True when the team was updated.
     /// </summary>
     public bool SetTeamLeaderKey(string teamName, string oldKey, string newKey)
     {
@@ -5143,7 +5144,7 @@ namespace UsurperRemake.Systems
             {
                 check.Transaction = tx;
                 // a current member of the team only: a stranger who takes a founder's old name is not the leader
-                check.CommandText = "SELECT COUNT(*) FROM players WHERE username = @new AND json_extract(player_data, '$.player.team') = @team;";
+                check.CommandText = "SELECT COUNT(*) FROM players WHERE username = @new AND (CASE WHEN json_valid(player_data) THEN json_extract(player_data, '$.player.team') END) = @team;";
                 check.Parameters.AddWithValue("@new", newKey);
                 check.Parameters.AddWithValue("@team", teamName);
                 if (Convert.ToInt32(check.ExecuteScalar()) != 1) return false;
@@ -5160,10 +5161,14 @@ namespace UsurperRemake.Systems
             using (var queued = connection.CreateCommand())
             {
                 queued.Transaction = tx;
+                // Another team still has the old key: what waits under it could be either team's, so it is
+                // set aside under a key no character has, where the sweep removes it as it always did, and
+                // a later fix of the other team cannot take it (Codex review). Otherwise it follows the team.
                 queued.CommandText = @"
-                    UPDATE pending_inheritance SET player_username = @new
-                    WHERE player_username = @old
-                    AND NOT EXISTS (SELECT 1 FROM player_teams WHERE created_by = @old);";
+                    UPDATE pending_inheritance
+                    SET player_username = CASE WHEN EXISTS (SELECT 1 FROM player_teams WHERE created_by = @old)
+                                               THEN '#shared-key:' || @old ELSE @new END
+                    WHERE player_username = @old;";
                 queued.Parameters.AddWithValue("@new", newKey);
                 queued.Parameters.AddWithValue("@old", oldKey);
                 queued.ExecuteNonQuery();
@@ -5203,6 +5208,33 @@ namespace UsurperRemake.Systems
         catch (Exception ex)
         {
             DebugLogger.Instance.LogError("SQL", $"Failed to queue inheritance for '{playerUsername}' from '{sourceNpcName}': {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// v1.1.10: queues a bequest for a team's leader, reading the leader key in the same statement, so
+    /// a leader key changed by an admin while an estate is being queued cannot leave rows under the
+    /// old key for the sweep (Codex review). False when the team does not exist or the write failed.
+    /// </summary>
+    public bool QueueTeamInheritance(string teamName, string sourceNpcName, string? itemJson, long goldAmount = 0)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"
+                INSERT INTO pending_inheritance (player_username, source_npc_name, item_json, gold_amount)
+                SELECT lower(created_by), @npc, @json, @gold FROM player_teams WHERE team_name = @team;";
+            cmd.Parameters.AddWithValue("@team", teamName);
+            cmd.Parameters.AddWithValue("@npc", sourceNpcName);
+            cmd.Parameters.AddWithValue("@json", itemJson ?? "");
+            cmd.Parameters.AddWithValue("@gold", goldAmount);
+            return cmd.ExecuteNonQuery() == 1;
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to queue inheritance for team '{teamName}' from '{sourceNpcName}': {ex.Message}");
             return false;
         }
     }
@@ -5438,7 +5470,8 @@ namespace UsurperRemake.Systems
                 FROM players p
                 LEFT JOIN online_players op ON LOWER(p.username) = LOWER(op.username)
                     AND op.last_heartbeat > datetime('now', '-120 seconds')
-                WHERE json_extract(p.player_data, '$.player.team') = @teamName
+                -- v1.1.10: one malformed save blob made json_extract throw for every team (Codex review)
+                WHERE (CASE WHEN json_valid(p.player_data) THEN json_extract(p.player_data, '$.player.team') END) = @teamName
                 AND p.player_data != '{}' AND LENGTH(p.player_data) > 2
                 AND p.is_banned = 0
                 AND p.username NOT LIKE 'emergency_%'
@@ -5494,7 +5527,7 @@ namespace UsurperRemake.Systems
             cmd.CommandText = @"
                 UPDATE player_teams SET member_count = (
                     SELECT COUNT(*) FROM players
-                    WHERE json_extract(player_data, '$.player.team') = @teamName
+                    WHERE (CASE WHEN json_valid(player_data) THEN json_extract(player_data, '$.player.team') END) = @teamName
                     AND player_data != '{}' AND LENGTH(player_data) > 2
                     AND is_banned = 0 AND username NOT LIKE 'emergency_%'
                 ) WHERE team_name = @teamName;

@@ -1348,6 +1348,8 @@ public class WorldSimulator
             leaderTask.Wait();
             var leaderUsername = leaderTask.Result;
             if (string.IsNullOrEmpty(leaderUsername)) return;
+            // v1.1.10: each row reads the team's leader key again as it is queued (QueueTeamInheritance),
+            // so an admin fixing the key meanwhile cannot strand part of the estate under the old one
 
             int queued = 0;
             var jsonOpts = new System.Text.Json.JsonSerializerOptions
@@ -1368,7 +1370,7 @@ public class WorldSimulator
                 var item = deceased.ConvertEquipmentToLegacyItem(eq);
                 if (item == null) continue;
                 string itemJson = System.Text.Json.JsonSerializer.Serialize(item, jsonOpts);
-                if (backend.QueueInheritance(leaderUsername, deceased.Name2 ?? deceased.Name1 ?? "Unknown", itemJson, 0))
+                if (backend.QueueTeamInheritance(deceased.Team, deceased.Name2 ?? deceased.Name1 ?? "Unknown", itemJson, 0))
                 {
                     queued++;
                     queuedSlots.Add(kvp.Key);
@@ -1383,7 +1385,7 @@ public class WorldSimulator
                 {
                     if (item == null) continue;
                     string itemJson = System.Text.Json.JsonSerializer.Serialize(item, jsonOpts);
-                    if (backend.QueueInheritance(leaderUsername, deceased.Name2 ?? deceased.Name1 ?? "Unknown", itemJson, 0))
+                    if (backend.QueueTeamInheritance(deceased.Team, deceased.Name2 ?? deceased.Name1 ?? "Unknown", itemJson, 0))
                     {
                         queued++;
                         queuedItems.Add(item);
@@ -1395,7 +1397,7 @@ public class WorldSimulator
             bool goldQueued = false;
             if (deceased.Gold > 0)
             {
-                goldQueued = backend.QueueInheritance(leaderUsername, deceased.Name2 ?? deceased.Name1 ?? "Unknown", null, deceased.Gold);
+                goldQueued = backend.QueueTeamInheritance(deceased.Team, deceased.Name2 ?? deceased.Name1 ?? "Unknown", null, deceased.Gold);
                 if (goldQueued) queued++;
             }
 
