@@ -164,4 +164,28 @@ public class TeamHQBonusTests : IDisposable
         term.StreamWriterInternal!.Flush();
         System.Text.Encoding.UTF8.GetString(output.ToArray()).Should().NotContain(Loc.Get("base.hq_armory", 3, 15));
     }
+
+    [Fact]
+    public void OnlineLevelsOlderThanAMinute_AreReadAgain_BeforeUse()
+    {
+        // Review: a potion in town or a queued reward used the levels from login; a teammate's upgrade was missed.
+        var saved = (TeamHQBonus.IsOnline, TeamHQBonus.Backend, TeamHQBonus.Now);
+        var clock = new DateTime(2026, 9, 24, 12, 0, 0, DateTimeKind.Utc);
+        try
+        {
+            TeamHQBonus.IsOnline = () => true;
+            TeamHQBonus.Backend = () => _db;
+            TeamHQBonus.Now = () => clock;
+            var c = Member("Iron Wolves");
+            TeamHQBonus.RefreshLevels(c, _db);
+            TeamHQBonus.Armory(c).Should().Be(3);
+
+            Exec("UPDATE team_upgrades SET level = 7 WHERE team_name = 'Iron Wolves' AND upgrade_type = 'armory';");
+            clock = clock.AddSeconds(30);
+            TeamHQBonus.Armory(c).Should().Be(3, "read less than a minute ago");
+            clock = clock.AddSeconds(31);
+            TeamHQBonus.Armory(c).Should().Be(7, "a teammate's upgrade is seen once the levels are a minute old");
+        }
+        finally { (TeamHQBonus.IsOnline, TeamHQBonus.Backend, TeamHQBonus.Now) = saved; }
+    }
 }

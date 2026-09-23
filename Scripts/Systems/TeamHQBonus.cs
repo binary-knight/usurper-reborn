@@ -24,7 +24,24 @@ namespace UsurperRemake.Systems
         public const double TrainingPerLevel = 0.05;
         public const double InfirmaryPerLevel = 0.10;
 
-        private static bool Current(Character c) => !string.IsNullOrEmpty(c.Team) && c.Team == c.HQLevelsTeam;
+        /// <summary>
+        /// v1.1.11: levels older than this are read again before use, so a teammate's upgrade reaches a potion
+        /// in town, a queued reward or any other use outside the fixed refresh points (review).
+        /// </summary>
+        public static readonly TimeSpan MaxLevelAge = TimeSpan.FromMinutes(1);
+
+        // online only: the database holds the team's upgrades; tests and single-player have none to read
+        internal static Func<bool> IsOnline = () => UsurperRemake.BBS.DoorMode.IsOnlineMode;
+        internal static Func<SqlSaveBackend?> Backend = () => SaveSystem.Instance?.Backend as SqlSaveBackend;
+        internal static Func<DateTime> Now = () => DateTime.UtcNow;
+
+        private static bool Current(Character c)
+        {
+            if (string.IsNullOrEmpty(c.Team)) return false;
+            if (c is not NPC && IsOnline() && Now() - c.HQLevelsReadAt > MaxLevelAge)
+                RefreshLevels(c);
+            return c.Team == c.HQLevelsTeam;
+        }
 
         public static int Armory(Character c) => Current(c) ? c.HQArmoryLevel : 0;
         public static int Barracks(Character c) => Current(c) ? c.HQBarracksLevel : 0;
@@ -49,7 +66,8 @@ namespace UsurperRemake.Systems
         /// </summary>
         public static void RefreshLevels(Character c, SqlSaveBackend? backend = null)
         {
-            backend ??= SaveSystem.Instance?.Backend as SqlSaveBackend;
+            backend ??= Backend();
+            c.HQLevelsReadAt = Now();
             if (c is NPC || string.IsNullOrEmpty(c.Team) || backend == null)
             {
                 c.HQArmoryLevel = c.HQBarracksLevel = c.HQTrainingLevel = c.HQInfirmaryLevel = 0;

@@ -596,6 +596,8 @@ public class Character
     public int HQInfirmaryLevel { get; set; } // +10% healing per level
     /// <summary>v1.1.11: the team the HQ levels above were read for; they count only while it is still the character's team (TeamHQBonus).</summary>
     public string HQLevelsTeam { get; set; } = "";
+    /// <summary>v1.1.11: when the HQ levels were read (run time only); TeamHQBonus reads them again when old.</summary>
+    public DateTime HQLevelsReadAt { get; set; } = DateTime.MinValue;
 
     // Herb pouch inventory (v0.48.5)
     public int HerbHealing { get; set; }        // Healing Herbs (garden lv1)
