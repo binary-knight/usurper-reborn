@@ -21417,7 +21417,9 @@ public partial class CombatEngine
         try
         {
             var ctx = UsurperRemake.Server.SessionContext.Current;
-            string username = ctx?.Username ?? player.Name1 ?? player.Name2 ?? "";
+            // v1.1.11: the character's key, as PermadeathHelper uses; the account name is the MAIN character's
+            // key, so on an alt the purge and the delete hit the main character (review)
+            string username = (!string.IsNullOrEmpty(ctx?.CharacterKey) ? ctx!.CharacterKey : ctx?.Username) ?? player.Name1 ?? player.Name2 ?? "";
             string displayName = player.Name2 ?? player.Name1 ?? username;
             string killerName = result.Monster?.Name ?? "an unknown end";
             int finalLevel = player.Level;

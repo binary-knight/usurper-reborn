@@ -399,4 +399,16 @@ public class CharacterRecreationTests : IDisposable
         var quest = CodeOnly(Source("Systems", "QuestSystem.cs"));
         quest.Should().Contain("IsPlayerBounty = onPlayer");
     }
+
+    [Fact]
+    public void EveryPermadeath_DeletesTheCharactersOwnKey_NotTheAccounts()
+    {
+        // On an alt the account name is the MAIN character's key; the death-cap path deleted that one.
+        var engine = CodeOnly(Source("Systems", "CombatEngine.cs"));
+        int del = engine.IndexOf("sqlBackend.DeleteGameData(username, bypassArchive: false);", StringComparison.Ordinal);
+        del.Should().BeGreaterThan(0);
+        engine.Substring(Math.Max(0, del - 2500), 2500).Should().Contain("ctx!.CharacterKey : ctx?.Username");
+        var helper = CodeOnly(Source("Systems", "PermadeathHelper.cs"));
+        helper.Should().Contain("ctx!.CharacterKey : ctx?.Username");
+    }
 }
