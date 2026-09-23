@@ -988,19 +988,11 @@ namespace UsurperRemake.Systems
             // were), and a penalty can take a stat down to zero, not below it.
             long attackBase = player.Strength + player.WeapPow;
             int attack = (int)((activeCombatModifiers.DamageMultiplier - 1.0) * attackBase) + activeCombatModifiers.BonusDamage;
-            if (attack != 0)
-            {
-                player.TempAttackBonus += (int)Math.Max(attack, -attackBase);
-                player.TempAttackBonusDuration = 999;
-            }
+            player.DialogueAttackBonus = (int)Math.Max(attack, -attackBase);
 
             long defenceBase = player.Defence + player.ArmPow;
             int defence = (int)((activeCombatModifiers.DefenseMultiplier - 1.0) * defenceBase) + activeCombatModifiers.BonusDefense;
-            if (defence != 0)
-            {
-                player.TempDefenseBonus += (int)Math.Max(defence, -defenceBase);
-                player.TempDefenseBonusDuration = 999;
-            }
+            player.DialogueDefenseBonus = (int)Math.Max(defence, -defenceBase);
 
             // CriticalChance is written as a total with 5% as the neutral base; the difference is the bonus
             player.TempCritChanceBonus = (int)Math.Round((activeCombatModifiers.CriticalChance - 0.05) * 100);
@@ -1028,6 +1020,8 @@ namespace UsurperRemake.Systems
             player.TempAttackBonusDuration = 0;
             player.TempDefenseBonusDuration = 0;
             player.TempCritChanceBonus = 0;
+            player.DialogueAttackBonus = 0;
+            player.DialogueDefenseBonus = 0;
         }
 
         /// <summary>

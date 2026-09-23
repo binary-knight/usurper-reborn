@@ -440,6 +440,7 @@ public partial class CombatEngine
         c.DodgeNextAttack = false;
         c.HasBloodlust = false;
         c.TempCritChanceBonus = 0;
+        c.DialogueAttackBonus = 0; c.DialogueDefenseBonus = 0;
         c.HasStatusImmunity = false; c.StatusImmunityDuration = 0;
         c.DeathsEmbraceActive = false;
         c.StatusLifestealPercent = 0;
@@ -862,6 +863,8 @@ public partial class CombatEngine
         player.HasStatusImmunity = false;
         player.StatusImmunityDuration = 0;
         player.TempCritChanceBonus = 0;
+        player.DialogueAttackBonus = 0;
+        player.DialogueDefenseBonus = 0;
         // v1.1.10: an Old God's dialogue bonuses go on after this reset, which used to wipe them
         BossContext?.ApplyPlayerModifiers?.Invoke(player);
         player.DeathsEmbraceActive = false;
@@ -2043,6 +2046,8 @@ public partial class CombatEngine
         // Clean up temporary combat buffs (matches single-monster/PvP cleanup)
         player.IsRaging = false;
         player.TempCritChanceBonus = 0;   // v1.1.10
+        player.DialogueAttackBonus = 0;
+        player.DialogueDefenseBonus = 0;
         player.TempAttackBonus = 0;
         player.TempAttackBonusDuration = 0;
         player.TempDefenseBonus = 0;
@@ -5208,7 +5213,7 @@ public partial class CombatEngine
             playerDefense = Math.Max(0, playerDefense - 4);
 
         // Apply temporary defense bonus from abilities
-        playerDefense += player.TempDefenseBonus;
+        playerDefense += player.TempDefenseBonus + player.DialogueDefenseBonus;   // v1.1.10: dialogue kept apart from ability buffs
 
         // Apply grief effects to defense - grief stage can modify defense
         var griefDefenseEffects = GriefSystem.Instance.GetCurrentEffects();
@@ -12843,8 +12848,8 @@ public partial class CombatEngine
                         int variationMax = Math.Max(21, player.Level / 2);
                         attackPower += random.Next(1, variationMax);
 
-                        // Temporary attack bonus from abilities
-                        attackPower += player.TempAttackBonus;
+                        // Temporary attack bonus from abilities, and an Old God's dialogue answer (v1.1.10)
+                        attackPower += player.TempAttackBonus + player.DialogueAttackBonus;
 
                         // Weapon configuration modifier (2H bonus, dual-wield off-hand penalty)
                         double damageModifier = GetWeaponConfigDamageModifier(player, isOffHandAttack);
