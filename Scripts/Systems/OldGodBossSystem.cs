@@ -817,8 +817,9 @@ namespace UsurperRemake.Systems
             // Apply dialogue-based stat adjustments to the monster
             ApplyModifiersToMonster(bossMonster);
 
-            // Apply player bonuses from dialogue
-            ApplyModifiersToPlayer(player);
+            // v1.1.10: the player's dialogue bonuses are applied by the combat engine after its
+            // fight-start reset (BossCombatContext.ApplyPlayerModifiers). Applied here, before the
+            // fight, the reset wiped every one of them, so no answer ever changed the player's side.
 
             // Set up boss context on combat engine
             var combatEngine = new CombatEngine(terminal);
@@ -839,6 +840,7 @@ namespace UsurperRemake.Systems
                 BossDefenseMultiplier = activeCombatModifiers.BossDefenseMultiplier,
                 BossConfused = activeCombatModifiers.BossConfused,
                 BossWeakened = activeCombatModifiers.BossWeakened,
+                ApplyPlayerModifiers = ApplyModifiersToPlayer,
             };
 
             // Configure boss-specific party balance mechanics (v0.52.1)
@@ -953,6 +955,16 @@ namespace UsurperRemake.Systems
                 monster.WeapPow = (long)(monster.WeapPow * 0.85);
             }
 
+            // v1.1.10: the god's damage from the dialogue, the same way BossWeakened works, so every
+            // damage path (basic, specials, named abilities) follows it. Nothing used to read it. The
+            // harsh side is capped at GameConfig.OldGodDialogueBossDamageCap until the gods are retuned.
+            double bossDamage = Math.Min(activeCombatModifiers.BossDamageMultiplier, GameConfig.OldGodDialogueBossDamageCap);
+            if (bossDamage != 1.0)
+            {
+                monster.Strength = (long)(monster.Strength * bossDamage);
+                monster.WeapPow = (long)(monster.WeapPow * bossDamage);
+            }
+
             if (activeCombatModifiers.BossDefenseMultiplier != 1.0)
             {
                 monster.Defence = (int)(monster.Defence * activeCombatModifiers.BossDefenseMultiplier);
@@ -971,19 +983,27 @@ namespace UsurperRemake.Systems
         /// </summary>
         private void ApplyModifiersToPlayer(Character player)
         {
-            if (activeCombatModifiers.DamageMultiplier > 1.0)
+            // v1.1.10: called by the combat engine after its fight-start reset. Penalties below 1.0
+            // apply too (they were skipped), flat bonuses and crit chance are applied (they never
+            // were), and a penalty can take a stat down to zero, not below it.
+            long attackBase = player.Strength + player.WeapPow;
+            int attack = (int)((activeCombatModifiers.DamageMultiplier - 1.0) * attackBase) + activeCombatModifiers.BonusDamage;
+            if (attack != 0)
             {
-                int bonus = (int)((activeCombatModifiers.DamageMultiplier - 1.0) * (player.Strength + player.WeapPow));
-                player.TempAttackBonus += bonus;
+                player.TempAttackBonus += (int)Math.Max(attack, -attackBase);
                 player.TempAttackBonusDuration = 999;
             }
 
-            if (activeCombatModifiers.DefenseMultiplier > 1.0)
+            long defenceBase = player.Defence + player.ArmPow;
+            int defence = (int)((activeCombatModifiers.DefenseMultiplier - 1.0) * defenceBase) + activeCombatModifiers.BonusDefense;
+            if (defence != 0)
             {
-                int bonus = (int)((activeCombatModifiers.DefenseMultiplier - 1.0) * (player.Defence + player.ArmPow));
-                player.TempDefenseBonus += bonus;
+                player.TempDefenseBonus += (int)Math.Max(defence, -defenceBase);
                 player.TempDefenseBonusDuration = 999;
             }
+
+            // CriticalChance is written as a total with 5% as the neutral base; the difference is the bonus
+            player.TempCritChanceBonus = (int)Math.Round((activeCombatModifiers.CriticalChance - 0.05) * 100);
 
             if (activeCombatModifiers.HasRageBoost)
             {
@@ -1007,6 +1027,7 @@ namespace UsurperRemake.Systems
             player.TempDefenseBonus = 0;
             player.TempAttackBonusDuration = 0;
             player.TempDefenseBonusDuration = 0;
+            player.TempCritChanceBonus = 0;
         }
 
         /// <summary>

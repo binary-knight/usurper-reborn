@@ -1843,6 +1843,11 @@ public static partial class GameConfig
     // It used to add 30 percent of the boss's attack for the rest of the fight, compounding with
     // every cast, against its own comment ("a few rounds").
     public const int BossPowerSurgeRounds = 3;
+
+    // v1.1.10: an Old God's dialogue answer can make the god hit harder (BossDamageMultiplier up to
+    // 1.25 as written). Capped here until the gods are retuned against the dialogue; the softer
+    // answers (down to 0.50) are not capped.
+    public const double OldGodDialogueBossDamageCap = 1.10;
     public const int StunDRWindowRounds = 5;                  // Rounds of "no stun" before DR resets to 0
     public const int MaxStunDurationNormal = 3;               // Hard cap on stun duration vs normal monsters
     public const int MaxStunDurationBoss = 1;                 // Hard cap on stun duration vs bosses

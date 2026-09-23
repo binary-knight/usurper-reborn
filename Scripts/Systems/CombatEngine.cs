@@ -439,6 +439,7 @@ public partial class CombatEngine
         c.MagicACBonus = 0;
         c.DodgeNextAttack = false;
         c.HasBloodlust = false;
+        c.TempCritChanceBonus = 0;
         c.HasStatusImmunity = false; c.StatusImmunityDuration = 0;
         c.DeathsEmbraceActive = false;
         c.StatusLifestealPercent = 0;
@@ -860,6 +861,9 @@ public partial class CombatEngine
         player.HasBloodlust = false;
         player.HasStatusImmunity = false;
         player.StatusImmunityDuration = 0;
+        player.TempCritChanceBonus = 0;
+        // v1.1.10: an Old God's dialogue bonuses go on after this reset, which used to wipe them
+        BossContext?.ApplyPlayerModifiers?.Invoke(player);
         player.DeathsEmbraceActive = false;
         player.StatusLifestealPercent = 0;
         // v0.56.0 tank ability buffs — reset per battle so they don't leak between fights
@@ -2038,6 +2042,7 @@ public partial class CombatEngine
 
         // Clean up temporary combat buffs (matches single-monster/PvP cleanup)
         player.IsRaging = false;
+        player.TempCritChanceBonus = 0;   // v1.1.10
         player.TempAttackBonus = 0;
         player.TempAttackBonusDuration = 0;
         player.TempDefenseBonus = 0;
@@ -30692,6 +30697,8 @@ public class BossCombatContext
     public bool HasRageBoost { get; set; }
     public bool HasInsight { get; set; }
     public double BossDamageMultiplier { get; set; } = 1.0;
+    /// <summary>v1.1.10: applies the player's dialogue bonuses; invoked after the fight-start reset.</summary>
+    public Action<Character>? ApplyPlayerModifiers { get; set; }
     public double BossDefenseMultiplier { get; set; } = 1.0;
     public bool BossConfused { get; set; }
     public bool BossWeakened { get; set; }
