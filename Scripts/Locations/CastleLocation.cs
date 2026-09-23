@@ -3524,7 +3524,8 @@ public class CastleLocation : BaseLocation
                 // v1.1.11: the king names anyone. It is a bounty on a player only when a player has that name
                 // and no NPC does; an NPC briefly missing from a roster being rebuilt must not be taken for a
                 // player (review), and an NPC bounty is the one beating the target can pay.
-                bool onPlayer = SaveSystem.Instance.IsDisplayNameTaken(name, "") && !QuestSystem.IsNPCName(name);
+                bool onPlayer = SaveSystem.Instance.IsDisplayNameTaken(name, "")
+                    && NPCSpawnSystem.Instance.IsRosterTrustworthy && !QuestSystem.IsNPCName(name);
                 QuestSystem.PostBountyOnPlayer(name, "Royal decree", amount, onPlayer: onPlayer);
 
                 // Broadcast and persist
