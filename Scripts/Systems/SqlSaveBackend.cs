@@ -2486,6 +2486,33 @@ namespace UsurperRemake.Systems
             }
         }
 
+        /// <summary>
+        /// v1.1.10: a team recorded its founder's display name, lowercased, as created_by, and a dying
+        /// NPC member's bequest is queued under that value; it is not an alt's save key and a marriage
+        /// changes it, so on the live server 19 of 36 teams had a key that matched no account, and
+        /// the sweep below deleted their bequests. New teams record the save key (TeamCornerLocation).
+        /// This repairs the old ones, and any bequest already queued under such a key, wherever exactly
+        /// one player has that display name; anything ambiguous or unknown is left as it is. Once a
+        /// key matches an account it is never touched again, so running it every time is safe.
+        /// Returns (teams, queued items) repaired.
+        /// </summary>
+        internal static (int teams, int queued) RepairLeaderKeys(SqliteConnection conn)
+        {
+            const string oneMatch = "(SELECT COUNT(*) FROM players p WHERE lower(p.display_name) = {0}) = 1";
+            const string theMatch = "(SELECT p.username FROM players p WHERE lower(p.display_name) = {0})";
+            using var teams = conn.CreateCommand();
+            teams.CommandText =
+                $"UPDATE player_teams SET created_by = {string.Format(theMatch, "player_teams.created_by")} " +
+                $"WHERE created_by NOT IN (SELECT username FROM players) AND {string.Format(oneMatch, "player_teams.created_by")};";
+            int t = teams.ExecuteNonQuery();
+            using var queued = conn.CreateCommand();
+            queued.CommandText =
+                $"UPDATE pending_inheritance SET player_username = {string.Format(theMatch, "pending_inheritance.player_username")} " +
+                $"WHERE player_username NOT IN (SELECT username FROM players) AND {string.Format(oneMatch, "pending_inheritance.player_username")};";
+            int q = queued.ExecuteNonQuery();
+            return (t, q);
+        }
+
         /// <summary>Remove orphaned rows from tables that reference deleted players.</summary>
         public async Task PruneOrphanedPlayerData()
         {
@@ -2493,6 +2520,11 @@ namespace UsurperRemake.Systems
             {
                 using var conn = new SqliteConnection(connectionString);
                 await conn.OpenAsync();
+
+                // v1.1.10: before the sweep, so a bequest queued under a repairable key is kept
+                var (teamsRepaired, queuedRepaired) = RepairLeaderKeys(conn);
+                if (teamsRepaired > 0 || queuedRepaired > 0)
+                    DebugLogger.Instance.LogInfo("SQL", $"Repaired leader keys: {teamsRepaired} team(s), {queuedRepaired} queued bequest(s)");
 
                 // sleeping_players, online_players, combat_events keyed on username/player_name
                 string[] orphanQueries = new[]
