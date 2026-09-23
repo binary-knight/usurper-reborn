@@ -3411,6 +3411,13 @@ public class TeamCornerLocation : BaseLocation
     // Team Headquarters
     // ═══════════════════════════════════════════════════════════════════════════
 
+    /// <summary>
+    /// v1.1.10: the price of a facility's next level: its base cost times the next level squared.
+    /// The menu showed this, but the purchase charged the base cost times the next level, far less at
+    /// high levels (maintainer: the shown price is the intended one). Both read this now.
+    /// </summary>
+    internal static long UpgradeCost(long baseCost, int currentLevel) => baseCost * (currentLevel + 1) * (currentLevel + 1);
+
     private static readonly Dictionary<string, (string NameKey, string DescKey, long BaseCost)> UpgradeDefinitions = new()
     {
         ["armory"]   = ("team.upgrade_armory",    "team.upgrade_armory_desc",    5000),
@@ -3458,7 +3465,7 @@ public class TeamCornerLocation : BaseLocation
                 // Quadratic scaling: tier 5 costs 25x tier 1 instead of 5x. Pre-tune,
                 // a full 5-facility HQ upgrade was ~375k gold (achievable solo in a
                 // day at mid-level). Now ~1.5M, requiring guild-pooled grinding.
-                long nextCost = def.BaseCost * (level + 1) * (level + 1);
+                long nextCost = UpgradeCost(def.BaseCost, level);
 
                 terminal.SetColor("bright_yellow");
                 terminal.Write($"  {idx}. ");
@@ -3516,7 +3523,7 @@ public class TeamCornerLocation : BaseLocation
             return;
         }
 
-        long cost = def.BaseCost * (currentLevel + 1);
+        long cost = UpgradeCost(def.BaseCost, currentLevel);
 
         // Try team vault first, then personal gold
         long vaultGold = await backend.GetTeamVaultGold(teamName);
