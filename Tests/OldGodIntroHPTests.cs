@@ -55,3 +55,17 @@ public class OldGodIntroHPTests
         shown.Should().NotContain(data.HP.ToString("N0"), "the unscaled data HP misled players by more than half");
     }
 }
+
+/// <summary>
+/// v1.1.10: Mael'Keth retuned for a level-30s party (maintainer decision): 22,000 HP and 265 Strength
+/// in the data, two attacks a round, defence unchanged. Pinned so a later edit is a decision, not a drift.
+/// </summary>
+public class MaelkethTuningTests
+{
+    [Fact]
+    public void MaelkethIsTunedForALevelThirtiesParty()
+    {
+        var m = UsurperRemake.Data.OldGodsData.GetGodBossData(OldGodType.Maelketh);
+        (m.HP, m.MaxHP, m.Strength, m.Defence, m.AttacksPerRound).Should().Be((22_000L, 22_000L, 265L, 180L, 2));
+    }
+}
