@@ -393,7 +393,8 @@ public class CharacterRecreationTests : IDisposable
         // as a player bounty made it uncollectable.
         var src = CodeOnly(Source("Locations", "CastleLocation.cs"));
         src.Should().Contain("\"Criminal activity\", (int)Math.Min(bountyCost, int.MaxValue), onPlayer: false)");
-        src.Should().Contain("\"Royal decree\", amount, onPlayer: !QuestSystem.IsNPCName(name))");
+        src.Should().Contain("bool onPlayer = SaveSystem.Instance.IsDisplayNameTaken(name, \"\") && !QuestSystem.IsNPCName(name);");
+        src.Should().Contain("\"Royal decree\", amount, onPlayer: onPlayer)");
         var quest = CodeOnly(Source("Systems", "QuestSystem.cs"));
         quest.Should().Contain("IsPlayerBounty = onPlayer");
     }
