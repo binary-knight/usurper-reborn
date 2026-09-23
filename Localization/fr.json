@@ -10968,6 +10968,7 @@
   "old_god.warning_less_damage": "  Votre arme non enchantée infligera {0}% de dégâts en moins.",
   "old_god.warning_enchant": "  Trouvez une arme enchantée pour briser cette protection!",
   "old_god.press_enter_face": "Appuyez sur Entrée pour affronter le Dieu Ancien...",
+  "old_god.enters_with_hp": "{0} entre au combat avec {1} PV.",
   "old_god.mod_fury_bright": "Votre fureur brûle intensément! +25% dégâts, -15% défense, +15% crit",
   "old_god.mod_maelketh_teachings": "Les enseignements de Maelketh vous guident. +20% défense, boss -15% dégâts",
   "old_god.mod_veloura_hostile": "Véloura devient hostile! +15% dégâts, mais elle se bat plus durement aussi",

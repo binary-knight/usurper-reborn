@@ -10976,6 +10976,7 @@
   "old_god.warning_less_damage": "  Bűvölet nélküli fegyvered {0}%-kal kevesebb sebzést okoz.",
   "old_god.warning_enchant": "  Keress egy bűvös fegyvert, hogy áttörd ezt a védelmet!",
   "old_god.press_enter_face": "Nyomj Entert, hogy szembenézz az Ősi Istennel...",
+  "old_god.enters_with_hp": "{0} {1} ÉP-vel lép harcba.",
   "old_god.mod_fury_bright": "Dühöd fényesen ég! +25% sebzés, -15% védekezés, +15% kritikus esély",
   "old_god.mod_maelketh_teachings": "Maelketh tanításai vezérelnek. +20% védekezés, Maelketh -15% sebzés",
   "old_god.mod_veloura_hostile": "Veloura ellenségessé válik! +15% sebzés, de ő is keményebben harcol",

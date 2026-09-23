@@ -127,6 +127,44 @@ public class OldGodDialogueTests
         god.MaxHP.Should().Be(49_500, "no damage answer, no HP change");
     }
 
+    [Fact]
+    public void WhenAnAnswerChangesTheGodsHP_TheFightSaysWhatItEntersWith()
+    {
+        var data = UsurperRemake.Data.OldGodsData.GetGodBossData(OldGodType.Maelketh);
+        var god = (Monster)typeof(OldGodBossSystem).GetMethod("CreateBossMonster", F)!.Invoke(OldGodBossSystem.Instance, new object[] { data })!;
+        WithModifiers(m => Set(m, "DamageMultiplier", 1.25), () => ApplyToMonster(god, Hero()));
+        var output = new MemoryStream();
+        var term = new TerminalEmulator(new MemoryStream(), output);
+        typeof(OldGodBossSystem).GetMethod("AnnounceFightHP", BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, new object[] { god, data, term });
+        term.StreamWriterInternal!.Flush();
+        Encoding.UTF8.GetString(output.ToArray()).Should().Contain(god.MaxHP.ToString("N0"));
+    }
+
+    [Fact]
+    public void TheGodsFixedAoEAndChannelDamage_FollowTheAnswerToo()
+    {
+        // Manwe's Creation's End and Unmake Reality deal fixed damage set for the fight, not damage from
+        // his stats (Codex round 4). A defence answer of +20% and a -15% god answer: 0.85 / 1.2.
+        var ctx = new BossCombatContext { AoEDamage = 1500, ChannelDamage = 3000 };
+        WithModifiers(m => { Set(m, "DefenseMultiplier", 1.20); Set(m, "BossDamageMultiplier", 0.85); },
+            () => typeof(OldGodBossSystem).GetMethod("ApplyDialogueToFixedBossDamage", F)!.Invoke(OldGodBossSystem.Instance, new object[] { ctx, Hero() }));
+        ctx.AoEDamage.Should().Be((int)Math.Round(1500 * 0.85 / 1.20));
+        ctx.ChannelDamage.Should().Be((int)Math.Round(3000 * 0.85 / 1.20));
+    }
+
+    [Fact]
+    public void AFlatAnswer_IsConvertedAgainstTheStatsTheFightUses()
+    {
+        // A flat +50 damage answer is converted against Strength + WeapPow. A shrine's blessing that the
+        // fight's own recalculation will drop must not count (Codex round 4), so the stats are recalculated first.
+        var hero = Hero();
+        hero.Strength = 205;   // a blessing on top of BaseStrength 100
+        var god = God();
+        WithModifiers(m => Set(m, "BonusDamage", 50), () => ApplyToMonster(god, hero));
+        hero.Strength.Should().NotBe(205, "recalculated before the conversion");
+        god.MaxHP.Should().Be((long)Math.Round(49_500 / (1.0 + 50.0 / (hero.Strength + hero.WeapPow))));
+    }
+
     [Theory]
     [InlineData(0.85, 0.85)]   // a softer answer, applied in full
     [InlineData(0.50, 0.50)]   // the softest written, not clamped

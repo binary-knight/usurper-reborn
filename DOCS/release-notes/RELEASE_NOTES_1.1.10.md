@@ -91,7 +91,7 @@ the same thread.
 
 ## Tests
 
-1,358 passing, up from 1,278. The new ones drive the Inn's patron screen,
+1,361 passing, up from 1,278. The new ones drive the Inn's patron screen,
 the god fight's reset and dialogue hook, companion hits from specials and
 from gods, the PvP control guards, the inheritance queue against a real
 database (alts, failed writes, full packs, new teams), and the ramp.

@@ -11153,6 +11153,7 @@
   "old_god.warning_less_damage": "  Your unenchanted weapon will deal {0}% less damage.",
   "old_god.warning_enchant": "  Find an enchanted weapon to bypass this protection!",
   "old_god.press_enter_face": "Press Enter to face the Old God...",
+  "old_god.enters_with_hp": "{0} enters the fight with {1} HP.",
   "old_god.mod_fury_bright": "Your fury burns bright! +25% damage, -15% defense, +15% crit",
   "old_god.mod_maelketh_teachings": "Maelketh's teachings guide you. +20% defense, boss -15% damage",
   "old_god.mod_veloura_hostile": "Veloura turns hostile! +15% damage, but she fights harder too",

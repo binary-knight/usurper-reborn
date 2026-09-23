@@ -816,6 +816,7 @@ namespace UsurperRemake.Systems
 
             // Apply dialogue-based stat adjustments to the monster
             ApplyModifiersToMonster(bossMonster, player);
+            AnnounceFightHP(bossMonster, boss, terminal);
 
             // v1.1.10: the player's dialogue bonuses are applied by the combat engine after its
             // fight-start reset (BossCombatContext.ApplyPlayerModifiers). Applied here, before the
@@ -845,6 +846,8 @@ namespace UsurperRemake.Systems
 
             // Configure boss-specific party balance mechanics (v0.52.1)
             ConfigureBossPartyMechanics(combatEngine.BossContext, boss.Type);
+
+            ApplyDialogueToFixedBossDamage(combatEngine.BossContext, player);
 
             // Set divine armor reduction on the combat context so CombatEngine applies it
             combatEngine.BossContext.DivineArmorReduction = GetDivineArmorReduction(boss.Type, player);
@@ -947,6 +950,41 @@ namespace UsurperRemake.Systems
         /// <summary>
         /// Apply dialogue-based modifiers to the boss monster's stats
         /// </summary>
+        /// <summary>
+        /// v1.1.10: how hard the god hits after the dialogue: its own damage answer divided by the
+        /// player's defence answer, the harsh side capped at GameConfig.OldGodDialogueBossDamageCap.
+        /// Applied to its stats and to the fixed damage of its scheduled AoE and channelled attacks.
+        /// </summary>
+        private double DialogueBossDamageFactor(Character player)
+        {
+            long defenceBase = Math.Max(1, player.Defence + player.ArmPow);
+            double playerDefence = Math.Max(0.1, activeCombatModifiers.DefenseMultiplier + (double)activeCombatModifiers.BonusDefense / defenceBase);
+            return Math.Min(activeCombatModifiers.BossDamageMultiplier / playerDefence, GameConfig.OldGodDialogueBossDamageCap);
+        }
+
+        /// <summary>
+        /// v1.1.10: the scheduled AoE and channelled attacks deal fixed damage set by
+        /// ConfigureBossPartyMechanics, not damage from the god's stats, so the dialogue's god-damage
+        /// factor is applied to them as well (Codex review).
+        /// </summary>
+        private void ApplyDialogueToFixedBossDamage(BossCombatContext ctx, Character player)
+        {
+            double factor = DialogueBossDamageFactor(player);
+            if (factor == 1.0) return;
+            ctx.AoEDamage = (int)Math.Round(ctx.AoEDamage * factor);
+            ctx.ChannelDamage = (int)Math.Round(ctx.ChannelDamage * factor);
+        }
+
+        /// <summary>
+        /// v1.1.10: the intro shows the god's HP before the dialogue, and a damage answer then lowers it,
+        /// so when it has changed, say what the god enters the fight with (supervisor review).
+        /// </summary>
+        private static void AnnounceFightHP(Monster bossMonster, OldGodBossData boss, TerminalEmulator terminal)
+        {
+            if (bossMonster.MaxHP == FightHP(boss)) return;
+            terminal.WriteLine($"  {Loc.Get("old_god.enters_with_hp", boss.Name, $"{bossMonster.MaxHP:N0}")}", "red");
+        }
+
         private void ApplyModifiersToMonster(Monster monster, Character player)
         {
             if (activeCombatModifiers.BossWeakened)
@@ -963,9 +1001,10 @@ namespace UsurperRemake.Systems
             // GameConfig.OldGodDialogueBossDamageCap until the gods are retuned. The player's damage
             // answer shortens the god's HP: +25% damage is the god having 1/1.25 of it. Both reach the
             // whole party, not only the player.
-            long defenceBase = Math.Max(1, player.Defence + player.ArmPow);
-            double playerDefence = Math.Max(0.1, activeCombatModifiers.DefenseMultiplier + (double)activeCombatModifiers.BonusDefense / defenceBase);
-            double bossDamage = Math.Min(activeCombatModifiers.BossDamageMultiplier / playerDefence, GameConfig.OldGodDialogueBossDamageCap);
+            // the fight recalculates the player's stats as it starts (dropping, say, a shrine's blessing);
+            // the flat answers below are converted against those stats, so recalculate first
+            player.RecalculateStats();
+            double bossDamage = DialogueBossDamageFactor(player);
             if (bossDamage != 1.0)
             {
                 monster.Strength = (long)(monster.Strength * bossDamage);

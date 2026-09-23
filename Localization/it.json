@@ -10968,6 +10968,7 @@
   "old_god.warning_less_damage": "  La tua arma non incantata infliggerà il {0}% di danni in meno.",
   "old_god.warning_enchant": "  Trova un'arma incantata per aggirare questa protezione!",
   "old_god.press_enter_face": "Premi Invio per affrontare l'Antico Dio...",
+  "old_god.enters_with_hp": "{0} entra in combattimento con {1} PV.",
   "old_god.mod_fury_bright": "La tua furia arde luminosa! +25% danni, -15% difesa, +15% critico",
   "old_god.mod_maelketh_teachings": "Gli insegnamenti di Maelketh ti guidano. +20% difesa, boss -15% danni",
   "old_god.mod_veloura_hostile": "Veloura diventa ostile! +15% danni, ma anche lei combatte più duramente",

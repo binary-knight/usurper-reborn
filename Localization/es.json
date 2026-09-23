@@ -10968,6 +10968,7 @@
   "old_god.warning_less_damage": "  Tu arma sin encantar hara {0}% menos de daño.",
   "old_god.warning_enchant": "  Encuentra un arma encantada para evitar está protección!",
   "old_god.press_enter_face": "Presiona Enter para enfrentar al Dios Antiguo...",
+  "old_god.enters_with_hp": "{0} entra en combate con {1} PV.",
   "old_god.mod_fury_bright": "Tu furia arde brillante! +25% daño, -15% defensa, +15% crítico",
   "old_god.mod_maelketh_teachings": "Las ensenanzas de Maelketh te guian. +20% defensa, jefe -15% daño",
   "old_god.mod_veloura_hostile": "Veloura se vuelve hostil! +15% daño, pero ella también lucha más fuerte",
