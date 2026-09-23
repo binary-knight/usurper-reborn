@@ -5096,6 +5096,8 @@ namespace UsurperRemake.Systems
         public string OldKey { get; set; } = "";
         public List<PlayerSummary> Members { get; set; } = new();
         public int QueuedBequests { get; set; }
+        /// <summary>Other teams with the same old key: what waits under it cannot be attributed to either.</summary>
+        public List<string> SharedWith { get; set; } = new();
     }
 
     /// <summary>v1.1.10: every team whose leader key matches no character, with its current members.</summary>
@@ -5118,7 +5120,10 @@ namespace UsurperRemake.Systems
                     teams.Add(new TeamWithUnknownLeader { TeamName = reader.GetString(0), OldKey = reader.GetString(1), QueuedBequests = reader.GetInt32(2) });
             }
             foreach (var team in teams)
+            {
                 team.Members = await GetPlayerTeamMembers(team.TeamName);
+                team.SharedWith = teams.Where(t => t.OldKey == team.OldKey && t.TeamName != team.TeamName).Select(t => t.TeamName).ToList();
+            }
         }
         catch (Exception ex)
         {
@@ -5131,11 +5136,15 @@ namespace UsurperRemake.Systems
     /// v1.1.10: sets a team's leader key to a character's save key, as confirmed by an admin. Only if
     /// the team still has oldKey (nothing changed it meanwhile) and newKey is a character. Bequests
     /// already queued under oldKey follow it; if another team still has oldKey they could be that
-    /// team's, so they are set aside for the sweep instead. newKey must be a current member of the team.
-    /// True when the team was updated.
+    /// team's, so they are set aside for the sweep instead. newKey must be a current member of the team,
+    /// and oldKey must still match no character. True when the team was updated.
     /// </summary>
-    public bool SetTeamLeaderKey(string teamName, string oldKey, string newKey)
+    public bool SetTeamLeaderKey(string teamName, string oldKey, string newKey) => SetTeamLeaderKey(teamName, oldKey, newKey, out _, out _);
+
+    /// <summary>As above; also says how many waiting bequests moved or were set aside, and which.</summary>
+    public bool SetTeamLeaderKey(string teamName, string oldKey, string newKey, out int bequests, out bool keyShared)
     {
+        bequests = 0; keyShared = false;
         try
         {
             using var connection = OpenConnection();
@@ -5148,6 +5157,14 @@ namespace UsurperRemake.Systems
                 check.Parameters.AddWithValue("@new", newKey);
                 check.Parameters.AddWithValue("@team", teamName);
                 if (Convert.ToInt32(check.ExecuteScalar()) != 1) return false;
+            }
+            using (var stillUnknown = connection.CreateCommand())
+            {
+                // a character registered under the old key since the screen was opened owns what waits under it
+                stillUnknown.Transaction = tx;
+                stillUnknown.CommandText = "SELECT COUNT(*) FROM players WHERE username = @old;";
+                stillUnknown.Parameters.AddWithValue("@old", oldKey);
+                if (Convert.ToInt32(stillUnknown.ExecuteScalar()) != 0) return false;
             }
             using (var team = connection.CreateCommand())
             {
@@ -5171,7 +5188,14 @@ namespace UsurperRemake.Systems
                     WHERE player_username = @old;";
                 queued.Parameters.AddWithValue("@new", newKey);
                 queued.Parameters.AddWithValue("@old", oldKey);
-                queued.ExecuteNonQuery();
+                bequests = queued.ExecuteNonQuery();
+            }
+            using (var shared = connection.CreateCommand())
+            {
+                shared.Transaction = tx;
+                shared.CommandText = "SELECT COUNT(*) FROM player_teams WHERE created_by = @old;";
+                shared.Parameters.AddWithValue("@old", oldKey);
+                keyShared = Convert.ToInt32(shared.ExecuteScalar()) > 0;
             }
             tx.Commit();
             DebugLogger.Instance.LogInfo("SQL", $"Team '{teamName}' leader key set from '{oldKey}' to '{newKey}' by an admin");

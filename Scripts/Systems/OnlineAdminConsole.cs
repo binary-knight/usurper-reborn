@@ -1886,6 +1886,8 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine($"  Team {index} of {teams.Count}: {team.TeamName}");
                 terminal.WriteLine($"  Leader key: '{team.OldKey}' (matches no character)");
                 terminal.WriteLine($"  Bequests waiting under that key: {team.QueuedBequests}");
+                if (team.SharedWith.Count > 0)
+                    terminal.WriteLine($"  The key is shared with: {string.Join(", ", team.SharedWith)}. Bequests waiting under it cannot be attributed to either team.");
                 terminal.WriteLine("");
 
                 if (team.Members.Count == 0)
@@ -1923,11 +1925,18 @@ namespace UsurperRemake.Systems
                 var confirm = await ReadInput($"Set the leader of {team.TeamName} to {pick.DisplayName} ({pick.Username})? (Y/N) ");
                 if (!GameConfig.IsAffirmative(confirm)) continue;
 
-                if (backend.SetTeamLeaderKey(team.TeamName, team.OldKey, pick.Username))
+                if (backend.SetTeamLeaderKey(team.TeamName, team.OldKey, pick.Username, out int bequests, out bool keyShared))
                 {
                     done++;
                     terminal.SetColor("green");
                     terminal.WriteLine($"  {team.TeamName}: leader set to {pick.DisplayName}.");
+                    if (bequests > 0)
+                    {
+                        terminal.SetColor(keyShared ? "yellow" : "green");
+                        terminal.WriteLine(keyShared
+                            ? $"  {bequests} waiting bequest(s) under the shared key cannot be attributed and will be removed at the nightly cleanup."
+                            : $"  {bequests} waiting bequest(s) now go to {pick.DisplayName}.");
+                    }
                     DebugLogger.Instance.LogInfo("ADMIN", $"Team leader key of '{team.TeamName}' changed from '{team.OldKey}' to '{pick.Username}' by {DoorMode.OnlineUsername}");
                 }
                 else

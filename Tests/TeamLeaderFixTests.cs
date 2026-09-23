@@ -116,6 +116,21 @@ public class TeamLeaderFixTests : IDisposable
     }
 
     [Fact]
+    public void AnOldKeyTakenByANewCharacter_IsNotFixed()
+    {
+        // Codex round 11: the screen is open, someone registers a character with the old key and has an
+        // item waiting; confirming must not hand that item to the team's leader.
+        Player("mira__alt", "Mira Vale", "Old Guard");
+        Team("Old Guard", "mira vale");
+        Player("mira vale", "Mira Vale", null);
+        _db.QueueInheritance("mira vale", "Abyssal Leviathan", "{\"name\":\"their own reward\"}").Should().BeTrue();
+
+        _db.SetTeamLeaderKey("Old Guard", "mira vale", "mira__alt").Should().BeFalse();
+        Leader("Old Guard").Should().Be("mira vale");
+        Queued("mira vale").Should().Be(1, "it belongs to the character who now has that key");
+    }
+
+    [Fact]
     public void AnOldKeyTwoTeamsShare_NeitherTeamTakesTheOthersBequests()
     {
         // Two teams founded under the same name: what waits under the key could be either team's. Codex
@@ -241,5 +256,30 @@ public class TeamLeaderFixTests : IDisposable
 
         await RunConsole("2\nY\n\n\n");
         Leader("Old Guard").Should().Be("twin_b", "members are listed by level, highest first");
+    }
+
+    [Fact]
+    public async Task TheConsole_SaysTheWaitingBequestsNowGoToTheNewLeader()
+    {
+        Player("mira__alt", "Mira Vale", "Old Guard");
+        Team("Old Guard", "mira vale");
+        _db.QueueInheritance("mira vale", "Aldric", "{\"name\":\"Aldric's sword\"}").Should().BeTrue();
+
+        var shown = await RunConsole("\nY\n\n\n");
+        shown.Should().Contain("1 waiting bequest(s) now go to Mira Vale");
+    }
+
+    [Fact]
+    public async Task TheConsole_MarksASharedKey_AndSaysItsBequestsWillBeRemoved()
+    {
+        Player("mira__alt", "Mira Vale", "Old Guard");
+        Team("Old Guard", "mira vale");
+        Team("New Guard", "mira vale");
+        _db.QueueInheritance("mira vale", "Aldric", "{\"name\":\"Aldric's sword\"}").Should().BeTrue();
+
+        // New Guard has no members and comes first by name: Enter moves past it; then Old Guard
+        var shown = await RunConsole("\n\nY\n\n\n");
+        shown.Should().Contain("The key is shared with: New Guard");
+        shown.Should().Contain("1 waiting bequest(s) under the shared key cannot be attributed and will be removed");
     }
 }
