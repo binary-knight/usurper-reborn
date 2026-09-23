@@ -55,6 +55,26 @@ public class InheritanceKeyTests : IDisposable
             .Which.ItemJson.Should().Contain("main item");
     }
 
+    [Theory]
+    [InlineData("rage", "rage__alt", "rage__alt", null)]      // an alt
+    [InlineData("rage", "rage", "rage", "Stormborn")]           // a main who was married when founding the team
+    public async System.Threading.Tasks.Task ABequestFromADyingTeammate_ReachesTheLeader(string account, string characterKey, string name1, string? surname)
+    {
+        // A team's leader key is recorded when the team is founded (TeamCornerLocation, from
+        // GameEngine.InheritanceKey) and read back when an NPC member dies, to queue the belongings
+        // (WorldSimulator.BequeathItemsToTeamLeader). It used to be the display name, which is not
+        // an alt's save key and changes with a marriage, so those bequests could never be delivered.
+        Playing(account, characterKey);
+        var leader = new Character { Name1 = name1, Name2 = "Rage" };
+        if (surname != null) leader.FamilySurname = surname;
+        leader.DisplayName.ToLower().Should().NotBe(GameEngine.InheritanceKey(leader), "the old display-name key would have missed this leader");
+        await _db.CreatePlayerTeam("The Unbroken", SqlSaveBackend.HashTeamPassword("pw"), GameEngine.InheritanceKey(leader));
+
+        var queuedUnder = await _db.GetTeamLeaderUsername("The Unbroken");
+        _db.QueueInheritance(queuedUnder!, "Aldric", "{\"name\":\"Aldric's sword\"}").Should().BeTrue();
+        _db.GetPendingInheritance(GameEngine.InheritanceKey(leader)).Should().ContainSingle("login delivery finds it under the same key");
+    }
+
     [Fact]
     public void WithoutASession_TheOldFallbacksStillApply()
     {

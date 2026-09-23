@@ -976,7 +976,11 @@ public class TeamCornerLocation : BaseLocation
             if (backend != null)
             {
                 string hashedPW = SqlSaveBackend.HashTeamPassword(password);
-                string username = currentPlayer.DisplayName.ToLower();
+                // v1.1.10: the team's leader key is the save key that queued bequests are delivered
+                // under (GameEngine.InheritanceKey), not the display name, which differs for an alt
+                // and changes with a marriage. created_by is read only to find where a dying NPC
+                // member's belongings go (WorldSimulator.BequeathItemsToTeamLeader).
+                string username = GameEngine.InheritanceKey(currentPlayer);
                 await backend.CreatePlayerTeam(teamName, hashedPW, username);
             }
         }
