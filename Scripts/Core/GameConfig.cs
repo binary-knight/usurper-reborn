@@ -1848,6 +1848,12 @@ public static partial class GameConfig
     // 1.25 as written). Capped here until the gods are retuned against the dialogue; the softer
     // answers (down to 0.50) are not capped.
     public const double OldGodDialogueBossDamageCap = 1.10;
+
+    // v1.1.10: regular dungeon monsters on the floors before an Old God's floor grow tougher, HP and
+    // damage, by this much per floor: +5% five floors out, up to +25% on the floor before the god
+    // (maintainer decision: a modest ramp, a warning rather than a wall; defence is not scaled).
+    public const int OldGodApproachFloors = 5;
+    public const double OldGodApproachStepPerFloor = 0.05;
     public const int StunDRWindowRounds = 5;                  // Rounds of "no stun" before DR resets to 0
     public const int MaxStunDurationNormal = 3;               // Hard cap on stun duration vs normal monsters
     public const int MaxStunDurationBoss = 1;                 // Hard cap on stun duration vs bosses

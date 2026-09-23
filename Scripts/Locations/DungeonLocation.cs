@@ -5319,7 +5319,7 @@ public class DungeonLocation : BaseLocation
         }
 
         // Generate monsters appropriate for this room
-        var monsters = MonsterGenerator.GenerateMonsterGroup(effectiveMonsterLevel, dungeonRandom);
+        var monsters = MonsterGenerator.GenerateMonsterGroup(effectiveMonsterLevel, dungeonRandom, MonsterGenerator.OldGodApproachScale(currentDungeonLevel));
 
         // v0.61.3 (player report, post-v0.61.2 cleared floors): "champions
         // typically have more HP than the floor boss, regular enemies often
@@ -7164,7 +7164,7 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine("");
 
         // Use new MonsterGenerator to create level-appropriate monsters
-        var monsters = MonsterGenerator.GenerateMonsterGroup(currentDungeonLevel, dungeonRandom);
+        var monsters = MonsterGenerator.GenerateMonsterGroup(currentDungeonLevel, dungeonRandom, MonsterGenerator.OldGodApproachScale(currentDungeonLevel));
 
         var combatEngine = new CombatEngine(terminal);
 
@@ -16158,7 +16158,7 @@ public class DungeonLocation : BaseLocation
 
             // Plain level-appropriate monster (no champion/boss multipliers) -- the scene is the
             // occasion, the fight is ordinary. Real CombatEngine combat per the v0.47.4 house rule.
-            var monster = MonsterGenerator.GenerateMonster(currentDungeonLevel);
+            var monster = MonsterGenerator.GenerateMonster(currentDungeonLevel, approachScale: MonsterGenerator.OldGodApproachScale(currentDungeonLevel));
             monster.Name = fightName;
             var beatCombatEngine = new CombatEngine(terminal);
             var result = await beatCombatEngine.PlayerVsMonster(currentPlayer, monster, teammates);
