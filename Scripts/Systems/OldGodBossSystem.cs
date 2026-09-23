@@ -1082,7 +1082,7 @@ namespace UsurperRemake.Systems
         {
             if (wasSaved)
             {
-                return await HandleBossSaved(combatResult.Player, boss, terminal);
+                return await HandleBossSaved(combatResult.Player, boss, terminal, inCombat: true);
             }
             else if (combatResult.Outcome == CombatOutcome.Victory)
             {
@@ -1122,7 +1122,7 @@ namespace UsurperRemake.Systems
         /// Handle boss being saved
         /// </summary>
         private async Task<BossEncounterResult> HandleBossSaved(
-            Character player, OldGodBossData boss, TerminalEmulator terminal)
+            Character player, OldGodBossData boss, TerminalEmulator terminal, bool inCombat = false)
         {
             terminal.Clear();
             terminal.WriteLine("");
@@ -1150,6 +1150,8 @@ namespace UsurperRemake.Systems
 
             // Award experience
             long xpReward = boss.Level * 1000;
+            // v1.1.11: Team HQ Training only when the save ended a fight, not when spared in dialogue.
+            if (inCombat) xpReward = TeamHQBonus.ApplyXP(player, xpReward);
             player.Experience += xpReward;
             terminal.WriteLine(Loc.Get("old_god.saved_xp", $"{xpReward:N0}"), "cyan");
 
@@ -1426,7 +1428,7 @@ namespace UsurperRemake.Systems
                 }
 
                 // Rewards
-                long xpReward = 300000;
+                long xpReward = TeamHQBonus.ApplyXP(player, 300000); // v1.1.11: Team HQ Training
                 int goldReward = 100000;
                 player.Experience += xpReward;
                 player.Gold += goldReward;

@@ -2135,7 +2135,7 @@ public partial class CombatEngine
                     var underlying = player.PetRoster?.FirstOrDefault(p => string.Equals(p.Name, teammate.Name, StringComparison.OrdinalIgnoreCase));
                     if (underlying != null)
                     {
-                        underlying.Experience += Math.Max(5, result.ExperienceGained / 20); // ~5% of combat XP, min 5
+                        underlying.Experience += Math.Max(5, result.ExperienceGained / 20); // ~5% of combat XP, min 5; hq-training: out (pet, not a player)
                         // Pet level-up at simple thresholds (50 * Level XP per next level).
                         while (underlying.Experience >= underlying.Level * 50)
                         {
@@ -7228,12 +7228,6 @@ public partial class CombatEngine
             double guildMult = GuildSystem.Instance.GetGuildXPMultiplier(result.Player.Name1 ?? "");
             if (guildMult > 1.0)
                 expReward = (long)(expReward * guildMult);
-        }
-
-        // Team HQ Training bonus: +5% XP per level
-        if (TeamHQBonus.Training(result.Player) > 0)
-        {
-            expReward += (long)(expReward * (TeamHQBonus.Training(result.Player) * 0.05));
         }
 
         // Fatigue XP penalty — Exhausted tier only (single-player only)
@@ -20680,12 +20674,6 @@ public partial class CombatEngine
                 adjustedExp = (long)(adjustedExp * guildMultMM);
         }
 
-        // Team HQ Training bonus: +5% XP per level — multi-monster path
-        if (TeamHQBonus.Training(result.Player) > 0)
-        {
-            adjustedExp += (long)(adjustedExp * (TeamHQBonus.Training(result.Player) * 0.05));
-        }
-
         // Fatigue XP penalty — Exhausted tier only (single-player only)
         if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && result.Player.Fatigue >= GameConfig.FatigueExhaustedThreshold)
         {
@@ -20709,6 +20697,8 @@ public partial class CombatEngine
         // Apply per-slot XP percentage distribution
         long totalXPPotMM = adjustedExp;
         long playerXPmm = (long)(totalXPPotMM * xpSharesMM[0] / 100.0);
+        // v1.1.11: Team HQ Training on the player's own share, after the split, so it stays out of the teammates' pot.
+        playerXPmm = TeamHQBonus.ApplyXP(result.Player, playerXPmm);
 
         // Apply rewards (player's percentage share)
         result.Player.Experience += playerXPmm;
@@ -21272,12 +21262,6 @@ public partial class CombatEngine
                 adjustedExp = (long)(adjustedExp * guildMultPV);
         }
 
-        // Team HQ Training bonus: +5% XP per level — berserker/special path
-        if (TeamHQBonus.Training(result.Player) > 0)
-        {
-            adjustedExp += (long)(adjustedExp * (TeamHQBonus.Training(result.Player) * 0.05));
-        }
-
         // v0.64.1 early-game XP multiplier (berserker / special path).
         double earlyGameMultPV = GameConfig.GetEarlyGameXPMultiplier((int)result.Player.Level);
         if (earlyGameMultPV > 1.0)
@@ -21292,6 +21276,8 @@ public partial class CombatEngine
         // Apply per-slot XP percentage distribution
         long totalXPPotPV = adjustedExp;
         long playerXPpv = (long)(totalXPPotPV * xpSharesPV[0] / 100.0);
+        // v1.1.11: Team HQ Training on the player's own share, after the split, so it stays out of the teammates' pot.
+        playerXPpv = TeamHQBonus.ApplyXP(result.Player, playerXPpv);
 
         result.Player.Experience += playerXPpv;
         result.Player.Gold += adjustedGold;
@@ -26262,6 +26248,8 @@ public partial class CombatEngine
             // Apply difficulty modifier (per-character difficulty + server-wide SysOp multiplier)
             float xpMult = DifficultySystem.GetExperienceMultiplier(DifficultySystem.CurrentDifficulty) * GameConfig.XPMultiplier;
             xpReward = (long)(xpReward * xpMult);
+            // v1.1.11: Team HQ Training last.
+            xpReward = TeamHQBonus.ApplyXP(result.Player, xpReward);
 
             // Calculate gold reward - take some of opponent's gold + level-based bonus
             long opponentGold = result.Opponent?.Gold ?? 0;
@@ -30509,10 +30497,6 @@ public partial class CombatEngine
                     playerExp = (long)(playerExp * gpGuildMult);
             }
 
-            // Team HQ Training bonus: +5% XP per level
-            if (TeamHQBonus.Training(groupedPlayer) > 0)
-                playerExp += (long)(playerExp * (TeamHQBonus.Training(groupedPlayer) * 0.05));
-
             // v0.64.1 early-game XP multiplier (per-grouped-player path).
             // Each grouped player's level keys into the curve independently
             // so a Lv 5 follower benefits even when grouped with a Lv 50 leader.
@@ -30524,6 +30508,9 @@ public partial class CombatEngine
             float groupXPMult = GroupSystem.GetGroupXPMultiplier(groupedPlayer.Level, highestLevel);
             if (groupXPMult < 1.0f)
                 playerExp = (long)(playerExp * groupXPMult);
+
+            // v1.1.11: Team HQ Training last, with the follower's own levels.
+            playerExp = TeamHQBonus.ApplyXP(groupedPlayer, playerExp);
 
             // Session XP diminishing returns removed in v0.54.7.
             groupedPlayer.SessionCombatCount++;

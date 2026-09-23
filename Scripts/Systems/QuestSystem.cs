@@ -1581,6 +1581,7 @@ public partial class QuestSystem
             player.Gold += reward;
             DebugLogger.Instance.LogInfo("GOLD", $"BOUNTY REWARD: {player.DisplayName} +{reward:N0}g for bounty on {npcName} (gold now {player.Gold:N0})");
             long xpReward = Math.Max(player.Level * 50, reward / 5); // XP scales with player level and bounty
+            xpReward = TeamHQBonus.ApplyXP(player, xpReward); // v1.1.11: Team HQ Training, the kill paid it
             player.Experience += xpReward;
             totalReward += reward;
 

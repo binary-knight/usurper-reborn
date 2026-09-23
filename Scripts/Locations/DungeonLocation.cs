@@ -5472,7 +5472,7 @@ public class DungeonLocation : BaseLocation
                 long bossGold = currentDungeonLevel * 500 + dungeonRandom.Next(1000);
                 long bossExp = currentDungeonLevel * 300;
 
-                var (bossXPShare, bossGoldShare) = AwardDungeonReward(bossExp, bossGold, "Boss Defeated");
+                var (bossXPShare, bossGoldShare) = AwardDungeonReward(bossExp, bossGold, "Boss Defeated", fromCombat: true);
 
                 if (teammates.Count > 0)
                 {
@@ -5481,7 +5481,7 @@ public class DungeonLocation : BaseLocation
                 }
                 else
                 {
-                    terminal.WriteLine(Loc.Get("dungeon.boss_bonus", bossGold, bossExp));
+                    terminal.WriteLine(Loc.Get("dungeon.boss_bonus", bossGold, bossXPShare)); // v1.1.11: what was paid, with Training
                 }
 
                 // Artifact drop chance for specific floor bosses
@@ -7818,7 +7818,7 @@ public class DungeonLocation : BaseLocation
                     terminal.SetColor("green");
                     terminal.WriteLine(Loc.Get("dungeon.portal_guardian_crystal"));
                     long bonusGold = (long)(Math.Pow(currentDungeonLevel, 1.5) * 36);
-                    long bonusXp = (long)(Math.Pow(currentDungeonLevel, 1.5) * 45);
+                    long bonusXp = TeamHQBonus.ApplyXP(currentPlayer, (long)(Math.Pow(currentDungeonLevel, 1.5) * 45)); // v1.1.11: Team HQ Training
                     currentPlayer.Gold += bonusGold;
                     currentPlayer.Experience += bonusXp;
                 }
@@ -7830,7 +7830,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("dungeon.portal_study"));
             // Small XP for studying - about half a monster kill
             long xpGain = (long)(Math.Pow(currentDungeonLevel, 1.5) * 8);
-            currentPlayer.Experience += xpGain;
+            currentPlayer.Experience += xpGain; // hq-training: out (portal study, no fight)
             terminal.WriteLine(Loc.Get("dungeon.portal_learn_magic", xpGain));
         }
         else
@@ -7977,7 +7977,7 @@ public class DungeonLocation : BaseLocation
                 // Rewards scale with rivalry intensity - roughly 2-4 monster kills based on rivalry
                 int rivalryBonus = 1 + duelist.TimesEncountered / 3;
                 long goldReward = (long)(Math.Pow(currentDungeonLevel, 1.5) * 24 * rivalryBonus);
-                long xpReward = (long)(Math.Pow(currentDungeonLevel, 1.5) * 15 * (1 + rivalryBonus * 0.5));
+                long xpReward = TeamHQBonus.ApplyXP(currentPlayer, (long)(Math.Pow(currentDungeonLevel, 1.5) * 15 * (1 + rivalryBonus * 0.5))); // v1.1.11: Team HQ Training
                 currentPlayer.Gold += goldReward;
                 currentPlayer.Experience += xpReward;
                 AlignmentSystem.Instance.ChangeAlignment(currentPlayer, 5, isGood: true, "dungeon.duelist_victory"); // v0.57.12: paired movement
@@ -16720,8 +16720,9 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("quest.aldric_ghosts.bonus"), "bright_cyan");
 
             // XP reward
-            player.Experience += 25000;
-            terminal.WriteLine(Loc.Get("quest.aldric_ghosts.xp_reward", "25,000"), "bright_green");
+            long malacharXP = TeamHQBonus.ApplyXP(player, 25000); // v1.1.11: Team HQ Training
+            player.Experience += malacharXP;
+            terminal.WriteLine(Loc.Get("quest.aldric_ghosts.xp_reward", $"{malacharXP:N0}"), "bright_green");
         }
 
         await terminal.PressAnyKey();
@@ -17834,7 +17835,7 @@ public class DungeonLocation : BaseLocation
     /// Companions are skipped (handled by CompanionSystem).
     /// Returns (leaderXP, leaderGold).
     /// </summary>
-    private (long leaderXP, long leaderGold) SplitPartyRewards(long totalXP, long totalGold, string source)
+    private (long leaderXP, long leaderGold) SplitPartyRewards(long totalXP, long totalGold, string source, bool fromCombat = false)
     {
         var player = GetCurrentPlayer();
         if (player == null) return (totalXP, totalGold);
@@ -17866,6 +17867,8 @@ public class DungeonLocation : BaseLocation
                 // Real players: full XP with level gap penalty
                 float groupXPMult = GroupSystem.GetGroupXPMultiplier(teammate.Level, highestLevel);
                 long memberXP = (long)(totalXP * groupXPMult);
+                // v1.1.11: a combat reward carries this player's own Team HQ Training.
+                if (fromCombat) memberXP = TeamHQBonus.ApplyXP(teammate, memberXP);
                 teammate.Experience += memberXP;
                 teammate.Statistics.RecordGoldChange(teammate.Gold);
 
@@ -17882,7 +17885,7 @@ public class DungeonLocation : BaseLocation
             {
                 // NPC teammates (spouses, mercenaries): 75% XP
                 long npcXP = (long)(totalXP * 0.75);
-                teammate.Experience += npcXP;
+                teammate.Experience += npcXP; // hq-training: out (NPC teammate share, never the leader's bonus)
             }
         }
 
@@ -17896,8 +17899,9 @@ public class DungeonLocation : BaseLocation
     /// <summary>
     /// Award XP and gold to the leader, splitting among party if in a group.
     /// Returns actual (xp, gold) awarded to the leader.
+    /// v1.1.11: fromCombat (the floor boss only) adds each real player's Team HQ Training to their own XP.
     /// </summary>
-    private (long xp, long gold) AwardDungeonReward(long xp, long gold, string source)
+    private (long xp, long gold) AwardDungeonReward(long xp, long gold, string source, bool fromCombat = false)
     {
         var player = GetCurrentPlayer();
         if (player == null) return (xp, gold);
@@ -17908,13 +17912,15 @@ public class DungeonLocation : BaseLocation
         lock (teammates) { hasGroupedPlayers = teammates.Any(t => t.IsGroupedPlayer); }
         if (hasGroupedPlayers)
         {
-            var (leaderXP, leaderGold) = SplitPartyRewards(xp, gold, source);
+            var (leaderXP, leaderGold) = SplitPartyRewards(xp, gold, source, fromCombat);
+            if (fromCombat) leaderXP = TeamHQBonus.ApplyXP(player, leaderXP);
             player.Gold += leaderGold;
             player.Experience += leaderXP;
             return (leaderXP, leaderGold);
         }
         else
         {
+            if (fromCombat) xp = TeamHQBonus.ApplyXP(player, xp);
             player.Gold += gold;
             player.Experience += xp;
             return (xp, gold);

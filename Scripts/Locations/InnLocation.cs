@@ -1006,6 +1006,7 @@ public class InnLocation : BaseLocation
                     xpReward /= 2;
                     goldReward /= 2;
                 }
+                xpReward = TeamHQBonus.ApplyXP(currentPlayer, xpReward); // v1.1.11: Team HQ Training, after the cut
 
                 currentPlayer.Experience += xpReward;
                 currentPlayer.Gold += goldReward;

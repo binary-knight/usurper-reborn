@@ -680,6 +680,7 @@ namespace UsurperRemake.Locations
                 // through ChangeAlignment so the v0.60.0 DR curve scales high-Chivalry gains down).
                 long waveGold = GameConfig.GauntletGoldPerWavePerLevel * currentPlayer.Level;
                 long waveXP = GameConfig.GauntletXPPerWave * (waveIdx + 4) * currentPlayer.Level; // wave-equiv +3 for honor-payout shape
+                waveXP = TeamHQBonus.ApplyXP(currentPlayer, waveXP); // v1.1.11: Team HQ Training
                 int waveFame = (waveIdx + 1) * 5; // 5 / 10 / 15 -- bigger per-wave Fame than Gauntlet warmup because each fight is a champion
                 int waveChivalry = 10 + waveIdx * 5; // 10 / 15 / 20 across the three waves
 
@@ -794,7 +795,7 @@ namespace UsurperRemake.Locations
 
             var tierRewards = UsurperRemake.Data.HonorTournamentData.GetTierRewards(earnedTier);
             long bonusGold = tierRewards.GoldMultiplierPerLevel * currentPlayer.Level;
-            long bonusXP = tierRewards.XpMultiplierPerLevel * currentPlayer.Level;
+            long bonusXP = TeamHQBonus.ApplyXP(currentPlayer, tierRewards.XpMultiplierPerLevel * currentPlayer.Level); // v1.1.11: Team HQ Training
             int bonusFame = tierRewards.FameBonus;
 
             currentPlayer.Gold += bonusGold;

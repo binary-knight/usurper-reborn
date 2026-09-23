@@ -554,7 +554,7 @@ public partial class PrisonWalkLocation : BaseLocation
             await terminal.WriteLineAsync(Loc.Get("prison_walk.damage_taken", (playerStartHP - player.HP).ToString()));
 
             // Award experience for defeating guards
-            long expGained = guards.Sum(g => g.Level * 50);
+            long expGained = TeamHQBonus.ApplyXP(player, guards.Sum(g => g.Level * 50)); // v1.1.11: Team HQ Training
             player.Experience += expGained;
             await terminal.WriteLineAsync(Loc.Get("prison_walk.xp_gained", expGained.ToString()));
 

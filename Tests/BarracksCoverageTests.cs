@@ -272,10 +272,18 @@ public class BarracksCoverageTests
     [Fact]
     public async Task LevelsReadForAnotherTeam_GiveNothing()
     {
-        var other = Hero(2);
-        other.HQLevelsTeam = "Y";
-        long plain = await Swing(Hero(0), 7);
-        long stale = await Swing(other, 7);
-        stale.Should().Be(plain);
+        // Dodging uses StatEffectsSystem's own unseeded dice, so compare only seeds where both swings land.
+        int compared = 0;
+        for (int seed = 1; seed <= 200 && compared < 10; seed++)
+        {
+            var other = Hero(2);
+            other.HQLevelsTeam = "Y";
+            long plain = await Swing(Hero(0), seed);
+            long stale = await Swing(other, seed);
+            if (plain <= 0 || stale <= 0) continue;
+            stale.Should().Be(plain, $"seed {seed}: levels read for another team give nothing");
+            compared++;
+        }
+        compared.Should().BeGreaterThan(0);
     }
 }

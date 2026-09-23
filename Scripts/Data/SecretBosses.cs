@@ -501,12 +501,13 @@ namespace UsurperRemake.Data
             }
 
             // Grant rewards
-            player.Experience += boss.RewardXP;
+            long rewardXP = TeamHQBonus.ApplyXP(player, boss.RewardXP); // v1.1.11: Team HQ Training
+            player.Experience += rewardXP;
             player.Gold += boss.RewardGold;
 
             terminal.WriteLine("");
-            if (boss.RewardXP > 0)
-                terminal.WriteLine(Loc.Get("secretboss.reward_xp", boss.RewardXP), "cyan");
+            if (rewardXP > 0)
+                terminal.WriteLine(Loc.Get("secretboss.reward_xp", rewardXP), "cyan");
             if (boss.RewardGold > 0)
                 terminal.WriteLine(Loc.Get("secretboss.reward_gold", boss.RewardGold), "yellow");
 

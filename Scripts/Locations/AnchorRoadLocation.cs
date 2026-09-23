@@ -483,7 +483,7 @@ public class AnchorRoadLocation : BaseLocation
             if (result.Outcome == CombatOutcome.Victory)
             {
                 long bounty = target.Level * 100 + (long)target.Darkness;
-                long expGain = target.Level * 50;
+                long expGain = TeamHQBonus.ApplyXP(currentPlayer, target.Level * 50); // v1.1.11: Team HQ Training
 
                 terminal.SetColor("bright_green");
                 terminal.WriteLine("");
@@ -755,11 +755,12 @@ public class AnchorRoadLocation : BaseLocation
                 terminal.SetColor("bright_green");
                 WriteSectionHeader(Loc.Get("anchor_road.gang_war_victory"), "bright_green");
                 terminal.WriteLine(Loc.Get("ui.defeated_all_members", enemiesDefeated, targetTeam.TeamName));
+                long wonXP = TeamHQBonus.ApplyXP(currentPlayer, totalXPReward); // v1.1.11: Team HQ Training
                 terminal.WriteLine(Loc.Get("ui.gold_plundered", $"{totalGoldReward:N0}"));
-                terminal.WriteLine($"{Loc.Get("ui.experience")}: {totalXPReward:N0}");
+                terminal.WriteLine($"{Loc.Get("ui.experience")}: {wonXP:N0}");
 
                 currentPlayer.Gold += totalGoldReward;
-                currentPlayer.Experience += totalXPReward;
+                currentPlayer.Experience += wonXP;
 
                 // Handle turf transfer
                 if (targetTeam.ControlsTurf)
@@ -800,7 +801,7 @@ public class AnchorRoadLocation : BaseLocation
                 {
                     // Give partial rewards for enemies defeated before losing
                     long partialGold = totalGoldReward / 2;
-                    long partialXP = totalXPReward / 2;
+                    long partialXP = TeamHQBonus.ApplyXP(currentPlayer, totalXPReward / 2); // v1.1.11: after the cut
                     terminal.SetColor("yellow");
                     terminal.WriteLine(Loc.Get("anchor_road.partial_rewards", $"{partialGold:N0}", $"{partialXP:N0}"));
                     currentPlayer.Gold += partialGold;
@@ -1060,7 +1061,7 @@ public class AnchorRoadLocation : BaseLocation
 
                 // Wave rewards
                 long waveGold = GameConfig.GauntletGoldPerWavePerLevel * currentPlayer.Level;
-                long waveXP = GameConfig.GauntletXPPerWave * wave * currentPlayer.Level;
+                long waveXP = TeamHQBonus.ApplyXP(currentPlayer, GameConfig.GauntletXPPerWave * wave * currentPlayer.Level); // v1.1.11: Team HQ Training
                 totalGoldEarned += waveGold;
                 totalXPEarned += waveXP;
                 currentPlayer.Gold += waveGold;
@@ -1116,7 +1117,7 @@ public class AnchorRoadLocation : BaseLocation
                     string tierAchievementId = UsurperRemake.Data.GauntletChampionData.GetTierAchievementId(earnedTier);
 
                     long tierGold = (long)rewards.GoldMultiplierPerLevel * currentPlayer.Level;
-                    long tierXP = (long)rewards.XpMultiplierPerLevel * currentPlayer.Level;
+                    long tierXP = TeamHQBonus.ApplyXP(currentPlayer, (long)rewards.XpMultiplierPerLevel * currentPlayer.Level); // v1.1.11: Team HQ Training
                     int tierFame = rewards.FameBonus;
 
                     totalGoldEarned += tierGold;

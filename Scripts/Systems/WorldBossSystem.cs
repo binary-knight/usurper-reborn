@@ -539,14 +539,16 @@ namespace UsurperRemake.Systems
                     terminal.SetColor("bright_yellow");
                     terminal.WriteLine(GameConfig.ScreenReaderMode ? $"  {Loc.Get("world_boss.rewards_delivered_header")}" : $"  ═══ {Loc.Get("world_boss.rewards_delivered_header")} ═══");
                 }
-                player.Experience += r.Xp;
+                // v1.1.11: Team HQ Training at delivery, where the player and their levels are loaded (after the settlement cap).
+                long xp = TeamHQBonus.ApplyXP(player, r.Xp);
+                player.Experience += xp;
                 player.Gold += r.Gold;
                 player.Fame += r.Fame;
                 terminal.SetColor("white");
                 terminal.WriteLine(r.Kind == "kill"
                     ? $"  {Loc.Get("world_boss.reward_kind_kill", r.BossName, r.Night, (int)(r.Score * 100), r.Mvp ? Loc.Get("world_boss.tier_mvp") : Loc.Get("world_boss.tier_contributor"))}"
                     : $"  {Loc.Get("world_boss.reward_kind_withdraw", r.BossName, r.Night)}");
-                terminal.WriteLine($"  {Loc.Get("world_boss.reward_xp", $"{r.Xp:N0}")}  {Loc.Get("world_boss.reward_gold", $"{r.Gold:N0}")}  {Loc.Get("world_boss.reward_fame", r.Fame)}");
+                terminal.WriteLine($"  {Loc.Get("world_boss.reward_xp", $"{xp:N0}")}  {Loc.Get("world_boss.reward_gold", $"{r.Gold:N0}")}  {Loc.Get("world_boss.reward_fame", r.Fame)}");
 
                 var boss = await backend.GetWorldBossById(r.BossId);
                 var bossDef = boss != null ? WorldBossDatabase.GetBossById(boss.DefinitionId) : null;
