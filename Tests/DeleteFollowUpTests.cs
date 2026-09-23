@@ -168,7 +168,7 @@ public class DeleteFollowUpTests : IDisposable
         saved.Count.Should().Be(2);
         _db.GetWorldStateVersion(OnlineStateManager.KEY_NPCS).Should().Be(version + 1, "a versioned write, so the world sim reloads it");
 
-        PermadeathHelper.RemoveGrudgesFromNpcJson(json, "Carol", out int none).Should().BeNull();
+        PermadeathHelper.RemoveDeletedCharacterFromNpcJson(json, "Carol", out int none, out int noSpouse).Should().BeNull();
         none.Should().Be(0);
     }
 
@@ -234,5 +234,131 @@ public class DeleteFollowUpTests : IDisposable
 
         _db.PurgePlayerWorldState("vesna_account", "Vesna");   // the test roster alone is not complete
         Count($"SELECT COUNT(*) FROM auction_listings WHERE id = {npcListing};").Should().Be(1, "an incomplete roster cannot rule out the NPC");
+    }
+
+    // ─── v1.1.11: review round 12 ───
+
+    private void DropJsonIndexes()
+    {
+        using var conn = new SqliteConnection($"Data Source={_path}");
+        conn.Open();
+        var names = new List<string>();
+        using (var q = conn.CreateCommand())
+        {
+            q.CommandText = "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'players' AND sql LIKE '%json%';";
+            using var r = q.ExecuteReader();
+            while (r.Read()) names.Add(r.GetString(0));
+        }
+        foreach (var name in names) { using var d = conn.CreateCommand(); d.CommandText = $"DROP INDEX \"{name}\";"; d.ExecuteNonQuery(); }
+    }
+
+    private void PlayerWithBlob(string username, string displayName, string blob) =>
+        Exec($"INSERT INTO players (username, display_name, player_data) VALUES ('{username}', '{displayName}', '{blob}');");
+
+    [Fact]
+    public async Task ANewBobsListing_SurvivesDeletingOldBobSmith()
+    {
+        PlayerWithBlob("old_bob", "Bob Smith", "{\"player\":{\"name2\":\"Bob\"}}");
+        PlayerWithBlob("new_bob", "Bob Jones", "{\"player\":{\"name2\":\"Bob\"}}");   // Name2 Bob, since married
+        DropJsonIndexes();   // a fresh database's expression indexes refuse a malformed blob; an upgraded one may lack them
+        PlayerWithBlob("broken", "Zed", "not json {");                                    // a malformed blob in the table
+        int newBobs = await _db.CreateAuctionListing("bob", "Axe", "{}", 100);
+        int oldMarried = await _db.CreateAuctionListing("bob smith", "Shield", "{}", 100);
+
+        WithCompleteRoster(() => _db.PurgePlayerWorldState("old_bob", "Bob"));
+
+        Count($"SELECT COUNT(*) FROM auction_listings WHERE id = {newBobs};").Should().Be(1, "another player carries the name Bob now");
+        Count($"SELECT COUNT(*) FROM auction_listings WHERE id = {oldMarried};").Should().Be(0, "the deleted character's own listing goes, malformed blob or not");
+    }
+
+    [Fact]
+    public async Task AnNPCsListing_SurvivesDeletingAnAccountOfItsName()
+    {
+        // the username key pass gets the same NPC protection as the display-name pass
+        Player("vesna", "Someone Else");
+        int npcListing = await _db.CreateAuctionListing("vesna", "Staff", "{}", 100);
+        var npc = new NPC { ID = "npc_vesna_key", Name1 = "Vesna", Name2 = "Vesna", Level = 20 };
+        WithCompleteRoster(() => _db.PurgePlayerWorldState("vesna", "Someone Else"), npc);
+        Count($"SELECT COUNT(*) FROM auction_listings WHERE id = {npcListing};").Should().Be(1, "an NPC carries the name");
+
+        _db.PurgePlayerWorldState("vesna", "Someone Else");
+        Count($"SELECT COUNT(*) FROM auction_listings WHERE id = {npcListing};").Should().Be(1, "an incomplete roster cannot rule out the NPC");
+
+        int own = await _db.CreateAuctionListing("zanthor", "Ring", "{}", 100);
+        Player("zanthor", "Zanthor");
+        WithCompleteRoster(() => _db.PurgePlayerWorldState("zanthor", "Zanthor"));
+        Count($"SELECT COUNT(*) FROM auction_listings WHERE id = {own};").Should().Be(0, "a name no NPC carries is purged");
+    }
+
+    [Fact]
+    public async Task TheSharedNpcRecord_LosesTheSpouse_AndTheGrudges_InOneVersionedWrite()
+    {
+        string json = "[" +
+            "{\"name\":\"Wife\",\"characterID\":\"npc_json_wife\",\"married\":true,\"isMarried\":true,\"spouseName\":\"Bob\",\"memories\":[" +
+                "{\"type\":\"Attacked\",\"involvedCharacter\":\"Bob\",\"emotionalImpact\":-0.5}]}," +
+            "{\"name\":\"Ann\",\"characterID\":\"npc_json_ann\",\"married\":true,\"isMarried\":true,\"spouseName\":\"Bob\",\"memories\":[]}," +
+            "{\"name\":\"Bob\",\"characterID\":\"npc_json_bob\",\"married\":true,\"isMarried\":true,\"spouseName\":\"Ann\",\"memories\":[]}]";
+        await _db.SaveWorldState(OnlineStateManager.KEY_NPCS, json);
+        long version = _db.GetWorldStateVersion(OnlineStateManager.KEY_NPCS);
+
+        var live = new NPC { ID = "npc_live_wife", Name1 = "Live Wife", Name2 = "Live Wife", Level = 10, SpouseName = "Bob", Married = true, IsMarried = true };
+        NPCSpawnSystem.Instance.ActiveNPCs.Add(live);
+        try
+        {
+            await PermadeathHelper.PurgeDeletedCharacterAsync(_db, "bob_account", "Bob");
+            live.SpouseName.Should().BeEmpty("the in-memory clear still runs");
+            live.IsMarried.Should().BeFalse();
+        }
+        finally { NPCSpawnSystem.Instance.ActiveNPCs.Remove(live); }
+
+        var saved = System.Text.Json.Nodes.JsonNode.Parse((await _db.LoadWorldState(OnlineStateManager.KEY_NPCS))!)!.AsArray();
+        var wife = saved[0]!;
+        ((string)wife["spouseName"]!).Should().BeEmpty();
+        ((bool)wife["married"]!).Should().BeFalse();
+        ((bool)wife["isMarried"]!).Should().BeFalse();
+        wife["memories"]!.AsArray().Should().BeEmpty("the grudge is gone too");
+        ((string)saved[1]!["spouseName"]!).Should().Be("Bob", "Ann is married to the NPC Bob, who names her back");
+        ((bool)saved[1]!["isMarried"]!).Should().BeTrue();
+        _db.GetWorldStateVersion(OnlineStateManager.KEY_NPCS).Should().Be(version + 1, "one versioned write");
+
+        // a record with only a marriage to the name (no grudge) is still edited
+        string onlySpouse = "[{\"name\":\"W\",\"married\":true,\"isMarried\":true,\"spouseName\":\"Carl\"}]";
+        PermadeathHelper.RemoveDeletedCharacterFromNpcJson(onlySpouse, "Carl", out int g, out int sp).Should().NotBeNull();
+        g.Should().Be(0);
+        sp.Should().Be(1);
+    }
+
+    [Fact]
+    public void AFreshProcess_ReadsTheSharedRoyalCourt_BeforeDecidingTheDeletedKingsReign()
+    {
+        var king = King.CreateNewKing("Bob", CharacterAI.Human, CharacterSex.Male);
+        CastleLocation.NeedsSharedCourtLoad(online: true, king: null, loadedFromShared: false).Should().BeTrue();
+        CastleLocation.NeedsSharedCourtLoad(online: true, king: king, loadedFromShared: false).Should().BeTrue("a king not read from shared state may be stale");
+        CastleLocation.NeedsSharedCourtLoad(online: true, king: king, loadedFromShared: true).Should().BeFalse();
+        CastleLocation.NeedsSharedCourtLoad(online: false, king: null, loadedFromShared: false).Should().BeFalse("offline has no shared court");
+
+        CastleLocation.IsDeletedCharactersReign(king, "Bob", null).Should().BeTrue();
+        CastleLocation.IsDeletedCharactersReign(king, "x", "bob").Should().BeTrue();
+        CastleLocation.IsDeletedCharactersReign(king, "Alice", "Alice").Should().BeFalse();
+        CastleLocation.IsDeletedCharactersReign(King.CreateNewKing("Bob", CharacterAI.Computer, CharacterSex.Male), "Bob", "Bob").Should().BeFalse();
+        CastleLocation.IsDeletedCharactersReign(null, "Bob", "Bob").Should().BeFalse();
+
+        string castle = Source("Locations", "CastleLocation.cs");
+        int start = castle.IndexOf("public static async Task<bool> AbdicateDeletedKingAsync(", StringComparison.Ordinal);
+        start.Should().BeGreaterThan(0);
+        string body = castle.Substring(start, castle.IndexOf("private static void EndPlayerReign(", start, StringComparison.Ordinal) - start);
+        body.IndexOf("await osm!.LoadRoyalCourtFromWorldState();", StringComparison.Ordinal)
+            .Should().BeGreaterThan(body.IndexOf("NeedsSharedCourtLoad(", StringComparison.Ordinal))
+            .And.BeLessThan(body.IndexOf("IsDeletedCharactersReign(", StringComparison.Ordinal));
+        body.Should().Contain("await osm.SaveRoyalCourtToWorldState();", "the ended reign is written to the shared royal_court");
+        Source("Systems", "OnlineStateManager.cs").Should().Contain("CastleLocation.RoyalCourtLoadedFromShared = true;");
+        Source("Systems", "PermadeathHelper.cs").Should().Contain("await global::CastleLocation.AbdicateDeletedKingAsync(");
+    }
+
+    private static string Source(string folder, string file)
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "Scripts"))) dir = dir.Parent;
+        return File.ReadAllText(Path.Combine(dir!.FullName, "Scripts", folder, file));
     }
 }

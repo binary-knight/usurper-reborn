@@ -6017,7 +6017,8 @@ public class CastleLocation : BaseLocation
                     HP = 500,
                     MaxHP = 500,
                     AI = CharacterAI.Computer,
-                    Class = CharacterClass.Warrior
+                    Class = CharacterClass.Warrior,
+                    IsLoadedPlayer = true   // v1.1.11: stands in for the player king, so a bounty on them is paid
                 };
             }
 
@@ -6051,7 +6052,8 @@ public class CastleLocation : BaseLocation
                 HP = (long)((400 + kingLevel * 60) * GameConfig.KingDefenderHPBonus),
                 MaxHP = (long)((400 + kingLevel * 60) * GameConfig.KingDefenderHPBonus),
                 AI = CharacterAI.Computer,
-                Class = CharacterClass.Warrior
+                Class = CharacterClass.Warrior,
+                IsLoadedPlayer = currentKing.AI == CharacterAI.Human   // v1.1.11: a stand-in for a player king
             };
 
             terminal.SetColor("gray");
@@ -7943,15 +7945,44 @@ public class CastleLocation : BaseLocation
     public static bool AbdicateDeletedKing(string? name, string? displayName, string reason)
     {
         var king = GetCurrentKing();
+        if (!IsDeletedCharactersReign(king, name, displayName)) return false;
+        EndPlayerReign(king!.Name, reason);
+        return true;
+    }
+
+    /// <summary>v1.1.11: set when this process has read the shared royal_court (the login, castle or world-sim loader).</summary>
+    public static bool RoyalCourtLoadedFromShared { get; set; }
+
+    /// <summary>v1.1.11: an active player king named by the deleted character's Name2 or display name.</summary>
+    internal static bool IsDeletedCharactersReign(King? king, string? name, string? displayName)
+    {
         if (king == null || !king.IsActive || king.AI != CharacterAI.Human) return false;
         bool named(string? n) => !string.IsNullOrWhiteSpace(n) && string.Equals(king.Name, n, StringComparison.OrdinalIgnoreCase);
-        if (!named(name) && !named(displayName)) return false;
-        EndPlayerReign(king.Name, reason);
+        return named(name) || named(displayName);
+    }
+
+    /// <summary>v1.1.11: online, a process that has not read the shared royal_court (a fresh door process at character select) reads it first.</summary>
+    internal static bool NeedsSharedCourtLoad(bool online, King? king, bool loadedFromShared) =>
+        online && (king == null || !loadedFromShared);
+
+    /// <summary>
+    /// v1.1.11: the delete path. Online, the authoritative royal_court is read first when this process
+    /// has not loaded it, and the ended reign is written back to it before returning.
+    /// </summary>
+    public static async Task<bool> AbdicateDeletedKingAsync(string? name, string? displayName, string reason)
+    {
+        var osm = UsurperRemake.BBS.DoorMode.IsOnlineMode ? OnlineStateManager.Instance : null;
+        if (NeedsSharedCourtLoad(osm != null, GetCurrentKing(), RoyalCourtLoadedFromShared))
+            await osm!.LoadRoyalCourtFromWorldState();
+        var king = GetCurrentKing();
+        if (!IsDeletedCharactersReign(king, name, displayName)) return false;
+        EndPlayerReign(king!.Name, reason, persist: osm == null);
+        if (osm != null) await osm.SaveRoyalCourtToWorldState();
         return true;
     }
 
     // v1.1.11: the throne side of AbdicatePlayerThrone, shared with AbdicateDeletedKing.
-    private static void EndPlayerReign(string kingDisplayName, string reason)
+    private static void EndPlayerReign(string kingDisplayName, string reason, bool persist = true)
     {
         var king = GetCurrentKing();
 
@@ -8000,8 +8031,8 @@ public class CastleLocation : BaseLocation
             }
         }
 
-        // Persist to world_state in online mode
-        if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+        // Persist to world_state in online mode (v1.1.11: the delete path awaits its own write)
+        if (persist && UsurperRemake.BBS.DoorMode.IsOnlineMode)
         {
             var osm = OnlineStateManager.Instance;
             if (osm != null)

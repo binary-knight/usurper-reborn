@@ -598,6 +598,9 @@ public class Character
     public string HQLevelsTeam { get; set; } = "";
     /// <summary>v1.1.11: when the HQ levels were read (run time only); TeamHQBonus reads them again when old.</summary>
     public DateTime HQLevelsReadAt { get; set; } = DateTime.MinValue;
+    /// <summary>v1.1.11: built from a real player's save (PlayerCharacterLoader), not a hired guard or an echo. Run time only.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsLoadedPlayer { get; set; }
 
     // Herb pouch inventory (v0.48.5)
     public int HerbHealing { get; set; }        // Healing Herbs (garden lv1)

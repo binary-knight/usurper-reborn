@@ -1559,6 +1559,7 @@ public partial class QuestSystem
     {
         var names = new[] { loser.Name2, loser.DisplayName }.Where(n => !string.IsNullOrWhiteSpace(n)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         if (winner == null || names.Count == 0) return new List<Quest>();
+        if (!loser.IsLoadedPlayer) return new List<Quest>();   // v1.1.11: a hired guard or echo named like a player
         if (names.Any(n => n.Equals(winner.Name2, StringComparison.OrdinalIgnoreCase) || n.Equals(winner.DisplayName, StringComparison.OrdinalIgnoreCase)))
             return new List<Quest>();
 
@@ -1567,7 +1568,12 @@ public partial class QuestSystem
         {
             claimed = questDatabase.Where(q => !q.Deleted && q.IsPlayerBounty && q.Initiator == KING_BOUNTY_INITIATOR &&
                 !string.IsNullOrEmpty(q.TargetNPCName) && names.Any(n => q.TargetNPCName.Equals(n, StringComparison.OrdinalIgnoreCase))).ToList();
-            foreach (var q in claimed) { q.Deleted = true; q.Occupier = winner.Name2; q.OccupiedDays = 1; }
+            // v1.1.11: another process may hold the same bounty; only the one whose DB claim lands pays it.
+            // A bounty claimed elsewhere is marked Deleted here too, unpaid.
+            var found = claimed;
+            claimed = found.Where(q => ClaimAcrossProcesses(q, winner.Name2)).ToList();
+            foreach (var q in found) q.Deleted = true;
+            foreach (var q in claimed) { q.Occupier = winner.Name2; q.OccupiedDays = 1; }
         }
 
         foreach (var bounty in claimed)
@@ -1653,6 +1659,18 @@ public partial class QuestSystem
     // it done, and both were paid (Codex review). Finding and marking now happen under one lock.
     private static readonly object _bountyPayoutLock = new();
 
+    /// <summary>
+    /// v1.1.11: the one-time claim in the shared database, taken before any payout. The in-process lock
+    /// covers one process; separate door and world-sim processes each hold their own copy of the bounty.
+    /// Without an SQL backend (offline, file saves) the lock is enough. A quest with no id cannot be
+    /// claimed by id and relies on the lock.
+    /// </summary>
+    internal static bool ClaimAcrossProcesses(Quest q, string claimer)
+    {
+        if (SaveSystem.Instance?.Backend is not SqlSaveBackend sql || string.IsNullOrEmpty(q.Id)) return true;
+        return sql.TryClaimBounty(q.Id, claimer);
+    }
+
     public static long AutoCompleteBountyForNPC(Character player, string npcName, bool includeKillContracts = true)
     {
         if (string.IsNullOrEmpty(npcName)) return 0;
@@ -1670,7 +1688,11 @@ public partial class QuestSystem
             !q.IsPlayerBounty &&   // v1.1.11: beating an NPC never pays a bounty on a player of that name (review)
             (includeKillContracts || q.QuestTarget != QuestTarget.Assassin)
         ).ToList();
-        foreach (var claimed in matchingBounties) claimed.Deleted = true;   // claimed for this payout
+        // v1.1.11: another process may hold the same bounty; only the one whose DB claim lands pays it.
+        // A bounty claimed elsewhere is marked Deleted here too, unpaid.
+        var found = matchingBounties;
+        matchingBounties = found.Where(q => ClaimAcrossProcesses(q, player?.Name2 ?? "")).ToList();
+        foreach (var claimed in found) claimed.Deleted = true;   // claimed for this payout
         }
 
         foreach (var bounty in matchingBounties)

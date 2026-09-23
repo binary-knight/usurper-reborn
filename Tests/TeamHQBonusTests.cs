@@ -116,6 +116,16 @@ public class TeamHQBonusTests : IDisposable
             .Where(m => m.Name.StartsWith("HQ", StringComparison.Ordinal)).Should().BeEmpty();
     }
 
+    [Fact]
+    public void RunTimeOnlyCharacterFields_AreNeverInTheSave()
+    {
+        // v1.1.11: IsLoadedPlayer says a Character was built from a player's save this run; a save carrying it
+        // would mark any character loaded from it, and the HQ bookkeeping is the team's, read from the database.
+        var names = typeof(PlayerData).GetMembers(BindingFlags.Public | BindingFlags.Instance).Select(m => m.Name).ToList();
+        names.Should().NotContain(new[] { "IsLoadedPlayer", "HQLevelsTeam", "HQLevelsReadAt" });
+        typeof(Character).GetProperty("IsLoadedPlayer").Should().NotBeNull("the check above must name a real member");
+    }
+
     // ─── the status screen ───
 
     private sealed class ScriptedStream : Stream

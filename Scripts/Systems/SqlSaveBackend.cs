@@ -841,6 +841,13 @@ namespace UsurperRemake.Systems
                         UNIQUE(username, event)
                     );
                     CREATE INDEX IF NOT EXISTS idx_onboarding_event ON onboarding_events(event, created_at DESC);
+
+                    -- v1.1.11: one row per bounty paid, so a bounty is paid once across processes
+                    CREATE TABLE IF NOT EXISTS bounty_claims (
+                        quest_id TEXT PRIMARY KEY,
+                        claimed_by TEXT,
+                        claimed_at TEXT DEFAULT (datetime('now'))
+                    );
                 ";
                 cmd.ExecuteNonQuery();
             }
@@ -939,6 +946,15 @@ namespace UsurperRemake.Systems
                 migCmd.ExecuteNonQuery();
             }
             catch { /* Column already exists - expected */ }
+
+            // v1.1.11: the one-time bounty claim table, also on a database made by an older release
+            try
+            {
+                using var migCmd = connection.CreateCommand();
+                migCmd.CommandText = "CREATE TABLE IF NOT EXISTS bounty_claims (quest_id TEXT PRIMARY KEY, claimed_by TEXT, claimed_at TEXT DEFAULT (datetime('now')));";
+                migCmd.ExecuteNonQuery();
+            }
+            catch (Exception ex) { DebugLogger.Instance.LogWarning("SQL", $"bounty_claims not ensured: {ex.Message}"); }
 
             MigrateWorldBossTables(connection); // v1.1.4
 
@@ -1183,9 +1199,10 @@ namespace UsurperRemake.Systems
                 ExecPurge(connection, tx, "bounties",          "LOWER(target_player) = LOWER(@u) OR LOWER(placed_by) = LOWER(@u) OR LOWER(claimed_by) = LOWER(@u)", username);
                 // v1.1.11: only the character's own listings. The buyer clause is gone: a sold row the seller
                 // has not collected holds that seller's gold, and the buyer already has the item. A seller
-                // equal to the key is skipped when it is another player's display name.
-                ExecPurge(connection, tx, "auction_listings",
-                    "LOWER(seller) = LOWER(@u) AND NOT EXISTS (SELECT 1 FROM players p WHERE LOWER(p.display_name) = LOWER(@u) AND LOWER(p.username) != LOWER(@u))", username);
+                // name another player or an NPC may carry now is left alone.
+                if (!CouldBeNpcName(username))
+                    ExecPurge(connection, tx, "auction_listings",
+                        $"LOWER(seller) = LOWER(@u) AND {SellerNotOtherPlayer}", username);
                 ExecPurge(connection, tx, "world_boss_damage", "LOWER(player_name) = LOWER(@u)", username);
 
                 // v0.65.0: pvp_log was deliberately excluded in v0.60.5 ("history
@@ -1218,11 +1235,9 @@ namespace UsurperRemake.Systems
                         username, displayName);
                     // NPCs list under their own name in lowercase: a name an NPC may carry (one does, or the roster
                     // is not complete enough to rule it out) keeps its listings; a stale one is the safe side
-                    var spawner = NPCSpawnSystem.Instance;
-                    bool couldBeNpcName = spawner == null || !spawner.IsRosterTrustworthy || QuestSystem.IsNPCName(displayName);
-                    if (!couldBeNpcName)
+                    if (!CouldBeNpcName(displayName))
                         ExecPurge(connection, tx, "auction_listings",
-                            $"LOWER(seller) = LOWER(@d) OR LOWER(seller) IN {ownNames}", username, displayName);
+                            $"(LOWER(seller) = LOWER(@d) OR LOWER(seller) IN {ownNames}) AND {SellerNotOtherPlayer}", username, displayName);
                 }
 
                 tx.Commit();
@@ -1244,6 +1259,44 @@ namespace UsurperRemake.Systems
             {
                 DebugLogger.Instance.LogError("PERMADEATH",
                     $"PurgePlayerWorldState failed for '{username}': {ex.Message}");
+            }
+        }
+
+        // v1.1.11: an auction seller name that another players row carries now, as its display name or
+        // its save's Name2, is that player's listing, never the deleted character's.
+        private const string SellerNotOtherPlayer =
+            "NOT EXISTS (SELECT 1 FROM players p WHERE LOWER(p.username) != LOWER(@u) AND (" +
+            "LOWER(p.display_name) = LOWER(auction_listings.seller) OR " +
+            "LOWER(CASE WHEN json_valid(p.player_data) THEN json_extract(p.player_data, '$.player.name2') END) = LOWER(auction_listings.seller)))";
+
+        // v1.1.11: a name an NPC may carry (one does, or the roster cannot rule it out)
+        private static bool CouldBeNpcName(string name)
+        {
+            var spawner = NPCSpawnSystem.Instance;
+            return spawner == null || !spawner.IsRosterTrustworthy || QuestSystem.IsNPCName(name);
+        }
+
+        /// <summary>
+        /// v1.1.11: claims a bounty for payout, once across every process on this database. True only for the
+        /// first claim of the quest id; false when another process (or an earlier claim) already took it, or
+        /// the claim could not be written.
+        /// </summary>
+        public bool TryClaimBounty(string questId, string claimer)
+        {
+            if (string.IsNullOrWhiteSpace(questId)) return false;
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "INSERT OR IGNORE INTO bounty_claims (quest_id, claimed_by) VALUES (@q, @c);";
+                cmd.Parameters.AddWithValue("@q", questId);
+                cmd.Parameters.AddWithValue("@c", claimer ?? "");
+                return cmd.ExecuteNonQuery() == 1;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"TryClaimBounty failed for '{questId}': {ex.Message}");
+                return false;
             }
         }
 
@@ -5267,8 +5320,10 @@ namespace UsurperRemake.Systems
     /// player member, never excludeKey, a banned player or an emergency account. Only if the team still
     /// has oldKey; with requireOldLeaderGone, also only if oldKey's save no longer names the team. The
     /// key is left alone when there is no successor. True when the team was updated.
+    /// v1.1.11: with respectJoinGrace (the world-save pass), also only if nobody joined within
+    /// EmptyTeamJoinGraceMinutes, checked by the update itself: a returning leader's save may not have landed.
     /// </summary>
-    public bool TryPassTeamLeadership(string teamName, string oldKey, string? excludeKey, bool requireOldLeaderGone, out string? newKey)
+    public bool TryPassTeamLeadership(string teamName, string oldKey, string? excludeKey, bool requireOldLeaderGone, out string? newKey, bool respectJoinGrace = false)
     {
         newKey = null;
         try
@@ -5303,7 +5358,9 @@ namespace UsurperRemake.Systems
                     (requireOldLeaderGone ? @"
                     AND NOT EXISTS (SELECT 1 FROM players l WHERE l.username = @old
                         AND (NOT json_valid(l.player_data)
-                             OR (CASE WHEN json_valid(l.player_data) THEN json_extract(l.player_data, '$.player.team') END) = @team));" : ";");
+                             OR (CASE WHEN json_valid(l.player_data) THEN json_extract(l.player_data, '$.player.team') END) = @team))" : "") +
+                    (respectJoinGrace ? " AND (last_join_at IS NULL OR last_join_at < datetime('now', '-' || @joinGrace || ' minutes'))" : "") + ";";
+                if (respectJoinGrace) update.Parameters.AddWithValue("@joinGrace", GameConfig.EmptyTeamJoinGraceMinutes);
                 update.Parameters.AddWithValue("@new", successor.ToLowerInvariant());
                 update.Parameters.AddWithValue("@team", teamName);
                 update.Parameters.AddWithValue("@old", oldKey);

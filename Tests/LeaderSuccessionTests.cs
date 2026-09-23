@@ -166,6 +166,53 @@ public class LeaderSuccessionTests : IDisposable
     }
 
     [Fact]
+    public void TheWorldSavesUpdate_RechecksTheJoinGrace()
+    {
+        // v1.1.11: the pass listed the team before the founder rejoined; the rejoin stamped last_join_at but
+        // the founder's save (naming the team) has not landed. The update itself must see the stamp.
+        Player("founder", null, level: 60);
+        Player("bran", "Rejoined", level: 20);
+        Team("Rejoined", "founder");
+        Exec("UPDATE player_teams SET last_join_at = datetime('now') WHERE team_name = 'Rejoined';");
+
+        _db.TryPassTeamLeadership("Rejoined", "founder", "founder", requireOldLeaderGone: true, out var next, respectJoinGrace: true)
+            .Should().BeFalse();
+        next.Should().BeNull();
+        Leader("Rejoined").Should().Be("founder");
+
+        Exec($"UPDATE player_teams SET last_join_at = datetime('now', '-{GameConfig.EmptyTeamJoinGraceMinutes + 1} minutes') WHERE team_name = 'Rejoined';");
+        _db.TryPassTeamLeadership("Rejoined", "founder", "founder", requireOldLeaderGone: true, out _, respectJoinGrace: true).Should().BeTrue();
+        Leader("Rejoined").Should().Be("bran");
+
+        CodeOnly(Source("Systems", "WorldSimService.cs")).Should().Contain("respectJoinGrace: true");
+    }
+
+    [Fact]
+    public void AGuildSuccessor_WhoLeftBeforeTheSuccession_IsNotAppointed()
+    {
+        var guilds = new GuildSystem(_path, register: false);
+        Player("boss", null, level: 90);
+        Player("top", null, level: 80);
+        Player("next", null, level: 40);
+        Guild("oakhall", "boss");
+        GuildMember("top", "oakhall", "2026-01-01 00:00:00");
+        GuildMember("next", "oakhall", "2026-01-02 00:00:00");
+
+        Exec("DELETE FROM guild_members WHERE username = 'top';");   // the first choice left
+        guilds.PassLeadership("oakhall", "boss").Should().Be("next");
+        GuildLeader("oakhall").Should().Be("next");
+        Scalar("SELECT rank FROM guild_members WHERE username = 'next'").Should().Be("Leader");
+
+        // the candidates are read inside the transaction, and a rank update that changes no row rolls back
+        string src = CodeOnly(Source("Systems", "GuildSystem.cs"));
+        int start = src.IndexOf("public string? PassLeadership(", StringComparison.Ordinal);
+        string body = src.Substring(start, src.IndexOf("public int PassLeadershipOf(", start, StringComparison.Ordinal) - start);
+        body.IndexOf("BeginTransaction(", StringComparison.Ordinal).Should().BeLessThan(body.IndexOf("SELECT gm.username", StringComparison.Ordinal));
+        body.Should().Contain("cmd.Transaction = tx;");
+        body.Should().Contain("if (rank.ExecuteNonQuery() != 1) { tx.Rollback(); return null; }");
+    }
+
+    [Fact]
     public void AGuildLeaderWhoLeaves_IsSucceededByTheHighestLevelMember()
     {
         var guilds = new GuildSystem(_path, register: false);

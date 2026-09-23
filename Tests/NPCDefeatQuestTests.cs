@@ -3,6 +3,7 @@ using System.IO;
 using System.Reflection;
 using System.Threading.Tasks;
 using FluentAssertions;
+using Microsoft.Data.Sqlite;
 using UsurperRemake.Systems;
 using Xunit;
 
@@ -144,7 +145,7 @@ public class NPCDefeatQuestTests
         // Inn and Dormitory attacks on a sleeping player end in this same duel outcome.
         var bounty = BountyOnPlayer("Wanted Rogue", 4000);
         var winner = new Character { Name1 = "sheriff", Name2 = "Sheriff", Level = 30, Gold = 0, HP = 500, MaxHP = 500 };
-        var rogue = new Character { Name1 = "wanted_rogue", Name2 = "Wanted Rogue", Level = 30, HP = 0, MaxHP = 400 };
+        var rogue = new Character { Name1 = "wanted_rogue", Name2 = "Wanted Rogue", Level = 30, HP = 0, MaxHP = 400, IsLoadedPlayer = true };
         await Outcome(new CombatResult { Player = winner, Opponent = rogue });
         winner.Gold.Should().BeGreaterThanOrEqualTo(4000);
         bounty.Deleted.Should().BeTrue();
@@ -159,7 +160,7 @@ public class NPCDefeatQuestTests
     public void APlayer_CannotCollectTheBountyOnThemselves()
     {
         var bounty = BountyOnPlayer("Self Collector", 3000);
-        var self = new Character { Name1 = "self_collector", Name2 = "Self Collector", Level = 30 };
+        var self = new Character { Name1 = "self_collector", Name2 = "Self Collector", Level = 30, IsLoadedPlayer = true };
         QuestSystem.CollectBountiesOnPlayer(self, self).Should().BeEmpty();
         bounty.Deleted.Should().BeFalse();
         bounty.Deleted = true;
@@ -174,5 +175,117 @@ public class NPCDefeatQuestTests
         await Outcome(new CombatResult { Player = winner, Opponent = npcTwin });
         bounty.Deleted.Should().BeFalse();
         bounty.Deleted = true;
+    }
+
+    // ─── v1.1.11: a hired guard is not the player it is named like ───
+
+    [Fact]
+    public async Task AHiredGuardNamedLikeAPlayer_PaysNothing_TheLoadedPlayerDoes()
+    {
+        var bounty = BountyOnPlayer("Rookie Guard", 3000);
+        var winner = new Character { Name1 = "raider", Name2 = "Raider", Level = 30, Gold = 0, HP = 500, MaxHP = 500 };
+        var guard = new Character { Name1 = "Rookie Guard", Name2 = "Rookie Guard", Level = 10, HP = 0, MaxHP = 100 };   // as HeadlessCombatResolver builds one
+        await Outcome(new CombatResult { Player = winner, Opponent = guard });
+        winner.Gold.Should().BeLessThan(3000, "the guard is not the player with the bounty");
+        bounty.Deleted.Should().BeFalse();
+
+        var player = PlayerCharacterLoader.CreateFromSaveData(new PlayerData { Name1 = "rookie_guard", Name2 = "Rookie Guard", Level = 20, MaxHP = 300 }, "Rookie Guard");
+        player.IsLoadedPlayer.Should().BeTrue();
+        player.HP = 0;
+        await Outcome(new CombatResult { Player = winner, Opponent = player });
+        winner.Gold.Should().BeGreaterThanOrEqualTo(3000);
+        bounty.Deleted.Should().BeTrue();
+
+        PlayerCharacterLoader.CreateFromSaveData(new PlayerData { Name2 = "Echo" }, "Echo", isEcho: true).IsLoadedPlayer.Should().BeFalse();
+    }
+
+    // ─── v1.1.11: the one-time claim in the shared database ───
+
+    private static async Task WithSqlBackend(Func<SqlSaveBackend, string, Task> body)
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"usurper-claim-{Guid.NewGuid():N}.db");
+        var field = typeof(SaveSystem).GetField("instance", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var before = field.GetValue(null);
+        var db = new SqlSaveBackend(path);
+        SaveSystem.InitializeWithBackend(db);
+        try { await body(db, path); }
+        finally
+        {
+            field.SetValue(null, before);
+            SqliteConnection.ClearAllPools();
+            try { File.Delete(path); } catch { }
+        }
+    }
+
+    [Fact]
+    public async Task TryClaimBounty_SucceedsOncePerQuestId()
+    {
+        await WithSqlBackend(async (db, path) =>
+        {
+            db.TryClaimBounty("Qclaim1", "alice").Should().BeTrue();
+            db.TryClaimBounty("Qclaim1", "bob").Should().BeFalse("another process took it");
+            db.TryClaimBounty("Qclaim2", "bob").Should().BeTrue();
+            db.TryClaimBounty("", "bob").Should().BeFalse();
+
+            using var conn = new SqliteConnection($"Data Source={path}");
+            conn.Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "INSERT OR IGNORE INTO bounty_claims (quest_id, claimed_by) VALUES ('Qclaim1', 'carol');";
+            cmd.ExecuteNonQuery().Should().Be(0, "a second claim of the same id changes no row");
+            cmd.CommandText = "SELECT claimed_by FROM bounty_claims WHERE quest_id = 'Qclaim1';";
+            (cmd.ExecuteScalar() as string).Should().Be("alice");
+            await Task.CompletedTask;
+        });
+    }
+
+    [Fact]
+    public async Task APlayerBounty_PaidInOneProcess_PaysNothingThroughAnotherProcesssCopy()
+    {
+        await WithSqlBackend(async (db, _) =>
+        {
+            var bounty = BountyOnPlayer("Stale Rogue", 4000);
+            var winner = new Character { Name1 = "sheriff_a", Name2 = "Sheriff A", Level = 30, Gold = 0 };
+            var rogue = new Character { Name1 = "stale_rogue", Name2 = "Stale Rogue", Level = 30, IsLoadedPlayer = true };
+            QuestSystem.CollectBountiesOnPlayer(winner, rogue).Should().ContainSingle();
+            winner.Gold.Should().BeGreaterThanOrEqualTo(4000);
+
+            // the other process still holds its own copy of the same bounty (same id, another object)
+            var copy = BountyOnPlayer("Stale Rogue", 4000);
+            copy.Id = bounty.Id;
+            var other = new Character { Name1 = "sheriff_b", Name2 = "Sheriff B", Level = 30, Gold = 0 };
+            QuestSystem.CollectBountiesOnPlayer(other, rogue).Should().BeEmpty();
+            other.Gold.Should().Be(0);
+            copy.Deleted.Should().BeTrue("another process took it, so it is gone here too");
+            await Task.CompletedTask;
+        });
+    }
+
+    [Fact]
+    public async Task AnNPCBounty_AnotherProcessClaimedFirst_PaysNothing()
+    {
+        await WithSqlBackend(async (db, _) =>
+        {
+            var (hunter, target, bounty) = Wanted("Claimed Mark");
+            db.TryClaimBounty(bounty.Id, "another process").Should().BeTrue();
+            QuestSystem.AutoCompleteBountyForNPC(hunter, target.Name).Should().Be(0);
+            hunter.Gold.Should().Be(0);
+            bounty.Deleted.Should().BeTrue();
+
+            var (hunter2, target2, bounty2) = Wanted("Unclaimed Mark");
+            QuestSystem.AutoCompleteBountyForNPC(hunter2, target2.Name).Should().Be(5000);
+            db.TryClaimBounty(bounty2.Id, "late").Should().BeFalse("the payout claimed it first");
+            await Task.CompletedTask;
+        });
+    }
+
+    [Fact]
+    public void TheClaimTable_IsAlsoAMigration()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "Scripts"))) dir = dir.Parent;
+        string src = File.ReadAllText(Path.Combine(dir!.FullName, "Scripts", "Systems", "SqlSaveBackend.cs"));
+        int migrations = src.IndexOf("MigrateWorldBossTables(connection);", StringComparison.Ordinal);
+        src.LastIndexOf("CREATE TABLE IF NOT EXISTS bounty_claims", migrations, StringComparison.Ordinal)
+            .Should().BeGreaterThan(src.IndexOf("ALTER TABLE player_teams ADD COLUMN last_join_at", StringComparison.Ordinal));
     }
 }

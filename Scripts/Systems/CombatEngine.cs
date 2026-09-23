@@ -26151,9 +26151,10 @@ public partial class CombatEngine
         long bounty;
         if (result.Opponent is NPC npc)
             bounty = QuestSystem.RecordNPCDefeat(result.Player, npc, killed: _pvpLethal && !npc.IsAlive);
-        else
+        else if (result.Opponent.IsLoadedPlayer)
         {
-            // v1.1.11: a Crown bounty on a player is paid to the duel's winner, lethal or not (a duel won)
+            // v1.1.11: a Crown bounty on a player is paid to the duel's winner, lethal or not (a duel won).
+            // Only a player loaded from a save; a hired guard or an echo may carry a player's name.
             var paid = QuestSystem.CollectBountiesOnPlayer(result.Player, result.Opponent);
             bounty = paid.Sum(QuestSystem.BountyReward);
             if (paid.Count > 0 && UsurperRemake.BBS.DoorMode.IsOnlineMode && OnlineStateManager.IsActive)
@@ -26162,6 +26163,7 @@ public partial class CombatEngine
                 await OnlineStateManager.Instance!.RemoveSharedQuestsAsync(q => ids.Contains(q.Id));   // edited in place
             }
         }
+        else bounty = 0;
         if (bounty > 0)
         {
             terminal.WriteLine(Loc.Get("street.fight.bounty_collected", bounty.ToString("N0")), "bright_yellow");

@@ -594,6 +594,7 @@ namespace UsurperRemake.Systems
                 if (string.IsNullOrEmpty(json)) return;
 
                 var royalCourt = JsonSerializer.Deserialize<RoyalCourtSaveData>(json, jsonOptions);
+                if (royalCourt != null) CastleLocation.RoyalCourtLoadedFromShared = true;   // v1.1.11
                 if (royalCourt == null || string.IsNullOrEmpty(royalCourt.KingName)) return;
 
                 var king = CastleLocation.GetCurrentKing();
@@ -1466,7 +1467,7 @@ namespace UsurperRemake.Systems
             try
             {
                 foreach (var (team, leader) in sqlBackend.GetTeamsLedByExMembers())
-                    if (sqlBackend.TryPassTeamLeadership(team, leader, leader, requireOldLeaderGone: true, out _)) passed++;
+                    if (sqlBackend.TryPassTeamLeadership(team, leader, leader, requireOldLeaderGone: true, out _, respectJoinGrace: true)) passed++;   // v1.1.11: rechecks the join grace
             }
             catch (Exception ex)
             {

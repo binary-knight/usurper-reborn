@@ -638,6 +638,7 @@ namespace UsurperRemake.Systems
                 if (string.IsNullOrEmpty(json)) return;
 
                 var royalCourt = JsonSerializer.Deserialize<RoyalCourtSaveData>(json, jsonOptions);
+                if (royalCourt != null) global::CastleLocation.RoyalCourtLoadedFromShared = true;   // v1.1.11
                 if (royalCourt == null || string.IsNullOrEmpty(royalCourt.KingName)) return;
 
                 var king = global::CastleLocation.GetCurrentKing();

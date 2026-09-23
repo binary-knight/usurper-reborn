@@ -51,6 +51,7 @@ public static class PlayerCharacterLoader
             BonusArmPow = playerData.BonusArmPow,
             AI = CharacterAI.Computer,
             IsEcho = isEcho,
+            IsLoadedPlayer = !isEcho,   // v1.1.11: a player's own save, so a bounty on them can be paid
             // Restore base stats for RecalculateStats
             BaseStrength = playerData.BaseStrength > 0 ? playerData.BaseStrength : playerData.Strength,
             BaseDexterity = playerData.BaseDexterity > 0 ? playerData.BaseDexterity : playerData.Dexterity,

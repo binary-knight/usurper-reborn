@@ -455,7 +455,7 @@ namespace UsurperRemake.Systems
             {
                 // v1.1.11: a deleted king abdicates through the normal path (history, NPC succession, persist)
                 string? shown = player?.DisplayName ?? (string.IsNullOrWhiteSpace(username) ? null : backend?.GetStoredDisplayName(username!));
-                if (global::CastleLocation.AbdicateDeletedKing(name, shown, "left the throne and the realm"))
+                if (await global::CastleLocation.AbdicateDeletedKingAsync(name, shown, "left the throne and the realm"))
                     DebugLogger.Instance.LogInfo("DELETE", $"Deleted '{name}' held the throne; the reign has ended.");
             }
             catch (Exception tex) { DebugLogger.Instance.LogWarning("DELETE", $"Throne handover failed for '{name}': {tex.Message}"); }
@@ -464,8 +464,10 @@ namespace UsurperRemake.Systems
             {
                 // v1.1.11: NPC grudges naming the character. In memory, and in the shared npcs record
                 // edited in place (a world-sim reload would otherwise bring them back).
+                // v1.1.11: the same in-place edit also ends NPC marriages to the name, so this write
+                // cannot carry the old marriage back for a world-sim reload
                 int forgotten = ForgetNpcGrudgesAgainst(name);
-                if (backend != null) forgotten += await RemoveSharedNpcGrudgesAsync(backend, name);
+                if (backend != null) forgotten += (await RemoveDeletedCharacterFromSharedNpcsAsync(backend, name)).Grudges;
                 if (forgotten > 0)
                     DebugLogger.Instance.LogInfo("DELETE", $"Dropped {forgotten} NPC grudge memory(ies) of deleted '{name}'.");
             }
@@ -519,12 +521,14 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// v1.1.11: remove the grudges against the name from the npcs JSON, touching nothing else.
-        /// Returns the edited JSON, or null when nothing matched.
+        /// v1.1.11: remove the grudges against the name from the npcs JSON, and end the marriage of an NPC
+        /// whose spouse was the name (married, isMarried, spouseName, as ClearNpcSpousesOf does), touching
+        /// nothing else. An NPC married to another NPC is left alone: the registry says so, or another
+        /// record in the JSON names this NPC as its spouse. Returns the edited JSON, or null when nothing matched.
         /// </summary>
-        public static string? RemoveGrudgesFromNpcJson(string json, string name, out int removed)
+        public static string? RemoveDeletedCharacterFromNpcJson(string json, string name, out int grudges, out int spouses)
         {
-            removed = 0;
+            grudges = 0; spouses = 0;
             if (string.IsNullOrWhiteSpace(json) || string.IsNullOrWhiteSpace(name)) return null;
             if (System.Text.Json.Nodes.JsonNode.Parse(json) is not System.Text.Json.Nodes.JsonArray npcs) return null;
             foreach (var npc in npcs)
@@ -540,11 +544,27 @@ namespace UsurperRemake.Systems
                     if ((typed && MemorySystem.IsGrudge(type, impact)) || (!typed && impact < 0f))
                     {
                         memories.RemoveAt(i);
-                        removed++;
+                        grudges++;
                     }
                 }
             }
-            return removed > 0 ? npcs.ToJsonString() : null;
+            foreach (var npc in npcs)
+            {
+                if (npc is not System.Text.Json.Nodes.JsonObject rec) continue;
+                if (!string.Equals(StringOf(rec["spouseName"]), name, StringComparison.OrdinalIgnoreCase)) continue;
+                string id = StringOf(rec["characterID"]);
+                if (!string.IsNullOrEmpty(id) && NPCMarriageRegistry.Instance.IsMarriedToNPC(id)) continue;
+                string own = StringOf(rec["name"]);
+                bool npcSpouse = !string.IsNullOrEmpty(own) && npcs.Any(o => o != null && !ReferenceEquals(o, npc)
+                    && string.Equals(StringOf(o["name"]), name, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(StringOf(o["spouseName"]), own, StringComparison.OrdinalIgnoreCase));
+                if (npcSpouse) continue;
+                rec["married"] = false;
+                rec["isMarried"] = false;
+                rec["spouseName"] = "";
+                spouses++;
+            }
+            return grudges + spouses > 0 ? npcs.ToJsonString() : null;
         }
 
         private static string StringOf(System.Text.Json.Nodes.JsonNode? node)
@@ -556,19 +576,19 @@ namespace UsurperRemake.Systems
         /// v1.1.11: the shared npcs record, edited in place under its version (as RemoveSharedQuestsAsync
         /// does for quests), never replaced by this process's list. Retries if another writer got in first.
         /// </summary>
-        public static async Task<int> RemoveSharedNpcGrudgesAsync(SqlSaveBackend backend, string name)
+        public static async Task<(int Grudges, int Spouses)> RemoveDeletedCharacterFromSharedNpcsAsync(SqlSaveBackend backend, string name)
         {
             for (int attempt = 0; attempt < 3; attempt++)
             {
                 long version = backend.GetWorldStateVersion(OnlineStateManager.KEY_NPCS);
                 string? json = await backend.LoadWorldState(OnlineStateManager.KEY_NPCS);
-                if (string.IsNullOrEmpty(json)) return 0;
-                string? edited = RemoveGrudgesFromNpcJson(json, name, out int removed);
-                if (edited == null) return 0;
-                if (await backend.SaveWorldStateIfVersion(OnlineStateManager.KEY_NPCS, edited, version)) return removed;
+                if (string.IsNullOrEmpty(json)) return (0, 0);
+                string? edited = RemoveDeletedCharacterFromNpcJson(json, name, out int grudges, out int spouses);
+                if (edited == null) return (0, 0);
+                if (await backend.SaveWorldStateIfVersion(OnlineStateManager.KEY_NPCS, edited, version)) return (grudges, spouses);
             }
-            DebugLogger.Instance.LogWarning("DELETE", $"Shared NPC grudges of '{name}' not cleared: the record kept changing.");
-            return 0;
+            DebugLogger.Instance.LogWarning("DELETE", $"Shared NPC grudges and marriages of '{name}' not cleared: the record kept changing.");
+            return (0, 0);
         }
 
         /// <summary>

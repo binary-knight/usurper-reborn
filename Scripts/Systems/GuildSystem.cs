@@ -184,9 +184,13 @@ public class GuildSystem
         {
             using var conn = new SqliteConnection(connectionString);
             conn.Open();
+            // v1.1.11: the candidates are read in the same (immediate) transaction as the update, so a
+            // member who leaves meanwhile cannot be appointed
+            using var tx = conn.BeginTransaction(deferred: false);
             var candidates = new List<(string, int, string?)>();
             using (var cmd = conn.CreateCommand())
             {
+                cmd.Transaction = tx;
                 cmd.CommandText = @"
                     SELECT gm.username,
                            CAST(CASE WHEN json_valid(p.player_data) THEN json_extract(p.player_data, '$.player.level') END AS INTEGER),
@@ -205,7 +209,6 @@ public class GuildSystem
             var successor = SqlSaveBackend.PickSuccessor(candidates);
             if (successor == null) return null;
 
-            using var tx = conn.BeginTransaction();
             using (var update = conn.CreateCommand())
             {
                 // v1.1.11: a leader changed meanwhile (a transfer) wins
@@ -222,7 +225,7 @@ public class GuildSystem
                 rank.CommandText = "UPDATE guild_members SET rank = 'Leader' WHERE username = @new COLLATE NOCASE AND guild_name = @guild COLLATE NOCASE";
                 rank.Parameters.AddWithValue("@new", successor);
                 rank.Parameters.AddWithValue("@guild", guildName);
-                rank.ExecuteNonQuery();
+                if (rank.ExecuteNonQuery() != 1) { tx.Rollback(); return null; }   // v1.1.11: never a guild with no Leader rank
             }
             tx.Commit();
             DebugLogger.Instance?.LogInfo("GUILD", $"Guild '{guildName}' leadership passed from '{oldLeader}' to '{successor.ToLowerInvariant()}'");
