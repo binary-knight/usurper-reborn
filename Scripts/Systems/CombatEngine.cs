@@ -456,10 +456,59 @@ public partial class CombatEngine
     // NPC defenders (sleeping NPCs, the king), so repeated disarms drove them to zero.
     private readonly Dictionary<Character, long> _pvpDisarmedWeapPow = new();
 
+    // v1.1.10: hard control in a duel follows the rules a monster stun already has. Before this a
+    // stun, sleep or freeze in PvP landed every time, a new cast replaced the clock, and nothing
+    // stopped one fighter keeping the other unable to act for a whole fight (player report on
+    // freeze: "pretty much an autowin"). Per fighter, for this duel only.
+    private sealed class PvPControlState { public int ImmuneRounds; public int RecentCount; public int RoundsSinceLast; public bool Held; }
+    private readonly Dictionary<Character, PvPControlState> _pvpControl = new();
+
+    private static bool IsHeld(Character c) => c.ActiveStatuses.Keys.Any(s => s.PreventsAction() && s != StatusEffect.Charmed);
+
+    /// <summary>
+    /// v1.1.10: applies a turn-skipping status in PvP under the monster-stun rules: no new one while
+    /// one holds, GameConfig.StunImmunityRoundsAfterRecovery rounds of immunity after it ends,
+    /// diminishing returns (full, half, quarter, then immune until StunDRWindowRounds pass without
+    /// one), and a cap of GameConfig.MaxStunDurationNormal rounds. True when it landed.
+    /// </summary>
+    internal bool TryApplyPvPControl(Character target, StatusEffect status, int requestedDuration)
+    {
+        if (!_pvpControl.TryGetValue(target, out var st)) _pvpControl[target] = st = new PvPControlState();
+        if (IsHeld(target) || st.ImmuneRounds > 0 || st.RecentCount >= 3)
+        {
+            terminal.WriteLine(Loc.Get("combat.pvp_control_resisted", target.DisplayName), "gray");
+            return false;
+        }
+        int percent = st.RecentCount switch { 0 => 100, 1 => 50, _ => 25 };
+        int duration = Math.Min(GameConfig.MaxStunDurationNormal, Math.Max(1, (requestedDuration * percent + 99) / 100));
+        target.ApplyStatus(status, duration);
+        st.RecentCount++;
+        st.RoundsSinceLast = 0;
+        st.Held = true;
+        return true;
+    }
+
+    /// <summary>v1.1.10: once per duel round, after statuses tick: start immunity when a hold ends, count the rest down.</summary>
+    internal void TickPvPControl(Character fighter)
+    {
+        if (!_pvpControl.TryGetValue(fighter, out var st)) return;
+        if (st.Held && !IsHeld(fighter))
+        {
+            st.Held = false;
+            st.ImmuneRounds = GameConfig.StunImmunityRoundsAfterRecovery;
+        }
+        else if (st.ImmuneRounds > 0)
+        {
+            st.ImmuneRounds--;
+        }
+        if (++st.RoundsSinceLast >= GameConfig.StunDRWindowRounds) st.RecentCount = 0;
+    }
+
     private void EndPvPCombat(Character attacker, Character defender)
     {
         foreach (var kv in _pvpDisarmedWeapPow) kv.Key.WeapPow = kv.Value;
         _pvpDisarmedWeapPow.Clear();
+        _pvpControl.Clear();
         ConsumeCombatBuffs(attacker);
         ScrubTransientCombatState(attacker);
         ScrubTransientCombatState(defender);
@@ -658,6 +707,8 @@ public partial class CombatEngine
                 terminal.WriteLine(msg, color);
             foreach (var (msg, color) in defender.ProcessStatusEffects())
                 terminal.WriteLine(msg, color);
+            TickPvPControl(attacker);   // v1.1.10
+            TickPvPControl(defender);
 
             // Process Shaman totem effects for both combatants
             if (attacker.ActiveTotemRounds > 0)
@@ -26636,8 +26687,8 @@ public partial class CombatEngine
         {
             case "lightning":
             case "stun":
-                target.ApplyStatus(StatusEffect.Stunned, duration);
-                terminal.WriteLine(Loc.Get("combat.is_stunned", target.DisplayName), "bright_yellow");
+                if (TryApplyPvPControl(target, StatusEffect.Stunned, duration))
+                    terminal.WriteLine(Loc.Get("combat.is_stunned", target.DisplayName), "bright_yellow");
                 break;
 
             case "poison":
@@ -26646,13 +26697,13 @@ public partial class CombatEngine
                 break;
 
             case "sleep":
-                target.ApplyStatus(StatusEffect.Sleeping, duration);
-                terminal.WriteLine($"{target.DisplayName} falls into a magical slumber!", "cyan");
+                if (TryApplyPvPControl(target, StatusEffect.Sleeping, duration))
+                    terminal.WriteLine($"{target.DisplayName} falls into a magical slumber!", "cyan");
                 break;
 
             case "freeze":
-                target.ApplyStatus(StatusEffect.Frozen, duration);
-                terminal.WriteLine(Loc.Get("combat.is_frozen", target.DisplayName), "bright_cyan");
+                if (TryApplyPvPControl(target, StatusEffect.Frozen, duration))
+                    terminal.WriteLine(Loc.Get("combat.is_frozen", target.DisplayName), "bright_cyan");
                 break;
 
             // v1.1.10: frost slows, as it does against a monster. Frost Touch and Ice Storm are the
@@ -26792,8 +26843,8 @@ public partial class CombatEngine
                 break;
 
             case "temporal":
-                target.ApplyStatus(StatusEffect.Stunned, 2);
-                terminal.WriteLine(Loc.Get("combat.trapped_time_loop", target.DisplayName), "bright_cyan");
+                if (TryApplyPvPControl(target, StatusEffect.Stunned, 2))
+                    terminal.WriteLine(Loc.Get("combat.trapped_time_loop", target.DisplayName), "bright_cyan");
                 break;
         }
     }

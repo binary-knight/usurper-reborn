@@ -20030,6 +20030,7 @@
   "combat.tidal_barrier_reflect": "La barrière de marée renverra les dégâts aux attaquants !",
   "combat.is_poisoned": "{0} est empoisonné(e) !",
   "combat.is_frozen": "{0} est gelé(e) !",
+  "combat.pvp_control_resisted": "  {0} s'en débarrasse.",
   "combat.cowers_in_fear": "{0} tremble de peur !",
   "combat.is_slowed": "{0} est ralenti(e) !",
   "combat.is_blinded": "{0} est aveuglé(e) !",

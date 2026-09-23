@@ -20344,6 +20344,7 @@
   "combat.tidal_barrier_reflect": "Az árapály-gát visszaveri a sebzést a támadókra!",
   "combat.is_poisoned": "{0} megmérgezve!",
   "combat.is_frozen": "{0} le van fagyva!",
+  "combat.pvp_control_resisted": "  {0} lerázza magáról.",
   "combat.cowers_in_fear": "{0} rémülten meglapul!",
   "combat.is_slowed": "{0} le van lassítva!",
   "combat.is_blinded": "{0} meg van vakítva!",

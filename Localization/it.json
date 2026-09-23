@@ -20030,6 +20030,7 @@
   "combat.tidal_barrier_reflect": "La barriera di marea rifletterà i danni agli attaccanti!",
   "combat.is_poisoned": "{0} è avvelenato!",
   "combat.is_frozen": "{0} è congelato!",
+  "combat.pvp_control_resisted": "  {0} se lo scrolla di dosso.",
   "combat.cowers_in_fear": "{0} trema di paura!",
   "combat.is_slowed": "{0} è rallentato!",
   "combat.is_blinded": "{0} è accecato!",

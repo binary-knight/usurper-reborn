@@ -34,6 +34,76 @@ public class PvPFrostTests
         target.HasStatus(StatusEffect.Frozen).Should().BeFalse("frost is a slow, as it is against a monster");
     }
 
+    // ─── v1.1.10: guards on hard control in a duel, the rules a monster stun already has ───
+
+    private static (CombatEngine engine, System.Action<string, int> cast) Duel(Character target)
+    {
+        var engine = new CombatEngine(new TerminalEmulator(new MemoryStream(), new MemoryStream()));
+        var m = typeof(CombatEngine).GetMethod("ApplyPvPSpellEffect", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var caster = Duelist("Caster");
+        return (engine, (effect, rounds) => m.Invoke(engine, new object[] { caster, target, new SpellSystem.SpellResult { SpecialEffect = effect, Duration = rounds } }));
+    }
+
+    /// <summary>One duel round's end, as the PvP loop runs it: statuses tick, then the control guard.</summary>
+    private static void EndRound(CombatEngine engine, Character c) { c.ProcessStatusEffects(); engine.TickPvPControl(c); }
+
+    private static bool Held(Character c) => c.HasStatus(StatusEffect.Stunned) || c.HasStatus(StatusEffect.Frozen) || c.HasStatus(StatusEffect.Sleeping);
+
+    [Fact]
+    public void ANewHold_DoesNotLandWhileOneHolds()
+    {
+        var target = Duelist("Target");
+        var (engine, cast) = Duel(target);
+        cast("stun", 2);
+        cast("freeze", 3);
+        target.HasStatus(StatusEffect.Stunned).Should().BeTrue();
+        target.HasStatus(StatusEffect.Frozen).Should().BeFalse("a second hold used to replace or stack on the first");
+    }
+
+    [Fact]
+    public void AHold_IsCappedAtThreeRounds()
+    {
+        var target = Duelist("Target");
+        var (_, cast) = Duel(target);
+        cast("freeze", 20);   // a Sage's Freeze at high proficiency asks for this
+        target.ActiveStatuses[StatusEffect.Frozen].Should().Be(GameConfig.MaxStunDurationNormal);
+    }
+
+    [Fact]
+    public void AfterAHoldEnds_TheFighterIsImmune_ThenTheNextHoldIsShorter()
+    {
+        var target = Duelist("Target");
+        var (engine, cast) = Duel(target);
+        cast("stun", 1);
+        EndRound(engine, target);                       // the stun runs out; immunity starts
+        Held(target).Should().BeFalse();
+        for (int r = 0; r < GameConfig.StunImmunityRoundsAfterRecovery; r++)
+        {
+            cast("stun", 2);
+            Held(target).Should().BeFalse($"immune round {r + 1}");
+            EndRound(engine, target);
+        }
+        cast("stun", 2);
+        target.ActiveStatuses[StatusEffect.Stunned].Should().Be(1, "the second hold in the window is halved");
+    }
+
+    [Fact]
+    public void CastingEveryRound_CanNoLongerHoldAFighterForTheWholeDuel()
+    {
+        // The report: one side cast every round and the other never acted. Count the rounds held
+        // out of twenty with a 2-round stun cast at the start of every round.
+        var target = Duelist("Target");
+        var (engine, cast) = Duel(target);
+        int held = 0;
+        for (int round = 0; round < 20; round++)
+        {
+            cast("stun", 2);
+            if (Held(target)) held++;
+            EndRound(engine, target);
+        }
+        held.Should().BeLessThan(10, "the fighter gets to act most rounds");
+    }
+
     [Fact]
     public void Freeze_StillFreezes()
     {

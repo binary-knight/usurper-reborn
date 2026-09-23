@@ -20520,6 +20520,7 @@
   "combat.tidal_barrier_reflect": "The tidal barrier will reflect damage back at attackers!",
   "combat.is_poisoned": "{0} is poisoned!",
   "combat.is_frozen": "{0} is frozen!",
+  "combat.pvp_control_resisted": "  {0} shrugs it off.",
   "combat.cowers_in_fear": "{0} cowers in fear!",
   "combat.is_slowed": "{0} is slowed!",
   "combat.is_blinded": "{0} is blinded!",

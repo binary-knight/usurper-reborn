@@ -20041,6 +20041,7 @@
   "combat.tidal_barrier_reflect": "¡La barrera de mareas reflejará el daño a los atacantes!",
   "combat.is_poisoned": "¡{0} está envenenado!",
   "combat.is_frozen": "¡{0} está congelado!",
+  "combat.pvp_control_resisted": "  {0} se lo sacude de encima.",
   "combat.cowers_in_fear": "¡{0} se encoge de miedo!",
   "combat.is_slowed": "¡{0} está ralentizado!",
   "combat.is_blinded": "¡{0} está cegado!",
