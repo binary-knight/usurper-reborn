@@ -155,6 +155,26 @@ public class OldGodDialogueTests
     }
 
     [Fact]
+    public void WhatTheGodSummons_HitsAsTheAnswerSays()
+    {
+        // Manwe's shadow, the spectral soldiers and other summons get stats of their own when they appear,
+        // so the answer's factor is carried on the context and applied to them (Codex round 6).
+        var ctx = new BossCombatContext { AoEDamage = 1500 };
+        WithModifiers(m => { Set(m, "DefenseMultiplier", 1.20); Set(m, "BossDamageMultiplier", 0.85); },
+            () => typeof(OldGodBossSystem).GetMethod("ApplyDialogueToFixedBossDamage", F)!.Invoke(OldGodBossSystem.Instance, new object[] { ctx, Hero() }));
+        ctx.DialogueDamageFactor.Should().BeApproximately(0.85 / 1.20, 1e-9);
+
+        var engine = new CombatEngine(new TerminalEmulator(new MemoryStream(), new MemoryStream())) { BossContext = ctx };
+        var soldiers = (List<Monster>)typeof(CombatEngine).GetMethod("CreateSpectralSoldiers", F)!.Invoke(engine, new object[] { 1, 50 })!;
+        soldiers[0].Strength.Should().Be((long)((10 + 50 * 2) * ctx.DialogueDamageFactor));
+        soldiers[0].WeapPow.Should().Be((long)((5 + 50) * ctx.DialogueDamageFactor));
+
+        var unscaled = (List<Monster>)typeof(CombatEngine).GetMethod("CreateSpectralSoldiers", F)!
+            .Invoke(new CombatEngine(new TerminalEmulator(new MemoryStream(), new MemoryStream())), new object[] { 1, 50 })!;
+        unscaled[0].Strength.Should().Be(110, "outside a god fight nothing changes");
+    }
+
+    [Fact]
     public void AFlatAnswer_IsConvertedAgainstTheStatsTheFightUses()
     {
         // A flat +50 damage answer is converted against Strength + WeapPow. A shrine's blessing that the

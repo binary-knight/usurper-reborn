@@ -5615,7 +5615,7 @@ public partial class CombatEngine
         for (int i = 0; i < summonCount; i++)
         {
             long sHp = 40 + monster.Level * 3;
-            summons.Add(new Monster
+            summons.Add(WithDialogueDamage(new Monster
             {
                 Name = Loc.Get("combat.summoned_minion_name", monster.Name),
                 Level = Math.Max(1, monster.Level - 8),
@@ -5628,7 +5628,7 @@ public partial class CombatEngine
                 FamilyName = monster.FamilyName ?? "Summoned",
                 MonsterClass = monster.MonsterClass,
                 IsBoss = false, IsActive = true, CanSpeak = false
-            });
+            }));
         }
         monsterList.AddRange(summons);
         result.Monsters?.AddRange(summons);
@@ -6301,7 +6301,7 @@ public partial class CombatEngine
                     for (int i = 0; i < count; i++)
                     {
                         long hp = 50 + monster.Level * 4;
-                        minions.Add(new Monster
+                        minions.Add(WithDialogueDamage(new Monster
                         {
                             Name = minionName,
                             Level = Math.Max(1, monster.Level - 10),
@@ -6313,7 +6313,7 @@ public partial class CombatEngine
                             MonsterColor = "dark_red",
                             FamilyName = "Summoned",
                             IsBoss = false, IsActive = true, CanSpeak = false
-                        });
+                        }));
                     }
                     monsterList.AddRange(minions);
                     result.Monsters.AddRange(minions);
@@ -6557,7 +6557,7 @@ public partial class CombatEngine
                 {
                     _manweSplitFormUsed = true;
                     long shadowHP = 25000;
-                    var shadow = new Monster
+                    var shadow = WithDialogueDamage(new Monster
                     {
                         Name = "Shadow of Manwe",
                         Level = 80,
@@ -6569,7 +6569,7 @@ public partial class CombatEngine
                         MonsterColor = "dark_magenta",
                         FamilyName = "Divine",
                         IsBoss = false, IsActive = true, CanSpeak = true
-                    };
+                    });
                     monsterList.Add(shadow);
                     result.Monsters.Add(shadow);
                     terminal.WriteLine("");
@@ -19519,6 +19519,22 @@ public partial class CombatEngine
     /// <summary>
     /// Handle monster attacking a companion instead of the player
     /// </summary>
+    /// <summary>
+    /// v1.1.10: a creature summoned in an Old God fight hits as the god's dialogue answer says the god
+    /// does (BossCombatContext.DialogueDamageFactor); its stats are set at summoning, not from the god's
+    /// (Codex round 6: Manwe's shadow, the spectral soldiers and other summons kept full strength).
+    /// </summary>
+    private Monster WithDialogueDamage(Monster summoned)
+    {
+        double factor = BossContext?.DialogueDamageFactor ?? 1.0;
+        if (factor != 1.0)
+        {
+            summoned.Strength = (long)(summoned.Strength * factor);
+            summoned.WeapPow = (long)(summoned.WeapPow * factor);
+        }
+        return summoned;
+    }
+
     /// <summary>v1.1.10: taunts that also protect the taunter. Their effect names do not say "taunt".</summary>
     private static readonly HashSet<string> ProtectiveTaunts = new()
     {
@@ -28768,7 +28784,7 @@ public partial class CombatEngine
                 IsActive = true,
                 CanSpeak = false
             };
-            soldiers.Add(soldier);
+            soldiers.Add(WithDialogueDamage(soldier));
         }
 
         terminal.WriteLine("");
@@ -30745,6 +30761,8 @@ public class BossCombatContext
     public bool HasPhysicalImmunityPhase { get; set; }    // Boss has a physical immunity phase
     public bool HasMagicalImmunityPhase { get; set; }     // Boss has a magical immunity phase
     public int CorruptionDamagePerStack { get; set; }     // Damage per corruption stack per round
+    /// <summary>v1.1.10: the dialogue's god-damage factor, applied to anything the god summons during the fight.</summary>
+    public double DialogueDamageFactor { get; set; } = 1.0;
     public int DoomRounds { get; set; } = 3;              // Rounds before Doom kills
     public int ChannelFrequency { get; set; } = 0;        // Every N rounds boss channels (0 = never)
     public string ChannelAbilityName { get; set; } = "";  // Name of channeled ability

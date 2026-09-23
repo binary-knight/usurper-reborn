@@ -972,6 +972,7 @@ namespace UsurperRemake.Systems
         {
             double factor = DialogueBossDamageFactor(player);
             if (factor == 1.0) return;
+            ctx.DialogueDamageFactor = factor;   // what the god summons hits the same way (Codex round 6)
             // every fixed damage figure the context carries (Doom is a countdown to a kill, not damage)
             ctx.AoEDamage = (int)Math.Round(ctx.AoEDamage * factor);
             ctx.ChannelDamage = (int)Math.Round(ctx.ChannelDamage * factor);
