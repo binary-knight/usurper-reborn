@@ -5547,6 +5547,19 @@ namespace UsurperRemake.Systems
         {
             using var connection = OpenConnection();
             using var cmd = connection.CreateCommand();
+            // A malformed save cannot say which team it names, so while one exists no team counts as empty.
+            using (var bad = connection.CreateCommand())
+            {
+                bad.CommandText = "SELECT username FROM players WHERE NOT json_valid(player_data);";
+                using var badReader = bad.ExecuteReader();
+                var badKeys = new List<string>();
+                while (badReader.Read()) badKeys.Add(badReader.GetString(0));
+                if (badKeys.Count > 0)
+                {
+                    DebugLogger.Instance.LogWarning("SQL", $"Empty-team cleanup skipped: malformed save(s) for {string.Join(", ", badKeys)}");
+                    return teams;
+                }
+            }
             cmd.CommandText = @"
                 SELECT t.team_name FROM player_teams t
                 WHERE NOT EXISTS (SELECT 1 FROM players p
@@ -5563,7 +5576,8 @@ namespace UsurperRemake.Systems
 
     /// <summary>
     /// v1.1.11: removes a team nobody is in, with its upgrades and vault, in one transaction; only if no
-    /// player's save names it at the moment of the delete. True when it was removed.
+    /// player's save names it at the moment of the delete, and no save is malformed (it could name the
+    /// team). True when it was removed.
     /// </summary>
     public bool DeleteEmptyTeam(string teamName)
     {
@@ -5577,7 +5591,8 @@ namespace UsurperRemake.Systems
                 team.CommandText = @"
                     DELETE FROM player_teams WHERE team_name = @team
                     AND NOT EXISTS (SELECT 1 FROM players p
-                        WHERE (CASE WHEN json_valid(p.player_data) THEN json_extract(p.player_data, '$.player.team') END) = @team);";
+                        WHERE NOT json_valid(p.player_data)
+                        OR (CASE WHEN json_valid(p.player_data) THEN json_extract(p.player_data, '$.player.team') END) = @team);";
                 team.Parameters.AddWithValue("@team", teamName);
                 if (team.ExecuteNonQuery() != 1) return false;
             }

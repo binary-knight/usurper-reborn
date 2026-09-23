@@ -108,4 +108,28 @@ public class EmptyTeamCleanupTests : IDisposable
         }
         finally { NPCSpawnSystem.Instance.ActiveNPCs.Remove(npc); }
     }
+
+    [Fact]
+    public void WhileASaveIsMalformed_NoTeamIsRemoved()
+    {
+        // A malformed save cannot say which team it names; its player may be the last member.
+        using (var conn = new SqliteConnection($"Data Source={_path}"))
+        {
+            conn.Open();
+            var names = new System.Collections.Generic.List<string>();
+            using (var q = conn.CreateCommand())
+            {
+                q.CommandText = "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'players' AND sql LIKE '%json%';";
+                using var r = q.ExecuteReader();
+                while (r.Read()) names.Add(r.GetString(0));
+            }
+            foreach (var name in names) { using var d = conn.CreateCommand(); d.CommandText = $"DROP INDEX \"{name}\";"; d.ExecuteNonQuery(); }
+        }
+        Exec("INSERT INTO players (username, display_name, player_data) VALUES ('broken', 'Broken', '{not json');");
+        Team("Nobody Left");
+
+        _db.GetTeamsWithoutPlayerMembers().Should().BeEmpty();
+        _db.DeleteEmptyTeam("Nobody Left").Should().BeFalse();
+        Count("SELECT COUNT(*) FROM player_teams WHERE team_name = 'Nobody Left'").Should().Be(1);
+    }
 }
