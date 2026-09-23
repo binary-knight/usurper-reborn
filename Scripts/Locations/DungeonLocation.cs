@@ -16645,6 +16645,7 @@ public class DungeonLocation : BaseLocation
             if (playerJoins)
             {
                 long playerDmg = player.Strength + player.WeapPow + dungeonRandom.Next(50);
+                playerDmg = TeamHQBonus.ApplyAttack(player, playerDmg); // v1.1.11: Team HQ Armory, last.
                 malachar.HP -= (int)playerDmg;
                 terminal.WriteLine(Loc.Get("quest.aldric_ghosts.player_strike", playerDmg), "bright_cyan");
             }

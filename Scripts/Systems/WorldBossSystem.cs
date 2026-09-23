@@ -878,6 +878,9 @@ namespace UsurperRemake.Systems
         private async Task RunWorldBossCombat(Character player, TerminalEmulator terminal,
             SqlSaveBackend backend, WorldBossInfo boss)
         {
+            // v1.1.11: read the team's HQ levels when the fight starts.
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                TeamHQBonus.RefreshLevels(player);
             string playerKey = RowKey(player);
             // v1.1.4: the re-entry cooldown is on the player's row (two minutes after a retreat or the
             // fifty-round rest, five after a fall). There is no lock: retreat, fall, and rest all re-enter.
@@ -1073,6 +1076,8 @@ namespace UsurperRemake.Systems
                         // for the single caller whose conditional status-flip won the race; other
                         // concurrent callers who bring remainingHp to 0 in the same round see
                         // wasKillingBlow == false (v0.57.9 fix for duplicate kill-credit bug).
+                        // v1.1.11: Team HQ Armory, after every modifier and before the ratio and the cap.
+                        roundDamage = TeamHQBonus.ApplyAttack(player, roundDamage);
                         long cap = WorldBossMath.RoundCap(state.BossMaxHP, currentBoss.Staggered);
                         long toApply = WorldBossMath.Applied(roundDamage, state.Ratio, cap);
                         var (remainingHp, wasKillingBlow, applied) = await backend.RecordWorldBossDamage(

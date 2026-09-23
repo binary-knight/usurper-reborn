@@ -8601,6 +8601,7 @@ public class CastleLocation : BaseLocation
                 // Team attacks (combined)
                 long teamDmg = Math.Max(1, teamPower - monsterDef);
                 teamDmg = (long)(teamDmg * (0.8 + random.NextDouble() * 0.4));
+                teamDmg = TeamHQBonus.ApplyAttack(currentPlayer, teamDmg); // v1.1.11: Team HQ Armory, last.
                 monsterHP -= teamDmg;
 
                 terminal.SetColor("bright_green");
@@ -8671,6 +8672,7 @@ public class CastleLocation : BaseLocation
 
                     long teamDmg = Math.Max(1, teamPower - guardDef);
                     teamDmg = (long)(teamDmg * (0.8 + random.NextDouble() * 0.4));
+                    teamDmg = TeamHQBonus.ApplyAttack(currentPlayer, teamDmg); // v1.1.11: Team HQ Armory, last.
                     guardHP -= teamDmg;
 
                     terminal.SetColor("bright_green");
@@ -8871,6 +8873,7 @@ public class CastleLocation : BaseLocation
             // Player attacks (accounts for weapon and armor power)
             long playerDamage = Math.Max(1, currentPlayer.Strength + currentPlayer.WeapPow - siegeKingDef - siegeKingArmPow);
             playerDamage = (long)(playerDamage * (0.8 + random.NextDouble() * 0.4));
+            playerDamage = TeamHQBonus.ApplyAttack(currentPlayer, playerDamage); // v1.1.11: Team HQ Armory, last.
             kingHP -= playerDamage;
 
             terminal.SetColor("bright_green");
