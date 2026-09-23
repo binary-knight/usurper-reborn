@@ -938,9 +938,9 @@ namespace UsurperRemake.Systems
                 IsActive = true,
                 CanSpeak = true,
                 Phrase = boss.LocIntro().Length > 0 ? boss.LocIntro()[0] : "",
-                // v1.1.11: the fight's victory pays nothing for the god; HandleBossDefeated pays the reward once
-                Experience = 0,
-                Gold = 0,
+                // the fight's victory pays this to the whole party; HandleBossDefeated adds the leader's reward
+                Experience = boss.Level * 2000,
+                Gold = boss.Level * 500,
             };
 
             // Set special abilities from phase 1 abilities for display
@@ -1380,10 +1380,6 @@ namespace UsurperRemake.Systems
             // line for line (artifact scaling, base difficulty scale, the Strength and Defence
             // splits), which a later edit to one could silently leave behind in the other.
             var noctura = CreateBossMonster(betrayalData);
-            // v1.1.11: the betrayal keeps its reward as it was: the fight's victory pays this, and the
-            // flat reward below is paid on top (CreateBossMonster now pays nothing for a god)
-            noctura.Experience = betrayalData.Level * 2000;
-            noctura.Gold = betrayalData.Level * 500;
 
             // Run combat
             terminal.Clear();

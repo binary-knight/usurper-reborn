@@ -1848,11 +1848,11 @@ public static partial class GameConfig
     // 1.25 as written). Capped here until the gods are retuned against the dialogue; the softer
     // answers (down to 0.50) are not capped.
     public const double OldGodDialogueBossDamageCap = 1.10;
-    // v1.1.11: an Old God kill paid its reward three times (the fight's victory, the god-defeated
-    // handler, and the dungeon again). It is paid once now, by the handler, at three times the old
-    // per-level amount, so a kill is worth what it was.
-    public const int OldGodDefeatXPPerLevel = 6000;
-    public const int OldGodDefeatGoldPerLevel = 1500;
+    // v1.1.11: an Old God kill paid the god-defeated handler's reward twice (the handler, then the dungeon
+    // again). The fight's own victory pays the god's Level x 2000 XP / x 500 gold, shared by the party as any
+    // victory is; the handler pays the leader this, once, so the leader's total stays what it was.
+    public const int OldGodDefeatXPPerLevel = 4000;
+    public const int OldGodDefeatGoldPerLevel = 1000;
     // v1.1.11: a player team is removed only after it has been seen empty this long (WorldSimService.PruneEmptyTeams)
     public const int EmptyTeamGraceMinutes = 30;
 

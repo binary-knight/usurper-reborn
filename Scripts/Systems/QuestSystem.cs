@@ -1526,7 +1526,7 @@ public partial class QuestSystem
         if (player == null || npc == null) return 0;
         // a target beaten but left alive does not meet an assassination contract (Codex review)
         long bounty = AutoCompleteBountyForNPC(player, npc.Name ?? npc.Name2 ?? "", includeKillContracts: killed);
-        OnNPCDefeated(player, npc);
+        OnNPCDefeated(player, npc, killed);
         return bounty;
     }
 
@@ -1534,7 +1534,7 @@ public partial class QuestSystem
     /// Update quest progress when player defeats an NPC (bounty system)
     /// Call this from StreetEncounterSystem and BaseLocation.ChallengeNPC when NPC is killed
     /// </summary>
-    public static void OnNPCDefeated(Character player, NPC defeatedNPC)
+    public static void OnNPCDefeated(Character player, NPC defeatedNPC, bool killed = true)
     {
         if (player == null || defeatedNPC == null) return;
 
@@ -1545,6 +1545,10 @@ public partial class QuestSystem
         var playerQuests = GetPlayerQuests(player.Name2);
         foreach (var quest in playerQuests)
         {
+            // v1.1.11: a target beaten and left alive does not meet an assassination contract, not even
+            // for a manual turn-in (review)
+            if (!killed && quest.QuestTarget == QuestTarget.Assassin) continue;
+
             // Check if this quest is a bounty targeting this specific NPC
             if (!string.IsNullOrEmpty(quest.TargetNPCName))
             {

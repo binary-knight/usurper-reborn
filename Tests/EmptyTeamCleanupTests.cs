@@ -174,4 +174,42 @@ public class EmptyTeamCleanupTests : IDisposable
         _db.DeleteEmptyTeam("Nobody Left").Should().BeFalse();
         Count("SELECT COUNT(*) FROM player_teams WHERE team_name = 'Nobody Left'").Should().Be(1);
     }
+
+    [Fact]
+    public void TheGracePeriod_IsLongEnoughToCoverAJoinAndItsSave()
+    {
+        // A join is saved within seconds, and a roster rebuild within a tick; 30 minutes is the margin the
+        // cleanup relies on before it treats a team as abandoned (review: nothing pinned it).
+        GameConfig.EmptyTeamGraceMinutes.Should().BeGreaterThanOrEqualTo(30);
+    }
+
+    [Fact]
+    public void ACharacterArchivedByPermadeath_StillKeepsItsTeam_UntilTheArchiveExpires()
+    {
+        Team("Fallen Hero");
+        Team("Long Gone");
+        Exec("INSERT INTO deleted_characters (username, display_name, player_data, expires_at) VALUES " +
+             "('hero', 'Hero', '{\"player\":{\"team\":\"Fallen Hero\"}}', datetime('now', '+6 days')), " +
+             "('ghost', 'Ghost', '{\"player\":{\"team\":\"Long Gone\"}}', datetime('now', '-1 days'));");
+        _db.GetTeamsWithoutPlayerMembers().Should().BeEquivalentTo(new[] { "Long Gone" }, "a restore within the window brings the member back");
+        _db.DeleteEmptyTeam("Fallen Hero").Should().BeFalse();
+        _db.DeleteEmptyTeam("Long Gone").Should().BeTrue();
+    }
+
+    [Fact]
+    public void TheJoinAndTheCleanup_HoldTheSameGate()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "Scripts"))) dir = dir.Parent;
+        string corner = File.ReadAllText(Path.Combine(dir!.FullName, "Scripts", "Locations", "TeamCornerLocation.cs"));
+        string sim = File.ReadAllText(Path.Combine(dir.FullName, "Scripts", "Systems", "WorldSimService.cs"));
+        int wait = corner.IndexOf("await TeamMembershipGate.Gate.WaitAsync();", StringComparison.Ordinal);
+        int verify = corner.IndexOf("await backend.VerifyPlayerTeam(teamName, password);", StringComparison.Ordinal);
+        int persist = corner.IndexOf("await PersistTeamMembershipChange();", verify, StringComparison.Ordinal);
+        int release = corner.IndexOf("TeamMembershipGate.Gate.Release();", verify, StringComparison.Ordinal);
+        wait.Should().BeGreaterThan(0);
+        verify.Should().BeGreaterThan(wait, "the check that the team exists is inside the gate");
+        release.Should().BeGreaterThan(persist, "and so is the save of the membership");
+        sim.Should().Contain("TeamMembershipGate.Gate.Wait();").And.Contain("removedNow = !IsTeamOnline(team) && sqlBackend.DeleteEmptyTeam(team);");
+    }
 }

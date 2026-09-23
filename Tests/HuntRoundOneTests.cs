@@ -57,26 +57,38 @@ public class HuntRoundOneTests
     }
 
     [Fact]
-    public async Task AnOldGodsFight_PaysNoEngineXP_NotEvenTheTenXPFloor()
+    public void EveryLiveRiderCaller_PassesTheArmoryBoostedHit()
     {
-        var data = UsurperRemake.Data.OldGodsData.GetGodBossData(OldGodType.Maelketh);
-        var god = (Monster)typeof(OldGodBossSystem).GetMethod("CreateBossMonster", F)!.Invoke(OldGodBossSystem.Instance, new object[] { data })!;
-        god.HP = 0;
-        var hero = new Character { Name1 = "godslayer", Name2 = "Godslayer", Class = CharacterClass.Warrior, Level = 30, HP = 5000, MaxHP = 5000, AutoLevelUp = false, CombatSpeed = CombatSpeed.Instant, MKills = 100 };
-        var result = new CombatResult { Player = hero, Outcome = CombatOutcome.Victory };
-        result.DefeatedMonsters.Add(god);
-        var engine = new CombatEngine(new TerminalEmulator(new ScriptedStream(string.Concat(Enumerable.Repeat("P\n", 40))), new MemoryStream()));
-        typeof(CombatEngine).GetField("currentPlayer", F)!.SetValue(engine, hero);
-        await (Task)typeof(CombatEngine).GetMethod("HandleVictoryMultiMonster", F)!.Invoke(engine, new object[] { result, false })!;
-        result.ExperienceGained.Should().Be(0, "HandleBossDefeated pays the god's reward, once");
+        string src = Source("Scripts/Systems/CombatEngine.cs");
+        Regex.Matches(src, @"ApplyPlayerSwingOnHitEffects\(player, \w+, TeamHQBonus\.ApplyAttack\(player, ").Count.Should().Be(3);
+        src.Should().Contain("ApplyPostHitEnchantments(player, offHandTarget, TeamHQBonus.ApplyAttack(player, ohDamage)");
+        src.Should().Contain("ApplyPostHitEnchantments(teammate, target, TeamHQBonus.ApplyAttack(teammate, damage)");
+        // riders that do not come from the hit take the Armory themselves
+        src.Should().Contain("enchantDamage = TeamHQBonus.ApplyAttack(player, enchantDamage);");
+        src.Should().Contain("Math.Max(1, TeamHQBonus.ApplyAttack(attacker, weapon.PoisonDamage))");
     }
 
     [Fact]
-    public void TheSwingRiders_ScaleFromTheArmoryBoostedHit()
+    public void ADuelDefenderFromASave_KeepsItsTeam_AndAnEchoDoesNot()
     {
-        var calls = Regex.Matches(Source("Scripts/Systems/CombatEngine.cs"), @"ApplyPlayerSwingOnHitEffects\(player, \w+, ([^,]+),");
-        calls.Count.Should().Be(3);
-        foreach (Match c in calls) c.Groups[1].Value.Should().Be("TeamHQBonus.ApplyAttack(player");
+        var data = new PlayerData { Name1 = "defender", Name2 = "Defender", Level = 30, MaxHP = 500, Team = "Iron Wolves" };
+        PlayerCharacterLoader.CreateFromSaveData(data, "Defender").Team.Should().Be("Iron Wolves");
+        PlayerCharacterLoader.CreateFromSaveData(data, "Defender", isEcho: true).Team.Should().Be("");
+    }
+
+    [Fact]
+    public void SparingAnAssassinationTarget_DoesNotMeetItsObjective()
+    {
+        var hunter = new Character { Name1 = "assassin_h", Name2 = "Assassin H", Level = 32 };
+        var target = new NPC { ID = "npc_contract_obj", Name1 = "Contract Obj", Name2 = "Contract Obj", Level = 30 };
+        var contract = new Quest { Title = "Contract", QuestTarget = QuestTarget.Assassin, Occupier = hunter.Name2, TargetNPCName = target.Name, Date = DateTime.Now, DaysToComplete = 30 };
+        contract.Objectives.Add(new QuestObjective(QuestObjectiveType.DefeatNPC, "Kill Contract Obj", 1, target.Name, target.Name));
+        QuestSystem.AddQuestToDatabase(contract);
+        QuestSystem.RecordNPCDefeat(hunter, target, killed: false);
+        contract.Objectives[0].IsComplete.Should().BeFalse("a manual turn-in must not accept a target who walked away");
+        contract.Deleted.Should().BeFalse();
+        QuestSystem.RecordNPCDefeat(hunter, target, killed: true);
+        contract.Deleted.Should().BeTrue("a kill meets it");
     }
 
     [Fact]

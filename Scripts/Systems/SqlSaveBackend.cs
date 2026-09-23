@@ -5560,10 +5560,13 @@ namespace UsurperRemake.Systems
                     return teams;
                 }
             }
+            // A character archived by permadeath can be restored within the window, so it is still a member (review).
             cmd.CommandText = @"
                 SELECT t.team_name FROM player_teams t
                 WHERE NOT EXISTS (SELECT 1 FROM players p
-                    WHERE (CASE WHEN json_valid(p.player_data) THEN json_extract(p.player_data, '$.player.team') END) = t.team_name);";
+                    WHERE (CASE WHEN json_valid(p.player_data) THEN json_extract(p.player_data, '$.player.team') END) = t.team_name)
+                AND NOT EXISTS (SELECT 1 FROM deleted_characters d WHERE d.expires_at > datetime('now')
+                    AND (CASE WHEN json_valid(d.player_data) THEN json_extract(d.player_data, '$.player.team') END) = t.team_name);";
             using var reader = cmd.ExecuteReader();
             while (reader.Read()) teams.Add(reader.GetString(0));
         }
@@ -5592,7 +5595,9 @@ namespace UsurperRemake.Systems
                     DELETE FROM player_teams WHERE team_name = @team
                     AND NOT EXISTS (SELECT 1 FROM players p
                         WHERE NOT json_valid(p.player_data)
-                        OR (CASE WHEN json_valid(p.player_data) THEN json_extract(p.player_data, '$.player.team') END) = @team);";
+                        OR (CASE WHEN json_valid(p.player_data) THEN json_extract(p.player_data, '$.player.team') END) = @team)
+                    AND NOT EXISTS (SELECT 1 FROM deleted_characters d WHERE d.expires_at > datetime('now')
+                        AND (CASE WHEN json_valid(d.player_data) THEN json_extract(d.player_data, '$.player.team') END) = @team);";
                 team.Parameters.AddWithValue("@team", teamName);
                 if (team.ExecuteNonQuery() != 1) return false;
             }

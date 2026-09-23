@@ -40,12 +40,14 @@ public class OldGodPayoutTests
     private static readonly BindingFlags F = BindingFlags.NonPublic | BindingFlags.Instance;
 
     [Fact]
-    public void TheGodsFight_PaysNothingForTheGod()
+    public void TheGodsFight_PaysTheGodsCombatRewardToTheParty()
     {
         var data = UsurperRemake.Data.OldGodsData.GetGodBossData(OldGodType.Maelketh);
         var god = (Monster)typeof(OldGodBossSystem).GetMethod("CreateBossMonster", F)!.Invoke(OldGodBossSystem.Instance, new object[] { data })!;
-        god.Experience.Should().Be(0, "the victory used to pay it on top of the handler");
-        god.Gold.Should().Be(0);
+        // the fight's victory shares this with grouped players and allies, as any victory does (review:
+        // zeroing it took their share away); the handler adds the leader's own reward once
+        god.Experience.Should().Be(data.Level * 2000);
+        god.Gold.Should().Be(data.Level * 500);
     }
 
     [Fact]
@@ -63,10 +65,11 @@ public class OldGodPayoutTests
     }
 
     [Fact]
-    public void TheOnePayout_IsThreeTimesTheOldPerLevelAmount()
+    public void TheLeadersReward_PlusTheFight_IsWhatAKillPaidBefore()
     {
-        GameConfig.OldGodDefeatXPPerLevel.Should().Be(3 * 2000);
-        GameConfig.OldGodDefeatGoldPerLevel.Should().Be(3 * 500);
+        // before: the fight (Level x 2000) + the handler (x 2000) + the dungeon repeating it (x 2000)
+        (2000 + GameConfig.OldGodDefeatXPPerLevel).Should().Be(3 * 2000);
+        (500 + GameConfig.OldGodDefeatGoldPerLevel).Should().Be(3 * 500);
     }
 
     [Fact]
@@ -78,9 +81,9 @@ public class OldGodPayoutTests
         var term = new TerminalEmulator(new ScriptedStream(new string('\n', 40)), new MemoryStream());
         var res = await (Task<BossEncounterResult>)typeof(OldGodBossSystem).GetMethod("HandleBossDefeated", F)!
             .Invoke(OldGodBossSystem.Instance, new object[] { player, data, term })!;
-        long expected = (long)Math.Round(data.Level * 6000 * 1.10);
+        long expected = (long)Math.Round(data.Level * 4000 * 1.10);
         player.Experience.Should().Be(expected);
-        player.Gold.Should().Be(data.Level * 1500);
+        player.Gold.Should().Be(data.Level * 1000);
         res.XPGained.Should().Be(expected, "reported for the screen, not paid again");
     }
 }

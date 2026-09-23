@@ -8633,9 +8633,11 @@ public partial class CombatEngine
 
         if (targetAlive && weapon.HasPoisonEnchant && random.NextDouble() < GameConfig.PoisonEnchantProcChance)
         {
-            int poisonValue = weapon.PoisonDamage > 0 ? weapon.PoisonDamage : (int)(damage * 0.10);
-            long poisonDamage = Math.Max(1, poisonValue);
-            target.HP = Math.Max(0, target.HP - poisonDamage); // hq-armory: out (post-hit rider)
+            // v1.1.11: a fixed PoisonDamage does not come from the (Armory-boosted) hit, so it takes the Armory itself
+            long poisonDamage = weapon.PoisonDamage > 0
+                ? Math.Max(1, TeamHQBonus.ApplyAttack(attacker, weapon.PoisonDamage))
+                : Math.Max(1, (int)(damage * 0.10));
+            target.HP = Math.Max(0, target.HP - poisonDamage); // hq-armory: out (percentage rider of the boosted hit; the fixed value applies it above)
             terminal.SetColor("green");
             // v0.60.10 (druidah report): attribute teammate procs by name (see frost note above).
             terminal.WriteLine(isPlayer
@@ -12793,7 +12795,8 @@ public partial class CombatEngine
             long shamanWeapPowMM = shamanWeaponMM?.WeaponPower ?? 0;
             long enchantDamage = (long)(shamanWeapPowMM * player.ShamanEnchantPower / 100.0);
             enchantDamage = Math.Max(1, enchantDamage);
-            target.HP -= (int)enchantDamage; // hq-armory: out (post-hit rider)
+            enchantDamage = TeamHQBonus.ApplyAttack(player, enchantDamage);   // v1.1.11: from weapon power, not the hit, so it takes the Armory itself
+            target.HP -= (int)enchantDamage;
             result.TotalDamageDealt += enchantDamage;
 
             string enchantMsg = player.ShamanEnchantType switch
@@ -14523,7 +14526,7 @@ public partial class CombatEngine
                 // Off-hand follow-up only procs its enchants if it actually connected; an evaded
                 // swing (Incorporeal/Phase) passes through for 0 damage and must not lifesteal.
                 if (await ApplySingleMonsterDamage(offHandTarget, ohDamage, result, "off-hand strike", player))
-                    ApplyPostHitEnchantments(player, offHandTarget, ohDamage, result, weaponSlot: EquipmentSlot.OffHand);
+                    ApplyPostHitEnchantments(player, offHandTarget, TeamHQBonus.ApplyAttack(player, ohDamage), result, weaponSlot: EquipmentSlot.OffHand);   // v1.1.11: riders scale from the boosted hit, as at every other caller
             }
         }
 
@@ -18362,7 +18365,7 @@ public partial class CombatEngine
                 // Apply post-hit enchantment effects only if the attack landed -- an evaded swing
                 // (Incorporeal/Phase) must not proc the teammate's lifesteal/enchants either.
                 if (tmLanded)
-                    ApplyPostHitEnchantments(teammate, target, damage, result, weaponSlot: isOffHandAttack ? EquipmentSlot.OffHand : EquipmentSlot.MainHand);
+                    ApplyPostHitEnchantments(teammate, target, TeamHQBonus.ApplyAttack(teammate, damage), result, weaponSlot: isOffHandAttack ? EquipmentSlot.OffHand : EquipmentSlot.MainHand);   // v1.1.11 (0 for NPCs)
 
                 // If target died, retarget to next weakest
                 if (!target.IsAlive)
@@ -20483,9 +20486,6 @@ public partial class CombatEngine
                 : Math.Max(0.25, 1.0 + levelDiff * 0.15);
             long expReward = (long)(baseExp * levelMultiplier);
             expReward = Math.Max(10, expReward); // Never less than 10 XP
-            // v1.1.11: an Old God's reward is paid once by OldGodBossSystem.HandleBossDefeated; its monster
-            // carries no XP, and the 10-XP floor must not pay it here (Codex review)
-            if (monster.FamilyName == "OldGod" && monster.Experience == 0) expReward = 0;
 
             // Calculate gold reward
             long goldReward = monster.Gold + random.Next(0, (int)Math.Min(int.MaxValue - 1L, (long)(monster.Gold * 0.5))); // v1.1.1: no int overflow on huge purses

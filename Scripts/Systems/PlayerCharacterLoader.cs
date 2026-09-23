@@ -16,6 +16,9 @@ public static class PlayerCharacterLoader
         {
             Name1 = playerData.Name1,
             Name2 = playerData.Name2 ?? displayName,
+            // v1.1.11: a duel defender fights with its own team's HQ levels (CombatEngine.PlayerVsPlayer reads
+            // them by team); without the team it had none (review). An echo is only a copy and keeps none.
+            Team = isEcho ? "" : (playerData.Team ?? ""),
             Level = playerData.Level,
             HP = playerData.MaxHP,
             MaxHP = playerData.MaxHP,
