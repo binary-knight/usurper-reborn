@@ -144,6 +144,8 @@ public class Monster
     public int MarkedDuration { get; set; } = 0;
     public bool IsFrozen { get; set; } = false;         // Frozen solid - cannot act
     public int FrozenDuration { get; set; } = 0;
+    public long PowerSurgeStrength { get; set; } = 0;   // v1.1.10: Strength a boss's power surge added, taken back when it ends
+    public int PowerSurgeRounds { get; set; } = 0;      // v1.1.10: boss rounds the surge has left
     public bool IsConfused { get; set; } = false;       // Confused - may skip or hit self
     public int ConfusedDuration { get; set; } = 0;
 

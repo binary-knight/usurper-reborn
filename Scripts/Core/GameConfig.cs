@@ -1837,6 +1837,12 @@ public static partial class GameConfig
     //     (1st = 100%, 2nd = 50%, 3rd = 25%, 4th+ = immune until the window resets).
     //   * Bosses and mini-bosses get a flat resist roll AND a hard duration cap.
     public const int StunImmunityRoundsAfterRecovery = 3;     // Rounds of immunity after a stun expires
+
+    // v1.1.10: an Old God's power surge (War Cry, Berserker Rage, Martial Law, Absolute Order,
+    // Entomb) lasts this many of the boss's rounds and a second cast while it lasts only renews it.
+    // It used to add 30 percent of the boss's attack for the rest of the fight, compounding with
+    // every cast, against its own comment ("a few rounds").
+    public const int BossPowerSurgeRounds = 3;
     public const int StunDRWindowRounds = 5;                  // Rounds of "no stun" before DR resets to 0
     public const int MaxStunDurationNormal = 3;               // Hard cap on stun duration vs normal monsters
     public const int MaxStunDurationBoss = 1;                 // Hard cap on stun duration vs bosses

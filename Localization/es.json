@@ -19078,6 +19078,8 @@
   "combat.you_take_damage_fmt": "  Recibes {0} de dano!",
   "combat.monster_heals": "  {0} se cura {1} PV!",
   "combat.monster_power_surges": "  El poder de {0} se intensifica! (+{1} de ataque)",
+  "combat.monster_power_surge_renewed": "  ¡El poder de {0} se renueva!",
+  "combat.monster_power_surge_fades": "  El arrebato de poder de {0} se desvanece.",
   "combat.calm_waters_deflects": "  El escudo de aguas tranquilas desvia {0}!",
   "combat.calm_waters_deflects_curse": "  El escudo de aguas tranquilas desvia la maldicion!",
   "combat.calm_waters_deflects_stun": "  El escudo de aguas tranquilas desvia el aturdimiento!",

@@ -19067,6 +19067,8 @@
   "combat.you_take_damage_fmt": "  Vous subissez {0} dégâts !",
   "combat.monster_heals": "  {0} récupère {1} PV !",
   "combat.monster_power_surges": "  La puissance de {0} explose ! (+{1} attaque)",
+  "combat.monster_power_surge_renewed": "  La puissance de {0} se ravive !",
+  "combat.monster_power_surge_fades": "  L'élan de puissance de {0} s'estompe.",
   "combat.calm_waters_deflects": "  Le bouclier d'eaux calmes dévie {0} !",
   "combat.calm_waters_deflects_curse": "  Le bouclier d'eaux calmes dévie la malédiction !",
   "combat.calm_waters_deflects_stun": "  Le bouclier d'eaux calmes dévie l'étourdissement !",

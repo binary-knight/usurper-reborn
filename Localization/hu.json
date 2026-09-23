@@ -19381,6 +19381,8 @@
   "combat.you_take_damage_fmt": "  {0} sebzést szenvedsz!",
   "combat.monster_heals": "  {0} gyógyul {1} HP-t!",
   "combat.monster_power_surges": "  {0} ereje megnő! (+{1} támadás)",
+  "combat.monster_power_surge_renewed": "  {0} ereje újra fellángol!",
+  "combat.monster_power_surge_fades": "  {0} erejének fellángolása elhalványul.",
   "combat.calm_waters_deflects": "  A nyugodt vizek pajzsa elhárítja: {0}!",
   "combat.calm_waters_deflects_curse": "  A nyugodt vizek pajzsa elhárítja az átkot!",
   "combat.calm_waters_deflects_stun": "  A nyugodt vizek pajzsa elhárítja a kábítást!",

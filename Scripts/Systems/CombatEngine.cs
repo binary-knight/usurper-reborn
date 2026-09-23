@@ -4611,6 +4611,13 @@ public partial class CombatEngine
         }
         monster.StatusTickedThisRound = true;
 
+        // v1.1.10 - an Old God's power surge ends after its rounds and takes its Strength with it.
+        // It counts down here, before any stun, sleep or fear can skip the boss's turn: a buff that
+        // paused while the boss was held would let the player's own control stretch its strongest
+        // rounds, and a stun-lock on a surging god would cost nothing.
+        if (firstActionThisRound && TickPowerSurge(monster))
+            terminal.WriteLine(Loc.Get("combat.monster_power_surge_fades", monster.Name), "gray");
+
         // v0.60.8: burn and poison tick INDEPENDENTLY. Pre-fix, both effects
         // shared the PoisonRounds counter and only one tick fired per round
         // based on the IsBurning flag -- so casting Roast (fire) on a poisoned
@@ -6092,9 +6099,21 @@ public partial class CombatEngine
             case "Absolute Order":
             case "Entomb":
             {
+                // v1.1.10: for a few rounds, as the comment says, and a second cast renews it rather
+                // than stacking. It used to be permanent and compound with every cast, so a long god
+                // fight turned into a wall the longer it ran.
+                terminal.WriteLine(Loc.Get("combat.monster_uses_ability", monster.Name, abilityName), "bright_red");
+                if (monster.PowerSurgeRounds > 0)
+                {
+                    monster.PowerSurgeRounds = GameConfig.BossPowerSurgeRounds;
+                    terminal.WriteLine(Loc.Get("combat.monster_power_surge_renewed", monster.Name), "red");
+                    result.CombatLog.Add($"{monster.Name} uses {abilityName} (attack buff renewed)");
+                    return true;
+                }
                 int buff = (int)(baseDamage * 0.3);
                 monster.Strength += buff;
-                terminal.WriteLine(Loc.Get("combat.monster_uses_ability", monster.Name, abilityName), "bright_red");
+                monster.PowerSurgeStrength = buff;
+                monster.PowerSurgeRounds = GameConfig.BossPowerSurgeRounds;
                 terminal.WriteLine(Loc.Get("combat.monster_power_surges", monster.Name, buff), "red");
                 result.CombatLog.Add($"{monster.Name} uses {abilityName} (attack buff +{buff})");
                 return true;
@@ -6289,6 +6308,20 @@ public partial class CombatEngine
             default:
                 return false; // Unknown ability, fall through to normal attack
         }
+    }
+
+    /// <summary>
+    /// v1.1.10: one boss round off a power surge; true when this round ended it (its Strength is
+    /// taken back then).
+    /// </summary>
+    internal static bool TickPowerSurge(Monster monster)
+    {
+        if (monster.PowerSurgeRounds <= 0) return false;
+        monster.PowerSurgeRounds--;
+        if (monster.PowerSurgeRounds > 0) return false;
+        monster.Strength = Math.Max(0, monster.Strength - monster.PowerSurgeStrength);
+        monster.PowerSurgeStrength = 0;
+        return true;
     }
 
     /// <summary>

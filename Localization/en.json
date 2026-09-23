@@ -19557,6 +19557,8 @@
   "combat.you_take_damage_fmt": "  You take {0} damage!",
   "combat.monster_heals": "  {0} heals {1} HP!",
   "combat.monster_power_surges": "  {0}'s power surges! (+{1} attack)",
+  "combat.monster_power_surge_renewed": "  {0}'s power surge is renewed!",
+  "combat.monster_power_surge_fades": "  {0}'s surge of power fades.",
   "combat.calm_waters_deflects": "  Calm waters shield deflects {0}!",
   "combat.calm_waters_deflects_curse": "  Calm waters shield deflects the curse!",
   "combat.calm_waters_deflects_stun": "  Calm waters shield deflects the stun!",
