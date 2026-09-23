@@ -11686,7 +11686,7 @@ public class DungeonLocation : BaseLocation
                 potions = player is Player pp ? pp.Healing : 0,
                 maxPotions = player is Player pp2 ? pp2.MaxPotions : 0,
                 gold = player.Gold,
-                healAmount = player.MaxHP / 4,
+                healAmount = TeamHQBonus.ApplyPotionHeal(player, player.MaxHP / 4), // v1.1.11: Infirmary
                 potionCost = 50 + (player.Level * 10),
                 teammates = memberData,
             });
@@ -11743,6 +11743,7 @@ public class DungeonLocation : BaseLocation
 
             // Calculate heal amount (potions heal 25% of max HP)
             long healAmount = player.MaxHP / 4;
+            healAmount = TeamHQBonus.ApplyPotionHeal(player, healAmount); // v1.1.11: Infirmary
 
             terminal.SetColor("white");
             terminal.WriteLine(Loc.Get("dungeon.options"));
@@ -12442,6 +12443,7 @@ public class DungeonLocation : BaseLocation
         // Calculate potions needed
         long missingHP = target.MaxHP - target.HP;
         int healPerPotion = 30 + player.Level * 5 + 20;
+        healPerPotion = (int)TeamHQBonus.ApplyPotionHeal(player, healPerPotion); // v1.1.11: the giver's Infirmary
         int potionsNeeded = (int)Math.Ceiling((double)missingHP / healPerPotion);
         potionsNeeded = Math.Min(potionsNeeded, (int)player.Healing);
 
@@ -12506,6 +12508,7 @@ public class DungeonLocation : BaseLocation
         {
             player.Healing--;
             int healAmount = 30 + player.Level * 5 + dungeonRandom.Next(10, 31);
+            healAmount = (int)TeamHQBonus.ApplyPotionHeal(player, healAmount); // v1.1.11: the giver's Infirmary
             target.HP = Math.Min(target.MaxHP, target.HP + healAmount);
         }
         long totalHeal = target.HP - oldHP;
@@ -12545,6 +12548,7 @@ public class DungeonLocation : BaseLocation
     private async Task HealEntireParty(Character player, List<Character> companions)
     {
         int healPerPotion = 30 + player.Level * 5 + 20;
+        healPerPotion = (int)TeamHQBonus.ApplyPotionHeal(player, healPerPotion); // v1.1.11: the giver's Infirmary
         int totalPotionsUsed = 0;
         long totalHealing = 0;
 
@@ -12628,6 +12632,7 @@ public class DungeonLocation : BaseLocation
                 player.Healing--;
                 totalPotionsUsed++;
                 int healAmount = 30 + player.Level * 5 + dungeonRandom.Next(10, 31);
+                healAmount = (int)TeamHQBonus.ApplyPotionHeal(player, healAmount); // v1.1.11: Infirmary
                 player.HP = Math.Min(player.MaxHP, player.HP + healAmount);
             }
             long healed = player.HP - oldHP;
@@ -12647,6 +12652,7 @@ public class DungeonLocation : BaseLocation
                     player.Healing--;
                     totalPotionsUsed++;
                     int healAmount = 30 + player.Level * 5 + dungeonRandom.Next(10, 31);
+                    healAmount = (int)TeamHQBonus.ApplyPotionHeal(player, healAmount); // v1.1.11: the giver's Infirmary
                     companion.HP = Math.Min(companion.MaxHP, companion.HP + healAmount);
                 }
                 long healed = companion.HP - oldHP;
@@ -12702,6 +12708,7 @@ public class DungeonLocation : BaseLocation
         // Use one potion
         player.Healing--;
         long healAmount = player.MaxHP / 4;
+        healAmount = TeamHQBonus.ApplyPotionHeal(player, healAmount); // v1.1.11: Infirmary, before the cap
         long oldHP = player.HP;
         player.HP = Math.Min(player.MaxHP, player.HP + healAmount);
         long actualHeal = player.HP - oldHP;
@@ -12741,6 +12748,7 @@ public class DungeonLocation : BaseLocation
         }
 
         long healAmount = player.MaxHP / 4;
+        healAmount = TeamHQBonus.ApplyPotionHeal(player, healAmount); // v1.1.11: Infirmary, so potionsNeeded matches
         int potionsNeeded = (int)Math.Ceiling((double)(player.MaxHP - player.HP) / healAmount);
         int potionsToUse = Math.Min(potionsNeeded, (int)player.Healing);
 
@@ -18653,6 +18661,7 @@ public class DungeonLocation : BaseLocation
         {
             long oldHP = player.HP;
             int healAmount = 30 + player.Level * 5 + Random.Shared.Next(10, 31);
+            healAmount = (int)TeamHQBonus.ApplyPotionHeal(player, healAmount); // v1.1.11: the follower's own Infirmary
             player.HP = Math.Min(player.MaxHP, player.HP + healAmount);
             long actualHeal = player.HP - oldHP;
             player.Healing--;
