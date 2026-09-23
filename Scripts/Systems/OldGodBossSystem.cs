@@ -425,7 +425,7 @@ namespace UsurperRemake.Systems
 
             // Show boss stats
             terminal.WriteLine($"  {Loc.Get("ui.level")}: {boss.Level}", "gray");
-            terminal.WriteLine($"  {Loc.Get("ui.stat_hp")}: {boss.HP:N0}", "red");
+            terminal.WriteLine($"  {Loc.Get("ui.stat_hp")}: {FightHP(boss):N0}", "red");   // v1.1.10: the fight's HP, not the data's
 
             // Warning for unenchanted weapons against gods with divine armor
             double divineArmor = GetDivineArmorReduction(boss.Type, player);
@@ -879,20 +879,31 @@ namespace UsurperRemake.Systems
         /// <summary>
         /// Create a Monster object from OldGodBossData for use with CombatEngine
         /// </summary>
+        /// <summary>
+        /// v1.1.10: the HP the god actually fights with: its data HP, the artifact scaling and the
+        /// base difficulty scale. The intro screen showed the data HP alone, 55,000 for Maelketh
+        /// against the 123,750 of the fight (player report of a god far harder than expected).
+        /// </summary>
+        internal static long FightHP(OldGodBossData boss)
+        {
+            int artifactCount = ArtifactSystem.Instance.GetCollectedCount();
+            float hpScale = 1.0f + Math.Min(0.40f, artifactCount * GameConfig.OldGodDivineScalingHPPerArtifact);
+            return (long)(boss.HP * hpScale * GameConfig.BaseMonsterDifficultyScale);
+        }
+
         private Monster CreateBossMonster(OldGodBossData boss)
         {
             // v0.56.1 Divine Scaling: remaining Old Gods scale up with every artifact the
             // player has collected. Prevents trivialization once geared — feedback explicitly
             // said Veloura onward became easy with a tank+healer plus artifacts.
             int artifactCount = ArtifactSystem.Instance.GetCollectedCount();
-            float hpScale = 1.0f + Math.Min(0.40f, artifactCount * GameConfig.OldGodDivineScalingHPPerArtifact);
             float dmgScale = 1.0f + Math.Min(0.20f, artifactCount * GameConfig.OldGodDivineScalingDamagePerArtifact);
 
             // Post-beta-launch baseline difficulty correction (15%): applied here as
             // well so Old Gods scale alongside regular monsters. Stacks multiplicatively
             // with the artifact-based Divine Scaling above.
             float baseScale = GameConfig.BaseMonsterDifficultyScale;
-            long scaledHP = (long)(boss.HP * hpScale * baseScale);
+            long scaledHP = FightHP(boss);
             long scaledStrength = (long)(boss.Strength * dmgScale * baseScale);
             long scaledDefence = (long)(boss.Defence * baseScale);
 
