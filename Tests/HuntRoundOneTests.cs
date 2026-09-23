@@ -102,4 +102,10 @@ public class HuntRoundOneTests
     {
         Source("Scripts/Systems/CombatEngine.cs").Should().Contain("foreach (var mate in teammates.ToList().Where(t => t is not NPC)) TeamHQBonus.RefreshLevels(mate);");
     }
+
+    [Fact]
+    public void TheCastleSiegeKing_HitsThroughTheBarracks()
+    {
+        Source("Scripts/Locations/CastleLocation.cs").Should().Contain("kingDamage = TeamHQBonus.ApplyDefense(currentPlayer, kingDamage);");
+    }
 }

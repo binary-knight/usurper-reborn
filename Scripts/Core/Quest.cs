@@ -55,6 +55,8 @@ public partial class Quest
     public string TitleKey { get; set; } = "";
     public List<string> TitleArgs { get; set; } = new();
     public string CommentKey { get; set; } = "";
+    /// <summary>v1.1.11: a Crown bounty posted on a player (PostBountyOnPlayer), not on an NPC.</summary>
+    public bool IsPlayerBounty { get; set; }
     public List<string> CommentArgs { get; set; } = new();
     public string InitiatorKey { get; set; } = "";
 

@@ -50,7 +50,7 @@ public class CharacterRecreationTests : IDisposable
     private static Quest Wanted(string target) => new Quest
     {
         Title = "WANTED: " + target, Initiator = "The Crown", QuestTarget = QuestTarget.DefeatNPC,
-        TargetNPCName = target, BountyGold = 5000, Date = DateTime.Now, DaysToComplete = 30
+        TargetNPCName = target, BountyGold = 5000, Date = DateTime.Now, DaysToComplete = 30, IsPlayerBounty = true
     };
 
     private static bool InDatabase(Quest q) => QuestSystem.GetAllQuests(includeCompleted: true).Contains(q);
@@ -284,8 +284,8 @@ public class CharacterRecreationTests : IDisposable
         finally { NPCSpawnSystem.Instance.ActiveNPCs.Remove(npc); npcBounty.Deleted = true; }
 
         // a bounty on a player carries no TitleKey and is removed
-        QuestSystem.IsBountyOnPlayer("The Crown", "", "Dorn", "Dorn").Should().BeTrue();
-        QuestSystem.IsBountyOnPlayer("The Crown", "quest.bounty.wanted", "Dorn", "Dorn").Should().BeFalse();
+        QuestSystem.IsBountyOnPlayer("The Crown", "", "Dorn", true, "Dorn").Should().BeTrue();
+        QuestSystem.IsBountyOnPlayer("The Crown", "quest.bounty.wanted", "Dorn", false, "Dorn").Should().BeFalse();
     }
 
     [Fact]
@@ -293,7 +293,7 @@ public class CharacterRecreationTests : IDisposable
     {
         PermadeathHelper.QuestLeftByCharacter(new QuestData { Occupier = "Bob" }, "Bob").Should().BeTrue();
         PermadeathHelper.QuestLeftByCharacter(new QuestData { OfferedTo = "bob" }, "Bob").Should().BeTrue();
-        PermadeathHelper.QuestLeftByCharacter(new QuestData { Initiator = "The Crown", TargetNPCName = "Bob" }, "Bob").Should().BeTrue();
+        PermadeathHelper.QuestLeftByCharacter(new QuestData { Initiator = "The Crown", TargetNPCName = "Bob", IsPlayerBounty = true }, "Bob").Should().BeTrue();
         PermadeathHelper.QuestLeftByCharacter(new QuestData { Occupier = "Alice" }, "Bob").Should().BeFalse("another player's quest stays");
 
         // review: a delete in a fresh process pushed its own (unloaded) quest list over everyone's
@@ -310,5 +310,43 @@ public class CharacterRecreationTests : IDisposable
         // review: a display name can be another account's key
         var purge = CodeOnly(Source("Systems", "PermadeathHelper.cs"));
         purge.Should().Contain("ForgetMember(username)").And.NotContain("ForgetMember(name)");
+    }
+
+    [Fact]
+    public void AMarkedPlayerBounty_IsRemoved_EvenWhenAnNPCSharesTheName()
+    {
+        // Review: the NPC-name guard also kept a real bounty on a player named like an NPC.
+        var npc = new NPC { ID = "npc_bounty_twin", Name1 = "Corvin", Name2 = "Corvin", Level = 20 };
+        var onPlayer = Wanted("Corvin");
+        QuestSystem.AddQuestToDatabase(onPlayer);
+        NPCSpawnSystem.Instance.ActiveNPCs.Add(npc);
+        try { QuestSystem.RemoveBountiesOnPlayer("Corvin").Should().Be(1); }
+        finally { NPCSpawnSystem.Instance.ActiveNPCs.Remove(npc); }
+        InDatabase(onPlayer).Should().BeFalse();
+    }
+
+    [Fact]
+    public void AnUnmarkedLegacyBounty_IsLeftAlone_WhileTheRosterIsIncomplete()
+    {
+        // Before the mark, NPC bounties could lack a TitleKey too; with no complete roster to rule out an
+        // NPC of that name, it is kept (review). The test roster holds a handful of NPCs, so it is not complete.
+        QuestSystem.IsBountyOnPlayer("The Crown", "", "Legacy Mark", false, "Legacy Mark").Should().BeFalse();
+
+        var spawner = NPCSpawnSystem.Instance;
+        var fillers = new System.Collections.Generic.List<NPC>();
+        for (int i = 0; i < 60; i++) fillers.Add(new NPC { ID = $"npc_legacy_filler_{i}", Name1 = $"Filler {i}", Name2 = $"Filler {i}", Level = 5 });
+        foreach (var f in fillers) spawner.ActiveNPCs.Add(f);
+        try { QuestSystem.IsBountyOnPlayer("The Crown", "", "Legacy Mark", false, "Legacy Mark").Should().BeTrue("a complete roster has no NPC of that name"); }
+        finally { foreach (var f in fillers) spawner.ActiveNPCs.Remove(f); }
+    }
+
+    [Fact]
+    public void ThePlayerBountyMark_SurvivesSaveAndLoad()
+    {
+        var engine = CodeOnly(Source("Systems", "OnlineStateManager.cs")) + CodeOnly(Source("Systems", "SaveSystem.cs"));
+        System.Text.RegularExpressions.Regex.Matches(engine, @"IsPlayerBounty = quest\.IsPlayerBounty").Count.Should().Be(2, "both writers carry it");
+        System.Text.RegularExpressions.Regex.Matches(CodeOnly(Source("Systems", "QuestSystem.cs")), @"IsPlayerBounty = questData\.IsPlayerBounty").Count.Should().Be(3, "all three readers carry it");
+        var json = System.Text.Json.JsonSerializer.Serialize(new QuestData { IsPlayerBounty = true });
+        System.Text.Json.JsonSerializer.Deserialize<QuestData>(json)!.IsPlayerBounty.Should().BeTrue();
     }
 }

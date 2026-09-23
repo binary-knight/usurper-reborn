@@ -468,7 +468,7 @@ namespace UsurperRemake.Systems
         public static bool QuestLeftByCharacter(QuestData q, string name) =>
             string.Equals(q.Occupier, name, StringComparison.OrdinalIgnoreCase) ||
             string.Equals(q.OfferedTo, name, StringComparison.OrdinalIgnoreCase) ||
-            (!QuestSystem.IsNPCName(name) && QuestSystem.IsBountyOnPlayer(q.Initiator, q.TitleKey, q.TargetNPCName, name));
+            QuestSystem.IsBountyOnPlayer(q.Initiator, q.TitleKey, q.TargetNPCName, q.IsPlayerBounty, name);
 
         /// <summary>
         /// v1.1.11: end the marriage of any NPC whose spouse was the deleted character, clearing the

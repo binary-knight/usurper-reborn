@@ -8886,6 +8886,7 @@ public class CastleLocation : BaseLocation
             // King attacks (accounts for weapon and armor power)
             long kingDamage = Math.Max(1, siegeKingStr + siegeKingWeapPow - currentPlayer.Defence - currentPlayer.ArmPow);
             kingDamage = (long)(kingDamage * (0.8 + random.NextDouble() * 0.4));
+            kingDamage = TeamHQBonus.ApplyDefense(currentPlayer, kingDamage);   // v1.1.11: Team HQ Barracks on the king's hits too
             playerHP -= kingDamage;
 
             terminal.SetColor("red");

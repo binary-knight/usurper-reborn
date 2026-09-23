@@ -1690,6 +1690,7 @@ namespace UsurperRemake.Systems
                     // bounties (king bounties + Slice 20 NPC-issued quests) couldn't
                     // track their target across a server restart.
                     TargetNPCName = quest.TargetNPCName ?? "",
+                    IsPlayerBounty = quest.IsPlayerBounty,
                     // v0.62.x Phase 4 (Mercenary board): faction-issued freelance contract fields.
                     IsMercContract = quest.IsMercContract,
                     IssuingFaction = quest.IssuingFaction.HasValue ? (int)quest.IssuingFaction.Value : -1,

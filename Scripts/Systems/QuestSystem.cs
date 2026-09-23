@@ -1122,6 +1122,7 @@ public partial class QuestSystem
                 OfferedTo = questData.OfferedTo,
                 Forced = questData.Forced,
                 TargetNPCName = questData.TargetNPCName ?? "",
+                IsPlayerBounty = questData.IsPlayerBounty,
                 Deleted = questData.Status == QuestStatus.Completed || questData.Status == QuestStatus.Failed || questData.Status == QuestStatus.Abandoned,
                 IsAbandoned = questData.Status == QuestStatus.Abandoned,
                 // v0.62.x Phase 4 (Mercenary board): restore faction-issued freelance contract fields.
@@ -1213,6 +1214,7 @@ public partial class QuestSystem
                 OfferedTo = questData.OfferedTo,
                 Forced = questData.Forced,
                 TargetNPCName = questData.TargetNPCName ?? "",
+                IsPlayerBounty = questData.IsPlayerBounty,
                 Deleted = questData.Status == QuestStatus.Completed || questData.Status == QuestStatus.Failed || questData.Status == QuestStatus.Abandoned,
                 IsAbandoned = questData.Status == QuestStatus.Abandoned,
                 // v0.62.x Phase 4 (Mercenary board): restore faction-issued freelance contract fields.
@@ -1290,8 +1292,8 @@ public partial class QuestSystem
     /// </summary>
     public static int RemoveBountiesOnPlayer(string? playerName)
     {
-        if (string.IsNullOrWhiteSpace(playerName) || IsNPCName(playerName)) return 0;
-        return questDatabase.RemoveAll(q => IsBountyOnPlayer(q.Initiator, q.TitleKey, q.TargetNPCName, playerName));
+        if (string.IsNullOrWhiteSpace(playerName)) return 0;
+        return questDatabase.RemoveAll(q => IsBountyOnPlayer(q.Initiator, q.TitleKey, q.TargetNPCName, q.IsPlayerBounty, playerName));
     }
 
     /// <summary>
@@ -1299,9 +1301,16 @@ public partial class QuestSystem
     /// NPC bounties always carry a TitleKey; player bounties never have (review: a character named after an
     /// NPC removed a bounty on that NPC).
     /// </summary>
-    public static bool IsBountyOnPlayer(string? initiator, string? titleKey, string? target, string playerName) =>
-        initiator == KING_BOUNTY_INITIATOR && string.IsNullOrEmpty(titleKey) &&
-        !string.IsNullOrEmpty(target) && target.Equals(playerName, StringComparison.OrdinalIgnoreCase);
+    public static bool IsBountyOnPlayer(string? initiator, string? titleKey, string? target, bool isPlayerBounty, string playerName)
+    {
+        if (initiator != KING_BOUNTY_INITIATOR || string.IsNullOrEmpty(target) || !target.Equals(playerName, StringComparison.OrdinalIgnoreCase))
+            return false;
+        if (isPlayerBounty) return true;   // marked since v1.1.11
+        // A bounty from before the mark: NPC bounties then could lack a TitleKey too, so it counts as a
+        // player's only when the NPC roster is complete and no NPC carries the name (review).
+        var spawner = NPCSpawnSystem.Instance;
+        return string.IsNullOrEmpty(titleKey) && spawner != null && spawner.IsRosterTrustworthy && !IsNPCName(playerName);
+    }
 
     /// <summary>v1.1.11: whether an NPC in the world carries this name.</summary>
     public static bool IsNPCName(string name) =>
@@ -1370,6 +1379,7 @@ public partial class QuestSystem
                 OfferedTo = questData.OfferedTo,
                 Forced = questData.Forced,
                 TargetNPCName = questData.TargetNPCName ?? "",
+                IsPlayerBounty = questData.IsPlayerBounty,
                 Deleted = questData.Status == QuestStatus.Completed || questData.Status == QuestStatus.Failed || questData.Status == QuestStatus.Abandoned,
                 IsAbandoned = questData.Status == QuestStatus.Abandoned,
                 // v0.62.x Phase 4 (Mercenary board): restore faction-issued freelance contract fields.
@@ -2218,7 +2228,8 @@ public partial class QuestSystem
             DaysToComplete = 30, // Long duration for player bounties
             BountyGold = bountyAmount,  // Actual gold amount (not limited by byte Reward)
             RewardType = QuestRewardType.Money,
-            TargetNPCName = playerName
+            TargetNPCName = playerName,
+            IsPlayerBounty = true   // v1.1.11
         };
 
         bounty.Objectives.Add(new QuestObjective(
