@@ -14,7 +14,9 @@ public static class MonsterGenerator
     /// Generate a monster for a specific dungeon level
     /// Uses monster families and balanced stat scaling
     /// </summary>
-    public static Monster GenerateMonster(int dungeonLevel, bool isBoss = false, bool isMiniBoss = false, Random? random = null)
+    /// <param name="approachScale">v1.1.10: extra HP and damage for a dungeon floor that leads up to an Old
+    /// God (OldGodApproachScale); 1.0 everywhere else. Defence is not scaled.</param>
+    public static Monster GenerateMonster(int dungeonLevel, bool isBoss = false, bool isMiniBoss = false, Random? random = null, double approachScale = 1.0)
     {
         random ??= Random.Shared;
 
@@ -25,7 +27,7 @@ public static class MonsterGenerator
         var (family, tier) = MonsterFamilies.GetMonsterForLevel(dungeonLevel, random);
 
         // Calculate base stats using smooth scaling formulas
-        var stats = CalculateMonsterStats(dungeonLevel, tier.PowerMultiplier, isBoss, isMiniBoss);
+        var stats = CalculateMonsterStats(dungeonLevel, tier.PowerMultiplier, isBoss, isMiniBoss, approachScale);
 
         // Generate monster name - mini-bosses get "Champion" suffix
         string monsterName = tier.Name;
@@ -227,7 +229,7 @@ public static class MonsterGenerator
     /// - Level 50 player (Str 100, Weap 100) deals ~400 damage -> Monster HP ~1200-2000
     /// - Level 100 player (Str 200, Weap 200) deals ~800 damage -> Monster HP ~2500-4000
     /// </summary>
-    private static MonsterStats CalculateMonsterStats(int level, float powerMultiplier, bool isBoss, bool isMiniBoss = false)
+    private static MonsterStats CalculateMonsterStats(int level, float powerMultiplier, bool isBoss, bool isMiniBoss = false, double approachScale = 1.0)
     {
         // v0.56.1 — separate HP/damage/defense multipliers so we can buff HP aggressively
         // without turning bosses into one-shot machines.
@@ -284,6 +286,18 @@ public static class MonsterGenerator
         punch = (long)(punch * baseScale);
         weaponPower = (long)(weaponPower * baseScale);
         armorPower = (long)(armorPower * baseScale);
+
+        // v1.1.10: the floors that lead up to an Old God grow gradually tougher, HP and damage only, so
+        // the god is not the first real fight in five floors (player report: the monsters on the way
+        // down went in one or two turns, then Mael'Keth killed three companions). Defence is left alone
+        // so a weaker party is warned, not walled.
+        if (approachScale != 1.0)
+        {
+            hp = (long)(hp * approachScale);
+            strength = (long)(strength * approachScale);
+            punch = (long)(punch * approachScale);
+            weaponPower = (long)(weaponPower * approachScale);
+        }
 
         // Apply server-wide SysOp HP multiplier
         hp = (long)(hp * GameConfig.MonsterHPMultiplier);
@@ -470,7 +484,26 @@ public static class MonsterGenerator
     /// Generate a group of monsters for an encounter
     /// Group size and composition based on dungeon level
     /// </summary>
-    public static List<Monster> GenerateMonsterGroup(int dungeonLevel, Random? random = null)
+    /// <summary>
+    /// v1.1.10: the HP and damage scale for regular monsters on a dungeon floor: 1.0, except on the
+    /// GameConfig.OldGodApproachFloors floors before an Old God's floor, where it rises by
+    /// GameConfig.OldGodApproachStepPerFloor a floor (1.05 five floors out to 1.25 on the floor
+    /// before the god). The god's own floor and every floor after it are 1.0.
+    /// </summary>
+    public static double OldGodApproachScale(int floor)
+    {
+        // a god's own floor is never scaled, even floor 95, which is also five floors before 100
+        if (Array.IndexOf(UsurperRemake.Systems.ProgressionRoadmap.OldGodFloors, floor) >= 0) return 1.0;
+        foreach (int godFloor in UsurperRemake.Systems.ProgressionRoadmap.OldGodFloors)
+        {
+            int before = godFloor - floor;
+            if (before >= 1 && before <= GameConfig.OldGodApproachFloors)
+                return 1.0 + GameConfig.OldGodApproachStepPerFloor * (GameConfig.OldGodApproachFloors + 1 - before);
+        }
+        return 1.0;
+    }
+
+    public static List<Monster> GenerateMonsterGroup(int dungeonLevel, Random? random = null, double approachScale = 1.0)
     {
         random ??= Random.Shared;
         var monsters = new List<Monster>();
@@ -482,7 +515,7 @@ public static class MonsterGenerator
         // These are named champions that always drop equipment loot
         if (random.NextDouble() < 0.10)
         {
-            monsters.Add(GenerateMonster(dungeonLevel, isBoss: false, isMiniBoss: true, random: random));
+            monsters.Add(GenerateMonster(dungeonLevel, isBoss: false, isMiniBoss: true, random: random, approachScale: approachScale));
             return monsters;
         }
 
@@ -506,7 +539,7 @@ public static class MonsterGenerator
 
             for (int i = 0; i < groupSize; i++)
             {
-                var stats = CalculateMonsterStats(dungeonLevel, tier.PowerMultiplier, false);
+                var stats = CalculateMonsterStats(dungeonLevel, tier.PowerMultiplier, false, false, approachScale);
 
                 var monster = Monster.CreateMonster(
                     nr: dungeonLevel,
@@ -571,7 +604,7 @@ public static class MonsterGenerator
             // Mixed family encounter
             for (int i = 0; i < groupSize; i++)
             {
-                monsters.Add(GenerateMonster(dungeonLevel, isBoss: false, isMiniBoss: false, random: random));
+                monsters.Add(GenerateMonster(dungeonLevel, isBoss: false, isMiniBoss: false, random: random, approachScale: approachScale));
             }
         }
 

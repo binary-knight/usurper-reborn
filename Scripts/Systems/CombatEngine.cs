@@ -439,6 +439,7 @@ public partial class CombatEngine
         c.MagicACBonus = 0;
         c.DodgeNextAttack = false;
         c.HasBloodlust = false;
+        c.TempCritChanceBonus = 0;
         c.HasStatusImmunity = false; c.StatusImmunityDuration = 0;
         c.DeathsEmbraceActive = false;
         c.StatusLifestealPercent = 0;
@@ -456,10 +457,68 @@ public partial class CombatEngine
     // NPC defenders (sleeping NPCs, the king), so repeated disarms drove them to zero.
     private readonly Dictionary<Character, long> _pvpDisarmedWeapPow = new();
 
+    // v1.1.10: hard control in a duel follows the rules a monster stun already has. Before this a
+    // stun, sleep or freeze in PvP landed every time, a new cast replaced the clock, and nothing
+    // stopped one fighter keeping the other unable to act for a whole fight (player report on
+    // freeze: "pretty much an autowin"). Per fighter, for this duel only.
+    private sealed class PvPControlState { public int ImmuneRounds; public int RecentCount; public int RoundsSinceLast; public bool Held; }
+    private readonly Dictionary<Character, PvPControlState> _pvpControl = new();
+    // v1.1.10: the fighters whose turn has come this duel round. A hold put on one of them ticks once
+    // at the end of this round before it can cost a turn (Codex round 7).
+    private readonly HashSet<Character> _pvpTurnTakenThisRound = new();
+
+    private static bool IsHeld(Character c) => c.ActiveStatuses.Keys.Any(s => s.PreventsAction() && s != StatusEffect.Charmed);
+
+    /// <summary>
+    /// v1.1.10: applies a turn-skipping status in PvP under the monster-stun rules: no new one while
+    /// one holds, GameConfig.StunImmunityRoundsAfterRecovery rounds of immunity after it ends,
+    /// diminishing returns (full, half, quarter, then immune until StunDRWindowRounds pass without
+    /// one), and a cap of GameConfig.MaxStunDurationNormal rounds. True when it landed.
+    /// </summary>
+    internal bool TryApplyPvPControl(Character target, StatusEffect status, int requestedDuration)
+    {
+        if (!_pvpControl.TryGetValue(target, out var st)) _pvpControl[target] = st = new PvPControlState();
+        if (IsHeld(target) || st.ImmuneRounds > 0 || st.RecentCount >= 3)
+        {
+            terminal.WriteLine(Loc.Get("combat.pvp_control_resisted", target.DisplayName), "gray");
+            return false;
+        }
+        int percent = st.RecentCount switch { 0 => 100, 1 => 50, _ => 25 };
+        int duration = Math.Min(GameConfig.MaxStunDurationNormal, Math.Max(1, (requestedDuration * percent + 99) / 100));
+        // a fighter who has already had this round's turn loses a round of the hold at the round's end,
+        // so it must be at least 2 to cost a turn; a shortened hold otherwise cost nothing and still
+        // gave the immunity (Codex round 7: the AI defender acts after the attacker)
+        if (_pvpTurnTakenThisRound.Contains(target)) duration = Math.Max(duration, 2);
+        target.ApplyStatus(status, duration);
+        st.RecentCount++;
+        st.RoundsSinceLast = 0;
+        st.Held = true;
+        return true;
+    }
+
+    /// <summary>v1.1.10: once per duel round, after statuses tick: start immunity when a hold ends, count the rest down.</summary>
+    internal void TickPvPControl(Character fighter)
+    {
+        if (!_pvpControl.TryGetValue(fighter, out var st)) return;
+        if (st.Held && !IsHeld(fighter))
+        {
+            // the round a hold ends was a held round: it starts the immunity and does not count as free
+            st.Held = false;
+            st.ImmuneRounds = GameConfig.StunImmunityRoundsAfterRecovery;
+            return;
+        }
+        if (st.ImmuneRounds > 0) st.ImmuneRounds--;
+        // the window is rounds with no hold: a held round does not count towards forgetting the last one
+        // (Codex review: counting held rounds, and then the round a hold ended, reset the returns early)
+        if (!IsHeld(fighter) && ++st.RoundsSinceLast >= GameConfig.StunDRWindowRounds) st.RecentCount = 0;
+    }
+
     private void EndPvPCombat(Character attacker, Character defender)
     {
         foreach (var kv in _pvpDisarmedWeapPow) kv.Key.WeapPow = kv.Value;
         _pvpDisarmedWeapPow.Clear();
+        _pvpControl.Clear();
+        _pvpTurnTakenThisRound.Clear();
         ConsumeCombatBuffs(attacker);
         ScrubTransientCombatState(attacker);
         ScrubTransientCombatState(defender);
@@ -590,10 +649,12 @@ public partial class CombatEngine
             // round; consumed only by OfferNPCSurrenderAsync.
             attacker.HpAtRoundStart = attacker.HP;
             defender.HpAtRoundStart = defender.HP;
+            _pvpTurnTakenThisRound.Clear();
 
             // Attacker's turn — check for status effects that prevent action
             if (attacker.IsAlive && defender.IsAlive)
             {
+                _pvpTurnTakenThisRound.Add(attacker);   // v1.1.10: a hold cast on them later this round
                 bool attackerCharmSkip = ResolvePvPCharm(attacker, isPlayer: true);
                 var preventingStatus = attacker.ActiveStatuses.Keys
                     .FirstOrDefault(s => s.PreventsAction() && s != StatusEffect.Charmed);
@@ -631,6 +692,7 @@ public partial class CombatEngine
             // Skip if attacker fled — no retaliation
             if (defender.IsAlive && attacker.IsAlive && !globalEscape && defender.AI == CharacterAI.Computer)
             {
+                _pvpTurnTakenThisRound.Add(defender);
                 bool defenderCharmSkip = ResolvePvPCharm(defender, isPlayer: false);
                 var defenderPreventing = defender.ActiveStatuses.Keys
                     .FirstOrDefault(s => s.PreventsAction() && s != StatusEffect.Charmed);
@@ -658,6 +720,8 @@ public partial class CombatEngine
                 terminal.WriteLine(msg, color);
             foreach (var (msg, color) in defender.ProcessStatusEffects())
                 terminal.WriteLine(msg, color);
+            TickPvPControl(attacker);   // v1.1.10
+            TickPvPControl(defender);
 
             // Process Shaman totem effects for both combatants
             if (attacker.ActiveTotemRounds > 0)
@@ -809,6 +873,9 @@ public partial class CombatEngine
         player.HasBloodlust = false;
         player.HasStatusImmunity = false;
         player.StatusImmunityDuration = 0;
+        player.TempCritChanceBonus = 0;
+        // v1.1.10: an Old God's dialogue bonuses go on after this reset, which used to wipe them
+        BossContext?.ApplyPlayerModifiers?.Invoke(player);
         player.DeathsEmbraceActive = false;
         player.StatusLifestealPercent = 0;
         // v0.56.0 tank ability buffs — reset per battle so they don't leak between fights
@@ -1644,7 +1711,7 @@ public partial class CombatEngine
                 foreach (var tm in result.Teammates) tm._hitsThisRound = 0;
 
             // Reset per-round status tick flag so boss multi-attacks don't tick statuses multiple times
-            foreach (var m in livingMonsters) m.StatusTickedThisRound = false;
+            foreach (var m in livingMonsters) { m.StatusTickedThisRound = false; m.PowerSurgeTickedThisRound = false; }
 
             foreach (var monster in livingMonsters)
             {
@@ -1666,6 +1733,9 @@ public partial class CombatEngine
                         terminal.WriteLine("");
                         terminal.SetColor("cyan");
                         terminal.WriteLine(Loc.Get("combat.boss_confused", monster.Name));
+                        // v1.1.10: a confused skip bypasses ProcessMonsterAction, so the surge ticks here
+                        if (TickPowerSurgeOncePerRound(monster))
+                            terminal.WriteLine(Loc.Get("combat.monster_power_surge_fades", monster.Name), "gray");
                         if (hasGroup)
                             BroadcastGroupCombatEvent(result,
                                 $"\u001b[36m  {monster.Name} hesitates, confused by internal contradictions!\u001b[0m");
@@ -1987,6 +2057,7 @@ public partial class CombatEngine
 
         // Clean up temporary combat buffs (matches single-monster/PvP cleanup)
         player.IsRaging = false;
+        player.TempCritChanceBonus = 0;   // v1.1.10
         player.TempAttackBonus = 0;
         player.TempAttackBonusDuration = 0;
         player.TempDefenseBonus = 0;
@@ -4611,6 +4682,13 @@ public partial class CombatEngine
         }
         monster.StatusTickedThisRound = true;
 
+        // v1.1.10 - an Old God's power surge ends after its rounds and takes its Strength with it.
+        // It counts down here, before any stun, sleep or fear can skip the boss's turn: a buff that
+        // paused while the boss was held would let the player's own control stretch its strongest
+        // rounds, and a stun-lock on a surging god would cost nothing.
+        if (TickPowerSurgeOncePerRound(monster))
+            terminal.WriteLine(Loc.Get("combat.monster_power_surge_fades", monster.Name), "gray");
+
         // v0.60.8: burn and poison tick INDEPENDENTLY. Pre-fix, both effects
         // shared the PoisonRounds counter and only one tick fired per round
         // based on the IsBurning flag -- so casting Roast (fire) on a poisoned
@@ -5548,7 +5626,7 @@ public partial class CombatEngine
         for (int i = 0; i < summonCount; i++)
         {
             long sHp = 40 + monster.Level * 3;
-            summons.Add(new Monster
+            summons.Add(WithDialogueDamage(new Monster
             {
                 Name = Loc.Get("combat.summoned_minion_name", monster.Name),
                 Level = Math.Max(1, monster.Level - 8),
@@ -5561,7 +5639,7 @@ public partial class CombatEngine
                 FamilyName = monster.FamilyName ?? "Summoned",
                 MonsterClass = monster.MonsterClass,
                 IsBoss = false, IsActive = true, CanSpeak = false
-            });
+            }));
         }
         monsterList.AddRange(summons);
         result.Monsters?.AddRange(summons);
@@ -6092,9 +6170,22 @@ public partial class CombatEngine
             case "Absolute Order":
             case "Entomb":
             {
-                int buff = (int)(baseDamage * 0.3);
-                monster.Strength += buff;
+                // v1.1.10: for a few rounds, as the comment says, and a second cast renews it rather
+                // than stacking. It used to be permanent and compound with every cast, so a long god
+                // fight turned into a wall the longer it ran.
                 terminal.WriteLine(Loc.Get("combat.monster_uses_ability", monster.Name, abilityName), "bright_red");
+                if (monster.PowerSurgeRounds > 0)
+                {
+                    monster.PowerSurgeRounds = GameConfig.BossPowerSurgeRounds;
+                    terminal.WriteLine(Loc.Get("combat.monster_power_surge_renewed", monster.Name), "red");
+                    result.CombatLog.Add($"{monster.Name} uses {abilityName} (attack buff renewed)");
+                    return true;
+                }
+                int buff = (int)(baseDamage * 0.3);
+                monster.PowerSurgeBase = monster.Strength;
+                monster.Strength += buff;
+                monster.PowerSurgeStrength = buff;
+                monster.PowerSurgeRounds = GameConfig.BossPowerSurgeRounds;
                 terminal.WriteLine(Loc.Get("combat.monster_power_surges", monster.Name, buff), "red");
                 result.CombatLog.Add($"{monster.Name} uses {abilityName} (attack buff +{buff})");
                 return true;
@@ -6221,7 +6312,7 @@ public partial class CombatEngine
                     for (int i = 0; i < count; i++)
                     {
                         long hp = 50 + monster.Level * 4;
-                        minions.Add(new Monster
+                        minions.Add(WithDialogueDamage(new Monster
                         {
                             Name = minionName,
                             Level = Math.Max(1, monster.Level - 10),
@@ -6233,7 +6324,7 @@ public partial class CombatEngine
                             MonsterColor = "dark_red",
                             FamilyName = "Summoned",
                             IsBoss = false, IsActive = true, CanSpeak = false
-                        });
+                        }));
                     }
                     monsterList.AddRange(minions);
                     result.Monsters.AddRange(minions);
@@ -6289,6 +6380,34 @@ public partial class CombatEngine
             default:
                 return false; // Unknown ability, fall through to normal attack
         }
+    }
+
+    /// <summary>
+    /// v1.1.10: one boss round off a power surge; true when this round ended it. Its Strength is taken
+    /// back in proportion (Strength x base / (base + surge)), not as a fixed amount, so a percentage
+    /// debuff that landed while it lasted (Hemlock, Deathbane) keeps its full effect afterwards
+    /// (Codex review: subtracting the fixed amount over-weakened the boss).
+    /// </summary>
+    internal static bool TickPowerSurge(Monster monster)
+    {
+        if (monster.PowerSurgeRounds <= 0) return false;
+        monster.PowerSurgeRounds--;
+        if (monster.PowerSurgeRounds > 0) return false;
+        long surged = monster.PowerSurgeBase + monster.PowerSurgeStrength;
+        monster.Strength = surged > 0
+            ? Math.Max(0, (long)Math.Round((double)monster.Strength * monster.PowerSurgeBase / surged))
+            : Math.Max(0, monster.Strength - monster.PowerSurgeStrength);
+        monster.PowerSurgeStrength = 0;
+        monster.PowerSurgeBase = 0;
+        return true;
+    }
+
+    /// <summary>v1.1.10: the surge's once-a-round tick, on whichever path the boss's round takes (including a confused skip).</summary>
+    internal static bool TickPowerSurgeOncePerRound(Monster monster)
+    {
+        if (monster.PowerSurgeTickedThisRound) return false;
+        monster.PowerSurgeTickedThisRound = true;
+        return TickPowerSurge(monster);
     }
 
     /// <summary>
@@ -6449,7 +6568,7 @@ public partial class CombatEngine
                 {
                     _manweSplitFormUsed = true;
                     long shadowHP = 25000;
-                    var shadow = new Monster
+                    var shadow = WithDialogueDamage(new Monster
                     {
                         Name = "Shadow of Manwe",
                         Level = 80,
@@ -6461,7 +6580,7 @@ public partial class CombatEngine
                         MonsterColor = "dark_magenta",
                         FamilyName = "Divine",
                         IsBoss = false, IsActive = true, CanSpeak = true
-                    };
+                    });
                     monsterList.Add(shadow);
                     result.Monsters.Add(shadow);
                     terminal.WriteLine("");
@@ -18895,7 +19014,7 @@ public partial class CombatEngine
         {
             // Cautious never starts a taunt, through the tank block or the random pool
             // (Thundering Roar is a Debuff with an aoe_taunt effect and would be drawn there).
-            var withoutTaunts = affordableAbilities.Where(a => a.SpecialEffect == null || !a.SpecialEffect.Contains("taunt")).ToList();
+            var withoutTaunts = affordableAbilities.Where(a => !IsTauntAbility(a)).ToList();
             if (withoutTaunts.Count < affordableAbilities.Count)
             {
                 SayWhyOnce(teammate, "combat.teammate_holds_taunt");
@@ -18924,9 +19043,11 @@ public partial class CombatEngine
             bool anyTaunted = livingMonsters.Any(m => !string.IsNullOrEmpty(m.TauntedBy) && m.TauntRoundsLeft > 0);
             if (!anyTaunted)
             {
-                // Prefer AoE taunt (Thundering Roar), then single taunt
-                var tauntAbility = affordableAbilities.FirstOrDefault(a => a.SpecialEffect == "aoe_taunt")
-                    ?? affordableAbilities.FirstOrDefault(a => a.SpecialEffect == "taunt");
+                // v1.1.10: a taunt that also protects the tank first (Shield Wall Formation, Divine
+                // Mandate, Rage Challenge, the Tidesworn stances), then the AoE taunt, then a single
+                // taunt. The picker used to look for "aoe_taunt" only, so a level-40 tank kept
+                // taunting bare with Thundering Roar and never raised its Formation.
+                var tauntAbility = OpeningTankMove(affordableAbilities);
                 if (tauntAbility != null && chosenAbility == null) // v1.2: never over a wounded teammate's shield
                     chosenAbility = tauntAbility; // v1.1.3: a Cautious ally's taunts were filtered out above
             }
@@ -19409,6 +19530,106 @@ public partial class CombatEngine
     /// <summary>
     /// Handle monster attacking a companion instead of the player
     /// </summary>
+    /// <summary>
+    /// v1.1.10: a creature summoned in an Old God fight hits as the god's dialogue answer says the god
+    /// does (BossCombatContext.DialogueDamageFactor); its stats are set at summoning, not from the god's
+    /// (Codex round 6: Manwe's shadow, the spectral soldiers and other summons kept full strength).
+    /// </summary>
+    private Monster WithDialogueDamage(Monster summoned)
+    {
+        double factor = BossContext?.DialogueDamageFactor ?? 1.0;
+        if (factor != 1.0)
+        {
+            summoned.Strength = (long)(summoned.Strength * factor);
+            summoned.WeapPow = (long)(summoned.WeapPow * factor);
+        }
+        return summoned;
+    }
+
+    /// <summary>v1.1.10: taunts that also protect the taunter. Their effect names do not say "taunt".</summary>
+    private static readonly HashSet<string> ProtectiveTaunts = new()
+    {
+        "shield_wall_formation", "divine_mandate", "rage_challenge", "undertow", "abyssal_anchor", "eternal_vigil",
+    };
+
+    /// <summary>
+    /// v1.1.10: every ability that pulls monsters onto its user. A Cautious ally holds all of them; it
+    /// used to hold only the ones whose effect name said "taunt", so it still taunted with the six above.
+    /// </summary>
+    internal static bool IsTauntAbility(ClassAbilitySystem.ClassAbility a) =>
+        a.SpecialEffect != null && (a.SpecialEffect.Contains("taunt") || ProtectiveTaunts.Contains(a.SpecialEffect));
+
+    /// <summary>
+    /// v1.1.10: a tank ally's opening move while nothing is taunted. A taunt that also protects it is
+    /// taken at once; a bare taunt (Thundering Roar, or a single taunt) waits one turn behind Shield
+    /// Wall when the tank can raise it (player suggestion, maintainer decision 2026-09-23). The
+    /// defensive-spread rule drops Shield Wall from the choices while it is up, so the next turn
+    /// taunts.
+    /// </summary>
+    internal static ClassAbilitySystem.ClassAbility? OpeningTankMove(IEnumerable<ClassAbilitySystem.ClassAbility> affordable)
+    {
+        var list = affordable.ToList();
+        var taunt = PreferredTaunt(list);
+        if (taunt == null || ProtectiveTaunts.Contains(taunt.SpecialEffect ?? "")) return taunt;
+        return list.FirstOrDefault(a => a.Id == "shield_wall") ?? taunt;
+    }
+
+    /// <summary>v1.1.10: the taunt a tank ally opens with: one that also protects it, then the AoE taunt, then a single taunt.</summary>
+    internal static ClassAbilitySystem.ClassAbility? PreferredTaunt(IEnumerable<ClassAbilitySystem.ClassAbility> affordable)
+    {
+        var list = affordable.ToList();
+        return list.FirstOrDefault(a => ProtectiveTaunts.Contains(a.SpecialEffect ?? ""))
+            ?? list.FirstOrDefault(a => a.SpecialEffect == "aoe_taunt")
+            ?? list.FirstOrDefault(a => a.SpecialEffect == "taunt");
+    }
+
+    /// <summary>
+    /// v1.1.10: what a monster's special ability hit on a companion goes through after defence. It
+    /// used to skip the three things that protect a companion from a basic attack and the player
+    /// from the same ability: the lower boss cap in a fight's first rounds, the multi-hit
+    /// reduction (a special did not even count as a hit), and Shield Wall Formation. So a tank
+    /// that taunted four Gelatinous Cubes took four full Engulfs (player report: about 4,000
+    /// damage). The order is the basic attack's, so a special is never mitigated more than a basic
+    /// hit: the brace, the per-hit cap, the boss minimum, the multi-hit reduction, Formation, then
+    /// the Old God cap. The counter lives here too, so a basic hit after a special in the same round
+    /// is reduced as a second hit.
+    /// </summary>
+    private long MitigateCompanionAbilityHit(Monster monster, Character companion, long damage, CombatResult result)
+    {
+        if (companion.IsDefending) damage = Math.Max(1, damage / 2); // v1.2: brace covers specials and life drain too
+
+        double capPercent;
+        if (monster.IsBoss && result.CurrentRound <= GameConfig.BossFirstRoundsDamageCapRounds)
+            capPercent = GameConfig.BossFirstRoundsDamageCapPercent;
+        else if (monster.IsBoss)
+            capPercent = 0.85;
+        else
+            capPercent = 0.75;
+        long maxDmg = Math.Max(1, (long)(companion.MaxHP * capPercent));
+        if (damage > maxDmg) damage = maxDmg;
+        if (monster.IsBoss)
+            damage = Math.Max(damage, (long)(monster.Level * 1.5));
+
+        if (companion._hitsThisRound > 0)
+        {
+            double reduction = Math.Min(0.50, companion._hitsThisRound * 0.25);   // as the basic attack: 25% per extra hit, cap 50%
+            damage = Math.Max(1, (long)(damage * (1.0 - reduction)));
+        }
+        companion._hitsThisRound++;
+
+        if (companion.TempDamageReductionPercent > 0 && companion.TempDamageReductionDuration > 0 && damage > 1)
+        {
+            long reduced = (long)(damage * (companion.TempDamageReductionPercent / 100.0));
+            if (reduced > 0)
+            {
+                damage = Math.Max(1, damage - reduced);
+                terminal.WriteLine(Loc.Get("combat.shield_wall_formation_absorbs", reduced), "bright_cyan");
+            }
+        }
+
+        return CapTeammateDamageInOldGodFight(companion, damage);
+    }
+
     private async Task MonsterAttacksCompanion(Monster monster, Character companion, CombatResult result, List<Monster>? liveMonsterList = null)
     {
         // Check if companion will dodge (from Time Stop, abilities, etc.)
@@ -19454,14 +19675,7 @@ public partial class CombatEngine
                             terminal.SetColor("dark_gray");
                             terminal.WriteLine($"[{abilityResult.DirectDamage} damage vs {abilityDefense} defense]");
                         }
-                        // Cap ability damage per hit (same as player path)
-                        double abCapPct = monster.IsBoss ? 0.85 : 0.75;
-                        long abMaxDmg = Math.Max(1, (long)(companion.MaxHP * abCapPct));
-                        if (actualDmg > abMaxDmg) actualDmg = abMaxDmg;
-                        if (monster.IsBoss)
-                            actualDmg = Math.Max(actualDmg, (long)(monster.Level * 1.5));
-                        actualDmg = CapTeammateDamageInOldGodFight(companion, actualDmg);
-                        if (companion.IsDefending) actualDmg = Math.Max(1, actualDmg / 2); // v1.2: brace covers specials too
+                        actualDmg = MitigateCompanionAbilityHit(monster, companion, actualDmg, result);
                         RecordAllyHit(companion, actualDmg); // v1.1.3
                         companion.HP = Math.Max(0, companion.HP - actualDmg);
                         terminal.WriteLine($"{companion.DisplayName} takes {actualDmg} damage!", "red");
@@ -19487,14 +19701,7 @@ public partial class CombatEngine
                             terminal.SetColor("dark_gray");
                             terminal.WriteLine($"[{rawAbilityDmg} damage vs {abilityDefense} defense]");
                         }
-                        // Cap ability damage per hit
-                        double dmCapPct = monster.IsBoss ? 0.85 : 0.75;
-                        long dmMaxDmg = Math.Max(1, (long)(companion.MaxHP * dmCapPct));
-                        if (dmg > dmMaxDmg) dmg = dmMaxDmg;
-                        if (monster.IsBoss)
-                            dmg = Math.Max(dmg, (long)(monster.Level * 1.5));
-                        dmg = CapTeammateDamageInOldGodFight(companion, dmg);
-                        if (companion.IsDefending) dmg = Math.Max(1, dmg / 2); // v1.2: brace covers life drain too
+                        dmg = MitigateCompanionAbilityHit(monster, companion, dmg, result);
                         RecordAllyHit(companion, dmg); // v1.1.3
                         companion.HP = Math.Max(0, companion.HP - dmg);
                         if (abilityResult.LifeStealPercent > 0)
@@ -19590,22 +19797,11 @@ public partial class CombatEngine
                     // a separate beat from the followup attack.
                     await Task.Delay(GetCombatDelay(600));
                 }
-                else if (monster.IsBoss)
-                {
-                    // Old God abilities use custom names that don't match MonsterAbilities enum.
-                    // Generate direct damage so these thematic attacks still hurt companions.
-                    long bossDmg = (long)(monster.Level * 2) + random.Next(0, monster.Level);
-                    bossDmg = CapTeammateDamageInOldGodFight(companion, bossDmg);
-                    RecordAllyHit(companion, bossDmg); // v1.1.3
-                    companion.HP = Math.Max(0, companion.HP - bossDmg);
-                    terminal.SetColor("bright_red");
-                    terminal.WriteLine($"{monster.Name} unleashes {abilityName}!");
-                    terminal.SetColor("red");
-                    terminal.WriteLine($"{companion.DisplayName} takes {bossDmg} damage! ({companion.HP}/{companion.MaxHP} HP)");
-                    result.CombatLog.Add($"{monster.Name} uses {abilityName} on {companion.DisplayName} for {bossDmg}");
-                    await Task.Delay(GetCombatDelay(800));
-                    if (companion.IsAlive) return;
-                }
+                // v1.1.10: an Old God's own named abilities (War Cry, Shield Bash and the rest) are
+                // written against the player and are not MonsterAbilities, so aimed at a companion
+                // they used to become a flat poke of about twice the god's level, which used up the
+                // god's action and never showed the real ability. Now the god makes its normal attack
+                // on the companion instead (maintainer decision, 2026-09-23).
             }
         }
 
@@ -26570,8 +26766,8 @@ public partial class CombatEngine
         {
             case "lightning":
             case "stun":
-                target.ApplyStatus(StatusEffect.Stunned, duration);
-                terminal.WriteLine(Loc.Get("combat.is_stunned", target.DisplayName), "bright_yellow");
+                if (TryApplyPvPControl(target, StatusEffect.Stunned, duration))
+                    terminal.WriteLine(Loc.Get("combat.is_stunned", target.DisplayName), "bright_yellow");
                 break;
 
             case "poison":
@@ -26580,14 +26776,21 @@ public partial class CombatEngine
                 break;
 
             case "sleep":
-                target.ApplyStatus(StatusEffect.Sleeping, duration);
-                terminal.WriteLine($"{target.DisplayName} falls into a magical slumber!", "cyan");
+                if (TryApplyPvPControl(target, StatusEffect.Sleeping, duration))
+                    terminal.WriteLine($"{target.DisplayName} falls into a magical slumber!", "cyan");
                 break;
 
             case "freeze":
+                if (TryApplyPvPControl(target, StatusEffect.Frozen, duration))
+                    terminal.WriteLine(Loc.Get("combat.is_frozen", target.DisplayName), "bright_cyan");
+                break;
+
+            // v1.1.10: frost slows, as it does against a monster. Frost Touch and Ice Storm are the
+            // Magician's damage spells; in PvP only, their frost froze the target solid (a full lost
+            // turn), and one side could keep the other frozen for a whole fight (player report).
             case "frost":
-                target.ApplyStatus(StatusEffect.Frozen, duration);
-                terminal.WriteLine(Loc.Get("combat.is_frozen", target.DisplayName), "bright_cyan");
+                target.ApplyStatus(StatusEffect.Slow, duration);
+                terminal.WriteLine(Loc.Get("combat.is_slowed", target.DisplayName), "gray");
                 break;
 
             case "fear":
@@ -26719,8 +26922,8 @@ public partial class CombatEngine
                 break;
 
             case "temporal":
-                target.ApplyStatus(StatusEffect.Stunned, 2);
-                terminal.WriteLine(Loc.Get("combat.trapped_time_loop", target.DisplayName), "bright_cyan");
+                if (TryApplyPvPControl(target, StatusEffect.Stunned, 2))
+                    terminal.WriteLine(Loc.Get("combat.trapped_time_loop", target.DisplayName), "bright_cyan");
                 break;
         }
     }
@@ -28592,7 +28795,7 @@ public partial class CombatEngine
                 IsActive = true,
                 CanSpeak = false
             };
-            soldiers.Add(soldier);
+            soldiers.Add(WithDialogueDamage(soldier));
         }
 
         terminal.WriteLine("");
@@ -30555,6 +30758,8 @@ public class BossCombatContext
     public bool HasRageBoost { get; set; }
     public bool HasInsight { get; set; }
     public double BossDamageMultiplier { get; set; } = 1.0;
+    /// <summary>v1.1.10: applies the player's dialogue bonuses; invoked after the fight-start reset.</summary>
+    public Action<Character>? ApplyPlayerModifiers { get; set; }
     public double BossDefenseMultiplier { get; set; } = 1.0;
     public bool BossConfused { get; set; }
     public bool BossWeakened { get; set; }
@@ -30567,6 +30772,8 @@ public class BossCombatContext
     public bool HasPhysicalImmunityPhase { get; set; }    // Boss has a physical immunity phase
     public bool HasMagicalImmunityPhase { get; set; }     // Boss has a magical immunity phase
     public int CorruptionDamagePerStack { get; set; }     // Damage per corruption stack per round
+    /// <summary>v1.1.10: the dialogue's god-damage factor, applied to anything the god summons during the fight.</summary>
+    public double DialogueDamageFactor { get; set; } = 1.0;
     public int DoomRounds { get; set; } = 3;              // Rounds before Doom kills
     public int ChannelFrequency { get; set; } = 0;        // Every N rounds boss channels (0 = never)
     public string ChannelAbilityName { get; set; } = "";  // Name of channeled ability

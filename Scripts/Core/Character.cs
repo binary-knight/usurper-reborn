@@ -312,6 +312,7 @@ public class Character
     public int TempAttackBonusDuration { get; set; } = 0;
     public int TempDefenseBonus { get; set; } = 0;
     public int TempDefenseBonusDuration { get; set; } = 0;
+    public int TempCritChanceBonus { get; set; } = 0;        // v1.1.10: percentage points for this fight (an Old God's dialogue); not saved
     public bool DodgeNextAttack { get; set; } = false;
 
     // Tank ability transient state (v0.56.0)

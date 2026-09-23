@@ -1081,32 +1081,88 @@ public class InnLocation : BaseLocation
             return;
         }
 
-        // Show NPCs with interaction options
-        int displayCount = Math.Min(npcsHere.Count, 8);
-        terminal.SetColor("white");
-        terminal.WriteLine($"{Loc.Get("inn.patrons_following")} ({displayCount})");
-        terminal.WriteLine("");
+        // v1.1.10: every patron is reachable. The list used to stop at the first eight, and its order
+        // never changes, so on a busy night the rest could not be spoken to at all, including the
+        // target of a contract (player report). Now it pages, a number counts across pages, a typed
+        // name finds someone, and the targets of your own contracts are listed first and marked.
+        var targets = QuestSystem.GetPlayerQuests(currentPlayer.Name2)
+            .Where(q => !string.IsNullOrEmpty(q.TargetNPCName))
+            .Select(q => q.TargetNPCName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        bool IsTarget(NPC n) => targets.Contains(n.Name2 ?? "");
+        var ordered = npcsHere.Where(IsTarget).Concat(npcsHere.Where(n => !IsTarget(n))).ToList();
 
-        for (int i = 0; i < displayCount; i++)
+        const int pageSize = 10;
+        var shown = ordered;
+        string? filter = null;
+        int pageIndex = 0;
+        while (true)
         {
-            var npc = npcsHere[i];
-            var alignColor = npc.Darkness > npc.Chivalry ? "red" : (npc.Chivalry > 500 ? "bright_green" : "cyan");
-            terminal.SetColor(alignColor);
-            terminal.WriteLine(IsScreenReader
-                ? $"  {i + 1}. {npc.Name2} - {Loc.Get("inn.npc_level_class", npc.Level, npc.ClassName)} ({GetAlignmentDisplay(npc)})"
-                : $"  [{i + 1}] {npc.Name2} - {Loc.Get("inn.npc_level_class", npc.Level, npc.ClassName)} ({GetAlignmentDisplay(npc)})");
-        }
+            int totalPages = Math.Max(1, (shown.Count + pageSize - 1) / pageSize);
+            pageIndex = Math.Clamp(pageIndex, 0, totalPages - 1);
+            var pageRows = shown.Skip(pageIndex * pageSize).Take(pageSize).ToList();
 
-        terminal.WriteLine("");
-        terminal.SetColor("bright_yellow");
-        terminal.WriteLine(IsScreenReader ? $"0. {Loc.Get("inn.return_to_menu")}" : $"[0] {Loc.Get("inn.return_to_menu")}");
-        terminal.WriteLine("");
+            terminal.ClearScreen();
+            WriteSectionHeader(Loc.Get("inn.mingle_patrons"), "cyan");
+            terminal.WriteLine("");
+            terminal.SetColor("white");
+            terminal.WriteLine(filter == null
+                ? $"{Loc.Get("inn.patrons_following")} ({shown.Count})"
+                : Loc.Get("inn.patrons_matching", filter));
+            terminal.WriteLine("");
 
-        var choice = await terminal.GetInput(Loc.Get("inn.choose_npc_prompt", displayCount));
+            for (int i = 0; i < pageRows.Count; i++)
+            {
+                var npc = pageRows[i];
+                int number = pageIndex * pageSize + i + 1;
+                var alignColor = npc.Darkness > npc.Chivalry ? "red" : (npc.Chivalry > 500 ? "bright_green" : "cyan");
+                string contract = IsTarget(npc) ? $" {Loc.Get("inn.patrons_contract")}" : "";
+                terminal.SetColor(alignColor);
+                terminal.WriteLine(IsScreenReader
+                    ? $"  {number}. {npc.Name2} - {Loc.Get("inn.npc_level_class", npc.Level, npc.ClassName)} ({GetAlignmentDisplay(npc)}){contract}"
+                    : $"  [{number}] {npc.Name2} - {Loc.Get("inn.npc_level_class", npc.Level, npc.ClassName)} ({GetAlignmentDisplay(npc)}){contract}");
+            }
 
-        if (int.TryParse(choice, out int npcIndex) && npcIndex > 0 && npcIndex <= displayCount)
-        {
-            await InteractWithNPC(npcsHere[npcIndex - 1]);
+            terminal.WriteLine("");
+            if (totalPages > 1)
+            {
+                terminal.SetColor("darkgray");
+                terminal.WriteLine(Loc.Get("team.recruit_page_footer", pageIndex * pageSize + 1, pageIndex * pageSize + pageRows.Count, shown.Count, pageIndex + 1, totalPages));
+            }
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine(IsScreenReader ? $"0. {Loc.Get("inn.return_to_menu")}" : $"[0] {Loc.Get("inn.return_to_menu")}");
+            terminal.WriteLine("");
+
+            string input = ((await terminal.GetInput(Loc.Get(totalPages > 1 ? "inn.patrons_nav_pages" : "inn.patrons_nav"))) ?? "").Trim();
+            // with a name filter on, an empty line goes back to everyone; otherwise it leaves
+            if (input.Length == 0 && filter != null) { shown = ordered; filter = null; pageIndex = 0; continue; }
+            if (input.Length == 0 || input == "0") return;
+            string upper = input.ToUpperInvariant();
+            if (upper == "N") { if (pageIndex + 1 < totalPages) pageIndex++; continue; }
+            if (upper == "P") { if (pageIndex > 0) pageIndex--; continue; }
+
+            if (int.TryParse(input, out int pick))
+            {
+                if (pick >= 1 && pick <= shown.Count) { await InteractWithNPC(shown[pick - 1]); return; }
+                terminal.SetColor("gray");
+                terminal.WriteLine(Loc.Get("inn.patrons_no_number", pick, shown.Count));
+                await terminal.PressAnyKey();
+                continue;
+            }
+
+            // A name, or the start of one: a single match goes straight to that patron.
+            var matches = ordered.Where(n => (n.Name2 ?? "").StartsWith(input, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (matches.Count == 0)
+                matches = ordered.Where(n => (n.Name2 ?? "").Contains(input, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (matches.Count == 1) { await InteractWithNPC(matches[0]); return; }
+            if (matches.Count == 0)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine(Loc.Get("inn.patrons_no_match", input));
+                await terminal.PressAnyKey();
+                continue;
+            }
+            shown = matches; filter = input; pageIndex = 0;
         }
     }
 

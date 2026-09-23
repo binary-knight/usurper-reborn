@@ -55,9 +55,15 @@ namespace UsurperRemake.Data
                 Name = "Maelketh, The Broken Blade",
                 Title = "God of War and Conquest",
                 Level = 28,           // Slightly above floor 25 - requires preparation
-                HP = 55000,           // God of War — challenging first boss, beatable with a party
-                MaxHP = 55000,
-                Strength = 420,       // Hits hard but survivable with good armor
+                // v1.1.10: retuned from 55000 HP / 420 Str (maintainer decision, 2026-09-23). At 55000 no live
+                // party below level 48 had won. Measured on this data with a level-32 Warrior at the live
+                // winners' median stats and a Paladin/Cleric/Assassin party in Epic loot (100 fights): it wins
+                // about 43% in a median 16 rounds, with 0.6 companion deaths a fight and the tank dying in 39%
+                // of fights (median round 11); a level-25 party and a level-32 player alone lost all 40 of
+                // theirs. CreateBossMonster multiplies HP and Str by 2.25.
+                HP = 22000,           // God of War: the first party-composition check
+                MaxHP = 22000,
+                Strength = 265,       // Two hits a round; about half land under the per-hit cap on a geared L32 player
                 Defence = 180,        // Reduced so players deal meaningful damage
                 Agility = 240,
                 AttacksPerRound = 2,

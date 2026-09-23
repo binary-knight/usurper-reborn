@@ -429,7 +429,13 @@ public static class StatEffectsSystem
     /// <summary>
     /// Roll for a critical hit
     /// </summary>
-    public static bool RollCriticalHit(Character attacker)
+    public static bool RollCriticalHit(Character attacker) => _random.Next(100) < CritChance(attacker);
+
+    /// <summary>
+    /// The crit chance RollCriticalHit rolls against, with every bonus stacked. v1.1.10: split out so
+    /// it can be read, and it now carries the fight's TempCritChanceBonus (an Old God's dialogue).
+    /// </summary>
+    internal static int CritChance(Character attacker)
     {
         // Apply drug DexterityBonus to effective DEX for crit calculation
         var drugEffects = DrugSystem.GetDrugEffects(attacker);
@@ -461,7 +467,11 @@ public static class StatEffectsSystem
         if (alignCrit > 0)
             critChance = Math.Clamp(critChance + alignCrit, 5, GetCriticalHitChanceCapped(attacker.Dexterity));
 
-        return _random.Next(100) < critChance;
+        // v1.1.10: this fight's bonus or penalty (an Old God's dialogue), under the same cap
+        if (attacker.TempCritChanceBonus != 0)
+            critChance = Math.Clamp(critChance + attacker.TempCritChanceBonus, 5, GetCriticalHitChanceCapped(attacker.Dexterity));
+
+        return critChance;
     }
 
     /// <summary>v0.61.0: helper to keep crit-cap logic in one place. Returns the DEX-scaled

@@ -5085,6 +5085,130 @@ namespace UsurperRemake.Systems
     }
 
     /// <summary>
+    /// v1.1.10: a team whose leader key (created_by) matches no character. Teams founded before
+    /// v1.1.10 recorded the founder's display name, lowercased; a dying NPC member's bequest is queued
+    /// under it, never delivered, and deleted by the orphan sweep. The saves hold no record of who
+    /// founded a team, so the admin console maps these one at a time (OnlineAdminConsole.FixTeamLeaders).
+    /// </summary>
+    public class TeamWithUnknownLeader
+    {
+        public string TeamName { get; set; } = "";
+        public string OldKey { get; set; } = "";
+        public List<PlayerSummary> Members { get; set; } = new();
+        public int QueuedBequests { get; set; }
+        /// <summary>Other teams with the same old key: what waits under it cannot be attributed to either.</summary>
+        public List<string> SharedWith { get; set; } = new();
+    }
+
+    /// <summary>v1.1.10: every team whose leader key matches no character, with its current members.</summary>
+    public async Task<List<TeamWithUnknownLeader>> GetTeamsWithUnknownLeader()
+    {
+        var teams = new List<TeamWithUnknownLeader>();
+        try
+        {
+            using (var connection = OpenConnection())
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = @"
+                    SELECT t.team_name, t.created_by,
+                           (SELECT COUNT(*) FROM pending_inheritance pi WHERE pi.player_username = t.created_by)
+                    FROM player_teams t
+                    WHERE t.created_by NOT IN (SELECT username FROM players)
+                    ORDER BY t.team_name;";
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                    teams.Add(new TeamWithUnknownLeader { TeamName = reader.GetString(0), OldKey = reader.GetString(1), QueuedBequests = reader.GetInt32(2) });
+            }
+            foreach (var team in teams)
+            {
+                team.Members = await GetPlayerTeamMembers(team.TeamName);
+                team.SharedWith = teams.Where(t => t.OldKey == team.OldKey && t.TeamName != team.TeamName).Select(t => t.TeamName).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to list teams with an unknown leader: {ex.Message}");
+        }
+        return teams;
+    }
+
+    /// <summary>
+    /// v1.1.10: sets a team's leader key to a character's save key, as confirmed by an admin. Only if
+    /// the team still has oldKey (nothing changed it meanwhile) and newKey is a character. Bequests
+    /// already queued under oldKey follow it; if another team still has oldKey they could be that
+    /// team's, so they are set aside for the sweep instead. newKey must be a current member of the team,
+    /// and oldKey must still match no character. True when the team was updated.
+    /// </summary>
+    public bool SetTeamLeaderKey(string teamName, string oldKey, string newKey) => SetTeamLeaderKey(teamName, oldKey, newKey, out _, out _);
+
+    /// <summary>As above; also says how many waiting bequests moved or were set aside, and which.</summary>
+    public bool SetTeamLeaderKey(string teamName, string oldKey, string newKey, out int bequests, out bool keyShared)
+    {
+        bequests = 0; keyShared = false;
+        try
+        {
+            using var connection = OpenConnection();
+            using var tx = connection.BeginTransaction();
+            using (var check = connection.CreateCommand())
+            {
+                check.Transaction = tx;
+                // a current member of the team only: a stranger who takes a founder's old name is not the leader
+                check.CommandText = "SELECT COUNT(*) FROM players WHERE username = @new AND (CASE WHEN json_valid(player_data) THEN json_extract(player_data, '$.player.team') END) = @team;";
+                check.Parameters.AddWithValue("@new", newKey);
+                check.Parameters.AddWithValue("@team", teamName);
+                if (Convert.ToInt32(check.ExecuteScalar()) != 1) return false;
+            }
+            using (var stillUnknown = connection.CreateCommand())
+            {
+                // a character registered under the old key since the screen was opened owns what waits under it
+                stillUnknown.Transaction = tx;
+                stillUnknown.CommandText = "SELECT COUNT(*) FROM players WHERE username = @old;";
+                stillUnknown.Parameters.AddWithValue("@old", oldKey);
+                if (Convert.ToInt32(stillUnknown.ExecuteScalar()) != 0) return false;
+            }
+            using (var team = connection.CreateCommand())
+            {
+                team.Transaction = tx;
+                team.CommandText = "UPDATE player_teams SET created_by = @new WHERE team_name = @team AND created_by = @old;";
+                team.Parameters.AddWithValue("@new", newKey);
+                team.Parameters.AddWithValue("@team", teamName);
+                team.Parameters.AddWithValue("@old", oldKey);
+                if (team.ExecuteNonQuery() != 1) return false;
+            }
+            using (var queued = connection.CreateCommand())
+            {
+                queued.Transaction = tx;
+                // Another team still has the old key: what waits under it could be either team's, so it is
+                // set aside under a key no character has, where the sweep removes it as it always did, and
+                // a later fix of the other team cannot take it (Codex review). Otherwise it follows the team.
+                queued.CommandText = @"
+                    UPDATE pending_inheritance
+                    SET player_username = CASE WHEN EXISTS (SELECT 1 FROM player_teams WHERE created_by = @old)
+                                               THEN '#shared-key:' || @old ELSE @new END
+                    WHERE player_username = @old;";
+                queued.Parameters.AddWithValue("@new", newKey);
+                queued.Parameters.AddWithValue("@old", oldKey);
+                bequests = queued.ExecuteNonQuery();
+            }
+            using (var shared = connection.CreateCommand())
+            {
+                shared.Transaction = tx;
+                shared.CommandText = "SELECT COUNT(*) FROM player_teams WHERE created_by = @old;";
+                shared.Parameters.AddWithValue("@old", oldKey);
+                keyShared = Convert.ToInt32(shared.ExecuteScalar()) > 0;
+            }
+            tx.Commit();
+            DebugLogger.Instance.LogInfo("SQL", $"Team '{teamName}' leader key set from '{oldKey}' to '{newKey}' by an admin");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to set the leader key of team '{teamName}': {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
     /// v0.61.5: Queue an item for delivery to a player on their next login.
     /// Used when a team NPC dies of old age — their belongings go to the team
     /// leader. Each call queues one item (or a gold amount when itemJson is null).
@@ -5108,6 +5232,33 @@ namespace UsurperRemake.Systems
         catch (Exception ex)
         {
             DebugLogger.Instance.LogError("SQL", $"Failed to queue inheritance for '{playerUsername}' from '{sourceNpcName}': {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// v1.1.10: queues a bequest for a team's leader, reading the leader key in the same statement, so
+    /// a leader key changed by an admin while an estate is being queued cannot leave rows under the
+    /// old key for the sweep (Codex review). False when the team does not exist or the write failed.
+    /// </summary>
+    public bool QueueTeamInheritance(string teamName, string sourceNpcName, string? itemJson, long goldAmount = 0)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"
+                INSERT INTO pending_inheritance (player_username, source_npc_name, item_json, gold_amount)
+                SELECT lower(created_by), @npc, @json, @gold FROM player_teams WHERE team_name = @team;";
+            cmd.Parameters.AddWithValue("@team", teamName);
+            cmd.Parameters.AddWithValue("@npc", sourceNpcName);
+            cmd.Parameters.AddWithValue("@json", itemJson ?? "");
+            cmd.Parameters.AddWithValue("@gold", goldAmount);
+            return cmd.ExecuteNonQuery() == 1;
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to queue inheritance for team '{teamName}' from '{sourceNpcName}': {ex.Message}");
             return false;
         }
     }
@@ -5343,7 +5494,8 @@ namespace UsurperRemake.Systems
                 FROM players p
                 LEFT JOIN online_players op ON LOWER(p.username) = LOWER(op.username)
                     AND op.last_heartbeat > datetime('now', '-120 seconds')
-                WHERE json_extract(p.player_data, '$.player.team') = @teamName
+                -- v1.1.10: one malformed save blob made json_extract throw for every team (Codex review)
+                WHERE (CASE WHEN json_valid(p.player_data) THEN json_extract(p.player_data, '$.player.team') END) = @teamName
                 AND p.player_data != '{}' AND LENGTH(p.player_data) > 2
                 AND p.is_banned = 0
                 AND p.username NOT LIKE 'emergency_%'
@@ -5399,7 +5551,7 @@ namespace UsurperRemake.Systems
             cmd.CommandText = @"
                 UPDATE player_teams SET member_count = (
                     SELECT COUNT(*) FROM players
-                    WHERE json_extract(player_data, '$.player.team') = @teamName
+                    WHERE (CASE WHEN json_valid(player_data) THEN json_extract(player_data, '$.player.team') END) = @teamName
                     AND player_data != '{}' AND LENGTH(player_data) > 2
                     AND is_banned = 0 AND username NOT LIKE 'emergency_%'
                 ) WHERE team_name = @teamName;

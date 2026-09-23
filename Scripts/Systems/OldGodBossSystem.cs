@@ -425,7 +425,7 @@ namespace UsurperRemake.Systems
 
             // Show boss stats
             terminal.WriteLine($"  {Loc.Get("ui.level")}: {boss.Level}", "gray");
-            terminal.WriteLine($"  {Loc.Get("ui.stat_hp")}: {boss.HP:N0}", "red");
+            terminal.WriteLine($"  {Loc.Get("ui.stat_hp")}: {FightHP(boss):N0}", "red");   // v1.1.10: the fight's HP, not the data's
 
             // Warning for unenchanted weapons against gods with divine armor
             double divineArmor = GetDivineArmorReduction(boss.Type, player);
@@ -815,10 +815,13 @@ namespace UsurperRemake.Systems
             var bossMonster = CreateBossMonster(boss);
 
             // Apply dialogue-based stat adjustments to the monster
-            ApplyModifiersToMonster(bossMonster);
+            ApplyModifiersToMonster(bossMonster, player);
+            if (AnnounceFightHP(bossMonster, boss, terminal))
+                await Task.Delay(1500);   // the fight clears the screen as it starts
 
-            // Apply player bonuses from dialogue
-            ApplyModifiersToPlayer(player);
+            // v1.1.10: the player's dialogue bonuses are applied by the combat engine after its
+            // fight-start reset (BossCombatContext.ApplyPlayerModifiers). Applied here, before the
+            // fight, the reset wiped every one of them, so no answer ever changed the player's side.
 
             // Set up boss context on combat engine
             var combatEngine = new CombatEngine(terminal);
@@ -839,10 +842,13 @@ namespace UsurperRemake.Systems
                 BossDefenseMultiplier = activeCombatModifiers.BossDefenseMultiplier,
                 BossConfused = activeCombatModifiers.BossConfused,
                 BossWeakened = activeCombatModifiers.BossWeakened,
+                ApplyPlayerModifiers = ApplyModifiersToPlayer,
             };
 
             // Configure boss-specific party balance mechanics (v0.52.1)
             ConfigureBossPartyMechanics(combatEngine.BossContext, boss.Type);
+
+            ApplyDialogueToFixedBossDamage(combatEngine.BossContext, player);
 
             // Set divine armor reduction on the combat context so CombatEngine applies it
             combatEngine.BossContext.DivineArmorReduction = GetDivineArmorReduction(boss.Type, player);
@@ -879,20 +885,31 @@ namespace UsurperRemake.Systems
         /// <summary>
         /// Create a Monster object from OldGodBossData for use with CombatEngine
         /// </summary>
+        /// <summary>
+        /// v1.1.10: the HP the god actually fights with: its data HP, the artifact scaling and the
+        /// base difficulty scale. The intro screen showed the data HP alone, 55,000 for Maelketh
+        /// against the 123,750 of the fight (player report of a god far harder than expected).
+        /// </summary>
+        internal static long FightHP(OldGodBossData boss)
+        {
+            int artifactCount = ArtifactSystem.Instance.GetCollectedCount();
+            float hpScale = 1.0f + Math.Min(0.40f, artifactCount * GameConfig.OldGodDivineScalingHPPerArtifact);
+            return (long)(boss.HP * hpScale * GameConfig.BaseMonsterDifficultyScale);
+        }
+
         private Monster CreateBossMonster(OldGodBossData boss)
         {
             // v0.56.1 Divine Scaling: remaining Old Gods scale up with every artifact the
             // player has collected. Prevents trivialization once geared — feedback explicitly
             // said Veloura onward became easy with a tank+healer plus artifacts.
             int artifactCount = ArtifactSystem.Instance.GetCollectedCount();
-            float hpScale = 1.0f + Math.Min(0.40f, artifactCount * GameConfig.OldGodDivineScalingHPPerArtifact);
             float dmgScale = 1.0f + Math.Min(0.20f, artifactCount * GameConfig.OldGodDivineScalingDamagePerArtifact);
 
             // Post-beta-launch baseline difficulty correction (15%): applied here as
             // well so Old Gods scale alongside regular monsters. Stacks multiplicatively
             // with the artifact-based Divine Scaling above.
             float baseScale = GameConfig.BaseMonsterDifficultyScale;
-            long scaledHP = (long)(boss.HP * hpScale * baseScale);
+            long scaledHP = FightHP(boss);
             long scaledStrength = (long)(boss.Strength * dmgScale * baseScale);
             long scaledDefence = (long)(boss.Defence * baseScale);
 
@@ -934,12 +951,77 @@ namespace UsurperRemake.Systems
         /// <summary>
         /// Apply dialogue-based modifiers to the boss monster's stats
         /// </summary>
-        private void ApplyModifiersToMonster(Monster monster)
+        /// <summary>
+        /// v1.1.10: how hard the god hits after the dialogue: its own damage answer divided by the
+        /// player's defence answer, the harsh side capped at GameConfig.OldGodDialogueBossDamageCap.
+        /// Applied to its stats and to the fixed damage of its scheduled AoE and channelled attacks.
+        /// </summary>
+        private double DialogueBossDamageFactor(Character player)
+        {
+            long defenceBase = Math.Max(1, player.Defence + player.ArmPow);
+            double playerDefence = Math.Max(0.1, activeCombatModifiers.DefenseMultiplier + (double)activeCombatModifiers.BonusDefense / defenceBase);
+            return Math.Min(activeCombatModifiers.BossDamageMultiplier / playerDefence, GameConfig.OldGodDialogueBossDamageCap);
+        }
+
+        /// <summary>
+        /// v1.1.10: the scheduled AoE, the channelled attacks and corruption deal fixed damage set by
+        /// ConfigureBossPartyMechanics, not damage from the god's stats, so the dialogue's god-damage
+        /// factor is applied to them as well (Codex review).
+        /// </summary>
+        private void ApplyDialogueToFixedBossDamage(BossCombatContext ctx, Character player)
+        {
+            double factor = DialogueBossDamageFactor(player);
+            if (factor == 1.0) return;
+            ctx.DialogueDamageFactor = factor;   // what the god summons hits the same way (Codex round 6)
+            // every fixed damage figure the context carries (Doom is a countdown to a kill, not damage)
+            ctx.AoEDamage = (int)Math.Round(ctx.AoEDamage * factor);
+            ctx.ChannelDamage = (int)Math.Round(ctx.ChannelDamage * factor);
+            ctx.CorruptionDamagePerStack = (int)Math.Round(ctx.CorruptionDamagePerStack * factor);
+        }
+
+        /// <summary>
+        /// v1.1.10: the intro shows the god's HP before the dialogue, and a damage answer then lowers it,
+        /// so when it has changed, say what the god enters the fight with (supervisor review).
+        /// </summary>
+        private static bool AnnounceFightHP(Monster bossMonster, OldGodBossData boss, TerminalEmulator terminal)
+        {
+            if (bossMonster.MaxHP == FightHP(boss)) return false;
+            terminal.WriteLine($"  {Loc.Get("old_god.enters_with_hp", boss.Name, $"{bossMonster.MaxHP:N0}")}", "red");
+            return true;
+        }
+
+        private void ApplyModifiersToMonster(Monster monster, Character player)
         {
             if (activeCombatModifiers.BossWeakened)
             {
                 monster.Strength = (long)(monster.Strength * 0.85);
                 monster.WeapPow = (long)(monster.WeapPow * 0.85);
+            }
+
+            // v1.1.10: the answer's effect on damage and defence is carried on the god, once, so every
+            // attack in the fight follows it; the combat engine has dozens of separate damage paths and a
+            // player-side bonus missed many of them (Codex review). The answer's own god-damage change
+            // (BossDamageMultiplier, read by nothing before) combines with the player's defence answer:
+            // +20% defence is the god hitting 1/1.2 as hard. The harsh side of that product is capped at
+            // GameConfig.OldGodDialogueBossDamageCap until the gods are retuned. The player's damage
+            // answer shortens the god's HP: +25% damage is the god having 1/1.25 of it. Both reach the
+            // whole party, not only the player.
+            // the fight recalculates the player's stats as it starts (dropping, say, a shrine's blessing);
+            // the flat answers below are converted against those stats, so recalculate first
+            player.RecalculateStats();
+            double bossDamage = DialogueBossDamageFactor(player);
+            if (bossDamage != 1.0)
+            {
+                monster.Strength = (long)(monster.Strength * bossDamage);
+                monster.WeapPow = (long)(monster.WeapPow * bossDamage);
+            }
+
+            long attackBase = Math.Max(1, player.Strength + player.WeapPow);
+            double playerDamage = Math.Max(0.1, activeCombatModifiers.DamageMultiplier + (double)activeCombatModifiers.BonusDamage / attackBase);
+            if (playerDamage != 1.0)
+            {
+                monster.MaxHP = Math.Max(1, (long)Math.Round(monster.MaxHP / playerDamage));
+                monster.HP = monster.MaxHP;
             }
 
             if (activeCombatModifiers.BossDefenseMultiplier != 1.0)
@@ -960,19 +1042,11 @@ namespace UsurperRemake.Systems
         /// </summary>
         private void ApplyModifiersToPlayer(Character player)
         {
-            if (activeCombatModifiers.DamageMultiplier > 1.0)
-            {
-                int bonus = (int)((activeCombatModifiers.DamageMultiplier - 1.0) * (player.Strength + player.WeapPow));
-                player.TempAttackBonus += bonus;
-                player.TempAttackBonusDuration = 999;
-            }
-
-            if (activeCombatModifiers.DefenseMultiplier > 1.0)
-            {
-                int bonus = (int)((activeCombatModifiers.DefenseMultiplier - 1.0) * (player.Defence + player.ArmPow));
-                player.TempDefenseBonus += bonus;
-                player.TempDefenseBonusDuration = 999;
-            }
+            // v1.1.10: called by the combat engine after its fight-start reset. The answer's damage and
+            // defence are carried on the god (ApplyModifiersToMonster), which every attack reaches;
+            // crit chance, bloodlust and insight belong to the player.
+            // CriticalChance is written as a total with 5% as the neutral base; the difference is the bonus
+            player.TempCritChanceBonus = (int)Math.Round((activeCombatModifiers.CriticalChance - 0.05) * 100);
 
             if (activeCombatModifiers.HasRageBoost)
             {
@@ -996,6 +1070,7 @@ namespace UsurperRemake.Systems
             player.TempDefenseBonus = 0;
             player.TempAttackBonusDuration = 0;
             player.TempDefenseBonusDuration = 0;
+            player.TempCritChanceBonus = 0;
         }
 
         /// <summary>
@@ -1298,44 +1373,10 @@ namespace UsurperRemake.Systems
                 await Task.Delay(2000);
             }
 
-            // Create Noctura as a monster for combat using the same pattern as CreateBossMonster
-            // v0.56.1: Apply Divine Scaling — Noctura is an Old God and should scale with artifacts too
-            int nocturaArtifactCount = ArtifactSystem.Instance.GetCollectedCount();
-            float nocturaHpScale = 1.0f + Math.Min(0.40f, nocturaArtifactCount * GameConfig.OldGodDivineScalingHPPerArtifact);
-            float nocturaDmgScale = 1.0f + Math.Min(0.20f, nocturaArtifactCount * GameConfig.OldGodDivineScalingDamagePerArtifact);
-            // Post-beta-launch baseline difficulty correction (15%): stacks with
-            // artifact-based Divine Scaling.
-            float nocturaBaseScale = GameConfig.BaseMonsterDifficultyScale;
-            long nocturaScaledHP = (long)(betrayalData.HP * nocturaHpScale * nocturaBaseScale);
-            long nocturaScaledStrength = (long)(betrayalData.Strength * nocturaDmgScale * nocturaBaseScale);
-            long nocturaScaledDefence = (long)(betrayalData.Defence * nocturaBaseScale);
-
-            long monsterStrength = nocturaScaledStrength / 2;
-            long monsterWeapPow = nocturaScaledStrength / 2;
-            int monsterDefence = (int)(nocturaScaledDefence / 2);
-            long monsterArmPow = nocturaScaledDefence / 2;
-
-            var noctura = new Monster
-            {
-                Name = betrayalData.Name,
-                Level = betrayalData.Level,
-                HP = nocturaScaledHP,
-                MaxHP = nocturaScaledHP,
-                Strength = monsterStrength,
-                WeapPow = monsterWeapPow,
-                Defence = monsterDefence,
-                ArmPow = monsterArmPow,
-                MagicRes = (int)(50 + betrayalData.Wisdom / 10),
-                MonsterColor = betrayalData.ThemeColor,
-                FamilyName = "OldGod",
-                IsBoss = true,
-                IsActive = true,
-                CanSpeak = true,
-                Phrase = betrayalData.LocIntro().Length > 0 ? betrayalData.LocIntro()[0] : "",
-                Experience = betrayalData.Level * 2000,
-                Gold = betrayalData.Level * 500,
-            };
-            noctura.SpecialAbilities = new List<string>(betrayalData.Phase1Abilities);
+            // v1.1.10: built by CreateBossMonster itself. It used to repeat that method's arithmetic
+            // line for line (artifact scaling, base difficulty scale, the Strength and Defence
+            // splits), which a later edit to one could silently leave behind in the other.
+            var noctura = CreateBossMonster(betrayalData);
 
             // Run combat
             terminal.Clear();
