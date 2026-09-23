@@ -108,4 +108,10 @@ public class HuntRoundOneTests
     {
         Source("Scripts/Locations/CastleLocation.cs").Should().Contain("kingDamage = TeamHQBonus.ApplyDefense(currentPlayer, kingDamage);");
     }
+
+    [Fact]
+    public void TheCastleSiege_ReadsTheTeamsCurrentLevels()
+    {
+        MethodBody(Source("Scripts/Locations/CastleLocation.cs"), "private async Task CastleSiegeMenu(").Should().Contain("TeamHQBonus.RefreshLevels(currentPlayer, backend);");
+    }
 }

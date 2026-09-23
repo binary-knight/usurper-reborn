@@ -1582,6 +1582,7 @@ public partial class QuestSystem
             // v1.1.11: a target beaten and left alive does not meet an assassination contract, not even
             // for a manual turn-in (review)
             if (!killed && quest.QuestTarget == QuestTarget.Assassin) continue;
+            if (quest.IsPlayerBounty) continue;   // v1.1.11: a bounty on a player, not on this NPC
 
             // Check if this quest is a bounty targeting this specific NPC
             if (!string.IsNullOrEmpty(quest.TargetNPCName))
@@ -1629,6 +1630,7 @@ public partial class QuestSystem
             !q.Deleted &&
             !string.IsNullOrEmpty(q.TargetNPCName) &&
             q.TargetNPCName.Equals(npcName, StringComparison.OrdinalIgnoreCase) &&
+            !q.IsPlayerBounty &&   // v1.1.11: beating an NPC never pays a bounty on a player of that name (review)
             (includeKillContracts || q.QuestTarget != QuestTarget.Assassin)
         ).ToList();
         foreach (var claimed in matchingBounties) claimed.Deleted = true;   // claimed for this payout
@@ -2200,15 +2202,15 @@ public partial class QuestSystem
         if (king == null) return;
 
         // Check if player already has an active bounty
+        // v1.1.11: only a bounty on this PLAYER is topped up; an NPC of the same name keeps its own (review)
         var existingBounty = questDatabase.FirstOrDefault(q =>
-            q.Initiator == KING_BOUNTY_INITIATOR &&
-            q.TargetNPCName == playerName &&
-            !q.Deleted);
+            !q.Deleted && IsBountyOnPlayer(q.Initiator, q.TitleKey, q.TargetNPCName, q.IsPlayerBounty, playerName));
 
         if (existingBounty != null)
         {
             // Increase existing bounty
             existingBounty.BountyGold += bountyAmount;
+            existingBounty.IsPlayerBounty = true;   // a legacy one is marked from now on
             existingBounty.Comment += $" {Loc.Get("quest.bounty.additional_charge", crime)}";
             NewsSystem.Instance?.Newsy(true, Loc.Get("quest.bounty_increased_news", playerName, existingBounty.BountyGold));
             return;

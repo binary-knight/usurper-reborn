@@ -349,4 +349,40 @@ public class CharacterRecreationTests : IDisposable
         var json = System.Text.Json.JsonSerializer.Serialize(new QuestData { IsPlayerBounty = true });
         System.Text.Json.JsonSerializer.Deserialize<QuestData>(json)!.IsPlayerBounty.Should().BeTrue();
     }
+
+    [Fact]
+    public void BeatingAnNPC_NeverPaysABountyOnAPlayerOfTheSameName()
+    {
+        // Review: the player could even collect the bounty on themselves by beating their NPC namesake.
+        var onPlayer = Wanted("Mirrow");
+        QuestSystem.AddQuestToDatabase(onPlayer);
+        var hunter = new Character { Name1 = "hunter_m", Name2 = "Hunter M", Level = 30 };
+        var namesake = new NPC { ID = "npc_mirrow", Name1 = "Mirrow", Name2 = "Mirrow", Level = 20 };
+        QuestSystem.RecordNPCDefeat(hunter, namesake, killed: true).Should().Be(0);
+        InDatabase(onPlayer).Should().BeTrue();
+        onPlayer.Deleted = true;
+    }
+
+    [Fact]
+    public void ANewChargeOnAPlayer_TopsUpTheirBounty_NotAnNPCsOfTheSameName()
+    {
+        var npcBounty = new Quest { Title = "WANTED: Sable", TitleKey = "quest.bounty.wanted", Initiator = "The Crown", TargetNPCName = "Sable", BountyGold = 1000, Date = DateTime.Now, DaysToComplete = 30 };
+        QuestSystem.AddQuestToDatabase(npcBounty);
+        try
+        {
+            QuestSystem.PostBountyOnPlayer("Sable", "theft", 700);
+            npcBounty.BountyGold.Should().Be(1000, "the NPC's bounty is not the player's");
+            var mine = QuestSystem.GetAllQuests(includeCompleted: true).Where(q => q.IsPlayerBounty && q.TargetNPCName == "Sable" && !q.Deleted).ToList();
+            if (CastleLocation.GetCurrentKing() != null) mine.Should().ContainSingle();   // posting needs a king
+            // the test world may have no king, so the selector is also pinned in the source
+            var src = CodeOnly(Source("Systems", "QuestSystem.cs"));
+            int post = src.IndexOf("public static void PostBountyOnPlayer(", StringComparison.Ordinal);
+            src.Substring(post, 900).Should().Contain("IsBountyOnPlayer(q.Initiator, q.TitleKey, q.TargetNPCName, q.IsPlayerBounty, playerName)");
+        }
+        finally
+        {
+            npcBounty.Deleted = true;
+            foreach (var q in QuestSystem.GetAllQuests(includeCompleted: true).Where(q => q.TargetNPCName == "Sable")) q.Deleted = true;
+        }
+    }
 }

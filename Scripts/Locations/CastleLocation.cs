@@ -8458,6 +8458,10 @@ public class CastleLocation : BaseLocation
             return;
         }
 
+        // v1.1.11: the team's current HQ levels; the siege fights outside CombatEngine, which reads them
+        // at a fight's start (review: a teammate's upgrade was not seen)
+        TeamHQBonus.RefreshLevels(currentPlayer, backend);
+
         // Must be on a team
         if (string.IsNullOrEmpty(currentPlayer.Team))
         {
