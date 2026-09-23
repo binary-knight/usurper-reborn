@@ -36,7 +36,8 @@ the same thread.
   counts for the whole party: a damage answer shortens the god's health and
   a defence answer changes how hard it and anything it summons hit. A harsh answer can make a god
   hit at most 10 percent harder until the gods are retuned; the softer
-  answers apply in full.
+  answers apply in full. The answer does not change the minimum damage a
+  god's blow always deals, or the ticks of a curse or other status.
 
 ## Companions
 
