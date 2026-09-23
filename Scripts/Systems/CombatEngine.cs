@@ -28371,10 +28371,14 @@ public partial class CombatEngine
                 else if (!SpellSystem.HasRequiredSpellWeapon(player))
                 {
                     var reqType = SpellSystem.GetSpellWeaponRequirement(player.Class);
-                    displayName = $"{spell.Name} (Need {reqType})";
+                    displayName = Loc.Get("combat.qb_need_weapon", spell.Name, reqType);
                 }
                 else if (!player.CanCastSpells())
-                    displayName = $"{spell.Name} (SILENCED)";
+                    displayName = Loc.Get("combat.qb_silenced", spell.Name);
+                else if (player.Mana < manaCost)
+                    // v1.1.11: say why it cannot be cast (player report: a new Magician read "unavailable" and
+                    // suspected the staff)
+                    displayName = Loc.Get("combat.qb_need_mana", spell.Name, manaCost, player.Mana);
                 else
                     displayName = $"{spell.Name} ({manaCost} MP)";
                 actions.Add(((i + 1).ToString(), slotId, displayName, canCast));
