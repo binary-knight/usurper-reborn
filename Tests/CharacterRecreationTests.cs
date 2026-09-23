@@ -218,7 +218,6 @@ public class CharacterRecreationTests : IDisposable
         var allowed = new System.Collections.Generic.Dictionary<string, string>
         {
             ["SaveSystem.cs"] = "DeleteSave: the backend call itself; its online callers purge first (N, D)",
-            ["CastleLocation.cs"] = "rebellion coin flip: deferred for 1.1.12 (it also passes the wrong key)",
         };
         var problems = new System.Collections.Generic.List<string>();
         foreach (var file in Directory.EnumerateFiles(Path.Combine(dir!.FullName, "Scripts"), "*.cs", SearchOption.AllDirectories))
@@ -237,6 +236,20 @@ public class CharacterRecreationTests : IDisposable
             }
         }
         problems.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TheRebellionCoinFlip_DeletesTheCharactersKey_AfterThePurge()
+    {
+        // It passed Name2.ToLower() as the key, which deleted 0 rows when the two differed.
+        var src = CodeOnly(Source("Locations", "CastleLocation.cs"));
+        int del = src.IndexOf("backend.DeleteGameData(username);", StringComparison.Ordinal);
+        del.Should().BeGreaterThan(0);
+        string before = src.Substring(Math.Max(0, del - 1200), 1200);
+        before.Should().Contain("string username = (!string.IsNullOrEmpty(sctx?.CharacterKey) ? sctx!.CharacterKey : sctx?.Username)");
+        before.Should().Contain("await PermadeathHelper.PurgeDeletedCharacterAsync(backend, username,");
+        before.Should().NotContain("Name2?.ToLowerInvariant() ?? currentPlayer.Name1");
+        before.IndexOf("PurgeDeletedCharacterAsync(", StringComparison.Ordinal).Should().BeGreaterThan(before.IndexOf("string username =", StringComparison.Ordinal));
     }
 
     [Fact]

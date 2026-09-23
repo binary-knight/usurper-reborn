@@ -453,6 +453,26 @@ namespace UsurperRemake.Systems
 
             try
             {
+                // v1.1.11: a deleted king abdicates through the normal path (history, NPC succession, persist)
+                string? shown = player?.DisplayName ?? (string.IsNullOrWhiteSpace(username) ? null : backend?.GetStoredDisplayName(username!));
+                if (global::CastleLocation.AbdicateDeletedKing(name, shown, "left the throne and the realm"))
+                    DebugLogger.Instance.LogInfo("DELETE", $"Deleted '{name}' held the throne; the reign has ended.");
+            }
+            catch (Exception tex) { DebugLogger.Instance.LogWarning("DELETE", $"Throne handover failed for '{name}': {tex.Message}"); }
+
+            try
+            {
+                // v1.1.11: NPC grudges naming the character. In memory, and in the shared npcs record
+                // edited in place (a world-sim reload would otherwise bring them back).
+                int forgotten = ForgetNpcGrudgesAgainst(name);
+                if (backend != null) forgotten += await RemoveSharedNpcGrudgesAsync(backend, name);
+                if (forgotten > 0)
+                    DebugLogger.Instance.LogInfo("DELETE", $"Dropped {forgotten} NPC grudge memory(ies) of deleted '{name}'.");
+            }
+            catch (Exception mex) { DebugLogger.Instance.LogWarning("DELETE", $"NPC grudge clear failed for '{name}': {mex.Message}"); }
+
+            try
+            {
                 int widowed = ClearNpcSpousesOf(name);
                 if (widowed > 0)
                     DebugLogger.Instance.LogInfo("DELETE", $"Cleared the marriage of {widowed} NPC(s) to deleted '{name}'.");
@@ -480,6 +500,76 @@ namespace UsurperRemake.Systems
             string.Equals(q.Occupier, name, StringComparison.OrdinalIgnoreCase) ||
             string.Equals(q.OfferedTo, name, StringComparison.OrdinalIgnoreCase) ||
             QuestSystem.IsBountyOnPlayer(q.Initiator, q.TitleKey, q.TargetNPCName, q.IsPlayerBounty, name);
+
+        /// <summary>v1.1.11: drop every live NPC's grudges against the name (MemorySystem.IsGrudge).</summary>
+        public static int ForgetNpcGrudgesAgainst(string? name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return 0;
+            var npcs = NPCSpawnSystem.Instance?.ActiveNPCs;
+            if (npcs == null) return 0;
+            int removed = 0;
+            foreach (var npc in npcs.ToList())
+            {
+                if (npc == null) continue;
+                var brainMemory = npc.Brain?.Memory;
+                if (brainMemory != null) removed += brainMemory.ForgetGrudgesAgainst(name!);
+                if (npc.Memory != null && !ReferenceEquals(npc.Memory, brainMemory)) removed += npc.Memory.ForgetGrudgesAgainst(name!);
+            }
+            return removed;
+        }
+
+        /// <summary>
+        /// v1.1.11: remove the grudges against the name from the npcs JSON, touching nothing else.
+        /// Returns the edited JSON, or null when nothing matched.
+        /// </summary>
+        public static string? RemoveGrudgesFromNpcJson(string json, string name, out int removed)
+        {
+            removed = 0;
+            if (string.IsNullOrWhiteSpace(json) || string.IsNullOrWhiteSpace(name)) return null;
+            if (System.Text.Json.Nodes.JsonNode.Parse(json) is not System.Text.Json.Nodes.JsonArray npcs) return null;
+            foreach (var npc in npcs)
+            {
+                if (npc?["memories"] is not System.Text.Json.Nodes.JsonArray memories) continue;
+                for (int i = memories.Count - 1; i >= 0; i--)
+                {
+                    var m = memories[i];
+                    if (m == null || !string.Equals(StringOf(m["involvedCharacter"]), name, StringComparison.OrdinalIgnoreCase)) continue;
+                    float impact = 0f;
+                    try { impact = m["emotionalImpact"]?.GetValue<float>() ?? 0f; } catch { }
+                    bool typed = Enum.TryParse<MemoryType>(StringOf(m["type"]), out var type);
+                    if ((typed && MemorySystem.IsGrudge(type, impact)) || (!typed && impact < 0f))
+                    {
+                        memories.RemoveAt(i);
+                        removed++;
+                    }
+                }
+            }
+            return removed > 0 ? npcs.ToJsonString() : null;
+        }
+
+        private static string StringOf(System.Text.Json.Nodes.JsonNode? node)
+        {
+            try { return node?.GetValue<string>() ?? ""; } catch { return ""; }
+        }
+
+        /// <summary>
+        /// v1.1.11: the shared npcs record, edited in place under its version (as RemoveSharedQuestsAsync
+        /// does for quests), never replaced by this process's list. Retries if another writer got in first.
+        /// </summary>
+        public static async Task<int> RemoveSharedNpcGrudgesAsync(SqlSaveBackend backend, string name)
+        {
+            for (int attempt = 0; attempt < 3; attempt++)
+            {
+                long version = backend.GetWorldStateVersion(OnlineStateManager.KEY_NPCS);
+                string? json = await backend.LoadWorldState(OnlineStateManager.KEY_NPCS);
+                if (string.IsNullOrEmpty(json)) return 0;
+                string? edited = RemoveGrudgesFromNpcJson(json, name, out int removed);
+                if (edited == null) return 0;
+                if (await backend.SaveWorldStateIfVersion(OnlineStateManager.KEY_NPCS, edited, version)) return removed;
+            }
+            DebugLogger.Instance.LogWarning("DELETE", $"Shared NPC grudges of '{name}' not cleared: the record kept changing.");
+            return 0;
+        }
 
         /// <summary>
         /// v1.1.11: end the marriage of any NPC whose spouse was the deleted character, clearing the

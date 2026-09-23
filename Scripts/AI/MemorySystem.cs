@@ -73,9 +73,12 @@ public partial class MemorySystem
         characterImpressions[characterId] = Math.Max(-1.0f, Math.Min(1.0f, characterImpressions[characterId]));
     }
     
-    private float CalculateImpressionChange(MemoryEvent memoryEvent)
+    private float CalculateImpressionChange(MemoryEvent memoryEvent) => ImpressionChangeFor(memoryEvent.Type);
+
+    /// <summary>v1.1.11: how a memory of this type moves the NPC's impression of the character.</summary>
+    public static float ImpressionChangeFor(MemoryType type)
     {
-        return memoryEvent.Type switch
+        return type switch
         {
             MemoryType.Attacked => -0.8f,
             MemoryType.Betrayed => -0.9f,
@@ -179,6 +182,31 @@ public partial class MemorySystem
             (characterId == null || m.InvolvedCharacter == characterId));
     }
     
+    /// <summary>
+    /// v1.1.11: a grudge or other negative memory about a character: a type that lowers the impression,
+    /// a family killing or a witnessed attack or theft, or any memory with a negative emotional impact.
+    /// </summary>
+    public static bool IsGrudge(MemoryType type, float emotionalImpact) =>
+        emotionalImpact < 0f || ImpressionChangeFor(type) < 0f ||
+        type is MemoryType.KilledMyParent or MemoryType.KilledMyFamily or MemoryType.WitnessedAttack or MemoryType.WitnessedTheft;
+
+    /// <summary>
+    /// v1.1.11: drop the grudges naming a deleted character (any letter case) and rebuild the impression
+    /// of that name from the memories that remain, so a same-name character is not hated for the old one.
+    /// </summary>
+    public int ForgetGrudgesAgainst(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return 0;
+        int removed = memories.RemoveAll(m => string.Equals(m.InvolvedCharacter, name, StringComparison.OrdinalIgnoreCase)
+                                              && IsGrudge(m.Type, m.EmotionalImpact));
+        if (removed == 0) return 0;
+        foreach (var key in characterImpressions.Keys.Where(k => string.Equals(k, name, StringComparison.OrdinalIgnoreCase)).ToList())
+            characterImpressions.Remove(key);
+        foreach (var m in memories.Where(m => string.Equals(m.InvolvedCharacter, name, StringComparison.OrdinalIgnoreCase)).ToList())
+            UpdateCharacterImpression(m);
+        return removed;
+    }
+
     public void ForgetCharacter(string characterId)
     {
         memories.RemoveAll(m => m.InvolvedCharacter == characterId);

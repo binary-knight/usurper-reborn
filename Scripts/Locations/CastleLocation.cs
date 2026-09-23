@@ -1874,11 +1874,14 @@ public class CastleLocation : BaseLocation
                 var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
                 if (backend != null)
                 {
-                    string username = currentPlayer.Name2?.ToLowerInvariant() ?? currentPlayer.Name1?.ToLowerInvariant() ?? "";
+                    // v1.1.11: the character's own key, as permadeath gets it (Name2 deleted 0 rows when it
+                    // differed from the key), and the shared purge before the delete.
+                    string username = (!string.IsNullOrEmpty(sctx?.CharacterKey) ? sctx!.CharacterKey : sctx?.Username) ?? currentPlayer.Name1 ?? currentPlayer.Name2 ?? "";
                     if (!string.IsNullOrEmpty(username))
                     {
                         try
                         {
+                            await PermadeathHelper.PurgeDeletedCharacterAsync(backend, username, currentPlayer.Name2 ?? currentPlayer.Name1, currentPlayer);
                             backend.DeleteGameData(username);
                             DebugLogger.Instance.LogInfo("REBELLION", $"Character '{kingName}' permanently deleted — coin was HEADS");
                         }
@@ -7922,6 +7925,34 @@ public class CastleLocation : BaseLocation
     {
         if (player == null || !player.King) return;
 
+        // Clear player state
+        player.King = false;
+        if (player.NobleTitle == "King" || player.NobleTitle == "Queen")
+            player.NobleTitle = null;
+        player.RoyalMercenaries?.Clear();
+        player.RecalculateStats();
+
+        EndPlayerReign(player.DisplayName, reason);
+    }
+
+    /// <summary>
+    /// v1.1.11: a deleted character who holds the throne abdicates through the same path, so the normal
+    /// NPC succession runs. The deleted character has no loaded Character, so the match is by the
+    /// king's name (Name2, or the married DisplayName) and only a player king is removed.
+    /// </summary>
+    public static bool AbdicateDeletedKing(string? name, string? displayName, string reason)
+    {
+        var king = GetCurrentKing();
+        if (king == null || !king.IsActive || king.AI != CharacterAI.Human) return false;
+        bool named(string? n) => !string.IsNullOrWhiteSpace(n) && string.Equals(king.Name, n, StringComparison.OrdinalIgnoreCase);
+        if (!named(name) && !named(displayName)) return false;
+        EndPlayerReign(king.Name, reason);
+        return true;
+    }
+
+    // v1.1.11: the throne side of AbdicatePlayerThrone, shared with AbdicateDeletedKing.
+    private static void EndPlayerReign(string kingDisplayName, string reason)
+    {
         var king = GetCurrentKing();
 
         // Record monarch history
@@ -7942,17 +7973,10 @@ public class CastleLocation : BaseLocation
             king.IsActive = false;
         }
 
-        // Clear player state
-        player.King = false;
-        if (player.NobleTitle == "King" || player.NobleTitle == "Queen")
-            player.NobleTitle = null;
-        player.RoyalMercenaries?.Clear();
-        player.RecalculateStats();
-
         currentKing = null;
 
         // News
-        NewsSystem.Instance?.Newsy(true, $"{player.DisplayName} has {reason}! The kingdom is in chaos!");
+        NewsSystem.Instance?.Newsy(true, $"{kingDisplayName} has {reason}! The kingdom is in chaos!");
 
         // Trigger NPC succession (uses only static fields + singletons)
         var npcs = NPCSpawnSystem.Instance?.ActiveNPCs;

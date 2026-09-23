@@ -1181,7 +1181,11 @@ namespace UsurperRemake.Systems
                 ExecPurge(connection, tx, "messages",          "LOWER(from_player) = LOWER(@u) OR LOWER(to_player) = LOWER(@u)", username);
                 ExecPurge(connection, tx, "trade_offers",      "LOWER(from_player) = LOWER(@u) OR LOWER(to_player) = LOWER(@u)", username);
                 ExecPurge(connection, tx, "bounties",          "LOWER(target_player) = LOWER(@u) OR LOWER(placed_by) = LOWER(@u) OR LOWER(claimed_by) = LOWER(@u)", username);
-                ExecPurge(connection, tx, "auction_listings",  "LOWER(seller) = LOWER(@u) OR LOWER(buyer) = LOWER(@u)", username);
+                // v1.1.11: only the character's own listings. The buyer clause is gone: a sold row the seller
+                // has not collected holds that seller's gold, and the buyer already has the item. A seller
+                // equal to the key is skipped when it is another player's display name.
+                ExecPurge(connection, tx, "auction_listings",
+                    "LOWER(seller) = LOWER(@u) AND NOT EXISTS (SELECT 1 FROM players p WHERE LOWER(p.display_name) = LOWER(@u) AND LOWER(p.username) != LOWER(@u))", username);
                 ExecPurge(connection, tx, "world_boss_damage", "LOWER(player_name) = LOWER(@u)", username);
 
                 // v0.65.0: pvp_log was deliberately excluded in v0.60.5 ("history
@@ -1201,6 +1205,25 @@ namespace UsurperRemake.Systems
                 ExecPurge(connection, tx, "pending_inheritance",    "LOWER(player_username) = LOWER(@u)", username);
                 ExecPurge(connection, tx, "pending_gold_transfers", "LOWER(recipient_username) = LOWER(@u)", username);
                 ExecPurge(connection, tx, "world_boss_rewards",     "LOWER(player_name) = LOWER(@u) AND COALESCE(delivered, 0) = 0", username);
+
+                // v1.1.11: mail and auctions also key on the display name (mail to Name2, auction sellers
+                // are DisplayName.ToLower(), the married surname form comes from players.display_name).
+                // Only mail TO the character; a name that is another account's key is left alone.
+                if (!string.IsNullOrWhiteSpace(displayName))
+                {
+                    const string ownNames = "(SELECT LOWER(display_name) FROM players WHERE LOWER(username) = LOWER(@u) AND display_name IS NOT NULL)";
+                    ExecPurge(connection, tx, "messages",
+                        $"to_player != '*' AND (LOWER(to_player) = LOWER(@d) OR LOWER(to_player) IN {ownNames}) " +
+                        "AND NOT EXISTS (SELECT 1 FROM players p WHERE LOWER(p.username) = LOWER(messages.to_player) AND LOWER(p.username) != LOWER(@u))",
+                        username, displayName);
+                    // NPCs list under their own name in lowercase: a name an NPC may carry (one does, or the roster
+                    // is not complete enough to rule it out) keeps its listings; a stale one is the safe side
+                    var spawner = NPCSpawnSystem.Instance;
+                    bool couldBeNpcName = spawner == null || !spawner.IsRosterTrustworthy || QuestSystem.IsNPCName(displayName);
+                    if (!couldBeNpcName)
+                        ExecPurge(connection, tx, "auction_listings",
+                            $"LOWER(seller) = LOWER(@d) OR LOWER(seller) IN {ownNames}", username, displayName);
+                }
 
                 tx.Commit();
                 DebugLogger.Instance.LogInfo("PERMADEATH",
@@ -1224,7 +1247,7 @@ namespace UsurperRemake.Systems
             }
         }
 
-        private static void ExecPurge(SqliteConnection conn, SqliteTransaction tx, string table, string whereClause, string username)
+        private static void ExecPurge(SqliteConnection conn, SqliteTransaction tx, string table, string whereClause, string username, string? displayName = null)
         {
             try
             {
@@ -1232,6 +1255,7 @@ namespace UsurperRemake.Systems
                 cmd.Transaction = tx;
                 cmd.CommandText = $"DELETE FROM {table} WHERE {whereClause};";
                 cmd.Parameters.AddWithValue("@u", username);
+                if (displayName != null) cmd.Parameters.AddWithValue("@d", displayName);   // v1.1.11: display-name key
                 int rows = cmd.ExecuteNonQuery();
                 if (rows > 0)
                     DebugLogger.Instance.LogInfo("PERMADEATH", $"  {table}: removed {rows} row(s) for '{username}'");
@@ -5869,6 +5893,20 @@ namespace UsurperRemake.Systems
     /// Resolves a player name (username or display name) to their lowercase display name.
     /// Returns null if the player doesn't exist.
     /// </summary>
+    /// <summary>v1.1.11: the players.display_name of one key (the married surname form), or null.</summary>
+    public string? GetStoredDisplayName(string username)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT display_name FROM players WHERE LOWER(username) = LOWER(@u) LIMIT 1;";
+            cmd.Parameters.AddWithValue("@u", username);
+            return cmd.ExecuteScalar() as string;
+        }
+        catch { return null; }
+    }
+
     public string? ResolvePlayerDisplayName(string nameOrDisplay)
     {
         try
