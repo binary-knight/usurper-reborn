@@ -963,6 +963,7 @@ public class TeamCornerLocation : BaseLocation
         currentPlayer.Team = teamName;
         currentPlayer.TeamPW = password;
         currentPlayer.CTurf = false;
+        TeamHQBonus.RefreshLevels(currentPlayer);   // v1.1.11
         currentPlayer.TeamRec = 0;
         await PersistTeamMembershipChange();
 
@@ -1056,6 +1057,7 @@ public class TeamCornerLocation : BaseLocation
                     currentPlayer.Team = teamName;
                     currentPlayer.TeamPW = password;
                     currentPlayer.CTurf = false;
+                    TeamHQBonus.RefreshLevels(currentPlayer);   // v1.1.11: the team's upgrades count from joining
                     await PersistTeamMembershipChange();
 
                     WorldSimulator.RegisterPlayerTeam(teamName);
@@ -1111,6 +1113,7 @@ public class TeamCornerLocation : BaseLocation
             currentPlayer.Team = teamName;
             currentPlayer.TeamPW = npcPassword;
             currentPlayer.CTurf = teamMember.CTurf;
+            TeamHQBonus.RefreshLevels(currentPlayer);   // v1.1.11
             await PersistTeamMembershipChange();
 
             WorldSimulator.RegisterPlayerTeam(teamName);
@@ -3572,10 +3575,7 @@ public class TeamCornerLocation : BaseLocation
         terminal.WriteLine(Loc.Get("team.facility_upgraded", Loc.Get(def.NameKey), currentLevel + 1));
 
         // Refresh cached HQ upgrade levels on the player
-        currentPlayer.HQArmoryLevel = backend.GetTeamUpgradeLevel(teamName, "armory");
-        currentPlayer.HQBarracksLevel = backend.GetTeamUpgradeLevel(teamName, "barracks");
-        currentPlayer.HQTrainingLevel = backend.GetTeamUpgradeLevel(teamName, "training");
-        currentPlayer.HQInfirmaryLevel = backend.GetTeamUpgradeLevel(teamName, "infirmary");
+        TeamHQBonus.RefreshLevels(currentPlayer, backend);
 
         await Task.Delay(2000);
     }

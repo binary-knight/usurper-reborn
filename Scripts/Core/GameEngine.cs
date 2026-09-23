@@ -6269,16 +6269,7 @@ public partial class GameEngine
 
             // Cache team HQ upgrade levels for combat bonuses (online mode only)
             if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
-            {
-                var hqBackend = SaveSystem.Instance.Backend as SqlSaveBackend;
-                if (hqBackend != null)
-                {
-                    player.HQArmoryLevel = hqBackend.GetTeamUpgradeLevel(player.Team, "armory");
-                    player.HQBarracksLevel = hqBackend.GetTeamUpgradeLevel(player.Team, "barracks");
-                    player.HQTrainingLevel = hqBackend.GetTeamUpgradeLevel(player.Team, "training");
-                    player.HQInfirmaryLevel = hqBackend.GetTeamUpgradeLevel(player.Team, "infirmary");
-                }
-            }
+                TeamHQBonus.RefreshLevels(player);
         }
 
         // Apply player's color theme preference

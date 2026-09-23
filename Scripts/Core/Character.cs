@@ -594,6 +594,8 @@ public class Character
     public int HQBarracksLevel { get; set; }  // +5% defense per level
     public int HQTrainingLevel { get; set; }  // +5% XP per level
     public int HQInfirmaryLevel { get; set; } // +10% healing per level
+    /// <summary>v1.1.11: the team the HQ levels above were read for; they count only while it is still the character's team (TeamHQBonus).</summary>
+    public string HQLevelsTeam { get; set; } = "";
 
     // Herb pouch inventory (v0.48.5)
     public int HerbHealing { get; set; }        // Healing Herbs (garden lv1)

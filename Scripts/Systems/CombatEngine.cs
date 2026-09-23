@@ -630,6 +630,12 @@ public partial class CombatEngine
             CombatLog = new List<string>()
         };
         _combatOwner = attacker;
+        if (DoorMode.IsOnlineMode)
+        {
+            // v1.1.11: each fighter's own Team HQ levels, the defender's read by its team from the database
+            TeamHQBonus.RefreshLevels(attacker);
+            TeamHQBonus.RefreshLevels(defender);
+        }
         // v1.1.1: EndPvPCombat (buff consumption, disarm restore, scrub) runs in the finally
         // so a thrown disconnect mid-duel cannot leave either side with stale combat state.
         try
@@ -824,6 +830,14 @@ public partial class CombatEngine
 
         // Store player reference for combat speed setting
         currentPlayer = player;
+
+        // v1.1.11: the Team HQ levels of this moment (a teammate may have upgraded, or the player changed team)
+        if (DoorMode.IsOnlineMode)
+        {
+            TeamHQBonus.RefreshLevels(player);
+            if (teammates != null)
+                foreach (var mate in teammates.Where(t => t is not NPC)) TeamHQBonus.RefreshLevels(mate);
+        }
 
         // v0.65.6 Death's Door: once-per-combat burst rescue resets at combat start.
         player.DeathsDoorUsedThisCombat = false;
@@ -3829,9 +3843,9 @@ public partial class CombatEngine
         }
 
         // Team HQ Armory bonus: +5% attack per level
-        if (attacker.HQArmoryLevel > 0)
+        if (TeamHQBonus.Armory(attacker) > 0)
         {
-            attackPower += (long)(attackPower * (attacker.HQArmoryLevel * 0.05));
+            attackPower += (long)(attackPower * (TeamHQBonus.Armory(attacker) * 0.05));
         }
 
         // Knighthood bonus: +5% damage for knighted players
@@ -4153,8 +4167,8 @@ public partial class CombatEngine
             long healAmount = 30 + player.Level * 5 + random.Next(10, 30);
             if (player.Class == CharacterClass.Alchemist)
                 healAmount = (long)(healAmount * (1.0 + GameConfig.AlchemistPotionMasteryBonus));
-            if (player.HQInfirmaryLevel > 0)
-                healAmount = (long)(healAmount * (1.0 + player.HQInfirmaryLevel * 0.10));
+            if (TeamHQBonus.Infirmary(player) > 0)
+                healAmount = (long)(healAmount * (1.0 + TeamHQBonus.Infirmary(player) * 0.10));
             healAmount = DifficultySystem.ApplyHealingMultiplier(healAmount);
             healAmount = Math.Min(healAmount, player.MaxHP - player.HP);
             player.HP += healAmount;
@@ -4197,8 +4211,8 @@ public partial class CombatEngine
                 long healAmount = 30 + player.Level * 5 + random.Next(10, 30);
                 if (player.Class == CharacterClass.Alchemist)
                     healAmount = (long)(healAmount * (1.0 + GameConfig.AlchemistPotionMasteryBonus));
-                if (player.HQInfirmaryLevel > 0)
-                    healAmount = (long)(healAmount * (1.0 + player.HQInfirmaryLevel * 0.10));
+                if (TeamHQBonus.Infirmary(player) > 0)
+                    healAmount = (long)(healAmount * (1.0 + TeamHQBonus.Infirmary(player) * 0.10));
                 healAmount = DifficultySystem.ApplyHealingMultiplier(healAmount);
                 healAmount = Math.Min(healAmount, player.MaxHP - player.HP);
                 player.HP += healAmount;
@@ -5309,9 +5323,9 @@ public partial class CombatEngine
         }
 
         // Team HQ Barracks bonus: +5% defense per level
-        if (player.HQBarracksLevel > 0)
+        if (TeamHQBonus.Barracks(player) > 0)
         {
-            playerDefense += (long)(playerDefense * (player.HQBarracksLevel * 0.05));
+            playerDefense += (long)(playerDefense * (TeamHQBonus.Barracks(player) * 0.05));
         }
 
         // Knighthood bonus: +5% defense for knighted players
@@ -7216,9 +7230,9 @@ public partial class CombatEngine
         }
 
         // Team HQ Training bonus: +5% XP per level
-        if (result.Player.HQTrainingLevel > 0)
+        if (TeamHQBonus.Training(result.Player) > 0)
         {
-            expReward += (long)(expReward * (result.Player.HQTrainingLevel * 0.05));
+            expReward += (long)(expReward * (TeamHQBonus.Training(result.Player) * 0.05));
         }
 
         // Fatigue XP penalty — Exhausted tier only (single-player only)
@@ -12994,8 +13008,8 @@ public partial class CombatEngine
                             attackPower += (long)(attackPower * GameConfig.PoisonCoatingDamageBonus);
                         if (player.PermanentDamageBonus > 0)
                             attackPower += (long)(attackPower * (player.PermanentDamageBonus / 100.0));
-                        if (player.HQArmoryLevel > 0)
-                            attackPower += (long)(attackPower * (player.HQArmoryLevel * 0.05));
+                        if (TeamHQBonus.Armory(player) > 0)
+                            attackPower += (long)(attackPower * (TeamHQBonus.Armory(player) * 0.05));
                         if (player.IsKnighted)
                             attackPower += (long)(attackPower * GameConfig.KnightDamageBonus);
                         // v0.60.11: Grand Champion +3% damage stacks with knighthood.
@@ -20606,9 +20620,9 @@ public partial class CombatEngine
         }
 
         // Team HQ Training bonus: +5% XP per level — multi-monster path
-        if (result.Player.HQTrainingLevel > 0)
+        if (TeamHQBonus.Training(result.Player) > 0)
         {
-            adjustedExp += (long)(adjustedExp * (result.Player.HQTrainingLevel * 0.05));
+            adjustedExp += (long)(adjustedExp * (TeamHQBonus.Training(result.Player) * 0.05));
         }
 
         // Fatigue XP penalty — Exhausted tier only (single-player only)
@@ -21198,9 +21212,9 @@ public partial class CombatEngine
         }
 
         // Team HQ Training bonus: +5% XP per level — berserker/special path
-        if (result.Player.HQTrainingLevel > 0)
+        if (TeamHQBonus.Training(result.Player) > 0)
         {
-            adjustedExp += (long)(adjustedExp * (result.Player.HQTrainingLevel * 0.05));
+            adjustedExp += (long)(adjustedExp * (TeamHQBonus.Training(result.Player) * 0.05));
         }
 
         // v0.64.1 early-game XP multiplier (berserker / special path).
@@ -30413,8 +30427,8 @@ public partial class CombatEngine
             }
 
             // Team HQ Training bonus: +5% XP per level
-            if (groupedPlayer.HQTrainingLevel > 0)
-                playerExp += (long)(playerExp * (groupedPlayer.HQTrainingLevel * 0.05));
+            if (TeamHQBonus.Training(groupedPlayer) > 0)
+                playerExp += (long)(playerExp * (TeamHQBonus.Training(groupedPlayer) * 0.05));
 
             // v0.64.1 early-game XP multiplier (per-grouped-player path).
             // Each grouped player's level keys into the curve independently

@@ -6856,6 +6856,26 @@ namespace UsurperRemake.Systems
         catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to withdraw from vault: {ex.Message}"); return false; }
     }
 
+    /// <summary>v1.1.11: every upgrade level of a team in one read (TeamHQBonus.RefreshLevels).</summary>
+    public Dictionary<string, int> GetTeamUpgradeLevels(string teamName)
+    {
+        var levels = new Dictionary<string, int>();
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT upgrade_type, level FROM team_upgrades WHERE team_name = @team;";
+            cmd.Parameters.AddWithValue("@team", teamName);
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read()) levels[reader.GetString(0)] = reader.GetInt32(1);
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to read the upgrades of team '{teamName}': {ex.Message}");
+        }
+        return levels;
+    }
+
     public int GetTeamUpgradeLevel(string teamName, string upgradeType)
     {
         try
