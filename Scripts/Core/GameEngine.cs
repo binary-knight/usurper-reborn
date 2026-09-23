@@ -666,15 +666,16 @@ public partial class GameEngine
                     var confirm = await terminal.GetInput(Loc.Get("engine.delete_confirm_prompt"));
                     if (confirm == "DELETE")
                     {
-                        // Disown this character's children before recreating with the
-                        // same name, so the new character doesn't inherit the old life's
-                        // kids (and their daily gold) by name-match.
-                        DisownDeletedCharacterChildren(mainSave.PlayerName);
+                        // v1.1.11: run the same purge as permadeath before the delete (quests, god,
+                        // WANTED bounty, children, guild, queued deliveries). Only the children were
+                        // cleared before, so a same-name recreation kept the old quests and god.
+                        await PermadeathHelper.PurgeDeletedCharacterAsync(
+                            SaveSystem.Instance.Backend as SqlSaveBackend, accountName, mainSave.PlayerName);
                         // Delete main character save only (not alt)
                         var saves = SaveSystem.Instance.GetPlayerSaves(accountName);
                         foreach (var save in saves)
                         {
-                            SaveSystem.Instance.DeleteSave(Path.GetFileNameWithoutExtension(save.FileName));
+                            SaveSystem.Instance.DeleteSave(Path.GetFileNameWithoutExtension(save.FileName), save.PlayerName);
                         }
                         // Ensure identity is main account
                         UsurperRemake.BBS.DoorMode.SetOnlineUsername(accountName);
@@ -843,11 +844,11 @@ public partial class GameEngine
                     var confirmDel = await terminal.GetInput(Loc.Get("engine.delete_alt_confirm"));
                     if (confirmDel == "DELETE")
                     {
-                        // Disown the alt's children so a future same-named recreate
-                        // doesn't inherit them (and so they don't linger parented to a
-                        // character that no longer exists).
-                        DisownDeletedCharacterChildren(altSave.PlayerName);
-                        SaveSystem.Instance.DeleteSave(altKey);
+                        // v1.1.11: the same purge as permadeath before the delete; it also disowns
+                        // the alt's children, which this path did on its own before.
+                        await PermadeathHelper.PurgeDeletedCharacterAsync(
+                            SaveSystem.Instance.Backend as SqlSaveBackend, altKey, altSave.PlayerName);
+                        SaveSystem.Instance.DeleteSave(altKey, altSave.PlayerName);
                         // Also clean up sleeping_players entry for the alt
                         if (SaveSystem.Instance.Backend is SqlSaveBackend sqlDel)
                         {
@@ -2556,20 +2557,9 @@ public partial class GameEngine
                     if (confirm == "DELETE")
                     {
                         // Delete all saves for this player
-                        foreach (var save in saves)
-                        {
-                            var filePath = System.IO.Path.Combine(
-                                System.IO.Path.Combine(GetUserDataPath(), "saves"),
-                                save.FileName);
-                            try
-                            {
-                                System.IO.File.Delete(filePath);
-                            }
-                            catch (Exception ex)
-            {
-                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "ENGINE", $"Swallowed exception: {ex.Message}");
-            }
-                        }
+                        // v1.1.11: through SaveSystem (was a raw File.Delete per file), so the god entry
+                        // is cleared by the character's Name2 as well as the save key.
+                        SaveSystem.Instance.DeleteSaves(playerName, saves);
                         terminal.WriteLine(Loc.Get("engine.all_saves_deleted"), "green");
                         await Task.Delay(1500);
                         return;
@@ -2851,8 +2841,9 @@ public partial class GameEngine
             // Restore story systems (companions, children, seals, etc.)
             // In online mode, only restore this player's god entry — other players' stale
             // snapshots would overwrite their current worship choices in the shared GodSystem.
-            string? godRestoreFilter = (UsurperRemake.BBS.DoorMode.IsOnlineMode && currentPlayer != null)
-                ? currentPlayer.Name2 : null;
+            // v1.1.11: single-player too. Every save carries the whole worship dictionary, so an old
+            // entry for a deleted same-name character was restored with any save.
+            string? godRestoreFilter = GodRestoreFilterFor(currentPlayer);
             SaveSystem.Instance.RestoreStorySystems(saveData.StorySystems, godRestoreFilter);
 
             // Migration: sync RelationshipSystem with RomanceTracker for saves affected by
@@ -4713,8 +4704,7 @@ public partial class GameEngine
         // Restore story systems (companions, children, seals, etc.)
         // In online mode, only restore this player's god entry — other players' stale
         // snapshots would overwrite their current worship choices in the shared GodSystem.
-        string? godFilter = (UsurperRemake.BBS.DoorMode.IsOnlineMode && currentPlayer != null)
-            ? currentPlayer.Name2 : null;
+        string? godFilter = GodRestoreFilterFor(currentPlayer); // v1.1.11: single-player too
         SaveSystem.Instance.RestoreStorySystems(saveData.StorySystems, godFilter);
 
         // In online mode, override royal court, children, and marriages with world_state
@@ -4758,27 +4748,34 @@ public partial class GameEngine
     }
     
     /// <summary>
-    /// Disown a deleted character's children so a same-named recreate does not
-    /// inherit them by name-match (children match parents on display name, and
-    /// the recreated character keeps the same name). Online only -- in
-    /// single-player CreateNewGame resets FamilySystem entirely. Player report:
-    /// deleted a character, recreated it, and a kid from the old life paid the
-    /// daily child gold bonus on the next day. Persist is gated on disowned > 0
-    /// so a stale/empty FamilySystem can never write an empty children set back
-    /// to world_state.
+    /// v1.1.11: clear the state shared systems still hold under a new character's display name: the
+    /// god worship entry, quests claimed by or offered to it, the King's WANTED bounty on it, and its
+    /// relationship records. Safe because the name cannot belong to anyone else: online,
+    /// CharacterCreationSystem refuses a name another character holds (IsDisplayNameTaken, ignoring
+    /// case, excluding only the key being created); in single-player only the loading character's
+    /// god entry is restored. On an NG+ reroll it clears the previous life, as the NG+ god clear does.
+    /// Returns the number of quests and bounties removed.
     /// </summary>
-    private void DisownDeletedCharacterChildren(string? characterName)
+    public static int ClearLeftoversForNewCharacter(string? name2)
     {
-        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode || string.IsNullOrEmpty(characterName))
-            return;
-        int disowned = UsurperRemake.Systems.FamilySystem.Instance.DisownChildrenOf(characterName);
-        if (disowned > 0)
-        {
-            DebugLogger.Instance.LogInfo("DELETE", $"Disowned {disowned} child(ren) of deleted character '{characterName}'");
-            if (UsurperRemake.Systems.OnlineStateManager.Instance != null)
-                _ = UsurperRemake.Systems.OnlineStateManager.Instance.SaveSharedChildrenNow();
-        }
+        if (string.IsNullOrWhiteSpace(name2)) return 0;
+        try { UsurperRemake.GodSystemSingleton.Instance?.ClearPlayerGodAnyCase(name2); }
+        catch (Exception ex) { DebugLogger.Instance.LogWarning("CREATE", $"Leftover god clear failed for '{name2}': {ex.Message}"); }
+        int removed = QuestSystem.RemovePlayerQuests(name2) + QuestSystem.RemoveBountiesOnPlayer(name2);
+        try { RelationshipSystem.Instance?.ResetPlayerRelationships(name2); }
+        catch (Exception ex) { DebugLogger.Instance.LogWarning("CREATE", $"Leftover relationship clear failed for '{name2}': {ex.Message}"); }
+        if (removed > 0)
+            DebugLogger.Instance.LogInfo("CREATE", $"Removed {removed} leftover quest(s) and bounties under '{name2}'.");
+        return removed;
     }
+
+    /// <summary>
+    /// v1.1.11: the one name whose god worship entry a load restores from the save. Online always
+    /// filtered this way; single-player restored the whole dictionary. Never null, so a load
+    /// without a name restores no one's entry rather than everyone's.
+    /// </summary>
+    public static string GodRestoreFilterFor(Character? player) =>
+        !string.IsNullOrEmpty(player?.Name2) ? player!.Name2 : (player?.Name1 ?? "");
 
     /// <summary>
     /// Create new game
@@ -4961,6 +4958,16 @@ public partial class GameEngine
         }
 
         currentPlayer = (Character)newCharacter;
+
+        // v1.1.11: backstop for every path, single-player included. Player report: a character
+        // deleted and recreated under the same name kept the old god and quest list. Clear what the
+        // shared systems still hold under this name before the first save captures it.
+        int leftoverQuests = ClearLeftoversForNewCharacter(currentPlayer.Name2);
+        if (leftoverQuests > 0 && UsurperRemake.BBS.DoorMode.IsOnlineMode && OnlineStateManager.IsActive)
+        {
+            try { await OnlineStateManager.Instance!.SaveSharedQuestsNow(); }
+            catch (Exception qx) { DebugLogger.Instance.LogWarning("CREATE", $"Leftover quest push failed: {qx.Message}"); }
+        }
 
         // Apply SysOp's default color theme to new characters
         currentPlayer.ColorTheme = GameConfig.DefaultColorTheme;

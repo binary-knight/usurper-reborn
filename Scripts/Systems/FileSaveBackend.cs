@@ -322,6 +322,32 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
+        /// v1.1.11: delete one listed save file (autosave, backup, emergency dump) by its file name in
+        /// the active save directory, under the write lock. A name with a path in it is refused.
+        /// </summary>
+        public bool DeleteSaveFile(string? fileName)
+        {
+            if (string.IsNullOrWhiteSpace(fileName) || Path.GetFileName(fileName) != fileName) return false;
+            _writeLock.Wait();
+            try
+            {
+                var filePath = Path.Combine(SaveDirectory, fileName);
+                if (!File.Exists(filePath)) return false;
+                File.Delete(filePath);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogWarning("SAVE", $"DeleteSaveFile failed for '{fileName}': {ex.Message}");
+                return false;
+            }
+            finally
+            {
+                _writeLock.Release();
+            }
+        }
+
+        /// <summary>
         /// v0.60.7: predicate for auxiliary / non-character JSON files that live
         /// alongside saves. Returns true for files that should be excluded from
         /// every listing path (`GetAllSaves`, `GetPlayerSaves`, `GetAllPlayerNames`).

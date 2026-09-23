@@ -160,6 +160,16 @@ public class GuildSystem
     }
 
     /// <summary>
+    /// v1.1.11: drop a deleted character from the membership cache. The guild_members row is
+    /// removed by SqlSaveBackend.PurgePlayerWorldState; without this the cache kept it until restart.
+    /// </summary>
+    public void ForgetMember(string? username)
+    {
+        if (!string.IsNullOrWhiteSpace(username))
+            membershipCache.TryRemove(username, out _);
+    }
+
+    /// <summary>
     /// Get the display name of a player's guild, or null if not in a guild.
     /// </summary>
     public string? GetPlayerGuildDisplayName(string username)

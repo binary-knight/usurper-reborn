@@ -348,6 +348,22 @@ public class GodSystem
     }
     
     /// <summary>
+    /// v1.1.11: clear the worship entry for a character name in any letter case (the dictionary is
+    /// case-sensitive, display names are unique ignoring case). Goes through SetPlayerGod so the
+    /// god's believer count drops. Returns the number of entries cleared.
+    /// </summary>
+    public int ClearPlayerGodAnyCase(string? playerName)
+    {
+        if (string.IsNullOrWhiteSpace(playerName)) return 0;
+        var keys = playerGods.Keys
+            .Where(k => string.Equals(k, playerName, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        foreach (var key in keys)
+            SetPlayerGod(key, "");
+        return keys.Count;
+    }
+
+    /// <summary>
     /// Calculate sacrifice gold return (Pascal Sacrifice_Gold_Return function)
     /// </summary>
     public static long CalculateSacrificeGoldReturn(long goldAmount)

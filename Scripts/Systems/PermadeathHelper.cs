@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using UsurperRemake.UI;
 
@@ -192,54 +193,24 @@ namespace UsurperRemake.Systems
                     // character created on this account key.
                     sqlBackend.RecordFallenLegacy(username, displayName, finalLevel, className,
                         killerName, GameConfig.GetFallenLegacyGold(finalLevel));
+                }
 
-                    // v0.60.5: purge shared world-state references (guild membership,
-                    // bounties, trades, world-boss damage, etc.) BEFORE clearing the
-                    // player_data so any joined queries in the purge hooks still
-                    // resolve. Player report (Rage): "lost all 4 lives, made a new
-                    // char, came back in my guild still, actually still worshiping
-                    // the same god." Fixed by this purge + the in-memory hook.
-                    sqlBackend.PurgePlayerWorldState(username, displayName);
+                // v0.60.5: purge shared world-state references (guild membership,
+                // bounties, trades, world-boss damage, etc.) BEFORE clearing the
+                // player_data so any joined queries in the purge hooks still
+                // resolve. Player report (Rage): "lost all 4 lives, made a new
+                // char, came back in my guild still, actually still worshiping
+                // the same god." Fixed by this purge + the in-memory hook.
+                // v1.1.11: the purge, the quest removal and the child disown now live in
+                // PurgeDeletedCharacterAsync, which every online delete path shares.
+                await PurgeDeletedCharacterAsync(SaveSystem.Instance?.Backend as SqlSaveBackend, username, displayName, player);
 
-                    sqlBackend.DeleteGameData(username, bypassArchive: false);
+                if (SaveSystem.Instance?.Backend is SqlSaveBackend sqlDelete && !string.IsNullOrEmpty(username))
+                {
+                    sqlDelete.DeleteGameData(username, bypassArchive: false);
                     DebugLogger.Instance.LogWarning("DEATH_CAP",
                         $"Permadeleted '{username}' (display='{displayName}', lv={finalLevel}, class={className}, killer={killerName}). 7-day /restore window active.");
                 }
-
-                // v0.65.0 (eldruin/Eldruin report): permadeath must also clear the
-                // character's identity-linked state that lives OUTSIDE the players
-                // row, or a same-name recreation re-binds to it. SQL-side state is
-                // handled by PurgePlayerWorldState above; these three live in
-                // shared in-memory systems + their world_state mirrors.
-                try
-                {
-                    // (1) Claimed quests: keyed by Occupier = display name in the
-                    // shared questDatabase. Remove them and push the cleaned list
-                    // to world_state["quests"] so it's durable (otherwise they
-                    // re-surface for the next character named the same).
-                    int removedQuests = QuestSystem.RemovePlayerQuests(displayName, username, player.Name1, player.Name2);
-                    if (removedQuests > 0)
-                        DebugLogger.Instance.LogInfo("DEATH_CAP", $"Removed {removedQuests} claimed quest(s) for permadied '{displayName}'.");
-                    if (UsurperRemake.BBS.DoorMode.IsOnlineMode && OnlineStateManager.IsActive)
-                        await OnlineStateManager.Instance!.SaveSharedQuestsNow();
-                }
-                catch (Exception qex) { DebugLogger.Instance.LogWarning("DEATH_CAP", $"Quest purge failed: {qex.Message}"); }
-
-                try
-                {
-                    // (2) Children: disown so the dead parent's kids don't grant a
-                    // same-name recreation family bonuses / show as their children.
-                    // Use the ID-first Character overload (v0.63.0 slice 4) for the
-                    // same rename/name-collision robustness the NG+/delete paths use.
-                    int disowned = UsurperRemake.Systems.FamilySystem.Instance?.DisownChildrenOf(player) ?? 0;
-                    if (disowned > 0)
-                    {
-                        DebugLogger.Instance.LogInfo("DEATH_CAP", $"Disowned {disowned} child(ren) of permadied '{displayName}'.");
-                        if (UsurperRemake.BBS.DoorMode.IsOnlineMode && OnlineStateManager.IsActive)
-                            await OnlineStateManager.Instance!.SaveSharedChildrenNow();
-                    }
-                }
-                catch (Exception cex) { DebugLogger.Instance.LogWarning("DEATH_CAP", $"Child disown failed: {cex.Message}"); }
 
                 if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
                 {
@@ -429,6 +400,90 @@ namespace UsurperRemake.Systems
                 DebugLogger.Instance.LogWarning("DEATH_CAP",
                     $"TryDistributeInheritance failed: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// v1.1.11: the one purge for a character leaving the world, shared by permadeath, the
+        /// character-select deletes (N, D) and both admin deletes. Player report: a character deleted
+        /// and recreated under the same name kept the old quest list and god. Call it BEFORE
+        /// DeleteGameData, which still archives the row for the 7-day /restore; as with permadeath,
+        /// a restore does not bring back the world state cleared here.
+        /// </summary>
+        public static async Task PurgeDeletedCharacterAsync(SqlSaveBackend? backend, string? username, string? displayName, global::Character? player = null)
+        {
+            string name = !string.IsNullOrWhiteSpace(displayName) ? displayName! : (username ?? "");
+            if (string.IsNullOrWhiteSpace(name)) return;
+
+            // SQL rows keyed by the character key, then PermadeathPurgeHook (god worship, relationships).
+            if (backend != null && !string.IsNullOrWhiteSpace(username))
+                backend.PurgePlayerWorldState(username!, name);
+
+            try
+            {
+                // Claimed quests (Occupier / OfferedTo = display name) and the King's WANTED bounty on
+                // the character. Pushed even when nothing was removed, since world_state may still hold
+                // a stale copy that a same-name character would merge back on load.
+                int removed = QuestSystem.RemovePlayerQuests(name) + QuestSystem.RemoveBountiesOnPlayer(name);
+                if (removed > 0)
+                    DebugLogger.Instance.LogInfo("DELETE", $"Removed {removed} quest(s) and bounties for deleted '{name}'.");
+                if (UsurperRemake.BBS.DoorMode.IsOnlineMode && OnlineStateManager.IsActive)
+                    await OnlineStateManager.Instance!.SaveSharedQuestsNow();
+            }
+            catch (Exception qex) { DebugLogger.Instance.LogWarning("DELETE", $"Quest purge failed for '{name}': {qex.Message}"); }
+
+            try
+            {
+                // The guild_members row went with the SQL purge; the cache is keyed by the character key.
+                if (!string.IsNullOrWhiteSpace(username)) GuildSystem.Instance?.ForgetMember(username);
+                GuildSystem.Instance?.ForgetMember(name);
+            }
+            catch (Exception gex) { DebugLogger.Instance.LogWarning("DELETE", $"Guild cache clear failed for '{name}': {gex.Message}"); }
+
+            try
+            {
+                int widowed = ClearNpcSpousesOf(name);
+                if (widowed > 0)
+                    DebugLogger.Instance.LogInfo("DELETE", $"Cleared the marriage of {widowed} NPC(s) to deleted '{name}'.");
+            }
+            catch (Exception sex) { DebugLogger.Instance.LogWarning("DELETE", $"NPC spouse clear failed for '{name}': {sex.Message}"); }
+
+            try
+            {
+                // Children match parents by name, so a same-name recreation would inherit them. The
+                // ID-first Character overload is used when the caller has the character (permadeath).
+                var family = FamilySystem.Instance;
+                int disowned = family == null ? 0 : (player != null ? family.DisownChildrenOf(player) : family.DisownChildrenOf(name));
+                if (disowned > 0)
+                {
+                    DebugLogger.Instance.LogInfo("DELETE", $"Disowned {disowned} child(ren) of deleted '{name}'.");
+                    if (UsurperRemake.BBS.DoorMode.IsOnlineMode && OnlineStateManager.IsActive)
+                        await OnlineStateManager.Instance!.SaveSharedChildrenNow();
+                }
+            }
+            catch (Exception cex) { DebugLogger.Instance.LogWarning("DELETE", $"Child disown failed for '{name}': {cex.Message}"); }
+        }
+
+        /// <summary>
+        /// v1.1.11: end the marriage of any NPC whose spouse was the deleted character, clearing the
+        /// same three flags a divorce clears on the NPC. An NPC married to another NPC (registry) is
+        /// left alone, in case that NPC shares the name.
+        /// </summary>
+        public static int ClearNpcSpousesOf(string? name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return 0;
+            var npcs = NPCSpawnSystem.Instance?.ActiveNPCs;
+            if (npcs == null) return 0;
+            int cleared = 0;
+            foreach (var npc in npcs.ToList())
+            {
+                if (npc == null || !string.Equals(npc.SpouseName, name, StringComparison.OrdinalIgnoreCase)) continue;
+                if (!string.IsNullOrEmpty(npc.ID) && NPCMarriageRegistry.Instance.IsMarriedToNPC(npc.ID)) continue;
+                npc.Married = false;
+                npc.IsMarried = false;
+                npc.SpouseName = "";
+                cleared++;
+            }
+            return cleared;
         }
     }
 }

@@ -1285,6 +1285,19 @@ public partial class QuestSystem
     }
 
     /// <summary>
+    /// v1.1.11: remove the King's WANTED bounties posted on a player (PostBountyOnPlayer), so a deleted
+    /// character's bounty does not hang over a new character given the same name.
+    /// </summary>
+    public static int RemoveBountiesOnPlayer(string? playerName)
+    {
+        if (string.IsNullOrWhiteSpace(playerName)) return 0;
+        return questDatabase.RemoveAll(q =>
+            q.Initiator == KING_BOUNTY_INITIATOR &&
+            !string.IsNullOrEmpty(q.TargetNPCName) &&
+            q.TargetNPCName.Equals(playerName, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
     /// v0.65.0: drop any quest claimed by / offered to playerName whose Id is NOT
     /// in keepIds. Run AFTER MergeWorldQuests during load to close the
     /// re-injection window: MergePlayerQuests purges the dead character's quests

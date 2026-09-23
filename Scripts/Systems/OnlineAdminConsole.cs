@@ -646,6 +646,11 @@ namespace UsurperRemake.Systems
                 return;
             }
 
+            // v1.1.11: the same purge as permadeath before the delete. display_name carries a
+            // married surname, so the character's Name2 is read from the save.
+            var deletedSave = await backend.ReadGameData(target.Username);
+            await PermadeathHelper.PurgeDeletedCharacterAsync(backend, target.Username,
+                deletedSave?.Player?.Name2 ?? target.DisplayName);
             backend.DeleteGameData(target.Username);
             terminal.SetColor("green");
             terminal.WriteLine($"Player '{target.DisplayName}' has been permanently deleted.");

@@ -1196,6 +1196,12 @@ namespace UsurperRemake.Systems
                 // and must not be deleted out from under them.
                 ExecPurge(connection, tx, "pvp_log", "LOWER(winner) = LOWER(@u)", username);
 
+                // v1.1.11: queued deliveries keyed by the character key. A new character on the same
+                // key used to collect the deleted one's inheritance, bank wires and boss rewards.
+                ExecPurge(connection, tx, "pending_inheritance",    "LOWER(player_username) = LOWER(@u)", username);
+                ExecPurge(connection, tx, "pending_gold_transfers", "LOWER(recipient_username) = LOWER(@u)", username);
+                ExecPurge(connection, tx, "world_boss_rewards",     "LOWER(player_name) = LOWER(@u) AND COALESCE(delivered, 0) = 0", username);
+
                 tx.Commit();
                 DebugLogger.Instance.LogInfo("PERMADEATH",
                     $"Purged shared world-state references for '{username}' (guild, bounties, trades, auctions, etc.)");

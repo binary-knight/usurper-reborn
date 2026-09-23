@@ -698,6 +698,11 @@ namespace UsurperRemake.Systems
             var confirm2 = await terminal.GetInputAsync(" Type YES for final confirmation: ");
             if (confirm2 != "YES") { terminal.SetColor("gray"); terminal.WriteLine(" Cancelled."); await terminal.GetInputAsync(" Press Enter..."); return; }
 
+            // v1.1.11: the same purge as permadeath before the delete. display_name carries a
+            // married surname, so the character's Name2 is read from the save.
+            var deletedSave = await sqlBackend.ReadGameData(target.Username);
+            await PermadeathHelper.PurgeDeletedCharacterAsync(sqlBackend, target.Username,
+                deletedSave?.Player?.Name2 ?? target.DisplayName);
             sqlBackend.DeleteGameData(target.Username);
             terminal.SetColor("green");
             terminal.WriteLine($" {target.DisplayName} has been permanently deleted.");

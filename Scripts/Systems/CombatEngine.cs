@@ -21429,6 +21429,8 @@ public partial class CombatEngine
 
             if (SaveSystem.Instance?.Backend is SqlSaveBackend sqlBackend && !string.IsNullOrEmpty(username))
             {
+                // v1.1.11: the same purge as every other delete, so a same-name character starts clean
+                await PermadeathHelper.PurgeDeletedCharacterAsync(sqlBackend, username, displayName, player);
                 sqlBackend.DeleteGameData(username, bypassArchive: false);
                 DebugLogger.Instance.LogWarning("DEATH_CAP",
                     $"Permadeleted '{username}' (display='{displayName}', lv={finalLevel}, class={className}) for excessive deaths ({player.PlaythroughDeaths} total, killed by {killerName}). 7-day /restore window active.");
