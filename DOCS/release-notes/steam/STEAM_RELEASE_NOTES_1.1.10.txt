@@ -8,7 +8,7 @@ A player met Mael'Keth after floors that went down in one or two turns and lost 
 [*]A god's War Cry and similar buffs last three rounds instead of the whole fight, and the intro screen shows the HP the god really has.
 [*]Dialogue answers before a god fight now do what they promise.
 [*]Monster special attacks on companions are softened like normal hits, a god's ability aimed at a companion is its normal attack, and tanks protect themselves before they taunt.
-[*]Items waiting for room in your pack reach alt characters, can no longer be lost, arrive when you open /boss, and team bequests reach the team's leader.
+[*]Items waiting for room in your pack reach alt characters, can no longer be lost, arrive when you open /boss, and bequests from new teams reach the team's leader.
 [*]The Inn lists every patron, not just the first eight, and you can find someone by name.
 [*]In PvP, frost slows instead of freezing, and stuns, sleeps and freezes can no longer be chained.
 [*]Team HQ upgrades cost what the menu shows.

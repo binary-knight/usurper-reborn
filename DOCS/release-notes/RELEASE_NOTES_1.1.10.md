@@ -58,13 +58,13 @@ the same thread.
   it never arrived, and an alt could collect its main's items instead.
 - **They are never lost.** If queueing the item failed, it was gone; it
   goes into the pack past the usual limit instead.
-- **Teammates' bequests reach their team's leader.** A team recorded its
-  founder by display name, which is not an alt's key and changes with a
-  marriage, so when an NPC member died their belongings were queued under
-  a key nobody logs in with, and the nightly cleanup deleted them. New
-  teams record the right key, and existing teams are repaired when the
-  server starts, wherever exactly one player has that name (13 of the 19
-  affected teams on the live server).
+- **New teams' bequests reach their leader.** A team recorded its founder
+  by display name, which is not an alt's key and changes with a marriage,
+  so when an NPC member died their belongings were queued under a key
+  nobody logs in with, and the nightly cleanup deleted them. Teams founded
+  from this version record the right key. Teams founded before it are
+  unchanged: nothing in the saves says reliably who founded them, so they
+  are not guessed at.
 - **They arrive during play too.** Open /boss with room in your pack and
   they are handed over, rather than waiting for the next login, and the
   messages now say so. With a full pack you are told how many items wait,
@@ -88,9 +88,9 @@ the same thread.
 
 ## Tests
 
-1,355 passing, up from 1,278. The new ones drive the Inn's patron screen,
+1,361 passing, up from 1,278. The new ones drive the Inn's patron screen,
 the god fight's reset and dialogue hook, companion hits from specials and
 from gods, the PvP control guards, the inheritance queue against a real
-database (alts, failed writes, full packs, team repairs), and the ramp.
+database (alts, failed writes, full packs, new teams), and the ramp.
 The Mael'Keth numbers above come from a measurement of the real fight,
 kept outside the test suite.
