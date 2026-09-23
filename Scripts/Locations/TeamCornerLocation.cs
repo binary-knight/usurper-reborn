@@ -1051,25 +1051,16 @@ public class TeamCornerLocation : BaseLocation
                 terminal.SetColor("white");
                 string password = await terminal.ReadLineAsync();
 
-                // v1.1.11: hold the gate from the check that the team exists until the membership is saved,
-                // so the empty-team cleanup cannot remove it in between (TeamMembershipGate)
-                bool exists, pwCorrect;
-                await TeamMembershipGate.Gate.WaitAsync();
-                try
-                {
-                    (exists, pwCorrect) = await backend.VerifyPlayerTeam(teamName, password);
-                    if (exists && pwCorrect)
-                    {
-                        currentPlayer.Team = teamName;
-                        currentPlayer.TeamPW = password;
-                        currentPlayer.CTurf = false;
-                        TeamHQBonus.RefreshLevels(currentPlayer);   // v1.1.11: the team's upgrades count from joining
-                        await PersistTeamMembershipChange();
-                    }
-                }
-                finally { TeamMembershipGate.Gate.Release(); }
+                // v1.1.11: a successful check stamps the team's last join, so the empty-team cleanup leaves it
+                // alone until this membership is saved (SqlSaveBackend.VerifyPlayerTeam / DeleteEmptyTeam)
+                var (exists, pwCorrect) = await backend.VerifyPlayerTeam(teamName, password);
                 if (exists && pwCorrect)
                 {
+                    currentPlayer.Team = teamName;
+                    currentPlayer.TeamPW = password;
+                    currentPlayer.CTurf = false;
+                    TeamHQBonus.RefreshLevels(currentPlayer);   // v1.1.11: the team's upgrades count from joining
+                    await PersistTeamMembershipChange();
 
                     WorldSimulator.RegisterPlayerTeam(teamName);
                     await backend.UpdatePlayerTeamMemberCount(teamName);

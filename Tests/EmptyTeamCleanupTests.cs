@@ -197,19 +197,18 @@ public class EmptyTeamCleanupTests : IDisposable
     }
 
     [Fact]
-    public void TheJoinAndTheCleanup_HoldTheSameGate()
+    public async Task AJoin_StampsTheTeam_AndTheDeleteLeavesAFreshlyJoinedTeamAlone()
     {
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "Scripts"))) dir = dir.Parent;
-        string corner = File.ReadAllText(Path.Combine(dir!.FullName, "Scripts", "Locations", "TeamCornerLocation.cs"));
-        string sim = File.ReadAllText(Path.Combine(dir.FullName, "Scripts", "Systems", "WorldSimService.cs"));
-        int wait = corner.IndexOf("await TeamMembershipGate.Gate.WaitAsync();", StringComparison.Ordinal);
-        int verify = corner.IndexOf("await backend.VerifyPlayerTeam(teamName, password);", StringComparison.Ordinal);
-        int persist = corner.IndexOf("await PersistTeamMembershipChange();", verify, StringComparison.Ordinal);
-        int release = corner.IndexOf("TeamMembershipGate.Gate.Release();", verify, StringComparison.Ordinal);
-        wait.Should().BeGreaterThan(0);
-        verify.Should().BeGreaterThan(wait, "the check that the team exists is inside the gate");
-        release.Should().BeGreaterThan(persist, "and so is the save of the membership");
-        sim.Should().Contain("TeamMembershipGate.Gate.Wait();").And.Contain("removedNow = !IsTeamOnline(team) && sqlBackend.DeleteEmptyTeam(team);");
+        // A join and the cleanup can run in different processes; the stamp is in the database (review).
+        Exec($"INSERT INTO player_teams (team_name, password_hash, created_by) VALUES ('Just Joined', '{SqlSaveBackend.HashTeamPassword("pw")}', 'founder');");
+        (await _db.VerifyPlayerTeam("Just Joined", "wrong")).Should().Be((true, false));
+        Count("SELECT COUNT(*) FROM player_teams WHERE team_name = 'Just Joined' AND last_join_at IS NOT NULL").Should().Be(0, "a failed check does not stamp");
+
+        (await _db.VerifyPlayerTeam("Just Joined", "pw")).Should().Be((true, true));
+        _db.DeleteEmptyTeam("Just Joined").Should().BeFalse("the joiner's save has not landed yet");
+
+        Exec($"UPDATE player_teams SET last_join_at = datetime('now', '-{GameConfig.EmptyTeamJoinGraceMinutes + 1} minutes') WHERE team_name = 'Just Joined';");
+        _db.DeleteEmptyTeam("Just Joined").Should().BeTrue("the join never became a membership");
+        (await _db.VerifyPlayerTeam("Just Joined", "pw")).Should().Be((false, false));
     }
 }

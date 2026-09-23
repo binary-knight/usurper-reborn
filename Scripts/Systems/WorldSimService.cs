@@ -1428,15 +1428,9 @@ namespace UsurperRemake.Systems
                 {
                     if (!_teamEmptySince.TryGetValue(team, out var since)) { _teamEmptySince[team] = now; continue; }
                     if (now - since < TimeSpan.FromMinutes(GameConfig.EmptyTeamGraceMinutes)) continue;
-                    // the last check and the delete, under the gate a join holds from its check to its save
-                    bool removedNow;
-                    TeamMembershipGate.Gate.Wait();
-                    try
-                    {
-                        removedNow = !IsTeamOnline(team) && sqlBackend.DeleteEmptyTeam(team);
-                    }
-                    finally { TeamMembershipGate.Gate.Release(); }
-                    if (!removedNow) { if (IsTeamOnline(team)) _teamEmptySince.Remove(team); continue; }
+                    // a join in any process stamps the team first, and the delete refuses a recent stamp
+                    if (IsTeamOnline(team)) { _teamEmptySince.Remove(team); continue; }
+                    if (!sqlBackend.DeleteEmptyTeam(team)) continue;
                     _teamEmptySince.Remove(team);
                     deleted.Add(team);
                     DebugLogger.Instance.LogInfo("WORLDSIM", $"Removed empty team '{team}'");

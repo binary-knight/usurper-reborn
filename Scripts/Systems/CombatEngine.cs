@@ -524,8 +524,13 @@ public partial class CombatEngine
         ScrubTransientCombatState(defender);
     }
 
-    public async Task<CombatResult> PlayerVsPlayer(Character attacker, Character defender, bool allowSurrender = true)
+    // v1.1.11: false for a duel whose caller brings the loser back (the Dormitory wake-up brawl), so a
+    // beaten NPC is not reported as killed (review)
+    private bool _pvpLethal = true;
+
+    public async Task<CombatResult> PlayerVsPlayer(Character attacker, Character defender, bool allowSurrender = true, bool lethal = true)
     {
+        _pvpLethal = lethal;
         // Wizard godmode: save HP/Mana before combat to restore after
         bool isGodMode = UsurperRemake.Server.SessionContext.IsActive
             && (UsurperRemake.Server.SessionContext.Current?.WizardGodMode ?? false);
@@ -26143,7 +26148,7 @@ public partial class CombatEngine
     private void ReportNPCDefeat(CombatResult result)
     {
         if (result.Opponent is not NPC npc || result.Player == null) return;
-        long bounty = QuestSystem.RecordNPCDefeat(result.Player, npc, killed: !npc.IsAlive);
+        long bounty = QuestSystem.RecordNPCDefeat(result.Player, npc, killed: _pvpLethal && !npc.IsAlive);
         if (bounty > 0)
         {
             terminal.WriteLine(Loc.Get("street.fight.bounty_collected", bounty.ToString("N0")), "bright_yellow");

@@ -1855,6 +1855,8 @@ public static partial class GameConfig
     public const int OldGodDefeatGoldPerLevel = 1000;
     // v1.1.11: a player team is removed only after it has been seen empty this long (WorldSimService.PruneEmptyTeams)
     public const int EmptyTeamGraceMinutes = 30;
+    // v1.1.11: after a join, the team is left alone this long so the joiner's save can land (every process)
+    public const int EmptyTeamJoinGraceMinutes = 10;
 
     // v1.1.10: regular dungeon monsters on the floors before an Old God's floor grow tougher, HP and
     // damage, by this much per floor: +5% five floors out, up to +25% on the floor before the god

@@ -905,7 +905,7 @@ public class DormitoryLocation : BaseLocation
             terminal.WriteLine(Loc.Get("dormitory.wakes_furious", npc.Name2), "red");
             await Task.Delay(1000);
 
-            var result = await combatEngine.PlayerVsPlayer(currentPlayer, npc);
+            var result = await combatEngine.PlayerVsPlayer(currentPlayer, npc, lethal: false);   // v1.1.11: the guest is brought back below
             if (!currentPlayer.IsAlive)
             {
                 terminal.WriteLine(Loc.Get("dormitory.knocked_out"), "red");

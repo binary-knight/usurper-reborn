@@ -112,4 +112,17 @@ public class NPCDefeatQuestTests
             System.Threading.Interlocked.Add(ref paid, QuestSystem.AutoCompleteBountyForNPC(new Character { Name2 = "Racer", Level = 30 }, target.Name)));
         paid.Should().Be(5000);
     }
+
+    [Fact]
+    public async Task ANonLethalDuel_WonAgainstAnAssassinationTarget_DoesNotMeetTheContract()
+    {
+        // The Dormitory wake-up brawl brings the guest back after the fight (review).
+        var (hunter, target, bounty) = Wanted("Sleeper Mark");
+        bounty.QuestTarget = QuestTarget.Assassin;
+        var engine = new CombatEngine(new TerminalEmulator(new MemoryStream(), new MemoryStream()));
+        typeof(CombatEngine).GetField("_pvpLethal", F)!.SetValue(engine, false);
+        await (Task)typeof(CombatEngine).GetMethod("DeterminePvPOutcome", F)!.Invoke(engine, new object[] { new CombatResult { Player = hunter, Opponent = target } })!;
+        bounty.Deleted.Should().BeFalse();
+        bounty.Deleted = true;
+    }
 }

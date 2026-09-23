@@ -476,7 +476,8 @@ namespace UsurperRemake.Systems
                         created_by TEXT NOT NULL,
                         created_at TEXT DEFAULT (datetime('now')),
                         member_count INTEGER DEFAULT 1,
-                        controls_turf INTEGER DEFAULT 0
+                        controls_turf INTEGER DEFAULT 0,
+                        last_join_at TEXT
                     );
 
                     CREATE TABLE IF NOT EXISTS trade_offers (
@@ -878,6 +879,16 @@ namespace UsurperRemake.Systems
             {
                 using var migCmd = connection.CreateCommand();
                 migCmd.CommandText = "ALTER TABLE players ADD COLUMN last_login_ip TEXT;";
+                migCmd.ExecuteNonQuery();
+            }
+            catch { /* Column already exists - expected */ }
+
+            // v1.1.11: when a player last joined the team; the empty-team cleanup leaves a team alone for a
+            // while after a join, in every process (a join and the cleanup can run in different processes)
+            try
+            {
+                using var migCmd = connection.CreateCommand();
+                migCmd.CommandText = "ALTER TABLE player_teams ADD COLUMN last_join_at TEXT;";
                 migCmd.ExecuteNonQuery();
             }
             catch { /* Column already exists - expected */ }
@@ -5429,7 +5440,14 @@ namespace UsurperRemake.Systems
             var result = await Task.Run(() => cmd.ExecuteScalar());
             if (result == null) return (false, false);
             var storedHash = result.ToString() ?? "";
-            return (true, VerifyPassword(password, storedHash));
+            if (!VerifyPassword(password, storedHash)) return (true, false);
+            // v1.1.11: stamp the join, so the empty-team cleanup (in this process or another) leaves the team
+            // alone until the membership is saved; no row means it was removed a moment ago
+            using var stamp = connection.CreateCommand();
+            stamp.CommandText = "UPDATE player_teams SET last_join_at = datetime('now') WHERE team_name = @name;";
+            stamp.Parameters.AddWithValue("@name", teamName);
+            if (stamp.ExecuteNonQuery() != 1) return (false, false);
+            return (true, true);
         }
         catch (Exception ex)
         {
@@ -5597,8 +5615,10 @@ namespace UsurperRemake.Systems
                         WHERE NOT json_valid(p.player_data)
                         OR (CASE WHEN json_valid(p.player_data) THEN json_extract(p.player_data, '$.player.team') END) = @team)
                     AND NOT EXISTS (SELECT 1 FROM deleted_characters d WHERE d.expires_at > datetime('now')
-                        AND (CASE WHEN json_valid(d.player_data) THEN json_extract(d.player_data, '$.player.team') END) = @team);";
+                        AND (CASE WHEN json_valid(d.player_data) THEN json_extract(d.player_data, '$.player.team') END) = @team)
+                    AND (last_join_at IS NULL OR last_join_at < datetime('now', '-' || @joinGrace || ' minutes'));";
                 team.Parameters.AddWithValue("@team", teamName);
+                team.Parameters.AddWithValue("@joinGrace", GameConfig.EmptyTeamJoinGraceMinutes);
                 if (team.ExecuteNonQuery() != 1) return false;
             }
             foreach (var table in new[] { "team_upgrades", "team_vault" })
