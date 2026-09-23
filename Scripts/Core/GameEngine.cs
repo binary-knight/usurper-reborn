@@ -4192,13 +4192,27 @@ public partial class GameEngine
     /// space and re-trigger delivery on next login. Each delivered row is cleared from the
     /// pending_inheritance table atomically.
     /// </summary>
+    /// <summary>
+    /// v1.1.10: the key a character's queued items are found under: the save key of the character
+    /// being played (the account name for a main, "name__alt" for an alt), the same key a world boss
+    /// queues an item under (WorldBossSystem.RowKey). It used to be the account name, so an alt's
+    /// item was never found, and an alt's session delivered its main's items to the alt.
+    /// </summary>
+    internal static string InheritanceKey(Character player)
+    {
+        var ctx = UsurperRemake.Server.SessionContext.Current;
+        var key = !string.IsNullOrEmpty(ctx?.CharacterKey) ? ctx.CharacterKey
+            : ctx?.Username
+            ?? UsurperRemake.BBS.DoorMode.GetPlayerName()
+            ?? player.Name2
+            ?? "";
+        return key.ToLowerInvariant();
+    }
+
     private async Task DeliverPendingInheritance(SqlSaveBackend backend)
     {
         if (currentPlayer == null) return;
-        var username = UsurperRemake.Server.SessionContext.Current?.Username
-            ?? UsurperRemake.BBS.DoorMode.GetPlayerName()?.ToLowerInvariant()
-            ?? currentPlayer.Name2?.ToLowerInvariant()
-            ?? "";
+        var username = InheritanceKey(currentPlayer);
         if (string.IsNullOrEmpty(username)) return;
 
         try
