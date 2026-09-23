@@ -19442,6 +19442,53 @@ public partial class CombatEngine
     /// <summary>
     /// Handle monster attacking a companion instead of the player
     /// </summary>
+    /// <summary>
+    /// v1.1.10: what a monster's special ability hit on a companion goes through after defence. It
+    /// used to skip the three things that protect a companion from a basic attack and the player
+    /// from the same ability: the lower boss cap in a fight's first rounds, the multi-hit
+    /// reduction (a special did not even count as a hit), and Shield Wall Formation. So a tank
+    /// that taunted four Gelatinous Cubes took four full Engulfs (player report: about 4,000
+    /// damage). The order is the basic attack's, so a special is never mitigated more than a basic
+    /// hit: the brace, the per-hit cap, the boss minimum, the multi-hit reduction, Formation, then
+    /// the Old God cap. The counter lives here too, so a basic hit after a special in the same round
+    /// is reduced as a second hit.
+    /// </summary>
+    private long MitigateCompanionAbilityHit(Monster monster, Character companion, long damage, CombatResult result)
+    {
+        if (companion.IsDefending) damage = Math.Max(1, damage / 2); // v1.2: brace covers specials and life drain too
+
+        double capPercent;
+        if (monster.IsBoss && result.CurrentRound <= GameConfig.BossFirstRoundsDamageCapRounds)
+            capPercent = GameConfig.BossFirstRoundsDamageCapPercent;
+        else if (monster.IsBoss)
+            capPercent = 0.85;
+        else
+            capPercent = 0.75;
+        long maxDmg = Math.Max(1, (long)(companion.MaxHP * capPercent));
+        if (damage > maxDmg) damage = maxDmg;
+        if (monster.IsBoss)
+            damage = Math.Max(damage, (long)(monster.Level * 1.5));
+
+        if (companion._hitsThisRound > 0)
+        {
+            double reduction = Math.Min(0.50, companion._hitsThisRound * 0.25);   // as the basic attack: 25% per extra hit, cap 50%
+            damage = Math.Max(1, (long)(damage * (1.0 - reduction)));
+        }
+        companion._hitsThisRound++;
+
+        if (companion.TempDamageReductionPercent > 0 && companion.TempDamageReductionDuration > 0 && damage > 1)
+        {
+            long reduced = (long)(damage * (companion.TempDamageReductionPercent / 100.0));
+            if (reduced > 0)
+            {
+                damage = Math.Max(1, damage - reduced);
+                terminal.WriteLine(Loc.Get("combat.shield_wall_formation_absorbs", reduced), "bright_cyan");
+            }
+        }
+
+        return CapTeammateDamageInOldGodFight(companion, damage);
+    }
+
     private async Task MonsterAttacksCompanion(Monster monster, Character companion, CombatResult result, List<Monster>? liveMonsterList = null)
     {
         // Check if companion will dodge (from Time Stop, abilities, etc.)
@@ -19487,14 +19534,7 @@ public partial class CombatEngine
                             terminal.SetColor("dark_gray");
                             terminal.WriteLine($"[{abilityResult.DirectDamage} damage vs {abilityDefense} defense]");
                         }
-                        // Cap ability damage per hit (same as player path)
-                        double abCapPct = monster.IsBoss ? 0.85 : 0.75;
-                        long abMaxDmg = Math.Max(1, (long)(companion.MaxHP * abCapPct));
-                        if (actualDmg > abMaxDmg) actualDmg = abMaxDmg;
-                        if (monster.IsBoss)
-                            actualDmg = Math.Max(actualDmg, (long)(monster.Level * 1.5));
-                        actualDmg = CapTeammateDamageInOldGodFight(companion, actualDmg);
-                        if (companion.IsDefending) actualDmg = Math.Max(1, actualDmg / 2); // v1.2: brace covers specials too
+                        actualDmg = MitigateCompanionAbilityHit(monster, companion, actualDmg, result);
                         RecordAllyHit(companion, actualDmg); // v1.1.3
                         companion.HP = Math.Max(0, companion.HP - actualDmg);
                         terminal.WriteLine($"{companion.DisplayName} takes {actualDmg} damage!", "red");
@@ -19520,14 +19560,7 @@ public partial class CombatEngine
                             terminal.SetColor("dark_gray");
                             terminal.WriteLine($"[{rawAbilityDmg} damage vs {abilityDefense} defense]");
                         }
-                        // Cap ability damage per hit
-                        double dmCapPct = monster.IsBoss ? 0.85 : 0.75;
-                        long dmMaxDmg = Math.Max(1, (long)(companion.MaxHP * dmCapPct));
-                        if (dmg > dmMaxDmg) dmg = dmMaxDmg;
-                        if (monster.IsBoss)
-                            dmg = Math.Max(dmg, (long)(monster.Level * 1.5));
-                        dmg = CapTeammateDamageInOldGodFight(companion, dmg);
-                        if (companion.IsDefending) dmg = Math.Max(1, dmg / 2); // v1.2: brace covers life drain too
+                        dmg = MitigateCompanionAbilityHit(monster, companion, dmg, result);
                         RecordAllyHit(companion, dmg); // v1.1.3
                         companion.HP = Math.Max(0, companion.HP - dmg);
                         if (abilityResult.LifeStealPercent > 0)
