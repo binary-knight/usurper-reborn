@@ -1985,17 +1985,8 @@ public class DungeonLocation : BaseLocation
                     StoryProgressionSystem.Instance.CollectedArtifacts.Add(artifactType.Value);
                 }
 
-                // XP and gold reward
-                if (result.XPGained > 0)
-                {
-                    player.Experience += result.XPGained;
-                    term.WriteLine(Loc.Get("dungeon.xp_gained", result.XPGained), "green");
-                }
-                if (result.GoldGained > 0)
-                {
-                    player.Gold += result.GoldGained;
-                    term.WriteLine(Loc.Get("dungeon.gold_gained", result.GoldGained), "yellow");
-                }
+                // v1.1.11: the XP and gold were paid by OldGodBossSystem.HandleBossDefeated; adding
+                // result.XPGained and GoldGained here paid them again
 
                 // Chivalry impact — v0.57.12: paired movement (killing an Old God is evil, lowers chivalry)
                 AlignmentSystem.Instance.ChangeAlignment(player, 100, isGood: false, "dungeon.old_god_killed");

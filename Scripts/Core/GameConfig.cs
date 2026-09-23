@@ -1848,6 +1848,11 @@ public static partial class GameConfig
     // 1.25 as written). Capped here until the gods are retuned against the dialogue; the softer
     // answers (down to 0.50) are not capped.
     public const double OldGodDialogueBossDamageCap = 1.10;
+    // v1.1.11: an Old God kill paid its reward three times (the fight's victory, the god-defeated
+    // handler, and the dungeon again). It is paid once now, by the handler, at three times the old
+    // per-level amount, so a kill is worth what it was.
+    public const int OldGodDefeatXPPerLevel = 6000;
+    public const int OldGodDefeatGoldPerLevel = 1500;
 
     // v1.1.10: regular dungeon monsters on the floors before an Old God's floor grow tougher, HP and
     // damage, by this much per floor: +5% five floors out, up to +25% on the floor before the god
