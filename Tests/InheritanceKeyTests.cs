@@ -107,7 +107,9 @@ public class InheritanceKeyTests : IDisposable
         var output = new MemoryStream();
         var term = new TerminalEmulator(new MemoryStream(), output);
 
+        var clock = System.Diagnostics.Stopwatch.StartNew();
         (await GameEngine.DeliverPendingInheritance(hero, term, _db)).Should().Be(0);
+        clock.ElapsedMilliseconds.Should().BeGreaterThanOrEqualTo(1_400, "the line is held on screen before the /boss screen clears it");
         term.StreamWriterInternal!.Flush();
         string shown = System.Text.Encoding.UTF8.GetString(output.ToArray());
         shown.Should().Contain(Loc.Get("engine.inheritance_waiting", 2)).And.NotContain(Loc.Get("engine.inheritance_header"));

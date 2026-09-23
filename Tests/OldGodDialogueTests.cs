@@ -165,6 +165,51 @@ public class OldGodDialogueTests
         (await Lands(0.25)).Should().Be((long)Math.Round(await Lands(0) * 1.25));
     }
 
+    // The other three places the player's damage lands (supervisor: each was unpinned). Each is run
+    // twice with the engine's random seeded the same, once plain and once with a +25% answer.
+    private static (CombatEngine engine, Character hero, Monster god) Setup(double answer)
+    {
+        var engine = new CombatEngine(new TerminalEmulator(new MemoryStream(), new MemoryStream()));
+        typeof(CombatEngine).GetField("random", F)!.SetValue(engine, new Random(42));
+        var hero = Hero(); hero.DialogueDamagePercent = answer;
+        typeof(CombatEngine).GetField("currentPlayer", F)!.SetValue(engine, hero);
+        var god = new Monster { Name = "Maelketh", Level = 28, HP = 1_000_000, MaxHP = 1_000_000, Defence = 0, IsActive = true };
+        return (engine, hero, god);
+    }
+
+    private static async Task<long> LandedBy(string path, double answer)
+    {
+        var (engine, hero, god) = Setup(answer);
+        switch (path)
+        {
+            case "handler ability":
+                typeof(CombatEngine).GetMethod("ApplyHandlerAbilityDamage", F)!
+                    .Invoke(engine, new object[] { hero, god, 1_000L, new CombatResult(), new ClassAbilityResult() });
+                break;
+            case "area attack":
+                await (Task)typeof(CombatEngine).GetMethod("ApplyAoEDamage", F)!
+                    .Invoke(engine, new object?[] { new List<Monster> { god }, 1_000L, new CombatResult(), "an area attack", false, hero })!;
+                break;
+            case "single-target ability":
+                var ability = new ClassAbilityResult { AbilityUsed = ClassAbilitySystem.GetAbility("power_strike"), Damage = 1_000 };
+                await (Task)typeof(CombatEngine).GetMethod("ApplyAbilityEffectsMultiMonster", F)!
+                    .Invoke(engine, new object[] { hero, god, new List<Monster> { god }, ability, new CombatResult() })!;
+                break;
+        }
+        return 1_000_000 - god.HP;
+    }
+
+    [Theory]
+    [InlineData("handler ability")]
+    [InlineData("area attack")]
+    [InlineData("single-target ability")]
+    public async Task TheDamageAnswer_ReachesEveryOtherPlaceThePlayersDamageLands(string path)
+    {
+        long plain = await LandedBy(path, 0), answered = await LandedBy(path, 0.25);
+        plain.Should().BeGreaterThan(0, path);
+        answered.Should().BeCloseTo((long)Math.Round(plain * 1.25), 2, path);
+    }
+
     [Fact]
     public void TheDefenceAnswer_CountsAgainstAGodsNamedAttacks()
     {

@@ -4258,6 +4258,8 @@ public partial class GameEngine
                 terminal.SetColor("yellow");
                 terminal.WriteLine(Loc.Get("engine.inheritance_waiting", pending.Count));
                 terminal.WriteLine("");
+                // the same pause the delivered path takes: the /boss screen clears right after this
+                await Task.Delay(1500);
                 return 0;
             }
 
