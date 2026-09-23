@@ -3521,7 +3521,8 @@ public class CastleLocation : BaseLocation
                 NewsSystem.Instance.Newsy(true, $"BOUNTY: {amount:N0} gold on {name} by order of {currentKing.GetTitle()} {currentKing.Name}!");
 
                 // Wire into QuestSystem so the bounty is trackable
-                QuestSystem.PostBountyOnPlayer(name, "Royal decree", amount);
+                // v1.1.11: the king names anyone; a name an NPC carries is taken as that NPC
+                QuestSystem.PostBountyOnPlayer(name, "Royal decree", amount, onPlayer: !QuestSystem.IsNPCName(name));
 
                 // Broadcast and persist
                 if (DoorMode.IsOnlineMode)
@@ -7184,7 +7185,7 @@ public class CastleLocation : BaseLocation
                         NewsSystem.Instance?.Newsy(true, $"A bounty has been placed on {target.Name} by royal decree!");
 
                         // Wire into QuestSystem so the bounty is trackable
-                        QuestSystem.PostBountyOnPlayer(target.Name, "Criminal activity", (int)Math.Min(bountyCost, int.MaxValue));
+                        QuestSystem.PostBountyOnPlayer(target.Name, "Criminal activity", (int)Math.Min(bountyCost, int.MaxValue), onPlayer: false);   // v1.1.11: an NPC
 
                         // Small chivalry boost for reporting — v0.57.12: paired movement
                         AlignmentSystem.Instance.ChangeAlignment(currentPlayer, 5, isGood: true, "castle.report_crime");

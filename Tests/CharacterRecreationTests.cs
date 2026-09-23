@@ -385,4 +385,16 @@ public class CharacterRecreationTests : IDisposable
             foreach (var q in QuestSystem.GetAllQuests(includeCompleted: true).Where(q => q.TargetNPCName == "Sable")) q.Deleted = true;
         }
     }
+
+    [Fact]
+    public void ABountyPostedOnAnNPC_IsNotAPlayerBounty_SoBeatingTheNPCPaysIt()
+    {
+        // Review: the Castle's crime report posts a paid bounty on an NPC through PostBountyOnPlayer; marking it
+        // as a player bounty made it uncollectable.
+        var src = CodeOnly(Source("Locations", "CastleLocation.cs"));
+        src.Should().Contain("\"Criminal activity\", (int)Math.Min(bountyCost, int.MaxValue), onPlayer: false)");
+        src.Should().Contain("\"Royal decree\", amount, onPlayer: !QuestSystem.IsNPCName(name))");
+        var quest = CodeOnly(Source("Systems", "QuestSystem.cs"));
+        quest.Should().Contain("IsPlayerBounty = onPlayer");
+    }
 }

@@ -2196,21 +2196,24 @@ public partial class QuestSystem
     /// <summary>
     /// The King can post a bounty on the player if they commit crimes
     /// </summary>
-    public static void PostBountyOnPlayer(string playerName, string crime, long bountyAmount)
+    /// <param name="onPlayer">v1.1.11: false when the target is an NPC (a reported crime); only a bounty on a
+    /// player is marked IsPlayerBounty, which NPC defeats never pay (review).</param>
+    public static void PostBountyOnPlayer(string playerName, string crime, long bountyAmount, bool onPlayer = true)
     {
         var king = CastleLocation.GetCurrentKing();
         if (king == null) return;
 
         // Check if player already has an active bounty
         // v1.1.11: only a bounty on this PLAYER is topped up; an NPC of the same name keeps its own (review)
-        var existingBounty = questDatabase.FirstOrDefault(q =>
-            !q.Deleted && IsBountyOnPlayer(q.Initiator, q.TitleKey, q.TargetNPCName, q.IsPlayerBounty, playerName));
+        var existingBounty = questDatabase.FirstOrDefault(q => !q.Deleted && (onPlayer
+            ? IsBountyOnPlayer(q.Initiator, q.TitleKey, q.TargetNPCName, q.IsPlayerBounty, playerName)
+            : q.Initiator == KING_BOUNTY_INITIATOR && !q.IsPlayerBounty && string.Equals(q.TargetNPCName, playerName, StringComparison.OrdinalIgnoreCase)));
 
         if (existingBounty != null)
         {
             // Increase existing bounty
             existingBounty.BountyGold += bountyAmount;
-            existingBounty.IsPlayerBounty = true;   // a legacy one is marked from now on
+            if (onPlayer) existingBounty.IsPlayerBounty = true;   // a legacy one is marked from now on
             existingBounty.Comment += $" {Loc.Get("quest.bounty.additional_charge", crime)}";
             NewsSystem.Instance?.Newsy(true, Loc.Get("quest.bounty_increased_news", playerName, existingBounty.BountyGold));
             return;
@@ -2231,7 +2234,7 @@ public partial class QuestSystem
             BountyGold = bountyAmount,  // Actual gold amount (not limited by byte Reward)
             RewardType = QuestRewardType.Money,
             TargetNPCName = playerName,
-            IsPlayerBounty = true   // v1.1.11
+            IsPlayerBounty = onPlayer   // v1.1.11
         };
 
         bounty.Objectives.Add(new QuestObjective(
