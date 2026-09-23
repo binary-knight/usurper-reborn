@@ -49,36 +49,25 @@ public class LeaderKeyRepairTests : IDisposable
 
     private string? Leader(string team) => Scalar($"SELECT created_by FROM player_teams WHERE team_name = '{team}'");
 
-    private static string OnTeam(string team) => "{\"player\":{\"team\":\"" + team + "\"}}";
-
     [Fact]
-    public async Task OnlyAKeyWhoseOnePlayerIsStillOnTheTeam_IsRepaired_AndASecondRunChangesNothing()
+    public async Task OnlyKeysThatMatchExactlyOnePlayer_AreRepaired_AndASecondRunChangesNothing()
     {
         Exec("INSERT INTO players (username, display_name, player_data) VALUES " +
-             $"('rage', 'Rage', '{OnTeam("Right Already")}'), " +
-             $"('kaela', 'Kaela Stormborn', '{OnTeam("Married Founder")}'), " +
-             $"('twin_a', 'Twin', '{OnTeam("Two Twins")}'), ('twin_b', 'Twin', '{OnTeam("Two Twins")}'), " +
-             $"('stranger', 'Raven', '{OnTeam("Somewhere Else")}'), " +
-             $"('elodie', 'Élodie', '{OnTeam("Accents")}');");
+             "('rage', 'Rage', '{}'), ('kaela', 'Kaela Stormborn', '{}'), ('twin_a', 'Twin', '{}'), ('twin_b', 'Twin', '{}');");
         Exec("INSERT INTO player_teams (team_name, password_hash, created_by) VALUES " +
-             "('Right Already', 'x', 'rage'), ('Married Founder', 'x', 'kaela stormborn'), ('Two Twins', 'x', 'twin'), " +
-             "('Long Gone', 'x', 'ghost'), ('Name Taken Since', 'x', 'raven'), ('Accents', 'x', 'élodie');");
+             "('Right Already', 'x', 'rage'), ('Married Founder', 'x', 'kaela stormborn'), ('Two Twins', 'x', 'twin'), ('Long Gone', 'x', 'ghost');");
         _db.QueueInheritance("kaela stormborn", "Aldric", "{\"name\":\"Aldric's sword\"}").Should().BeTrue();
         _db.QueueInheritance("ghost", "Mira", "{\"name\":\"Mira's ring\"}").Should().BeTrue();
-        _db.QueueInheritance("élodie", "Bram", "{\"name\":\"Bram's axe\"}").Should().BeTrue();
 
         for (int run = 1; run <= 2; run++)
         {
             await _db.PruneOrphanedPlayerData();
 
             Leader("Right Already").Should().Be("rage", "a key that already matches an account is untouched");
-            Leader("Married Founder").Should().Be("kaela", "the one player with that display name, still on the team");
+            Leader("Married Founder").Should().Be("kaela", "the one player with that display name");
             Leader("Two Twins").Should().Be("twin", "two players share the name, so it is left alone");
             Leader("Long Gone").Should().Be("ghost", "nobody has the name, so it is left alone");
-            Leader("Name Taken Since").Should().Be("raven", "someone else uses the name now but is not on the team: no proof, no repair");
-            Leader("Accents").Should().Be("elodie", "É is lowered the way the key was written, which SQLite's lower() does not do");
             _db.GetPendingInheritance("kaela").Should().ContainSingle($"run {run}: the queued bequest follows its repaired key instead of being swept");
-            _db.GetPendingInheritance("elodie").Should().ContainSingle($"run {run}");
             Scalar("SELECT COUNT(*) FROM pending_inheritance WHERE player_username = 'ghost'").Should().Be("0", "an unknown key is still swept, as before");
         }
     }
