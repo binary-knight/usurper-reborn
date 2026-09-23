@@ -815,7 +815,7 @@ namespace UsurperRemake.Systems
             var bossMonster = CreateBossMonster(boss);
 
             // Apply dialogue-based stat adjustments to the monster
-            ApplyModifiersToMonster(bossMonster);
+            ApplyModifiersToMonster(bossMonster, player);
 
             // v1.1.10: the player's dialogue bonuses are applied by the combat engine after its
             // fight-start reset (BossCombatContext.ApplyPlayerModifiers). Applied here, before the
@@ -947,7 +947,7 @@ namespace UsurperRemake.Systems
         /// <summary>
         /// Apply dialogue-based modifiers to the boss monster's stats
         /// </summary>
-        private void ApplyModifiersToMonster(Monster monster)
+        private void ApplyModifiersToMonster(Monster monster, Character player)
         {
             if (activeCombatModifiers.BossWeakened)
             {
@@ -955,14 +955,29 @@ namespace UsurperRemake.Systems
                 monster.WeapPow = (long)(monster.WeapPow * 0.85);
             }
 
-            // v1.1.10: the god's damage from the dialogue, the same way BossWeakened works, so every
-            // damage path (basic, specials, named abilities) follows it. Nothing used to read it. The
-            // harsh side is capped at GameConfig.OldGodDialogueBossDamageCap until the gods are retuned.
-            double bossDamage = Math.Min(activeCombatModifiers.BossDamageMultiplier, GameConfig.OldGodDialogueBossDamageCap);
+            // v1.1.10: the answer's effect on damage and defence is carried on the god, once, so every
+            // attack in the fight follows it; the combat engine has dozens of separate damage paths and a
+            // player-side bonus missed many of them (Codex review). The answer's own god-damage change
+            // (BossDamageMultiplier, read by nothing before) combines with the player's defence answer:
+            // +20% defence is the god hitting 1/1.2 as hard. The harsh side of that product is capped at
+            // GameConfig.OldGodDialogueBossDamageCap until the gods are retuned. The player's damage
+            // answer shortens the god's HP: +25% damage is the god having 1/1.25 of it. Both reach the
+            // whole party, not only the player.
+            long defenceBase = Math.Max(1, player.Defence + player.ArmPow);
+            double playerDefence = Math.Max(0.1, activeCombatModifiers.DefenseMultiplier + (double)activeCombatModifiers.BonusDefense / defenceBase);
+            double bossDamage = Math.Min(activeCombatModifiers.BossDamageMultiplier / playerDefence, GameConfig.OldGodDialogueBossDamageCap);
             if (bossDamage != 1.0)
             {
                 monster.Strength = (long)(monster.Strength * bossDamage);
                 monster.WeapPow = (long)(monster.WeapPow * bossDamage);
+            }
+
+            long attackBase = Math.Max(1, player.Strength + player.WeapPow);
+            double playerDamage = Math.Max(0.1, activeCombatModifiers.DamageMultiplier + (double)activeCombatModifiers.BonusDamage / attackBase);
+            if (playerDamage != 1.0)
+            {
+                monster.MaxHP = Math.Max(1, (long)Math.Round(monster.MaxHP / playerDamage));
+                monster.HP = monster.MaxHP;
             }
 
             if (activeCombatModifiers.BossDefenseMultiplier != 1.0)
@@ -983,20 +998,9 @@ namespace UsurperRemake.Systems
         /// </summary>
         private void ApplyModifiersToPlayer(Character player)
         {
-            // v1.1.10: called by the combat engine after its fight-start reset. Penalties below 1.0
-            // apply too (they were skipped), flat bonuses and crit chance are applied (they never
-            // were), and a penalty can take a stat down to zero, not below it.
-            // the damage answer is a share of everything the player lands (basic blows, abilities,
-            // spells), so it is kept as a fraction; a flat BonusDamage is folded in against the attack
-            // stats it would have been added to. Floored at -100%.
-            long attackBase = Math.Max(1, player.Strength + player.WeapPow);
-            double damage = (activeCombatModifiers.DamageMultiplier - 1.0) + (double)activeCombatModifiers.BonusDamage / attackBase;
-            player.DialogueDamagePercent = Math.Max(-1.0, damage);
-
-            long defenceBase = player.Defence + player.ArmPow;
-            int defence = (int)((activeCombatModifiers.DefenseMultiplier - 1.0) * defenceBase) + activeCombatModifiers.BonusDefense;
-            player.DialogueDefenseBonus = (int)Math.Max(defence, -defenceBase);
-
+            // v1.1.10: called by the combat engine after its fight-start reset. The answer's damage and
+            // defence are carried on the god (ApplyModifiersToMonster), which every attack reaches;
+            // crit chance, bloodlust and insight belong to the player.
             // CriticalChance is written as a total with 5% as the neutral base; the difference is the bonus
             player.TempCritChanceBonus = (int)Math.Round((activeCombatModifiers.CriticalChance - 0.05) * 100);
 
@@ -1023,8 +1027,6 @@ namespace UsurperRemake.Systems
             player.TempAttackBonusDuration = 0;
             player.TempDefenseBonusDuration = 0;
             player.TempCritChanceBonus = 0;
-            player.DialogueDamagePercent = 0;
-            player.DialogueDefenseBonus = 0;
         }
 
         /// <summary>

@@ -31,8 +31,11 @@ the same thread.
   promised effects ("+25% damage, -15% defense, +15% crit") and delivered
   almost none: the player's bonuses were wiped as the fight began,
   penalties and crit chance were never applied, and the god's own damage
-  change was read by nothing. They all apply now. A harsh answer can make a
-  god at most 10 percent stronger until the gods are retuned; the softer
+  change was read by nothing. They all apply now. An answer's effect on
+  damage and defence is carried by the god for the whole fight, so it
+  counts for the whole party: a damage answer shortens the god's health and
+  a defence answer changes how hard it hits. A harsh answer can make a god
+  hit at most 10 percent harder until the gods are retuned; the softer
   answers apply in full.
 
 ## Companions
@@ -88,7 +91,7 @@ the same thread.
 
 ## Tests
 
-1,361 passing, up from 1,278. The new ones drive the Inn's patron screen,
+1,358 passing, up from 1,278. The new ones drive the Inn's patron screen,
 the god fight's reset and dialogue hook, companion hits from specials and
 from gods, the PvP control guards, the inheritance queue against a real
 database (alts, failed writes, full packs, new teams), and the ramp.

@@ -68,8 +68,8 @@ public class OldGodDialogueTests
     private static void ApplyToPlayer(Character p) =>
         typeof(OldGodBossSystem).GetMethod("ApplyModifiersToPlayer", F)!.Invoke(OldGodBossSystem.Instance, new object[] { p });
 
-    private static void ApplyToMonster(Monster m) =>
-        typeof(OldGodBossSystem).GetMethod("ApplyModifiersToMonster", F)!.Invoke(OldGodBossSystem.Instance, new object[] { m });
+    private static void ApplyToMonster(Monster m, Character player) =>
+        typeof(OldGodBossSystem).GetMethod("ApplyModifiersToMonster", F)!.Invoke(OldGodBossSystem.Instance, new object[] { m, player });
 
     [Fact]
     public async Task TheDialogueHook_FiresAfterTheFightStartReset_InARealFight()
@@ -79,13 +79,12 @@ public class OldGodDialogueTests
         var engine = new CombatEngine(term);
         var hero = Hero();
         hero.TempAttackBonus = 777;          // leftovers the reset must clear before the hook runs
-        hero.DialogueDamagePercent = 0.77;
         hero.HasBloodlust = true;
-        int? attackSeen = null; bool? bloodlustSeen = null; double? dialogueSeen = null;
+        int? attackSeen = null; bool? bloodlustSeen = null;
         engine.BossContext = new BossCombatContext
         {
             BossData = UsurperRemake.Data.OldGodsData.GetGodBossData(OldGodType.Maelketh),
-            ApplyPlayerModifiers = p => { attackSeen = p.TempAttackBonus; bloodlustSeen = p.HasBloodlust; dialogueSeen = p.DialogueDamagePercent; },
+            ApplyPlayerModifiers = p => { attackSeen = p.TempAttackBonus; bloodlustSeen = p.HasBloodlust; },
         };
         var rat = new Monster { Name = "Sewer Rat", Level = 1, HP = 1, MaxHP = 1, Strength = 1, Defence = 0, Experience = 5, Gold = 3 };
         try { await engine.PlayerVsMonsters(hero, new List<Monster> { rat }, offerMonkEncounter: false); }
@@ -93,147 +92,39 @@ public class OldGodDialogueTests
 
         attackSeen.Should().Be(0, "the hook runs after the reset, so what it applies survives into the fight");
         bloodlustSeen.Should().BeFalse();
-        dialogueSeen.Should().Be(0, "last fight's dialogue answer does not carry into this one");
     }
 
+    private static Monster God() => new Monster { Name = "Maelketh", Level = 28, HP = 49_500, MaxHP = 49_500, Strength = 1000, WeapPow = 1000, IsBoss = true };
+
     [Fact]
-    public void TheRecklessAnswer_GivesAttack_TakesDefence_AndRaisesCrit()
+    public void TheRecklessAnswer_ShortensTheGod_SharpensItsBlows_AndRaisesCrit()
     {
-        // Maelketh's "destroy you" answer: +25% damage, -15% defence (it used to be skipped), 15% crit
+        // Maelketh's "destroy you" answer: +25% damage, -15% defence, 15% crit. Damage and defence are
+        // carried on the god, so every attack in the fight follows them (Codex round 3: a bonus on the
+        // player's side missed dozens of damage paths).
         var hero = Hero();
+        var god = God();
         int critBefore = StatEffectsSystem.CritChance(hero);
         WithModifiers(m => { Set(m, "DamageMultiplier", 1.25); Set(m, "DefenseMultiplier", 0.85); Set(m, "CriticalChance", 0.15); Set(m, "HasRageBoost", true); },
-            () => ApplyToPlayer(hero));
+            () => { ApplyToMonster(god, hero); ApplyToPlayer(hero); });
 
-        hero.DialogueDamagePercent.Should().BeApproximately(0.25, 1e-9, "+25% on everything the player lands");
-        hero.DialogueDefenseBonus.Should().Be(-15, "15% off Defence 50 + ArmPow 50");
-
-        // an ability buff replaces the temporary defence bonus and then runs out; the answer stays
-        hero.TempDefenseBonus = 30; hero.TempDefenseBonusDuration = 3;
-        hero.TempDefenseBonus = 0; hero.TempDefenseBonusDuration = 0;
-        hero.DialogueDefenseBonus.Should().Be(-15, "a Shield Wall used to erase the dialogue penalty for the rest of the fight");
+        god.MaxHP.Should().Be(39_600, "+25% damage is the god having 1/1.25 of its HP");
+        god.HP.Should().Be(god.MaxHP);
+        god.Strength.Should().Be(1_100, "-15% defence is the god hitting 1/0.85 as hard, capped at 1.10 until the gods are retuned");
         hero.TempCritChanceBonus.Should().Be(10, "15% written against the 5% base");
         StatEffectsSystem.CritChance(hero).Should().BeGreaterThan(critBefore, "the roll site reads the bonus");
         hero.HasBloodlust.Should().BeTrue();
     }
 
     [Fact]
-    public async Task TheDefenceAnswer_IsReadWhenAMonsterHitsThePlayer()
+    public void TheCautiousAnswer_SoftensTheGodsBlows()
     {
-        // Through the real monster-attack path: blows against a +1,500 dialogue defence land for far
-        // less than without it (defence is scaled down later in the path, so not the full 1,500). A
-        // blow can miss, so the average of the blows that land over many turns is compared, and each
-        // side must have landed some.
-        async Task<double> AverageHit(int dialogueDefence)
-        {
-            var engine = new CombatEngine(new TerminalEmulator(new MemoryStream(), new MemoryStream()));
-            var turn = typeof(CombatEngine).GetMethod("ProcessMonsterAction", F)!;
-            var hits = new List<long>();
-            for (int i = 0; i < 60; i++)
-            {
-                var hero = Hero();
-                hero.HP = hero.MaxHP = 200_000;   // the per-hit floor is 0.25% of MaxHP: 500, well under both averages
-                hero.DialogueDefenseBonus = dialogueDefence;
-                var brute = new Monster { Name = "Brute", Level = 30, HP = 10_000, MaxHP = 10_000, Strength = 2_000, WeapPow = 0, Defence = 0, IsActive = true };
-                typeof(CombatEngine).GetField("currentPlayer", F)!.SetValue(engine, hero);   // instant speed: no combat delays
-                await (Task)turn.Invoke(engine, new object?[] { brute, hero, new CombatResult { CurrentRound = 10 }, null })!;
-                if (hero.HP < 200_000) hits.Add(200_000 - hero.HP);
-            }
-            hits.Should().NotBeEmpty("some blows must land for the comparison to mean anything");
-            return hits.Average();
-        }
-        double plain = await AverageHit(0), shielded = await AverageHit(1_500);
-        (plain - shielded).Should().BeGreaterThan(600, $"average hit {plain:F0} plain, {shielded:F0} with the answer");
-    }
-
-    [Fact]
-    public async Task TheDamageAnswer_ReachesWhatLandsThroughTheSharedDamagePath()
-    {
-        // Basic blows, spells, backstab and the other strikes all land through ApplySingleMonsterDamage
-        // with the player as the attacker; the answer is applied there (Codex round 2: it reached only
-        // the basic swing before). The same 1,000 lands as 1,250 with a +25% answer.
-        async Task<long> Lands(double answer)
-        {
-            var engine = new CombatEngine(new TerminalEmulator(new MemoryStream(), new MemoryStream()));
-            var hero = Hero(); hero.DialogueDamagePercent = answer;
-            typeof(CombatEngine).GetField("currentPlayer", F)!.SetValue(engine, hero);
-            var god = new Monster { Name = "Maelketh", Level = 28, HP = 1_000_000, MaxHP = 1_000_000, Defence = 0, IsActive = true };
-            await (Task<bool>)typeof(CombatEngine).GetMethod("ApplySingleMonsterDamage", F)!
-                .Invoke(engine, new object?[] { god, 1_000L, new CombatResult(), "a spell", hero, true })!;
-            return 1_000_000 - god.HP;
-        }
-        (await Lands(0.25)).Should().Be((long)Math.Round(await Lands(0) * 1.25));
-    }
-
-    // The other three places the player's damage lands (supervisor: each was unpinned). Each is run
-    // twice with the engine's random seeded the same, once plain and once with a +25% answer.
-    private static (CombatEngine engine, Character hero, Monster god) Setup(double answer)
-    {
-        var engine = new CombatEngine(new TerminalEmulator(new MemoryStream(), new MemoryStream()));
-        typeof(CombatEngine).GetField("random", F)!.SetValue(engine, new Random(42));
-        var hero = Hero(); hero.DialogueDamagePercent = answer;
-        typeof(CombatEngine).GetField("currentPlayer", F)!.SetValue(engine, hero);
-        var god = new Monster { Name = "Maelketh", Level = 28, HP = 1_000_000, MaxHP = 1_000_000, Defence = 0, IsActive = true };
-        return (engine, hero, god);
-    }
-
-    private static async Task<long> LandedBy(string path, double answer)
-    {
-        var (engine, hero, god) = Setup(answer);
-        switch (path)
-        {
-            case "handler ability":
-                typeof(CombatEngine).GetMethod("ApplyHandlerAbilityDamage", F)!
-                    .Invoke(engine, new object[] { hero, god, 1_000L, new CombatResult(), new ClassAbilityResult() });
-                break;
-            case "area attack":
-                await (Task)typeof(CombatEngine).GetMethod("ApplyAoEDamage", F)!
-                    .Invoke(engine, new object?[] { new List<Monster> { god }, 1_000L, new CombatResult(), "an area attack", false, hero })!;
-                break;
-            case "single-target ability":
-                var ability = new ClassAbilityResult { AbilityUsed = ClassAbilitySystem.GetAbility("power_strike"), Damage = 1_000 };
-                await (Task)typeof(CombatEngine).GetMethod("ApplyAbilityEffectsMultiMonster", F)!
-                    .Invoke(engine, new object[] { hero, god, new List<Monster> { god }, ability, new CombatResult() })!;
-                break;
-        }
-        return 1_000_000 - god.HP;
-    }
-
-    [Theory]
-    [InlineData("handler ability")]
-    [InlineData("area attack")]
-    [InlineData("single-target ability")]
-    public async Task TheDamageAnswer_ReachesEveryOtherPlaceThePlayersDamageLands(string path)
-    {
-        long plain = await LandedBy(path, 0), answered = await LandedBy(path, 0.25);
-        plain.Should().BeGreaterThan(0, path);
-        answered.Should().BeCloseTo((long)Math.Round(plain * 1.25), 2, path);
-    }
-
-    [Fact]
-    public void TheDefenceAnswer_CountsAgainstAGodsNamedAttacks()
-    {
-        // Cleave and the other named attacks land through ApplyBossAbilityDamageToPlayer; the answer is
-        // applied there as it is to ordinary blows (Codex round 2).
-        long Taken(int answer)
-        {
-            var engine = new CombatEngine(new TerminalEmulator(new MemoryStream(), new MemoryStream()));
-            var hero = Hero(); hero.HP = hero.MaxHP = 100_000; hero.DialogueDefenseBonus = answer;
-            typeof(CombatEngine).GetField("currentPlayer", F)!.SetValue(engine, hero);
-            var god = new Monster { Name = "Maelketh", Level = 28, IsBoss = true };
-            return (long)typeof(CombatEngine).GetMethod("ApplyBossAbilityDamageToPlayer", F)!
-                .Invoke(engine, new object[] { god, hero, 1_000L, "Cleave", new CombatResult { CurrentRound = 10 } })!;
-        }
-        Taken(100).Should().Be(Taken(0) - 100, "a +100 answer softens the named attack by 100");
-        Taken(-15).Should().Be(Taken(0) + 15, "the reckless answer's penalty sharpens it");
-    }
-
-    [Fact]
-    public void APenalty_CannotTakeAStatBelowZero()
-    {
+        // Maelketh's "teach me" answer: +20% defence and the god doing 15% less damage: 0.85 / 1.2
         var hero = Hero();
-        WithModifiers(m => Set(m, "DamageMultiplier", -1.0), () => ApplyToPlayer(hero));
-        hero.DialogueDamagePercent.Should().Be(-1.0, "floored at -100%");
+        var god = God();
+        WithModifiers(m => { Set(m, "DefenseMultiplier", 1.20); Set(m, "BossDamageMultiplier", 0.85); }, () => ApplyToMonster(god, hero));
+        god.Strength.Should().Be((long)(1000 * 0.85 / 1.20));
+        god.MaxHP.Should().Be(49_500, "no damage answer, no HP change");
     }
 
     [Theory]
@@ -242,8 +133,8 @@ public class OldGodDialogueTests
     [InlineData(1.25, 1.10)]   // a harsher answer, capped until the gods are retuned
     public void TheGodsDamage_FollowsTheAnswer_AndTheHarshSideIsCapped(double answer, double applied)
     {
-        var god = new Monster { Name = "Maelketh", Level = 28, Strength = 1000, WeapPow = 1000, IsBoss = true };
-        WithModifiers(m => Set(m, "BossDamageMultiplier", answer), () => ApplyToMonster(god));
+        var god = God();
+        WithModifiers(m => Set(m, "BossDamageMultiplier", answer), () => ApplyToMonster(god, Hero()));
         god.Strength.Should().Be((long)(1000 * applied));
         god.WeapPow.Should().Be((long)(1000 * applied));
     }

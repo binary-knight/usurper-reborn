@@ -313,10 +313,6 @@ public class Character
     public int TempDefenseBonus { get; set; } = 0;
     public int TempDefenseBonusDuration { get; set; } = 0;
     public int TempCritChanceBonus { get; set; } = 0;        // v1.1.10: percentage points for this fight (an Old God's dialogue); not saved
-    // v1.1.10: an Old God's dialogue answer for the whole fight, kept apart from TempAttackBonus and
-    // TempDefenseBonus, which an ability buff replaces (Shield Wall used to erase a dialogue penalty); not saved
-    public double DialogueDamagePercent { get; set; } = 0;   // fraction: 0.25 is +25% on every blow, spell and ability the player lands
-    public int DialogueDefenseBonus { get; set; } = 0;
     public bool DodgeNextAttack { get; set; } = false;
 
     // Tank ability transient state (v0.56.0)
