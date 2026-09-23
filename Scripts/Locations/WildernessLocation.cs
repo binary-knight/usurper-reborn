@@ -461,9 +461,31 @@ public class WildernessLocation : BaseLocation
         await terminal.PressAnyKey();
     }
 
+    /// <summary>
+    /// v1.1.11: the level wilderness finds pay at, the same one its fights use: the region's minimum
+    /// level or the player's, whichever is higher.
+    /// </summary>
+    private int RewardLevel(WildernessRegion region) => Math.Max(region.MinLevel, currentPlayer.Level);
+
+    /// <summary>
+    /// v1.1.11: wilderness gold finds pay what the matching dungeon finds pay at the same level (player
+    /// report: "low by a factor of 100"; they grew by 3 to 20 gold a level while the dungeon's grow by
+    /// 100 to 300). small = the dungeon's small find, medium and ruins treasure = a treasure room,
+    /// large = a notch above a chest. Wilderness trips are capped per day.
+    /// </summary>
+    internal static long FindGold(string size, int level, Random rng)
+    {
+        level = Math.Max(1, level);
+        return size switch
+        {
+            "small" => level * 30L + rng.Next(level * 20),
+            "large" => level * 150L + rng.Next(level * 200),
+            _ => level * 100L + rng.Next(level * 200),   // "medium" and "treasure"
+        };
+    }
+
     private void ApplyForagingResult(string effect, WildernessRegion region)
     {
-        int levelScale = Math.Max(1, region.MinLevel / 5);
 
         switch (effect)
         {
@@ -556,19 +578,19 @@ public class WildernessLocation : BaseLocation
                 }
                 break;
             case "gold_small":
-                long goldS = 20 * levelScale + Random.Shared.Next(20);
+                long goldS = FindGold("small", RewardLevel(region), Random.Shared);
                 currentPlayer.Gold += goldS;
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine(Loc.Get("wilderness.worth_gold", goldS));
                 break;
             case "gold_medium":
-                long goldM = 50 * levelScale + Random.Shared.Next(50);
+                long goldM = FindGold("medium", RewardLevel(region), Random.Shared);
                 currentPlayer.Gold += goldM;
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine(Loc.Get("wilderness.worth_gold", goldM));
                 break;
             case "gold_large":
-                long goldL = 100 * levelScale + Random.Shared.Next(100);
+                long goldL = FindGold("large", RewardLevel(region), Random.Shared);
                 currentPlayer.Gold += goldL;
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine(Loc.Get("wilderness.worth_gold", goldL));
@@ -605,7 +627,7 @@ public class WildernessLocation : BaseLocation
             int roll = Random.Shared.Next(100);
             if (roll < 60)
             {
-                long gold = 30 + (long)(currentPlayer.Level * 3) + Random.Shared.Next(50);
+                long gold = FindGold("treasure", RewardLevel(region), Random.Shared);
                 currentPlayer.Gold += gold;
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine(Loc.Get("wilderness.ruins_gold_found", gold));
