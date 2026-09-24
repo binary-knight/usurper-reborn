@@ -1071,6 +1071,28 @@ namespace UsurperRemake.Systems
             }
         }
 
+        /// <summary>
+        /// v1.1.12: the save's Name2 for one key, banned accounts included (ReadGameData skips them), for the
+        /// admin deletes: a married display name is not the name children and quests record. Null if none.
+        /// </summary>
+        public string? GetStoredName2(string username)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT CASE WHEN json_valid(player_data) THEN json_extract(player_data, '$.player.name2') END FROM players " +
+                                  "WHERE LOWER(username) = LOWER(@u) ORDER BY LENGTH(player_data) DESC LIMIT 1;";
+                cmd.Parameters.AddWithValue("@u", username);
+                return cmd.ExecuteScalar() is string s && !string.IsNullOrWhiteSpace(s) ? s : null;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogWarning("SQL", $"GetStoredName2('{username}') failed: {ex.Message}");
+                return null;
+            }
+        }
+
         public async Task<SaveGameData?> ReadGameData(string playerName)
         {
             try
