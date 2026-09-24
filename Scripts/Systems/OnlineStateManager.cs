@@ -129,6 +129,13 @@ namespace UsurperRemake.Systems
         // hash per NPC of the roster as loaded, so the NPCs this session changed are known on a conflict.
         private long? _npcsVersion;
         private Dictionary<string, string>? _npcBaseline;
+        // v1.1.13: kept apart from the baseline. Seen: every NPC in a roster this session loaded from the store or
+        // wrote (an NPC never seen there is one this session created). Removed: tombstones, NPCs a stored roster
+        // had and a later one no longer has, fed by every reload; they are never appended again. PendingMine:
+        // NPCs this session changed that a reload laid over the stored roster and no write has stored yet.
+        private readonly HashSet<string> _npcSeen = new();
+        private readonly HashSet<string> _npcRemoved = new();
+        private readonly HashSet<string> _npcPendingMine = new();
 
         internal long? NpcsVersion => _npcsVersion;
 
@@ -149,7 +156,14 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>v1.1.13: call after RestoreNPCs of the loaded shared roster: the NPCs as this session has them now.</summary>
-        public void NoteNpcBaseline() => _npcBaseline = HashRoster(SerializeCurrentNPCs());
+        public void NoteNpcBaseline()
+        {
+            _npcBaseline = HashRoster(SerializeCurrentNPCs());
+            _npcSeen.Clear();
+            _npcSeen.UnionWith(_npcBaseline.Keys);   // v1.1.13: the post-login roster
+            _npcRemoved.Clear();
+            _npcPendingMine.Clear();
+        }
 
         /// <summary>
         /// v1.1.13: the ordinary save of a process that is not the owner (a door session). The whole roster is
@@ -198,7 +212,7 @@ namespace UsurperRemake.Systems
                 npcData = SerializeCurrentNPCs();
                 // the NPCs laid over stay this session's own changes if this write conflicts too
                 _npcBaseline = HashRoster(npcData);
-                foreach (var key in mine.Keys) _npcBaseline.Remove(key);
+                _npcPendingMine.UnionWith(mine.Keys);   // v1.1.13: kept as changed, never taken for created
                 DebugLogger.Instance.LogInfo("ONLINE",
                     $"NPC roster changed by another process since this session loaded it (now v{version}): reloaded it, kept {kept} NPC(s) this session changed, retrying.");
             }
@@ -213,7 +227,7 @@ namespace UsurperRemake.Systems
             var keys = new HashSet<string>();
             if (_npcBaseline == null) return keys;
             foreach (var (key, hash) in HashRoster(roster))
-                if (!_npcBaseline.TryGetValue(key, out var h) || h != hash) keys.Add(key);
+                if (!_npcBaseline.TryGetValue(key, out var h) || h != hash || _npcPendingMine.Contains(key)) keys.Add(key);
             return keys;
         }
 
@@ -232,16 +246,25 @@ namespace UsurperRemake.Systems
                 storedKeys.Add(NpcKey(stored[i]));
                 if (mine.TryGetValue(NpcKey(stored[i]), out var own)) { stored[i] = own; kept++; }
             }
+            // v1.1.13: an NPC a roster this session saw had and this stored roster lacks was removed: a tombstone
+            foreach (var key in _npcSeen)
+                if (!storedKeys.Contains(key)) _npcRemoved.Add(key);
             foreach (var (key, own) in mine)
-                if (!storedKeys.Contains(key) && _npcBaseline != null && !_npcBaseline.ContainsKey(key)) { stored.Add(own); kept++; }
+                if (!storedKeys.Contains(key) && _npcBaseline != null && CreatedThisSession(key)) { stored.Add(own); kept++; }
+            _npcSeen.UnionWith(storedKeys);
             return kept;
         }
+
+        /// <summary>v1.1.13: an NPC this session made: never in a stored roster it saw, and not removed since.</summary>
+        private bool CreatedThisSession(string key) => !_npcSeen.Contains(key) && !_npcRemoved.Contains(key);
 
         /// <summary>v1.1.13: the stored roster now holds this session's roster at this version.</summary>
         internal void NoteRosterWritten(List<NPCData> written, long version)
         {
             _npcsVersion = version;
             _npcBaseline = HashRoster(written);
+            _npcSeen.UnionWith(_npcBaseline.Keys);   // v1.1.13: stored now
+            _npcPendingMine.Clear();
         }
 
         /// <summary>v1.1.13: after a purge reloaded the stored roster (and laid this session's changes over it) without writing.</summary>
@@ -249,7 +272,7 @@ namespace UsurperRemake.Systems
         {
             _npcsVersion = version;
             _npcBaseline = HashRoster(stored);
-            foreach (var key in mineKeys) _npcBaseline.Remove(key);
+            _npcPendingMine.UnionWith(mineKeys);   // v1.1.13: kept as changed, never taken for created
         }
 
         // v1.1.13: the live NPC roster is process-wide. RosterLock is held by every rebuild of it (RestoreNPCs,
