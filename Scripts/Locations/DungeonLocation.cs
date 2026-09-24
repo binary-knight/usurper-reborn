@@ -18046,6 +18046,7 @@ public class DungeonLocation : BaseLocation
         player.RemoteTerminal = term;
         player.GroupPlayerUsername = ctx.Username;
         player.CombatInputChannel = System.Threading.Channels.Channel.CreateBounded<string>(1);
+        AwakeningBonus.Stamp(player);   // v1.1.12: stamped here, in the follower's own session, before the leader's party uses it
 
         // Add to leader's teammates list
         lock (leaderDungeon.teammates)

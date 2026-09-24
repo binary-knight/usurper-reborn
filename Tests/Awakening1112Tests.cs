@@ -591,6 +591,54 @@ public class Awakening1112Tests : IDisposable
     }
 
     [Fact]
+    public void AGroupedFollower_KeepsItsOwnStage_InTheLeadersSession()
+    {
+        // v1.1.12: a follower's fights and rewards run in the leader's session, whose own stage is 0
+        var follower = Caster();
+        var leader = Caster(); leader.Name1 = "lead"; leader.Name2 = "Lead";
+        var plain = Caster(); plain.Name1 = "plain"; plain.Name2 = "Plain";
+        (long hp, long mana, long wis) own = AsPlayer(follower, () =>
+        {
+            ToStage(7);                               // the follower's own session stamps the rise
+            follower.RecalculateStats();
+            follower.HP = follower.MaxHP; follower.Mana = follower.MaxMana;
+            return (follower.MaxHP, follower.MaxMana, follower.Wisdom);
+        });
+        follower.AwakeningStage.Should().Be(7);
+        Ocean.Reset();                                // the leader's session: no awakening of its own
+        AsPlayer(leader, () =>
+        {
+            plain.RecalculateStats();
+            AwakeningBonus.StageOf(follower).Should().Be(7);
+            TeamHQBonus.ApplyAttack(follower, 1000).Should().Be(1080);
+            TeamHQBonus.ApplyDefense(follower, 1000).Should().Be(920);
+            TeamHQBonus.ApplyXP(follower, 1000).Should().Be(1100);
+            follower.RecalculateStats();              // equipping loot or levelling in the leader's session
+            follower.MaxHP.Should().Be(own.hp).And.BeGreaterThan(plain.MaxHP);
+            follower.MaxMana.Should().Be(own.mana).And.BeGreaterThan(plain.MaxMana);
+            follower.Wisdom.Should().Be(own.wis).And.Be(plain.Wisdom + AwakeningBonus.Wisdom1);
+            follower.HP.Should().Be(own.hp, "nothing clamped the pools");
+            follower.Mana.Should().Be(own.mana);
+            AwakeningBonus.StageOf(plain).Should().Be(0, "an unstamped character still gets nothing");
+            return 0;
+        });
+
+        var four = Caster(); four.Name1 = "four"; four.Name2 = "Four";
+        Ocean.Reset();
+        long fourHP = AsPlayer(four, () => { ToStage(4); four.RecalculateStats(); four.HP = four.MaxHP; return four.MaxHP; });
+        Ocean.Reset();
+        AsPlayer(leader, () =>
+        {
+            TeamHQBonus.ApplyXP(four, 1000).Should().Be(1050);
+            four.RecalculateStats();
+            four.MaxHP.Should().Be(fourHP);
+            four.HP.Should().Be(fourHP);
+            return 0;
+        });
+        Source("Scripts/Locations/DungeonLocation.cs").Should().Contain("AwakeningBonus.Stamp(player);", "the follower is stamped as it joins");
+    }
+
+    [Fact]
     public void ALoadedPlayer_GetsTheBoons_AndKeepsTheSavedHP()
     {
         var hero = Caster();

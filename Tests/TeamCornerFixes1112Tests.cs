@@ -203,12 +203,43 @@ public class TeamCornerFixes1112Tests : IDisposable
     }
 
     [Fact]
-    public void Rankings_GroupNamesIgnoringCase()
+    public void Rankings_KeepCaseVariants_AsSeparateTeams()
     {
+        // v1.1.12: older data can hold "Grey Band" and "grey band"; each stays its own row, joined by its exact name
         var a = TeamCornerRig.Npc("tc_rank_1", "Rank One", "Grey Band", level: 10);
         var b = TeamCornerRig.Npc("tc_rank_2", "Rank Two", "grey band", level: 20);
         var rows = TeamCornerLocation.BuildTeamRankings(new[] { a, b }, Array.Empty<PlayerTeamInfo>(), null);
-        rows.Should().ContainSingle().Which.MemberCount.Should().Be(2);
+        rows.Select(r => r.TeamName).Should().BeEquivalentTo(new[] { "Grey Band", "grey band" });
+        rows.Should().OnlyContain(r => r.MemberCount == 1);
+    }
+
+    [Fact]
+    public async Task CaseVariants_BothListed_TheLowercasePlayerTeamJoins_AndAThirdIsRefused()
+    {
+        var npc = TeamCornerRig.Npc("tc_case_1", "Case Wolf", "Wolves");
+        NPCSpawnSystem.Instance.ActiveNPCs.Add(npc);
+        try
+        {
+            await TeamCornerRig.Online(async (db, path) =>
+            {
+                // a player team from before the create guard, differing from the NPC team only in case
+                TeamCornerRig.Exec(path, $"INSERT INTO player_teams (team_name, password_hash, created_by) VALUES ('wolves', '{SqlSaveBackend.HashTeamPassword("howl")}', 'boss');");
+                TeamCornerRig.PlayerRow(path, "boss", "wolves");
+                var hero = TeamCornerRig.Hero(name: "Case Joiner");
+                string shown = await new TeamCornerRig(hero, new[] { "wolves", "howl", "" }).Run("JoinTeam");
+                shown.Should().Contain("Wolves").And.Contain("wolves");
+                hero.Team.Should().Be("wolves", "the player team, chosen by its exact name");
+                shown.Should().Contain(Loc.Get("team.joined_team", "wolves"));
+                WorldSimulator.UnregisterPlayerTeam("wolves");
+
+                var other = TeamCornerRig.Hero(name: "Case Founder", gold: 50000);
+                string refused = await new TeamCornerRig(other, new[] { "WOLVES", "pw" }).Run("CreateTeam");
+                refused.Should().Contain(Loc.Get("team.team_name_exists"));
+                other.Team.Should().BeEmpty();
+                other.Gold.Should().Be(50000);
+            });
+        }
+        finally { NPCSpawnSystem.Instance.ActiveNPCs.Remove(npc); }
     }
 
     // ---------- 5. the live NPC ----------
@@ -720,6 +751,33 @@ public class TeamCornerFixes1112Tests : IDisposable
                 shown.Should().Contain($"{Loc.Get("combat.bar_hp")}: 20/", "the injured player's HP, not full");
                 shown.Should().Contain($"{Loc.Get("ui.mana_label")}: 5/");
                 shown.Should().Contain($"{Loc.Get("team.examine_age")}: 33");
+            });
+        }
+        finally { NPCSpawnSystem.Instance.ActiveNPCs.Remove(npc); }
+    }
+
+    [Fact]
+    public async Task Examine_AnAwakenedPlayer_ShowsTheSavedPoolsAndMaxima()
+    {
+        // v1.1.12: saved at stage 4 with its HP boon; the loader recalculates without it
+        var npc = TeamCornerRig.Npc("tc_exam_aw_1", "Tide Band Npc", "Tide Band");
+        NPCSpawnSystem.Instance.ActiveNPCs.Add(npc);
+        try
+        {
+            await TeamCornerRig.Online(async (db, path) =>
+            {
+                await db.WriteGameData("marin", new SaveGameData
+                {
+                    Version = GameConfig.SaveVersion,
+                    Player = new PlayerData { Name1 = "marin", Name2 = "Marin", Team = "Tide Band", Class = CharacterClass.Magician, Level = 30,
+                                              Constitution = 10, BaseConstitution = 10, Intelligence = 10, BaseIntelligence = 10, Wisdom = 10, BaseWisdom = 10,
+                                              HP = 1030, MaxHP = 1050, BaseMaxHP = 1000, Mana = 520, MaxMana = 525, BaseMaxMana = 500, Age = 40 },
+                    StorySystems = new StorySystemsData { AwakeningLevel = 4 }
+                });
+                var hero = TeamCornerRig.Hero(team: "Tide Band");
+                string shown = await new TeamCornerRig(hero, new[] { "marin", "" }).Run("ExamineMember");
+                shown.Should().Contain($"{Loc.Get("combat.bar_hp")}: 1030/1050");
+                shown.Should().Contain($"{Loc.Get("ui.mana_label")}: 520/525");
             });
         }
         finally { NPCSpawnSystem.Instance.ActiveNPCs.Remove(npc); }

@@ -277,9 +277,13 @@ namespace UsurperRemake.Systems
             {
                 int oldLevel = AwakeningLevel;
                 AwakeningLevel = newLevel;
+                StampPlayer();
                 OnStageRose(oldLevel, newLevel);
             }
         }
+
+        // v1.1.12: the session's player carries their stage, so it counts in another session's party too
+        private void StampPlayer() => AwakeningBonus.Stamp(GameEngine.Instance?.CurrentPlayer, AwakeningLevel);
 
         /// <summary>
         /// v1.1.12: a stage rise queues its announcement for the next safe point, which also
@@ -340,6 +344,7 @@ namespace UsurperRemake.Systems
                         if (!string.IsNullOrEmpty(id) && InsightIds.Add(id)) CheckAwakeningProgress();
                 int floor = Math.Clamp(savedLevel, 0, MaxStage);
                 if (floor > AwakeningLevel) AwakeningLevel = floor;
+                StampPlayer();
             }
             finally { _restoring = false; }
         }
@@ -531,6 +536,7 @@ namespace UsurperRemake.Systems
             CollectedFragments = new HashSet<WaveFragment>(data.CollectedFragments);
             ExperiencedMoments = new HashSet<AwakeningMoment>(data.ExperiencedMoments);
             Insights = data.Insights?.ToList() ?? new List<OceanInsight>();
+            StampPlayer();
         }
 
         /// <summary>
@@ -545,6 +551,7 @@ namespace UsurperRemake.Systems
             InsightIds = new HashSet<string>();
             PendingAnnouncementStage = 0;
             PendingAnnouncementFromStage = 0;
+            StampPlayer();
         }
     }
 

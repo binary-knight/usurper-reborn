@@ -5102,6 +5102,9 @@ public abstract class BaseLocation
                 continue;
             }
 
+            // v1.1.12: a name typed in its exact case wins, so two names differing only in case can each be chosen
+            var sameCase = all.Where(x => string.Equals(nameSelector(x) ?? "", input, StringComparison.Ordinal)).ToList();
+            if (sameCase.Count == 1) return sameCase[0];
             var exact = all.Where(x => string.Equals(nameSelector(x) ?? "", input, StringComparison.OrdinalIgnoreCase)).ToList();
             if (exact.Count == 1) return exact[0];
             var matches = all.Where(x => (nameSelector(x) ?? "").StartsWith(input, StringComparison.OrdinalIgnoreCase)).ToList();

@@ -13,8 +13,8 @@ namespace UsurperRemake.Systems
     ///   Stage 5  +3% damage dealt
     ///   Stage 6  3% less damage taken
     ///   Stage 7  +5 more to each percentage above, and the title "the Awakened"
-    /// Only the session's own player has an awakening: companions, NPCs and other players' characters
-    /// get nothing from it. Damage, defence and XP go through TeamHQBonus.Apply*, so they follow its
+    /// Only a player has an awakening, stamped on their Character by their own session (AwakeningStage):
+    /// companions, NPCs and characters loaded from other players' saves get nothing from it. Damage, defence and XP go through TeamHQBonus.Apply*, so they follow its
     /// ordering rule (after every other modifier, before any floor, cap or minimum).
     /// </summary>
     public static class AwakeningBonus
@@ -27,10 +27,13 @@ namespace UsurperRemake.Systems
         public const double Defense6 = 0.03;
         public const double Stage7Extra = 0.05;
 
-        /// <summary>The awakening stage that applies to this character: the session player's, else 0.</summary>
+        /// <summary>The awakening stage that applies to this character: its own stamped stage, else the
+        /// session player's, else 0.</summary>
         public static int StageOf(Character? c)
         {
             if (c == null || c is NPC) return 0;
+            // v1.1.12: the stamp travels with a grouped follower into the leader's session
+            if (c.AwakeningStage >= 0) return c.AwakeningStage;
             var player = GameEngine.Instance?.CurrentPlayer;
             if (!ReferenceEquals(c, player)) return 0;
             return OceanPhilosophySystem.Instance?.AwakeningLevel ?? 0;
@@ -58,10 +61,19 @@ namespace UsurperRemake.Systems
         /// </summary>
         public static void RecalculateAfterRestore(Character? player, long savedHP, long savedMana)
         {
-            if (player == null || StageOf(player) == 0) return;
+            if (player == null) return;
+            Stamp(player);
+            if (StageOf(player) == 0) return;
             player.RecalculateStats();
             if (savedHP > player.HP) player.HP = Math.Min(savedHP, player.MaxHP);
             if (savedMana > player.Mana) player.Mana = Math.Min(savedMana, player.MaxMana);
+        }
+
+        /// <summary>v1.1.12: give a player the session's stage as their own.</summary>
+        public static void Stamp(Character? player, int? stage = null)
+        {
+            if (player == null || player is NPC) return;
+            player.AwakeningStage = stage ?? OceanPhilosophySystem.Instance?.AwakeningLevel ?? 0;
         }
 
         private static int P(double pct) => (int)Math.Round(pct * 100);

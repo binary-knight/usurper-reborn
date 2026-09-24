@@ -611,13 +611,13 @@ public class TeamCornerLocation : BaseLocation
     /// </summary>
     internal static List<TeamRankingRow> BuildTeamRankings(IEnumerable<NPC> npcs, IEnumerable<PlayerTeamInfo> playerTeams, Character? viewer)
     {
-        // v1.1.12: grouped ignoring case, as the protection list and the create guard compare names
-        var acc = new Dictionary<string, (int Members, long LevelSum, long Power, bool Turf)>(StringComparer.OrdinalIgnoreCase);
+        // v1.1.12: grouped by the exact name; older case variants are separate teams (a join checks the exact name)
+        var acc = new Dictionary<string, (int Members, long LevelSum, long Power, bool Turf)>(StringComparer.Ordinal);
         var order = new List<string>();
         void Add(string team, int members, long levels, long power, bool turf)
         {
             if (!acc.TryGetValue(team, out var a)) { order.Add(team); a = default; }
-            acc[team] = (a.Members + members, a.LevelSum + levels, a.Power + power, a.Turf || turf);   // the first spelling seen is shown
+            acc[team] = (a.Members + members, a.LevelSum + levels, a.Power + power, a.Turf || turf);
         }
 
         foreach (var n in npcs)
@@ -632,7 +632,7 @@ public class TeamCornerLocation : BaseLocation
         return order
             .Where(t => acc[t].Members > 0)
             .Select(t => new TeamRankingRow(t, acc[t].Members, acc[t].Power, (int)(acc[t].LevelSum / acc[t].Members), acc[t].Turf,
-                viewer != null && string.Equals(t, viewer.Team, StringComparison.OrdinalIgnoreCase)))
+                viewer != null && string.Equals(t, viewer.Team, StringComparison.Ordinal)))
             .OrderByDescending(r => r.TotalPower)
             .ToList();
     }
@@ -857,7 +857,10 @@ public class TeamCornerLocation : BaseLocation
                 if (data?.Player != null)
                 {
                     c = PlayerCharacterLoader.CreateFromSaveData(data.Player, summary.DisplayName);
-                    // v1.1.12: the combat loader starts at full HP and mana and has no age; show the saved ones
+                    // v1.1.12: the combat loader starts at full HP and mana and has no age; show the saved ones.
+                    // The saved maxima too: the loader's lack the member's awakening boons.
+                    if (data.Player.MaxHP > 0) c.MaxHP = data.Player.MaxHP;
+                    if (data.Player.MaxMana > 0) c.MaxMana = data.Player.MaxMana;
                     c.HP = Math.Min(data.Player.HP, c.MaxHP);
                     c.Mana = Math.Min(data.Player.Mana, c.MaxMana);
                     c.Age = data.Player.Age;

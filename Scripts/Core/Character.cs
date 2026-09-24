@@ -601,6 +601,9 @@ public class Character
     /// <summary>v1.1.11: built from a real player's save (PlayerCharacterLoader), not a hired guard or an echo. Run time only.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public bool IsLoadedPlayer { get; set; }
+    /// <summary>v1.1.12: this player's own awakening stage, stamped by their session (-1 = not stamped). Run time only.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int AwakeningStage { get; set; } = -1;
 
     // Herb pouch inventory (v0.48.5)
     public int HerbHealing { get; set; }        // Healing Herbs (garden lv1)

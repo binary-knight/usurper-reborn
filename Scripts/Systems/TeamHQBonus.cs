@@ -54,7 +54,7 @@ namespace UsurperRemake.Systems
         public static double PotionHealMultiplier(Character c) => 1.0 + Infirmary(c) * InfirmaryPerLevel;
 
         // v1.1.12: the awakening boons (AwakeningBonus) ride on these three, in the same place and order,
-        // multiplied with the HQ factor and rounded once. They apply offline too, and only to the session's player.
+        // multiplied with the HQ factor and rounded once. They apply offline too, and only to a player with a stage of their own (AwakeningBonus.StageOf).
 
         /// <summary>Damage dealt by the player, after every other modifier.</summary>
         public static long ApplyAttack(Character c, long damage)
