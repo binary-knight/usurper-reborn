@@ -139,6 +139,8 @@ namespace UsurperRemake.Systems
                 ("", ""),
                 (Loc.Get("opening_story.dream_remember_answer"), "bright_yellow"),
                 ("", ""),
+                (Loc.Get("opening_story.dream_asleep"), "bright_cyan"), // v1.1.12: the awakening, named without spoiling it
+                ("", ""),
                 (Loc.Get("opening_story.dream_fades"), "gray"),
                 (Loc.Get("opening_story.dream_and_then"), "gray")
             };

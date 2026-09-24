@@ -35,6 +35,7 @@ namespace UsurperRemake.Systems
         public const string HINT_COMPANION_LYRIS_TEASER = "companion_lyris_teaser";
         public const string HINT_COMPANION_MIRA_TEASER = "companion_mira_teaser";
         public const string HINT_LIVES = "lives"; // v1.1.12
+        public const string HINT_AWAKENING = "awakening"; // v1.1.12
 
         // Hint definitions. Title and message text are resolved at display time
         // from loc keys derived from the hint ID (`hint.<id>.title` /
@@ -58,7 +59,8 @@ namespace UsurperRemake.Systems
             [HINT_QUEST_SYSTEM] = new HintDefinition("bright_green"),
             [HINT_GETTING_STARTED] = new HintDefinition("bright_cyan"),
             [HINT_FIRST_COMBAT_CLASS] = new HintDefinition("bright_green"),
-            [HINT_LIVES] = new HintDefinition("bright_yellow")
+            [HINT_LIVES] = new HintDefinition("bright_yellow"),
+            [HINT_AWAKENING] = new HintDefinition("bright_cyan")
         };
 
         /// <summary>

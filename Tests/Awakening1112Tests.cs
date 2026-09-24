@@ -274,6 +274,89 @@ public class Awakening1112Tests : IDisposable
         finally { amnesia.Deserialize(saved); }
     }
 
+    // ---------- 3. the announcement ----------
+
+    private static void RaiseTo(int stage)
+    {
+        for (int i = 0; Ocean.AwakeningLevel < stage; i++) Ocean.GainInsight("rise" + i);
+    }
+
+    [Fact]
+    public void ARise_IsQueued_NotShownAtOnce()
+    {
+        RaiseTo(1);
+        Ocean.PendingAnnouncementStage.Should().Be(1);
+        Ocean.PendingAnnouncementFromStage.Should().Be(0);
+        RaiseTo(2);
+        Ocean.PendingAnnouncementStage.Should().Be(2, "rises before the next safe point fold into one screen");
+        Ocean.PendingAnnouncementFromStage.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task TheAnnouncement_ShowsOnce_WithStageLoreBoostAndWhatOpened()
+    {
+        RaiseTo(2);
+        var hero = Hero();
+        var (term, output) = Terminal("\n\n\n");
+        (await AwakeningScreens.ShowPending(term, hero)).Should().BeTrue();
+        string shown = Shown(term, output);
+        shown.Should().Contain(Loc.Get("ocean.awakening_header"));
+        shown.Should().Contain(Loc.Get("ocean.awakening_stage", 2, 7, Loc.Get("base.awakening_aware")));
+        shown.Should().Contain(Loc.Get("ocean.stage.2.lore.1"));
+        shown.Should().Contain(AwakeningBonus.GainedAt(1)).And.Contain(AwakeningBonus.GainedAt(2));
+        shown.Should().Contain(Loc.Get("ocean.stage.2.opens"));
+        hero.HintsShown.Should().Contain(HintSystem.HINT_AWAKENING, "the first rise explains the awakening");
+
+        var (term2, _) = Terminal("\n\n");
+        (await AwakeningScreens.ShowPending(term2, hero)).Should().BeFalse("shown once");
+    }
+
+    [Fact]
+    public void TheAnnouncement_WaitsForTheLocationLoop()
+    {
+        string loop = Source("Scripts/Locations/BaseLocation.cs");
+        loop.Should().Contain("await AwakeningScreens.ShowPending(terminal, currentPlayer);");
+        Source("Scripts/Systems/CombatEngine.cs").Should().NotContain("AwakeningScreens.ShowPending");
+        Source("Scripts/Systems/DialogueSystem.cs").Should().NotContain("AwakeningScreens.ShowPending");
+    }
+
+    [Fact]
+    public void EveryStage_HasLore_AndWhatItOpens()
+    {
+        for (int stage = 1; stage <= 7; stage++)
+        {
+            for (int i = 1; i <= AwakeningScreens.LoreLinesPerStage; i++)
+                Loc.Get($"ocean.stage.{stage}.lore.{i}").Should().NotBe($"ocean.stage.{stage}.lore.{i}");
+            Loc.Get($"ocean.stage.{stage}.opens").Should().NotBe($"ocean.stage.{stage}.opens");
+            AwakeningBonus.GainedAt(stage).Should().NotBeNullOrEmpty();
+        }
+        // only stages 6 and 7 speak of the Creator, and only 7 names him
+        for (int stage = 1; stage <= 6; stage++)
+            for (int i = 1; i <= AwakeningScreens.LoreLinesPerStage; i++)
+                Loc.Get($"ocean.stage.{stage}.lore.{i}").Should().NotContain("Manwe");
+        Enumerable.Range(1, 4).Select(i => Loc.Get($"ocean.stage.7.lore.{i}")).Should().Contain(l => l.Contains("Manwe"));
+    }
+
+    [Fact]
+    public void ANewCharacter_IsToldSomethingSleeps_AndTheStatusLinePointsToTheJournal()
+    {
+        Source("Scripts/Systems/OpeningStorySystem.cs").Should().Contain("opening_story.dream_asleep");
+        Loc.Get("opening_story.dream_asleep").Should().NotContain("Manwe");
+        string status = Source("Scripts/Locations/BaseLocation.cs");
+        status.Should().Contain("base.stat_awakening_hint");
+        status.Should().Contain("HintSystem.Instance.TryShowHint(HintSystem.HINT_AWAKENING, terminal, currentPlayer?.HintsShown)");
+    }
+
+    [Fact]
+    public void TheAwakeningHint_IsRegistered_AndShownOnce()
+    {
+        var hero = Hero();
+        var (term, output) = Terminal();
+        HintSystem.Instance.TryShowHint(HintSystem.HINT_AWAKENING, term, hero.HintsShown).Should().BeTrue();
+        HintSystem.Instance.TryShowHint(HintSystem.HINT_AWAKENING, term, hero.HintsShown).Should().BeFalse();
+        Shown(term, output).Should().Contain(Loc.Get("hint.awakening.title"));
+    }
+
     [Fact]
     public void Reset_ClearsInsights()
     {
