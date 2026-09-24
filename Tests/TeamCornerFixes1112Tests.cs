@@ -1166,6 +1166,43 @@ public class TeamCornerFixes1112Tests : IDisposable
     }
 
     [Fact]
+    public async Task AnOlderNameEntry_BesideAnNpcOfThatName_StillLoadsTheEcho()
+    {
+        // v1.1.12: an older entry "Robin" names a player; an NPC "Robin" in the party is not that echo
+        var saved = UsurperRemake.Server.SessionContext.Current;
+        var partyBefore = GameEngine.Instance.DungeonPartyPlayerNames.ToList();
+        try
+        {
+            await TeamCornerRig.Online(async (db, path) =>
+            {
+                await db.CreatePlayerTeam("Echo Band", "x", "carl");
+                await WriteSave(db, "sam", "Robin", 7);   // the entry is a display name, not this key
+                SetViewer("carl");
+                GameEngine.Instance.SetDungeonPartyPlayers(new[] { "Robin" });
+
+                var dungeon = new DungeonLocation();
+                var hero = TeamCornerRig.Hero(name: "Carl", team: "Echo Band");
+                typeof(BaseLocation).GetField("currentPlayer", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
+                    .SetValue(dungeon, hero);
+                dungeon.teammates.Clear();
+                dungeon.teammates.Add(TeamCornerRig.Npc("npc-robin-2", "Robin", "Echo Band"));
+                var term = new TeamCornerRig(hero, Array.Empty<string>()).Term;
+                var restore = typeof(DungeonLocation).GetMethod("RestorePlayerTeammates",
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+                await (Task)restore.Invoke(dungeon, new object[] { term })!;
+
+                dungeon.teammates.Count(t => t.IsEcho).Should().Be(1, "the NPC Robin is not the recruited player's echo");
+                dungeon.teammates.Single(t => t.IsEcho).EchoSaveKey.Should().Be("sam");
+            });
+        }
+        finally
+        {
+            UsurperRemake.Server.SessionContext.Current = saved;
+            GameEngine.Instance.SetDungeonPartyPlayers(partyBefore);
+        }
+    }
+
+    [Fact]
     public void RecruitList_MatchesAKeyToItsMemberOnly_AndAnOlderNameByDisplayName()
     {
         var keys = new[] { "robin", "sam", "carl" };
