@@ -424,7 +424,7 @@ namespace UsurperRemake.Systems
                     return false;
 
                 case ConditionType.HasOceanInsight:
-                    return OceanPhilosophySystem.Instance.Insights.Count >= condition.IntValue;
+                    return OceanPhilosophySystem.Instance.InsightIds.Count >= condition.IntValue; // v1.1.12: distinct insights
 
                 case ConditionType.ExperiencedMoment:
                     if (Enum.TryParse<AwakeningMoment>(condition.StringValue, out var moment))
@@ -469,7 +469,7 @@ namespace UsurperRemake.Systems
 
             foreach (var effect in node.Effects)
             {
-                ApplyEffect(effect);
+                ApplyEffect(effect, node.Id);
             }
         }
 
@@ -482,14 +482,14 @@ namespace UsurperRemake.Systems
 
             foreach (var effect in choice.Effects)
             {
-                ApplyEffect(effect);
+                ApplyEffect(effect, currentNode?.Id ?? "");
             }
         }
 
         /// <summary>
         /// Apply a single dialogue effect
         /// </summary>
-        private void ApplyEffect(DialogueEffect effect)
+        private void ApplyEffect(DialogueEffect effect, string sourceNodeId)
         {
             if (currentPlayer == null) return;
             var story = StoryProgressionSystem.Instance;
@@ -618,7 +618,7 @@ namespace UsurperRemake.Systems
 
                 // Ocean Philosophy effects
                 case EffectType.GainOceanInsight:
-                    OceanPhilosophySystem.Instance.GainInsight(effect.IntValue);
+                    OceanPhilosophySystem.Instance.GainInsight("dialogue:" + sourceNodeId); // v1.1.12: one insight per node
                     terminal?.WriteLine("(A deeper understanding settles within you)", "bright_cyan");
                     break;
 

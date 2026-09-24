@@ -1426,7 +1426,7 @@ public class FeatureInteractionSystem
         // Trigger ocean philosophy awakening with insight points
         try
         {
-            OceanPhilosophySystem.Instance?.GainInsight(5); // 5 insight points from feature discovery
+            OceanPhilosophySystem.Instance?.GainInsight("feature:" + insight.InsightType); // v1.1.12: one insight per kind
         }
         catch { /* System may not be initialized */ }
 

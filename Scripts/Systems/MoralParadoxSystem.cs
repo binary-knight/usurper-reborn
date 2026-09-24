@@ -859,7 +859,7 @@ namespace UsurperRemake.Systems
 
             if (choice.OceanPhilosophyBonus)
             {
-                OceanPhilosophySystem.Instance.GainInsight(20);
+                OceanPhilosophySystem.Instance.GainInsight("paradox:" + choice.Id); // v1.1.12
             }
 
             if (choice.RevealsPlayerSecret)

@@ -1422,7 +1422,7 @@ public abstract class BaseLocation
         // Apply awakening gain
         if (stage.AwakeningGain > 0)
         {
-            OceanPhilosophySystem.Instance.GainInsight(stage.AwakeningGain * 10);
+            OceanPhilosophySystem.Instance.GainInsight($"npc:{npcKey}:{stage.StageId}"); // v1.1.12: one insight per story stage
             terminal.SetColor("magenta");
             terminal.WriteLine(Loc.Get("base.deeper_understanding"));
         }

@@ -3840,7 +3840,7 @@ namespace UsurperRemake.Locations
                 if (deed.SpecialEffect == "void" && !currentPlayer.HasTouchedTheVoid)
                 {
                     currentPlayer.HasTouchedTheVoid = true;
-                    OceanPhilosophySystem.Instance?.GainInsight(10);
+                    OceanPhilosophySystem.Instance?.GainInsight("dark_alley:void"); // v1.1.12
                     terminal.SetColor("bright_cyan");
                     terminal.WriteLine(Loc.Get("dark_alley.evil_void_whisper"));
                     terminal.WriteLine(Loc.Get("dark_alley.evil_awakening"));

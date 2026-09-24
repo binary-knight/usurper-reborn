@@ -1040,7 +1040,7 @@ namespace UsurperRemake.Systems
                 // Apply awakening gain
                 if (dream.AwakeningGain > 0)
                 {
-                    OceanPhilosophySystem.Instance?.GainInsight(dream.AwakeningGain * 10);
+                    OceanPhilosophySystem.Instance?.GainInsight("dream:" + dream.Id); // v1.1.12: one insight per dream
                 }
 
                 // Grant wave fragment
