@@ -5217,15 +5217,32 @@ namespace UsurperRemake.Systems
     {
         try
         {
-            using var connection = OpenConnection();
-            using var cmd = connection.CreateCommand();
-            cmd.CommandText = @"INSERT INTO player_teams (team_name, password_hash, created_by, last_join_at)
-                SELECT @name, @hash, @creator, datetime('now')
-                WHERE NOT EXISTS (SELECT 1 FROM player_teams WHERE ulower(team_name) = ulower(@name));";
-            cmd.Parameters.AddWithValue("@name", teamName);
-            cmd.Parameters.AddWithValue("@hash", passwordHash);
-            cmd.Parameters.AddWithValue("@creator", createdBy.ToLower());
-            return await Task.Run(() => cmd.ExecuteNonQuery()) == 1;
+            return await Task.Run(() =>
+            {
+                using var connection = OpenConnection();
+                using var tx = connection.BeginTransaction();
+                using var cmd = connection.CreateCommand();
+                cmd.Transaction = tx;
+                cmd.CommandText = @"INSERT INTO player_teams (team_name, password_hash, created_by, last_join_at)
+                    SELECT @name, @hash, @creator, datetime('now')
+                    WHERE NOT EXISTS (SELECT 1 FROM player_teams WHERE ulower(team_name) = ulower(@name));";
+                cmd.Parameters.AddWithValue("@name", teamName);
+                cmd.Parameters.AddWithValue("@hash", passwordHash);
+                cmd.Parameters.AddWithValue("@creator", createdBy.ToLower());
+                if (cmd.ExecuteNonQuery() != 1) return false;
+                // v1.1.12: a new team starts bare; before this release a team dissolved by its last member
+                // left its upgrades and vault under the name for the next team of that name
+                foreach (var table in new[] { "team_upgrades", "team_vault" })
+                {
+                    using var clear = connection.CreateCommand();
+                    clear.Transaction = tx;
+                    clear.CommandText = $"DELETE FROM {table} WHERE ulower(team_name) = ulower(@name);";
+                    clear.Parameters.AddWithValue("@name", teamName);
+                    clear.ExecuteNonQuery();
+                }
+                tx.Commit();
+                return true;
+            });
         }
         catch (Exception ex)
         {
@@ -5234,12 +5251,6 @@ namespace UsurperRemake.Systems
         }
     }
 
-    /// <summary>
-    /// v0.61.5: Look up the player who created a team (the team leader). Returns
-    /// the leader's username (lowercase) or null if the team doesn't exist.
-    /// Used by the NPC-old-age-death inheritance flow to find who should receive
-    /// the deceased teammate's belongings.
-    /// </summary>
     /// <summary>v1.1.12: whether a team has a player_teams row (an NPC-founded team has none); null on a DB error.</summary>
     public bool? HasPlayerTeamRow(string teamName)
     {
@@ -5258,6 +5269,12 @@ namespace UsurperRemake.Systems
         }
     }
 
+    /// <summary>
+    /// v0.61.5: Look up the player who created a team (the team leader). Returns
+    /// the leader's username (lowercase) or null if the team doesn't exist.
+    /// Used by the NPC-old-age-death inheritance flow to find who should receive
+    /// the deceased teammate's belongings.
+    /// </summary>
     public async Task<string?> GetTeamLeaderUsername(string teamName)
     {
         try

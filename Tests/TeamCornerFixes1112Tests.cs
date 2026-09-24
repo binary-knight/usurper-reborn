@@ -231,6 +231,21 @@ public class TeamCornerFixes1112Tests : IDisposable
     }
 
     [Fact]
+    public async Task ANewTeam_StartsWithoutAnOldTeamsLeftoverUpgradesAndVault()
+    {
+        // v1.1.12: 1.1.11's last-member dissolve left these under the name for the next team of that name
+        Exec("INSERT INTO team_upgrades (team_name, upgrade_type, level) VALUES ('Wolves', 'armory', 4);");
+        Exec("INSERT INTO team_vault (team_name, gold) VALUES ('wolves', 9000);");
+        (await _db.CreatePlayerTeam("Wolves", "x", "a")).Should().BeTrue();
+        Long("SELECT COUNT(*) FROM team_upgrades WHERE team_name = 'Wolves'").Should().Be(0);
+        Long("SELECT COUNT(*) FROM team_vault WHERE LOWER(team_name) = 'wolves'").Should().Be(0);
+
+        Exec("INSERT INTO team_upgrades (team_name, upgrade_type, level) VALUES ('Wolves', 'barracks', 2);");
+        (await _db.CreatePlayerTeam("WOLVES", "x", "b")).Should().BeFalse("the name is taken");
+        Long("SELECT COUNT(*) FROM team_upgrades WHERE team_name = 'Wolves'").Should().Be(1, "a refused create touches nothing");
+    }
+
+    [Fact]
     public async Task Create_ANameTakenInAnotherCase_IsRefused_AndNothingIsCharged()
     {
         await TeamCornerRig.Online(async (db, path) =>
