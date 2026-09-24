@@ -314,15 +314,36 @@ namespace UsurperRemake.Systems
         /// stored. A delete in a fresh process has not loaded the shared quests, so pushing its own list
         /// (SaveSharedQuestsNow) would overwrite other players' quests (review). Returns the number removed.
         /// </summary>
-        public async Task<int> RemoveSharedQuestsAsync(Func<QuestData, bool> matches)
+        public Task<int> RemoveSharedQuestsAsync(Func<QuestData, bool> matches) => RemoveSharedQuestsAsync(matches, null);
+
+        /// <summary>
+        /// v1.1.11: the edit is written under the record's version, re-read and re-applied if another
+        /// process wrote first, so a concurrent removal or addition is kept. beforeWrite is a test hook.
+        /// </summary>
+        internal async Task<int> RemoveSharedQuestsAsync(Func<QuestData, bool> matches, Func<Task>? beforeWrite)
         {
             try
             {
-                var shared = await LoadSharedQuests();
-                if (shared == null) return 0;
-                int removed = shared.RemoveAll(q => matches(q));
-                if (removed > 0) await SaveSharedQuests(shared);
-                return removed;
+                if (backend is not SqlSaveBackend sql)
+                {
+                    var shared = await LoadSharedQuests();
+                    if (shared == null) return 0;
+                    int removed = shared.RemoveAll(q => matches(q));
+                    if (removed > 0) await SaveSharedQuests(shared);
+                    return removed;
+                }
+                for (int attempt = 0; attempt < 5; attempt++)
+                {
+                    long version = sql.GetWorldStateVersion(KEY_QUESTS);   // read before the value, so any later write is a conflict
+                    var shared = await LoadSharedQuests();
+                    if (shared == null) return 0;
+                    int removed = shared.RemoveAll(q => matches(q));
+                    if (removed == 0) return 0;
+                    if (beforeWrite != null) await beforeWrite();
+                    if (await sql.SaveWorldStateIfVersion(KEY_QUESTS, JsonSerializer.Serialize(shared, jsonOptions), version)) return removed;
+                }
+                DebugLogger.Instance.LogWarning("ONLINE", "RemoveSharedQuestsAsync gave up: the quest record kept changing.");
+                return 0;
             }
             catch (Exception ex)
             {
@@ -453,135 +474,172 @@ namespace UsurperRemake.Systems
                     // v1.1.11: an unmarked empty court never replaces a marked vacancy the world sim has yet to act on
                     if (KeepsStoredVacancy(await ReadRoyalCourtFromWorldState(), throneVacated)) return;
                     // Throne is vacant — save empty state so other sessions see it
-                    // v1.1.11: a reign that just ended with no successor is marked, so the loaders clear their king
-                    var emptyData = new RoyalCourtSaveData { KingName = "", Treasury = 0, KingAI = 1, ThroneVacant = throneVacated };
-                    var emptyJson = System.Text.Json.JsonSerializer.Serialize(emptyData,
-                        new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
                     var backend = SaveSystem.Instance?.Backend as SqlSaveBackend;
-                    if (backend != null) await backend.SaveWorldState("royal_court", emptyJson);
+                    if (backend != null) await backend.SaveWorldState("royal_court", EmptyRoyalCourtJson(throneVacated));
                     return;
                 }
 
-                var data = new RoyalCourtSaveData
-                {
-                    KingName = king.Name,
-                    Treasury = king.Treasury,
-                    TaxRate = king.TaxRate,
-                    TotalReign = king.TotalReign,
-                    KingTaxPercent = king.KingTaxPercent,
-                    CityTaxPercent = king.CityTaxPercent,
-                    DesignatedHeir = king.DesignatedHeir ?? "",
-                    KingAI = (int)king.AI,
-                    KingSex = (int)king.Sex,
-                    CoronationDate = king.CoronationDate.ToString("o"),
-                    TaxAlignment = (int)king.TaxAlignment,
-                    MonarchHistory = global::CastleLocation.GetMonarchHistory()?.Select(m => new MonarchRecordSaveData
-                    {
-                        Name = m.Name,
-                        Title = m.Title,
-                        DaysReigned = m.DaysReigned,
-                        CoronationDate = m.CoronationDate.ToString("o"),
-                        EndReason = m.EndReason
-                    }).ToList() ?? new List<MonarchRecordSaveData>(),
-                    CourtMembers = king.CourtMembers?.Select(m => new CourtMemberSaveData
-                    {
-                        Name = m.Name,
-                        Faction = (int)m.Faction,
-                        Influence = m.Influence,
-                        LoyaltyToKing = m.LoyaltyToKing,
-                        Role = m.Role,
-                        IsPlotting = m.IsPlotting
-                    }).ToList() ?? new List<CourtMemberSaveData>(),
-                    Heirs = king.Heirs?.Select(h => new RoyalHeirSaveData
-                    {
-                        Name = h.Name,
-                        Age = h.Age,
-                        ClaimStrength = h.ClaimStrength,
-                        ParentName = h.ParentName,
-                        Sex = (int)h.Sex,
-                        IsDesignated = h.IsDesignated
-                    }).ToList() ?? new List<RoyalHeirSaveData>(),
-                    Spouse = king.Spouse != null ? new RoyalSpouseSaveData
-                    {
-                        Name = king.Spouse.Name,
-                        Sex = (int)king.Spouse.Sex,
-                        OriginalFaction = (int)king.Spouse.OriginalFaction,
-                        Dowry = king.Spouse.Dowry,
-                        Happiness = king.Spouse.Happiness
-                    } : null,
-                    ActivePlots = king.ActivePlots?.Select(p => new CourtIntrigueSaveData
-                    {
-                        PlotType = p.PlotType,
-                        Conspirators = p.Conspirators,
-                        Target = p.Target,
-                        Progress = p.Progress,
-                        IsDiscovered = p.IsDiscovered
-                    }).ToList() ?? new List<CourtIntrigueSaveData>(),
-                    Guards = king.Guards?.Select(g => new RoyalGuardSaveData
-                    {
-                        Name = g.Name,
-                        AI = (int)g.AI,
-                        Sex = (int)g.Sex,
-                        DailySalary = g.DailySalary,
-                        Loyalty = g.Loyalty,
-                        IsActive = g.IsActive
-                    }).ToList() ?? new List<RoyalGuardSaveData>(),
-                    MonsterGuards = king.MonsterGuards?.Select(m => new MonsterGuardSaveData
-                    {
-                        Name = m.Name,
-                        Level = m.Level,
-                        HP = m.HP,
-                        MaxHP = m.MaxHP,
-                        Strength = m.Strength,
-                        Defence = m.Defence,
-                        WeapPow = m.WeapPow,
-                        ArmPow = m.ArmPow,
-                        MonsterType = m.MonsterType,
-                        PurchaseCost = m.PurchaseCost,
-                        DailyFeedingCost = m.DailyFeedingCost
-                    }).ToList() ?? new List<MonsterGuardSaveData>(),
-
-                    // Phase 2 — previously unserialized fields
-                    Prisoners = king.Prisoners?.Select(kvp => new PrisonRecordSaveData
-                    {
-                        CharacterName = kvp.Value.CharacterName,
-                        Crime = kvp.Value.Crime,
-                        Sentence = kvp.Value.Sentence,
-                        DaysServed = kvp.Value.DaysServed,
-                        ImprisonmentDate = kvp.Value.ImprisonmentDate.ToString("o"),
-                        BailAmount = kvp.Value.BailAmount
-                    }).ToList() ?? new List<PrisonRecordSaveData>(),
-                    Orphans = king.Orphans?.Select(o => new RoyalOrphanSaveData
-                    {
-                        Name = o.Name,
-                        Age = o.Age,
-                        Sex = (int)o.Sex,
-                        ArrivalDate = o.ArrivalDate.ToString("o"),
-                        BackgroundStory = o.BackgroundStory,
-                        Happiness = o.Happiness,
-                        MotherName = o.MotherName,
-                        FatherName = o.FatherName,
-                        MotherID = o.MotherID,
-                        FatherID = o.FatherID,
-                        Race = (int)o.Race,
-                        BirthDate = o.BirthDate.ToString("o"),
-                        Soul = o.Soul,
-                        IsRealOrphan = o.IsRealOrphan
-                    }).ToList() ?? new List<RoyalOrphanSaveData>(),
-                    MagicBudget = king.MagicBudget,
-                    EstablishmentStatus = king.EstablishmentStatus ?? new Dictionary<string, bool>(),
-                    LastProclamation = king.LastProclamation ?? "",
-                    LastProclamationDate = king.LastProclamationDate != DateTime.MinValue
-                        ? king.LastProclamationDate.ToString("o") : ""
-                };
-
-                var json = JsonSerializer.Serialize(data, jsonOptions);
+                var json = RoyalCourtJson(king);
                 await backend.SaveWorldState("royal_court", json);
                 DebugLogger.Instance.LogDebug("ONLINE", $"Royal court saved to world_state: {king.Name}");
             }
             catch (Exception ex)
             {
                 DebugLogger.Instance.LogError("ONLINE", $"Failed to save royal court to world_state: {ex.Message}");
+            }
+        }
+
+        /// <summary>v1.1.11: the stored form of an empty court; a reign that just ended with no successor is marked, so the loaders clear their king.</summary>
+        private static string EmptyRoyalCourtJson(bool throneVacated)
+        {
+            var emptyData = new RoyalCourtSaveData { KingName = "", Treasury = 0, KingAI = 1, ThroneVacant = throneVacated };
+            return System.Text.Json.JsonSerializer.Serialize(emptyData,
+                new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
+        }
+
+        /// <summary>v1.1.11: the stored form of the court of this king (the body of SaveRoyalCourtToWorldState).</summary>
+        private string RoyalCourtJson(King king)
+        {
+            var data = new RoyalCourtSaveData
+            {
+                KingName = king.Name,
+                Treasury = king.Treasury,
+                TaxRate = king.TaxRate,
+                TotalReign = king.TotalReign,
+                KingTaxPercent = king.KingTaxPercent,
+                CityTaxPercent = king.CityTaxPercent,
+                DesignatedHeir = king.DesignatedHeir ?? "",
+                KingAI = (int)king.AI,
+                KingSex = (int)king.Sex,
+                CoronationDate = king.CoronationDate.ToString("o"),
+                TaxAlignment = (int)king.TaxAlignment,
+                MonarchHistory = global::CastleLocation.GetMonarchHistory()?.Select(m => new MonarchRecordSaveData
+                {
+                    Name = m.Name,
+                    Title = m.Title,
+                    DaysReigned = m.DaysReigned,
+                    CoronationDate = m.CoronationDate.ToString("o"),
+                    EndReason = m.EndReason
+                }).ToList() ?? new List<MonarchRecordSaveData>(),
+                CourtMembers = king.CourtMembers?.Select(m => new CourtMemberSaveData
+                {
+                    Name = m.Name,
+                    Faction = (int)m.Faction,
+                    Influence = m.Influence,
+                    LoyaltyToKing = m.LoyaltyToKing,
+                    Role = m.Role,
+                    IsPlotting = m.IsPlotting
+                }).ToList() ?? new List<CourtMemberSaveData>(),
+                Heirs = king.Heirs?.Select(h => new RoyalHeirSaveData
+                {
+                    Name = h.Name,
+                    Age = h.Age,
+                    ClaimStrength = h.ClaimStrength,
+                    ParentName = h.ParentName,
+                    Sex = (int)h.Sex,
+                    IsDesignated = h.IsDesignated
+                }).ToList() ?? new List<RoyalHeirSaveData>(),
+                Spouse = king.Spouse != null ? new RoyalSpouseSaveData
+                {
+                    Name = king.Spouse.Name,
+                    Sex = (int)king.Spouse.Sex,
+                    OriginalFaction = (int)king.Spouse.OriginalFaction,
+                    Dowry = king.Spouse.Dowry,
+                    Happiness = king.Spouse.Happiness
+                } : null,
+                ActivePlots = king.ActivePlots?.Select(p => new CourtIntrigueSaveData
+                {
+                    PlotType = p.PlotType,
+                    Conspirators = p.Conspirators,
+                    Target = p.Target,
+                    Progress = p.Progress,
+                    IsDiscovered = p.IsDiscovered
+                }).ToList() ?? new List<CourtIntrigueSaveData>(),
+                Guards = king.Guards?.Select(g => new RoyalGuardSaveData
+                {
+                    Name = g.Name,
+                    AI = (int)g.AI,
+                    Sex = (int)g.Sex,
+                    DailySalary = g.DailySalary,
+                    Loyalty = g.Loyalty,
+                    IsActive = g.IsActive
+                }).ToList() ?? new List<RoyalGuardSaveData>(),
+                MonsterGuards = king.MonsterGuards?.Select(m => new MonsterGuardSaveData
+                {
+                    Name = m.Name,
+                    Level = m.Level,
+                    HP = m.HP,
+                    MaxHP = m.MaxHP,
+                    Strength = m.Strength,
+                    Defence = m.Defence,
+                    WeapPow = m.WeapPow,
+                    ArmPow = m.ArmPow,
+                    MonsterType = m.MonsterType,
+                    PurchaseCost = m.PurchaseCost,
+                    DailyFeedingCost = m.DailyFeedingCost
+                }).ToList() ?? new List<MonsterGuardSaveData>(),
+
+                // Phase 2: previously unserialized fields
+                Prisoners = king.Prisoners?.Select(kvp => new PrisonRecordSaveData
+                {
+                    CharacterName = kvp.Value.CharacterName,
+                    Crime = kvp.Value.Crime,
+                    Sentence = kvp.Value.Sentence,
+                    DaysServed = kvp.Value.DaysServed,
+                    ImprisonmentDate = kvp.Value.ImprisonmentDate.ToString("o"),
+                    BailAmount = kvp.Value.BailAmount
+                }).ToList() ?? new List<PrisonRecordSaveData>(),
+                Orphans = king.Orphans?.Select(o => new RoyalOrphanSaveData
+                {
+                    Name = o.Name,
+                    Age = o.Age,
+                    Sex = (int)o.Sex,
+                    ArrivalDate = o.ArrivalDate.ToString("o"),
+                    BackgroundStory = o.BackgroundStory,
+                    Happiness = o.Happiness,
+                    MotherName = o.MotherName,
+                    FatherName = o.FatherName,
+                    MotherID = o.MotherID,
+                    FatherID = o.FatherID,
+                    Race = (int)o.Race,
+                    BirthDate = o.BirthDate.ToString("o"),
+                    Soul = o.Soul,
+                    IsRealOrphan = o.IsRealOrphan
+                }).ToList() ?? new List<RoyalOrphanSaveData>(),
+                MagicBudget = king.MagicBudget,
+                EstablishmentStatus = king.EstablishmentStatus ?? new Dictionary<string, bool>(),
+                LastProclamation = king.LastProclamation ?? "",
+                LastProclamationDate = king.LastProclamationDate != DateTime.MinValue
+                    ? king.LastProclamationDate.ToString("o") : ""
+            };
+
+            return JsonSerializer.Serialize(data, jsonOptions);
+        }
+
+        /// <summary>v1.1.11: the stored court and the version it was read at (the version read first, so a later write is a conflict).</summary>
+        internal async Task<(RoyalCourtSaveData? Court, long Version)> ReadRoyalCourtWithVersionAsync()
+        {
+            long version = (backend as SqlSaveBackend)?.GetWorldStateVersion("royal_court") ?? 0;
+            return (await ReadRoyalCourtFromWorldState(), version);
+        }
+
+        /// <summary>
+        /// v1.1.11: this process's court, written only if the stored court is still at the version read.
+        /// False on a conflict, so the caller re-reads and decides again. Without SQL it is a plain save.
+        /// </summary>
+        internal async Task<bool> SaveRoyalCourtIfVersionAsync(long version, bool throneVacated)
+        {
+            try
+            {
+                if (backend is not SqlSaveBackend sql) { await SaveRoyalCourtToWorldState(throneVacated); return true; }
+                var king = global::CastleLocation.GetCurrentKing();
+                string json = king == null ? EmptyRoyalCourtJson(throneVacated) : RoyalCourtJson(king);
+                return await sql.SaveWorldStateIfVersion("royal_court", json, version);
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("ONLINE", $"Failed to save royal court under its version: {ex.Message}");
+                return false;
             }
         }
 

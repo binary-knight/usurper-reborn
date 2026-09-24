@@ -418,15 +418,22 @@ namespace UsurperRemake.Systems
             if (backend != null && !string.IsNullOrWhiteSpace(username))
                 backend.PurgePlayerWorldState(username!, name);
 
+            // v1.1.11: every name the character was known by; a royal-debt bounty names the married display name
+            string? shown = player?.DisplayName ?? (string.IsNullOrWhiteSpace(username) ? null : backend?.GetStoredDisplayName(username!));
+            var aliases = CharacterAliases(name, player?.Name2, shown);
+            // quests record only the character's Name2 (Occupier / OfferedTo); the married display name is for
+            // bounties only, since another character's Name2 may equal it (review)
+            var questNames = CharacterAliases(name, player?.Name2);
+
             try
             {
                 // Claimed quests (Occupier / OfferedTo = display name) and the King's WANTED bounty on
                 // the character. Pushed even when nothing was removed, since world_state may still hold
                 // a stale copy that a same-name character would merge back on load.
-                int removed = QuestSystem.RemovePlayerQuests(name) + QuestSystem.RemoveBountiesOnPlayer(name);
+                int removed = QuestSystem.RemovePlayerQuests(questNames.ToArray()) + aliases.Sum(a => QuestSystem.RemoveBountiesOnPlayer(a));
                 // the shared record is edited in place, not replaced by this process's list (review)
                 if (UsurperRemake.BBS.DoorMode.IsOnlineMode && OnlineStateManager.IsActive)
-                    removed += await OnlineStateManager.Instance!.RemoveSharedQuestsAsync(q => QuestLeftByCharacter(q, name));
+                    removed += await OnlineStateManager.Instance!.RemoveSharedQuestsAsync(q => QuestLeftByCharacter(q, questNames, aliases));
                 if (removed > 0)
                     DebugLogger.Instance.LogInfo("DELETE", $"Removed {removed} quest(s) and bounties for deleted '{name}'.");
             }
@@ -454,7 +461,6 @@ namespace UsurperRemake.Systems
             try
             {
                 // v1.1.11: a deleted king abdicates through the normal path (history, NPC succession, persist)
-                string? shown = player?.DisplayName ?? (string.IsNullOrWhiteSpace(username) ? null : backend?.GetStoredDisplayName(username!));
                 if (await global::CastleLocation.AbdicateDeletedKingAsync(name, shown, "left the throne and the realm"))
                     DebugLogger.Instance.LogInfo("DELETE", $"Deleted '{name}' held the throne; the reign has ended.");
             }
@@ -502,6 +508,23 @@ namespace UsurperRemake.Systems
             string.Equals(q.Occupier, name, StringComparison.OrdinalIgnoreCase) ||
             string.Equals(q.OfferedTo, name, StringComparison.OrdinalIgnoreCase) ||
             QuestSystem.IsBountyOnPlayer(q.Initiator, q.TitleKey, q.TargetNPCName, q.IsPlayerBounty, name);
+
+        /// <summary>
+        /// v1.1.11: as above for a character known by several names (a royal-debt bounty names the married
+        /// display name): a match on the name or any alias.
+        /// </summary>
+        public static bool QuestLeftByCharacter(QuestData q, IReadOnlyList<string> questNames, IReadOnlyList<string> bountyAliases) =>
+            questNames.Any(n => QuestLeftByCharacter(q, n)) ||
+            bountyAliases.Any(a => QuestSystem.IsBountyOnPlayer(q.Initiator, q.TitleKey, q.TargetNPCName, q.IsPlayerBounty, a));
+
+        /// <summary>v1.1.11: the distinct, non-blank names a character went by, the name first.</summary>
+        public static List<string> CharacterAliases(params string?[] names)
+        {
+            var list = new List<string>();
+            foreach (var n in names)
+                if (!string.IsNullOrWhiteSpace(n) && !list.Any(x => string.Equals(x, n, StringComparison.OrdinalIgnoreCase))) list.Add(n!);
+            return list;
+        }
 
         /// <summary>v1.1.11: drop every live NPC's grudges against the name (MemorySystem.IsGrudge).</summary>
         public static int ForgetNpcGrudgesAgainst(string? name)

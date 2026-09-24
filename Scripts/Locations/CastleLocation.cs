@@ -7961,44 +7961,60 @@ public class CastleLocation : BaseLocation
         return named(name) || named(displayName);
     }
 
-    /// <summary>v1.1.11: online, a process that has not read the shared royal_court (a fresh door process at character select) reads it first.</summary>
-    internal static bool NeedsSharedCourtLoad(bool online, King? king, bool loadedFromShared) =>
-        online && (king == null || !loadedFromShared);
-
     /// <summary>
-    /// v1.1.11: the delete path. Online, the authoritative royal_court is read first when this process
-    /// has not loaded it, and the ended reign is written back to it before returning.
+    /// v1.1.11: the delete path. Online, the authoritative royal_court is always read to decide, and the
+    /// ended reign is written back under the version read before returning.
     /// </summary>
     public static Task<bool> AbdicateDeletedKingAsync(string? name, string? displayName, string reason)
     {
         var osm = UsurperRemake.BBS.DoorMode.IsOnlineMode ? OnlineStateManager.Instance : null;
         if (osm == null) return AbdicateDeletedKingAsync(name, displayName, reason, false, null, null, null);
         return AbdicateDeletedKingAsync(name, displayName, reason, true,
-            osm.ReadRoyalCourtFromWorldState, osm.LoadRoyalCourtFromWorldState, () => osm.SaveRoyalCourtToWorldState(throneVacated: true));
+            osm.ReadRoyalCourtWithVersionAsync, osm.LoadRoyalCourtFromWorldState, v => osm.SaveRoyalCourtIfVersionAsync(v, throneVacated: true));
     }
 
     /// <summary>
-    /// v1.1.11: the delete path with the shared court calls passed in. A process that has not read the
-    /// shared court only reads the king's name from it; the court is applied only when that king is the
-    /// deleted character, so deleting anyone else leaves this process's court as it was.
+    /// v1.1.11: the delete path with the shared court calls passed in. The shared court decides, even in a
+    /// process that loaded it earlier (its copy may be stale): the reign ends only when the stored king is
+    /// the deleted character, and that court is loaded first. The write is guarded by the version read; on a
+    /// conflict the court is read and the decision made again, up to 3 times.
     /// </summary>
     internal static async Task<bool> AbdicateDeletedKingAsync(string? name, string? displayName, string reason, bool online,
-        Func<Task<RoyalCourtSaveData?>>? readShared, Func<Task>? loadShared, Func<Task>? saveShared)
+        Func<Task<(RoyalCourtSaveData? Court, long Version)>>? readShared, Func<Task>? loadShared, Func<long, Task<bool>>? saveSharedIfVersion)
     {
-        if (NeedsSharedCourtLoad(online, GetCurrentKing(), RoyalCourtLoadedFromShared))
+        if (!online || readShared == null)
         {
-            var shared = readShared == null ? null : await readShared();
+            var local = GetCurrentKing();
+            if (!IsDeletedCharactersReign(local, name, displayName)) return false;
+            EndPlayerReign(local!.Name, reason, persist: !online);
+            return true;
+        }
+
+        bool changedLocally = false;
+        var history = GetMonarchHistory().ToList();
+        for (int attempt = 0; attempt < 3; attempt++)
+        {
+            if (changedLocally) SetMonarchHistory(history.ToList());   // v1.1.11: a retry records the reign once
+            var (shared, version) = await readShared();
             if (shared != null)
             {
-                if (!SharedCourtNamesDeletedCharacter(shared, name, displayName)) return false;
+                if (!SharedCourtNamesDeletedCharacter(shared, name, displayName))
+                {
+                    // v1.1.11: a lost race ended a reign locally that the shared court no longer holds
+                    if (changedLocally && loadShared != null) await loadShared();
+                    return false;
+                }
                 if (loadShared != null) await loadShared();
             }
+            var king = GetCurrentKing();
+            if (!IsDeletedCharactersReign(king, name, displayName)) return false;
+            EndPlayerReign(king!.Name, reason, persist: false);
+            changedLocally = true;
+            if (saveSharedIfVersion == null || await saveSharedIfVersion(version)) return true;
         }
-        var king = GetCurrentKing();
-        if (!IsDeletedCharactersReign(king, name, displayName)) return false;
-        EndPlayerReign(king!.Name, reason, persist: !online);
-        if (online && saveShared != null) await saveShared();
-        return true;
+        DebugLogger.Instance.LogWarning("CASTLE", $"The reign of deleted '{name}' was not ended in the shared court: it kept changing.");
+        if (loadShared != null) await loadShared();
+        return false;
     }
 
     /// <summary>v1.1.11: the stored court's king is the deleted character (a reigning player of that name).</summary>

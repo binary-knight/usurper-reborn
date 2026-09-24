@@ -424,4 +424,91 @@ public class CharacterRecreationTests : IDisposable
         var helper = CodeOnly(Source("Systems", "PermadeathHelper.cs"));
         helper.Should().Contain("ctx!.CharacterKey : ctx?.Username");
     }
+
+    // ─── v1.1.11: review round 14 ───
+
+    private static OnlineStateManager NewOsm(SqlSaveBackend db) =>
+        (OnlineStateManager)Activator.CreateInstance(typeof(OnlineStateManager),
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance, null, new object[] { db, "r14" }, null)!;
+
+    [Fact]
+    public async System.Threading.Tasks.Task InterleavedSharedQuestRemovals_BothPersist_AndAnAdditionIsKept()
+    {
+        _db = new SqlSaveBackend(_path);
+        var osm = NewOsm(_db);
+        await osm.SaveSharedQuests(new List<QuestData> { new QuestData { Id = "A" }, new QuestData { Id = "B" } });
+
+        bool first = true;
+        int removed = await osm.RemoveSharedQuestsAsync(q => q.Id == "A", async () =>
+        {
+            if (!first) return;
+            first = false;
+            // another process, between this read and this write: removes B, then adds C
+            (await osm.RemoveSharedQuestsAsync(q => q.Id == "B")).Should().Be(1);
+            var now = (await osm.LoadSharedQuests())!;
+            now.Add(new QuestData { Id = "C" });
+            await osm.SaveSharedQuests(now);
+        });
+        removed.Should().Be(1);
+        first.Should().BeFalse("the hook ran");
+        (await osm.LoadSharedQuests())!.Select(q => q.Id).Should().BeEquivalentTo(new[] { "C" }, "neither removal undoes the other, and the addition stays");
+
+        var src = CodeOnly(Source("Systems", "OnlineStateManager.cs"));
+        src.Should().Contain("await sql.SaveWorldStateIfVersion(KEY_QUESTS, JsonSerializer.Serialize(shared, jsonOptions), version)");
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task ARoyalDebtBountyOnTheMarriedName_IsRemoved_LocallyAndInTheSharedRecord()
+    {
+        _db = new SqlSaveBackend(_path);
+        using (var conn = new SqliteConnection($"Data Source={_path}"))
+        {
+            conn.Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "INSERT INTO players (username, display_name, player_data) VALUES ('bob_acct', 'Bob Smith', '{}');";
+            cmd.ExecuteNonQuery();
+        }
+        try
+        {
+            // locally, with the display name read from the players row
+            var onMarried = Add(Wanted("Bob Smith"));
+            var onOther = Add(Wanted("Carol Smith"));
+            await PermadeathHelper.PurgeDeletedCharacterAsync(_db, "bob_acct", "Bob");
+            InDatabase(onMarried).Should().BeFalse("the royal-debt bounty names the married display name");
+            InDatabase(onOther).Should().BeTrue();
+
+            // locally, with the display name from the character passed in
+            var again = Add(Wanted("Bob Smith"));
+            var bob = new Character { Name1 = "bob_acct2", Name2 = "Bob", FamilySurname = "Smith" };
+            bob.DisplayName.Should().Be("Bob Smith");
+            await PermadeathHelper.PurgeDeletedCharacterAsync(null, "bob_acct2", "Bob", bob);
+            InDatabase(again).Should().BeFalse();
+
+            // the shared record, edited with the purge's predicate
+            var osm = NewOsm(_db);
+            await osm.SaveSharedQuests(new List<QuestData>
+            {
+                new QuestData { Id = "R1", Initiator = "The Crown", TargetNPCName = "Bob Smith", IsPlayerBounty = true },
+                new QuestData { Id = "R2", Initiator = "The Crown", TargetNPCName = "Bob", IsPlayerBounty = true },
+                new QuestData { Id = "R3", Initiator = "The Crown", TargetNPCName = "Carol Smith", IsPlayerBounty = true },
+                new QuestData { Id = "R4", Occupier = "Bob" },
+                new QuestData { Id = "R5", Occupier = "Bob Smith" }   // another character whose Name2 is "Bob Smith"
+            });
+            var aliases = PermadeathHelper.CharacterAliases("Bob", null, _db.GetStoredDisplayName("bob_acct"));
+            aliases.Should().Equal("Bob", "Bob Smith");
+            (await osm.RemoveSharedQuestsAsync(q => PermadeathHelper.QuestLeftByCharacter(q, new[] { "Bob" }, aliases))).Should().Be(3);
+            (await osm.LoadSharedQuests())!.Select(q => q.Id).Should().Equal(new[] { "R3", "R5" },
+                "quests record Name2 only; the married name is for bounties, and another character may carry it as Name2");
+        }
+        finally
+        {
+            QuestSystem.RemoveBountiesOnPlayer("Bob Smith");
+            QuestSystem.RemoveBountiesOnPlayer("Carol Smith");
+        }
+
+        var purge = CodeOnly(Source("Systems", "PermadeathHelper.cs"));
+        purge.Should().Contain("aliases.Sum(a => QuestSystem.RemoveBountiesOnPlayer(a))");
+        purge.Should().Contain("RemoveSharedQuestsAsync(q => QuestLeftByCharacter(q, questNames, aliases))");
+        purge.Should().Contain("QuestSystem.RemovePlayerQuests(questNames.ToArray())");
+    }
 }

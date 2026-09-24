@@ -26159,8 +26159,9 @@ public partial class CombatEngine
             bounty = paid.Sum(QuestSystem.BountyReward);
             if (paid.Count > 0 && UsurperRemake.BBS.DoorMode.IsOnlineMode && OnlineStateManager.IsActive)
             {
-                var ids = paid.Select(q => q.Id).ToHashSet();
-                await OnlineStateManager.Instance!.RemoveSharedQuestsAsync(q => ids.Contains(q.Id));   // edited in place
+                // v1.1.11: matched by claim key, so one id-less bounty does not take the other id-less quests with it
+                var keys = paid.Select(q => QuestSystem.BountyClaimKey(q)).ToHashSet();
+                await OnlineStateManager.Instance!.RemoveSharedQuestsAsync(q => keys.Contains(QuestSystem.BountyClaimKey(q)));   // edited in place
             }
         }
         else bounty = 0;

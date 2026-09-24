@@ -332,10 +332,6 @@ public class DeleteFollowUpTests : IDisposable
     public void AFreshProcess_ReadsTheSharedRoyalCourt_BeforeDecidingTheDeletedKingsReign()
     {
         var king = King.CreateNewKing("Bob", CharacterAI.Human, CharacterSex.Male);
-        CastleLocation.NeedsSharedCourtLoad(online: true, king: null, loadedFromShared: false).Should().BeTrue();
-        CastleLocation.NeedsSharedCourtLoad(online: true, king: king, loadedFromShared: false).Should().BeTrue("a king not read from shared state may be stale");
-        CastleLocation.NeedsSharedCourtLoad(online: true, king: king, loadedFromShared: true).Should().BeFalse();
-        CastleLocation.NeedsSharedCourtLoad(online: false, king: null, loadedFromShared: false).Should().BeFalse("offline has no shared court");
 
         CastleLocation.IsDeletedCharactersReign(king, "Bob", null).Should().BeTrue();
         CastleLocation.IsDeletedCharactersReign(king, "x", "bob").Should().BeTrue();
@@ -348,12 +344,14 @@ public class DeleteFollowUpTests : IDisposable
         start.Should().BeGreaterThan(0);
         string body = castle.Substring(start, castle.IndexOf("internal static bool SharedCourtNamesDeletedCharacter(", start, StringComparison.Ordinal) - start);
         int read = body.IndexOf("await readShared()", StringComparison.Ordinal);
-        read.Should().BeGreaterThan(body.IndexOf("NeedsSharedCourtLoad(", StringComparison.Ordinal));
-        body.IndexOf("await loadShared()", StringComparison.Ordinal)
+        read.Should().BeGreaterThan(0);
+        body.Should().NotContain("RoyalCourtLoadedFromShared", "the shared court is read even by a process that loaded it earlier");
+        int loop = body.IndexOf("for (int attempt", StringComparison.Ordinal);
+        body.IndexOf("await loadShared()", loop, StringComparison.Ordinal)
             .Should().BeGreaterThan(body.IndexOf("SharedCourtNamesDeletedCharacter(", read, StringComparison.Ordinal), "the court is applied only on a match")
-            .And.BeLessThan(body.IndexOf("IsDeletedCharactersReign(", StringComparison.Ordinal));
-        body.Should().Contain("await saveShared()", "the ended reign is written to the shared royal_court");
-        castle.Should().Contain("osm.ReadRoyalCourtFromWorldState, osm.LoadRoyalCourtFromWorldState, () => osm.SaveRoyalCourtToWorldState(throneVacated: true)");
+            .And.BeLessThan(body.IndexOf("IsDeletedCharactersReign(", loop, StringComparison.Ordinal));
+        body.Should().Contain("await saveSharedIfVersion(version)", "the ended reign is written under the version read");
+        castle.Should().Contain("osm.ReadRoyalCourtWithVersionAsync, osm.LoadRoyalCourtFromWorldState, v => osm.SaveRoyalCourtIfVersionAsync(v, throneVacated: true)");
         Source("Systems", "OnlineStateManager.cs").Should().Contain("CastleLocation.RoyalCourtLoadedFromShared = true;");
         Source("Systems", "PermadeathHelper.cs").Should().Contain("await global::CastleLocation.AbdicateDeletedKingAsync(");
     }
@@ -436,9 +434,9 @@ public class DeleteFollowUpTests : IDisposable
                 CastleLocation.RoyalCourtLoadedFromShared = false;
                 bool applied = false, saved = false;
                 bool ended = await CastleLocation.AbdicateDeletedKingAsync("Bob", "Bob", "left", online: true,
-                    () => Task.FromResult<RoyalCourtSaveData?>(shared),
+                    () => Task.FromResult<(RoyalCourtSaveData?, long)>((shared, 1)),
                     () => { applied = true; return Task.CompletedTask; },
-                    () => { saved = true; return Task.CompletedTask; });
+                    _ => { saved = true; return Task.FromResult(true); });
                 ended.Should().BeFalse();
                 applied.Should().BeFalse("the court is not applied for a non-king");
                 saved.Should().BeFalse();
@@ -454,9 +452,9 @@ public class DeleteFollowUpTests : IDisposable
                 CastleLocation.RoyalCourtLoadedFromShared = false;
                 bool applied = false, saved = false;
                 bool ended = await CastleLocation.AbdicateDeletedKingAsync("Bob", "Bob", "left", online: true,
-                    () => Task.FromResult<RoyalCourtSaveData?>(bobCourt),
+                    () => Task.FromResult<(RoyalCourtSaveData?, long)>((bobCourt, 1)),
                     () => { applied = true; CastleLocation.SetKing(King.CreateNewKing("Bob", CharacterAI.Human, CharacterSex.Male)); return Task.CompletedTask; },
-                    () => { saved = true; return Task.CompletedTask; });
+                    _ => { saved = true; return Task.FromResult(true); });
                 ended.Should().BeTrue();
                 applied.Should().BeTrue();
                 saved.Should().BeTrue();
@@ -469,6 +467,88 @@ public class DeleteFollowUpTests : IDisposable
             .Should().BeFalse("an NPC king of the name");
         CastleLocation.SharedCourtNamesDeletedCharacter(new RoyalCourtSaveData { KingName = "", ThroneVacant = true }, "Bob", "Bob").Should().BeFalse();
         CastleLocation.SharedCourtNamesDeletedCharacter(new RoyalCourtSaveData { KingName = "Bob Smith", KingAI = (int)CharacterAI.Human }, "Bob", "Bob Smith").Should().BeTrue();
+    }
+
+    // ─── v1.1.11: review round 14 ───
+
+    private static OnlineStateManager NewOsm(SqlSaveBackend db) =>
+        (OnlineStateManager)Activator.CreateInstance(typeof(OnlineStateManager),
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance, null, new object[] { db, "r14" }, null)!;
+
+    private RoyalCourtSaveData StoredCourt() =>
+        System.Text.Json.JsonSerializer.Deserialize<RoyalCourtSaveData>(_db.LoadWorldState("royal_court").Result!,
+            new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
+
+    [Fact]
+    public async Task AStaleCourt_DoesNotAbdicateAFormerKing_OverTheSharedNewKing()
+    {
+        bool loadedBefore = CastleLocation.RoyalCourtLoadedFromShared;
+        try
+        {
+            var osm = NewOsm(_db);
+            // this process loaded Bob as king; Alice took the throne in another process since
+            var bob = King.CreateNewKing("Bob", CharacterAI.Human, CharacterSex.Male);
+            await _db.SaveWorldState("royal_court", CourtJson(new RoyalCourtSaveData { KingName = "Alice", KingAI = (int)CharacterAI.Human, Treasury = 777 }));
+            long version = _db.GetWorldStateVersion("royal_court");
+            await WithKing(bob, async () =>
+            {
+                CastleLocation.RoyalCourtLoadedFromShared = true;
+                bool ended = await CastleLocation.AbdicateDeletedKingAsync("Bob", "Bob", "left", online: true,
+                    osm.ReadRoyalCourtWithVersionAsync, osm.LoadRoyalCourtFromWorldState, v => osm.SaveRoyalCourtIfVersionAsync(v, throneVacated: true));
+                ended.Should().BeFalse("the shared king is Alice");
+                StoredCourt().KingName.Should().Be("Alice");
+                StoredCourt().Treasury.Should().Be(777);
+                _db.GetWorldStateVersion("royal_court").Should().Be(version, "nothing was written");
+            });
+        }
+        finally { CastleLocation.RoyalCourtLoadedFromShared = loadedBefore; }
+    }
+
+    [Fact]
+    public async Task AVersionConflict_ReadsTheCourtAgain_AndDecidesAgain()
+    {
+        bool loadedBefore = CastleLocation.RoyalCourtLoadedFromShared;
+        try
+        {
+            var osm = NewOsm(_db);
+            // Alice takes the throne between the read and the write: the write fails, the re-read sees Alice
+            await _db.SaveWorldState("royal_court", CourtJson(new RoyalCourtSaveData { KingName = "Bob", KingAI = (int)CharacterAI.Human }));
+            await WithKing(King.CreateNewKing("Bob", CharacterAI.Human, CharacterSex.Male), async () =>
+            {
+                int saves = 0;
+                bool ended = await CastleLocation.AbdicateDeletedKingAsync("Bob", "Bob", "left", online: true,
+                    osm.ReadRoyalCourtWithVersionAsync, osm.LoadRoyalCourtFromWorldState, async v =>
+                    {
+                        if (saves++ == 0)
+                            await _db.SaveWorldState("royal_court", CourtJson(new RoyalCourtSaveData { KingName = "Alice", KingAI = (int)CharacterAI.Human }));
+                        return await osm.SaveRoyalCourtIfVersionAsync(v, throneVacated: true);
+                    });
+                ended.Should().BeFalse();
+                saves.Should().Be(1);
+                StoredCourt().KingName.Should().Be("Alice", "the newer court is not overwritten");
+                (CastleLocation.GetCurrentKing()?.Name).Should().Be("Alice", "this process takes the shared court back");
+            });
+
+            // a concurrent write that keeps Bob (a treasury change): the retry ends the reign and is written
+            await _db.SaveWorldState("royal_court", CourtJson(new RoyalCourtSaveData { KingName = "Bob", KingAI = (int)CharacterAI.Human }));
+            await WithKing(King.CreateNewKing("Bob", CharacterAI.Human, CharacterSex.Male), async () =>
+            {
+                int saves = 0;
+                int bobRecords = CastleLocation.GetMonarchHistory().Count(m => m.Name == "Bob");
+                bool ended = await CastleLocation.AbdicateDeletedKingAsync("Bob", "Bob", "left", online: true,
+                    osm.ReadRoyalCourtWithVersionAsync, osm.LoadRoyalCourtFromWorldState, async v =>
+                    {
+                        if (saves++ == 0)
+                            await _db.SaveWorldState("royal_court", CourtJson(new RoyalCourtSaveData { KingName = "Bob", KingAI = (int)CharacterAI.Human, Treasury = 5 }));
+                        return await osm.SaveRoyalCourtIfVersionAsync(v, throneVacated: true);
+                    });
+                ended.Should().BeTrue();
+                saves.Should().Be(2);
+                StoredCourt().KingName.Should().NotBe("Bob");
+                CastleLocation.GetMonarchHistory().Count(m => m.Name == "Bob").Should().Be(bobRecords + 1, "the retry records the reign once");
+            });
+        }
+        finally { CastleLocation.RoyalCourtLoadedFromShared = loadedBefore; }
     }
 
     [Fact]

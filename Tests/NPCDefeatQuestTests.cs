@@ -325,30 +325,15 @@ public class NPCDefeatQuestTests
     }
 
     [Fact]
-    public async Task OldBountyClaims_ArePruned_AfterTheRetention()
+    public void BountyClaims_AreNeverPruned()
     {
-        GameConfig.BountyClaimRetentionDays.Should().Be(90);
-        await WithSqlBackend(async (db, path) =>
-        {
-            db.TryClaimBounty("Qfresh", "alice").Should().BeTrue();
-            using (var conn = new SqliteConnection($"Data Source={path}"))
-            {
-                conn.Open();
-                using var cmd = conn.CreateCommand();
-                cmd.CommandText = "INSERT INTO bounty_claims (quest_id, claimed_by, claimed_at) VALUES ('Qold', 'bob', datetime('now', '-100 days')), ('Qrecent', 'bob', datetime('now', '-60 days'));";
-                cmd.ExecuteNonQuery();
-            }
-            db.PruneOldBountyClaims().Should().Be(1);
-            db.TryClaimBounty("Qold", "carol").Should().BeTrue("the old claim is gone");
-            db.TryClaimBounty("Qrecent", "carol").Should().BeFalse("a claim within the retention stays");
-            db.TryClaimBounty("Qfresh", "carol").Should().BeFalse();
-            await Task.CompletedTask;
-        });
-
+        // v1.1.11: a stale save can bring an old bounty back after any retention, so the claims stay
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
         while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "Scripts"))) dir = dir.Parent;
-        File.ReadAllText(Path.Combine(dir!.FullName, "Scripts", "Systems", "WorldSimService.cs"))
-            .Should().Contain("sqlBackend.PruneOldBountyClaims();", "the world save cycle prunes it");
+        string Src(string folder, string file) => File.ReadAllText(Path.Combine(dir!.FullName, "Scripts", folder, file));
+        Src("Systems", "SqlSaveBackend.cs").Should().NotContain("PruneOldBountyClaims").And.NotContain("DELETE FROM bounty_claims");
+        Src("Systems", "WorldSimService.cs").Should().NotContain("PruneOldBountyClaims");
+        Src("Core", "GameConfig.cs").Should().NotContain("BountyClaimRetentionDays");
     }
 
     [Fact]
@@ -368,5 +353,53 @@ public class NPCDefeatQuestTests
             QuestSystem.CollectBountiesOnPlayer(winner, loaded).Should().ContainSingle("the loaded defender carries the married name");
         }
         finally { bounty.Deleted = true; }
+    }
+
+    // ─── v1.1.11: review round 14 ───
+
+    [Fact]
+    public async Task CollectingOneIdlessBounty_RemovesOnlyThatOne_FromTheSharedRecord()
+    {
+        await WithSqlBackend(async (db, _) =>
+        {
+            var osm = (OnlineStateManager)Activator.CreateInstance(typeof(OnlineStateManager),
+                BindingFlags.NonPublic | BindingFlags.Instance, null, new object[] { db, "r14" }, null)!;
+            QuestData Stored(string target) => new QuestData
+            {
+                Id = "", Title = "WANTED: " + target, Initiator = "The Crown", TargetNPCName = target, IsPlayerBounty = true
+            };
+            await osm.SaveSharedQuests(new System.Collections.Generic.List<QuestData>
+            {
+                Stored("Idless Bob R14"), Stored("Idless Alice R14"), new QuestData { Id = "", Title = "Fetch the ale", Initiator = "Innkeeper" }
+            });
+
+            var bounty = BountyOnPlayer("Idless Bob R14", 2000);
+            bounty.Id = "";
+            var bob = new Character { Name1 = "idless_bob_r14", Name2 = "Idless Bob R14", Level = 30, IsLoadedPlayer = true };
+            var winner = new Character { Name1 = "sheriff_r14", Name2 = "Sheriff R14", Level = 30, Gold = 0 };
+            var paid = QuestSystem.CollectBountiesOnPlayer(winner, bob);
+            paid.Should().ContainSingle();
+
+            // the same match the duel path uses (CombatEngine.ReportDuelDefeat)
+            var keys = new System.Collections.Generic.HashSet<string>();
+            foreach (var q in paid) keys.Add(QuestSystem.BountyClaimKey(q));
+            (await osm.RemoveSharedQuestsAsync(q => keys.Contains(QuestSystem.BountyClaimKey(q)))).Should().Be(1);
+
+            var left = (await osm.LoadSharedQuests())!;
+            left.Should().HaveCount(2);
+            left.Should().NotContain(q => q.TargetNPCName == "Idless Bob R14");
+            left.Should().Contain(q => q.TargetNPCName == "Idless Alice R14", "another id-less bounty stays");
+            left.Should().Contain(q => q.Title == "Fetch the ale");
+        });
+
+        QuestSystem.BountyClaimKey(new QuestData { Id = "", Initiator = "The Crown", TargetNPCName = "X", Title = "WANTED: X" })
+            .Should().Be(QuestSystem.BountyClaimKey(new Quest { Id = "", Initiator = "The Crown", TargetNPCName = "X", Title = "WANTED: X" }));
+        QuestSystem.BountyClaimKey(new QuestData { Id = "Q7" }).Should().Be("Q7");
+
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "Scripts"))) dir = dir.Parent;
+        File.ReadAllText(Path.Combine(dir!.FullName, "Scripts", "Systems", "CombatEngine.cs"))
+            .Should().Contain("RemoveSharedQuestsAsync(q => keys.Contains(QuestSystem.BountyClaimKey(q)))")
+            .And.NotContain("RemoveSharedQuestsAsync(q => ids.Contains(q.Id))");
     }
 }

@@ -1675,10 +1675,16 @@ public partial class QuestSystem
     /// v1.1.11: the key a bounty is claimed under: its id, or for a quest saved without one, "legacy:" and a
     /// SHA-256 of its initiator, target and title, the same in every process that loaded the quest.
     /// </summary>
-    internal static string BountyClaimKey(Quest q)
+    internal static string BountyClaimKey(Quest q) => BountyClaimKey(q.Id, q.Initiator, q.TargetNPCName, q.Title);
+
+    /// <summary>v1.1.11: the same key for a stored quest, so the shared record is matched as the claim was.</summary>
+    internal static string BountyClaimKey(QuestData q) => BountyClaimKey(q.Id, q.Initiator, q.TargetNPCName, q.Title);
+
+    /// <summary>v1.1.11: the claim key from the fields both quest forms carry.</summary>
+    internal static string BountyClaimKey(string? id, string? initiator, string? targetName, string? title)
     {
-        if (!string.IsNullOrEmpty(q.Id)) return q.Id;
-        string basis = (q.Initiator ?? "") + "|" + (q.TargetNPCName ?? "") + "|" + (q.Title ?? "");
+        if (!string.IsNullOrEmpty(id)) return id!;
+        string basis = (initiator ?? "") + "|" + (targetName ?? "") + "|" + (title ?? "");
         var hash = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(basis));
         return "legacy:" + Convert.ToHexString(hash).ToLowerInvariant();
     }

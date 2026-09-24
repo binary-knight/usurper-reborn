@@ -842,7 +842,8 @@ namespace UsurperRemake.Systems
                     );
                     CREATE INDEX IF NOT EXISTS idx_onboarding_event ON onboarding_events(event, created_at DESC);
 
-                    -- v1.1.11: one row per bounty paid, so a bounty is paid once across processes
+                    -- v1.1.11: one row per bounty paid, so a bounty is paid once across processes.
+                    -- v1.1.11: never pruned (a stale save can bring an old bounty back); one small row per bounty paid.
                     CREATE TABLE IF NOT EXISTS bounty_claims (
                         quest_id TEXT PRIMARY KEY,
                         claimed_by TEXT,
@@ -1316,24 +1317,6 @@ namespace UsurperRemake.Systems
             {
                 DebugLogger.Instance.LogError("SQL", $"TryClaimBounty failed for '{questId}': {ex.Message}");
                 return false;
-            }
-        }
-
-        /// <summary>v1.1.11: removes bounty claims older than the retention (GameConfig.BountyClaimRetentionDays). Returns the rows removed.</summary>
-        public int PruneOldBountyClaims(int daysToKeep = GameConfig.BountyClaimRetentionDays)
-        {
-            try
-            {
-                using var connection = OpenConnection();
-                using var cmd = connection.CreateCommand();
-                cmd.CommandText = "DELETE FROM bounty_claims WHERE claimed_at < datetime('now', @cutoff);";
-                cmd.Parameters.AddWithValue("@cutoff", $"-{daysToKeep} days");
-                return cmd.ExecuteNonQuery();
-            }
-            catch (Exception ex)
-            {
-                DebugLogger.Instance.LogError("SQL", $"Failed to prune bounty_claims: {ex.Message}");
-                return 0;
             }
         }
 

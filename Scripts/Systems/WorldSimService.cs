@@ -567,9 +567,6 @@ namespace UsurperRemake.Systems
                 // Clean up orphaned data from deleted players
                 await sqlBackend.PruneOrphanedPlayerData();
 
-                // v1.1.11: paid-bounty claims past any bounty's life
-                sqlBackend.PruneOldBountyClaims();
-
                 // v1.1.11: teams nobody is in any more
                 PruneEmptyTeams();
 
