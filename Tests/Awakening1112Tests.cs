@@ -357,6 +357,61 @@ public class Awakening1112Tests : IDisposable
         Shown(term, output).Should().Contain(Loc.Get("hint.awakening.title"));
     }
 
+    // ---------- 4. the Ocean Journal ----------
+
+    [Fact]
+    public void TheJournalSummary_UsesTheSevenStageScale()
+    {
+        Ocean.CollectFragment(WaveFragment.Origin);
+        Ocean.ExperienceMoment(AwakeningMoment.SparedAnEnemy);
+        var (term, output) = Terminal();
+        AwakeningScreens.WriteJournalSummary(term);
+        string shown = Shown(term, output);
+        shown.Should().Contain(Loc.Get("ocean.journal_stage", 1, 7, Loc.Get("base.awakening_stirring")));
+        shown.Should().Contain(Loc.Get("ocean.journal_points", 5, 12));
+        shown.Should().Contain(Loc.Get("ocean.journal_fragments", 1, 10));
+        shown.Should().Contain(Loc.Get("ocean.journal_moments", 1));
+        shown.Should().NotContain("/5");
+    }
+
+    [Fact]
+    public async Task TheJournalPages_ShowEachFragmentsLore_AndTheMomentsLived()
+    {
+        Ocean.CollectFragment(WaveFragment.TheSevenDrops);
+        Ocean.ExperienceMoment(AwakeningMoment.SacrificedForAnother);
+        var (term, output) = Terminal("\n");
+        await AwakeningScreens.ShowJournal(term);
+        string shown = Shown(term, output);
+        shown.Should().Contain(Loc.Get("ocean.fragment.TheSevenDrops.title"));
+        shown.Should().Contain(Loc.Get("ocean.fragment.TheSevenDrops.text").Split(' ').Take(6).Aggregate((a, b) => a + " " + b));
+        shown.Should().NotContain(Loc.Get("ocean.fragment.Origin.title"), "only found fragments are readable");
+        shown.Should().Contain(Loc.Get("ocean.journal_hidden", 9));
+        shown.Should().Contain(Loc.Get("ocean.moment.SacrificedForAnother"));
+    }
+
+    [Fact]
+    public void EveryFragmentAndMoment_HasJournalText()
+    {
+        foreach (WaveFragment f in Enum.GetValues(typeof(WaveFragment)))
+        {
+            Loc.Get($"ocean.fragment.{f}.title").Should().NotBe($"ocean.fragment.{f}.title");
+            Loc.Get($"ocean.fragment.{f}.text").Should().NotBe($"ocean.fragment.{f}.text");
+        }
+        foreach (AwakeningMoment m in Enum.GetValues(typeof(AwakeningMoment)))
+            Loc.Get($"ocean.moment.{m}").Should().NotBe($"ocean.moment.{m}");
+    }
+
+    [Fact]
+    public void TheFiveScale_IsGone()
+    {
+        string src = Source("Scripts/Locations/MainStreetLocation.cs");
+        src.Should().NotContain("main_street.awakening_level").And.NotContain("main_street.awakening_0");
+        src.Should().Contain("AwakeningScreens.WriteJournalSummary(terminal)").And.Contain("AwakeningScreens.ShowJournal(terminal)");
+        string en = Source("Localization/en.json");
+        en.Should().NotContain("\"main_street.awakening_level\"").And.NotContain("\"main_street.story_awakening_");
+        en.Should().NotContain("\"main_street.awakening_0\"").And.NotContain("\"main_street.awakening_5\"");
+    }
+
     [Fact]
     public void Reset_ClearsInsights()
     {

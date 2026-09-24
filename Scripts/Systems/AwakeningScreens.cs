@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using UsurperRemake.UI;
 
@@ -25,6 +27,94 @@ namespace UsurperRemake.Systems
         };
 
         public const int LoreLinesPerStage = 4;
+
+        public static string FragmentTitle(WaveFragment f) => Loc.Get($"ocean.fragment.{f}.title");
+        public static string FragmentText(WaveFragment f) => Loc.Get($"ocean.fragment.{f}.text");
+        public static string MomentLabel(AwakeningMoment m) => Loc.Get($"ocean.moment.{m}");
+
+        /// <summary>
+        /// v1.1.12: the Ocean Journal section of [P] Progress: the stage and its name, the points toward
+        /// the next stage, the fragments found, the moments lived and the active boons.
+        /// </summary>
+        public static void WriteJournalSummary(TerminalEmulator term)
+        {
+            var ocean = OceanPhilosophySystem.Instance;
+            int stage = ocean.AwakeningLevel;
+            term.SetColor("bright_cyan");
+            term.WriteLine($"  {Loc.Get("ocean.journal_stage", stage, OceanPhilosophySystem.MaxStage, StageName(stage))}");
+            term.SetColor("white");
+            if (stage >= OceanPhilosophySystem.MaxStage)
+                term.WriteLine($"  {Loc.Get("ocean.journal_awake")}");
+            else if (stage == OceanPhilosophySystem.MaxStage - 1 && ocean.Points >= ocean.PointsForNextStage)
+                term.WriteLine($"  {Loc.Get("ocean.journal_points_last", ocean.Points)}");
+            else
+                term.WriteLine($"  {Loc.Get("ocean.journal_points", ocean.Points, ocean.PointsForNextStage)}");
+            term.SetColor("gray");
+            term.WriteLine($"  {Loc.Get("ocean.journal_fragments", ocean.CollectedFragments.Count, OceanPhilosophySystem.FragmentData.Count)}");
+            term.WriteLine($"  {Loc.Get("ocean.journal_moments", ocean.ExperiencedMoments.Count)}");
+
+            var boons = AwakeningBonus.ActiveAt(stage);
+            if (boons.Count > 0)
+            {
+                term.SetColor("bright_green");
+                term.WriteLine($"  {Loc.Get("ocean.journal_boons", string.Join(", ", boons))}");
+            }
+            term.SetColor("yellow");
+            term.WriteLine($"  {Loc.Get("ocean.journal_open_key")}");
+            term.SetColor("white");
+        }
+
+        /// <summary>v1.1.12: the Journal's pages: each fragment found with its lore, then the moments lived.</summary>
+        public static async Task ShowJournal(TerminalEmulator term)
+        {
+            var ocean = OceanPhilosophySystem.Instance;
+            term.ClearScreen();
+            term.WriteLine("");
+            UIHelper.WriteBoxHeader(term, Loc.Get("ocean.journal_header"), "bright_cyan", 64);
+            term.WriteLine("");
+
+            term.WriteLine($"  {Loc.Get("ocean.journal_fragments", ocean.CollectedFragments.Count, OceanPhilosophySystem.FragmentData.Count)}", "bright_cyan");
+            term.WriteLine("");
+            foreach (var f in ocean.CollectedFragments.OrderBy(f => OceanPhilosophySystem.FragmentData[f].RequiredAwakening).ThenBy(f => (int)f))
+            {
+                term.WriteLine($"  [{FragmentTitle(f)}]", "bright_white");
+                foreach (var line in Wrap(FragmentText(f), 72))
+                    term.WriteLine($"    {line}", "cyan");
+                term.WriteLine("");
+            }
+            int hidden = OceanPhilosophySystem.FragmentData.Count - ocean.CollectedFragments.Count;
+            if (hidden > 0)
+            {
+                term.WriteLine($"  {Loc.Get("ocean.journal_hidden", hidden)}", "dark_gray");
+                term.WriteLine("");
+            }
+
+            term.WriteLine($"  {Loc.Get("ocean.journal_moments", ocean.ExperiencedMoments.Count)}", "bright_magenta");
+            foreach (var m in ocean.ExperiencedMoments.OrderBy(m => (int)m))
+                term.WriteLine($"    - {MomentLabel(m)}", "magenta");
+            if (ocean.ExperiencedMoments.Count == 0)
+                term.WriteLine($"    {Loc.Get("ocean.journal_no_moments")}", "dark_gray");
+            term.WriteLine("");
+
+            await term.PressAnyKey();
+        }
+
+        private static List<string> Wrap(string text, int width)
+        {
+            var lines = new List<string>();
+            string current = "";
+            foreach (var word in text.Split(' '))
+            {
+                if (current.Length > 0 && current.Length + 1 + word.Length > width)
+                {
+                    lines.Add(current);
+                    current = word;
+                }
+                else current = current.Length == 0 ? word : current + " " + word;
+            }
+            if (current.Length > 0) lines.Add(current);
+            return lines;
+        }
 
         /// <summary>Show the pending announcement, once. Returns false when nothing was pending.</summary>
         public static async Task<bool> ShowPending(TerminalEmulator term, Character? player)

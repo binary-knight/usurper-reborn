@@ -507,31 +507,6 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Get all fragments as a formatted string for display
-        /// </summary>
-        public string GetFragmentLore()
-        {
-            var lines = new List<string>();
-            lines.Add("=== The Fragments of Truth ===\n");
-
-            foreach (var fragment in CollectedFragments.OrderBy(f => FragmentData[f].RequiredAwakening))
-            {
-                var data = FragmentData[fragment];
-                lines.Add($"[{data.Title}]");
-                lines.Add(data.Text);
-                lines.Add("");
-            }
-
-            if (CollectedFragments.Count < FragmentData.Count)
-            {
-                int missing = FragmentData.Count - CollectedFragments.Count;
-                lines.Add($"({missing} fragments remain hidden...)");
-            }
-
-            return string.Join("\n", lines);
-        }
-
-        /// <summary>
         /// Serialize state for saving
         /// </summary>
         public OceanPhilosophyData Serialize()
