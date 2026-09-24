@@ -567,6 +567,9 @@ namespace UsurperRemake.Systems
                 // Clean up orphaned data from deleted players
                 await sqlBackend.PruneOrphanedPlayerData();
 
+                // v1.1.11: paid-bounty claims past any bounty's life
+                sqlBackend.PruneOldBountyClaims();
+
                 // v1.1.11: teams nobody is in any more
                 PruneEmptyTeams();
 
@@ -586,7 +589,7 @@ namespace UsurperRemake.Systems
         /// read/write this key. The world sim is the primary maintainer; player actions
         /// (throne challenges, tax changes) write updates to this key immediately.
         /// </summary>
-        private void LoadRoyalCourtFromWorldState()
+        internal void LoadRoyalCourtFromWorldState()
         {
             try
             {
@@ -595,7 +598,14 @@ namespace UsurperRemake.Systems
 
                 var royalCourt = JsonSerializer.Deserialize<RoyalCourtSaveData>(json, jsonOptions);
                 if (royalCourt != null) CastleLocation.RoyalCourtLoadedFromShared = true;   // v1.1.11
-                if (royalCourt == null || string.IsNullOrEmpty(royalCourt.KingName)) return;
+                if (royalCourt == null) return;
+                if (CastleLocation.ApplySharedThroneVacancy(royalCourt))
+                {
+                    // v1.1.11: the NPC succession used whenever there is no king fills it now
+                    ChallengeSystem.Instance.ClaimEmptyThroneIfVacant();
+                    return;
+                }
+                if (string.IsNullOrEmpty(royalCourt.KingName)) return;
 
                 var king = CastleLocation.GetCurrentKing();
 
@@ -801,7 +811,7 @@ namespace UsurperRemake.Systems
         /// Save current royal court state to world_state.
         /// This is the authoritative write - the world sim maintains this data.
         /// </summary>
-        private async Task SaveRoyalCourtToWorldState()
+        internal async Task SaveRoyalCourtToWorldState()
         {
             try
             {

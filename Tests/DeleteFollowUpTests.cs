@@ -344,15 +344,193 @@ public class DeleteFollowUpTests : IDisposable
         CastleLocation.IsDeletedCharactersReign(null, "Bob", "Bob").Should().BeFalse();
 
         string castle = Source("Locations", "CastleLocation.cs");
-        int start = castle.IndexOf("public static async Task<bool> AbdicateDeletedKingAsync(", StringComparison.Ordinal);
+        int start = castle.IndexOf("internal static async Task<bool> AbdicateDeletedKingAsync(", StringComparison.Ordinal);
         start.Should().BeGreaterThan(0);
-        string body = castle.Substring(start, castle.IndexOf("private static void EndPlayerReign(", start, StringComparison.Ordinal) - start);
-        body.IndexOf("await osm!.LoadRoyalCourtFromWorldState();", StringComparison.Ordinal)
-            .Should().BeGreaterThan(body.IndexOf("NeedsSharedCourtLoad(", StringComparison.Ordinal))
+        string body = castle.Substring(start, castle.IndexOf("internal static bool SharedCourtNamesDeletedCharacter(", start, StringComparison.Ordinal) - start);
+        int read = body.IndexOf("await readShared()", StringComparison.Ordinal);
+        read.Should().BeGreaterThan(body.IndexOf("NeedsSharedCourtLoad(", StringComparison.Ordinal));
+        body.IndexOf("await loadShared()", StringComparison.Ordinal)
+            .Should().BeGreaterThan(body.IndexOf("SharedCourtNamesDeletedCharacter(", read, StringComparison.Ordinal), "the court is applied only on a match")
             .And.BeLessThan(body.IndexOf("IsDeletedCharactersReign(", StringComparison.Ordinal));
-        body.Should().Contain("await osm.SaveRoyalCourtToWorldState();", "the ended reign is written to the shared royal_court");
+        body.Should().Contain("await saveShared()", "the ended reign is written to the shared royal_court");
+        castle.Should().Contain("osm.ReadRoyalCourtFromWorldState, osm.LoadRoyalCourtFromWorldState, () => osm.SaveRoyalCourtToWorldState(throneVacated: true)");
         Source("Systems", "OnlineStateManager.cs").Should().Contain("CastleLocation.RoyalCourtLoadedFromShared = true;");
         Source("Systems", "PermadeathHelper.cs").Should().Contain("await global::CastleLocation.AbdicateDeletedKingAsync(");
+    }
+
+    // ─── v1.1.11: review round 13 ───
+
+    private static string CourtJson(RoyalCourtSaveData court) =>
+        System.Text.Json.JsonSerializer.Serialize(court, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
+
+    [Fact]
+    public async Task AVacantThrone_IsHonouredByTheWorldSim_WhichDoesNotWriteTheKingBack()
+    {
+        bool loadedBefore = CastleLocation.RoyalCourtLoadedFromShared;
+        try
+        {
+            var bob = King.CreateNewKing("Bob", CharacterAI.Human, CharacterSex.Male);
+            await WithKing(bob, async () =>
+            {
+                // a fresh database with no court: absent changes nothing
+                var sim = new WorldSimService(_db);
+                var simVersion = typeof(WorldSimService).GetField("lastRoyalCourtVersion", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+                sim.LoadRoyalCourtFromWorldState();
+                CastleLocation.GetCurrentKing().Should().BeSameAs(bob);
+
+                // control: the sim's court save does write its king when it holds the current version
+                await _db.SaveWorldState("royal_court", CourtJson(new RoyalCourtSaveData { KingName = "Bob", KingAI = (int)CharacterAI.Human }));
+                simVersion.SetValue(sim, _db.GetWorldStateVersion("royal_court"));
+                await _db.SaveWorldState("royal_court", CourtJson(new RoyalCourtSaveData { KingName = "Nobody", KingAI = 1 }));
+                simVersion.SetValue(sim, _db.GetWorldStateVersion("royal_court"));
+                await sim.SaveRoyalCourtToWorldState();
+                (await _db.LoadWorldState("royal_court")).Should().Contain("\"Bob\"", "the save path is live");
+
+                // an empty name without the vacancy mark (an older write) is still ignored
+                await _db.SaveWorldState("royal_court", CourtJson(new RoyalCourtSaveData { KingName = "", KingAI = 1 }));
+                sim.LoadRoyalCourtFromWorldState();
+                CastleLocation.GetCurrentKing().Should().BeSameAs(bob);
+
+                // the deleting process ended the reign with no successor
+                await _db.SaveWorldState("royal_court", CourtJson(new RoyalCourtSaveData { KingName = "", KingAI = 1, ThroneVacant = true }));
+                sim.LoadRoyalCourtFromWorldState();
+                (CastleLocation.GetCurrentKing()?.Name).Should().NotBe("Bob", "the world sim's copy of the deleted king is cleared");
+                bob.IsActive.Should().BeFalse();
+
+                simVersion.SetValue(sim, _db.GetWorldStateVersion("royal_court"));   // the sim holds the vacancy's version
+                await sim.SaveRoyalCourtToWorldState();
+                var stored = System.Text.Json.JsonSerializer.Deserialize<RoyalCourtSaveData>((await _db.LoadWorldState("royal_court"))!,
+                    new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
+                stored.KingName.Should().NotBe("Bob", "the world sim's court save does not write the deleted king back");
+            });
+        }
+        finally { CastleLocation.RoyalCourtLoadedFromShared = loadedBefore; }
+
+        string osm = Source("Systems", "OnlineStateManager.cs");
+        osm.Should().Contain("global::CastleLocation.ApplySharedThroneVacancy(royalCourt)", "the login loader honours it too");
+        osm.Should().Contain("ThroneVacant = throneVacated");
+        osm.Should().Contain("if (KeepsStoredVacancy(await ReadRoyalCourtFromWorldState(), throneVacated)) return;");
+        OnlineStateManager.KeepsStoredVacancy(new RoyalCourtSaveData { ThroneVacant = true }, throneVacated: false)
+            .Should().BeTrue("a later session's plain empty save does not hide the vacancy from the world sim");
+        OnlineStateManager.KeepsStoredVacancy(new RoyalCourtSaveData { ThroneVacant = true }, throneVacated: true).Should().BeFalse();
+        OnlineStateManager.KeepsStoredVacancy(new RoyalCourtSaveData { KingName = "Bob" }, throneVacated: false).Should().BeFalse();
+        OnlineStateManager.KeepsStoredVacancy(null, throneVacated: false).Should().BeFalse();
+        Source("Systems", "WorldSimService.cs").Should().Contain("ChallengeSystem.Instance.ClaimEmptyThroneIfVacant();");
+    }
+
+    [Fact]
+    public async Task DeletingANonKing_ReadsOnlyTheName_AndLeavesTheCourtUntouched()
+    {
+        bool loadedBefore = CastleLocation.RoyalCourtLoadedFromShared;
+        try
+        {
+            var alice = King.CreateNewKing("Alice", CharacterAI.Human, CharacterSex.Female);
+            alice.Guards.Clear();   // she dismissed her guards
+            var shared = new RoyalCourtSaveData
+            {
+                KingName = "Alice", KingAI = (int)CharacterAI.Human,
+                Guards = new List<RoyalGuardSaveData> { new RoyalGuardSaveData { Name = "Old Guard", IsActive = true } }
+            };
+            await WithKing(alice, async () =>
+            {
+                CastleLocation.RoyalCourtLoadedFromShared = false;
+                bool applied = false, saved = false;
+                bool ended = await CastleLocation.AbdicateDeletedKingAsync("Bob", "Bob", "left", online: true,
+                    () => Task.FromResult<RoyalCourtSaveData?>(shared),
+                    () => { applied = true; return Task.CompletedTask; },
+                    () => { saved = true; return Task.CompletedTask; });
+                ended.Should().BeFalse();
+                applied.Should().BeFalse("the court is not applied for a non-king");
+                saved.Should().BeFalse();
+                CastleLocation.GetCurrentKing().Should().BeSameAs(alice);
+                alice.Guards.Should().BeEmpty("dismissed guards stay dismissed");
+                CastleLocation.RoyalCourtLoadedFromShared.Should().BeFalse("a mere read does not count as a load");
+            });
+
+            // the shared court names the deleted character: it is loaded, the reign ends, and it is written back
+            var bobCourt = new RoyalCourtSaveData { KingName = "Bob", KingAI = (int)CharacterAI.Human };
+            await WithKing(alice, async () =>
+            {
+                CastleLocation.RoyalCourtLoadedFromShared = false;
+                bool applied = false, saved = false;
+                bool ended = await CastleLocation.AbdicateDeletedKingAsync("Bob", "Bob", "left", online: true,
+                    () => Task.FromResult<RoyalCourtSaveData?>(bobCourt),
+                    () => { applied = true; CastleLocation.SetKing(King.CreateNewKing("Bob", CharacterAI.Human, CharacterSex.Male)); return Task.CompletedTask; },
+                    () => { saved = true; return Task.CompletedTask; });
+                ended.Should().BeTrue();
+                applied.Should().BeTrue();
+                saved.Should().BeTrue();
+                (CastleLocation.GetCurrentKing()?.Name).Should().NotBe("Bob");
+            });
+        }
+        finally { CastleLocation.RoyalCourtLoadedFromShared = loadedBefore; }
+
+        CastleLocation.SharedCourtNamesDeletedCharacter(new RoyalCourtSaveData { KingName = "Bob", KingAI = (int)CharacterAI.Computer }, "Bob", "Bob")
+            .Should().BeFalse("an NPC king of the name");
+        CastleLocation.SharedCourtNamesDeletedCharacter(new RoyalCourtSaveData { KingName = "", ThroneVacant = true }, "Bob", "Bob").Should().BeFalse();
+        CastleLocation.SharedCourtNamesDeletedCharacter(new RoyalCourtSaveData { KingName = "Bob Smith", KingAI = (int)CharacterAI.Human }, "Bob", "Bob Smith").Should().BeTrue();
+    }
+
+    [Fact]
+    public void APlayerNpcMarriage_IsCleared_InMemoryAndInTheJson_AndLeavesTheRegistry()
+    {
+        var reg = NPCMarriageRegistry.Instance;
+        var wife = new NPC { ID = "npc_r13_wife", Name1 = "Wife", Name2 = "Wife", Level = 10, SpouseName = "Bob", Married = true, IsMarried = true };
+        var ann = new NPC { ID = "npc_r13_ann", Name1 = "Ann", Name2 = "Ann", Level = 10, SpouseName = "Bob", Married = true, IsMarried = true };
+        var npcBob = new NPC { ID = "npc_r13_bob", Name1 = "Bob", Name2 = "Bob", Level = 10, SpouseName = "Ann", Married = true, IsMarried = true };
+        reg.RegisterMarriage("player_bob_id", wife.ID, "Bob", "Wife");   // the player Bob married Wife
+        reg.RegisterMarriage(ann.ID, npcBob.ID, "Ann", "Bob");           // Ann married the NPC Bob
+        NPCSpawnSystem.Instance.ActiveNPCs.AddRange(new[] { wife, ann, npcBob });
+        try
+        {
+            PermadeathHelper.ClearNpcSpousesOf("Bob").Should().Be(1);
+            wife.SpouseName.Should().BeEmpty("a player-NPC marriage is in the registry too, and is cleared");
+            wife.IsMarried.Should().BeFalse();
+            reg.IsMarriedToNPC(wife.ID).Should().BeFalse("the registry entry goes as in a divorce");
+            reg.IsMarriedToNPC("player_bob_id").Should().BeFalse();
+            ann.SpouseName.Should().Be("Bob", "Ann's partner is an NPC");
+            reg.GetSpouseId(ann.ID).Should().Be(npcBob.ID);
+
+            // the shared JSON, with the registry holding the player-NPC marriage again
+            reg.RegisterMarriage("player_bob_id", wife.ID, "Bob", "Wife");
+            string json = "[" +
+                "{\"name\":\"Wife\",\"characterID\":\"npc_r13_wife\",\"married\":true,\"isMarried\":true,\"spouseName\":\"Bob\"}," +
+                "{\"name\":\"Ann\",\"characterID\":\"npc_r13_ann\",\"married\":true,\"isMarried\":true,\"spouseName\":\"Bob\"}]";
+            var edited = PermadeathHelper.RemoveDeletedCharacterFromNpcJson(json, "Bob", out _, out int spouses);
+            spouses.Should().Be(1);
+            var arr = System.Text.Json.Nodes.JsonNode.Parse(edited!)!.AsArray();
+            ((string)arr[0]!["spouseName"]!).Should().BeEmpty();
+            ((string)arr[1]!["spouseName"]!).Should().Be("Bob", "the registry marries Ann to an NPC");
+            reg.IsMarriedToNPC(wife.ID).Should().BeFalse();
+        }
+        finally
+        {
+            foreach (var n in new[] { wife, ann, npcBob }) NPCSpawnSystem.Instance.ActiveNPCs.Remove(n);
+            reg.EndMarriage(wife.ID);
+            reg.EndMarriage(ann.ID);
+        }
+    }
+
+    [Fact]
+    public async Task TheMarriedNameAlias_IsCheckedAgainstTheNpcGuard_AliasByAlias()
+    {
+        // Ursula took the surname Ironheart; an NPC is called Ursula Ironheart
+        Player("ursula", "Ursula Ironheart");
+        int own = await _db.CreateAuctionListing("ursula", "Ring", "{}", 100);
+        int npcs = await _db.CreateAuctionListing("ursula ironheart", "Axe", "{}", 100);
+        var npc = new NPC { ID = "npc_ursula_ironheart", Name1 = "Ursula Ironheart", Name2 = "Ursula Ironheart", Level = 20 };
+        WithCompleteRoster(() => _db.PurgePlayerWorldState("ursula", "Ursula"), npc);
+        Count($"SELECT COUNT(*) FROM auction_listings WHERE id = {npcs};").Should().Be(1, "the stored display name is an NPC's name");
+        Count($"SELECT COUNT(*) FROM auction_listings WHERE id = {own};").Should().Be(0, "the other aliases are still purged");
+
+        SqlSaveBackend.AuctionSellerAliases("ursula", "Ursula", "Ursula Ironheart")
+            .Should().Equal("ursula", "Ursula Ironheart");
+        SqlSaveBackend.AuctionSellerAliases("bob_account", null, " ").Should().Equal("bob_account");
+
+        string src = Source("Systems", "SqlSaveBackend.cs");
+        int start = src.IndexOf("public void PurgePlayerWorldState(", StringComparison.Ordinal);
+        string body = src.Substring(start, src.IndexOf("private const string SellerNotOtherPlayer", start, StringComparison.Ordinal) - start);
+        body.Split("\"auction_listings\"").Length.Should().Be(2, "one auction DELETE, fed by the alias list the guard checks");
     }
 
     private static string Source(string folder, string file)

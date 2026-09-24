@@ -1197,12 +1197,24 @@ namespace UsurperRemake.Systems
                 ExecPurge(connection, tx, "messages",          "LOWER(from_player) = LOWER(@u) OR LOWER(to_player) = LOWER(@u)", username);
                 ExecPurge(connection, tx, "trade_offers",      "LOWER(from_player) = LOWER(@u) OR LOWER(to_player) = LOWER(@u)", username);
                 ExecPurge(connection, tx, "bounties",          "LOWER(target_player) = LOWER(@u) OR LOWER(placed_by) = LOWER(@u) OR LOWER(claimed_by) = LOWER(@u)", username);
-                // v1.1.11: only the character's own listings. The buyer clause is gone: a sold row the seller
-                // has not collected holds that seller's gold, and the buyer already has the item. A seller
-                // name another player or an NPC may carry now is left alone.
-                if (!CouldBeNpcName(username))
+                // v1.1.11: only the character's own listings, under each name it may have listed as (the key,
+                // the display name, the stored married display name). The buyer clause is gone: a sold row the
+                // seller has not collected holds that seller's gold, and the buyer already has the item. A
+                // seller name another player or an NPC may carry now is left alone, alias by alias.
+                string? storedDisplayName = null;
+                using (var dn = connection.CreateCommand())
+                {
+                    dn.Transaction = tx;
+                    dn.CommandText = "SELECT display_name FROM players WHERE LOWER(username) = LOWER(@u) AND display_name IS NOT NULL LIMIT 1;";
+                    dn.Parameters.AddWithValue("@u", username);
+                    storedDisplayName = dn.ExecuteScalar() as string;
+                }
+                foreach (var alias in AuctionSellerAliases(username, displayName, storedDisplayName))
+                {
+                    if (CouldBeNpcName(alias)) continue;
                     ExecPurge(connection, tx, "auction_listings",
-                        $"LOWER(seller) = LOWER(@u) AND {SellerNotOtherPlayer}", username);
+                        $"LOWER(seller) = LOWER(@d) AND {SellerNotOtherPlayer}", username, alias);
+                }
                 ExecPurge(connection, tx, "world_boss_damage", "LOWER(player_name) = LOWER(@u)", username);
 
                 // v0.65.0: pvp_log was deliberately excluded in v0.60.5 ("history
@@ -1233,11 +1245,6 @@ namespace UsurperRemake.Systems
                         $"to_player != '*' AND (LOWER(to_player) = LOWER(@d) OR LOWER(to_player) IN {ownNames}) " +
                         "AND NOT EXISTS (SELECT 1 FROM players p WHERE LOWER(p.username) = LOWER(messages.to_player) AND LOWER(p.username) != LOWER(@u))",
                         username, displayName);
-                    // NPCs list under their own name in lowercase: a name an NPC may carry (one does, or the roster
-                    // is not complete enough to rule it out) keeps its listings; a stale one is the safe side
-                    if (!CouldBeNpcName(displayName))
-                        ExecPurge(connection, tx, "auction_listings",
-                            $"(LOWER(seller) = LOWER(@d) OR LOWER(seller) IN {ownNames}) AND {SellerNotOtherPlayer}", username, displayName);
                 }
 
                 tx.Commit();
@@ -1269,6 +1276,18 @@ namespace UsurperRemake.Systems
             "LOWER(p.display_name) = LOWER(auction_listings.seller) OR " +
             "LOWER(CASE WHEN json_valid(p.player_data) THEN json_extract(p.player_data, '$.player.name2') END) = LOWER(auction_listings.seller)))";
 
+        /// <summary>
+        /// v1.1.11: every seller name the delete purge removes listings under: the key, the display name
+        /// given, and the display name stored on the players row (the married form). Each is checked
+        /// against the NPC guard by the caller; one list, so the guard and the DELETE cannot differ.
+        /// </summary>
+        internal static List<string> AuctionSellerAliases(string username, string? displayName, string? storedDisplayName) =>
+            new[] { username, displayName, storedDisplayName }
+                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .Select(n => n!)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
         // v1.1.11: a name an NPC may carry (one does, or the roster cannot rule it out)
         private static bool CouldBeNpcName(string name)
         {
@@ -1297,6 +1316,24 @@ namespace UsurperRemake.Systems
             {
                 DebugLogger.Instance.LogError("SQL", $"TryClaimBounty failed for '{questId}': {ex.Message}");
                 return false;
+            }
+        }
+
+        /// <summary>v1.1.11: removes bounty claims older than the retention (GameConfig.BountyClaimRetentionDays). Returns the rows removed.</summary>
+        public int PruneOldBountyClaims(int daysToKeep = GameConfig.BountyClaimRetentionDays)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "DELETE FROM bounty_claims WHERE claimed_at < datetime('now', @cutoff);";
+                cmd.Parameters.AddWithValue("@cutoff", $"-{daysToKeep} days");
+                return cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to prune bounty_claims: {ex.Message}");
+                return 0;
             }
         }
 
@@ -5323,6 +5360,9 @@ namespace UsurperRemake.Systems
     /// v1.1.11: with respectJoinGrace (the world-save pass), also only if nobody joined within
     /// EmptyTeamJoinGraceMinutes, checked by the update itself: a returning leader's save may not have landed.
     /// </summary>
+    /// <summary>v1.1.11: tests only; runs between the successor's selection and the update.</summary>
+    internal static Action<string>? BeforeTeamLeaderUpdateForTests;
+
     public bool TryPassTeamLeadership(string teamName, string oldKey, string? excludeKey, bool requireOldLeaderGone, out string? newKey, bool respectJoinGrace = false)
     {
         newKey = null;
@@ -5351,10 +5391,16 @@ namespace UsurperRemake.Systems
             }
             var successor = PickSuccessor(candidates);
             if (successor == null) return false;
+            BeforeTeamLeaderUpdateForTests?.Invoke(successor);
             using (var update = connection.CreateCommand())
             {
-                // v1.1.11: a leader key changed meanwhile (an admin fix, another pass) wins
-                update.CommandText = "UPDATE player_teams SET created_by = @new WHERE team_name = @team AND created_by = @old" +
+                // v1.1.11: a leader key changed meanwhile (an admin fix, another pass) wins, and the successor
+                // must still be eligible when the update runs (not banned since, still on the team)
+                update.CommandText = "UPDATE player_teams SET created_by = @new WHERE team_name = @team AND created_by = @old" + @"
+                    AND EXISTS (SELECT 1 FROM players s WHERE LOWER(s.username) = LOWER(@new)
+                        AND s.is_banned = 0 AND s.username NOT LIKE 'emergency_%'
+                        AND s.player_data != '{}' AND LENGTH(s.player_data) > 2
+                        AND (CASE WHEN json_valid(s.player_data) THEN json_extract(s.player_data, '$.player.team') END) = @team)" +
                     (requireOldLeaderGone ? @"
                     AND NOT EXISTS (SELECT 1 FROM players l WHERE l.username = @old
                         AND (NOT json_valid(l.player_data)

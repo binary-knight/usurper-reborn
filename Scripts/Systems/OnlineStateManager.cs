@@ -443,15 +443,18 @@ namespace UsurperRemake.Systems
         /// The world_state 'royal_court' key is the single source of truth -
         /// the world sim reads this and maintains it between player sessions.
         /// </summary>
-        public async Task SaveRoyalCourtToWorldState()
+        public async Task SaveRoyalCourtToWorldState(bool throneVacated = false)
         {
             try
             {
                 var king = global::CastleLocation.GetCurrentKing();
                 if (king == null)
                 {
+                    // v1.1.11: an unmarked empty court never replaces a marked vacancy the world sim has yet to act on
+                    if (KeepsStoredVacancy(await ReadRoyalCourtFromWorldState(), throneVacated)) return;
                     // Throne is vacant — save empty state so other sessions see it
-                    var emptyData = new RoyalCourtSaveData { KingName = "", Treasury = 0, KingAI = 1 };
+                    // v1.1.11: a reign that just ended with no successor is marked, so the loaders clear their king
+                    var emptyData = new RoyalCourtSaveData { KingName = "", Treasury = 0, KingAI = 1, ThroneVacant = throneVacated };
                     var emptyJson = System.Text.Json.JsonSerializer.Serialize(emptyData,
                         new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
                     var backend = SaveSystem.Instance?.Backend as SqlSaveBackend;
@@ -625,6 +628,25 @@ namespace UsurperRemake.Systems
             }
         }
 
+        /// <summary>v1.1.11: an empty-court save that is not itself a vacancy leaves a stored vacancy in place.</summary>
+        internal static bool KeepsStoredVacancy(RoyalCourtSaveData? stored, bool throneVacated) =>
+            !throneVacated && stored?.ThroneVacant == true;
+
+        /// <summary>v1.1.11: the shared royal_court as stored, applied to nothing (null when absent or unreadable).</summary>
+        public async Task<RoyalCourtSaveData?> ReadRoyalCourtFromWorldState()
+        {
+            try
+            {
+                var json = await backend.LoadWorldState("royal_court");
+                return string.IsNullOrEmpty(json) ? null : JsonSerializer.Deserialize<RoyalCourtSaveData>(json, jsonOptions);
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("ONLINE", $"Failed to read royal court: {ex.Message}");
+                return null;
+            }
+        }
+
         /// <summary>
         /// Load royal court state from world_state and apply to current king.
         /// Called by player sessions on login to get the authoritative king state
@@ -639,7 +661,8 @@ namespace UsurperRemake.Systems
 
                 var royalCourt = JsonSerializer.Deserialize<RoyalCourtSaveData>(json, jsonOptions);
                 if (royalCourt != null) global::CastleLocation.RoyalCourtLoadedFromShared = true;   // v1.1.11
-                if (royalCourt == null || string.IsNullOrEmpty(royalCourt.KingName)) return;
+                if (royalCourt == null || global::CastleLocation.ApplySharedThroneVacancy(royalCourt)) return;   // v1.1.11
+                if (string.IsNullOrEmpty(royalCourt.KingName)) return;
 
                 var king = global::CastleLocation.GetCurrentKing();
 

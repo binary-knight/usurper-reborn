@@ -1851,6 +1851,8 @@ namespace UsurperRemake.Systems
     public class RoyalCourtSaveData
     {
         public string KingName { get; set; } = "";
+        /// <summary>v1.1.11: the throne was deliberately left empty; every loader clears its king. Absent (false) changes nothing.</summary>
+        public bool ThroneVacant { get; set; }
         public long Treasury { get; set; }
         public long TaxRate { get; set; }
         public long TotalReign { get; set; }

@@ -7969,15 +7969,62 @@ public class CastleLocation : BaseLocation
     /// v1.1.11: the delete path. Online, the authoritative royal_court is read first when this process
     /// has not loaded it, and the ended reign is written back to it before returning.
     /// </summary>
-    public static async Task<bool> AbdicateDeletedKingAsync(string? name, string? displayName, string reason)
+    public static Task<bool> AbdicateDeletedKingAsync(string? name, string? displayName, string reason)
     {
         var osm = UsurperRemake.BBS.DoorMode.IsOnlineMode ? OnlineStateManager.Instance : null;
-        if (NeedsSharedCourtLoad(osm != null, GetCurrentKing(), RoyalCourtLoadedFromShared))
-            await osm!.LoadRoyalCourtFromWorldState();
+        if (osm == null) return AbdicateDeletedKingAsync(name, displayName, reason, false, null, null, null);
+        return AbdicateDeletedKingAsync(name, displayName, reason, true,
+            osm.ReadRoyalCourtFromWorldState, osm.LoadRoyalCourtFromWorldState, () => osm.SaveRoyalCourtToWorldState(throneVacated: true));
+    }
+
+    /// <summary>
+    /// v1.1.11: the delete path with the shared court calls passed in. A process that has not read the
+    /// shared court only reads the king's name from it; the court is applied only when that king is the
+    /// deleted character, so deleting anyone else leaves this process's court as it was.
+    /// </summary>
+    internal static async Task<bool> AbdicateDeletedKingAsync(string? name, string? displayName, string reason, bool online,
+        Func<Task<RoyalCourtSaveData?>>? readShared, Func<Task>? loadShared, Func<Task>? saveShared)
+    {
+        if (NeedsSharedCourtLoad(online, GetCurrentKing(), RoyalCourtLoadedFromShared))
+        {
+            var shared = readShared == null ? null : await readShared();
+            if (shared != null)
+            {
+                if (!SharedCourtNamesDeletedCharacter(shared, name, displayName)) return false;
+                if (loadShared != null) await loadShared();
+            }
+        }
         var king = GetCurrentKing();
         if (!IsDeletedCharactersReign(king, name, displayName)) return false;
-        EndPlayerReign(king!.Name, reason, persist: osm == null);
-        if (osm != null) await osm.SaveRoyalCourtToWorldState();
+        EndPlayerReign(king!.Name, reason, persist: !online);
+        if (online && saveShared != null) await saveShared();
+        return true;
+    }
+
+    /// <summary>v1.1.11: the stored court's king is the deleted character (a reigning player of that name).</summary>
+    internal static bool SharedCourtNamesDeletedCharacter(RoyalCourtSaveData? court, string? name, string? displayName)
+    {
+        if (court == null || court.ThroneVacant || string.IsNullOrEmpty(court.KingName)) return false;
+        var king = new King { Name = court.KingName, AI = (CharacterAI)court.KingAI, IsActive = true };
+        return IsDeletedCharactersReign(king, name, displayName);
+    }
+
+    /// <summary>
+    /// v1.1.11: a court loader's handling of an explicit vacancy (ThroneVacant): this process's king is
+    /// cleared too. True when the court is a vacancy, and the loader applies nothing else from it.
+    /// </summary>
+    public static bool ApplySharedThroneVacancy(RoyalCourtSaveData court)
+    {
+        if (court == null || !court.ThroneVacant) return false;
+        var king = currentKing;
+        if (king != null)
+        {
+            king.IsActive = false;
+            var npcs = NPCSpawnSystem.Instance?.ActiveNPCs;
+            if (npcs != null)
+                foreach (var npc in npcs.Where(n => n != null && n.King && n.Name == king.Name).ToList()) npc.King = false;
+            currentKing = null;
+        }
         return true;
     }
 
@@ -8039,7 +8086,7 @@ public class CastleLocation : BaseLocation
             {
                 _ = Task.Run(async () =>
                 {
-                    try { await osm.SaveRoyalCourtToWorldState(); }
+                    try { await osm.SaveRoyalCourtToWorldState(throneVacated: true); }   // v1.1.11: no NPC took it
                     catch (Exception ex)
                     {
                         DebugLogger.Instance.LogError("CASTLE", $"Failed to persist abdication: {ex.Message}");

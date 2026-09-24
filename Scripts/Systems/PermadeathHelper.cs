@@ -553,7 +553,9 @@ namespace UsurperRemake.Systems
                 if (npc is not System.Text.Json.Nodes.JsonObject rec) continue;
                 if (!string.Equals(StringOf(rec["spouseName"]), name, StringComparison.OrdinalIgnoreCase)) continue;
                 string id = StringOf(rec["characterID"]);
-                if (!string.IsNullOrEmpty(id) && NPCMarriageRegistry.Instance.IsMarriedToNPC(id)) continue;
+                // v1.1.11: a registered marriage to another NPC is kept; one to a player (the deleted one) is not
+                if (RegisteredToAnotherNpc(id, pid => npcs.Any(o => o != null && !ReferenceEquals(o, npc) && StringOf(o["characterID"]) == pid)
+                                                     || IsActiveNpcId(pid, null))) continue;
                 string own = StringOf(rec["name"]);
                 bool npcSpouse = !string.IsNullOrEmpty(own) && npcs.Any(o => o != null && !ReferenceEquals(o, npc)
                     && string.Equals(StringOf(o["name"]), name, StringComparison.OrdinalIgnoreCase)
@@ -562,6 +564,7 @@ namespace UsurperRemake.Systems
                 rec["married"] = false;
                 rec["isMarried"] = false;
                 rec["spouseName"] = "";
+                if (!string.IsNullOrEmpty(id)) NPCMarriageRegistry.Instance.EndMarriage(id);   // v1.1.11: as a divorce does
                 spouses++;
             }
             return grudges + spouses > 0 ? npcs.ToJsonString() : null;
@@ -593,8 +596,8 @@ namespace UsurperRemake.Systems
 
         /// <summary>
         /// v1.1.11: end the marriage of any NPC whose spouse was the deleted character, clearing the
-        /// same three flags a divorce clears on the NPC. An NPC married to another NPC (registry) is
-        /// left alone, in case that NPC shares the name.
+        /// same three flags a divorce clears on the NPC and its registry entry. An NPC the registry
+        /// marries to another NPC is left alone, in case that NPC shares the name.
         /// </summary>
         public static int ClearNpcSpousesOf(string? name)
         {
@@ -605,13 +608,29 @@ namespace UsurperRemake.Systems
             foreach (var npc in npcs.ToList())
             {
                 if (npc == null || !string.Equals(npc.SpouseName, name, StringComparison.OrdinalIgnoreCase)) continue;
-                if (!string.IsNullOrEmpty(npc.ID) && NPCMarriageRegistry.Instance.IsMarriedToNPC(npc.ID)) continue;
+                if (RegisteredToAnotherNpc(npc.ID, pid => IsActiveNpcId(pid, npc))) continue;   // v1.1.11: not a player-NPC marriage
                 npc.Married = false;
                 npc.IsMarried = false;
                 npc.SpouseName = "";
+                if (!string.IsNullOrEmpty(npc.ID)) NPCMarriageRegistry.Instance.EndMarriage(npc.ID);   // v1.1.11: as a divorce does
                 cleared++;
             }
             return cleared;
         }
+
+        /// <summary>
+        /// v1.1.11: the registry marries this NPC to another NPC. The registry also holds player-NPC
+        /// marriages, so the partner must itself be an NPC; a player partner (the deleted character) or an
+        /// unknown id is the marriage to clear.
+        /// </summary>
+        internal static bool RegisteredToAnotherNpc(string? npcId, Func<string, bool> isNpcId)
+        {
+            if (string.IsNullOrEmpty(npcId)) return false;
+            var partner = NPCMarriageRegistry.Instance.GetSpouseId(npcId!);
+            return !string.IsNullOrEmpty(partner) && partner != npcId && isNpcId(partner!);
+        }
+
+        private static bool IsActiveNpcId(string id, NPC? self) =>
+            NPCSpawnSystem.Instance?.ActiveNPCs?.Any(n => n != null && !ReferenceEquals(n, self) && n.ID == id) == true;
     }
 }

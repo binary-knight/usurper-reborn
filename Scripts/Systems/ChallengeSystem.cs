@@ -574,6 +574,14 @@ public class ChallengeSystem
     /// </summary>
     private string? _lastDesignatedHeir;
 
+    /// <summary>v1.1.11: the empty-throne succession, run at once when a loader has just cleared the king.</summary>
+    public void ClaimEmptyThroneIfVacant()
+    {
+        if (CastleLocation.GetCurrentKing() != null) return;
+        _pendingChallenge = null;
+        ClaimEmptyThrone();
+    }
+
     private void ClaimEmptyThrone()
     {
         // Save orphans from the previous king before the throne changes hands

@@ -1663,12 +1663,24 @@ public partial class QuestSystem
     /// v1.1.11: the one-time claim in the shared database, taken before any payout. The in-process lock
     /// covers one process; separate door and world-sim processes each hold their own copy of the bounty.
     /// Without an SQL backend (offline, file saves) the lock is enough. A quest with no id cannot be
-    /// claimed by id and relies on the lock.
+    /// claimed by id and is claimed under a key built from its fields (BountyClaimKey).
     /// </summary>
     internal static bool ClaimAcrossProcesses(Quest q, string claimer)
     {
-        if (SaveSystem.Instance?.Backend is not SqlSaveBackend sql || string.IsNullOrEmpty(q.Id)) return true;
-        return sql.TryClaimBounty(q.Id, claimer);
+        if (SaveSystem.Instance?.Backend is not SqlSaveBackend sql) return true;
+        return sql.TryClaimBounty(BountyClaimKey(q), claimer);
+    }
+
+    /// <summary>
+    /// v1.1.11: the key a bounty is claimed under: its id, or for a quest saved without one, "legacy:" and a
+    /// SHA-256 of its initiator, target and title, the same in every process that loaded the quest.
+    /// </summary>
+    internal static string BountyClaimKey(Quest q)
+    {
+        if (!string.IsNullOrEmpty(q.Id)) return q.Id;
+        string basis = (q.Initiator ?? "") + "|" + (q.TargetNPCName ?? "") + "|" + (q.Title ?? "");
+        var hash = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(basis));
+        return "legacy:" + Convert.ToHexString(hash).ToLowerInvariant();
     }
 
     public static long AutoCompleteBountyForNPC(Character player, string npcName, bool includeKillContracts = true)

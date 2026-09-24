@@ -288,4 +288,85 @@ public class NPCDefeatQuestTests
         src.LastIndexOf("CREATE TABLE IF NOT EXISTS bounty_claims", migrations, StringComparison.Ordinal)
             .Should().BeGreaterThan(src.IndexOf("ALTER TABLE player_teams ADD COLUMN last_join_at", StringComparison.Ordinal));
     }
+
+    // ─── v1.1.11: review round 13 ───
+
+    [Fact]
+    public void ALegacyQuestWithNoId_GetsTheSameClaimKey_InEveryProcess()
+    {
+        Quest Legacy(string target) => new Quest { Id = "", Title = "WANTED: " + target, Initiator = "The Crown", TargetNPCName = target, Date = DateTime.Now };
+        var a = Legacy("Grim");
+        System.Threading.Thread.Sleep(5);
+        var b = Legacy("Grim");   // another process's copy, built on its own (its load time differs)
+        QuestSystem.BountyClaimKey(a).Should().Be(QuestSystem.BountyClaimKey(b));
+        QuestSystem.BountyClaimKey(a).Should().StartWith("legacy:").And.HaveLength("legacy:".Length + 64, "a SHA-256 in hex");
+        QuestSystem.BountyClaimKey(a).Should().NotBe(QuestSystem.BountyClaimKey(Legacy("Other")));
+        QuestSystem.BountyClaimKey(new Quest { Id = "Q42" }).Should().Be("Q42");
+    }
+
+    [Fact]
+    public async Task ALegacyBountyWithNoId_IsPaidOnce_AcrossProcesses()
+    {
+        await WithSqlBackend(async (db, _) =>
+        {
+            var bounty = BountyOnPlayer("Idless Rogue", 3000);
+            bounty.Id = "";
+            var rogue = new Character { Name1 = "idless_rogue", Name2 = "Idless Rogue", Level = 30, IsLoadedPlayer = true };
+            var winner = new Character { Name1 = "sheriff_c", Name2 = "Sheriff C", Level = 30, Gold = 0 };
+            QuestSystem.CollectBountiesOnPlayer(winner, rogue).Should().ContainSingle();
+
+            var copy = BountyOnPlayer("Idless Rogue", 3000);   // the other process's copy, also with no id
+            copy.Id = "";
+            var other = new Character { Name1 = "sheriff_d", Name2 = "Sheriff D", Level = 30, Gold = 0 };
+            QuestSystem.CollectBountiesOnPlayer(other, rogue).Should().BeEmpty("the legacy key was claimed already");
+            other.Gold.Should().Be(0);
+            await Task.CompletedTask;
+        });
+    }
+
+    [Fact]
+    public async Task OldBountyClaims_ArePruned_AfterTheRetention()
+    {
+        GameConfig.BountyClaimRetentionDays.Should().Be(90);
+        await WithSqlBackend(async (db, path) =>
+        {
+            db.TryClaimBounty("Qfresh", "alice").Should().BeTrue();
+            using (var conn = new SqliteConnection($"Data Source={path}"))
+            {
+                conn.Open();
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = "INSERT INTO bounty_claims (quest_id, claimed_by, claimed_at) VALUES ('Qold', 'bob', datetime('now', '-100 days')), ('Qrecent', 'bob', datetime('now', '-60 days'));";
+                cmd.ExecuteNonQuery();
+            }
+            db.PruneOldBountyClaims().Should().Be(1);
+            db.TryClaimBounty("Qold", "carol").Should().BeTrue("the old claim is gone");
+            db.TryClaimBounty("Qrecent", "carol").Should().BeFalse("a claim within the retention stays");
+            db.TryClaimBounty("Qfresh", "carol").Should().BeFalse();
+            await Task.CompletedTask;
+        });
+
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "Scripts"))) dir = dir.Parent;
+        File.ReadAllText(Path.Combine(dir!.FullName, "Scripts", "Systems", "WorldSimService.cs"))
+            .Should().Contain("sqlBackend.PruneOldBountyClaims();", "the world save cycle prunes it");
+    }
+
+    [Fact]
+    public void AMarriedPlayer_LoadsWithTheSameDisplayName_AndTheirBountyIsPaid()
+    {
+        var bob = new Character { Name1 = "bob_acct", Name2 = "Bob", FamilySurname = "Smith", Level = 20, HP = 100, MaxHP = 100 };
+        var serialize = typeof(SaveSystem).GetMethod("SerializePlayer", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var data = (PlayerData)serialize.Invoke(SaveSystem.Instance, new object[] { bob })!;
+        var back = System.Text.Json.JsonSerializer.Deserialize<PlayerData>(System.Text.Json.JsonSerializer.Serialize(data))!;
+        var loaded = PlayerCharacterLoader.CreateFromSaveData(back, "Bob");
+        loaded.DisplayName.Should().Be(bob.DisplayName).And.Be("Bob Smith");
+
+        var bounty = BountyOnPlayer("Bob Smith", 2500);
+        try
+        {
+            var winner = new Character { Name1 = "sheriff_e", Name2 = "Sheriff E", Level = 30, Gold = 0 };
+            QuestSystem.CollectBountiesOnPlayer(winner, loaded).Should().ContainSingle("the loaded defender carries the married name");
+        }
+        finally { bounty.Deleted = true; }
+    }
 }

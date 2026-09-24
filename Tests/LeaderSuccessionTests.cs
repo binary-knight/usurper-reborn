@@ -209,7 +209,7 @@ public class LeaderSuccessionTests : IDisposable
         string body = src.Substring(start, src.IndexOf("public int PassLeadershipOf(", start, StringComparison.Ordinal) - start);
         body.IndexOf("BeginTransaction(", StringComparison.Ordinal).Should().BeLessThan(body.IndexOf("SELECT gm.username", StringComparison.Ordinal));
         body.Should().Contain("cmd.Transaction = tx;");
-        body.Should().Contain("if (rank.ExecuteNonQuery() != 1) { tx.Rollback(); return null; }");
+        body.Should().Contain("if (rank.ExecuteNonQuery() != 1) { tx.Rollback(\"succession\"); return null; }");
     }
 
     [Fact]
@@ -277,7 +277,7 @@ public class LeaderSuccessionTests : IDisposable
 
         string guild = CodeOnly(Source("Systems", "GuildSystem.cs"));
         int rm = guild.IndexOf("public string? RemoveMember(", StringComparison.Ordinal);
-        guild.IndexOf("PassLeadership(guildName, username)", rm, StringComparison.Ordinal).Should().BeGreaterThan(rm);
+        guild.IndexOf("PassLeadershipInTx(conn, tx, guildName, leader!)", rm, StringComparison.Ordinal).Should().BeGreaterThan(rm);
 
         string sim = CodeOnly(Source("Systems", "WorldSimService.cs"));
         int prune = sim.IndexOf("PruneEmptyTeams();", StringComparison.Ordinal);
@@ -288,6 +288,87 @@ public class LeaderSuccessionTests : IDisposable
     public void CodeOnly_IgnoresACommentedOutCall()
     {
         CodeOnly("        // backend.TryPassTeamLeadership(oldTeam, myKey, myKey, true, out _);").Should().NotContain("TryPassTeamLeadership(");
+    }
+
+    // ─── v1.1.11: review round 13 ───
+
+    [Fact]
+    public void ALeavingMember_WhoseGuildLeaderIsNoLongerAMember_TriggersSuccession()
+    {
+        // the leader left (and passed the guild to b) while b was leaving: b's delete finds a leader who is
+        // not a member and passes it on, in the same transaction
+        _ = new GuildSystem(_path, register: false);   // creates the guild tables
+        Player("b", null, level: 50);
+        Player("c", null, level: 30);
+        Guild("racehall", "b");
+        GuildMember("b", "racehall", "2026-01-01 00:00:00", "Leader");
+        GuildMember("c", "racehall", "2026-01-02 00:00:00");
+        var guilds = new GuildSystem(_path, register: false);   // the membership cache is read at start
+        guilds.RemoveMember("b").Should().BeNull();
+        GuildLeader("racehall").Should().Be("c");
+        Scalar("SELECT rank FROM guild_members WHERE username = 'c'").Should().Be("Leader");
+
+        // a stale leader (not a member) is repaired when anyone leaves
+        Player("gone", null, level: 90);
+        Player("d", null, level: 20);
+        Player("e", null, level: 40);
+        Guild("stalehall", "gone");
+        GuildMember("d", "stalehall", "2026-01-01 00:00:00");
+        GuildMember("e", "stalehall", "2026-01-02 00:00:00");
+        guilds = new GuildSystem(_path, register: false);
+        guilds.RemoveMember("d").Should().BeNull();
+        GuildLeader("stalehall").Should().Be("e");
+
+        GuildSystem.NeedsGuildSuccession("a", leaderIsMember: false).Should().BeTrue();
+        GuildSystem.NeedsGuildSuccession("a", leaderIsMember: true).Should().BeFalse();
+        GuildSystem.NeedsGuildSuccession(null, leaderIsMember: false).Should().BeFalse();
+
+        // the interleaving itself is not deterministic: the order is checked in the source instead
+        string src = CodeOnly(Source("Systems", "GuildSystem.cs"));
+        int rm = src.IndexOf("public string? RemoveMember(", StringComparison.Ordinal);
+        string body = src.Substring(rm, src.IndexOf("public string? DepositGold(", rm, StringComparison.Ordinal) - rm);
+        int begin = body.IndexOf("BeginTransaction(deferred: false)", StringComparison.Ordinal);
+        int del = body.IndexOf("DELETE FROM guild_members", StringComparison.Ordinal);
+        int read = body.IndexOf("SELECT g.leader_username", StringComparison.Ordinal);
+        int pass = body.IndexOf("PassLeadershipInTx(conn, tx,", StringComparison.Ordinal);
+        int commit = body.IndexOf("tx.Commit();", StringComparison.Ordinal);
+        begin.Should().BeGreaterThan(0);
+        del.Should().BeGreaterThan(begin);
+        read.Should().BeGreaterThan(del, "the leader is read after the delete, in the transaction");
+        pass.Should().BeGreaterThan(read);
+        commit.Should().BeGreaterThan(pass);
+        body.Should().NotContain("bool isLeader");
+    }
+
+    [Fact]
+    public void ATeamSuccessor_BannedBetweenSelectionAndUpdate_DoesNotGetTheTeam()
+    {
+        Player("founder", null, level: 50);
+        Player("tomas", "Ravens", level: 40);
+        Team("Ravens", "founder");
+        SqlSaveBackend.BeforeTeamLeaderUpdateForTests = chosen => Exec($"UPDATE players SET is_banned = 1 WHERE username = '{chosen}';");
+        try
+        {
+            _db.TryPassTeamLeadership("Ravens", "founder", "founder", requireOldLeaderGone: true, out var next).Should().BeFalse();
+            next.Should().BeNull();
+            Leader("Ravens").Should().Be("founder", "the banned successor is refused by the update itself");
+        }
+        finally { SqlSaveBackend.BeforeTeamLeaderUpdateForTests = null; }
+
+        // one who left the team in that window is refused too
+        Player("founder2", null, level: 50);
+        Player("mira", "Owls", level: 40);
+        Team("Owls", "founder2");
+        SqlSaveBackend.BeforeTeamLeaderUpdateForTests = chosen => Exec($"UPDATE players SET player_data = '{{\"player\":{{\"level\":40}}}}' WHERE username = '{chosen}';");
+        try { _db.TryPassTeamLeadership("Owls", "founder2", "founder2", requireOldLeaderGone: true, out _).Should().BeFalse(); }
+        finally { SqlSaveBackend.BeforeTeamLeaderUpdateForTests = null; }
+        Leader("Owls").Should().Be("founder2");
+
+        // with nothing in between it passes as before
+        _db.TryPassTeamLeadership("Ravens", "founder", "founder", requireOldLeaderGone: true, out _).Should().BeFalse("tomas is banned now");
+        Player("bran", "Ravens", level: 10);
+        _db.TryPassTeamLeadership("Ravens", "founder", "founder", requireOldLeaderGone: true, out var after).Should().BeTrue();
+        after.Should().Be("bran");
     }
 
     private static string Source(string folder, string file)
