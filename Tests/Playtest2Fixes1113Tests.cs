@@ -113,12 +113,22 @@ public class FloorAndStun1113Tests
     [Fact]
     public void Player_ControlState_IsClearedAtTheStartOfEachFight()
     {
-        var src = File.ReadAllText(Path.Combine(RepoRoot(), "Scripts", "Systems", "CombatEngine.cs"));
+        // v1.1.13: comments stripped, so a commented-out line fails the check as a deleted one does
+        var src = CodeOnly(File.ReadAllText(Path.Combine(RepoRoot(), "Scripts", "Systems", "CombatEngine.cs")));
         int start = src.IndexOf("public async Task<CombatResult> PlayerVsMonsters(");
-        int loop = src.IndexOf("// Main combat loop", start);
+        int loop = src.IndexOf("int roundNumber = 0;", start);
+        start.Should().BeGreaterThan(0);
+        loop.Should().BeGreaterThan(start);
         src.Substring(start, loop - start).Should().Contain("_pvpControl.Clear();");
         src.Substring(loop, 12000).Should().Contain("TickPvPControl(player);");
     }
+
+    private static string CodeOnly(string src) =>
+        string.Join("\n", src.Split('\n').Select(line =>
+        {
+            int c = line.IndexOf("//", StringComparison.Ordinal);
+            return c >= 0 ? line.Substring(0, c) : line;
+        }));
 }
 
 /// <summary>v1.1.13 playtest 2: the auto-combat healing threshold preference.</summary>
