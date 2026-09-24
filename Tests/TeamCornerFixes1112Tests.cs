@@ -177,6 +177,40 @@ public class TeamCornerFixes1112Tests : IDisposable
     }
 
     [Fact]
+    public async Task Quit_DuringARosterRebuild_KeepsTheTeam()
+    {
+        // v1.1.12: a roster being rebuilt can show no NPC members; the empty-team sweep removes a truly empty team later
+        await TeamCornerRig.Online(async (db, path) =>
+        {
+            TeamCornerRig.Exec(path, "INSERT INTO player_teams (team_name, password_hash, created_by) VALUES ('Reloaders', 'x', 'quit hero');");
+            TeamCornerRig.Exec(path, "INSERT INTO team_vault (team_name, gold) VALUES ('Reloaders', 50000);");
+            bool was = NPCSpawnSystem.Instance.IsRebuilding;
+            NPCSpawnSystem.Instance.IsRebuilding = true;
+            try
+            {
+                var hero = TeamCornerRig.Hero(name: "Quit Hero", team: "Reloaders");
+                await new TeamCornerRig(hero, new[] { "y", "" }).Run("QuitTeam");
+                Convert.ToInt64(TeamCornerRig.Scalar(path, "SELECT gold FROM team_vault WHERE team_name = 'Reloaders'")).Should().Be(50000);
+                Convert.ToInt64(TeamCornerRig.Scalar(path, "SELECT COUNT(*) FROM player_teams WHERE team_name = 'Reloaders'")).Should().Be(1);
+            }
+            finally { NPCSpawnSystem.Instance.IsRebuilding = was; }
+        });
+    }
+
+    [Theory]
+    [InlineData("ConfirmAndRecruit", "var liveRecruit = NPCSpawnSystem.Instance.ActiveNPCs")]
+    [InlineData("ResurrectTeammate", "var live = LiveTeamNpc(toResurrect);")]
+    public void TheCapacityQuery_RunsBeforeTheLiveNpcLookup(string method, string lookup)
+    {
+        // v1.1.12: the query yields; a roster reload during it would leave an NPC looked up before it stale
+        string body = MethodBody(method);
+        int query = body.LastIndexOf("await TeamSlotsUsed(", StringComparison.Ordinal);
+        int live = body.IndexOf(lookup, StringComparison.Ordinal);
+        query.Should().BeGreaterThan(0);
+        live.Should().BeGreaterThan(query, "the NPC is looked up after the last await before it is changed");
+    }
+
+    [Fact]
     public void Quit_SavesOnce()
     {
         string body = MethodBody("QuitTeam");

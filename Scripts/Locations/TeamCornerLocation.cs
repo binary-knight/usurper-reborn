@@ -1419,7 +1419,8 @@ public class TeamCornerLocation : BaseLocation
                 // If team is now empty (no players AND no NPCs), delete it. v1.1.12: with its upgrades and
                 // vault (a later team of the same name inherited them), and not within the join grace; a
                 // team left then is the empty-team sweep's to remove
-                if (remainingPlayers.Count == 0 && remainingNPCs == 0 && backend.DeleteEmptyTeam(oldTeam))
+                // v1.1.12: a roster being rebuilt can show no NPC members; the empty-team sweep removes it later
+                if (remainingPlayers.Count == 0 && remainingNPCs == 0 && !NPCSpawnSystem.Instance.IsRebuilding && backend.DeleteEmptyTeam(oldTeam))
                     DebugLogger.Instance.LogInfo("TEAM", $"Team '{oldTeam}' dissolved, no members remaining");
             }
 
@@ -1943,6 +1944,19 @@ public class TeamCornerLocation : BaseLocation
         // recruit list re-shows the NPC. Defense: re-resolve `recruit` to a
         // live ActiveNPCs reference by ID before any mutation. If the live
         // NPC is gone (rare — permadied or evicted by another path), refuse.
+        // v1.1.12: the team can have filled while the list was up; checked before the live lookup below, since
+        // the query yields and a roster reload in that wait would leave the looked-up NPC stale
+        if (await TeamSlotsUsed(currentPlayer.Team) >= MaxTeamSize)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine(Loc.Get("team.team_full", MaxTeamSize));
+            terminal.WriteLine("");
+            terminal.SetColor("darkgray");
+            terminal.WriteLine(Loc.Get("ui.press_enter"));
+            await terminal.ReadKeyAsync();
+            return;
+        }
+
         var liveRecruit = NPCSpawnSystem.Instance.ActiveNPCs
             .FirstOrDefault(n => !string.IsNullOrEmpty(n.ID) && n.ID == recruit.ID);
         if (liveRecruit == null)
@@ -2000,18 +2014,6 @@ public class TeamCornerLocation : BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.recruit_refuse_hate_1", recruit.DisplayName));
-            terminal.WriteLine("");
-            terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
-            return;
-        }
-
-        // v1.1.12: the team can have filled while the list was up
-        if (await TeamSlotsUsed(currentPlayer.Team) >= MaxTeamSize)
-        {
-            terminal.SetColor("red");
-            terminal.WriteLine(Loc.Get("team.team_full", MaxTeamSize));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
             terminal.WriteLine(Loc.Get("ui.press_enter"));
@@ -2719,6 +2721,18 @@ public class TeamCornerLocation : BaseLocation
         terminal.Write(Loc.Get("team.confirm_resurrect", toResurrect.DisplayName, $"{cost:N0}"));
         if (!GameConfig.IsAffirmative(await terminal.ReadLineAsync())) return;
 
+        // v1.1.12: a dead member holds a slot, so a revival adds no slot; it may bring the living up to
+        // MaxTeamSize and no further (a team from before the cap, with more, keeps its members). Checked before the
+        // live lookup below, since the query yields
+        int deadHere = NPCSpawnSystem.Instance.ActiveNPCs.Count(n => n.Team == currentPlayer.Team && (n.IsDead || !n.IsAlive) && !n.IsPermaDead && !n.IsAgedDeath);
+        if (await TeamSlotsUsed(currentPlayer.Team) - deadHere >= MaxTeamSize)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine(Loc.Get("team.team_full", MaxTeamSize));
+            await Task.Delay(2000);
+            return;
+        }
+
         // v1.1.12: the NPC is looked up again by ID; a world_state reload while the prompts were up replaced
         // the object picked from the list, and the gold paid revived no one
         var live = LiveTeamNpc(toResurrect);
@@ -2726,17 +2740,6 @@ public class TeamCornerLocation : BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.member_gone_now", toResurrect.DisplayName));
-            await Task.Delay(2000);
-            return;
-        }
-
-        // v1.1.12: a dead member holds a slot, so a revival adds no slot; it may bring the living up to
-        // MaxTeamSize and no further (a team from before the cap, with more, keeps its members)
-        int deadHere = NPCSpawnSystem.Instance.ActiveNPCs.Count(n => n.Team == currentPlayer.Team && (n.IsDead || !n.IsAlive) && !n.IsPermaDead && !n.IsAgedDeath);
-        if (await TeamSlotsUsed(currentPlayer.Team) - deadHere >= MaxTeamSize)
-        {
-            terminal.SetColor("red");
-            terminal.WriteLine(Loc.Get("team.team_full", MaxTeamSize));
             await Task.Delay(2000);
             return;
         }
