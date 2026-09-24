@@ -261,6 +261,80 @@ public class OwnerProcessTier2Tests : IDisposable
         Source("Server", "MudServer.cs").Should().Contain("if (!_sqlBackend.TryClaimAdminCommand(cmd.Id)) return;");
     }
 
+    // ─── The world_edits table ───
+
+    [Fact]
+    public void TheWorldEditsTable_IsMade_OnANewDatabase_AndOnAnOlderOne()
+    {
+        Scalar("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'world_edits';").Should().Be("1");
+        Exec("DROP TABLE world_edits;");
+        SqliteConnection.ClearAllPools();
+        _ = new SqlSaveBackend(_path);   // an older release's database, opened by this one
+        Scalar("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'world_edits';").Should().Be("1");
+        Scalar("SELECT group_concat(name) FROM pragma_table_info('world_edits');")
+            .Should().Be("id,kind,payload,created_at,created_by,applied_at,applied_by");
+    }
+
+    [Fact]
+    public void TheOwnersSet_IsEveryUnappliedEdit_AndTheLastDaysApplied()
+    {
+        long oldUnapplied = _db.AppendWorldEdit("forget_character", "{}", "t");
+        long oldApplied = _db.AppendWorldEdit("forget_character", "{}", "t");
+        long recentApplied = _db.AppendWorldEdit("forget_character", "{}", "t");
+        long recent = _db.AppendWorldEdit("vacate_throne", "{}", "t");
+        _db.MarkWorldEditsApplied(new[] { oldApplied, recentApplied }, "owner").Should().Be(2);
+        Exec($"UPDATE world_edits SET created_at = datetime('now', '-3 days') WHERE id IN ({oldUnapplied}, {oldApplied});");
+
+        _db.GetWorldEditsToApply().Select(e => e.Id).Should().Equal(oldUnapplied, recentApplied, recent);
+        _db.GetUnappliedWorldEditsOlderThan(24).Select(e => e.Id).Should().Equal(oldUnapplied);
+
+        string first = Scalar($"SELECT applied_at FROM world_edits WHERE id = {oldApplied};")!;
+        _db.MarkWorldEditsApplied(new[] { oldApplied }, "other").Should().Be(0, "an applied edit keeps its first mark");
+        Scalar($"SELECT applied_by FROM world_edits WHERE id = {oldApplied};").Should().Be("owner");
+        Scalar($"SELECT applied_at FROM world_edits WHERE id = {oldApplied};").Should().Be(first);
+    }
+
+    [Fact]
+    public void AppliedEdits_ArePrunedAfterSevenDays_UnappliedOnesNever()
+    {
+        long applied = _db.AppendWorldEdit("forget_character", "{}", "t");
+        long unapplied = _db.AppendWorldEdit("forget_character", "{}", "t");
+        long fresh = _db.AppendWorldEdit("forget_character", "{}", "t");
+        _db.MarkWorldEditsApplied(new[] { applied, fresh }, "owner");
+        Exec($"UPDATE world_edits SET created_at = datetime('now', '-9 days') WHERE id IN ({applied}, {unapplied});");
+        Exec($"UPDATE world_edits SET applied_at = datetime('now', '-8 days') WHERE id = {applied};");
+
+        _db.PruneAppliedWorldEdits(7).Should().Be(1);
+
+        Scalar("SELECT group_concat(id) FROM world_edits;").Should().Be($"{unapplied},{fresh}");
+    }
+
+    [Fact]
+    public void ALaterCharacter_IsARowWithASave_MadeOrSavedAfterTheEdit_OrOnTheSameAccount()
+    {
+        long id = _db.AppendWorldEdit("forget_character", "{}", "t");
+        string at = Scalar($"SELECT created_at FROM world_edits WHERE id = {id};")!;
+        var bob = new[] { "Bob" };
+        const string save = "'{\"player\":{\"name2\":\"Bob\"}}'";
+
+        Exec($"INSERT INTO players (username, display_name, player_data, created_at, last_login) VALUES ('old_acct', 'Bob', '{{}}', datetime('now', '-9 days'), datetime('now', '-9 days'));");
+        _db.LaterCharacterUsesName(bob, at, "bob_account").Should().BeFalse("an emptied row is no character");
+
+        Exec($"UPDATE players SET player_data = {save} WHERE username = 'old_acct';");
+        _db.LaterCharacterUsesName(bob, at, "bob_account").Should().BeFalse("made and last saved before the edit");
+
+        Exec("UPDATE players SET last_login = datetime('now', '+1 minute') WHERE username = 'old_acct';");
+        _db.LaterCharacterUsesName(bob, at, "bob_account").Should().BeTrue("saved after the edit: a new character on an old account");
+
+        Exec("DELETE FROM players;");
+        Exec($"INSERT INTO players (username, display_name, player_data, created_at) VALUES ('new_acct', 'Robert', {save}, datetime('now', '+1 minute'));");
+        _db.LaterCharacterUsesName(bob, at, "bob_account").Should().BeTrue("a row created after the edit, matched by its Name2");
+
+        Exec("DELETE FROM players;");
+        Exec($"INSERT INTO players (username, display_name, player_data, created_at, last_login) VALUES ('bob_account', 'Bob', {save}, datetime('now', '-9 days'), datetime('now', '-9 days'));");
+        _db.LaterCharacterUsesName(bob, at, "bob_account").Should().BeTrue("the deleted character's own account with a save again");
+    }
+
     private static string WebSource()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
