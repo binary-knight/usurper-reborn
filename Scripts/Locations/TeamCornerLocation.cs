@@ -832,7 +832,11 @@ public class TeamCornerLocation : BaseLocation
     {
         int players = team == currentPlayer.Team ? 1 : 0;
         if (DoorMode.IsOnlineMode && SaveSystem.Instance.Backend is SqlSaveBackend backend)
-            players += (await backend.GetPlayerTeamMembers(team, excludeDisplayName: currentPlayer.DisplayName)).Count;
+        {
+            // v1.1.12: the viewer is left out by save key; a display name can be another member's too
+            string myKey = GameEngine.InheritanceKey(currentPlayer);
+            players += (await backend.GetPlayerTeamMembers(team)).Count(m => !string.Equals(m.Username, myKey, StringComparison.OrdinalIgnoreCase));
+        }
         return CountTeamSlots(NPCSpawnSystem.Instance.ActiveNPCs, team, players);
     }
 

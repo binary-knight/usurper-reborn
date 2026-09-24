@@ -649,6 +649,29 @@ public class TeamCornerFixes1112Tests : IDisposable
     }
 
     [Fact]
+    public async Task Join_AFullTeam_WithAMemberOfTheJoinersDisplayName_IsRefused()
+    {
+        // v1.1.12: the joiner was left out of the count by display name, which also dropped a member of that name
+        await TeamCornerRig.Online(async (db, path) =>
+        {
+            await db.CreatePlayerTeam("Smithy", "pw", "bsmith");
+            TeamCornerRig.Exec(path, "INSERT INTO players (username, display_name, player_data) VALUES ('bsmith', 'Bob Smith', " +
+                "'{\"player\":{\"name2\":\"Bob Smith\",\"team\":\"Smithy\",\"level\":12,\"class\":0}}');");
+            var npcs = Enumerable.Range(1, 4).Select(i => TeamCornerRig.Npc($"tc_jname_{i}", $"Smithy {i}", "Smithy")).ToList();
+            NPCSpawnSystem.Instance.ActiveNPCs.AddRange(npcs);
+            try
+            {
+                var hero = new Character { Name1 = "bob", Name2 = "Bob", FamilySurname = "Smith", Class = CharacterClass.Warrior, Level = 20, HP = 300, MaxHP = 300, Gold = 10000 };
+                hero.DisplayName.Should().Be("Bob Smith");
+                string shown = await new TeamCornerRig(hero, new[] { "smithy", "pw", "" }).Run("JoinTeam");
+                shown.Should().Contain(Loc.Get("team.join_team_full", "Smithy", 5));
+                hero.Team.Should().BeEmpty();
+            }
+            finally { NPCSpawnSystem.Instance.ActiveNPCs.RemoveAll(n => n.ID.StartsWith("tc_jname_")); }
+        });
+    }
+
+    [Fact]
     public async Task Join_ATeamThatFillsDuringThePassword_IsRefused()
     {
         var npcs = Enumerable.Range(1, 4).Select(i => TeamCornerRig.Npc($"tc_jlate_{i}", $"Late {i}", "Late House")).ToList();
