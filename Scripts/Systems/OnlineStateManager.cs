@@ -1550,6 +1550,7 @@ namespace UsurperRemake.Systems
                     // AI state - for dashboard analytics
                     PersonalityProfile = SerializePersonalityStatic(npc.Brain?.Personality),
                     Memories = SerializeMemoriesStatic(npc.Brain?.Memory),
+                    MemoryTimesKept = true,   // v1.1.13
                     CurrentGoals = SerializeGoalsStatic(npc.Brain?.Goals),
                     EmotionalState = SerializeEmotionalStateForDashboard(npc),
                     // Scale from internal -1..1 to dashboard-expected -100..100

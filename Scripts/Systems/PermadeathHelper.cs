@@ -613,20 +613,17 @@ namespace UsurperRemake.Systems
         /// v1.1.13: the NPC half of the purge: grudges, Enemies and KnownCharacters, and marriages naming the
         /// character, on the live roster and registry, then written at once (OnlineStateManager.PersistNpcWorldNow).
         /// Nothing is awaited between the clean-up and the serialize, so a login's RestoreNPCs cannot put the
-        /// old roster back in between. Each retry after a reload re-applies it with the time of that attempt,
-        /// since a reload stamps every memory with the load time.
+        /// old roster back in between. A retry after a reload re-applies it with the same cut-off, the delete
+        /// time: a reload keeps each memory's recorded time (v1.1.13).
         /// </summary>
         internal static async Task<int> ForgetCharacterInNpcWorldAsync(SqlSaveBackend? backend, IReadOnlyList<string> names,
             DateTime deletedAt, bool untimedToo, Func<List<NPCData>, Task>? reloadRoster = null, Func<Task>? beforeWrite = null)
         {
-            bool first = true;
             var endedMarriages = new HashSet<string>();
             int CleanUp()
             {
-                var cutOff = first ? deletedAt : DateTime.Now;
-                first = false;
                 int n = 0;
-                foreach (var a in names) n += ForgetNpcGrudgesAgainst(a, cutOff, untimedToo) + ClearNpcSpousesOf(a, endedMarriages);
+                foreach (var a in names) n += ForgetNpcGrudgesAgainst(a, deletedAt, untimedToo) + ClearNpcSpousesOf(a, endedMarriages);
                 return n;
             }
             if (backend == null) return CleanUp();

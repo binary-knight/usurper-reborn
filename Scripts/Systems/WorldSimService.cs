@@ -1535,6 +1535,7 @@ namespace UsurperRemake.Systems
             // session mid-login can otherwise read this roster while it is half
             // rebuilt and wrongly retire a living partner.
             NPCSpawnSystem.Instance.IsRebuilding = true;
+            var memoryLoadTime = DateTime.Now;   // v1.1.13: one load time for every restored memory
             try
             {
             // Clear existing NPCs
@@ -1832,11 +1833,11 @@ namespace UsurperRemake.Systems
                                     Type = memType,
                                     Description = memData.Description,
                                     InvolvedCharacter = memData.InvolvedCharacter,
-                                    Timestamp = memData.Timestamp,
+                                    Timestamp = MemorySystem.RestoredTimestamp(memData.Timestamp, data.MemoryTimesKept, memoryLoadTime),   // v1.1.13
                                     Importance = memData.Importance,
                                     EmotionalImpact = memData.EmotionalImpact
                                 };
-                                npc.Brain.Memory?.RecordEvent(memory);
+                                npc.Brain.Memory?.RecordEvent(memory, keepTimestamp: true);   // v1.1.13: the saved time
                             }
                         }
                     }
