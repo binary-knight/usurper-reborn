@@ -5966,7 +5966,8 @@ public class CastleLocation : BaseLocation
             terminal.WriteLine("");
 
             var combatEngine = new CombatEngine(terminal);
-            var kingResult = await combatEngine.PlayerVsPlayer(currentPlayer, kingCharacter, allowSurrender: false); // v0.64.1: throne challenge treats non-Victory as defeat
+            // v1.1.11: not lethal; the NPC king's HP is put back below, so a win is not a kill (an Assassin contract stays)
+            var kingResult = await combatEngine.PlayerVsPlayer(currentPlayer, kingCharacter, allowSurrender: false, lethal: false); // v0.64.1: throne challenge treats non-Victory as defeat
 
             // Restore original NPC stats after combat
             kingCharacter.Defence = origDef;

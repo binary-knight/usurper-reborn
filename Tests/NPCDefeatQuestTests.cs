@@ -279,6 +279,74 @@ public class NPCDefeatQuestTests
     }
 
     [Fact]
+    public async Task AFailedClaimWrite_LeavesTheBountyOpen_AndUnpaid()
+    {
+        // v1.1.11: a busy database made the claim fail; the bounty was marked Deleted, unpaid, and lost
+        await WithSqlBackend(async (db, path) =>
+        {
+            using (var conn = new SqliteConnection($"Data Source={path}"))
+            {
+                conn.Open();
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = "DROP TABLE bounty_claims;";   // every claim write now fails
+                cmd.ExecuteNonQuery();
+            }
+            db.TryClaimBountyOrFail("Qfail", "x").Should().BeNull();
+
+            var bounty = BountyOnPlayer("Busy Rogue", 4000);
+            var winner = new Character { Name1 = "sheriff_f", Name2 = "Sheriff F", Level = 30, Gold = 0 };
+            var rogue = new Character { Name1 = "busy_rogue", Name2 = "Busy Rogue", Level = 30, IsLoadedPlayer = true };
+            try
+            {
+                QuestSystem.CollectBountiesOnPlayer(winner, rogue).Should().BeEmpty();
+                bounty.Deleted.Should().BeFalse("the claim was not written, so the bounty is still open");
+                winner.Gold.Should().Be(0);
+            }
+            finally { bounty.Deleted = true; }
+
+            var (hunter, target, npcBounty) = Wanted("Busy Mark");
+            try
+            {
+                QuestSystem.AutoCompleteBountyForNPC(hunter, target.Name).Should().Be(0);
+                npcBounty.Deleted.Should().BeFalse();
+            }
+            finally { npcBounty.Deleted = true; }
+            await Task.CompletedTask;
+        });
+    }
+
+    [Fact]
+    public void AWinnersMarriedName_DoesNotBlock_TheBountyOnThePlayerOfThatName()
+    {
+        // v1.1.11: "Bob" took the surname Smith and beat the real "Bob Smith"; the bounty is Bob Smith's, and paid
+        var bounty = BountyOnPlayer("Bob W Smith", 3000);
+        var winner = new Character { Name1 = "bob_w", Name2 = "Bob W", FamilySurname = "Smith", Level = 30, Gold = 0 };
+        winner.DisplayName.Should().Be("Bob W Smith");
+        var target = new Character { Name1 = "bob_w_smith", Name2 = "Bob W Smith", Level = 30, IsLoadedPlayer = true };
+        try
+        {
+            QuestSystem.CollectBountiesOnPlayer(winner, target).Should().ContainSingle();
+            winner.Gold.Should().BeGreaterThanOrEqualTo(3000);
+        }
+        finally { bounty.Deleted = true; }
+    }
+
+    [Fact]
+    public void TheNPCThroneChallenge_IsNotLethal()
+    {
+        // v1.1.11: the NPC king's HP is put back after the fight, so beating them is not a kill for a contract
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "Scripts"))) dir = dir.Parent;
+        string src = File.ReadAllText(Path.Combine(dir!.FullName, "Scripts", "Locations", "CastleLocation.cs"));
+        int npcKing = src.IndexOf("kingCharacter = kingNpc;", StringComparison.Ordinal);
+        npcKing.Should().BeGreaterThan(0);
+        int call = src.IndexOf("PlayerVsPlayer(", npcKing, StringComparison.Ordinal);
+        int restore = src.IndexOf("kingCharacter.HP = Math.Max(1, origHP);", npcKing, StringComparison.Ordinal);
+        call.Should().BeLessThan(restore);
+        src.Substring(call, src.IndexOf(';', call) - call).Should().Contain("lethal: false");
+    }
+
+    [Fact]
     public void TheClaimTable_IsAlsoAMigration()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);

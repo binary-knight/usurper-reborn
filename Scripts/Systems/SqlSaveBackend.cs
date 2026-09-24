@@ -1301,7 +1301,10 @@ namespace UsurperRemake.Systems
         /// first claim of the quest id; false when another process (or an earlier claim) already took it, or
         /// the claim could not be written.
         /// </summary>
-        public bool TryClaimBounty(string questId, string claimer)
+        public bool TryClaimBounty(string questId, string claimer) => TryClaimBountyOrFail(questId, claimer) == true;
+
+        /// <summary>v1.1.11: as TryClaimBounty, but null when the claim could not be written, so the bounty stays open.</summary>
+        public bool? TryClaimBountyOrFail(string questId, string claimer)
         {
             if (string.IsNullOrWhiteSpace(questId)) return false;
             try
@@ -1316,7 +1319,7 @@ namespace UsurperRemake.Systems
             catch (Exception ex)
             {
                 DebugLogger.Instance.LogError("SQL", $"TryClaimBounty failed for '{questId}': {ex.Message}");
-                return false;
+                return null;
             }
         }
 

@@ -1567,8 +1567,11 @@ public partial class QuestSystem
         if (SaveSystem.Instance?.Backend is SqlSaveBackend sqlNames)
             names = names.Where(n => n.Equals(loser.Name2, StringComparison.OrdinalIgnoreCase) || !sqlNames.IsNameUsedByAnotherCharacter(n, loser.Name2)).ToList();
         if (names.Count == 0) return new List<Quest>();
-        if (names.Any(n => n.Equals(winner.Name2, StringComparison.OrdinalIgnoreCase) || n.Equals(winner.DisplayName, StringComparison.OrdinalIgnoreCase)))
+        // v1.1.11: never the winner's own bounty; the winner is known by Name2, a married display name is cosmetic
+        if (ReferenceEquals(winner, loser) || string.Equals(winner.Name2, loser.Name2, StringComparison.OrdinalIgnoreCase))
             return new List<Quest>();
+        names = names.Where(n => !n.Equals(winner.Name2, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (names.Count == 0) return new List<Quest>();
 
         List<Quest> claimed;
         lock (_bountyPayoutLock)
@@ -1578,8 +1581,9 @@ public partial class QuestSystem
             // v1.1.11: another process may hold the same bounty; only the one whose DB claim lands pays it.
             // A bounty claimed elsewhere is marked Deleted here too, unpaid.
             var found = claimed;
-            claimed = found.Where(q => ClaimAcrossProcesses(q, winner.Name2)).ToList();
-            foreach (var q in found) q.Deleted = true;
+            var outcome = found.Select(q => (Quest: q, Claim: ClaimAcrossProcesses(q, winner.Name2))).ToList();
+            claimed = outcome.Where(o => o.Claim == true).Select(o => o.Quest).ToList();
+            foreach (var o in outcome) if (o.Claim != null) o.Quest.Deleted = true;   // a failed claim write leaves it unpaid and open
             foreach (var q in claimed) { q.Occupier = winner.Name2; q.OccupiedDays = 1; }
         }
 
@@ -1671,11 +1675,12 @@ public partial class QuestSystem
     /// covers one process; separate door and world-sim processes each hold their own copy of the bounty.
     /// Without an SQL backend (offline, file saves) the lock is enough. A quest with no id cannot be
     /// claimed by id and is claimed under a key built from its fields (BountyClaimKey).
+    /// True: claimed here. False: claimed elsewhere. Null: the claim could not be written (a busy database).
     /// </summary>
-    internal static bool ClaimAcrossProcesses(Quest q, string claimer)
+    internal static bool? ClaimAcrossProcesses(Quest q, string claimer)
     {
         if (SaveSystem.Instance?.Backend is not SqlSaveBackend sql) return true;
-        return sql.TryClaimBounty(BountyClaimKey(q), claimer);
+        return sql.TryClaimBountyOrFail(BountyClaimKey(q), claimer);
     }
 
     /// <summary>
@@ -1716,8 +1721,9 @@ public partial class QuestSystem
         // v1.1.11: another process may hold the same bounty; only the one whose DB claim lands pays it.
         // A bounty claimed elsewhere is marked Deleted here too, unpaid.
         var found = matchingBounties;
-        matchingBounties = found.Where(q => ClaimAcrossProcesses(q, player?.Name2 ?? "")).ToList();
-        foreach (var claimed in found) claimed.Deleted = true;   // claimed for this payout
+        var outcome = found.Select(q => (Quest: q, Claim: ClaimAcrossProcesses(q, player?.Name2 ?? ""))).ToList();
+        matchingBounties = outcome.Where(o => o.Claim == true).Select(o => o.Quest).ToList();
+        foreach (var o in outcome) if (o.Claim != null) o.Quest.Deleted = true;   // a failed claim write leaves it open
         }
 
         foreach (var bounty in matchingBounties)
