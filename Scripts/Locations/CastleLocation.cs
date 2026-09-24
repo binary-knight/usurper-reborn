@@ -7814,6 +7814,31 @@ public class CastleLocation : BaseLocation
         monarchHistory = history ?? new List<MonarchRecord>();
     }
 
+    /// <summary>v1.1.11: the monarch history in its stored form (every royal_court payload carries it).</summary>
+    public static List<MonarchRecordSaveData> MonarchHistorySaveData() =>
+        monarchHistory?.Select(m => new MonarchRecordSaveData
+        {
+            Name = m.Name,
+            Title = m.Title,
+            DaysReigned = m.DaysReigned,
+            CoronationDate = m.CoronationDate.ToString("o"),
+            EndReason = m.EndReason
+        }).ToList() ?? new List<MonarchRecordSaveData>();
+
+    /// <summary>v1.1.11: take a stored monarch history; an empty or missing one leaves this process's as is.</summary>
+    public static void ImportMonarchHistory(List<MonarchRecordSaveData>? saved)
+    {
+        if (saved == null || saved.Count == 0) return;
+        SetMonarchHistory(saved.Select(m => new MonarchRecord
+        {
+            Name = m.Name,
+            Title = m.Title,
+            DaysReigned = m.DaysReigned,
+            CoronationDate = DateTime.TryParse(m.CoronationDate, null, System.Globalization.DateTimeStyles.RoundtripKind, out var cd) ? cd : DateTime.Now,
+            EndReason = m.EndReason
+        }).ToList());
+    }
+
     /// <summary>
     /// Notify a dethroned player via system message.
     /// Their King flag will sync from world_state on next login or castle entry.
@@ -8032,6 +8057,7 @@ public class CastleLocation : BaseLocation
     public static bool ApplySharedThroneVacancy(RoyalCourtSaveData court)
     {
         if (court == null || !court.ThroneVacant) return false;
+        ImportMonarchHistory(court.MonarchHistory);   // v1.1.11: the ended reign the vacancy carries
         var king = currentKing;
         if (king != null)
         {

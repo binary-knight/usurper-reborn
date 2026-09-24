@@ -1355,6 +1355,7 @@ namespace UsurperRemake.Systems
         public bool Forced { get; set; }
         public string TargetNPCName { get; set; } = "";
         public bool IsPlayerBounty { get; set; }   // v1.1.11
+        public long BountyGold { get; set; }   // v1.1.11: a player bounty's posted gold (0 on legacy rows)
         public List<QuestObjectiveData> Objectives { get; set; } = new();
         public List<QuestMonsterData> Monsters { get; set; } = new();
         // v0.62.x Phase 4 (Mercenary board): faction-issued freelance contract fields.

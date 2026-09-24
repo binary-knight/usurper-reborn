@@ -1270,7 +1270,7 @@ namespace UsurperRemake.Systems
             }
         }
 
-        // v1.1.11: an auction seller name that another players row carries now, as its display name or
+        // v1.1.11: an auction seller name that another player's row carries now, as its display name or
         // its save's Name2, is that player's listing, never the deleted character's.
         private const string SellerNotOtherPlayer =
             "NOT EXISTS (SELECT 1 FROM players p WHERE LOWER(p.username) != LOWER(@u) AND (" +
@@ -5976,9 +5976,30 @@ namespace UsurperRemake.Systems
     }
 
     /// <summary>
-    /// Resolves a player name (username or display name) to their lowercase display name.
-    /// Returns null if the player doesn't exist.
+    /// v1.1.11: another player's row (a different key) uses the name, as its display name or its save's
+    /// Name2. On a failed read the name counts as used, so the delete purge keeps that bounty.
     /// </summary>
+    public bool IsNameUsedByAnotherPlayer(string name, string username)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return false;
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT EXISTS (SELECT 1 FROM players WHERE LOWER(username) != LOWER(@u) AND (" +
+                "LOWER(display_name) = LOWER(@n) OR " +
+                "LOWER(CASE WHEN json_valid(player_data) THEN json_extract(player_data, '$.player.name2') END) = LOWER(@n)));";
+            cmd.Parameters.AddWithValue("@u", username ?? "");
+            cmd.Parameters.AddWithValue("@n", name);
+            return Convert.ToInt64(cmd.ExecuteScalar()) != 0;
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogWarning("SQL", $"IsNameUsedByAnotherPlayer('{name}') failed: {ex.Message}");
+            return true;
+        }
+    }
+
     /// <summary>v1.1.11: the players.display_name of one key (the married surname form), or null.</summary>
     public string? GetStoredDisplayName(string username)
     {
@@ -5993,6 +6014,10 @@ namespace UsurperRemake.Systems
         catch { return null; }
     }
 
+    /// <summary>
+    /// Resolves a player name (username or display name) to their lowercase display name.
+    /// Returns null if the player doesn't exist.
+    /// </summary>
     public string? ResolvePlayerDisplayName(string nameOrDisplay)
     {
         try

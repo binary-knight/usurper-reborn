@@ -511,4 +511,130 @@ public class CharacterRecreationTests : IDisposable
         purge.Should().Contain("RemoveSharedQuestsAsync(q => QuestLeftByCharacter(q, questNames, aliases))");
         purge.Should().Contain("QuestSystem.RemovePlayerQuests(questNames.ToArray())");
     }
+
+    // ─── v1.1.11: review round 15 ───
+
+    private void Players(params (string User, string Display, string Data)[] rows)
+    {
+        using var conn = new SqliteConnection($"Data Source={_path}");
+        conn.Open();
+        // a fresh database's json expression indexes refuse a malformed blob; an upgraded one may lack them
+        var indexes = new List<string>();
+        using (var q = conn.CreateCommand())
+        {
+            q.CommandText = "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'players' AND sql LIKE '%json%';";
+            using var reader = q.ExecuteReader();
+            while (reader.Read()) indexes.Add(reader.GetString(0));
+        }
+        foreach (var name in indexes) { using var d = conn.CreateCommand(); d.CommandText = $"DROP INDEX \"{name}\";"; d.ExecuteNonQuery(); }
+        foreach (var r in rows)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "INSERT INTO players (username, display_name, player_data) VALUES (@u, @d, @p);";
+            cmd.Parameters.AddWithValue("@u", r.User);
+            cmd.Parameters.AddWithValue("@d", r.Display);
+            cmd.Parameters.AddWithValue("@p", r.Data);
+            cmd.ExecuteNonQuery();
+        }
+    }
+
+    /// <summary>Runs the body as an online process whose OnlineStateManager is on this database.</summary>
+    private async System.Threading.Tasks.Task AsOnlineProcess(Func<OnlineStateManager, System.Threading.Tasks.Task> body)
+    {
+        var online = typeof(UsurperRemake.BBS.DoorMode).GetField("_onlineMode", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+        var fallback = typeof(OnlineStateManager).GetField("_fallbackInstance", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+        var (wasOnline, wasOsm) = (online.GetValue(null), fallback.GetValue(null));
+        var osm = NewOsm(_db!);
+        online.SetValue(null, true);
+        fallback.SetValue(null, osm);
+        try { await body(osm); }
+        finally
+        {
+            online.SetValue(null, wasOnline);
+            fallback.SetValue(null, wasOsm);
+        }
+    }
+
+    [Fact]
+    public void AnotherPlayersUseOfAName_IsFoundByDisplayNameOrName2_AndABadSaveIsSkipped()
+    {
+        _db = new SqlSaveBackend(_path);
+        Players(("bob_acct", "Bob Smith", "{}"),
+                ("bsmith", "Robert", "{\"player\":{\"name2\":\"Bob Smith\"}}"),
+                ("carol", "Carol Jones", "not json"));
+        _db.IsNameUsedByAnotherPlayer("bob smith", "bob_acct").Should().BeTrue("bsmith's save carries it as Name2");
+        _db.IsNameUsedByAnotherPlayer("Carol Jones", "bob_acct").Should().BeTrue("carol's display name, next to an unreadable save");
+        _db.IsNameUsedByAnotherPlayer("Carol Jones", "carol").Should().BeFalse("the character's own row does not count");
+        _db.IsNameUsedByAnotherPlayer("Alice", "bob_acct").Should().BeFalse();
+        _db.IsNameUsedByAnotherPlayer("Bob Smith", "BSMITH").Should().BeTrue("bob_acct's display name");
+        CodeOnly(Source("Systems", "SqlSaveBackend.cs"))
+            .Should().Contain("LOWER(CASE WHEN json_valid(player_data) THEN json_extract(player_data, '$.player.name2') END) = LOWER(@n)");
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task DeletingMarriedBob_KeepsTheBountyOnALivingBobSmith_LocallyAndShared()
+    {
+        _db = new SqlSaveBackend(_path);
+        Players(("bob_acct", "Bob Smith", "{\"player\":{\"name2\":\"Bob\"}}"),
+                ("bsmith", "Bob Smith Jr", "{\"player\":{\"name2\":\"Bob Smith\"}}"));
+        var bob = new Character { Name1 = "bob_acct", Name2 = "Bob", FamilySurname = "Smith" };
+        bob.DisplayName.Should().Be("Bob Smith");
+        try
+        {
+            await AsOnlineProcess(async osm =>
+            {
+                var onLiving = Add(Wanted("Bob Smith"));
+                var onBob = Add(Wanted("Bob"));
+                await osm.SaveSharedQuests(new List<QuestData>
+                {
+                    new QuestData { Id = "L1", Initiator = "The Crown", TargetNPCName = "Bob Smith", IsPlayerBounty = true },
+                    new QuestData { Id = "L2", Initiator = "The Crown", TargetNPCName = "Bob", IsPlayerBounty = true }
+                });
+
+                await PermadeathHelper.PurgeDeletedCharacterAsync(_db, "bob_acct", "Bob", bob);
+
+                InDatabase(onLiving).Should().BeTrue("the living Bob Smith's bounty is theirs");
+                InDatabase(onBob).Should().BeFalse();
+                (await osm.LoadSharedQuests())!.Select(q => q.Id).Should().Equal(new[] { "L1" });
+            });
+        }
+        finally
+        {
+            QuestSystem.RemoveBountiesOnPlayer("Bob Smith");
+        }
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task ThePurge_KeepsAQuestClaimedUnderTheMarriedName_AndRemovesItsBounty()
+    {
+        // quests record Name2, so a quest held by "Bob Smith" is another character's; the bounty is Bob's
+        _db = new SqlSaveBackend(_path);
+        var bob = new Character { Name1 = "bob_acct", Name2 = "Bob", FamilySurname = "Smith" };
+        bob.DisplayName.Should().Be("Bob Smith");
+        var claim = new Quest { Id = "q_claim_bob_smith", Title = "Held by Bob Smith", Occupier = "Bob Smith", Date = DateTime.Now, DaysToComplete = 7 };
+        try
+        {
+            await AsOnlineProcess(async osm =>
+            {
+                Add(claim);
+                var bounty = Add(Wanted("Bob Smith"));
+                await osm.SaveSharedQuests(new List<QuestData>
+                {
+                    new QuestData { Id = "S1", Occupier = "Bob Smith" },
+                    new QuestData { Id = "S2", Initiator = "The Crown", TargetNPCName = "Bob Smith", IsPlayerBounty = true }
+                });
+
+                await PermadeathHelper.PurgeDeletedCharacterAsync(_db, "bob_acct", "Bob", bob);
+
+                InDatabase(claim).Should().BeTrue("the purge's quest names exclude the married display name");
+                InDatabase(bounty).Should().BeFalse();
+                (await osm.LoadSharedQuests())!.Select(q => q.Id).Should().Equal(new[] { "S1" });
+            });
+        }
+        finally
+        {
+            QuestSystem.RemovePlayerQuests("Bob Smith");
+            QuestSystem.RemoveBountiesOnPlayer("Bob Smith");
+        }
+    }
 }

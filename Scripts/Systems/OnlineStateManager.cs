@@ -492,7 +492,9 @@ namespace UsurperRemake.Systems
         /// <summary>v1.1.11: the stored form of an empty court; a reign that just ended with no successor is marked, so the loaders clear their king.</summary>
         private static string EmptyRoyalCourtJson(bool throneVacated)
         {
-            var emptyData = new RoyalCourtSaveData { KingName = "", Treasury = 0, KingAI = 1, ThroneVacant = throneVacated };
+            // v1.1.11: the history goes too, with the reign the abdication just recorded
+            var emptyData = new RoyalCourtSaveData { KingName = "", Treasury = 0, KingAI = 1, ThroneVacant = throneVacated,
+                                                     MonarchHistory = global::CastleLocation.MonarchHistorySaveData() };
             return System.Text.Json.JsonSerializer.Serialize(emptyData,
                 new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
         }
@@ -1773,6 +1775,7 @@ namespace UsurperRemake.Systems
                     // track their target across a server restart.
                     TargetNPCName = quest.TargetNPCName ?? "",
                     IsPlayerBounty = quest.IsPlayerBounty,
+                    BountyGold = quest.BountyGold,   // v1.1.11
                     // v0.62.x Phase 4 (Mercenary board): faction-issued freelance contract fields.
                     IsMercContract = quest.IsMercContract,
                     IssuingFaction = quest.IssuingFaction.HasValue ? (int)quest.IssuingFaction.Value : -1,

@@ -1123,6 +1123,7 @@ public partial class QuestSystem
                 Forced = questData.Forced,
                 TargetNPCName = questData.TargetNPCName ?? "",
                 IsPlayerBounty = questData.IsPlayerBounty,
+                BountyGold = questData.BountyGold,   // v1.1.11
                 Deleted = questData.Status == QuestStatus.Completed || questData.Status == QuestStatus.Failed || questData.Status == QuestStatus.Abandoned,
                 IsAbandoned = questData.Status == QuestStatus.Abandoned,
                 // v0.62.x Phase 4 (Mercenary board): restore faction-issued freelance contract fields.
@@ -1215,6 +1216,7 @@ public partial class QuestSystem
                 Forced = questData.Forced,
                 TargetNPCName = questData.TargetNPCName ?? "",
                 IsPlayerBounty = questData.IsPlayerBounty,
+                BountyGold = questData.BountyGold,   // v1.1.11
                 Deleted = questData.Status == QuestStatus.Completed || questData.Status == QuestStatus.Failed || questData.Status == QuestStatus.Abandoned,
                 IsAbandoned = questData.Status == QuestStatus.Abandoned,
                 // v0.62.x Phase 4 (Mercenary board): restore faction-issued freelance contract fields.
@@ -1380,6 +1382,7 @@ public partial class QuestSystem
                 Forced = questData.Forced,
                 TargetNPCName = questData.TargetNPCName ?? "",
                 IsPlayerBounty = questData.IsPlayerBounty,
+                BountyGold = questData.BountyGold,   // v1.1.11
                 Deleted = questData.Status == QuestStatus.Completed || questData.Status == QuestStatus.Failed || questData.Status == QuestStatus.Abandoned,
                 IsAbandoned = questData.Status == QuestStatus.Abandoned,
                 // v0.62.x Phase 4 (Mercenary board): restore faction-issued freelance contract fields.

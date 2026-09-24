@@ -1618,6 +1618,7 @@ namespace UsurperRemake.Systems
                     Forced = quest.Forced,
                     TargetNPCName = quest.TargetNPCName ?? "",
                     IsPlayerBounty = quest.IsPlayerBounty,
+                    BountyGold = quest.BountyGold,   // v1.1.11
                     Objectives = new List<QuestObjectiveData>(),
                     Monsters = new List<QuestMonsterData>(),
                     // v0.62.x Phase 4 (Mercenary board): faction-issued freelance contract fields.

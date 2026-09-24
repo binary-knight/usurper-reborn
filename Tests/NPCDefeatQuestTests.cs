@@ -402,4 +402,78 @@ public class NPCDefeatQuestTests
             .Should().Contain("RemoveSharedQuestsAsync(q => keys.Contains(QuestSystem.BountyClaimKey(q)))")
             .And.NotContain("RemoveSharedQuestsAsync(q => ids.Contains(q.Id))");
     }
+
+    // ─── v1.1.11: a player bounty's gold survives a save and reload ───
+
+    /// <summary>Runs the body, then puts the shared quest list back as it was (the readers replace parts of it).</summary>
+    private static void KeepingTheQuestList(Action body)
+    {
+        var before = QuestSystem.GetAllQuests(includeCompleted: true);
+        try { body(); }
+        finally
+        {
+            QuestSystem.RestoreFromSaveData(new System.Collections.Generic.List<QuestData>());
+            foreach (var q in before) QuestSystem.AddQuestToDatabase(q);
+        }
+    }
+
+    private static Quest ByTarget(string target) =>
+        System.Linq.Enumerable.Single(QuestSystem.GetAllQuests(includeCompleted: true), q => q.TargetNPCName == target && !q.Deleted);
+
+    private static System.Collections.Generic.List<QuestData> ThroughJson(System.Collections.Generic.List<QuestData> list) =>
+        System.Text.Json.JsonSerializer.Deserialize<System.Collections.Generic.List<QuestData>>(System.Text.Json.JsonSerializer.Serialize(list))!;
+
+    [Fact]
+    public async Task APlayerBountysGold_SurvivesBothWriters_AndAllThreeReaders()
+    {
+        await WithSqlBackend(async (db, path) =>
+        {
+            var osm = (OnlineStateManager)Activator.CreateInstance(typeof(OnlineStateManager), F, null, new object[] { db, "r15" }, null)!;
+            KeepingTheQuestList(() =>
+            {
+                var posted = BountyOnPlayer("Gold Rogue", 100_000);
+                posted.Occupier = "Gold Hunter";
+
+                var saveWriter = typeof(SaveSystem).GetMethod("SerializeQuestList", F)!;
+                var fromSave = ThroughJson((System.Collections.Generic.List<QuestData>)saveWriter.Invoke(SaveSystem.Instance, new object[] { new System.Collections.Generic.List<Quest> { posted } })!);
+                var fromOnline = ThroughJson((System.Collections.Generic.List<QuestData>)typeof(OnlineStateManager).GetMethod("SerializeCurrentQuests", F)!.Invoke(osm, null)!);
+                fromSave.Should().ContainSingle().Which.BountyGold.Should().Be(100_000);
+                System.Linq.Enumerable.Single(fromOnline, d => d.Id == posted.Id).BountyGold.Should().Be(100_000);
+
+                QuestSystem.RestoreFromSaveData(fromSave);
+                ByTarget("Gold Rogue").BountyGold.Should().Be(100_000, "RestoreFromSaveData");
+                QuestSystem.MergePlayerQuests("Gold Hunter", fromSave);
+                ByTarget("Gold Rogue").BountyGold.Should().Be(100_000, "MergePlayerQuests");
+                QuestSystem.RestoreFromSaveData(new System.Collections.Generic.List<QuestData>());
+                fromSave[0].Occupier = "";
+                QuestSystem.MergeWorldQuests(fromSave);
+                ByTarget("Gold Rogue").BountyGold.Should().Be(100_000, "MergeWorldQuests");
+
+                // the reloaded bounty pays what was posted, not the 500 fallback
+                var winner = new Character { Name1 = "gold_sheriff", Name2 = "Gold Sheriff", Level = 30, Gold = 0 };
+                var rogue = new Character { Name1 = "gold_rogue", Name2 = "Gold Rogue", Level = 30, IsLoadedPlayer = true };
+                QuestSystem.CollectBountiesOnPlayer(winner, rogue).Should().ContainSingle();
+                winner.Gold.Should().Be(100_000);
+            });
+            await Task.CompletedTask;
+        });
+    }
+
+    [Fact]
+    public void ALegacyPlayerBounty_WithNoStoredGold_PaysThe500Fallback()
+    {
+        KeepingTheQuestList(() =>
+        {
+            // a row written before BountyGold was stored
+            var legacy = System.Text.Json.JsonSerializer.Deserialize<System.Collections.Generic.List<QuestData>>(
+                "[{\"Id\":\"legacy_bounty\",\"Initiator\":\"The Crown\",\"TargetNPCName\":\"Legacy Rogue\",\"IsPlayerBounty\":true,\"QuestTarget\":" +
+                (int)QuestTarget.DefeatNPC + ",\"DaysToComplete\":30,\"StartTime\":\"" + DateTime.Now.ToString("o") + "\"}]")!;
+            legacy[0].BountyGold.Should().Be(0);
+            QuestSystem.RestoreFromSaveData(legacy);
+            var winner = new Character { Name1 = "legacy_sheriff", Name2 = "Legacy Sheriff", Level = 30, Gold = 0 };
+            var rogue = new Character { Name1 = "legacy_rogue", Name2 = "Legacy Rogue", Level = 30, IsLoadedPlayer = true };
+            QuestSystem.CollectBountiesOnPlayer(winner, rogue).Should().ContainSingle();
+            winner.Gold.Should().Be(500);
+        });
+    }
 }

@@ -424,6 +424,10 @@ namespace UsurperRemake.Systems
             // quests record only the character's Name2 (Occupier / OfferedTo); the married display name is for
             // bounties only, since another character's Name2 may equal it (review)
             var questNames = CharacterAliases(name, player?.Name2);
+            // v1.1.11: an extra alias another player now uses (a living "Bob Smith") names their bounty, not this one's
+            if (backend != null && !string.IsNullOrWhiteSpace(username))
+                aliases = aliases.Where(a => questNames.Any(n => string.Equals(n, a, StringComparison.OrdinalIgnoreCase))
+                                             || !backend.IsNameUsedByAnotherPlayer(a, username!)).ToList();
 
             try
             {
@@ -468,27 +472,6 @@ namespace UsurperRemake.Systems
 
             try
             {
-                // v1.1.11: NPC grudges naming the character. In memory, and in the shared npcs record
-                // edited in place (a world-sim reload would otherwise bring them back).
-                // v1.1.11: the same in-place edit also ends NPC marriages to the name, so this write
-                // cannot carry the old marriage back for a world-sim reload
-                int forgotten = ForgetNpcGrudgesAgainst(name);
-                if (backend != null) forgotten += (await RemoveDeletedCharacterFromSharedNpcsAsync(backend, name)).Grudges;
-                if (forgotten > 0)
-                    DebugLogger.Instance.LogInfo("DELETE", $"Dropped {forgotten} NPC grudge memory(ies) of deleted '{name}'.");
-            }
-            catch (Exception mex) { DebugLogger.Instance.LogWarning("DELETE", $"NPC grudge clear failed for '{name}': {mex.Message}"); }
-
-            try
-            {
-                int widowed = ClearNpcSpousesOf(name);
-                if (widowed > 0)
-                    DebugLogger.Instance.LogInfo("DELETE", $"Cleared the marriage of {widowed} NPC(s) to deleted '{name}'.");
-            }
-            catch (Exception sex) { DebugLogger.Instance.LogWarning("DELETE", $"NPC spouse clear failed for '{name}': {sex.Message}"); }
-
-            try
-            {
                 // Children match parents by name, so a same-name recreation would inherit them. The
                 // ID-first Character overload is used when the caller has the character (permadeath).
                 var family = FamilySystem.Instance;
@@ -525,135 +508,5 @@ namespace UsurperRemake.Systems
                 if (!string.IsNullOrWhiteSpace(n) && !list.Any(x => string.Equals(x, n, StringComparison.OrdinalIgnoreCase))) list.Add(n!);
             return list;
         }
-
-        /// <summary>v1.1.11: drop every live NPC's grudges against the name (MemorySystem.IsGrudge).</summary>
-        public static int ForgetNpcGrudgesAgainst(string? name)
-        {
-            if (string.IsNullOrWhiteSpace(name)) return 0;
-            var npcs = NPCSpawnSystem.Instance?.ActiveNPCs;
-            if (npcs == null) return 0;
-            int removed = 0;
-            foreach (var npc in npcs.ToList())
-            {
-                if (npc == null) continue;
-                var brainMemory = npc.Brain?.Memory;
-                if (brainMemory != null) removed += brainMemory.ForgetGrudgesAgainst(name!);
-                if (npc.Memory != null && !ReferenceEquals(npc.Memory, brainMemory)) removed += npc.Memory.ForgetGrudgesAgainst(name!);
-            }
-            return removed;
-        }
-
-        /// <summary>
-        /// v1.1.11: remove the grudges against the name from the npcs JSON, and end the marriage of an NPC
-        /// whose spouse was the name (married, isMarried, spouseName, as ClearNpcSpousesOf does), touching
-        /// nothing else. An NPC married to another NPC is left alone: the registry says so, or another
-        /// record in the JSON names this NPC as its spouse. Returns the edited JSON, or null when nothing matched.
-        /// </summary>
-        public static string? RemoveDeletedCharacterFromNpcJson(string json, string name, out int grudges, out int spouses)
-        {
-            grudges = 0; spouses = 0;
-            if (string.IsNullOrWhiteSpace(json) || string.IsNullOrWhiteSpace(name)) return null;
-            if (System.Text.Json.Nodes.JsonNode.Parse(json) is not System.Text.Json.Nodes.JsonArray npcs) return null;
-            foreach (var npc in npcs)
-            {
-                if (npc?["memories"] is not System.Text.Json.Nodes.JsonArray memories) continue;
-                for (int i = memories.Count - 1; i >= 0; i--)
-                {
-                    var m = memories[i];
-                    if (m == null || !string.Equals(StringOf(m["involvedCharacter"]), name, StringComparison.OrdinalIgnoreCase)) continue;
-                    float impact = 0f;
-                    try { impact = m["emotionalImpact"]?.GetValue<float>() ?? 0f; } catch { }
-                    bool typed = Enum.TryParse<MemoryType>(StringOf(m["type"]), out var type);
-                    if ((typed && MemorySystem.IsGrudge(type, impact)) || (!typed && impact < 0f))
-                    {
-                        memories.RemoveAt(i);
-                        grudges++;
-                    }
-                }
-            }
-            foreach (var npc in npcs)
-            {
-                if (npc is not System.Text.Json.Nodes.JsonObject rec) continue;
-                if (!string.Equals(StringOf(rec["spouseName"]), name, StringComparison.OrdinalIgnoreCase)) continue;
-                string id = StringOf(rec["characterID"]);
-                // v1.1.11: a registered marriage to another NPC is kept; one to a player (the deleted one) is not
-                if (RegisteredToAnotherNpc(id, pid => npcs.Any(o => o != null && !ReferenceEquals(o, npc) && StringOf(o["characterID"]) == pid)
-                                                     || IsActiveNpcId(pid, null))) continue;
-                string own = StringOf(rec["name"]);
-                bool npcSpouse = !string.IsNullOrEmpty(own) && npcs.Any(o => o != null && !ReferenceEquals(o, npc)
-                    && string.Equals(StringOf(o["name"]), name, StringComparison.OrdinalIgnoreCase)
-                    && string.Equals(StringOf(o["spouseName"]), own, StringComparison.OrdinalIgnoreCase));
-                if (npcSpouse) continue;
-                rec["married"] = false;
-                rec["isMarried"] = false;
-                rec["spouseName"] = "";
-                if (!string.IsNullOrEmpty(id)) NPCMarriageRegistry.Instance.EndMarriage(id);   // v1.1.11: as a divorce does
-                spouses++;
-            }
-            return grudges + spouses > 0 ? npcs.ToJsonString() : null;
-        }
-
-        private static string StringOf(System.Text.Json.Nodes.JsonNode? node)
-        {
-            try { return node?.GetValue<string>() ?? ""; } catch { return ""; }
-        }
-
-        /// <summary>
-        /// v1.1.11: the shared npcs record, edited in place under its version (as RemoveSharedQuestsAsync
-        /// does for quests), never replaced by this process's list. Retries if another writer got in first.
-        /// </summary>
-        public static async Task<(int Grudges, int Spouses)> RemoveDeletedCharacterFromSharedNpcsAsync(SqlSaveBackend backend, string name)
-        {
-            for (int attempt = 0; attempt < 3; attempt++)
-            {
-                long version = backend.GetWorldStateVersion(OnlineStateManager.KEY_NPCS);
-                string? json = await backend.LoadWorldState(OnlineStateManager.KEY_NPCS);
-                if (string.IsNullOrEmpty(json)) return (0, 0);
-                string? edited = RemoveDeletedCharacterFromNpcJson(json, name, out int grudges, out int spouses);
-                if (edited == null) return (0, 0);
-                if (await backend.SaveWorldStateIfVersion(OnlineStateManager.KEY_NPCS, edited, version)) return (grudges, spouses);
-            }
-            DebugLogger.Instance.LogWarning("DELETE", $"Shared NPC grudges and marriages of '{name}' not cleared: the record kept changing.");
-            return (0, 0);
-        }
-
-        /// <summary>
-        /// v1.1.11: end the marriage of any NPC whose spouse was the deleted character, clearing the
-        /// same three flags a divorce clears on the NPC and its registry entry. An NPC the registry
-        /// marries to another NPC is left alone, in case that NPC shares the name.
-        /// </summary>
-        public static int ClearNpcSpousesOf(string? name)
-        {
-            if (string.IsNullOrWhiteSpace(name)) return 0;
-            var npcs = NPCSpawnSystem.Instance?.ActiveNPCs;
-            if (npcs == null) return 0;
-            int cleared = 0;
-            foreach (var npc in npcs.ToList())
-            {
-                if (npc == null || !string.Equals(npc.SpouseName, name, StringComparison.OrdinalIgnoreCase)) continue;
-                if (RegisteredToAnotherNpc(npc.ID, pid => IsActiveNpcId(pid, npc))) continue;   // v1.1.11: not a player-NPC marriage
-                npc.Married = false;
-                npc.IsMarried = false;
-                npc.SpouseName = "";
-                if (!string.IsNullOrEmpty(npc.ID)) NPCMarriageRegistry.Instance.EndMarriage(npc.ID);   // v1.1.11: as a divorce does
-                cleared++;
-            }
-            return cleared;
-        }
-
-        /// <summary>
-        /// v1.1.11: the registry marries this NPC to another NPC. The registry also holds player-NPC
-        /// marriages, so the partner must itself be an NPC; a player partner (the deleted character) or an
-        /// unknown id is the marriage to clear.
-        /// </summary>
-        internal static bool RegisteredToAnotherNpc(string? npcId, Func<string, bool> isNpcId)
-        {
-            if (string.IsNullOrEmpty(npcId)) return false;
-            var partner = NPCMarriageRegistry.Instance.GetSpouseId(npcId!);
-            return !string.IsNullOrEmpty(partner) && partner != npcId && isNpcId(partner!);
-        }
-
-        private static bool IsActiveNpcId(string id, NPC? self) =>
-            NPCSpawnSystem.Instance?.ActiveNPCs?.Any(n => n != null && !ReferenceEquals(n, self) && n.ID == id) == true;
     }
 }

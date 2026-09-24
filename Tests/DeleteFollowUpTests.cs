@@ -11,8 +11,8 @@ using Xunit;
 namespace UsurperReborn.Tests;
 
 /// <summary>
-/// v1.1.11: the delete purge also ends a deleted king's reign (through the abdication path), drops NPC
-/// grudges against the name, and removes mail and auction listings kept under the display name.
+/// v1.1.11: the delete purge also ends a deleted king's reign (through the abdication path) and removes
+/// mail and auction listings kept under the display name.
 /// </summary>
 [Collection("SharedGameSingletons")]
 public class DeleteFollowUpTests : IDisposable
@@ -107,69 +107,6 @@ public class DeleteFollowUpTests : IDisposable
             CastleLocation.AbdicateDeletedKing("Bob", "Bob", "x").Should().BeFalse("another player's reign is untouched");
             await Task.CompletedTask;
         });
-    }
-
-    private static MemoryEvent Mem(MemoryType type, string who, float impact = 0f) =>
-        new MemoryEvent { Type = type, InvolvedCharacter = who, Description = type.ToString(), EmotionalImpact = impact, Importance = 0.9f };
-
-    [Fact]
-    public void GrudgeTypes_AreTheNegativeOnes()
-    {
-        MemorySystem.IsGrudge(MemoryType.Attacked, 0f).Should().BeTrue();
-        MemorySystem.IsGrudge(MemoryType.Murdered, 0f).Should().BeTrue();
-        MemorySystem.IsGrudge(MemoryType.KilledMyParent, 0f).Should().BeTrue();
-        MemorySystem.IsGrudge(MemoryType.HeardGossip, -0.4f).Should().BeTrue("a negative memory of any type");
-        MemorySystem.IsGrudge(MemoryType.Helped, 0.4f).Should().BeFalse();
-        MemorySystem.IsGrudge(MemoryType.Traded, 0f).Should().BeFalse();
-    }
-
-    [Fact]
-    public async Task NpcGrudgesAgainstTheName_AreDropped_OthersKept()
-    {
-        var npc = new NPC { ID = "npc_grudge_test", Name1 = "Grudger", Name2 = "Grudger", Level = 10 };
-        npc.Memory = new MemorySystem();
-        npc.Memory.RecordEvent(Mem(MemoryType.Attacked, "Bob"));
-        npc.Memory.RecordEvent(Mem(MemoryType.Insulted, "bob"));
-        npc.Memory.RecordEvent(Mem(MemoryType.Helped, "Bob", 0.4f));
-        npc.Memory.RecordEvent(Mem(MemoryType.Attacked, "Alice"));
-        NPCSpawnSystem.Instance.ActiveNPCs.Add(npc);
-        try
-        {
-            npc.Memory.GetCharacterImpression("Bob").Should().BeLessThan(0f, "the seed must be a real grudge");
-            await PermadeathHelper.PurgeDeletedCharacterAsync(null, "bob_account", "Bob");
-
-            var left = npc.Memory.AllMemories;
-            left.Should().NotContain(m => m.InvolvedCharacter.Equals("Bob", StringComparison.OrdinalIgnoreCase) && m.Type != MemoryType.Helped);
-            left.Should().Contain(m => m.InvolvedCharacter == "Bob" && m.Type == MemoryType.Helped, "a kind memory is kept");
-            left.Should().Contain(m => m.InvolvedCharacter == "Alice", "another character's grudge is kept");
-            npc.Memory.GetCharacterImpression("Bob").Should().BeGreaterThan(0f, "the impression is rebuilt from what remains");
-            npc.Memory.GetCharacterImpression("Alice").Should().BeLessThan(0f);
-        }
-        finally { NPCSpawnSystem.Instance.ActiveNPCs.Remove(npc); }
-    }
-
-    [Fact]
-    public async Task TheSharedNpcRecord_LosesOnlyTheGrudges_AndKeepsEverythingElse()
-    {
-        string json = "[{\"name\":\"Grudger\",\"level\":10,\"unknownField\":{\"x\":1},\"memories\":[" +
-            "{\"type\":\"Attacked\",\"involvedCharacter\":\"Bob\",\"emotionalImpact\":-0.5}," +
-            "{\"type\":\"Helped\",\"involvedCharacter\":\"Bob\",\"emotionalImpact\":0.4}," +
-            "{\"type\":\"Betrayed\",\"involvedCharacter\":\"Alice\",\"emotionalImpact\":-0.9}]}," +
-            "{\"name\":\"Other\",\"memories\":[]}]";
-        await _db.SaveWorldState(OnlineStateManager.KEY_NPCS, json);
-        long version = _db.GetWorldStateVersion(OnlineStateManager.KEY_NPCS);
-
-        await PermadeathHelper.PurgeDeletedCharacterAsync(_db, "bob_account", "Bob");
-
-        var saved = System.Text.Json.Nodes.JsonNode.Parse((await _db.LoadWorldState(OnlineStateManager.KEY_NPCS))!)!.AsArray();
-        var memories = saved[0]!["memories"]!.AsArray();
-        memories.Select(m => (string)m!["type"]!).Should().BeEquivalentTo(new[] { "Helped", "Betrayed" });
-        ((int)saved[0]!["unknownField"]!["x"]!).Should().Be(1, "the record is edited in place, not rebuilt");
-        saved.Count.Should().Be(2);
-        _db.GetWorldStateVersion(OnlineStateManager.KEY_NPCS).Should().Be(version + 1, "a versioned write, so the world sim reloads it");
-
-        PermadeathHelper.RemoveDeletedCharacterFromNpcJson(json, "Carol", out int none, out int noSpouse).Should().BeNull();
-        none.Should().Be(0);
     }
 
     [Fact]
@@ -288,44 +225,6 @@ public class DeleteFollowUpTests : IDisposable
         Player("zanthor", "Zanthor");
         WithCompleteRoster(() => _db.PurgePlayerWorldState("zanthor", "Zanthor"));
         Count($"SELECT COUNT(*) FROM auction_listings WHERE id = {own};").Should().Be(0, "a name no NPC carries is purged");
-    }
-
-    [Fact]
-    public async Task TheSharedNpcRecord_LosesTheSpouse_AndTheGrudges_InOneVersionedWrite()
-    {
-        string json = "[" +
-            "{\"name\":\"Wife\",\"characterID\":\"npc_json_wife\",\"married\":true,\"isMarried\":true,\"spouseName\":\"Bob\",\"memories\":[" +
-                "{\"type\":\"Attacked\",\"involvedCharacter\":\"Bob\",\"emotionalImpact\":-0.5}]}," +
-            "{\"name\":\"Ann\",\"characterID\":\"npc_json_ann\",\"married\":true,\"isMarried\":true,\"spouseName\":\"Bob\",\"memories\":[]}," +
-            "{\"name\":\"Bob\",\"characterID\":\"npc_json_bob\",\"married\":true,\"isMarried\":true,\"spouseName\":\"Ann\",\"memories\":[]}]";
-        await _db.SaveWorldState(OnlineStateManager.KEY_NPCS, json);
-        long version = _db.GetWorldStateVersion(OnlineStateManager.KEY_NPCS);
-
-        var live = new NPC { ID = "npc_live_wife", Name1 = "Live Wife", Name2 = "Live Wife", Level = 10, SpouseName = "Bob", Married = true, IsMarried = true };
-        NPCSpawnSystem.Instance.ActiveNPCs.Add(live);
-        try
-        {
-            await PermadeathHelper.PurgeDeletedCharacterAsync(_db, "bob_account", "Bob");
-            live.SpouseName.Should().BeEmpty("the in-memory clear still runs");
-            live.IsMarried.Should().BeFalse();
-        }
-        finally { NPCSpawnSystem.Instance.ActiveNPCs.Remove(live); }
-
-        var saved = System.Text.Json.Nodes.JsonNode.Parse((await _db.LoadWorldState(OnlineStateManager.KEY_NPCS))!)!.AsArray();
-        var wife = saved[0]!;
-        ((string)wife["spouseName"]!).Should().BeEmpty();
-        ((bool)wife["married"]!).Should().BeFalse();
-        ((bool)wife["isMarried"]!).Should().BeFalse();
-        wife["memories"]!.AsArray().Should().BeEmpty("the grudge is gone too");
-        ((string)saved[1]!["spouseName"]!).Should().Be("Bob", "Ann is married to the NPC Bob, who names her back");
-        ((bool)saved[1]!["isMarried"]!).Should().BeTrue();
-        _db.GetWorldStateVersion(OnlineStateManager.KEY_NPCS).Should().Be(version + 1, "one versioned write");
-
-        // a record with only a marriage to the name (no grudge) is still edited
-        string onlySpouse = "[{\"name\":\"W\",\"married\":true,\"isMarried\":true,\"spouseName\":\"Carl\"}]";
-        PermadeathHelper.RemoveDeletedCharacterFromNpcJson(onlySpouse, "Carl", out int g, out int sp).Should().NotBeNull();
-        g.Should().Be(0);
-        sp.Should().Be(1);
     }
 
     [Fact]
@@ -552,46 +451,6 @@ public class DeleteFollowUpTests : IDisposable
     }
 
     [Fact]
-    public void APlayerNpcMarriage_IsCleared_InMemoryAndInTheJson_AndLeavesTheRegistry()
-    {
-        var reg = NPCMarriageRegistry.Instance;
-        var wife = new NPC { ID = "npc_r13_wife", Name1 = "Wife", Name2 = "Wife", Level = 10, SpouseName = "Bob", Married = true, IsMarried = true };
-        var ann = new NPC { ID = "npc_r13_ann", Name1 = "Ann", Name2 = "Ann", Level = 10, SpouseName = "Bob", Married = true, IsMarried = true };
-        var npcBob = new NPC { ID = "npc_r13_bob", Name1 = "Bob", Name2 = "Bob", Level = 10, SpouseName = "Ann", Married = true, IsMarried = true };
-        reg.RegisterMarriage("player_bob_id", wife.ID, "Bob", "Wife");   // the player Bob married Wife
-        reg.RegisterMarriage(ann.ID, npcBob.ID, "Ann", "Bob");           // Ann married the NPC Bob
-        NPCSpawnSystem.Instance.ActiveNPCs.AddRange(new[] { wife, ann, npcBob });
-        try
-        {
-            PermadeathHelper.ClearNpcSpousesOf("Bob").Should().Be(1);
-            wife.SpouseName.Should().BeEmpty("a player-NPC marriage is in the registry too, and is cleared");
-            wife.IsMarried.Should().BeFalse();
-            reg.IsMarriedToNPC(wife.ID).Should().BeFalse("the registry entry goes as in a divorce");
-            reg.IsMarriedToNPC("player_bob_id").Should().BeFalse();
-            ann.SpouseName.Should().Be("Bob", "Ann's partner is an NPC");
-            reg.GetSpouseId(ann.ID).Should().Be(npcBob.ID);
-
-            // the shared JSON, with the registry holding the player-NPC marriage again
-            reg.RegisterMarriage("player_bob_id", wife.ID, "Bob", "Wife");
-            string json = "[" +
-                "{\"name\":\"Wife\",\"characterID\":\"npc_r13_wife\",\"married\":true,\"isMarried\":true,\"spouseName\":\"Bob\"}," +
-                "{\"name\":\"Ann\",\"characterID\":\"npc_r13_ann\",\"married\":true,\"isMarried\":true,\"spouseName\":\"Bob\"}]";
-            var edited = PermadeathHelper.RemoveDeletedCharacterFromNpcJson(json, "Bob", out _, out int spouses);
-            spouses.Should().Be(1);
-            var arr = System.Text.Json.Nodes.JsonNode.Parse(edited!)!.AsArray();
-            ((string)arr[0]!["spouseName"]!).Should().BeEmpty();
-            ((string)arr[1]!["spouseName"]!).Should().Be("Bob", "the registry marries Ann to an NPC");
-            reg.IsMarriedToNPC(wife.ID).Should().BeFalse();
-        }
-        finally
-        {
-            foreach (var n in new[] { wife, ann, npcBob }) NPCSpawnSystem.Instance.ActiveNPCs.Remove(n);
-            reg.EndMarriage(wife.ID);
-            reg.EndMarriage(ann.ID);
-        }
-    }
-
-    [Fact]
     public async Task TheMarriedNameAlias_IsCheckedAgainstTheNpcGuard_AliasByAlias()
     {
         // Ursula took the surname Ironheart; an NPC is called Ursula Ironheart
@@ -611,6 +470,47 @@ public class DeleteFollowUpTests : IDisposable
         int start = src.IndexOf("public void PurgePlayerWorldState(", StringComparison.Ordinal);
         string body = src.Substring(start, src.IndexOf("private const string SellerNotOtherPlayer", start, StringComparison.Ordinal) - start);
         body.Split("\"auction_listings\"").Length.Should().Be(2, "one auction DELETE, fed by the alias list the guard checks");
+    }
+
+    [Fact]
+    public async Task AVacancy_CarriesTheMonarchHistory_AndBothLoadersImportIt()
+    {
+        bool loadedBefore = CastleLocation.RoyalCourtLoadedFromShared;
+        var osm = (OnlineStateManager)Activator.CreateInstance(typeof(OnlineStateManager),
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance, null, new object[] { _db, "r15" }, null)!;
+        try
+        {
+            await WithKing(null!, async () =>
+            {
+                // this process ended Bob's reign with no successor; the history records it
+                CastleLocation.SetMonarchHistory(new List<MonarchRecord>
+                {
+                    new MonarchRecord { Name = "Old Queen", Title = "Queen", DaysReigned = 40, EndReason = "Abdicated" },
+                    new MonarchRecord { Name = "Bob", Title = "King", DaysReigned = 12, EndReason = "left the throne and the realm" }
+                });
+                (await osm.SaveRoyalCourtIfVersionAsync(_db.GetWorldStateVersion("royal_court"), throneVacated: true)).Should().BeTrue();
+                var stored = (await osm.ReadRoyalCourtFromWorldState())!;
+                stored.ThroneVacant.Should().BeTrue();
+                stored.MonarchHistory.Select(m => m.Name).Should().Equal("Old Queen", "Bob");
+
+                // the login loader
+                CastleLocation.SetMonarchHistory(new List<MonarchRecord>());
+                await osm.LoadRoyalCourtFromWorldState();
+                CastleLocation.GetMonarchHistory().Select(m => m.Name).Should().Equal("Old Queen", "Bob");
+                CastleLocation.GetMonarchHistory()[1].DaysReigned.Should().Be(12);
+
+                // the world sim's loader, which then fills the throne
+                CastleLocation.SetMonarchHistory(new List<MonarchRecord>());
+                new WorldSimService(_db).LoadRoyalCourtFromWorldState();
+                CastleLocation.GetMonarchHistory().Select(m => m.Name).Should().StartWith(new[] { "Old Queen", "Bob" });
+
+                // an older vacancy with no history leaves this process's history alone
+                CastleLocation.SetMonarchHistory(new List<MonarchRecord> { new MonarchRecord { Name = "Kept" } });
+                CastleLocation.ApplySharedThroneVacancy(new RoyalCourtSaveData { ThroneVacant = true }).Should().BeTrue();
+                CastleLocation.GetMonarchHistory().Select(m => m.Name).Should().Equal("Kept");
+            });
+        }
+        finally { CastleLocation.RoyalCourtLoadedFromShared = loadedBefore; }
     }
 
     private static string Source(string folder, string file)
