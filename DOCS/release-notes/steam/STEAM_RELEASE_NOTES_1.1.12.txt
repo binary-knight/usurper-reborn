@@ -1,0 +1,10 @@
+[h1]Usurper Reborn 1.1.12[/h1]
+
+[list]
+[*]Awakening grows in seven stages, each shown when it happens, with a piece of the Ocean's story and a lasting gift: Wisdom, mana, XP, HP, damage and defence. Many more of your moments, dreams and discoveries now count, and [P] Progress opens the Ocean Journal.
+[*]Story chapter 1 is now "The Drowning".
+[*]Team Corner: pick teams and members from a list instead of typing names. Rankings load at once and show real numbers.
+[*]Team fixes: passwords, dissolving and creating teams, wars left running, vault deposits and upgrades, gear moved between teammates, and a five-member limit.
+[*]NPC teammates no longer attack their sleeping player.
+[*]The world event bonus line, cursed items, the one rest per floor, lives, the stamina bar and found gear comparisons are clearer.
+[/list]
