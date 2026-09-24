@@ -110,6 +110,19 @@ public class DeleteFollowUpTests : IDisposable
     }
 
     [Fact]
+    public async Task DeletingMarriedBob_LeavesALivingBobSmith_OnTheThrone()
+    {
+        // v1.1.11: the deleted Bob's married name is also a living player's name; that reign is theirs
+        Player("bob_account", "Bob Smith");
+        Exec("INSERT INTO players (username, display_name, player_data) VALUES ('bsmith', 'Bob Smith Jr', '{\"player\":{\"name2\":\"Bob Smith\"}}');");
+        await WithKing(King.CreateNewKing("Bob Smith", CharacterAI.Human, CharacterSex.Male), async () =>
+        {
+            await PermadeathHelper.PurgeDeletedCharacterAsync(_db, "bob_account", "Bob");
+            (CastleLocation.GetCurrentKing()?.Name).Should().Be("Bob Smith", "the living Bob Smith still reigns");
+        });
+    }
+
+    [Fact]
     public async Task MailAndAuctions_UnderTheDisplayName_ArePurged_OthersKept()
     {
         Player("bob_account", "Bob Smith");

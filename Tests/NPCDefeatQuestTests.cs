@@ -355,6 +355,43 @@ public class NPCDefeatQuestTests
         finally { bounty.Deleted = true; }
     }
 
+    [Fact]
+    public async Task BeatingMarriedBob_DoesNotCollectTheBountyOnALivingBobSmith()
+    {
+        // v1.1.11: "Bob Smith" is also another player's Name2, so the bounty names them, not the married Bob
+        await WithSqlBackend(async (db, path) =>
+        {
+            void Row(string user, string display, string name2)
+            {
+                using var conn = new SqliteConnection($"Data Source={path}");
+                conn.Open();
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = "INSERT INTO players (username, display_name, player_data) VALUES (@u, @d, @j);";
+                cmd.Parameters.AddWithValue("@u", user);
+                cmd.Parameters.AddWithValue("@d", display);
+                cmd.Parameters.AddWithValue("@j", "{\"player\":{\"name2\":\"" + name2 + "\"}}");
+                cmd.ExecuteNonQuery();
+            }
+            Row("bob_ns", "Bob NS Smith", "Bob NS");   // the married Bob's own row
+            var bob = new Character { Name1 = "bob_ns", Name2 = "Bob NS", FamilySurname = "Smith", Level = 20, IsLoadedPlayer = true };
+            var winner = new Character { Name1 = "sheriff_ns", Name2 = "Sheriff NS", Level = 30, Gold = 0 };
+            var bounty = BountyOnPlayer("Bob NS Smith", 3000);
+            try
+            {
+                Row("bsmith_ns", "Robert NS", "Bob NS Smith");
+                QuestSystem.CollectBountiesOnPlayer(winner, bob).Should().BeEmpty("the bounty names the living Bob NS Smith");
+                bounty.Deleted.Should().BeFalse();
+                winner.Gold.Should().Be(0);
+
+                db.IsNameUsedByAnotherCharacter("Bob NS Smith", "Bob NS").Should().BeTrue();
+                db.IsNameUsedByAnotherCharacter("Bob NS", "Bob NS").Should().BeFalse("the married Bob's own row is not another character");
+                QuestSystem.CollectBountiesOnPlayer(winner, new Character { Name1 = "bob_ns", Name2 = "Bob NS Smith", Level = 20, IsLoadedPlayer = true })
+                    .Should().ContainSingle("beating the living Bob NS Smith, whose Name2 it is, collects it");
+            }
+            finally { bounty.Deleted = true; }
+        });
+    }
+
     // ─── v1.1.11: review round 14 ───
 
     [Fact]

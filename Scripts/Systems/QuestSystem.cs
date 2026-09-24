@@ -1563,6 +1563,10 @@ public partial class QuestSystem
         var names = new[] { loser.Name2, loser.DisplayName }.Where(n => !string.IsNullOrWhiteSpace(n)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         if (winner == null || names.Count == 0) return new List<Quest>();
         if (!loser.IsLoadedPlayer) return new List<Quest>();   // v1.1.11: a hired guard or echo named like a player
+        // v1.1.11: a married display name another player also uses ("Bob Smith") names their bounty, not the loser's
+        if (SaveSystem.Instance?.Backend is SqlSaveBackend sqlNames)
+            names = names.Where(n => n.Equals(loser.Name2, StringComparison.OrdinalIgnoreCase) || !sqlNames.IsNameUsedByAnotherCharacter(n, loser.Name2)).ToList();
+        if (names.Count == 0) return new List<Quest>();
         if (names.Any(n => n.Equals(winner.Name2, StringComparison.OrdinalIgnoreCase) || n.Equals(winner.DisplayName, StringComparison.OrdinalIgnoreCase)))
             return new List<Quest>();
 

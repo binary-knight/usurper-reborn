@@ -465,7 +465,9 @@ namespace UsurperRemake.Systems
             try
             {
                 // v1.1.11: a deleted king abdicates through the normal path (history, NPC succession, persist)
-                if (await global::CastleLocation.AbdicateDeletedKingAsync(name, shown, "left the throne and the realm"))
+                // v1.1.11: a married name another living player now uses names their reign, not this one's
+                string? kingAlias = shown != null && aliases.Contains(shown, StringComparer.OrdinalIgnoreCase) ? shown : null;
+                if (await global::CastleLocation.AbdicateDeletedKingAsync(name, kingAlias, "left the throne and the realm"))
                     DebugLogger.Instance.LogInfo("DELETE", $"Deleted '{name}' held the throne; the reign has ended.");
             }
             catch (Exception tex) { DebugLogger.Instance.LogWarning("DELETE", $"Throne handover failed for '{name}': {tex.Message}"); }

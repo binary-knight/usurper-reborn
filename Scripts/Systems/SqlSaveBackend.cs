@@ -6000,6 +6000,31 @@ namespace UsurperRemake.Systems
         }
     }
 
+    /// <summary>
+    /// v1.1.11: a player row of another character (its save Name2 is not ownName2) uses the name, as display
+    /// name or Name2. A failed read counts as used, so a bounty under a shared name is not paid.
+    /// </summary>
+    public bool IsNameUsedByAnotherCharacter(string name, string ownName2)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return false;
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT EXISTS (SELECT 1 FROM players p, " +
+                "(SELECT LOWER(CASE WHEN json_valid(player_data) THEN json_extract(player_data, '$.player.name2') END) AS n2, rowid AS rid FROM players) j " +
+                "WHERE j.rid = p.rowid AND COALESCE(j.n2, '') != LOWER(@own) AND (LOWER(p.display_name) = LOWER(@n) OR j.n2 = LOWER(@n)));";
+            cmd.Parameters.AddWithValue("@n", name);
+            cmd.Parameters.AddWithValue("@own", ownName2 ?? "");
+            return Convert.ToInt64(cmd.ExecuteScalar()) != 0;
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogWarning("SQL", $"IsNameUsedByAnotherCharacter('{name}') failed: {ex.Message}");
+            return true;
+        }
+    }
+
     /// <summary>v1.1.11: the players.display_name of one key (the married surname form), or null.</summary>
     public string? GetStoredDisplayName(string username)
     {
