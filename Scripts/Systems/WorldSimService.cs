@@ -77,6 +77,7 @@ namespace UsurperRemake.Systems
 
             // Phase 1: Initialize minimal systems
             InitializeSystems();
+            WorldEditLog.NoteLockOwnerId(_heartbeatOwnerId);   // v1.1.13: the lock this process's world sim holds
 
             // Phase 2: Load NPC state from database
             await LoadWorldState();
@@ -91,6 +92,9 @@ namespace UsurperRemake.Systems
             LoadWorldEventsState();
             LoadSettlementState();
             LoadUsedNamesState();
+
+            // v1.1.13: the owner re-applies the world edits to what it just loaded (roster, court, registry)
+            ReapplyWorldEdits();
 
             // Load last world daily reset time from world_state
             LoadLastWorldDailyReset();
@@ -469,6 +473,9 @@ namespace UsurperRemake.Systems
                     lastRoyalCourtVersion = currentRoyalCourtVersion;
                 }
 
+                // v1.1.13: before every save and after any reload above, the owner re-applies the world edits
+                var editsInPass = ReapplyWorldEdits();
+
                 // Save our NPC state (either fresh from reload or accumulated simulation changes)
                 // Dirty-check: hash the serialized JSON and skip the DB write if nothing changed.
                 // The NPC blob is ~18 MB, so avoiding unnecessary writes saves significant I/O.
@@ -511,6 +518,8 @@ namespace UsurperRemake.Systems
                         // merge that write was owed.
                         lastNpcVersion = lastNpcVersion + 1;
                         DebugLogger.Instance.LogInfo("WORLDSIM", $"State saved (v{lastNpcVersion}): {aliveCount} alive NPCs at {DateTime.UtcNow:HH:mm:ss}");
+                        // v1.1.13: the roster edits are applied once this versioned write holds them
+                        MarkEditsApplied(editsInPass, WorldEditLog.ForgetCharacter);
                     }
                     else
                     {
@@ -572,11 +581,50 @@ namespace UsurperRemake.Systems
 
                 // v1.1.11: then teams whose leader has left them
                 PassLeadershipOfDepartedLeaders();
+
+                // v1.1.13: applied world edits go after 7 days; unapplied ones stay and are reported
+                if (WorldEditLog.IsOwnerProcess(sqlBackend))
+                {
+                    sqlBackend.PruneAppliedWorldEdits(WorldEditLog.PruneAppliedDays);
+                    WorldEditLog.ReportUnapplied(sqlBackend);
+                }
             }
             catch (Exception ex)
             {
                 DebugLogger.Instance.LogError("WORLDSIM", $"Failed to save world state: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// v1.1.13: in the owner process, apply every world edit still owed (WorldEditLog) to the live world.
+        /// Returns the edits not yet marked applied; while there are any, the next roster write is forced
+        /// (the dirty-check would skip it when the edit changed nothing), so the mark follows a real write.
+        /// </summary>
+        internal List<WorldEdit> ReapplyWorldEdits()
+        {
+            try
+            {
+                if (!WorldEditLog.IsOwnerProcess(sqlBackend)) return new List<WorldEdit>();
+                var edits = sqlBackend.GetWorldEditsToApply(WorldEditLog.ReapplyHours);
+                if (edits.Count == 0) return edits;
+                int changed = WorldEditLog.Apply(sqlBackend, edits);
+                if (changed > 0)
+                    DebugLogger.Instance.LogInfo("WORLD_EDITS", $"Re-applied {edits.Count} world edit(s): {changed} change(s) to the live world.");
+                var owed = edits.Where(e => e.AppliedAt == null).ToList();
+                if (owed.Count > 0 || changed > 0) _lastNpcJsonHash = null;
+                return owed;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("WORLD_EDITS", $"Re-applying world edits failed: {ex.Message}");
+                return new List<WorldEdit>();
+            }
+        }
+
+        private void MarkEditsApplied(List<WorldEdit> edits, string kind)
+        {
+            var ids = edits.Where(e => e.Kind == kind).Select(e => e.Id).ToList();
+            if (ids.Count > 0) sqlBackend.MarkWorldEditsApplied(ids, WorldEditLog.ProcessLabel);
         }
 
         /// <summary>

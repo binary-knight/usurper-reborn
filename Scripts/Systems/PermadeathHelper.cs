@@ -492,7 +492,11 @@ namespace UsurperRemake.Systems
                 // they are cleared only while no other player row uses the name; a deferred purge runs after
                 // the account's rows are gone, so any row with the name is a later character.
                 bool untimedToo = backend == null || !questNames.Any(a => backend.IsNameUsedByAnotherPlayer(a, deferred ? "" : (username ?? "")));
-                int forgotten = await ForgetCharacterInNpcWorldAsync(backend, questNames, DateTime.Now, untimedToo);
+                var deletedAt = DateTime.Now;
+                // v1.1.13: logged first, so the owner re-applies it over any stale or old-binary write
+                long editId = backend != null ? WorldEditLog.AppendForgetCharacter(backend, questNames, username, deletedAt, untimedToo) : 0;
+                int forgotten = await ForgetCharacterInNpcWorldAsync(backend, questNames, deletedAt, untimedToo,
+                    onWritten: () => { if (editId > 0 && WorldEditLog.IsOwnerProcess(backend)) backend!.MarkWorldEditsApplied(new[] { editId }, WorldEditLog.ProcessLabel); });
                 if (forgotten > 0)
                     DebugLogger.Instance.LogInfo("DELETE", $"Cleared {forgotten} NPC grudge(s), enemy entries and marriage(s) of deleted '{name}'.");
             }
@@ -617,7 +621,7 @@ namespace UsurperRemake.Systems
         /// time: a reload keeps each memory's recorded time (v1.1.13).
         /// </summary>
         internal static async Task<int> ForgetCharacterInNpcWorldAsync(SqlSaveBackend? backend, IReadOnlyList<string> names,
-            DateTime deletedAt, bool untimedToo, Func<List<NPCData>, Task>? reloadRoster = null, Func<Task>? beforeWrite = null)
+            DateTime deletedAt, bool untimedToo, Func<List<NPCData>, Task>? reloadRoster = null, Func<Task>? beforeWrite = null, Action? onWritten = null)
         {
             var endedMarriages = new HashSet<string>();
             int CleanUp()
@@ -627,7 +631,7 @@ namespace UsurperRemake.Systems
                 return n;
             }
             if (backend == null) return CleanUp();
-            return await OnlineStateManager.PersistNpcWorldNow(backend, CleanUp, endedMarriages, reloadRoster, beforeWrite);
+            return await OnlineStateManager.PersistNpcWorldNow(backend, CleanUp, endedMarriages, reloadRoster, beforeWrite, onWritten);
         }
     }
 }

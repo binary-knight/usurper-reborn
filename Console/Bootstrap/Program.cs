@@ -696,12 +696,19 @@ namespace UsurperConsole
                 }
             };
 
+            // v1.1.13: the standalone world sim takes the lock, so door sessions start no second world sim and
+            // the world edits have one owner. If another process holds it, this one takes it at its first beat.
+            string ownerId = $"worldsim_{Environment.ProcessId}_{DateTime.UtcNow.Ticks}";
+            if (!sqlBackend.TryAcquireWorldSimLock(ownerId))
+                DebugLogger.Instance.LogWarning("WORLDSIM", "The world sim lock is held by another process; this world sim takes it over.");
+
             // Create and run the world sim service
             var service = new WorldSimService(
                 sqlBackend,
                 simIntervalSeconds: DoorMode.SimIntervalSeconds,
                 npcXpMultiplier: DoorMode.NpcXpMultiplier,
-                saveIntervalMinutes: DoorMode.SaveIntervalMinutes
+                saveIntervalMinutes: DoorMode.SaveIntervalMinutes,
+                heartbeatOwnerId: ownerId
             );
 
             await service.RunAsync(cts.Token);

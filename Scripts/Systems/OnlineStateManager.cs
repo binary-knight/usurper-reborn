@@ -370,10 +370,11 @@ namespace UsurperRemake.Systems
         /// and the write retried (as RemoveSharedQuestsAsync does). The marriages record then loses every
         /// marriage of endedMarriages (the NPC ids the clean-up divorced) the same way. The record is edited,
         /// not replaced by this process's registry, since only the world sim's process loads the registry.
-        /// Returns what the first clean-up changed. beforeWrite is a test hook.
+        /// Returns what the first clean-up changed. beforeWrite is a test hook; onWritten runs once the stored
+        /// roster holds the clean-up (v1.1.13: the owner marks its world edit applied there).
         /// </summary>
         public static async Task<int> PersistNpcWorldNow(SqlSaveBackend sql, Func<int> cleanUp, ISet<string> endedMarriages,
-            Func<List<NPCData>, Task>? reloadRoster = null, Func<Task>? beforeWrite = null)
+            Func<List<NPCData>, Task>? reloadRoster = null, Func<Task>? beforeWrite = null, Action? onWritten = null)
         {
             long version = sql.GetWorldStateVersion(KEY_NPCS);   // read before the roster is serialized, so any later write is a conflict
             int changed = cleanUp();
@@ -399,6 +400,7 @@ namespace UsurperRemake.Systems
                     DebugLogger.Instance.LogWarning("ONLINE", "PersistNpcWorldNow gave up: the npcs record kept changing.");
                 if (endedMarriages.Count > 0)
                     await RemoveStoredMarriagesAsync(sql, endedMarriages);
+                if (saved) onWritten?.Invoke();
             }
             catch (Exception ex)
             {

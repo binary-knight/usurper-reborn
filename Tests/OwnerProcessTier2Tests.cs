@@ -40,6 +40,9 @@ public class OwnerProcessTier2Tests : IDisposable
         var roster = NPCSpawnSystem.Instance.ActiveNPCs;
         roster.Clear();
         roster.AddRange(_rosterBefore);
+        WorldEditLog.NoteLockOwnerId(null);
+        WorldEditLog.OwnerOverride = null;
+        foreach (var id in _marriedIds) NPCMarriageRegistry.Instance.EndMarriage(id);
         SqliteConnection.ClearAllPools();
         try { File.Delete(_path); } catch { }
     }
@@ -333,6 +336,173 @@ public class OwnerProcessTier2Tests : IDisposable
         Exec("DELETE FROM players;");
         Exec($"INSERT INTO players (username, display_name, player_data, created_at, last_login) VALUES ('bob_account', 'Bob', {save}, datetime('now', '-9 days'), datetime('now', '-9 days'));");
         _db.LaterCharacterUsesName(bob, at, "bob_account").Should().BeTrue("the deleted character's own account with a save again");
+    }
+
+    // ─── The owner loop ───
+
+    private readonly List<string> _marriedIds = new();
+
+    private NPC MarriedToBob(string id, string name)
+    {
+        var wife = Npc(id, name);
+        wife.SpouseName = "Bob"; wife.Married = true; wife.IsMarried = true;
+        NPCMarriageRegistry.Instance.RegisterMarriage("player_bob_id", wife.ID, "Bob", name);
+        _marriedIds.Add(wife.ID);
+        return wife;
+    }
+
+    private string RosterJson() => JsonSerializer.Serialize(OnlineStateManager.SerializeCurrentNPCs(), Json);
+
+    private async Task<List<NPCData>> StoredRoster() =>
+        JsonSerializer.Deserialize<List<NPCData>>((await _db.LoadWorldState(OnlineStateManager.KEY_NPCS))!, Json)!;
+
+    private static readonly System.Reflection.BindingFlags Priv = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+
+    /// <summary>The owner's world sim, holding the lock, with its baselines at the given versions.</summary>
+    private WorldSimService OwnerSim(string ownerId, long npcVersion)
+    {
+        _db.TryAcquireWorldSimLock(ownerId).Should().BeTrue();
+        WorldEditLog.NoteLockOwnerId(ownerId);
+        var sim = new WorldSimService(_db, heartbeatOwnerId: ownerId);
+        typeof(WorldSimService).GetField("lastNpcVersion", Priv)!.SetValue(sim, npcVersion);
+        typeof(WorldSimService).GetField("lastRoyalCourtVersion", Priv)!.SetValue(sim, _db.GetWorldStateVersion("royal_court"));
+        return sim;
+    }
+
+    private static Task SimSave(WorldSimService sim) => (Task)typeof(WorldSimService).GetMethod("SaveWorldState", Priv)!.Invoke(sim, null)!;
+
+    private (string? AppliedAt, string? AppliedBy) EditMark(string kind) =>
+        (Scalar($"SELECT applied_at FROM world_edits WHERE kind = '{kind}';"), Scalar($"SELECT applied_by FROM world_edits WHERE kind = '{kind}';"));
+
+    [Fact]
+    public async Task AnOldBinarysWrite_LandsAnyway_AndTheOwnersSave_ReappliesTheEdit_ThenMarksIt()
+    {
+        var npc = Npc("npc_o_1", "Grudger");
+        Remember(npc, MemoryType.Attacked, "Bob", DateTime.Now.AddMinutes(-5));
+        npc.Enemies.Add("Bob");
+        MarriedToBob("npc_o_w", "Wife");
+        string stale = RosterJson();
+        await _db.SaveWorldState(OnlineStateManager.KEY_NPCS, stale);
+
+        // a door process (not the owner) deletes Bob: the edit, the local clean-up, the versioned write
+        await PermadeathHelper.PurgeDeletedCharacterAsync(_db, "bob_account", "Bob");
+        Scalar("SELECT COUNT(*) FROM world_edits WHERE kind = 'forget_character';").Should().Be("1");
+        EditMark("forget_character").AppliedAt.Should().BeNull("only the owner marks an edit, after its own write");
+        (await StoredRoster()).Single(d => d.Name == "Grudger").Memories.Should().NotContain(m => m.InvolvedCharacter == "Bob");
+        long clean = _db.GetWorldStateVersion(OnlineStateManager.KEY_NPCS);
+
+        // an old binary's unconditional write of its stale roster lands anyway
+        await _db.SaveWorldState(OnlineStateManager.KEY_NPCS, stale);
+        (await StoredRoster()).Single(d => d.Name == "Wife").SpouseName.Should().Be("Bob");
+
+        // the owner's next save reloads on the version change, re-applies, writes, then marks
+        var sim = OwnerSim("owner_t", clean);
+        await SimSave(sim);
+
+        var stored = await StoredRoster();
+        stored.Single(d => d.Name == "Grudger").Memories.Should().NotContain(m => m.InvolvedCharacter == "Bob", "the grudge is gone again");
+        stored.Single(d => d.Name == "Grudger").Enemies.Should().NotContain("Bob");
+        stored.Single(d => d.Name == "Wife").SpouseName.Should().BeEmpty("and so is the marriage");
+        NPCMarriageRegistry.Instance.GetSpouseId("npc_o_w").Should().BeNull();
+        var marriages = await _db.LoadWorldState(OnlineStateManager.KEY_MARRIAGES);
+        marriages.Should().NotContain("npc_o_w", "the owner's registry, written after the re-apply, has no such marriage");
+        var mark = EditMark("forget_character");
+        mark.AppliedAt.Should().NotBeNull();
+        mark.AppliedBy.Should().Be("owner_t");
+    }
+
+    [Fact]
+    public async Task AProcessNotHoldingTheLock_DoesNotReapply_NorMark()
+    {
+        var npc = Npc("npc_o_2", "Grudger");
+        Remember(npc, MemoryType.Attacked, "Bob", DateTime.Now.AddMinutes(-5));
+        string stale = RosterJson();
+        await _db.SaveWorldState(OnlineStateManager.KEY_NPCS, stale);
+        await PermadeathHelper.PurgeDeletedCharacterAsync(_db, "bob_account", "Bob");
+        long clean = _db.GetWorldStateVersion(OnlineStateManager.KEY_NPCS);
+        await _db.SaveWorldState(OnlineStateManager.KEY_NPCS, stale);
+
+        var sim = OwnerSim("owner_t", clean);
+        _db.UpdateWorldSimHeartbeat("someone_else");   // the lock has moved on
+        sim.ReapplyWorldEdits().Should().BeEmpty();
+        await SimSave(sim);
+
+        EditMark("forget_character").AppliedAt.Should().BeNull();
+        (await StoredRoster()).Single(d => d.Name == "Grudger").Memories.Should().Contain(m => m.InvolvedCharacter == "Bob",
+            "a world sim that lost the lock is not the owner");
+
+        // applying an edit locally never marks it either
+        WorldEditLog.Apply(_db, _db.GetWorldEditsToApply());
+        EditMark("forget_character").AppliedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ANewSameNameCharacter_KeepsItsGrudgesAndSpouse_ThroughAReapply()
+    {
+        var npc = Npc("npc_o_3", "Grudger");
+        Remember(npc, MemoryType.Attacked, "Bob", DateTime.Now.AddMinutes(-5));
+        npc.Enemies.Add("Bob");
+        await PermadeathHelper.PurgeDeletedCharacterAsync(_db, "bob_account", "Bob");
+        npc.Enemies.Should().NotContain("Bob");
+        WorldEditLog.OwnerOverride = true;
+
+        // control: a stale copy of the old entries is cleared by the re-apply
+        npc.Enemies.Add("Bob");
+        WorldEditLog.Apply(_db, _db.GetWorldEditsToApply()).Should().BeGreaterThan(0);
+        npc.Enemies.Should().NotContain("Bob");
+        WorldEditLog.Apply(_db, _db.GetWorldEditsToApply()).Should().Be(0, "a second pass changes nothing");
+
+        // a new Bob, on a new account made after the delete, earns a grudge, an enemy and a wife
+        Exec("INSERT INTO players (username, display_name, player_data, created_at) VALUES ('bob_two', 'Bob', " +
+             "'{\"player\":{\"name2\":\"Bob\"}}', datetime('now', '+1 minute'));");
+        await Task.Delay(20);
+        Remember(npc, MemoryType.Insulted, "Bob", DateTime.Now);
+        npc.Enemies.Add("Bob");
+        var wife = MarriedToBob("npc_o_w3", "Wife");
+
+        WorldEditLog.Apply(_db, _db.GetWorldEditsToApply()).Should().Be(0);
+
+        npc.Brain!.Memory.AllMemories.Should().Contain(m => m.InvolvedCharacter == "Bob" && m.Type == MemoryType.Insulted,
+            "recorded after the delete, so past the cut-off");
+        npc.Enemies.Should().Contain("Bob", "a later character uses the name");
+        wife.SpouseName.Should().Be("Bob");
+        NPCMarriageRegistry.Instance.GetSpouseId(wife.ID).Should().Be("player_bob_id");
+    }
+
+    [Fact]
+    public void AnEditNoOwnerApplied_IsReported_AndNotPruned()
+    {
+        long id = WorldEditLog.AppendForgetCharacter(_db, new[] { "Bob" }, "bob_account", DateTime.Now, true);
+        Exec($"UPDATE world_edits SET created_at = datetime('now', '-10 days') WHERE id = {id};");
+        WorldEditLog.ReportUnapplied(_db).Should().Be(1);
+        _db.PruneAppliedWorldEdits(WorldEditLog.PruneAppliedDays).Should().Be(0);
+        _db.GetWorldEditsToApply().Select(e => e.Id).Should().Contain(id, "the owner still owes it");
+    }
+
+    [Fact]
+    public void TheOwner_TakesTheLock_AndReappliesAtLoadAndBeforeEverySave()
+    {
+        var mud = Source("Server", "MudServer.cs");
+        mud.Should().Contain("sqlBackend.TryAcquireWorldSimLock(worldSimOwnerId)").And.Contain("heartbeatOwnerId: worldSimOwnerId");
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "Console"))) dir = dir.Parent;
+        var program = File.ReadAllText(Path.Combine(dir!.FullName, "Console", "Bootstrap", "Program.cs"));
+        int ws = program.IndexOf("private static async Task RunWorldSimMode()", StringComparison.Ordinal);
+        program.Substring(ws, 2500).Should().Contain("sqlBackend.TryAcquireWorldSimLock(ownerId)").And.Contain("heartbeatOwnerId: ownerId");
+
+        var sim = Source("Systems", "WorldSimService.cs");
+        int run = sim.IndexOf("public async Task RunAsync", StringComparison.Ordinal);
+        int loaded = sim.IndexOf("LoadUsedNamesState();", run, StringComparison.Ordinal);
+        sim.IndexOf("ReapplyWorldEdits();", run, StringComparison.Ordinal).Should().BeGreaterThan(loaded, "after every record is loaded")
+            .And.BeLessThan(sim.IndexOf("while (!cancellationToken.IsCancellationRequested)", run, StringComparison.Ordinal));
+        int save = sim.IndexOf("private async Task SaveWorldState()", StringComparison.Ordinal);
+        int reload = sim.IndexOf("await LoadWorldState();", save, StringComparison.Ordinal);
+        int courtReload = sim.IndexOf("Royal court modified by player", save, StringComparison.Ordinal);
+        int reapply = sim.IndexOf("var editsInPass = ReapplyWorldEdits();", save, StringComparison.Ordinal);
+        reapply.Should().BeGreaterThan(reload).And.BeGreaterThan(courtReload, "after every version-triggered reload")
+            .And.BeLessThan(sim.IndexOf("OnlineStateManager.KEY_NPCS, json, lastNpcVersion", save, StringComparison.Ordinal), "before the write");
+        int mark = sim.IndexOf("MarkEditsApplied(editsInPass, WorldEditLog.ForgetCharacter);", save, StringComparison.Ordinal);
+        mark.Should().BeGreaterThan(sim.IndexOf("lastNpcVersion = lastNpcVersion + 1;", save, StringComparison.Ordinal), "marked only after the versioned write");
     }
 
     private static string WebSource()

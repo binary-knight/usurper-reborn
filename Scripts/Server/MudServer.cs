@@ -239,11 +239,18 @@ public class MudServer
 
         // Start the world simulator as an in-process background task
         // This replaces the separate usurper-world.service process
+        // v1.1.13: the MUD takes the world sim lock, so door processes on this database start no world sim of
+        // their own and know the owner. The MUD owns the shared records either way; its heartbeat takes a
+        // lock another process still holds.
+        string worldSimOwnerId = $"mud_{Environment.ProcessId}_{DateTime.UtcNow.Ticks}";
+        if (!sqlBackend.TryAcquireWorldSimLock(worldSimOwnerId))
+            Console.Error.WriteLine("[MUD] The world sim lock was held by another process; the MUD takes it over");
         var worldSimService = new WorldSimService(
             sqlBackend,
             simIntervalSeconds: UsurperRemake.BBS.DoorMode.SimIntervalSeconds,
             npcXpMultiplier: UsurperRemake.BBS.DoorMode.NpcXpMultiplier,
-            saveIntervalMinutes: UsurperRemake.BBS.DoorMode.SaveIntervalMinutes
+            saveIntervalMinutes: UsurperRemake.BBS.DoorMode.SaveIntervalMinutes,
+            heartbeatOwnerId: worldSimOwnerId
         );
         _worldSimService = worldSimService;
         var worldSimTask = Task.Run(() => worldSimService.RunAsync(_cts.Token));
