@@ -19,7 +19,7 @@
 - **The status screen always shows the team's HQ bonuses.**
 - **Team rankings count the real members.** A team that no player, NPC
   or online player belongs to is removed, with its upgrades and vault, so
-  a later team of the same name starts fresh.
+  a later team of the same name does not inherit them.
 - **Leadership passes on when a leader leaves.** When a team or guild
   leader quits, is deleted or dies for good, the highest-level remaining
   player member leads. Teams already led by a former member are fixed by
@@ -69,6 +69,10 @@
 
 - Deleting a character does not yet clear NPC grudges against it or an
   NPC's marriage to it; that comes in 1.1.12.
+- A removed team's war and siege records stay, and a new team of the
+  same name inherits them.
+- A guild whose remaining members are all banned or emergency accounts
+  has no leader until an admin promotes one.
 - A Crown bounty posted on a player before 1.1.11 is not paid in a duel;
   bounties posted from this version are.
 - Noctura's betrayal pays both of its rewards, and secret bosses pay
