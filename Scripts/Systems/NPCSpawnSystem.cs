@@ -1639,10 +1639,10 @@ namespace UsurperRemake.Systems
         /// v1.1.13: never appends a numeral. Trailing numerals are stripped; a taken
         /// one-word name gets a surname, a taken surnamed name keeps its first name
         /// with another surname, then other first names are tried. With
-        /// <paramref name="keepSurname"/> (children) the family surname stays last and
-        /// a second surname goes in the middle.
+        /// <paramref name="keepSurname"/> (children) the family surname stays and the
+        /// first name changes, from the <paramref name="sex"/> pool when given.
         /// </summary>
-        public string DisambiguateNPCName(string candidate, bool alreadyReserved = false, bool keepSurname = false)
+        public string DisambiguateNPCName(string candidate, bool alreadyReserved = false, bool keepSurname = false, CharacterSex? sex = null)
         {
             if (string.IsNullOrWhiteSpace(candidate)) return candidate;
 
@@ -1661,7 +1661,7 @@ namespace UsurperRemake.Systems
                 NPCNameRegistry.Reserve(stripped);
                 return stripped;
             }
-            foreach (var option in AlternativeNames(stripped, keepSurname))
+            foreach (var option in AlternativeNames(stripped, keepSurname, sex))
             {
                 if (!IsNameInUse(option))
                 {
@@ -1669,7 +1669,7 @@ namespace UsurperRemake.Systems
                     return option;
                 }
             }
-            // v1.1.13: unreachable in practice, the double-surname space holds millions of names
+            // v1.1.13: unreachable in practice, a child alone has 6,400 names per surname
             return stripped;
         }
 
@@ -1677,7 +1677,7 @@ namespace UsurperRemake.Systems
         /// v1.1.13: replacement names for a taken name, nearest first. Pools are shuffled
         /// so namesakes do not all land on the same surname.
         /// </summary>
-        private IEnumerable<string> AlternativeNames(string name, bool keepSurname)
+        private IEnumerable<string> AlternativeNames(string name, bool keepSurname, CharacterSex? sex)
         {
             var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             // A name made only of numerals has no given name worth keeping
@@ -1688,22 +1688,26 @@ namespace UsurperRemake.Systems
             bool NotCurrent(string s) => currentSurname == null || !s.Equals(currentSurname, StringComparison.OrdinalIgnoreCase);
 
             var surnames = AllSurnames.OrderBy(_ => random.Next()).ToArray();
-            // Other first names come from the given name's own pool when it is in one
-            string[] firstPool = ImmigrantFemaleNames.Contains(parts[0], StringComparer.OrdinalIgnoreCase) ? ImmigrantFemaleNames
+            // Other first names come from the sex pool, else the given name's own pool, else both
+            string[] firstPool = sex == CharacterSex.Female ? ImmigrantFemaleNames
+                : sex == CharacterSex.Male ? ImmigrantMaleNames
+                : ImmigrantFemaleNames.Contains(parts[0], StringComparer.OrdinalIgnoreCase) ? ImmigrantFemaleNames
                 : ImmigrantMaleNames.Contains(parts[0], StringComparer.OrdinalIgnoreCase) ? ImmigrantMaleNames
                 : ImmigrantMaleNames.Concat(ImmigrantFemaleNames).ToArray();
             var firstNames = firstPool.Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(_ => random.Next()).ToArray();
 
             if (keepGiven && keepSurname && currentSurname != null)
             {
-                // Family surname stays last, a second surname goes in the middle
-                foreach (var middle in surnames.Where(NotCurrent))
-                    yield return $"{given} {middle} {currentSurname}";
+                // v1.1.13: a child keeps the family surname and gets another first name
                 foreach (var first in firstNames)
-                    yield return $"{first} {currentSurname}";
+                    if (!first.Equals(given, StringComparison.OrdinalIgnoreCase))
+                        yield return $"{first} {currentSurname}";
+                // v1.1.13: every first name taken with this surname: two first names, surname last
                 foreach (var first in firstNames)
-                    foreach (var middle in surnames.Where(NotCurrent))
-                        yield return $"{first} {middle} {currentSurname}";
+                    foreach (var second in firstNames)
+                        if (!first.Equals(second, StringComparison.OrdinalIgnoreCase))
+                            yield return $"{first} {second} {currentSurname}";
+                yield break;
             }
 
             // Same given name, another surname

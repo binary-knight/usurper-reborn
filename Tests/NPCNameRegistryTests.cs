@@ -132,17 +132,76 @@ public class NPCNameRegistryTests
         names.Should().OnlyContain(n => !System.Text.RegularExpressions.Regex.IsMatch(n, @"\b[0-9a-f]{4}$"));
     }
 
+    /// <summary>v1.1.13: a taken child name keeps the family surname and gets another first name, exactly two words.</summary>
     [Fact]
-    public void Disambiguate_KeepSurname_KeepsFirstAndFamilySurname()
+    public void Disambiguate_KeepSurname_GetsOtherFirstNameWithFamilySurname()
     {
         NPCNameRegistry.Reset();
         var spawner = NPCSpawnSystem.Instance;
         NPCNameRegistry.Reserve("Wren Holloway");
 
-        var name = spawner.DisambiguateNPCName("Wren Holloway", keepSurname: true);
-        name.Should().StartWith("Wren ").And.EndWith(" Holloway").And.NotBe("Wren Holloway");
-        name.Split(' ').Should().HaveCount(3);
+        var name = spawner.DisambiguateNPCName("Wren Holloway", keepSurname: true, sex: CharacterSex.Female);
+        var parts = name.Split(' ');
+        parts.Should().HaveCount(2, "no middle surname");
+        parts[1].Should().Be("Holloway");
+        parts[0].Should().NotBe("Wren");
+        NPCSpawnSystem.ImmigrantFemaleNames.Should().Contain(parts[0]);
+        NPCSpawnSystem.AllSurnames.Should().NotContain(parts[0]);
         HasNumeral(name).Should().BeFalse();
+        NPCNameRegistry.IsTaken(name).Should().BeTrue();
+
+        // Sex decides the pool even when the typed first name is from the other one
+        NPCNameRegistry.Reserve("Bram Holloway");
+        var boy = spawner.DisambiguateNPCName("Bram Holloway", keepSurname: true, sex: CharacterSex.Female).Split(' ');
+        NPCSpawnSystem.ImmigrantFemaleNames.Should().Contain(boy[0]);
+        boy[1].Should().Be("Holloway");
+    }
+
+    [Fact]
+    public void Disambiguate_KeepSurname_ManyCollisions_AllUniqueTwoWordsSameSurname()
+    {
+        NPCNameRegistry.Reset();
+        var spawner = NPCSpawnSystem.Instance;
+        NPCNameRegistry.Reserve("Bram Holloway");
+        var names = new List<string>();
+        for (int i = 0; i < 60; i++)
+            names.Add(spawner.DisambiguateNPCName("Bram Holloway", keepSurname: true, sex: CharacterSex.Male));
+
+        names.Should().OnlyHaveUniqueItems(n => n.ToLowerInvariant());
+        names.Should().NotContain("Bram Holloway");
+        foreach (var n in names)
+        {
+            n.Split(' ').Should().HaveCount(2, n);
+            n.Should().EndWith(" Holloway");
+            HasNumeral(n).Should().BeFalse();
+            NPCSpawnSystem.ImmigrantMaleNames.Should().Contain(n.Split(' ')[0]);
+        }
+    }
+
+    /// <summary>v1.1.13: every first name taken with the surname: two first names, surname last, stable on reload.</summary>
+    [Fact]
+    public void Disambiguate_KeepSurname_FirstNamesExhausted_TwoFirstNamesThenSurname()
+    {
+        NPCNameRegistry.Reset();
+        var spawner = NPCSpawnSystem.Instance;
+        foreach (var f in NPCSpawnSystem.ImmigrantFemaleNames)
+            NPCNameRegistry.Reserve($"{f} Copperfield");
+
+        var name = spawner.DisambiguateNPCName("Wren Copperfield", keepSurname: true, sex: CharacterSex.Female);
+        var parts = name.Split(' ');
+        parts.Should().HaveCount(3);
+        parts[2].Should().Be("Copperfield");
+        NPCSpawnSystem.ImmigrantFemaleNames.Should().Contain(parts[0]).And.Contain(parts[1]);
+        NPCSpawnSystem.AllSurnames.Should().NotContain(parts[1]);
+        HasNumeral(name).Should().BeFalse();
+
+        var birth = new DateTime(2026, 9, 2, 12, 0, 0);
+        FamilySystem.Instance.DeserializeChildren(new List<ChildData>
+        {
+            new ChildData { Name = name, Mother = "Lucinda Copperfield", Father = "Bram Copperfield", Sex = (int)CharacterSex.Female,
+                            MotherID = "m1", FatherID = "f1", BirthDate = birth, Named = true },
+        });
+        FamilySystem.Instance.AllChildren.Single(c => c.BirthDate == birth).Name.Should().Be(name);
     }
 
     [Fact]
@@ -232,7 +291,7 @@ public class NPCNameRegistryTests
     }
 
     [Fact]
-    public void RegisteredChild_TakingARetiredName_GetsMiddleSurname()
+    public void RegisteredChild_TakingARetiredName_GetsOtherFirstName()
     {
         NPCNameRegistry.Reset();
         NPCNameRegistry.Reserve("Halvar Copperfield"); // an NPC carried this once
@@ -244,16 +303,21 @@ public class NPCNameRegistryTests
             Father = "Bram Copperfield",
             MotherID = "m1",
             FatherID = "f1",
+            Sex = CharacterSex.Male,
             BirthDate = new DateTime(2026, 9, 1, 12, 0, 0),
         };
         FamilySystem.Instance.RegisterChild(child);
 
-        // v1.1.13: first name and family surname kept, no numeral
-        child.Name.Should().StartWith("Halvar ").And.EndWith(" Copperfield").And.NotBe("Halvar Copperfield");
+        // v1.1.13: family surname kept, another male first name, no middle surname, no numeral
+        var parts = child.Name.Split(' ');
+        parts.Should().HaveCount(2);
+        parts[1].Should().Be("Copperfield");
+        parts[0].Should().NotBe("Halvar");
+        NPCSpawnSystem.ImmigrantMaleNames.Should().Contain(parts[0]);
         HasNumeral(child.Name).Should().BeFalse();
         NPCNameRegistry.IsTaken(child.Name).Should().BeTrue();
 
-        // The load migration accepts the middle surname: no rename on the next load
+        // The load migration leaves the new first name alone: no rename on the next load
         var saved = child.Name;
         FamilySystem.Instance.DeserializeChildren(new List<ChildData>
         {

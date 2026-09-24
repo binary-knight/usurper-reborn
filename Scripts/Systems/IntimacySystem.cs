@@ -485,8 +485,8 @@ namespace UsurperRemake.Systems
                 int spaceIdx = child.Name.IndexOf(' ');
                 if (spaceIdx > 0) surname = child.Name.Substring(spaceIdx);
                 // v1.0.4: reserve the chosen name for life
-                // v1.1.13: if taken, the chosen first name and family surname stay, a middle surname is added
-                child.Name = NPCSpawnSystem.Instance?.DisambiguateNPCName(nameInput + surname, keepSurname: surname.Length > 0) ?? nameInput + surname;
+                // v1.1.13: if taken, the family surname stays and another first name is picked
+                child.Name = NPCSpawnSystem.Instance?.DisambiguateNPCName(nameInput + surname, keepSurname: surname.Length > 0, sex: child.Sex) ?? nameInput + surname;
             }
 
             // Persist the new child to world_state immediately. Without this the

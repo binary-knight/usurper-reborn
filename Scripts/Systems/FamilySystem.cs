@@ -54,7 +54,7 @@ namespace UsurperRemake.Systems
             // v1.0.4: a child's name is reserved for life at birth, so no immigrant or
             // other child can take it before graduation. Suffixed if already in use.
             if (!string.IsNullOrEmpty(child.Name) && NPCSpawnSystem.Instance != null)
-                child.Name = NPCSpawnSystem.Instance.DisambiguateNPCName(child.Name, keepSurname: true);
+                child.Name = NPCSpawnSystem.Instance.DisambiguateNPCName(child.Name, keepSurname: true, sex: child.Sex);
 
             _children.Add(child);
 
@@ -918,7 +918,7 @@ namespace UsurperRemake.Systems
             // RomanceTracker / NPCMarriageRegistry name-fallback lookups (per the
             // recurring v0.54 ID-drift fix) become ambiguous.
             // v1.0.4: the name was reserved at birth; only the live roster can still collide
-            string displayName = NPCSpawnSystem.Instance?.DisambiguateNPCName(child.Name, alreadyReserved: true, keepSurname: true) ?? child.Name;
+            string displayName = NPCSpawnSystem.Instance?.DisambiguateNPCName(child.Name, alreadyReserved: true, keepSurname: true, sex: child.Sex) ?? child.Name;
 
             int level = 1;
             int strength = 10 + Random.Shared.Next(5);
@@ -1249,7 +1249,7 @@ namespace UsurperRemake.Systems
             if (fatherSurname == null)
                 fatherSurname = GenerateSurnameForParent(father.Name2 ?? father.Name);
             // v1.0.4: the surname is fixed, so roll first names until the full name
-            // has never been used (v1.1.13: RegisterChild adds a middle surname if every roll collides)
+            // has never been used (v1.1.13: RegisterChild picks another first name if every roll collides)
             string childName = "";
             for (int attempt = 0; attempt < 40; attempt++)
             {
@@ -1455,7 +1455,7 @@ namespace UsurperRemake.Systems
         /// DisambiguateNPCName falls back to are deliberate uniqueness suffixes from
         /// NPCNameRegistry, and stripping one would recreate the duplicate it exists
         /// to prevent. Only a wrong surname is rewritten, and through the registry.
-        /// v1.1.13: new names carry no suffix; a middle surname is accepted as right.
+        /// v1.1.13: new names carry no suffix; two first names before the surname are accepted.
         /// </summary>
         private void MigrateChildSurnames()
         {
@@ -1477,7 +1477,7 @@ namespace UsurperRemake.Systems
                     || child.Name.StartsWith(baseName + " ", StringComparison.Ordinal))
                     continue;
 
-                // v1.1.13: a disambiguated child carries a middle surname ("Wren Ashford Holloway")
+                // v1.1.13: an exhausted first-name pool gives two first names ("Wren Talia Holloway")
                 if (child.Name.StartsWith(firstName + " ", StringComparison.Ordinal)
                     && child.Name.EndsWith(" " + surname, StringComparison.Ordinal))
                     continue;
@@ -1490,7 +1490,7 @@ namespace UsurperRemake.Systems
                         || child.Name.StartsWith($"{firstName} {fatherParts[^1]} ", StringComparison.Ordinal)))
                     continue;
 
-                var correctName = NPCSpawnSystem.Instance?.DisambiguateNPCName(baseName, keepSurname: true) ?? baseName;
+                var correctName = NPCSpawnSystem.Instance?.DisambiguateNPCName(baseName, keepSurname: true, sex: child.Sex) ?? baseName;
 
                 if (!child.Name.Equals(correctName, StringComparison.Ordinal))
                 {
