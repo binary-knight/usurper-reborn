@@ -2845,6 +2845,7 @@ public partial class GameEngine
             // entry for a deleted same-name character was restored with any save.
             string? godRestoreFilter = GodRestoreFilterFor(currentPlayer);
             SaveSystem.Instance.RestoreStorySystems(saveData.StorySystems, godRestoreFilter);
+            AwakeningBonus.RecalculateAfterRestore(currentPlayer, saveData.Player?.HP ?? 0, saveData.Player?.Mana ?? 0); // v1.1.12
 
             // Migration: sync RelationshipSystem with RomanceTracker for saves affected by
             // the bidirectional key bug (pre-v0.42.4). If RomanceTracker says Lover/Spouse/FWB
@@ -4706,6 +4707,7 @@ public partial class GameEngine
         // snapshots would overwrite their current worship choices in the shared GodSystem.
         string? godFilter = GodRestoreFilterFor(currentPlayer); // v1.1.11: single-player too
         SaveSystem.Instance.RestoreStorySystems(saveData.StorySystems, godFilter);
+        AwakeningBonus.RecalculateAfterRestore(currentPlayer, saveData.Player?.HP ?? 0, saveData.Player?.Mana ?? 0); // v1.1.12
 
         // In online mode, override royal court, children, and marriages with world_state
         // (authoritative source). RestoreStorySystems loaded stale data from the player's

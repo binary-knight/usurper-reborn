@@ -412,6 +412,182 @@ public class Awakening1112Tests : IDisposable
         en.Should().NotContain("\"main_street.awakening_0\"").And.NotContain("\"main_street.awakening_5\"");
     }
 
+    // ---------- 5. the boons ----------
+
+    private static Character Caster() => new()
+    {
+        Name1 = "tide", Name2 = "Tide", Class = CharacterClass.Magician, Level = 20, AI = CharacterAI.Human,
+        BaseStrength = 10, BaseDexterity = 10, BaseConstitution = 10, BaseIntelligence = 20, BaseWisdom = 20,
+        BaseCharisma = 10, BaseMaxHP = 400, BaseMaxMana = 200, BaseDefence = 5, BaseStamina = 10, BaseAgility = 10,
+        HP = 400, Mana = 200
+    };
+
+    private static T AsPlayer<T>(Character hero, Func<T> body)
+    {
+        var engine = GameEngine.Instance;
+        var old = engine.CurrentPlayer;
+        engine.CurrentPlayer = hero;
+        try { return body(); }
+        finally { engine.CurrentPlayer = old; }
+    }
+
+    private static void ToStage(int stage)
+    {
+        if (stage >= 7) Ocean.ExperienceMoment(AwakeningMoment.TrueIdentityRevealed);
+        else RaiseTo(stage);
+        Ocean.AwakeningLevel.Should().Be(stage);
+    }
+
+    [Fact]
+    public void Stage1_AddsWisdom_AtRecalculation_NeverToTheBase()
+    {
+        var hero = Caster();
+        AsPlayer(hero, () =>
+        {
+            hero.RecalculateStats();
+            long before = hero.Wisdom;
+            ToStage(1);
+            hero.RecalculateStats();
+            hero.RecalculateStats();
+            hero.Wisdom.Should().Be(before + 3);
+            hero.BaseWisdom.Should().Be(20, "nothing is stored on the character");
+            return 0;
+        });
+    }
+
+    [Fact]
+    public void Stage2_AddsFivePercentMaxMana_Stage7Ten()
+    {
+        var hero = Caster();
+        AsPlayer(hero, () =>
+        {
+            ToStage(1);
+            hero.RecalculateStats();
+            long m1 = hero.MaxMana;
+            m1.Should().BeGreaterThan(0);
+            ToStage(2);
+            hero.RecalculateStats();
+            hero.MaxMana.Should().Be(m1 + (long)(m1 * 0.05));
+            ToStage(7);
+            hero.RecalculateStats();
+            hero.MaxMana.Should().Be(m1 + (long)(m1 * 0.10));
+            return 0;
+        });
+    }
+
+    [Fact]
+    public void Stage4_AddsFivePercentMaxHP_AndSurvivesRecalculation()
+    {
+        var hero = Caster();
+        AsPlayer(hero, () =>
+        {
+            hero.RecalculateStats();
+            long h0 = hero.MaxHP;
+            ToStage(4);
+            hero.RecalculateStats();
+            hero.RecalculateStats();
+            hero.MaxHP.Should().Be(h0 + (long)(h0 * 0.05));
+            return 0;
+        });
+    }
+
+    [Fact]
+    public void Stage3_AddsFivePercentCombatXP_WhereTheTrainingBonusApplies()
+    {
+        var hero = Caster();
+        AsPlayer(hero, () =>
+        {
+            TeamHQBonus.ApplyXP(hero, 1000).Should().Be(1000);
+            ToStage(2);
+            TeamHQBonus.ApplyXP(hero, 1000).Should().Be(1000);
+            ToStage(3);
+            TeamHQBonus.ApplyXP(hero, 1000).Should().Be(1050);
+            ToStage(7);
+            TeamHQBonus.ApplyXP(hero, 1000).Should().Be(1100);
+            return 0;
+        });
+    }
+
+    [Fact]
+    public void Stage5_AddsThreePercentDamage_WhereTheArmoryApplies()
+    {
+        var hero = Caster();
+        AsPlayer(hero, () =>
+        {
+            ToStage(4);
+            TeamHQBonus.ApplyAttack(hero, 1000).Should().Be(1000);
+            ToStage(5);
+            TeamHQBonus.ApplyAttack(hero, 1000).Should().Be(1030);
+            ToStage(7);
+            TeamHQBonus.ApplyAttack(hero, 1000).Should().Be(1080);
+            return 0;
+        });
+    }
+
+    [Fact]
+    public void Stage6_TakesThreePercentLessDamage_WhereTheBarracksApplies()
+    {
+        var hero = Caster();
+        AsPlayer(hero, () =>
+        {
+            ToStage(5);
+            TeamHQBonus.ApplyDefense(hero, 1000).Should().Be(1000);
+            ToStage(6);
+            TeamHQBonus.ApplyDefense(hero, 1000).Should().Be(970);
+            ToStage(7);
+            TeamHQBonus.ApplyDefense(hero, 1000).Should().Be(920);
+            return 0;
+        });
+    }
+
+    [Fact]
+    public void OnlyTheSessionsPlayer_IsAwakened()
+    {
+        var hero = Caster();
+        var companion = Caster();
+        var npc = new NPC { ID = "npc_awake", Name1 = "N", Name2 = "N", Level = 10, BaseMaxHP = 100, BaseWisdom = 10 };
+        AsPlayer(hero, () =>
+        {
+            ToStage(7);
+            AwakeningBonus.StageOf(hero).Should().Be(7);
+            AwakeningBonus.StageOf(companion).Should().Be(0);
+            AwakeningBonus.StageOf(npc).Should().Be(0);
+            TeamHQBonus.ApplyAttack(companion, 1000).Should().Be(1000);
+            TeamHQBonus.ApplyDefense(npc, 1000).Should().Be(1000);
+            TeamHQBonus.ApplyXP(companion, 1000).Should().Be(1000);
+            return 0;
+        });
+    }
+
+    [Fact]
+    public void ALoadedPlayer_GetsTheBoons_AndKeepsTheSavedHP()
+    {
+        var hero = Caster();
+        AsPlayer(hero, () =>
+        {
+            hero.RecalculateStats();                 // the load recalculates before the story systems
+            long savedHP = hero.MaxHP + 10;          // saved with the stage 4 bonus
+            hero.HP = hero.MaxHP;
+            Ocean.RestoreFromSave(Array.Empty<WaveFragment>(), Array.Empty<AwakeningMoment>(), null, savedLevel: 4);
+            AwakeningBonus.RecalculateAfterRestore(hero, savedHP, 0);
+            hero.MaxHP.Should().BeGreaterThanOrEqualTo(savedHP);
+            hero.HP.Should().Be(savedHP);
+            return 0;
+        });
+        Source("Scripts/Core/GameEngine.cs").Split("AwakeningBonus.RecalculateAfterRestore(currentPlayer").Length.Should().Be(3, "the offline and the online load");
+    }
+
+    [Fact]
+    public void TheStatusScreen_AndTheJournal_ShowTheBoons()
+    {
+        Source("Scripts/Locations/BaseLocation.cs").Should().Contain("AwakeningBonus.ActiveAt(awakeningLevel)");
+        var lines = AwakeningBonus.ActiveAt(7);
+        lines.Should().HaveCount(7);
+        lines.Should().Contain(Loc.Get("ocean.title_awakened_line"));
+        lines.Should().Contain(Loc.Get("ocean.boost.5", 8));
+        AwakeningBonus.ActiveAt(0).Should().BeEmpty();
+    }
+
     [Fact]
     public void Reset_ClearsInsights()
     {

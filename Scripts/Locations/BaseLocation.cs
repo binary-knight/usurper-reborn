@@ -6941,6 +6941,12 @@ public abstract class BaseLocation
             var awakeningLabel = AwakeningScreens.StageName(awakeningLevel); // v1.1.12: one set of labels
             terminal.SetColor("dark_magenta");
             terminal.WriteLine(Loc.Get("base.stat_awakening", awakeningLabel, awakeningLevel));
+            var awakeningBoons = AwakeningBonus.ActiveAt(awakeningLevel); // v1.1.12
+            if (awakeningBoons.Count > 0)
+            {
+                terminal.SetColor("bright_green");
+                terminal.WriteLine($"  {Loc.Get("ocean.journal_boons", string.Join(", ", awakeningBoons))}");
+            }
             terminal.SetColor("gray");
             terminal.WriteLine($"  {Loc.Get("base.stat_awakening_hint")}"); // v1.1.12
             terminal.SetColor("white");

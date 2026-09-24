@@ -1667,6 +1667,10 @@ public class Character
         // 2026-09-03). Placed before the CON-to-HP line so a set CON bonus flows into MaxHP.
         UsurperRemake.Systems.GearSetRegistry.Apply(this);
 
+        // v1.1.12: the awakening's Wisdom, added like gear Wisdom so it flows into mana; never stored
+        int awakeningStage = UsurperRemake.Systems.AwakeningBonus.StageOf(this);
+        Wisdom += UsurperRemake.Systems.AwakeningBonus.WisdomAt(awakeningStage);
+
         // Apply stat-based bonuses AFTER equipment (stats may have been modified)
         // Constitution bonus to HP
         MaxHP += StatEffectsSystem.GetConstitutionHPBonus(Constitution, Level);
@@ -1708,6 +1712,12 @@ public class Character
         {
             MaxMana += (long)(MaxMana * CachedBoonEffects.MaxManaPercent);
         }
+
+        // v1.1.12: the awakening's max HP and max mana percentages, beside the divine boons
+        double awakeningHP = UsurperRemake.Systems.AwakeningBonus.HPAt(awakeningStage);
+        if (awakeningHP > 0) MaxHP += (long)(MaxHP * awakeningHP);
+        double awakeningMana = UsurperRemake.Systems.AwakeningBonus.ManaAt(awakeningStage);
+        if (awakeningMana > 0 && MaxMana > 0) MaxMana += (long)(MaxMana * awakeningMana);
 
         // Apply Fountain of Vitality bonus HP
         if (BonusMaxHP > 0)

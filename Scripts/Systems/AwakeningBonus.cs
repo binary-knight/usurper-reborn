@@ -52,6 +52,18 @@ namespace UsurperRemake.Systems
         public static double DefenseFactor(Character c) => 1.0 - DefenseAt(StageOf(c));
         public static double XPMultiplier(Character c) => 1.0 + XPAt(StageOf(c));
 
+        /// <summary>
+        /// v1.1.12: the player was recalculated before the story systems were restored, so without the
+        /// boons; recalculate with them and give back the saved HP and mana the earlier pass clamped.
+        /// </summary>
+        public static void RecalculateAfterRestore(Character? player, long savedHP, long savedMana)
+        {
+            if (player == null || StageOf(player) == 0) return;
+            player.RecalculateStats();
+            if (savedHP > player.HP) player.HP = Math.Min(savedHP, player.MaxHP);
+            if (savedMana > player.Mana) player.Mana = Math.Min(savedMana, player.MaxMana);
+        }
+
         private static int P(double pct) => (int)Math.Round(pct * 100);
 
         /// <summary>The boon one stage adds, as a line of text.</summary>
