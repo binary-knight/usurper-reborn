@@ -6499,7 +6499,7 @@ public partial class GameEngine
         return Math.Min(randomAge, cap);
     }
 
-    private async Task RestoreNPCs(List<NPCData> npcData)
+    internal async Task RestoreNPCs(List<NPCData> npcData)   // v1.1.13: internal for the purge's reload
     {
         if (npcData == null || npcData.Count == 0)
         {

@@ -352,6 +352,93 @@ namespace UsurperRemake.Systems
             }
         }
 
+        /// <summary>v1.1.13: the options SaveSharedNPCs writes with, for the static persist below.</summary>
+        private static readonly JsonSerializerOptions PersistJsonOptions = new()
+        {
+            WriteIndented = false,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            IncludeFields = true,
+            NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowReadingFromString,
+            Converters = { new TolerantEnumReadOnlyConverterFactory() }
+        };
+
+        /// <summary>
+        /// v1.1.13: apply cleanUp to the live NPC roster and write it to world_state at once, under the
+        /// record's version, never unconditionally. From the clean-up to the serialize nothing is awaited,
+        /// so a login's RestoreNPCs(LoadSharedNPCs()) cannot put the old roster back in between. If another
+        /// writer got in first, the stored roster is loaded into the game, the clean-up re-applied to it
+        /// and the write retried (as RemoveSharedQuestsAsync does). The marriages record then loses every
+        /// marriage of endedMarriages (the NPC ids the clean-up divorced) the same way. The record is edited,
+        /// not replaced by this process's registry, since only the world sim's process loads the registry.
+        /// Returns what the first clean-up changed. beforeWrite is a test hook.
+        /// </summary>
+        public static async Task<int> PersistNpcWorldNow(SqlSaveBackend sql, Func<int> cleanUp, ISet<string> endedMarriages,
+            Func<List<NPCData>, Task>? reloadRoster = null, Func<Task>? beforeWrite = null)
+        {
+            long version = sql.GetWorldStateVersion(KEY_NPCS);   // read before the roster is serialized, so any later write is a conflict
+            int changed = cleanUp();
+            if (changed == 0) return 0;
+            string json = JsonSerializer.Serialize(SerializeCurrentNPCs(), PersistJsonOptions);
+            try
+            {
+                reloadRoster ??= list => GameEngine.Instance.RestoreNPCs(list);
+                bool saved = false;
+                for (int attempt = 0; attempt < 5 && !saved; attempt++)
+                {
+                    if (beforeWrite != null) await beforeWrite();
+                    if (await sql.SaveWorldStateIfVersion(KEY_NPCS, json, version)) { saved = true; break; }
+                    version = sql.GetWorldStateVersion(KEY_NPCS);
+                    var storedJson = await sql.LoadWorldState(KEY_NPCS);
+                    var stored = string.IsNullOrEmpty(storedJson) ? null : JsonSerializer.Deserialize<List<NPCData>>(storedJson, PersistJsonOptions);
+                    if (stored == null || stored.Count == 0) break;
+                    await reloadRoster(stored);
+                    if (cleanUp() == 0) { saved = true; break; }   // the stored roster is already clean
+                    json = JsonSerializer.Serialize(SerializeCurrentNPCs(), PersistJsonOptions);
+                }
+                if (!saved)
+                    DebugLogger.Instance.LogWarning("ONLINE", "PersistNpcWorldNow gave up: the npcs record kept changing.");
+                if (endedMarriages.Count > 0)
+                    await RemoveStoredMarriagesAsync(sql, endedMarriages);
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("ONLINE", $"PersistNpcWorldNow failed: {ex.Message}");
+            }
+            return changed;
+        }
+
+        /// <summary>
+        /// v1.1.13: remove every marriage naming one of the NPC ids from world_state["marriages"], under its
+        /// version, re-reading and re-applying on a conflict. Everything else in the record is kept as stored.
+        /// </summary>
+        internal static async Task<int> RemoveStoredMarriagesAsync(SqlSaveBackend sql, ICollection<string> npcIds, Func<Task>? beforeWrite = null)
+        {
+            for (int attempt = 0; attempt < 5; attempt++)
+            {
+                long version = sql.GetWorldStateVersion(KEY_MARRIAGES);
+                var json = await sql.LoadWorldState(KEY_MARRIAGES);
+                if (string.IsNullOrEmpty(json)) return 0;
+                if (System.Text.Json.Nodes.JsonNode.Parse(json) is not System.Text.Json.Nodes.JsonObject root
+                    || root["marriages"] is not System.Text.Json.Nodes.JsonArray list) return 0;
+                int removed = 0;
+                for (int i = list.Count - 1; i >= 0; i--)
+                {
+                    string a = IdOf(list[i], "npc1Id"), b = IdOf(list[i], "npc2Id");
+                    if (npcIds.Contains(a) || npcIds.Contains(b)) { list.RemoveAt(i); removed++; }
+                }
+                if (removed == 0) return 0;
+                if (beforeWrite != null) await beforeWrite();
+                if (await sql.SaveWorldStateIfVersion(KEY_MARRIAGES, root.ToJsonString(), version)) return removed;
+            }
+            DebugLogger.Instance.LogWarning("ONLINE", "RemoveStoredMarriagesAsync gave up: the marriages record kept changing.");
+            return 0;
+        }
+
+        private static string IdOf(System.Text.Json.Nodes.JsonNode? node, string key)
+        {
+            try { return node?[key]?.GetValue<string>() ?? ""; } catch { return ""; }
+        }
+
         /// <summary>
         /// Save quest data to shared state.
         /// </summary>
