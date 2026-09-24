@@ -2710,22 +2710,8 @@ public class MainStreetLocation : BaseLocation
         terminal.WriteLine($"  {Loc.Get("main_street.ocean_desc")}");
         terminal.WriteLine("");
 
-        int awakeningLevel = ocean.AwakeningLevel;
-        string awakeningDesc = awakeningLevel switch
-        {
-            0 => Loc.Get("main_street.awakening_0"),
-            1 => Loc.Get("main_street.awakening_1"),
-            2 => Loc.Get("main_street.awakening_2"),
-            3 => Loc.Get("main_street.awakening_3"),
-            4 => Loc.Get("main_street.awakening_4"),
-            >= 5 => Loc.Get("main_street.awakening_5"),
-            _ => Loc.Get("main_street.awakening_unknown")
-        };
-
-        terminal.SetColor("bright_cyan");
-        terminal.WriteLine($"  {Loc.Get("main_street.awakening_level", awakeningLevel)}");
-        terminal.SetColor("white");
-        terminal.WriteLine($"  {awakeningDesc}");
+        // v1.1.12: the Ocean Journal, on the status screen's 0-7 scale
+        AwakeningScreens.WriteJournalSummary(terminal);
         terminal.WriteLine("");
         // Show per-companion grief details
         var griefDetails = grief.GetActiveGriefDetails();
@@ -2878,7 +2864,11 @@ public class MainStreetLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("gray");
-        await terminal.PressAnyKey(Loc.Get("main_street.press_return"));
+        // v1.1.12: [J] opens the Ocean Journal's pages, any other key returns
+        terminal.Write($"  {Loc.Get("ocean.journal_prompt")} ");
+        string key = (await terminal.GetKeyInput())?.Trim().ToUpperInvariant() ?? "";
+        if (key == "J")
+            await AwakeningScreens.ShowJournal(terminal);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════

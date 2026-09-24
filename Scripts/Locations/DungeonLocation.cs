@@ -4913,7 +4913,7 @@ public class DungeonLocation : BaseLocation
         // Apply awakening gain if any
         if (vision.AwakeningGain > 0)
         {
-            OceanPhilosophySystem.Instance.GainInsight(vision.AwakeningGain * 10);
+            OceanPhilosophySystem.Instance.GainInsight("vision:" + vision.Id); // v1.1.12: one insight per vision
             terminal.SetColor("cyan");
             terminal.WriteLine(Loc.Get("dungeon.vision_memory_stirs"));
         }
@@ -15622,7 +15622,7 @@ public class DungeonLocation : BaseLocation
             // Ocean philosophy riddles grant awakening insight
             if (riddle.IsOceanPhilosophy)
             {
-                ocean.GainInsight(20);
+                ocean.GainInsight("riddle:" + riddle.Id); // v1.1.12
                 terminal.WriteLine(Loc.Get("dungeon.riddle_deeper"), "magenta");
             }
         }

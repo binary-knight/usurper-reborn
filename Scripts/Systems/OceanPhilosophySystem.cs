@@ -30,6 +30,47 @@ namespace UsurperRemake.Systems
         /// </summary>
         public int AwakeningLevel { get; private set; } = 0;
 
+        // v1.1.12: the points model. A moment is worth 3, a Wave Fragment 2, each distinct insight 1.
+        // Stage N needs StageThresholds[N] points. Expected pacing:
+        //   1 (4):  levels 1-10. The first companion (3) plus one early insight (the wave_self room
+        //           feature, the mirror dream, a catacomb discovery), or sparing a beaten foe.
+        //   2 (12): about level 20-30. A few more moments (a spared foe, a lore song, a companion's
+        //           death), the first fragments and a handful of dreams, discoveries and visions.
+        //           dream_ocean_first and the Magic Shop's sixth tier open here.
+        //   3 (22): the mid game, the first Old Gods and their fragments.
+        //   4 (34), 5 (48), 6 (62): the later Old Gods, the seals, the deep visions and dreams.
+        //   7: the stage 6 points plus TrueIdentityRevealed or AllSealsCollected.
+        //      TrueIdentityRevealed alone still grants 7 at once.
+        // The level never falls: a save restores at least the level it was saved with.
+        public const int PointsPerMoment = 3;
+        public const int PointsPerFragment = 2;
+        public const int PointsPerInsight = 1;
+        public static readonly int[] StageThresholds = { 0, 4, 12, 22, 34, 48, 62 };
+        public const int MaxStage = 7;
+
+        /// <summary>v1.1.12: the distinct insights gained, by source id. Saved.</summary>
+        public HashSet<string> InsightIds { get; private set; } = new();
+
+        /// <summary>v1.1.12: the highest stage risen to and not yet announced (0 = none).</summary>
+        public int PendingAnnouncementStage { get; private set; }
+        /// <summary>v1.1.12: the stage the pending rise started from.</summary>
+        public int PendingAnnouncementFromStage { get; private set; }
+
+        // v1.1.12: set while a save is replayed, so a restore never queues an announcement
+        private bool _restoring;
+
+        /// <summary>v1.1.12: the awakening points from moments, fragments and insights.</summary>
+        public int Points =>
+            ExperiencedMoments.Count * PointsPerMoment
+            + CollectedFragments.Count * PointsPerFragment
+            + InsightIds.Count * PointsPerInsight;
+
+        /// <summary>v1.1.12: the points the next stage needs, or -1 at the last stage.</summary>
+        public int PointsForNextStage =>
+            AwakeningLevel + 1 < StageThresholds.Length ? StageThresholds[AwakeningLevel + 1]
+            : AwakeningLevel < MaxStage ? StageThresholds[StageThresholds.Length - 1]
+            : -1;
+
         /// <summary>
         /// Wave Fragments: Cryptic lore pieces found throughout the game
         /// </summary>
@@ -210,39 +251,20 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Gain or lose awakening insight points directly
-        /// Used for choices that affect philosophical understanding
+        /// v1.1.12: gain an insight. Each distinct source id counts once toward the awakening.
+        /// Used for dreams, visions, discoveries, room features, riddles, songs and choices.
         /// </summary>
-        public void GainInsight(int points)
+        public void GainInsight(string insightId)
         {
-            // Blood Price blocks positive insight — murderers cannot awaken
-            if (points > 0)
-            {
-                var player = GameEngine.Instance?.CurrentPlayer;
-                if (player != null && player.MurderWeight > GameConfig.MurderWeightAwakeningBlock)
-                    return; // The weight of death clouds your mind
-            }
+            if (string.IsNullOrEmpty(insightId)) return;
 
-            // Track insight points in a simple way - affects awakening level calculation
-            // Positive points move toward awakening, negative move away
-            if (points > 0)
-            {
-                // Create a minor insight
-                var insight = new OceanInsight(
-                    "Moment of Clarity",
-                    "A deeper understanding settles into your consciousness.",
-                    points / 10 // Contributes to awakening
-                );
-                Insights.Add(insight);
-                // GD.Print($"[Ocean] Gained {points} insight points");
-            }
-            else if (points < 0)
-            {
-                // Grasping moves away from awakening
-                // GD.Print($"[Ocean] Lost {-points} insight points (grasping)");
-            }
+            // Blood Price blocks insight: murderers cannot awaken
+            var player = GameEngine.Instance?.CurrentPlayer;
+            if (player != null && player.MurderWeight > GameConfig.MurderWeightAwakeningBlock)
+                return; // The weight of death clouds your mind
 
-            CheckAwakeningProgress();
+            if (InsightIds.Add(insightId))
+                CheckAwakeningProgress();
         }
 
         /// <summary>
@@ -255,39 +277,71 @@ namespace UsurperRemake.Systems
             {
                 int oldLevel = AwakeningLevel;
                 AwakeningLevel = newLevel;
-                // GD.Print($"[Ocean] Awakening increased: {oldLevel} -> {newLevel}");
+                OnStageRose(oldLevel, newLevel);
             }
         }
 
         /// <summary>
-        /// Calculate awakening level based on fragments, moments, and insights
+        /// v1.1.12: a stage rise queues its announcement for the next safe point, which also
+        /// recalculates the player's stats (never mid-fight). A restore queues nothing: the stages
+        /// were announced when they happened.
+        /// </summary>
+        private void OnStageRose(int oldLevel, int newLevel)
+        {
+            if (_restoring) return;
+            if (PendingAnnouncementStage == 0) PendingAnnouncementFromStage = oldLevel;
+            PendingAnnouncementStage = Math.Max(PendingAnnouncementStage, newLevel);
+        }
+
+        /// <summary>
+        /// v1.1.12: take the pending announcement, once. Returns (from, to) or null.
+        /// </summary>
+        public (int From, int To)? TakePendingAnnouncement()
+        {
+            if (PendingAnnouncementStage == 0) return null;
+            var result = (PendingAnnouncementFromStage, PendingAnnouncementStage);
+            PendingAnnouncementStage = 0;
+            PendingAnnouncementFromStage = 0;
+            return result;
+        }
+
+        /// <summary>
+        /// v1.1.12: the stage the points and moments reach. Stages 1-6 by points; stage 7 needs the
+        /// stage 6 points and AllSealsCollected, or TrueIdentityRevealed alone.
         /// </summary>
         private int CalculateAwakeningLevel()
         {
+            if (ExperiencedMoments.Contains(AwakeningMoment.TrueIdentityRevealed)) return MaxStage;
+
+            int points = Points;
             int level = 0;
+            for (int stage = 1; stage < StageThresholds.Length; stage++)
+                if (points >= StageThresholds[stage]) level = stage;
 
-            // Fragments contribute
-            int fragmentCount = CollectedFragments.Count;
-            level += fragmentCount / 2; // Every 2 fragments = +1 level
+            if (level == StageThresholds.Length - 1 && ExperiencedMoments.Contains(AwakeningMoment.AllSealsCollected))
+                level = MaxStage;
 
-            // Key moments contribute
-            if (ExperiencedMoments.Contains(AwakeningMoment.FirstCompanionDeath)) level++;
-            if (ExperiencedMoments.Contains(AwakeningMoment.SacrificedForAnother)) level++;
-            if (ExperiencedMoments.Contains(AwakeningMoment.SparedAnEnemy)) level++;
-            if (ExperiencedMoments.Contains(AwakeningMoment.MetManwe)) level++;
-            if (ExperiencedMoments.Contains(AwakeningMoment.AllSealsCollected)) level++;
-            if (ExperiencedMoments.Contains(AwakeningMoment.MemoriesRecovered)) level++;
-            if (ExperiencedMoments.Contains(AwakeningMoment.TrueIdentityRevealed)) level = 7; // Auto-max
-            if (ExperiencedMoments.Contains(AwakeningMoment.LetGoOfPower)) level++;
-            if (ExperiencedMoments.Contains(AwakeningMoment.AcceptedDeath)) level++;
-            if (ExperiencedMoments.Contains(AwakeningMoment.CompanionSacrifice)) level++;
-            if (ExperiencedMoments.Contains(AwakeningMoment.ForgaveBetrayerMercy)) level++;
-            if (ExperiencedMoments.Contains(AwakeningMoment.AcceptedGrief)) level++;
-            if (ExperiencedMoments.Contains(AwakeningMoment.RejectedParadise)) level++;
-            if (ExperiencedMoments.Contains(AwakeningMoment.AbsorbedDarkness)) level++;
-            if (ExperiencedMoments.Contains(AwakeningMoment.HeardOldGodLoreSong)) level++;
+            return level;
+        }
 
-            return Math.Min(7, level);
+        /// <summary>
+        /// v1.1.12: replay a save. Nothing is announced, and the level is at least the saved level.
+        /// </summary>
+        public void RestoreFromSave(IEnumerable<WaveFragment> fragments, IEnumerable<AwakeningMoment> moments,
+            IEnumerable<string>? insightIds, int savedLevel)
+        {
+            _restoring = true;
+            try
+            {
+                foreach (var f in fragments) CollectFragment(f);
+                foreach (var m in moments) ExperienceMoment(m);
+                if (insightIds != null)
+                    foreach (var id in insightIds)
+                        if (!string.IsNullOrEmpty(id) && InsightIds.Add(id)) CheckAwakeningProgress();
+                int floor = Math.Clamp(savedLevel, 0, MaxStage);
+                if (floor > AwakeningLevel) AwakeningLevel = floor;
+            }
+            finally { _restoring = false; }
         }
 
         /// <summary>
@@ -304,10 +358,11 @@ namespace UsurperRemake.Systems
                     "Many times. An echo of ancient sorrow...",
                     2
                 ),
+                // v1.1.12: recorded when a companion joins you; the enum name stays for old saves
                 AwakeningMoment.SacrificedForAnother => new OceanInsight(
-                    "Water Flows Downhill",
-                    "In giving of yourself, the boundaries softened. " +
-                    "For a moment, there was no 'you' and 'them' - only love in motion. " +
+                    "Water Joins Water",
+                    "Another chose to walk your road. " +
+                    "For a moment, there was no 'you' and 'them' - two currents in one stream. " +
                     "Is this what the Ocean feels?",
                     3
                 ),
@@ -452,31 +507,6 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Get all fragments as a formatted string for display
-        /// </summary>
-        public string GetFragmentLore()
-        {
-            var lines = new List<string>();
-            lines.Add("=== The Fragments of Truth ===\n");
-
-            foreach (var fragment in CollectedFragments.OrderBy(f => FragmentData[f].RequiredAwakening))
-            {
-                var data = FragmentData[fragment];
-                lines.Add($"[{data.Title}]");
-                lines.Add(data.Text);
-                lines.Add("");
-            }
-
-            if (CollectedFragments.Count < FragmentData.Count)
-            {
-                int missing = FragmentData.Count - CollectedFragments.Count;
-                lines.Add($"({missing} fragments remain hidden...)");
-            }
-
-            return string.Join("\n", lines);
-        }
-
-        /// <summary>
         /// Serialize state for saving
         /// </summary>
         public OceanPhilosophyData Serialize()
@@ -512,6 +542,9 @@ namespace UsurperRemake.Systems
             CollectedFragments = new HashSet<WaveFragment>();
             ExperiencedMoments = new HashSet<AwakeningMoment>();
             Insights = new List<OceanInsight>();
+            InsightIds = new HashSet<string>();
+            PendingAnnouncementStage = 0;
+            PendingAnnouncementFromStage = 0;
         }
     }
 
@@ -540,7 +573,7 @@ namespace UsurperRemake.Systems
     public enum AwakeningMoment
     {
         FirstCompanionDeath,    // Losing someone you cared about
-        SacrificedForAnother,   // Giving something precious for another
+        SacrificedForAnother,   // v1.1.12: a companion joined you (name kept for old saves)
         SparedAnEnemy,          // Showing mercy when you could destroy
         MetManwe,               // Encountering the Creator
         AllSealsCollected,      // Understanding the full history

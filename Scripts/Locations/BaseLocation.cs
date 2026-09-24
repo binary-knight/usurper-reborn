@@ -740,6 +740,9 @@ public abstract class BaseLocation
                 terminal.WriteLine("");
             }
 
+            // v1.1.12: an awakening stage risen since the last menu, shown once at this clean boundary
+            await AwakeningScreens.ShowPending(terminal, currentPlayer);
+
             // Show deferred daily reset banner at a clean display boundary
             // (instead of mid-shop or mid-interaction where PeriodicUpdate fires)
             if (DailySystemManager.Instance.PendingDailyResetDisplay)
@@ -1422,7 +1425,7 @@ public abstract class BaseLocation
         // Apply awakening gain
         if (stage.AwakeningGain > 0)
         {
-            OceanPhilosophySystem.Instance.GainInsight(stage.AwakeningGain * 10);
+            OceanPhilosophySystem.Instance.GainInsight($"npc:{npcKey}:{stage.StageId}"); // v1.1.12: one insight per story stage
             terminal.SetColor("magenta");
             terminal.WriteLine(Loc.Get("base.deeper_understanding"));
         }
@@ -7014,21 +7017,19 @@ public abstract class BaseLocation
         if (ocean != null)
         {
             var awakeningLevel = ocean.AwakeningLevel;
-            var awakeningLabel = awakeningLevel switch
-            {
-                0 => Loc.Get("base.awakening_dormant"),
-                1 => Loc.Get("base.awakening_stirring"),
-                2 => Loc.Get("base.awakening_aware"),
-                3 => Loc.Get("base.awakening_seeking"),
-                4 => Loc.Get("base.awakening_illuminated"),
-                5 => Loc.Get("base.awakening_transcendent"),
-                6 => Loc.Get("base.awakening_enlightened"),
-                7 => Loc.Get("base.awakening_awakened"),
-                _ => Loc.Get("base.awakening_dormant")
-            };
+            var awakeningLabel = AwakeningScreens.StageName(awakeningLevel); // v1.1.12: one set of labels
             terminal.SetColor("dark_magenta");
             terminal.WriteLine(Loc.Get("base.stat_awakening", awakeningLabel, awakeningLevel));
+            var awakeningBoons = AwakeningBonus.ActiveAt(awakeningLevel); // v1.1.12
+            if (awakeningBoons.Count > 0)
+            {
+                terminal.SetColor("bright_green");
+                terminal.WriteLine($"  {Loc.Get("ocean.journal_boons", string.Join(", ", awakeningBoons))}");
+            }
+            terminal.SetColor("gray");
+            terminal.WriteLine($"  {Loc.Get("base.stat_awakening_hint")}"); // v1.1.12
             terminal.SetColor("white");
+            HintSystem.Instance.TryShowHint(HintSystem.HINT_AWAKENING, terminal, currentPlayer?.HintsShown); // v1.1.12
             terminal.WriteLine("");
         }
 

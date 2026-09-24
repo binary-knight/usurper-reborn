@@ -33,6 +33,7 @@ namespace UsurperRemake.Systems
         public int AwakeningLevel { get; set; }
         public List<int> CollectedFragments { get; set; } = new();
         public List<int> ExperiencedMoments { get; set; } = new();
+        public List<string> OceanInsightIds { get; set; } = new(); // v1.1.12: distinct insights, by source id
 
         // Seven Seals
         public List<int> CollectedSeals { get; set; } = new();

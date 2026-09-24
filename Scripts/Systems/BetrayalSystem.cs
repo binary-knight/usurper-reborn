@@ -338,7 +338,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("betrayal.ocean_understanding"), "dark_cyan");
                 terminal.WriteLine(Loc.Get("betrayal.ocean_wave_crashes"), "cyan");
-                OceanPhilosophySystem.Instance.GainInsight(5);
+                OceanPhilosophySystem.Instance.GainInsight("betrayal:" + npcId); // v1.1.12
             }
 
             return new BetrayalResult
@@ -640,7 +640,6 @@ namespace UsurperRemake.Systems
             // Ocean philosophy - revenge is grasping
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("betrayal.violence_begets"), "dark_cyan");
-            OceanPhilosophySystem.Instance.GainInsight(-5); // Negative insight
 
             terminal.WriteLine("");
             await terminal.GetInputAsync($"  {Loc.Get("ui.press_enter")}");
