@@ -17,7 +17,7 @@ namespace UsurperReborn.Tests;
 /// door's retried save, the owner's marriage registry, and the purges a web delete queues.
 /// </summary>
 [Collection("SharedGameSingletons")]
-public class OwnerProcessConflictTests : IDisposable
+public partial class OwnerProcessConflictTests : IDisposable
 {
     private readonly string _path = Path.Combine(Path.GetTempPath(), $"usurper-owner3-{Guid.NewGuid():N}.db");
     private readonly SqlSaveBackend _db;
@@ -207,30 +207,203 @@ public class OwnerProcessConflictTests : IDisposable
         });
     }
 
+    // ─── v1.1.13 r2: every court change is one guarded read-modify-write ───
+
+    private string CourtWith(string king, long treasury, params (string Name, int Loyalty)[] guards) =>
+        JsonSerializer.Serialize(new RoyalCourtSaveData
+        {
+            KingName = king, KingAI = (int)CharacterAI.Human, Treasury = treasury, TaxRate = 7, MagicBudget = GameConfig.MaxMagicBudget,
+            Guards = guards.Select(g => new RoyalGuardSaveData { Name = g.Name, Loyalty = g.Loyalty, DailySalary = 10, IsActive = true }).ToList()
+        }, Json);
+
     [Fact]
-    public async Task AnUnsavedTreasuryChange_IsCarriedOverAConflictingCourtWrite()
+    public async Task ALoginReload_WhileTheSimSaves_NeverDuplicatesATreasuryChange()
     {
-        await WithKing("Kim", 1000, async king =>
+        // both orders of the reported interleave: the login's stale court is applied after or before the sim's save
+        foreach (bool loginFirst in new[] { false, true })
+        {
+            await WithKing("Kim", 1000, async _ =>
+            {
+                var dbA = new SqlSaveBackend(_path);
+                await dbA.SaveWorldState("royal_court", Court("Kim", 1000));
+                var osmA = NewOsm(dbA);
+                await osmA.LoadRoyalCourtFromWorldState();
+                var sim = new WorldSimService(_db);
+
+                // a login reads the court (1000) before the change lands, and applies it late
+                long staleVersion = _db.GetWorldStateVersion("royal_court");
+                var stale = JsonSerializer.Deserialize<RoyalCourtSaveData>((await _db.LoadWorldState("royal_court"))!, Json)!;
+
+                var player = new Character { Name2 = "Pat", Gold = 250 };
+                (await CastleLocation.MoveTreasuryGoldAsync(osmA, player, -250)).Should().BeTrue();   // +250 into the treasury
+                player.Gold.Should().Be(0);
+
+                if (loginFirst) OnlineStateManager.ApplyLoadedCourt(stale, staleVersion);
+                await sim.SaveRoyalCourtToWorldState();
+                if (!loginFirst) OnlineStateManager.ApplyLoadedCourt(stale, staleVersion);
+                await sim.SaveRoyalCourtToWorldState();   // under the stale version: a conflict, reloaded, not written over
+                await osmA.SaveRoyalCourtToWorldState();
+
+                (await StoredCourt()).Treasury.Should().Be(1250, $"the +250 is stored exactly once (login first: {loginFirst})");
+                CastleLocation.GetCurrentKing()!.Treasury.Should().Be(1250);
+            });
+        }
+    }
+
+    [Fact]
+    public async Task AGuardBonus_AfterAConcurrentCourtWrite_KeepsBothTheCostAndTheLoyalty()
+    {
+        await WithKing("Kim", 1000, async _ =>
+        {
+            var dbA = new SqlSaveBackend(_path);
+            await dbA.SaveWorldState("royal_court", CourtWith("Kim", 1000, ("Gerald", 50), ("Helena", 60)));
+            var osmA = NewOsm(dbA);
+            await osmA.LoadRoyalCourtFromWorldState();
+
+            int writes = 0;
+            (await CastleLocation.PayGuardBonusAsync(osmA, 200, async () =>
+            {
+                // another process's court write (its income) lands during the bonus
+                if (writes++ == 0)
+                    (await _db.SaveWorldStateIfVersion("royal_court", CourtWith("Kim", 1500, ("Gerald", 50), ("Helena", 60)),
+                        _db.GetWorldStateVersion("royal_court"))).Should().BeTrue();
+            })).Should().BeTrue();
+
+            writes.Should().Be(2, "the first write met the other process's and was applied again");
+            var stored = await StoredCourt();
+            stored.Treasury.Should().Be(1100, "the other write's income stays and the bonus of 2 x 200 is paid once");
+            stored.Guards.Select(g => g.Loyalty).Should().Equal(new[] { 52, 62 }, "the loyalty the bonus bought is stored with its cost");
+            var king = CastleLocation.GetCurrentKing()!;
+            king.Treasury.Should().Be(1100);
+            king.Guards.Select(g => g.Loyalty).Should().Equal(new[] { 52, 62 });
+        });
+    }
+
+    [Fact]
+    public async Task TheSimsDailyTick_AndAWithdrawal_Interleaved_LeaveTheSumOfBoth()
+    {
+        await WithKing("Kim", 100000, async _ =>
+        {
+            await _db.SaveWorldState("royal_court", CourtWith("Kim", 100000, ("Gerald", 60)));
+            var sim = new WorldSimService(_db);
+            sim.LoadRoyalCourtFromWorldState();
+            var dbA = new SqlSaveBackend(_path);
+            var osmA = NewOsm(dbA);
+            var player = new Character { Name2 = "Pat", Gold = 0 };
+
+            var court = await StoredCourt();
+            long net = King.DailyIncomeOf(court, 0) - King.DailyExpensesOf(court);
+            long reign = court.TotalReign;
+
+            int writes = 0;
+            (await sim.ProcessCourtDailyAsync(async () =>
+            {
+                // a session's withdrawal lands between the sim's read and its write
+                if (writes++ == 0) (await CastleLocation.MoveTreasuryGoldAsync(osmA, player, 300)).Should().BeTrue();
+            })).Should().BeTrue();
+
+            writes.Should().Be(2);
+            player.Gold.Should().Be(300);
+            var stored = await StoredCourt();
+            stored.Treasury.Should().Be(100000 - 300 + net, "the day's income less expenses and the withdrawal both hold, each once");
+            stored.TotalReign.Should().Be(reign + 1, "the day is counted once");
+            CastleLocation.GetCurrentKing()!.Treasury.Should().Be(stored.Treasury);
+        });
+    }
+
+    [Fact]
+    public async Task TwoCourtChanges_BackToBack_TheSecondReadsTheFirstsVersion()
+    {
+        await WithKing("Kim", 1000, async _ =>
         {
             var dbA = new SqlSaveBackend(_path);
             await dbA.SaveWorldState("royal_court", Court("Kim", 1000));
             var osmA = NewOsm(dbA);
             await osmA.LoadRoyalCourtFromWorldState();
+            var player = new Character { Name2 = "Pat", Gold = 500 };
 
-            CastleLocation.GetCurrentKing()!.Treasury += 250;   // a bail paid into A's court (the player's gold already left)
-            await OtherCourtWrite("Kim", 1500);                 // B's income lands first
+            for (int i = 1; i <= 2; i++)
+            {
+                int writes = 0;
+                (await CastleLocation.MoveTreasuryGoldAsync(osmA, player, -100, () => { writes++; return Task.CompletedTask; })).Should().BeTrue();
+                writes.Should().Be(1, "no conflict: nothing else wrote the court");
+                OnlineStateManager.RoyalCourtVersion.Should().Be(_db.GetWorldStateVersion("royal_court"), "the in-memory court is the written copy, at its version");
+                CastleLocation.GetCurrentKing()!.Treasury.Should().Be((await StoredCourt()).Treasury);
+            }
+            (await StoredCourt()).Treasury.Should().Be(1200);
+            player.Gold.Should().Be(300);
+
+            // and the ordinary whole-court save that follows is no conflict either
+            long before = _db.GetWorldStateVersion("royal_court");
             await osmA.SaveRoyalCourtToWorldState();
-
-            (await StoredCourt()).Treasury.Should().Be(1750, "B's income and A's bail are both kept");
-            CastleLocation.GetCurrentKing()!.Treasury.Should().Be(1750);
-
-            // the world sim's reload keeps its own unsaved income the same way
-            var sim = new WorldSimService(_db);
-            CastleLocation.GetCurrentKing()!.Treasury += 40;   // the sim's daily income, not stored yet
-            await OtherCourtWrite("Kim", 1800);                 // a session's deposit of 50 lands
-            sim.LoadRoyalCourtFromWorldState();
-            CastleLocation.GetCurrentKing()!.Treasury.Should().Be(1840);
+            _db.GetWorldStateVersion("royal_court").Should().Be(before + 1);
+            (await StoredCourt()).Treasury.Should().Be(1200);
         });
+    }
+
+    /// <summary>Source with // and /* */ comments removed, so only code is checked.</summary>
+    private static string CodeOnly(string src)
+    {
+        src = System.Text.RegularExpressions.Regex.Replace(src, @"/\*.*?\*/", "", System.Text.RegularExpressions.RegexOptions.Singleline);
+        return string.Join("\n", src.Split('\n').Select(line =>
+        {
+            int c = line.IndexOf("//", StringComparison.Ordinal);
+            return c >= 0 ? line.Substring(0, c) : line;
+        }));
+    }
+
+    [Fact]
+    public void NoTreasuryIsAssigned_OutsideTheOneCourtChange()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "Scripts"))) dir = dir.Parent;
+        var root = Path.Combine(dir!.FullName, "Scripts");
+        // the receiver `court` is the court-change delegate's copy of the stored court (or its King form);
+        // the rest are the in-memory court's loaders and a new court's construction (a coronation, a new world)
+        var allowed = new (string File, string Member)[]
+        {
+            ("OnlineStateManager.cs", "ApplyCourtTo("),                 // the loaders' and the change's copy into a King
+            ("CastleLocation.cs", "ChallengeThrone("),                  // coronations: a new King, written whole
+            ("CastleLocation.cs", "CrownNPC("),
+            ("CastleLocation.cs", "CastleSiegeMenu("),
+            ("ChallengeSystem.cs", ""),                                 // a new king's court (kingData)
+            ("WorldInitializerSystem.cs", ""),                          // a new world
+            ("SaveSystem.cs", ""),                                      // the single-player save's own court
+            ("King.cs", "CreateNewKing("),
+            ("WorldSimulator.cs", "ExecutePlot("),                      // these two run only on ApplyKingChangeAsync's copy
+            ("WorldSimulator.cs", "ProcessNPCGuardRecruitment("),
+        };
+        var assign = new System.Text.RegularExpressions.Regex(@"(\b\w+(\(\))?\.)?\bTreasury\s*([-+*/]?=)(?!=)");
+        var offenders = new List<string>();
+        foreach (var path in Directory.GetFiles(root, "*.cs", SearchOption.AllDirectories))
+        {
+            var lines = CodeOnly(File.ReadAllText(path)).Split('\n');
+            string member = "";
+            for (int i = 0; i < lines.Length; i++)
+            {
+                var m0 = System.Text.RegularExpressions.Regex.Match(lines[i], @"^\s{4,8}(public|private|internal|protected)[^=;]*?\b(\w+)\s*\(");
+                if (m0.Success) member = m0.Groups[2].Value + "(";
+                foreach (System.Text.RegularExpressions.Match m in assign.Matches(lines[i]))
+                {
+                    if (m.Value.StartsWith("court.", StringComparison.Ordinal)) continue;                      // the change's copy
+                    if (m.Value.StartsWith("Communal", StringComparison.Ordinal) || lines[i].Contains("CommunalTreasury")) continue;   // the settlement's own
+                    if (lines[i].TrimStart().StartsWith("Treasury =", StringComparison.Ordinal) && lines[i].TrimEnd().EndsWith(",")) continue;   // an initializer of a new record or King
+                    if (lines[i].Contains("new RoyalCourtSaveData")) continue;                                  // a new (empty) court record
+                    string file = Path.GetFileName(path);
+                    if (allowed.Any(a => a.File == file && (a.Member == "" || a.Member == member))) continue;
+                    offenders.Add($"{file}:{i + 1} [{member}] {lines[i].Trim()}");
+                }
+            }
+        }
+        offenders.Should().BeEmpty("every change to a reigning court's treasury goes through OnlineStateManager.ApplyCourtChangeAsync");
+    }
+
+    [Fact]
+    public void TheCarriedTreasuryDelta_IsGone()
+    {
+        var osm = CodeOnly(Source("Systems", "OnlineStateManager.cs")) + CodeOnly(Source("Systems", "WorldSimService.cs"));
+        osm.Should().NotContain("UnsavedTreasury").And.NotContain("TreasuryAfterLoad").And.NotContain("_courtBaselineTreasury")
+            .And.NotContain("TryMoveTreasuryAsync");
     }
 
     [Fact]

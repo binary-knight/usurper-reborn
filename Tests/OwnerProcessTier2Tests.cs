@@ -367,7 +367,7 @@ public class OwnerProcessTier2Tests : IDisposable
         WorldEditLog.NoteLockOwnerId(ownerId);
         var sim = new WorldSimService(_db, heartbeatOwnerId: ownerId);
         typeof(WorldSimService).GetField("lastNpcVersion", Priv)!.SetValue(sim, npcVersion);
-        typeof(WorldSimService).GetField("lastRoyalCourtVersion", Priv)!.SetValue(sim, _db.GetWorldStateVersion("royal_court"));
+        OnlineStateManager.NoteRoyalCourtVersion(_db.GetWorldStateVersion("royal_court"));   // v1.1.13: the sim tracks the process-wide court version
         return sim;
     }
 

@@ -1020,7 +1020,8 @@ public class DailySystemManager
                     var incomeBefore = king.CalculateDailyIncome();
                     var treasuryBefore = king.Treasury;
 
-                    king.ProcessDailyActivities();
+                    await King.ProcessDailyActivitiesAsync(null);   // v1.1.13: through the one court change
+                    king = CastleLocation.GetCurrentKing() ?? king;
 
                     // Process guard loyalty changes based on treasury health
                     ProcessGuardLoyalty(king, treasuryBefore, terminal);

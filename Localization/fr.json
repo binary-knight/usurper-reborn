@@ -2722,6 +2722,7 @@
   "castle.treasury_not_enough": "Le trésor n’a pas autant!",
   "castle.withdrew_gold": "Vous retirez {0} or du trésor.",
   "castle.treasury_move_failed": "Le trésor a changé avant que l’or puisse être déplacé. Rien n’a été déplacé.",
+  "castle.court_change_failed": "La cour royale a changé, ou n’a pas pu le payer, avant que cela puisse être fait. Rien n’a été changé.",
   "castle.deposit_prompt": "Combien déposer? (Vous avez : {0}) : ",
   "castle.not_enough_gold": "Vous n’avez pas autant d’or!",
   "castle.deposited_gold": "Vous déposez {0} or dans le trésor.",

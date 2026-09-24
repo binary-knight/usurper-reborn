@@ -26,7 +26,9 @@ namespace UsurperRemake.Systems
         private DateTime lastSaveTime = DateTime.MinValue;
         private DateTime _lastWorldDailyReset = DateTime.MinValue;  // 7 PM ET world-level daily reset
         private long lastNpcVersion = 0;  // Track world_state NPC version to detect player changes
-        private long lastRoyalCourtVersion = 0;  // Track royal_court version to detect player changes (treasury, taxes, etc.)
+        // v1.1.13: the process-wide court version (OnlineStateManager), which the sessions' court changes advance
+        // with the in-memory court, so the sim never writes under a version its court does not match
+        private long lastRoyalCourtVersion => OnlineStateManager.RoyalCourtVersion ?? 0;
         private string? _lastNpcJsonHash;  // Dirty-check: skip NPC save when nothing changed
 
         // v0.64.1 audit fix: TTL bookkeeping for the engaged-NPC reload
@@ -78,6 +80,7 @@ namespace UsurperRemake.Systems
             // Phase 1: Initialize minimal systems
             InitializeSystems();
             WorldEditLog.NoteLockOwnerId(_heartbeatOwnerId);   // v1.1.13: the lock this process's world sim holds
+            OnlineStateManager.SimCourtStore = sqlBackend;   // v1.1.13: the court the sim's own court changes write to
 
             // Phase 2: Load NPC state from database
             await LoadWorldState();
@@ -104,7 +107,6 @@ namespace UsurperRemake.Systems
 
             // Track initial versions so we can detect player modifications
             lastNpcVersion = sqlBackend.GetWorldStateVersion(OnlineStateManager.KEY_NPCS);
-            lastRoyalCourtVersion = sqlBackend.GetWorldStateVersion("royal_court");
             DebugLogger.Instance.LogInfo("WORLDSIM", $"Initial versions - NPC: {lastNpcVersion}, Royal court: {lastRoyalCourtVersion}");
 
             // Phase 3: Set the NPC XP multiplier
@@ -455,8 +457,7 @@ namespace UsurperRemake.Systems
                     // between, our baseline is older than the content, which
                     // costs one spurious reload next cycle (fail-safe) instead
                     // of letting a guarded write pass against unseen content.
-                    lastRoyalCourtVersion = sqlBackend.GetWorldStateVersion("royal_court");
-                    LoadRoyalCourtFromWorldState();
+                    LoadRoyalCourtFromWorldState();   // v1.1.13: notes the version it read
 
                     // v0.65.0 (CAS): adopt the reloaded version as our baseline.
                     // Pre-CAS this didn't matter (the write was blind); with the
@@ -471,11 +472,10 @@ namespace UsurperRemake.Systems
                 // This catches changes that ONLY affect royal_court without changing NPC data:
                 // treasury deposits, tax policy changes, guard salary payments, etc.
                 long currentRoyalCourtVersion = sqlBackend.GetWorldStateVersion("royal_court");
-                if (currentRoyalCourtVersion > lastRoyalCourtVersion && lastRoyalCourtVersion > 0)
+                if (currentRoyalCourtVersion > lastRoyalCourtVersion)   // v1.1.13: a court never loaded here is loaded too
                 {
                     DebugLogger.Instance.LogInfo("WORLDSIM", $"Royal court modified by player (v{lastRoyalCourtVersion} → v{currentRoyalCourtVersion}). Reloading...");
                     LoadRoyalCourtFromWorldState();
-                    lastRoyalCourtVersion = currentRoyalCourtVersion;
                 }
 
                 // v1.1.13: before every save and after any reload above, the owner re-applies the world edits
@@ -655,213 +655,17 @@ namespace UsurperRemake.Systems
                 var json = sqlBackend.LoadWorldState("royal_court").GetAwaiter().GetResult();
                 if (string.IsNullOrEmpty(json)) return;
 
+                // v1.1.13: the loader both processes share; the court and its version are noted together
                 var royalCourt = JsonSerializer.Deserialize<RoyalCourtSaveData>(json, jsonOptions);
-                var unsaved = OnlineStateManager.UnsavedTreasury();   // v1.1.13: the income and payments not yet stored
-                if (royalCourt != null) CastleLocation.RoyalCourtLoadedFromShared = true;   // v1.1.11
-                if (royalCourt != null) OnlineStateManager.NoteRoyalCourtVersion(version);   // v1.1.13: the process-wide court
-                if (royalCourt == null) return;
-                if (CastleLocation.ApplySharedThroneVacancy(royalCourt))
+                if (OnlineStateManager.ApplyLoadedCourt(royalCourt, version))
                 {
                     // v1.1.11: the NPC succession used whenever there is no king fills it now
                     ChallengeSystem.Instance.ClaimEmptyThroneIfVacant();
                     return;
                 }
-                if (string.IsNullOrEmpty(royalCourt.KingName)) return;
-
                 var king = CastleLocation.GetCurrentKing();
-
-                // Check if king identity changed (player took the throne, or NPC challenge)
-                if (king == null || king.Name != royalCourt.KingName)
-                {
-                    // Create king directly from saved data — don't use SetCurrentKing
-                    // which creates a fresh King with default treasury/empty guards
-                    king = new King
-                    {
-                        Name = royalCourt.KingName,
-                        AI = (CharacterAI)royalCourt.KingAI,
-                        Sex = (CharacterSex)royalCourt.KingSex,
-                        IsActive = true
-                    };
-                    CastleLocation.SetKing(king);
-                    DebugLogger.Instance.LogInfo("WORLDSIM", $"King loaded from world_state: {royalCourt.KingName}");
-                }
-
                 if (king != null)
-                {
-                    // Restore financial/political state from world_state (authoritative)
-                    // v1.1.13: plus this process's unsaved treasury change to the same king, so it is not lost
-                    king.Treasury = OnlineStateManager.TreasuryAfterLoad(unsaved, royalCourt, version);
-                    king.TaxRate = royalCourt.TaxRate;
-                    king.TotalReign = royalCourt.TotalReign;
-                    king.KingTaxPercent = royalCourt.KingTaxPercent > 0 ? royalCourt.KingTaxPercent : 5;
-                    king.CityTaxPercent = royalCourt.CityTaxPercent > 0 ? royalCourt.CityTaxPercent : 2;
-
-                    // Restore coronation date and tax alignment
-                    if (!string.IsNullOrEmpty(royalCourt.CoronationDate))
-                    {
-                        if (DateTime.TryParse(royalCourt.CoronationDate, null, System.Globalization.DateTimeStyles.RoundtripKind, out var coronation))
-                            king.CoronationDate = coronation;
-                    }
-                    king.TaxAlignment = (GameConfig.TaxAlignment)royalCourt.TaxAlignment;
-
-                    // Restore monarch history
-                    if (royalCourt.MonarchHistory != null && royalCourt.MonarchHistory.Count > 0)
-                    {
-                        var history = royalCourt.MonarchHistory.Select(m => new MonarchRecord
-                        {
-                            Name = m.Name,
-                            Title = m.Title,
-                            DaysReigned = m.DaysReigned,
-                            CoronationDate = DateTime.TryParse(m.CoronationDate, null, System.Globalization.DateTimeStyles.RoundtripKind, out var cd) ? cd : DateTime.Now,
-                            EndReason = m.EndReason
-                        }).ToList();
-                        CastleLocation.SetMonarchHistory(history);
-                    }
-
-                    // Restore court members
-                    if (royalCourt.CourtMembers != null)
-                    {
-                        king.CourtMembers = royalCourt.CourtMembers.Select(m => new CourtMember
-                        {
-                            Name = m.Name,
-                            Faction = (CourtFaction)m.Faction,
-                            Influence = m.Influence,
-                            LoyaltyToKing = m.LoyaltyToKing,
-                            Role = m.Role,
-                            IsPlotting = m.IsPlotting
-                        }).ToList();
-                    }
-
-                    // Restore heirs
-                    if (royalCourt.Heirs != null)
-                    {
-                        king.Heirs = royalCourt.Heirs.Select(h => new RoyalHeir
-                        {
-                            Name = h.Name,
-                            Age = h.Age,
-                            ClaimStrength = h.ClaimStrength,
-                            ParentName = h.ParentName,
-                            Sex = (CharacterSex)h.Sex,
-                            IsDesignated = h.IsDesignated
-                        }).ToList();
-                    }
-
-                    // Restore spouse
-                    if (royalCourt.Spouse != null)
-                    {
-                        king.Spouse = new RoyalSpouse
-                        {
-                            Name = royalCourt.Spouse.Name,
-                            Sex = (CharacterSex)royalCourt.Spouse.Sex,
-                            OriginalFaction = (CourtFaction)royalCourt.Spouse.OriginalFaction,
-                            Dowry = royalCourt.Spouse.Dowry,
-                            Happiness = royalCourt.Spouse.Happiness
-                        };
-                    }
-                    else
-                    {
-                        king.Spouse = null; // Ensure old spouse doesn't carry over
-                    }
-
-                    // Restore plots
-                    if (royalCourt.ActivePlots != null)
-                    {
-                        king.ActivePlots = royalCourt.ActivePlots.Select(p => new CourtIntrigue
-                        {
-                            PlotType = p.PlotType,
-                            Conspirators = p.Conspirators ?? new List<string>(),
-                            Target = p.Target,
-                            Progress = p.Progress,
-                            IsDiscovered = p.IsDiscovered
-                        }).ToList();
-                    }
-
-                    king.DesignatedHeir = royalCourt.DesignatedHeir;
-
-                    // Restore guards
-                    if (royalCourt.Guards != null && royalCourt.Guards.Count > 0)
-                    {
-                        king.Guards = royalCourt.Guards.Select(g => new RoyalGuard
-                        {
-                            Name = g.Name,
-                            AI = (CharacterAI)g.AI,
-                            Sex = (CharacterSex)g.Sex,
-                            DailySalary = g.DailySalary,
-                            Loyalty = g.Loyalty,
-                            IsActive = g.IsActive
-                        }).ToList();
-                    }
-
-                    // Restore monster guards
-                    if (royalCourt.MonsterGuards != null && royalCourt.MonsterGuards.Count > 0)
-                    {
-                        king.MonsterGuards = royalCourt.MonsterGuards.Select(m => new MonsterGuard
-                        {
-                            Name = m.Name,
-                            Level = m.Level,
-                            HP = m.HP,
-                            MaxHP = m.MaxHP,
-                            Strength = m.Strength,
-                            Defence = m.Defence,
-                            WeapPow = m.WeapPow,
-                            ArmPow = m.ArmPow,
-                            MonsterType = m.MonsterType,
-                            PurchaseCost = m.PurchaseCost,
-                            DailyFeedingCost = m.DailyFeedingCost
-                        }).ToList();
-                    }
-
-                    // Phase 2 — restore previously unserialized fields
-                    if (royalCourt.Prisoners != null && royalCourt.Prisoners.Count > 0)
-                    {
-                        king.Prisoners = royalCourt.Prisoners.ToDictionary(
-                            p => p.CharacterName,
-                            p => new PrisonRecord
-                            {
-                                CharacterName = p.CharacterName,
-                                Crime = p.Crime,
-                                Sentence = p.Sentence,
-                                DaysServed = p.DaysServed,
-                                ImprisonmentDate = DateTime.TryParse(p.ImprisonmentDate, out var impDate) ? impDate : DateTime.Now,
-                                BailAmount = p.BailAmount
-                            });
-                    }
-
-                    if (royalCourt.Orphans != null && royalCourt.Orphans.Count > 0)
-                    {
-                        king.Orphans = royalCourt.Orphans.Select(o => new RoyalOrphan
-                        {
-                            Name = o.Name,
-                            Age = o.Age,
-                            Sex = (CharacterSex)o.Sex,
-                            ArrivalDate = DateTime.TryParse(o.ArrivalDate, out var arrDate) ? arrDate : DateTime.Now,
-                            BackgroundStory = o.BackgroundStory,
-                            Happiness = o.Happiness,
-                            MotherName = o.MotherName,
-                            FatherName = o.FatherName,
-                            MotherID = o.MotherID,
-                            FatherID = o.FatherID,
-                            Race = (CharacterRace)o.Race,
-                            BirthDate = DateTime.TryParse(o.BirthDate, out var bd) ? bd : DateTime.Now,
-                            Soul = o.Soul,
-                            IsRealOrphan = o.IsRealOrphan
-                        }).ToList();
-                    }
-
-                    king.MagicBudget = royalCourt.MagicBudget;
-
-                    if (royalCourt.EstablishmentStatus != null && royalCourt.EstablishmentStatus.Count > 0)
-                        king.EstablishmentStatus = new Dictionary<string, bool>(royalCourt.EstablishmentStatus);
-
-                    if (!string.IsNullOrEmpty(royalCourt.LastProclamation))
-                        king.LastProclamation = royalCourt.LastProclamation;
-
-                    if (!string.IsNullOrEmpty(royalCourt.LastProclamationDate) &&
-                        DateTime.TryParse(royalCourt.LastProclamationDate, out var procDate))
-                        king.LastProclamationDate = procDate;
-
                     DebugLogger.Instance.LogDebug("WORLDSIM", $"Royal court loaded: King {king.Name}, Treasury {king.Treasury:N0}, Guards {king.Guards.Count}, Monsters {king.MonsterGuards.Count}");
-                }
             }
             catch (Exception ex)
             {
@@ -879,165 +683,25 @@ namespace UsurperRemake.Systems
             try
             {
                 var king = CastleLocation.GetCurrentKing();
-                if (king == null)
+                // v1.1.13: a vacancy a throne edit made here is written as one; otherwise nothing to write
+                if (king == null && !_courtChangedByEdit)
+                    return lastRoyalCourtVersion == sqlBackend.GetWorldStateVersion("royal_court");
+
+                // v1.1.13: the in-memory court is written under the version it was loaded at or last written as.
+                // Every change to it (tax, upkeep, payments, purchases) was already its own guarded write, so on
+                // a conflict the stored court is loaded and this copy is not written over it.
+                var (json, loadedAt) = OnlineStateManager.SnapshotCourt(throneVacated: true);
+                long version = loadedAt ?? (sqlBackend.GetWorldStateVersion("royal_court") == 0 ? 0 : -1);
+                if (version >= 0 && await sqlBackend.SaveWorldStateIfVersion("royal_court", json, version))
                 {
-                    // v1.1.13: a vacancy a throne edit made here is written as one; otherwise nothing to write
-                    if (!_courtChangedByEdit)
-                        return lastRoyalCourtVersion == sqlBackend.GetWorldStateVersion("royal_court");
-                    if (!await sqlBackend.SaveWorldStateIfVersion("royal_court", OnlineStateManager.EmptyRoyalCourtJson(throneVacated: true), lastRoyalCourtVersion))
-                        return false;
-                    lastRoyalCourtVersion = lastRoyalCourtVersion + 1;
-                    OnlineStateManager.NoteRoyalCourtVersion(lastRoyalCourtVersion);
+                    OnlineStateManager.NoteCourtWritten(version);
                     _courtChangedByEdit = false;
                     return true;
                 }
-
-                var data = new RoyalCourtSaveData
-                {
-                    KingName = king.Name,
-                    Treasury = king.Treasury,
-                    TaxRate = king.TaxRate,
-                    TotalReign = king.TotalReign,
-                    KingTaxPercent = king.KingTaxPercent,
-                    CityTaxPercent = king.CityTaxPercent,
-                    DesignatedHeir = king.DesignatedHeir ?? "",
-                    KingAI = (int)king.AI,
-                    KingSex = (int)king.Sex,
-                    CoronationDate = king.CoronationDate.ToString("o"),
-                    TaxAlignment = (int)king.TaxAlignment,
-                    MonarchHistory = CastleLocation.GetMonarchHistory()?.Select(m => new MonarchRecordSaveData
-                    {
-                        Name = m.Name,
-                        Title = m.Title,
-                        DaysReigned = m.DaysReigned,
-                        CoronationDate = m.CoronationDate.ToString("o"),
-                        EndReason = m.EndReason
-                    }).ToList() ?? new List<MonarchRecordSaveData>(),
-                    CourtMembers = king.CourtMembers?.Select(m => new CourtMemberSaveData
-                    {
-                        Name = m.Name,
-                        Faction = (int)m.Faction,
-                        Influence = m.Influence,
-                        LoyaltyToKing = m.LoyaltyToKing,
-                        Role = m.Role,
-                        IsPlotting = m.IsPlotting
-                    }).ToList() ?? new List<CourtMemberSaveData>(),
-                    Heirs = king.Heirs?.Select(h => new RoyalHeirSaveData
-                    {
-                        Name = h.Name,
-                        Age = h.Age,
-                        ClaimStrength = h.ClaimStrength,
-                        ParentName = h.ParentName,
-                        Sex = (int)h.Sex,
-                        IsDesignated = h.IsDesignated
-                    }).ToList() ?? new List<RoyalHeirSaveData>(),
-                    Spouse = king.Spouse != null ? new RoyalSpouseSaveData
-                    {
-                        Name = king.Spouse.Name,
-                        Sex = (int)king.Spouse.Sex,
-                        OriginalFaction = (int)king.Spouse.OriginalFaction,
-                        Dowry = king.Spouse.Dowry,
-                        Happiness = king.Spouse.Happiness
-                    } : null,
-                    ActivePlots = king.ActivePlots?.Select(p => new CourtIntrigueSaveData
-                    {
-                        PlotType = p.PlotType,
-                        Conspirators = p.Conspirators,
-                        Target = p.Target,
-                        Progress = p.Progress,
-                        IsDiscovered = p.IsDiscovered
-                    }).ToList() ?? new List<CourtIntrigueSaveData>(),
-                    Guards = king.Guards?.Select(g => new RoyalGuardSaveData
-                    {
-                        Name = g.Name,
-                        AI = (int)g.AI,
-                        Sex = (int)g.Sex,
-                        DailySalary = g.DailySalary,
-                        Loyalty = g.Loyalty,
-                        IsActive = g.IsActive
-                    }).ToList() ?? new List<RoyalGuardSaveData>(),
-                    MonsterGuards = king.MonsterGuards?.Select(m => new MonsterGuardSaveData
-                    {
-                        Name = m.Name,
-                        Level = m.Level,
-                        HP = m.HP,
-                        MaxHP = m.MaxHP,
-                        Strength = m.Strength,
-                        Defence = m.Defence,
-                        WeapPow = m.WeapPow,
-                        ArmPow = m.ArmPow,
-                        MonsterType = m.MonsterType,
-                        PurchaseCost = m.PurchaseCost,
-                        DailyFeedingCost = m.DailyFeedingCost
-                    }).ToList() ?? new List<MonsterGuardSaveData>(),
-
-                    // Phase 2 — previously unserialized fields
-                    Prisoners = king.Prisoners?.Select(kvp => new PrisonRecordSaveData
-                    {
-                        CharacterName = kvp.Value.CharacterName,
-                        Crime = kvp.Value.Crime,
-                        Sentence = kvp.Value.Sentence,
-                        DaysServed = kvp.Value.DaysServed,
-                        ImprisonmentDate = kvp.Value.ImprisonmentDate.ToString("o"),
-                        BailAmount = kvp.Value.BailAmount
-                    }).ToList() ?? new List<PrisonRecordSaveData>(),
-                    Orphans = king.Orphans?.Select(o => new RoyalOrphanSaveData
-                    {
-                        Name = o.Name,
-                        Age = o.Age,
-                        Sex = (int)o.Sex,
-                        ArrivalDate = o.ArrivalDate.ToString("o"),
-                        BackgroundStory = o.BackgroundStory,
-                        Happiness = o.Happiness,
-                        MotherName = o.MotherName,
-                        FatherName = o.FatherName,
-                        MotherID = o.MotherID,
-                        FatherID = o.FatherID,
-                        Race = (int)o.Race,
-                        BirthDate = o.BirthDate.ToString("o"),
-                        Soul = o.Soul,
-                        IsRealOrphan = o.IsRealOrphan
-                    }).ToList() ?? new List<RoyalOrphanSaveData>(),
-                    MagicBudget = king.MagicBudget,
-                    EstablishmentStatus = king.EstablishmentStatus ?? new Dictionary<string, bool>(),
-                    LastProclamation = king.LastProclamation ?? "",
-                    LastProclamationDate = king.LastProclamationDate != DateTime.MinValue
-                        ? king.LastProclamationDate.ToString("o") : ""
-                };
-
-                var json = JsonSerializer.Serialize(data, jsonOptions);
-
-                // v0.65.0 (CAS): the royal_court version check at the top of
-                // SaveWorldState and this write are separated by the entire
-                // ~18 MB NPC capture/serialize block, so a player session's
-                // PersistRoyalCourtToWorldState (treasury, taxes, throne)
-                // landing in that window used to be clobbered here. Same guard
-                // pattern as the NPC write: conflict -> skip -> next cycle's
-                // version check reloads before re-saving.
-                bool wrote = await sqlBackend.SaveWorldStateIfVersion("royal_court", json, lastRoyalCourtVersion);
-                if (wrote)
-                {
-                    // CAS guarantees expected -> expected+1; compute locally
-                    // (a re-read could adopt a concurrent player write's
-                    // version and skip the reload it was owed).
-                    lastRoyalCourtVersion = lastRoyalCourtVersion + 1;
-                    OnlineStateManager.NoteRoyalCourtVersion(lastRoyalCourtVersion, data.KingName, data.Treasury);   // v1.1.13: sessions share this court
-                    _courtChangedByEdit = false;
-                    return true;
-                }
-                else
-                {
-                    // Zero-edge: row created by another writer between startup
-                    // and our first save. The reload trigger requires
-                    // lastRoyalCourtVersion > 0, so adopt a baseline (shared
-                    // in-process object graph makes the content equivalent).
-                    if (lastRoyalCourtVersion == 0)
-                        lastRoyalCourtVersion = sqlBackend.GetWorldStateVersion("royal_court");
-
-                    DebugLogger.Instance.LogInfo("WORLDSIM",
-                        "Royal court save skipped: version conflict or write error (likely a player write during our save window). Will reload next cycle.");
-                    return false;
-                }
+                DebugLogger.Instance.LogInfo("WORLDSIM",
+                    "Royal court save skipped: the stored court changed since it was loaded. Reloading it.");
+                LoadRoyalCourtFromWorldState();
+                return false;
             }
             catch (Exception ex)
             {
@@ -2219,80 +1883,92 @@ namespace UsurperRemake.Systems
         /// Handles king activities, guard loyalty, treasury, and world events.
         /// Player-specific resets are handled by DailySystemManager.ProcessPlayerDailyEvents().
         /// </summary>
+        /// <summary>
+        /// v1.1.13: the court's day (King.ProcessDailyActivitiesAsync) with the guards' loyalty, desertions and
+        /// the treasury crisis, applied to the stored court in one guarded change. The news goes out once the
+        /// change is written. beforeWrite is a test hook.
+        /// </summary>
+        internal async Task<bool> ProcessCourtDailyAsync(Func<Task>? beforeWrite = null)
+        {
+            var king = CastleLocation.GetCurrentKing();
+            if (king == null) return false;
+            var treasuryBefore = king.Treasury;
+            // the recruitment date is not stored with the court; the in-memory guards carry it
+            var recruited = king.Guards.GroupBy(g => g.Name).ToDictionary(g => g.Key, g => g.First().RecruitmentDate);
+            var news = new List<(bool, string)>();
+            var random = Random.Shared;
+            bool done = await King.ProcessDailyActivitiesAsync(sqlBackend, court =>
+            {
+                news.Clear();
+                // Process guard loyalty changes based on treasury health
+                long expenses = King.DailyExpensesOf(court);
+                var guardsToRemove = new List<RoyalGuardSaveData>();
+                foreach (var guard in court.Guards)
+                {
+                    if (court.Treasury < expenses)
+                        guard.Loyalty = Math.Max(0, guard.Loyalty - 5);
+                    else
+                        guard.Loyalty = Math.Min(100, guard.Loyalty + 1);
+
+                    if (recruited.TryGetValue(guard.Name, out var joined) && (DateTime.Now - joined).TotalDays > 30)
+                        guard.Loyalty = Math.Min(100, guard.Loyalty + 1);
+
+                    if (guard.Loyalty <= 10)
+                    {
+                        guardsToRemove.Add(guard);
+                        news.Add((true, $"Guard {guard.Name} has deserted the royal service!"));
+                    }
+                    else if (guard.Loyalty <= 25 && random.Next(100) < 10)
+                    {
+                        guardsToRemove.Add(guard);
+                        news.Add((true, $"Disgruntled guard {guard.Name} has abandoned their post!"));
+                    }
+                }
+                foreach (var deserter in guardsToRemove)
+                    court.Guards.Remove(deserter);
+
+                // Treasury crisis check
+                if (court.Treasury < King.DailyExpensesOf(court))
+                {
+                    foreach (var guard in court.Guards)
+                        guard.Loyalty = Math.Max(0, guard.Loyalty - 3);
+
+                    var escapedMonsters = court.MonsterGuards.Where(_ => random.Next(100) < 10).ToList();
+                    foreach (var monster in escapedMonsters)
+                    {
+                        news.Add((true, $"The unfed {monster.Name} has escaped from the castle moat!"));
+                        court.MonsterGuards.Remove(monster);
+                    }
+
+                    if (court.Guards.Count > 0 || court.MonsterGuards.Count > 0)
+                        news.Add((false, $"Royal treasury crisis! Guards and monsters go unpaid!"));
+                }
+                return true;
+            }, beforeWrite);
+            if (!done) return false;
+
+            foreach (var (important, text) in news)
+                NewsSystem.Instance?.Newsy(important, text);
+
+            king = CastleLocation.GetCurrentKing();
+            if (king == null) return true;
+            // Log financial summary
+            var netChange = king.CalculateDailyIncome() - king.CalculateDailyExpenses();
+            if (netChange < 0 && Math.Abs(netChange) > 100)
+                NewsSystem.Instance?.Newsy(false, $"The royal treasury hemorrhages {Math.Abs(netChange)} gold daily!");
+
+            DebugLogger.Instance.LogInfo("WORLDSIM",
+                $"World daily reset: King {king.Name}, Treasury {treasuryBefore:N0} -> {king.Treasury:N0}, Reign day {king.TotalReign}");
+            return true;
+        }
+
         private void ProcessWorldDailyReset()
         {
             try
             {
-                var king = CastleLocation.GetCurrentKing();
-                if (king?.IsActive == true)
-                {
-                    var treasuryBefore = king.Treasury;
-
-                    // King daily activities: treasury income/expenses, TotalReign++, prisoner processing
-                    king.ProcessDailyActivities();
-
-                    // Process guard loyalty changes based on treasury health
-                    var guardsToRemove = new List<RoyalGuard>();
-                    var random = Random.Shared;
-                    foreach (var guard in king.Guards)
-                    {
-                        if (king.Treasury < king.CalculateDailyExpenses())
-                        {
-                            guard.Loyalty = Math.Max(0, guard.Loyalty - 5);
-                        }
-                        else
-                        {
-                            guard.Loyalty = Math.Min(100, guard.Loyalty + 1);
-                        }
-
-                        var daysServed = (DateTime.Now - guard.RecruitmentDate).TotalDays;
-                        if (daysServed > 30)
-                            guard.Loyalty = Math.Min(100, guard.Loyalty + 1);
-
-                        if (guard.Loyalty <= 10)
-                        {
-                            guardsToRemove.Add(guard);
-                            NewsSystem.Instance?.Newsy(true, $"Guard {guard.Name} has deserted the royal service!");
-                        }
-                        else if (guard.Loyalty <= 25 && random.Next(100) < 10)
-                        {
-                            guardsToRemove.Add(guard);
-                            NewsSystem.Instance?.Newsy(true, $"Disgruntled guard {guard.Name} has abandoned their post!");
-                        }
-                    }
-                    foreach (var deserter in guardsToRemove)
-                        king.Guards.Remove(deserter);
-
-                    // Treasury crisis check
-                    if (king.Treasury < king.CalculateDailyExpenses())
-                    {
-                        foreach (var guard in king.Guards)
-                            guard.Loyalty = Math.Max(0, guard.Loyalty - 3);
-
-                        var escapedMonsters = new List<MonsterGuard>();
-                        foreach (var monster in king.MonsterGuards)
-                        {
-                            if (random.Next(100) < 10)
-                            {
-                                escapedMonsters.Add(monster);
-                                NewsSystem.Instance?.Newsy(true, $"The unfed {monster.Name} has escaped from the castle moat!");
-                            }
-                        }
-                        foreach (var monster in escapedMonsters)
-                            king.MonsterGuards.Remove(monster);
-
-                        if (king.Guards.Count > 0 || king.MonsterGuards.Count > 0)
-                            NewsSystem.Instance?.Newsy(false, $"Royal treasury crisis! Guards and monsters go unpaid!");
-                    }
-
-                    // Log financial summary
-                    var netChange = king.CalculateDailyIncome() - king.CalculateDailyExpenses();
-                    if (netChange < 0 && Math.Abs(netChange) > 100)
-                        NewsSystem.Instance?.Newsy(false, $"The royal treasury hemorrhages {Math.Abs(netChange)} gold daily!");
-
-                    DebugLogger.Instance.LogInfo("WORLDSIM",
-                        $"World daily reset: King {king.Name}, Treasury {treasuryBefore:N0} -> {king.Treasury:N0}, Reign day {king.TotalReign}");
-                }
+                // v1.1.13: the day's treasury, reign, prisoners and guards, as one guarded court change
+                if (CastleLocation.GetCurrentKing()?.IsActive == true)
+                    ProcessCourtDailyAsync().GetAwaiter().GetResult();
 
                 // Process world events
                 WorldEventSystem.Instance.ProcessDailyEvents(0);

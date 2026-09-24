@@ -5762,18 +5762,25 @@ public class WorldSimulator
                 // NPC applies and is accepted!
                 long salary = GameConfig.BaseGuardSalary + (npc.Level * GameConfig.GuardSalaryPerGuardLevel);
 
-                var guard = new RoyalGuard
-                {
-                    Name = npc.Name,
-                    AI = CharacterAI.Computer,
-                    Sex = npc.Sex,
-                    DailySalary = salary,
-                    RecruitmentDate = DateTime.Now,
-                    Loyalty = 80 + random.Next(21), // 80-100 loyalty
-                    IsActive = true
-                };
-
-                king.Guards.Add(guard);
+                // v1.1.13: the guard joins the stored court as one guarded court change
+                int loyalty = 80 + random.Next(21); // 80-100 loyalty
+                string guardName = npc.Name;
+                var guardSex = npc.Sex;
+                if (!CastleLocation.CourtChangeAsync(court =>
+                    {
+                        if (court.Guards.Count >= GameConfig.MaxRoyalGuards || court.Guards.Any(g => g.Name == guardName)) return false;
+                        court.Guards.Add(new RoyalGuardSaveData
+                        {
+                            Name = guardName,
+                            AI = (int)CharacterAI.Computer,
+                            Sex = (int)guardSex,
+                            DailySalary = salary,
+                            Loyalty = loyalty,
+                            IsActive = true
+                        });
+                        return true;
+                    }).GetAwaiter().GetResult())
+                    return;
 
                 // News announcement
                 NewsSystem.Instance?.Newsy(true, $"{npc.Name} has joined the Royal Guard!");
@@ -5789,9 +5796,12 @@ public class WorldSimulator
             if (npc.Gold > 500 && npc.Chivalry > 50)
             {
                 long donation = Math.Min(npc.Gold / 10, 200 + npc.Level * 10);
-                npc.SpendGold(donation);
-                king.Treasury += donation;
-                npc.Chivalry += (int)Math.Min(5, donation / 50);
+                // v1.1.13: into the stored treasury as one guarded court change; the NPC pays once it is written
+                if (CastleLocation.CourtChangeAsync(court => { court.Treasury += donation; return true; }).GetAwaiter().GetResult())
+                {
+                    npc.SpendGold(donation);
+                    npc.Chivalry += (int)Math.Min(5, donation / 50);
+                }
             }
         }
 
@@ -6381,9 +6391,25 @@ public class WorldSimulator
     {
         try
         {
-            var king = CastleLocation.GetCurrentKing();
-            if (king == null || !king.IsActive) return;
+            var current = CastleLocation.GetCurrentKing();
+            if (current == null || !current.IsActive) return;
 
+            // v1.1.13: the tick's court politics run on a copy of the stored court and are written as one
+            // guarded court change (only when something changed); the in-memory court is then the written one
+            string expected = current.Name;
+            OnlineStateManager.ApplyKingChangeAsync(OnlineStateManager.CourtStoreFor(CastleLocation.TreasuryOsm()),
+                king => king.Name == expected && CourtPoliticsTick(king)).GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+            {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SYSTEM", $"Swallowed exception: {ex.Message}");
+            }
+    }
+
+    /// <summary>v1.1.13: one tick of court politics on the court's working copy (see ProcessRoyalCourtPolitics).</summary>
+    private bool CourtPoliticsTick(King king)
+    {
+        {
             // NPC guard recruitment (10% chance per tick if there are openings)
             if (king.Guards.Count < King.MaxNPCGuards && (float)Random.Shared.NextDouble() < 0.10f)
             {
@@ -6402,10 +6428,7 @@ public class WorldSimulator
                 AdvancePlot(king, plot);
             }
         }
-        catch (Exception ex)
-            {
-                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SYSTEM", $"Swallowed exception: {ex.Message}");
-            }
+        return true;
     }
 
     /// <summary>

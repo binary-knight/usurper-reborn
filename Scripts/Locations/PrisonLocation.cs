@@ -465,20 +465,15 @@ public partial class PrisonLocation : BaseLocation
             return false;
         }
 
-        // Pay bail
-        player.Gold -= record.BailAmount;
+        // v1.1.13: the bail into the treasury and the release are one guarded court change; the gold
+        // leaves and the cell opens only once it is written
         long bailPaid = record.BailAmount;
-
-        // Add bail to king's treasury
-        king.Treasury += bailPaid;
-
-        // Release from prison
-        player.DaysInPrison = 0;
-        king.Prisoners.Remove(playerName);
-
-        // Persist changes
-        if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
-            CastleLocation.PersistRoyalCourtToWorldStateStatic();
+        if (!await PayBailAsync(CastleLocation.TreasuryOsm(), player, playerName, bailPaid))
+        {
+            await terminal.WriteColorLineAsync($"  {Loc.Get("castle.court_change_failed")}", TerminalEmulator.ColorRed);
+            await Task.Delay(2000);
+            return false;
+        }
 
         await terminal.WriteLineAsync();
         await terminal.WriteColorLineAsync($"  You pay {bailPaid:N0} gold to the jailer.", TerminalEmulator.ColorYellow);
@@ -490,6 +485,27 @@ public partial class PrisonLocation : BaseLocation
 
         await terminal.WaitForKey();
         return true; // Exit prison
+    }
+
+    /// <summary>
+    /// v1.1.13: bail paid into the stored treasury and the prisoner's record removed in one guarded court
+    /// change; the player's gold leaves and the prison days clear only once it is written.
+    /// </summary>
+    internal static async Task<bool> PayBailAsync(UsurperRemake.Systems.OnlineStateManager? osm, Character player, string playerName, long bail,
+        Func<Task>? beforeWrite = null)
+    {
+        if (player.Gold < bail) return false;
+        if (!await CastleLocation.CourtChangeAsync(osm, court =>
+            {
+                var stored = court.Prisoners.FirstOrDefault(p => p.CharacterName == playerName);
+                if (stored == null || stored.BailAmount != bail) return false;
+                court.Treasury += bail;
+                court.Prisoners.Remove(stored);
+                return true;
+            }, beforeWrite)) return false;
+        player.Gold -= bail;
+        player.DaysInPrison = 0;
+        return true;
     }
 
     /// <summary>
@@ -583,12 +599,11 @@ public partial class PrisonLocation : BaseLocation
                 await terminal.WriteColorLineAsync("  The king considers your plea for mercy...", TerminalEmulator.ColorWhite);
                 await Task.Delay(2000);
 
-                if (Random.Shared.Next(100) < pardonChance)
+                // v1.1.13: the release is one guarded court change; the player walks free once it is written
+                if (Random.Shared.Next(100) < pardonChance
+                    && await CastleLocation.CourtChangeAsync(CastleLocation.TreasuryOsm(), court => court.Prisoners.RemoveAll(p => p.CharacterName == playerName) > 0))
                 {
                     player.DaysInPrison = 0;
-                    king.Prisoners.Remove(playerName);
-                    if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
-                        CastleLocation.PersistRoyalCourtToWorldStateStatic();
 
                     await terminal.WriteColorLineAsync("  \"Very well. I shall show mercy this once.\"", TerminalEmulator.ColorGreen);
                     await terminal.WriteColorLineAsync("  The king pardons you! You are free!", TerminalEmulator.ColorGreen);

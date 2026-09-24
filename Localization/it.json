@@ -2722,6 +2722,7 @@
   "castle.treasury_not_enough": "Il tesoro non contiene abbastanza!",
   "castle.withdrew_gold": "Prelevato {0} oro dal tesoro.",
   "castle.treasury_move_failed": "Il tesoro è cambiato prima che l'oro potesse essere spostato. Non è stato spostato nulla.",
+  "castle.court_change_failed": "La corte reale è cambiata, o non poteva permetterselo, prima che questo potesse essere fatto. Non è cambiato nulla.",
   "castle.deposit_prompt": "Quanto depositare? (Possiedi: {0}): ",
   "castle.not_enough_gold": "Non hai abbastanza oro!",
   "castle.deposited_gold": "Depositato {0} oro nel tesoro.",

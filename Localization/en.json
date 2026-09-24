@@ -2722,6 +2722,7 @@
   "castle.treasury_not_enough": "The treasury doesn't have that much!",
   "castle.withdrew_gold": "Withdrew {0} gold from the treasury.",
   "castle.treasury_move_failed": "The treasury changed before the gold could be moved. Nothing was moved.",
+  "castle.court_change_failed": "The royal court changed, or could not afford it, before this could be done. Nothing was changed.",
   "castle.deposit_prompt": "Deposit how much? (You have: {0}): ",
   "castle.not_enough_gold": "You don't have that much gold!",
   "castle.deposited_gold": "Deposited {0} gold to the treasury.",

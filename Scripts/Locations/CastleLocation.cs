@@ -1305,7 +1305,17 @@ public class CastleLocation : BaseLocation
             sentence = target.IsNPC ? Math.Min(s, 30) : Math.Min(s, 1); // Players: max 1 day; NPCs: max 30
 
         // Add to king's prison records
-        currentKing.ImprisonCharacter(target.Name, sentence, crime);
+        // v1.1.13: one guarded court change; the arrest follows only once it is written
+        if (!await CourtChangeAsync(court =>
+            {
+                court.Prisoners.RemoveAll(p => p.CharacterName == target.Name);
+                court.Prisoners.Add(PrisonerRecord(target.Name, sentence, crime));
+                return true;
+            }))
+        {
+            await ShowCourtChangeFailed();
+            return;
+        }
 
         // Actually enforce the imprisonment
         if (target.IsNPC)
@@ -1370,10 +1380,6 @@ public class CastleLocation : BaseLocation
             }
         }
 
-        // Persist royal court changes in online mode
-        if (DoorMode.IsOnlineMode)
-            PersistRoyalCourtToWorldState();
-
         terminal.SetColor("bright_green");
         terminal.WriteLine(Loc.Get("castle.imprisoned_confirm", target.Name, sentence));
         NewsSystem.Instance.Newsy(true, $"{currentKing.GetTitle()} {currentKing.Name} imprisoned {target.Name} for {crime}!");
@@ -1413,7 +1419,7 @@ public class CastleLocation : BaseLocation
         }
 
         string name = keys[idx - 1];
-        if (currentKing.ReleaseCharacter(name))
+        if (await CourtChangeAsync(court => court.Prisoners.RemoveAll(p => p.CharacterName == name) > 0))   // v1.1.13: one guarded court change
         {
             // Actually release the NPC
             var npc = NPCSpawnSystem.Instance?.GetNPCByName(name);
@@ -1437,7 +1443,6 @@ public class CastleLocation : BaseLocation
                     }
                     catch { /* notification failed */ }
                 }
-                PersistRoyalCourtToWorldState();
             }
 
             terminal.SetColor("bright_green");
@@ -1488,7 +1493,12 @@ public class CastleLocation : BaseLocation
 
         if (GameConfig.IsAffirmative(confirm))
         {
-            currentKing.Prisoners.Remove(name);
+            // v1.1.13: one guarded court change; the execution follows only once it is written
+            if (!await CourtChangeAsync(court => court.Prisoners.RemoveAll(p => p.CharacterName == name) > 0))
+            {
+                await ShowCourtChangeFailed();
+                return;
+            }
             AlignmentSystem.Instance.ChangeAlignment(currentPlayer, 100, isGood: false, "castle.execute_prisoner"); // v0.57.12: paired movement
 
             // Permadeath the NPC
@@ -1520,7 +1530,6 @@ public class CastleLocation : BaseLocation
                     // ImprisonPlayer(name, 0) already set DaysInPrison=0 in DB
                     // Player picks up the release on next save/load cycle
                 }
-                PersistRoyalCourtToWorldState();
             }
 
             terminal.SetColor("red");
@@ -2111,7 +2120,18 @@ public class CastleLocation : BaseLocation
 
         if (long.TryParse(amountStr, out long amount) && amount >= 0)
         {
-            currentKing.Prisoners[name].BailAmount = amount;
+            // v1.1.13: one guarded court change
+            if (!await CourtChangeAsync(court =>
+                {
+                    var record = court.Prisoners.FirstOrDefault(p => p.CharacterName == name);
+                    if (record == null) return false;
+                    record.BailAmount = amount;
+                    return true;
+                }))
+            {
+                await ShowCourtChangeFailed();
+                return;
+            }
             terminal.SetColor("bright_green");
             if (amount > 0)
             {
@@ -2152,9 +2172,6 @@ public class CastleLocation : BaseLocation
             }
             else
                 terminal.WriteLine(Loc.Get("castle.no_bail", name));
-
-            if (DoorMode.IsOnlineMode)
-                PersistRoyalCourtToWorldState();
         }
 
         await Task.Delay(2000);
@@ -2337,7 +2354,7 @@ public class CastleLocation : BaseLocation
         else
         {
             // Single-player mode: process daily activities and continue
-            currentKing.ProcessDailyActivities();
+            await King.ProcessDailyActivitiesAsync(null);   // v1.1.13: through the one court change
 
             terminal.SetColor("bright_green");
             terminal.WriteLine(Loc.Get("castle.rest_night"));
@@ -2589,14 +2606,14 @@ public class CastleLocation : BaseLocation
         {
             var (name, level, cost) = sortedMonsters[choice - 1];
 
-            if (currentKing.AddMonsterGuard(name, level, cost))
+            // v1.1.13: the monster joins and its cost leaves the stored treasury in one guarded court change
+            if (await CourtChangeAsync(court => King.AddMonsterGuard(court, name, level, cost)))
             {
                 terminal.SetColor("bright_green");
                 // v0.62.1 article fix.
                 terminal.WriteLine(Loc.Get("castle.monster_added", GameConfig.ArticulateForLanguage(name)));
                 terminal.WriteLine(Loc.Get("castle.beast_lurks"));
                 NewsSystem.Instance.Newsy(true, $"{currentKing.GetTitle()} {currentKing.Name} acquired a fearsome {name} to guard the castle!");
-                PersistRoyalCourtToWorldState();
             }
             else
             {
@@ -2623,11 +2640,10 @@ public class CastleLocation : BaseLocation
         terminal.SetColor("white");
         string name = await terminal.ReadLineAsync();
 
-        if (currentKing.RemoveMonsterGuard(name))
+        if (await CourtChangeAsync(court => court.MonsterGuards.RemoveAll(m => m.Name == name) > 0))   // v1.1.13: one guarded court change
         {
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("castle.monster_released", name));
-            PersistRoyalCourtToWorldState();
         }
         else
         {
@@ -2671,12 +2687,14 @@ public class CastleLocation : BaseLocation
             // Scale guard salary with king level (guards hired by stronger kings demand more pay)
             int kLevel = GetKingLevel();
             long guardSalary = GameConfig.BaseGuardSalary + (kLevel * GameConfig.GuardSalaryPerGuardLevel);
-            if (currentKing.AddGuard(guardName, CharacterAI.Computer, sex, guardSalary))
+            // v1.1.13: the guard joins and the recruitment cost leaves the stored treasury in one guarded court change
+            if (await CourtChangeAsync(court => King.AddGuard(court, guardName, CharacterAI.Computer, sex, guardSalary)))
             {
                 terminal.SetColor("bright_green");
                 terminal.WriteLine(Loc.Get("castle.guard_joined", guardName));
-                PersistRoyalCourtToWorldState();
             }
+            else
+                await ShowCourtChangeFailed();
         }
 
         await Task.Delay(2000);
@@ -2697,11 +2715,10 @@ public class CastleLocation : BaseLocation
         terminal.SetColor("white");
         string name = await terminal.ReadLineAsync();
 
-        if (currentKing.RemoveGuard(name))
+        if (await CourtChangeAsync(court => court.Guards.RemoveAll(g => g.Name == name) > 0))   // v1.1.13: one guarded court change
         {
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("castle.guard_dismissed", name));
-            PersistRoyalCourtToWorldState();
         }
         else
         {
@@ -2735,21 +2752,37 @@ public class CastleLocation : BaseLocation
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("castle.insufficient_treasury_bonus"));
             }
+            else if (!await PayGuardBonusAsync(TreasuryOsm(), bonus))
+            {
+                await ShowCourtChangeFailed();
+            }
             else
             {
-                currentKing.Treasury -= totalCost;
-                foreach (var guard in currentKing.Guards)
-                {
-                    guard.Loyalty = Math.Min(100, guard.Loyalty + (int)(bonus / 100));
-                }
                 terminal.SetColor("bright_green");
                 terminal.WriteLine(Loc.Get("castle.bonus_paid", bonus.ToString("N0")));
                 terminal.WriteLine(Loc.Get("castle.loyalty_increased"));
-                PersistRoyalCourtToWorldState();
             }
         }
 
         await Task.Delay(2000);
+    }
+
+    /// <summary>
+    /// v1.1.13: a bonus to every guard of the stored court: the cost leaves the treasury and each guard's
+    /// loyalty rises in the same guarded court change, so a conflict never keeps one without the other.
+    /// </summary>
+    internal static Task<bool> PayGuardBonusAsync(OnlineStateManager? osm, long bonus, Func<Task>? beforeWrite = null)
+    {
+        string? expected = currentKing?.Name;
+        return CourtChangeAsync(osm, court =>
+        {
+            long totalCost = bonus * court.Guards.Count;
+            if (court.KingName != expected || court.Guards.Count == 0 || totalCost > court.Treasury) return false;
+            court.Treasury -= totalCost;
+            foreach (var guard in court.Guards)
+                guard.Loyalty = Math.Min(100, guard.Loyalty + (int)(bonus / 100));
+            return true;
+        }, beforeWrite);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -2877,7 +2910,12 @@ public class CastleLocation : BaseLocation
             return;
         }
 
-        currentKing.MagicBudget -= 1000;
+        // v1.1.13: the spell's cost leaves the stored magic budget in one guarded court change
+        if (!await CourtChangeAsync(court => { if (court.MagicBudget < 1000) return false; court.MagicBudget -= 1000; return true; }))
+        {
+            await ShowCourtChangeFailed();
+            return;
+        }
         AlignmentSystem.Instance.ChangeAlignment(currentPlayer, 25, isGood: true, "castle.wizard_court"); // v0.57.12: paired movement
 
         terminal.SetColor("bright_yellow");
@@ -2903,7 +2941,12 @@ public class CastleLocation : BaseLocation
             return;
         }
 
-        currentKing.MagicBudget -= 500;
+        // v1.1.13: the spell's cost leaves the stored magic budget in one guarded court change
+        if (!await CourtChangeAsync(court => { if (court.MagicBudget < 500) return false; court.MagicBudget -= 500; return true; }))
+        {
+            await ShowCourtChangeFailed();
+            return;
+        }
 
         terminal.SetColor("bright_blue");
         terminal.WriteLine("");
@@ -2946,7 +2989,12 @@ public class CastleLocation : BaseLocation
             return;
         }
 
-        currentKing.MagicBudget -= 2000;
+        // v1.1.13: the spell's cost leaves the stored magic budget in one guarded court change
+        if (!await CourtChangeAsync(court => { if (court.MagicBudget < 2000) return false; court.MagicBudget -= 2000; return true; }))
+        {
+            await ShowCourtChangeFailed();
+            return;
+        }
 
         // Boost all guards
         foreach (var guard in currentKing.Guards)
@@ -2975,7 +3023,12 @@ public class CastleLocation : BaseLocation
             return;
         }
 
-        currentKing.MagicBudget -= 1500;
+        // v1.1.13: the spell's cost leaves the stored magic budget in one guarded court change
+        if (!await CourtChangeAsync(court => { if (court.MagicBudget < 1500) return false; court.MagicBudget -= 1500; return true; }))
+        {
+            await ShowCourtChangeFailed();
+            return;
+        }
 
         terminal.SetColor("bright_blue");
         terminal.WriteLine("");
@@ -3107,9 +3160,13 @@ public class CastleLocation : BaseLocation
         terminal.SetColor("white");
         string alignInput = await terminal.ReadLineAsync();
 
+        // v1.1.13: the choices are gathered, then written as one guarded court change
+        GameConfig.TaxAlignment? newAlignment = null;
+        long? newRate = null;
+        int? newKingTax = null, newCityTax = null;
         if (int.TryParse(alignInput, out int alignChoice) && alignChoice >= 1 && alignChoice <= 4)
         {
-            currentKing.TaxAlignment = alignChoice switch
+            newAlignment = alignChoice switch
             {
                 1 => GameConfig.TaxAlignment.All,
                 2 => GameConfig.TaxAlignment.Good,
@@ -3126,9 +3183,9 @@ public class CastleLocation : BaseLocation
 
         if (long.TryParse(rateInput, out long rate) && rate >= 0)
         {
-            currentKing.TaxRate = Math.Min(rate, 1000);
+            newRate = Math.Min(rate, 1000);
             terminal.SetColor("bright_green");
-            terminal.WriteLine(Loc.Get("castle.citizen_tax_set", currentKing.TaxRate));
+            terminal.WriteLine(Loc.Get("castle.citizen_tax_set", newRate.Value));
 
             if (rate > 100)
             {
@@ -3145,9 +3202,9 @@ public class CastleLocation : BaseLocation
 
         if (int.TryParse(kingTaxInput, out int kingTax) && kingTax >= 0)
         {
-            currentKing.KingTaxPercent = Math.Min(kingTax, 25);
+            newKingTax = Math.Min(kingTax, 25);
             terminal.SetColor("bright_green");
-            terminal.WriteLine(Loc.Get("castle.king_sales_tax_set", currentKing.KingTaxPercent));
+            terminal.WriteLine(Loc.Get("castle.king_sales_tax_set", newKingTax.Value));
 
             if (kingTax > 15)
             {
@@ -3163,13 +3220,22 @@ public class CastleLocation : BaseLocation
 
         if (int.TryParse(cityTaxInput, out int cityTax) && cityTax >= 0)
         {
-            currentKing.CityTaxPercent = Math.Min(cityTax, 10);
+            newCityTax = Math.Min(cityTax, 10);
             terminal.SetColor("bright_green");
-            terminal.WriteLine(Loc.Get("castle.city_tax_set", currentKing.CityTaxPercent));
+            terminal.WriteLine(Loc.Get("castle.city_tax_set", newCityTax.Value));
         }
 
         // Persist tax changes to world_state
-        PersistRoyalCourtToWorldState();
+        if ((newAlignment != null || newRate != null || newKingTax != null || newCityTax != null)
+            && !await CourtChangeAsync(court =>
+            {
+                if (newAlignment != null) court.TaxAlignment = (int)newAlignment.Value;
+                if (newRate != null) court.TaxRate = newRate.Value;
+                if (newKingTax != null) court.KingTaxPercent = newKingTax.Value;
+                if (newCityTax != null) court.CityTaxPercent = newCityTax.Value;
+                return true;
+            }))
+            await ShowCourtChangeFailed();
 
         await Task.Delay(2000);
     }
@@ -3407,7 +3473,19 @@ public class CastleLocation : BaseLocation
             var key = establishments[choice - 1].Key;
             bool currentlyOpen = currentKing.EstablishmentStatus[key];
 
-            currentKing.EstablishmentStatus[key] = !currentKing.EstablishmentStatus[key];
+            // v1.1.13: one guarded court change (toggled from the stored status)
+            if (!await CourtChangeAsync(court =>
+                {
+                    if (court.EstablishmentStatus.Count == 0)   // an older record without them: the ones shown
+                        foreach (var est in establishments) court.EstablishmentStatus[est.Key] = est.Value;
+                    court.EstablishmentStatus[key] = !(court.EstablishmentStatus.TryGetValue(key, out var open) ? open : currentlyOpen);
+                    return true;
+                }))
+            {
+                await ShowCourtChangeFailed();
+                return;
+            }
+            currentlyOpen = !currentKing.EstablishmentStatus.GetValueOrDefault(key);
 
             // Check for rebellion from closing too many establishments
             if (currentlyOpen) // We just closed one
@@ -3446,7 +3524,6 @@ public class CastleLocation : BaseLocation
                 string color = currentKing.EstablishmentStatus[key] ? "\u001b[1;32m" : "\u001b[1;31m";
                 UsurperRemake.Server.MudServer.Instance?.BroadcastToAll(
                     $"{color}  *** {currentKing.GetTitle()} {currentKing.Name} has {newStatus} the {estDisplayName}! ***\u001b[0m");
-                PersistRoyalCourtToWorldState();
             }
 
             await Task.Delay(2000);
@@ -3469,8 +3546,18 @@ public class CastleLocation : BaseLocation
             if (proclamation.Length > 200)
                 proclamation = proclamation.Substring(0, 200);
 
-            currentKing.LastProclamation = proclamation;
-            currentKing.LastProclamationDate = DateTime.Now;
+            // v1.1.13: one guarded court change
+            var issued = DateTime.Now;
+            if (!await CourtChangeAsync(court =>
+                {
+                    court.LastProclamation = proclamation;
+                    court.LastProclamationDate = issued.ToString("o");
+                    return true;
+                }))
+            {
+                await ShowCourtChangeFailed();
+                return;
+            }
 
             terminal.SetColor("bright_yellow");
             terminal.WriteLine("");
@@ -3486,7 +3573,6 @@ public class CastleLocation : BaseLocation
             {
                 UsurperRemake.Server.MudServer.Instance?.BroadcastToAll(
                     $"\u001b[1;33m  *** Royal Proclamation by {currentKing.GetTitle()} {currentKing.Name}: \"{proclamation}\" ***\u001b[0m");
-                PersistRoyalCourtToWorldState();
             }
 
             await Task.Delay(3000);
@@ -3525,9 +3611,12 @@ public class CastleLocation : BaseLocation
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("castle.insufficient_treasury"));
             }
+            else if (!await CourtChangeAsync(court => { if (court.Treasury < amount) return false; court.Treasury -= amount; return true; }))   // v1.1.13
+            {
+                await ShowCourtChangeFailed();
+            }
             else
             {
-                currentKing.Treasury -= amount;
                 terminal.SetColor("bright_red");
                 terminal.WriteLine(Loc.Get("castle.bounty_placed", $"{amount:N0}", name));
 
@@ -3546,7 +3635,6 @@ public class CastleLocation : BaseLocation
                 {
                     UsurperRemake.Server.MudServer.Instance?.BroadcastToAll(
                         $"\u001b[1;31m  *** BOUNTY: {amount:N0} gold on {name} by order of {currentKing.GetTitle()} {currentKing.Name}! ***\u001b[0m");
-                    PersistRoyalCourtToWorldState();
                 }
             }
         }
@@ -3867,26 +3955,34 @@ public class CastleLocation : BaseLocation
             return;
         }
 
-        currentKing.Treasury -= GameConfig.OrphanCommissionCost;
-        currentKing.Orphans.Remove(orphan);
+        // v1.1.13: the cost, the orphan leaving and the guard joining are one guarded court change
+        if (!await CourtChangeAsync(court =>
+            {
+                if (court.Guards.Count >= King.MaxNPCGuards || court.Treasury < GameConfig.OrphanCommissionCost
+                    || court.Orphans.RemoveAll(o => o.Name == orphan.Name) == 0) return false;
+                court.Treasury -= GameConfig.OrphanCommissionCost;
+                // Create guard record with high loyalty (raised by the crown)
+                court.Guards.Add(new RoyalGuardSaveData
+                {
+                    Name = orphan.Name,
+                    AI = (int)CharacterAI.Computer,
+                    Sex = (int)orphan.Sex,
+                    DailySalary = GameConfig.BaseGuardSalary,
+                    Loyalty = 90, // Very high - raised by the crown
+                    IsActive = true
+                });
+                return true;
+            }))
+        {
+            await ShowCourtChangeFailed();
+            return;
+        }
 
         // Mark underlying Child as deleted
         MarkOrphanChildDeleted(orphan);
 
         // Create the NPC entity first (for combat stats)
         WorldSimulator.Instance?.OrphanBecomesNPC(orphan);
-
-        // Create guard record with high loyalty (raised by the crown)
-        var guard = new RoyalGuard
-        {
-            Name = orphan.Name,
-            AI = CharacterAI.Computer,
-            Sex = orphan.Sex,
-            DailySalary = GameConfig.BaseGuardSalary,
-            RecruitmentDate = DateTime.Now,
-            Loyalty = 90 // Very high — raised by the crown
-        };
-        currentKing.Guards.Add(guard);
 
         terminal.SetColor("bright_green");
         terminal.WriteLine(Loc.Get("castle.commissioned_guard", orphan.Name));
@@ -3896,7 +3992,6 @@ public class CastleLocation : BaseLocation
         terminal.WriteLine(Loc.Get("castle.orphan_treasury_minus", GameConfig.OrphanCommissionCost.ToString("N0")));
 
         AlignmentSystem.Instance.ChangeAlignment(currentPlayer, 10, isGood: true, "castle.orphan_loyalty"); // v0.57.12: paired movement
-        PersistRoyalCourtToWorldState();
         await Task.Delay(2500);
     }
 
@@ -3920,8 +4015,17 @@ public class CastleLocation : BaseLocation
             return;
         }
 
-        currentKing.Treasury -= mercCost;
-        currentKing.Orphans.Remove(orphan);
+        // v1.1.13: the cost and the orphan leaving are one guarded court change; the mercenary joins after it
+        if (!await CourtChangeAsync(court =>
+            {
+                if (court.Treasury < mercCost || court.Orphans.RemoveAll(o => o.Name == orphan.Name) == 0) return false;
+                court.Treasury -= mercCost;
+                return true;
+            }))
+        {
+            await ShowCourtChangeFailed();
+            return;
+        }
         MarkOrphanChildDeleted(orphan);
 
         // Pick a mercenary role based on soul
@@ -3941,14 +4045,22 @@ public class CastleLocation : BaseLocation
         terminal.WriteLine(Loc.Get("castle.orphan_treasury_minus", mercCost.ToString("N0")));
 
         AlignmentSystem.Instance.ChangeAlignment(currentPlayer, 10, isGood: true, "castle.commission_merc"); // v0.57.12: paired movement
-        PersistRoyalCourtToWorldState();
         await Task.Delay(2500);
     }
 
     private async Task CommissionAsNPC(RoyalOrphan orphan)
     {
-        currentKing.Treasury -= GameConfig.OrphanCommissionCost;
-        currentKing.Orphans.Remove(orphan);
+        // v1.1.13: the cost and the orphan leaving are one guarded court change
+        if (!await CourtChangeAsync(court =>
+            {
+                if (court.Treasury < GameConfig.OrphanCommissionCost || court.Orphans.RemoveAll(o => o.Name == orphan.Name) == 0) return false;
+                court.Treasury -= GameConfig.OrphanCommissionCost;
+                return true;
+            }))
+        {
+            await ShowCourtChangeFailed();
+            return;
+        }
         MarkOrphanChildDeleted(orphan);
 
         WorldSimulator.Instance?.OrphanBecomesNPC(orphan);
@@ -3961,7 +4073,6 @@ public class CastleLocation : BaseLocation
         terminal.WriteLine(Loc.Get("castle.orphan_treasury_minus", GameConfig.OrphanCommissionCost.ToString("N0")));
 
         AlignmentSystem.Instance.ChangeAlignment(currentPlayer, 5, isGood: true, "castle.commission_npc"); // v0.57.12: paired movement
-        PersistRoyalCourtToWorldState();
         await Task.Delay(2500);
     }
 
@@ -4018,8 +4129,20 @@ public class CastleLocation : BaseLocation
             BackgroundStory = OrphanBackstories[random.Next(OrphanBackstories.Length)]
         };
 
-        currentKing.Orphans.Add(orphan);
-        currentKing.Treasury -= adoptCost;
+        // v1.1.13: the orphan arrives and the cost leaves the stored treasury in one guarded court change
+        if (!await CourtChangeAsync(court =>
+            {
+                long cost = 500 + (court.Orphans.Count * 100);
+                if (court.Orphans.Count >= GameConfig.MaxRoyalOrphans || court.Treasury < cost) return false;
+                court.Orphans.Add(OnlineStateManager.OrphanData(orphan));
+                court.Treasury -= cost;
+                adoptCost = cost;
+                return true;
+            }))
+        {
+            await ShowCourtChangeFailed();
+            return;
+        }
 
         terminal.SetColor("bright_green");
         string sexStr = sex == CharacterSex.Male ? Loc.Get("castle.boy") : Loc.Get("castle.girl");
@@ -4032,7 +4155,6 @@ public class CastleLocation : BaseLocation
         terminal.WriteLine(Loc.Get("castle.orphan_treasury_minus", adoptCost.ToString("N0")));
 
         AlignmentSystem.Instance.ChangeAlignment(currentPlayer, 15, isGood: true, "castle.adopt_orphan"); // v0.57.12: paired movement
-        PersistRoyalCourtToWorldState();
 
         await Task.Delay(2500);
     }
@@ -4063,13 +4185,21 @@ public class CastleLocation : BaseLocation
             }
             else
             {
-                currentKing.Treasury -= amount;
-                int happinessBoost = (int)Math.Min(30, amount / (currentKing.Orphans.Count * 50));
-                if (happinessBoost < 1) happinessBoost = 1;
-
-                foreach (var orphan in currentKing.Orphans)
+                // v1.1.13: the gift leaves the treasury and the orphans' happiness rises in one guarded court change
+                int happinessBoost = 0;
+                if (!await CourtChangeAsync(court =>
+                    {
+                        if (court.Orphans.Count == 0 || court.Treasury < amount) return false;
+                        court.Treasury -= amount;
+                        happinessBoost = (int)Math.Max(1, Math.Min(30, amount / (court.Orphans.Count * 50)));
+                        foreach (var orphan in court.Orphans)
+                            orphan.Happiness = Math.Min(100, orphan.Happiness + happinessBoost);
+                        return true;
+                    }))
                 {
-                    orphan.Happiness = Math.Min(100, orphan.Happiness + happinessBoost);
+                    await ShowCourtChangeFailed();
+                    await Task.Delay(2000);
+                    return;
                 }
 
                 terminal.SetColor("bright_green");
@@ -4079,7 +4209,6 @@ public class CastleLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("castle.orphan_treasury_minus", amount.ToString("N0")));
 
                 AlignmentSystem.Instance.ChangeAlignment(currentPlayer, (int)Math.Min(50, amount / 200), isGood: true, "castle.orphan_gifts"); // v0.57.12: paired movement
-                PersistRoyalCourtToWorldState();
             }
         }
 
@@ -4294,17 +4423,30 @@ public class CastleLocation : BaseLocation
             long dowry = (candidate.Level * 1000) + (candidate.Charisma * 100);
             var faction = DetermineFactionForNPC(candidate);
 
-            currentKing.Spouse = new RoyalSpouse
+            // v1.1.13: the spouse, the dowry and the faction's loyalty are one guarded court change;
+            // the marriage itself is registered only once it is written
+            int happiness = 70 + random.Next(30);
+            if (!await CourtChangeAsync(court =>
+                {
+                    if (court.Spouse != null) return false;
+                    court.Spouse = new RoyalSpouseSaveData
+                    {
+                        Name = candidate.Name,
+                        Sex = (int)candidate.Sex,
+                        OriginalFaction = (int)faction,
+                        Dowry = dowry,
+                        Happiness = happiness
+                    };
+                    court.Treasury += dowry;
+                    // Boost loyalty of that faction
+                    foreach (var member in court.CourtMembers.Where(m => m.Faction == (int)faction))
+                        member.LoyaltyToKing = Math.Min(100, member.LoyaltyToKing + 20);
+                    return true;
+                }))
             {
-                Name = candidate.Name,
-                Sex = candidate.Sex,
-                OriginalFaction = faction,
-                Dowry = dowry,
-                MarriageDate = DateTime.Now,
-                Happiness = 70 + random.Next(30)
-            };
-
-            currentKing.Treasury += dowry;
+                await ShowCourtChangeFailed();
+                return;
+            }
 
             // Register the actual marriage on both characters
             currentPlayer.Married = true;
@@ -4330,12 +4472,6 @@ public class CastleLocation : BaseLocation
                 relation.MarriedDays = 0;
                 relation.MarriedTimes++;
                 RelationshipSystem.SaveRelationship(relation);
-            }
-
-            // Boost loyalty of that faction
-            foreach (var member in currentKing.CourtMembers.Where(m => m.Faction == faction))
-            {
-                member.LoyaltyToKing = Math.Min(100, member.LoyaltyToKing + 20);
             }
 
             terminal.SetColor("bright_green");
@@ -4376,9 +4512,19 @@ public class CastleLocation : BaseLocation
                 return;
             }
 
-            currentKing.Treasury -= amount;
             int happinessBoost = (int)Math.Min(30, amount / 500);
-            currentKing.Spouse!.Happiness = Math.Min(100, currentKing.Spouse.Happiness + happinessBoost);
+            // v1.1.13: the gift leaves the treasury and the spouse's happiness rises in one guarded court change
+            if (!await CourtChangeAsync(court =>
+                {
+                    if (court.Spouse == null || court.Treasury < amount) return false;
+                    court.Treasury -= amount;
+                    court.Spouse.Happiness = Math.Min(100, court.Spouse.Happiness + happinessBoost);
+                    return true;
+                }))
+            {
+                await ShowCourtChangeFailed();
+                return;
+            }
 
             terminal.SetColor("bright_green");
             terminal.WriteLine(Loc.Get("castle.spouse_pleased", happinessBoost));
@@ -4402,10 +4548,19 @@ public class CastleLocation : BaseLocation
             var faction = currentKing.Spouse.OriginalFaction;
             var spouseName = currentKing.Spouse.Name;
 
-            // Severe loyalty penalty to that faction
-            foreach (var member in currentKing.CourtMembers.Where(m => m.Faction == faction))
+            // v1.1.13: the spouse leaving and the faction's anger are one guarded court change
+            if (!await CourtChangeAsync(court =>
+                {
+                    if (court.Spouse?.Name != spouseName) return false;
+                    court.Spouse = null;
+                    // Severe loyalty penalty to that faction
+                    foreach (var member in court.CourtMembers.Where(m => m.Faction == (int)faction))
+                        member.LoyaltyToKing = Math.Max(0, member.LoyaltyToKing - 40);
+                    return true;
+                }))
             {
-                member.LoyaltyToKing = Math.Max(0, member.LoyaltyToKing - 40);
+                await ShowCourtChangeFailed();
+                return;
             }
 
             // Clear marriage state on player
@@ -4451,8 +4606,6 @@ public class CastleLocation : BaseLocation
 
             NewsSystem.Instance?.Newsy(true,
                 $"SCANDAL! {currentKing.GetTitle()} {currentKing.Name} has divorced {spouseName}!");
-
-            currentKing.Spouse = null;
         }
         else
         {
@@ -4638,11 +4791,19 @@ public class CastleLocation : BaseLocation
         if (int.TryParse(input, out int idx) && idx > 0 && idx <= currentKing.CourtMembers.Count)
         {
             var member = currentKing.CourtMembers[idx - 1];
-            currentKing.CourtMembers.RemoveAt(idx - 1);
-
-            // Faction loyalty hit
-            foreach (var cm in currentKing.CourtMembers.Where(c => c.Faction == member.Faction))
-                cm.LoyaltyToKing = Math.Max(0, cm.LoyaltyToKing - GameConfig.DismissLoyaltyCost);
+            // v1.1.13: the dismissal and the faction's loyalty hit are one guarded court change
+            if (!await CourtChangeAsync(court =>
+                {
+                    if (court.CourtMembers.RemoveAll(c => c.Name == member.Name) == 0) return false;
+                    // Faction loyalty hit
+                    foreach (var cm in court.CourtMembers.Where(c => c.Faction == (int)member.Faction))
+                        cm.LoyaltyToKing = Math.Max(0, cm.LoyaltyToKing - GameConfig.DismissLoyaltyCost);
+                    return true;
+                }))
+            {
+                await ShowCourtChangeFailed();
+                return;
+            }
 
             // Make the NPC hostile
             var npc = NPCSpawnSystem.Instance?.GetNPCByName(member.Name);
@@ -4690,29 +4851,45 @@ public class CastleLocation : BaseLocation
             }
 
             var plot = discoveredPlots[idx - 1];
-            currentKing.Treasury -= GameConfig.ArrestTrialCost;
-
-            // Arrest each conspirator
-            foreach (var conspirator in plot.Conspirators)
-            {
-                // Remove from court
-                var courtMember = currentKing.CourtMembers.FirstOrDefault(c => c.Name == conspirator);
-                if (courtMember != null)
+            var conspirators = plot.Conspirators.ToList();
+            var npcConspirators = conspirators.Where(c => NPCSpawnSystem.Instance?.GetNPCByName(c) != null).ToHashSet();
+            // v1.1.13: the trial's cost, the arrests and the plot's end are one guarded court change
+            if (!await CourtChangeAsync(court =>
                 {
-                    // Faction loyalty hit
-                    foreach (var cm in currentKing.CourtMembers.Where(c => c.Faction == courtMember.Faction))
-                        cm.LoyaltyToKing = Math.Max(0, cm.LoyaltyToKing - GameConfig.ArrestFactionLoyaltyCost);
-                    currentKing.CourtMembers.Remove(courtMember);
-                }
+                    var storedPlot = court.ActivePlots.FirstOrDefault(p => p.PlotType == plot.PlotType && p.IsDiscovered
+                        && (p.Conspirators ?? new List<string>()).SequenceEqual(conspirators));
+                    if (storedPlot == null || court.Treasury < GameConfig.ArrestTrialCost) return false;
+                    court.Treasury -= GameConfig.ArrestTrialCost;
 
-                // Imprison
-                var npc = NPCSpawnSystem.Instance?.GetNPCByName(conspirator);
-                if (npc != null)
-                    currentKing.ImprisonCharacter(conspirator, 14, $"{plot.PlotType} conspiracy");
+                    // Arrest each conspirator
+                    foreach (var conspirator in conspirators)
+                    {
+                        // Remove from court
+                        var courtMember = court.CourtMembers.FirstOrDefault(c => c.Name == conspirator);
+                        if (courtMember != null)
+                        {
+                            // Faction loyalty hit
+                            foreach (var cm in court.CourtMembers.Where(c => c.Faction == courtMember.Faction))
+                                cm.LoyaltyToKing = Math.Max(0, cm.LoyaltyToKing - GameConfig.ArrestFactionLoyaltyCost);
+                            court.CourtMembers.Remove(courtMember);
+                        }
+
+                        // Imprison
+                        if (npcConspirators.Contains(conspirator))
+                        {
+                            court.Prisoners.RemoveAll(p => p.CharacterName == conspirator);
+                            court.Prisoners.Add(PrisonerRecord(conspirator, 14, $"{plot.PlotType} conspiracy"));
+                        }
+                    }
+
+                    // Remove the plot
+                    court.ActivePlots.Remove(storedPlot);
+                    return true;
+                }))
+            {
+                await ShowCourtChangeFailed();
+                return;
             }
-
-            // Remove the plot
-            currentKing.ActivePlots.Remove(plot);
 
             terminal.SetColor("bright_green");
             terminal.WriteLine(Loc.Get("castle.arrested", GameConfig.ArrestTrialCost.ToString("N0")));
@@ -4754,29 +4931,51 @@ public class CastleLocation : BaseLocation
                 return;
             }
 
-            currentKing.Treasury -= cost;
             var random = Random.Shared;
             int loyaltyGain = 15 + random.Next(11); // 15-25
-            member.LoyaltyToKing = Math.Min(100, member.LoyaltyToKing + loyaltyGain);
-
-            // If plotting and loyalty now above 60, abandon plot
-            if (member.IsPlotting && member.LoyaltyToKing > 60)
-            {
-                member.IsPlotting = false;
-                var plotToRemove = currentKing.ActivePlots.FirstOrDefault(p => p.Conspirators.Contains(member.Name));
-                if (plotToRemove != null)
+            bool abandoned = false;
+            int loyaltyNow = 0;
+            // v1.1.13: the bribe, the loyalty it buys and the plot it ends are one guarded court change
+            if (!await CourtChangeAsync(court =>
                 {
-                    plotToRemove.Conspirators.Remove(member.Name);
-                    if (plotToRemove.Conspirators.Count == 0)
-                        currentKing.ActivePlots.Remove(plotToRemove);
-                }
+                    var m = court.CourtMembers.FirstOrDefault(c => c.Name == member.Name);
+                    if (m == null) return false;
+                    long price = GameConfig.BribeBaseCost + (100 - m.LoyaltyToKing) * 50;
+                    if (court.Treasury < price) return false;
+                    court.Treasury -= price;
+                    cost = price;
+                    m.LoyaltyToKing = Math.Min(100, m.LoyaltyToKing + loyaltyGain);
+                    loyaltyNow = m.LoyaltyToKing;
+                    abandoned = false;
+                    // If plotting and loyalty now above 60, abandon plot
+                    if (m.IsPlotting && m.LoyaltyToKing > 60)
+                    {
+                        abandoned = true;
+                        m.IsPlotting = false;
+                        var plotToRemove = court.ActivePlots.FirstOrDefault(p => p.Conspirators?.Contains(m.Name) == true);
+                        if (plotToRemove != null)
+                        {
+                            plotToRemove.Conspirators.Remove(m.Name);
+                            if (plotToRemove.Conspirators.Count == 0)
+                                court.ActivePlots.Remove(plotToRemove);
+                        }
+                    }
+                    return true;
+                }))
+            {
+                await ShowCourtChangeFailed();
+                return;
+            }
+
+            if (abandoned)
+            {
                 terminal.SetColor("bright_green");
                 terminal.WriteLine(Loc.Get("castle.bribe_abandoned", member.Name, loyaltyGain, cost.ToString("N0")));
             }
             else
             {
                 terminal.SetColor("green");
-                terminal.WriteLine(Loc.Get("castle.bribe_loyalty_up", member.Name, member.LoyaltyToKing, loyaltyGain, cost.ToString("N0")));
+                terminal.WriteLine(Loc.Get("castle.bribe_loyalty_up", member.Name, loyaltyNow, loyaltyGain, cost.ToString("N0")));
             }
         }
         terminal.WriteLine("");
@@ -4807,9 +5006,20 @@ public class CastleLocation : BaseLocation
             }
 
             var member = currentKing.CourtMembers[idx - 1];
-            currentKing.Treasury -= GameConfig.PromoteCost;
-            member.LoyaltyToKing = Math.Min(100, member.LoyaltyToKing + GameConfig.PromoteLoyaltyGain);
-            member.Influence = Math.Min(100, member.Influence + 5);
+            // v1.1.13: the cost and the promotion are one guarded court change
+            if (!await CourtChangeAsync(court =>
+                {
+                    var m = court.CourtMembers.FirstOrDefault(c => c.Name == member.Name);
+                    if (m == null || court.Treasury < GameConfig.PromoteCost) return false;
+                    court.Treasury -= GameConfig.PromoteCost;
+                    m.LoyaltyToKing = Math.Min(100, m.LoyaltyToKing + GameConfig.PromoteLoyaltyGain);
+                    m.Influence = Math.Min(100, m.Influence + 5);
+                    return true;
+                }))
+            {
+                await ShowCourtChangeFailed();
+                return;
+            }
 
             terminal.SetColor("bright_green");
             terminal.WriteLine(Loc.Get("castle.promoted", member.Name, GameConfig.PromoteLoyaltyGain, GameConfig.PromoteCost.ToString("N0")));
@@ -4949,15 +5159,23 @@ public class CastleLocation : BaseLocation
         {
             var heir = sortedHeirs[selection - 1];
 
-            // Clear old designation
-            foreach (var h in currentKing.Heirs)
+            // v1.1.13: one guarded court change
+            if (!await CourtChangeAsync(court =>
+                {
+                    var stored = court.Heirs.FirstOrDefault(h => h.Name == heir.Name);
+                    if (stored == null) return false;
+                    // Clear old designation
+                    foreach (var h in court.Heirs)
+                        h.IsDesignated = false;
+                    stored.IsDesignated = true;
+                    stored.ClaimStrength = Math.Min(100, stored.ClaimStrength + 20);
+                    court.DesignatedHeir = heir.Name;
+                    return true;
+                }))
             {
-                h.IsDesignated = false;
+                await ShowCourtChangeFailed();
+                return;
             }
-
-            heir.IsDesignated = true;
-            heir.ClaimStrength = Math.Min(100, heir.ClaimStrength + 20);
-            currentKing.DesignatedHeir = heir.Name;
 
             terminal.SetColor("bright_green");
             terminal.WriteLine(Loc.Get("castle.heir_designated", heir.Name));
@@ -5006,13 +5224,28 @@ public class CastleLocation : BaseLocation
             BirthDate = DateTime.Now.AddYears(-12 - random.Next(10))
         };
 
-        currentKing.Heirs.Add(newHeir);
-        currentKing.Treasury -= 5000;
-
-        // Reduce other heirs' claims slightly (jealousy)
-        foreach (var heir in currentKing.Heirs.Where(h => h.Name != name))
+        // v1.1.13: the heir, the cost and the other heirs' jealousy are one guarded court change
+        if (!await CourtChangeAsync(court =>
+            {
+                if (court.Treasury < 5000) return false;
+                // Reduce other heirs' claims slightly (jealousy)
+                foreach (var heir in court.Heirs.Where(h => h.Name != name))
+                    heir.ClaimStrength = Math.Max(10, heir.ClaimStrength - 10);
+                court.Heirs.Add(new RoyalHeirSaveData
+                {
+                    Name = newHeir.Name,
+                    Age = newHeir.Age,
+                    ClaimStrength = newHeir.ClaimStrength,
+                    ParentName = newHeir.ParentName,
+                    Sex = (int)newHeir.Sex,
+                    IsDesignated = newHeir.IsDesignated
+                });
+                court.Treasury -= 5000;
+                return true;
+            }))
         {
-            heir.ClaimStrength = Math.Max(10, heir.ClaimStrength - 10);
+            await ShowCourtChangeFailed();
+            return;
         }
 
         terminal.SetColor("bright_green");
@@ -5230,16 +5463,25 @@ public class CastleLocation : BaseLocation
             roleName = Loc.Get("castle.d3_role_advisor");
         }
 
-        chosen.NPCFaction = faction;
-        currentKing.CourtMembers.Add(new CourtMember
+        // v1.1.13: the appointment is one guarded court change; the faction and the Fame cost follow it
+        int influence = 40 + Random.Shared.Next(20);
+        if (!await CourtChangeAsync(court =>
+            {
+                court.CourtMembers.Add(new CourtMemberSaveData
+                {
+                    Name = chosen.Name2,
+                    Faction = (int)courtFaction,
+                    Role = roleName,
+                    Influence = influence,
+                    LoyaltyToKing = 80, // family loyalty is high
+                });
+                return true;
+            }))
         {
-            Name = chosen.Name2,
-            Faction = courtFaction,
-            Role = roleName,
-            Influence = 40 + Random.Shared.Next(20),
-            LoyaltyToKing = 80, // family loyalty is high
-            JoinedCourt = DateTime.Now,
-        });
+            await ShowCourtChangeFailed();
+            return;
+        }
+        chosen.NPCFaction = faction;
 
         // Pay the Fame cost.
         currentPlayer.Fame -= GameConfig.D3SponsorshipFameCost;
@@ -6944,11 +7186,9 @@ public class CastleLocation : BaseLocation
                     terminal.Write(Loc.Get("castle.pardon_partial_yn", partialReduction, partialCost));
                     string partial = await terminal.ReadLineAsync();
 
-                    if (GameConfig.IsAffirmative(partial))
+                    if (GameConfig.IsAffirmative(partial) && await PayIntoTreasury(partialCost, partialCost))   // v1.1.13: gold leaves once the court holds it
                     {
-                        currentPlayer.Gold -= partialCost;
                         currentPlayer.Darkness -= partialReduction;
-                        currentKing.Treasury += partialCost;
 
                         terminal.WriteLine("");
                         terminal.SetColor("bright_green");
@@ -6963,12 +7203,10 @@ public class CastleLocation : BaseLocation
                 terminal.Write(Loc.Get("castle.pardon_full_yn", pardonCost));
                 string response = await terminal.ReadLineAsync();
 
-                if (GameConfig.IsAffirmative(response))
+                if (GameConfig.IsAffirmative(response) && await PayIntoTreasury(pardonCost, pardonCost))   // v1.1.13: gold leaves once the court holds it
                 {
-                    currentPlayer.Gold -= pardonCost;
                     long oldDarkness = currentPlayer.Darkness;
                     currentPlayer.Darkness = 0;
-                    currentKing.Treasury += pardonCost;
 
                     terminal.WriteLine("");
                     terminal.SetColor("bright_green");
@@ -7029,10 +7267,8 @@ public class CastleLocation : BaseLocation
                 terminal.Write(Loc.Get("castle.loan_repay_yn", totalOwed));
                 string response = await terminal.ReadLineAsync();
 
-                if (GameConfig.IsAffirmative(response))
+                if (GameConfig.IsAffirmative(response) && await PayIntoTreasury(totalOwed, totalOwed))   // v1.1.13: gold leaves once the court holds it
                 {
-                    currentPlayer.Gold -= totalOwed;
-                    currentKing.Treasury += totalOwed;
                     currentPlayer.RoyalLoanAmount = 0;
                     currentPlayer.RoyalLoanDueDay = 0;
 
@@ -7198,10 +7434,8 @@ public class CastleLocation : BaseLocation
                     terminal.Write(Loc.Get("castle.crime_pay_bounty_yn", bountyCost));
                     string confirm = await terminal.ReadLineAsync();
 
-                    if (GameConfig.IsAffirmative(confirm))
+                    if (GameConfig.IsAffirmative(confirm) && await PayIntoTreasury(bountyCost, bountyCost / 2))   // Half goes to treasury; v1.1.13: gold leaves once the court holds it
                     {
-                        currentPlayer.Gold -= bountyCost;
-                        currentKing.Treasury += bountyCost / 2; // Half goes to treasury
 
                         terminal.WriteLine("");
                         terminal.SetColor("bright_green");
@@ -7307,11 +7541,8 @@ public class CastleLocation : BaseLocation
 
                 if (GameConfig.IsAffirmative(response))
                 {
-                    if (blessingCost > 0)
-                    {
-                        currentPlayer.Gold -= blessingCost;
-                        currentKing.Treasury += blessingCost;
-                    }
+                    if (blessingCost > 0 && !await PayIntoTreasury(blessingCost, blessingCost))   // v1.1.13: gold leaves once the court holds it
+                        return;
 
                     // Apply the Royal Blessing status effect (lasts several combats)
                     currentPlayer.ApplyStatus(StatusEffect.RoyalBlessing, GameConfig.RoyalBlessingDuration);
@@ -7402,12 +7633,11 @@ public class CastleLocation : BaseLocation
                 terminal.Write(Loc.Get("castle.tax_pay_yn", petitionCost));
                 string response = await terminal.ReadLineAsync();
 
-                if (GameConfig.IsAffirmative(response))
+                long oldRate = currentKing.TaxRate;
+                // v1.1.13: the payment and the lower tax are one guarded court change; gold leaves once it is written
+                if (GameConfig.IsAffirmative(response)
+                    && await PayIntoTreasury(petitionCost, petitionCost, court => { court.TaxRate = Math.Max(5, court.TaxRate - 5); return true; }))
                 {
-                    currentPlayer.Gold -= petitionCost;
-                    currentKing.Treasury += petitionCost;
-                    long oldRate = currentKing.TaxRate;
-                    currentKing.TaxRate = Math.Max(5, currentKing.TaxRate - 5);
 
                     terminal.WriteLine("");
                     terminal.SetColor("bright_green");
@@ -7609,18 +7839,27 @@ public class CastleLocation : BaseLocation
 
         if (GameConfig.IsAffirmative(response))
         {
-            // Add player as a guard
-            var guard = new RoyalGuard
+            // Add player as a guard; v1.1.13: one guarded court change
+            string guardName = currentPlayer.DisplayName;
+            var guardSex = currentPlayer.Sex;
+            if (!await CourtChangeAsync(court =>
+                {
+                    if (court.Guards.Count >= GameConfig.MaxRoyalGuards || court.Guards.Any(g => g.Name == guardName)) return false;
+                    court.Guards.Add(new RoyalGuardSaveData
+                    {
+                        Name = guardName,
+                        AI = (int)CharacterAI.Human,
+                        Sex = (int)guardSex,
+                        DailySalary = salary,
+                        Loyalty = 100,
+                        IsActive = true
+                    });
+                    return true;
+                }))
             {
-                Name = currentPlayer.DisplayName,
-                AI = CharacterAI.Human,
-                Sex = currentPlayer.Sex,
-                DailySalary = salary,
-                RecruitmentDate = DateTime.Now,
-                Loyalty = 100,
-                IsActive = true
-            };
-            currentKing.Guards.Add(guard);
+                await ShowCourtChangeFailed();
+                return;
+            }
 
             terminal.WriteLine("");
             terminal.SetColor("bright_green");
@@ -7664,29 +7903,81 @@ public class CastleLocation : BaseLocation
     /// Static version for use from other locations (e.g., PrisonLocation bail payment)
     /// </summary>
     /// <summary>v1.1.13: the session's online state when the court is shared, else null (the in-memory court only).</summary>
-    private static OnlineStateManager? TreasuryOsm() =>
+    internal static OnlineStateManager? TreasuryOsm() =>
         UsurperRemake.BBS.DoorMode.IsOnlineMode ? OnlineStateManager.Instance : null;
 
     /// <summary>
-    /// v1.1.13: move gold between the treasury and a player (toPlayer above 0: out of the treasury). With a
-    /// shared court the treasury's side is one versioned court write (OnlineStateManager.TryMoveTreasuryAsync),
-    /// and the player's gold changes only once it holds; a move that fails changes neither side.
+    /// v1.1.13: move gold between the treasury and a player (toPlayer above 0: out of the treasury). The
+    /// treasury's side is one guarded court change (CourtChangeAsync), and the player's gold changes only once
+    /// it is written; a move that fails changes neither side.
     /// </summary>
     internal static async Task<bool> MoveTreasuryGoldAsync(OnlineStateManager? osm, Character player, long toPlayer, Func<Task>? beforeWrite = null)
     {
         var king = currentKing;
         if (king == null || player == null) return false;
-        if (osm != null)
-        {
-            if (!await osm.TryMoveTreasuryAsync(king.Name, -toPlayer, beforeWrite)) return false;
-        }
-        else
-        {
-            if (king.Treasury - toPlayer < 0) return false;
-            king.Treasury -= toPlayer;
-        }
+        string expected = king.Name;
+        if (!await CourtChangeAsync(osm, court =>
+            {
+                if (court.KingName != expected || court.Treasury - toPlayer < 0) return false;
+                court.Treasury -= toPlayer;
+                return true;
+            }, beforeWrite)) return false;
         player.Gold += toPlayer;
         return true;
+    }
+
+    /// <summary>
+    /// v1.1.13: a change to the reigning court (OnlineStateManager.ApplyCourtChangeAsync): change is applied to
+    /// the stored court, its cost and its benefit together, and written under the version read; the caller
+    /// applies the player's side only on true. osm null: the in-memory court is the only one.
+    /// </summary>
+    internal static Task<bool> CourtChangeAsync(OnlineStateManager? osm, Func<RoyalCourtSaveData, bool> change, Func<Task>? beforeWrite = null) =>
+        OnlineStateManager.ApplyCourtChangeAsync(OnlineStateManager.CourtStoreFor(osm), change, beforeWrite);
+
+    /// <summary>v1.1.13: a change to this king's court (it refuses once another king reigns).</summary>
+    internal static Task<bool> CourtChangeAsync(Func<RoyalCourtSaveData, bool> change)
+    {
+        string? expected = currentKing?.Name;
+        return CourtChangeAsync(TreasuryOsm(), court => court.KingName == expected && change(court));
+    }
+
+    /// <summary>v1.1.13: a prison record as the stored court holds it.</summary>
+    internal static PrisonRecordSaveData PrisonerRecord(string name, int sentence, string crime, long bail = 0) => new()
+    {
+        CharacterName = name,
+        Crime = crime,
+        Sentence = sentence,
+        DaysServed = 0,
+        ImprisonmentDate = DateTime.Now.ToString("o"),
+        BailAmount = bail
+    };
+
+    /// <summary>
+    /// v1.1.13: the player pays playerPays for something the court grants: treasuryGets goes into the stored
+    /// treasury, with also applied to the court in the same guarded change, and the player's gold leaves only
+    /// once that is written. On false nothing changed and the player was told.
+    /// </summary>
+    private async Task<bool> PayIntoTreasury(long playerPays, long treasuryGets, Func<RoyalCourtSaveData, bool>? also = null)
+    {
+        if (currentPlayer.Gold < playerPays || !await CourtChangeAsync(court =>
+            {
+                court.Treasury += treasuryGets;
+                return also == null || also(court);
+            }))
+        {
+            await ShowCourtChangeFailed();
+            return false;
+        }
+        currentPlayer.Gold -= playerPays;
+        return true;
+    }
+
+    /// <summary>v1.1.13: the court change was refused or never written; nothing changed.</summary>
+    private async Task ShowCourtChangeFailed()
+    {
+        terminal.SetColor("red");
+        terminal.WriteLine(Loc.Get("castle.court_change_failed"));
+        await Task.Delay(1500);
     }
 
     public static void PersistRoyalCourtToWorldStateStatic()

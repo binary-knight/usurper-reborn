@@ -806,24 +806,18 @@ namespace UsurperRemake.Systems
                 if (king == null && KeepsStoredVacancy(await ReadRoyalCourtFromWorldState(), throneVacated)) return;
 
                 // v1.1.13: written only over the stored court this process's court was loaded from. A court never
-                // loaded here may write only where none is stored yet.
-                for (int attempt = 0; attempt < 5; attempt++)
+                // loaded here may write only where none is stored yet. On a conflict the stored court is loaded and
+                // this copy is not written over it: every change to a court is its own guarded write
+                // (ApplyCourtChangeAsync), so the stored court already holds them.
+                long? loadedAt = RoyalCourtVersion;
+                if (loadedAt == null && sql.GetWorldStateVersion("royal_court") == 0) loadedAt = 0;
+                if (loadedAt != null && await SaveRoyalCourtIfVersionAsync(loadedAt.Value, throneVacated))
                 {
-                    long? loadedAt = RoyalCourtVersion;
-                    if (loadedAt == null && sql.GetWorldStateVersion("royal_court") == 0) loadedAt = 0;
-                    if (loadedAt != null && await SaveRoyalCourtIfVersionAsync(loadedAt.Value, throneVacated))
-                    {
-                        DebugLogger.Instance.LogDebug("ONLINE", $"Royal court saved to world_state: {king?.Name ?? "(vacant)"}");
-                        return;
-                    }
-                    // v1.1.13: another writer changed the court; this stale copy is dropped and the stored court
-                    // loaded. This process's unsaved treasury change is carried onto it and written again, so a
-                    // payment into or out of the treasury is neither lost nor made twice.
-                    DebugLogger.Instance.LogInfo("ONLINE", "Royal court save skipped: the stored court changed since it was loaded. Reloading it.");
-                    await LoadRoyalCourtFromWorldState();
-                    king = global::CastleLocation.GetCurrentKing();
-                    if (UnsavedTreasuryDelta(king) == 0) return;
+                    DebugLogger.Instance.LogDebug("ONLINE", $"Royal court saved to world_state: {king?.Name ?? "(vacant)"}");
+                    return;
                 }
+                DebugLogger.Instance.LogInfo("ONLINE", "Royal court save skipped: the stored court changed since it was loaded. Reloading it.");
+                await LoadRoyalCourtFromWorldState();
             }
             catch (Exception ex)
             {
@@ -842,9 +836,13 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>v1.1.11: the stored form of the court of this king (the body of SaveRoyalCourtToWorldState).</summary>
-        private string RoyalCourtJson(King king) => RoyalCourtJson(king, out _);
+        private static string RoyalCourtJson(King king) => JsonSerializer.Serialize(CourtData(king), CourtJsonOptions);
 
-        private string RoyalCourtJson(King king, out long treasury)   // v1.1.13: the treasury as written
+        /// <summary>v1.1.13: the stored form of this king's court, as a record a court change edits (both processes' saves).</summary>
+        internal static RoyalCourtSaveData CourtData(King king) => CourtData(king, null);
+
+        /// <summary>v1.1.13: with this monarch history (null: the in-memory one).</summary>
+        internal static RoyalCourtSaveData CourtData(King king, List<MonarchRecordSaveData>? history)
         {
             var data = new RoyalCourtSaveData
             {
@@ -859,7 +857,7 @@ namespace UsurperRemake.Systems
                 KingSex = (int)king.Sex,
                 CoronationDate = king.CoronationDate.ToString("o"),
                 TaxAlignment = (int)king.TaxAlignment,
-                MonarchHistory = global::CastleLocation.GetMonarchHistory()?.Select(m => new MonarchRecordSaveData
+                MonarchHistory = history ?? global::CastleLocation.GetMonarchHistory()?.Select(m => new MonarchRecordSaveData
                 {
                     Name = m.Name,
                     Title = m.Title,
@@ -935,127 +933,181 @@ namespace UsurperRemake.Systems
                     ImprisonmentDate = kvp.Value.ImprisonmentDate.ToString("o"),
                     BailAmount = kvp.Value.BailAmount
                 }).ToList() ?? new List<PrisonRecordSaveData>(),
-                Orphans = king.Orphans?.Select(o => new RoyalOrphanSaveData
-                {
-                    Name = o.Name,
-                    Age = o.Age,
-                    Sex = (int)o.Sex,
-                    ArrivalDate = o.ArrivalDate.ToString("o"),
-                    BackgroundStory = o.BackgroundStory,
-                    Happiness = o.Happiness,
-                    MotherName = o.MotherName,
-                    FatherName = o.FatherName,
-                    MotherID = o.MotherID,
-                    FatherID = o.FatherID,
-                    Race = (int)o.Race,
-                    BirthDate = o.BirthDate.ToString("o"),
-                    Soul = o.Soul,
-                    IsRealOrphan = o.IsRealOrphan
-                }).ToList() ?? new List<RoyalOrphanSaveData>(),
+                Orphans = king.Orphans?.Select(OrphanData).ToList() ?? new List<RoyalOrphanSaveData>(),
                 MagicBudget = king.MagicBudget,
                 EstablishmentStatus = king.EstablishmentStatus ?? new Dictionary<string, bool>(),
                 LastProclamation = king.LastProclamation ?? "",
                 LastProclamationDate = king.LastProclamationDate != DateTime.MinValue
                     ? king.LastProclamationDate.ToString("o") : ""
             };
-
-            treasury = data.Treasury;
-            return JsonSerializer.Serialize(data, jsonOptions);
+            return data;
         }
 
+        /// <summary>v1.1.13: an orphan as the stored court holds it.</summary>
+        internal static RoyalOrphanSaveData OrphanData(RoyalOrphan o) => new()
+        {
+            Name = o.Name,
+            Age = o.Age,
+            Sex = (int)o.Sex,
+            ArrivalDate = o.ArrivalDate.ToString("o"),
+            BackgroundStory = o.BackgroundStory,
+            Happiness = o.Happiness,
+            MotherName = o.MotherName,
+            FatherName = o.FatherName,
+            MotherID = o.MotherID,
+            FatherID = o.FatherID,
+            Race = (int)o.Race,
+            BirthDate = o.BirthDate.ToString("o"),
+            Soul = o.Soul,
+            IsRealOrphan = o.IsRealOrphan
+        };
+
+        // v1.1.13: the options every court read and write uses (the ones jsonOptions has)
+        private static readonly JsonSerializerOptions CourtJsonOptions = PersistJsonOptions;
+
         // v1.1.13: the stored royal_court version the in-memory court was loaded from or last written as. The
-        // king is a process-wide static, so this is too: the world sim and every session share one court.
+        // king is a process-wide static, so this is too: the world sim and every session share one court. The
+        // in-memory court and this version change together, under this lock.
         private static readonly object RoyalCourtVersionLock = new();
         private static long? _royalCourtVersion;
 
         internal static long? RoyalCourtVersion { get { lock (RoyalCourtVersionLock) return _royalCourtVersion; } }
 
-        // v1.1.13: the king and treasury of the stored court at that version (null: unknown). The in-memory
-        // treasury minus it is this process's treasury change not yet stored, carried over a reload.
-        private static string? _courtBaselineKing;
-        private static long? _courtBaselineTreasury;
+        internal static void NoteRoyalCourtVersion(long? version) { lock (RoyalCourtVersionLock) _royalCourtVersion = version; }
 
-        internal static void NoteRoyalCourtVersion(long? version, string? king = null, long? treasury = null)
-        {
-            lock (RoyalCourtVersionLock)
-            {
-                _royalCourtVersion = version;
-                _courtBaselineKing = king;
-                _courtBaselineTreasury = string.IsNullOrEmpty(king) ? null : treasury;
-            }
-        }
-
-        /// <summary>v1.1.13: the in-memory king and its unsaved treasury change, taken before a load resets the baseline.</summary>
-        internal static (string? King, long Delta) UnsavedTreasury()
+        /// <summary>v1.1.13: the in-memory court as it would be stored, and the version it was loaded at or last written as, taken together.</summary>
+        internal static (string Json, long? Version) SnapshotCourt(bool throneVacated)
         {
             lock (RoyalCourtVersionLock)
             {
                 var king = global::CastleLocation.GetCurrentKing();
-                return (king?.Name, UnsavedTreasuryDelta(king));
+                return (king == null ? EmptyRoyalCourtJson(throneVacated) : RoyalCourtJson(king), _royalCourtVersion);
             }
         }
 
-        /// <summary>v1.1.13: this process's change to the king's treasury that the stored court does not have yet.</summary>
-        internal static long UnsavedTreasuryDelta(King? king)
+        /// <summary>v1.1.13: a whole-court save written at version + 1 from a snapshot taken at version.</summary>
+        internal static void NoteCourtWritten(long version)
         {
             lock (RoyalCourtVersionLock)
-            {
-                if (king == null || _courtBaselineTreasury == null || !string.Equals(_courtBaselineKing, king.Name, StringComparison.Ordinal)) return 0;
-                return king.Treasury - _courtBaselineTreasury.Value;
-            }
+                if (_royalCourtVersion == null || _royalCourtVersion == version) _royalCourtVersion = version + 1;
         }
 
-        /// <summary>
-        /// v1.1.13: a loaded court's treasury for the in-memory king: the stored treasury plus this process's
-        /// unsaved change to the same king's treasury, so a reload never drops a payment or an income this
-        /// process made. Notes the loaded version and treasury as the new baseline.
-        /// </summary>
-        internal static long TreasuryAfterLoad((string? King, long Delta) unsaved, RoyalCourtSaveData stored, long version)
-        {
-            lock (RoyalCourtVersionLock)
-            {
-                long carry = string.Equals(unsaved.King, stored.KingName, StringComparison.Ordinal) ? unsaved.Delta : 0;
-                NoteRoyalCourtVersion(version, stored.KingName, stored.Treasury);
-                if (carry != 0)
-                    DebugLogger.Instance.LogInfo("ONLINE", $"Royal court reloaded (v{version}); this process's unsaved treasury change of {carry:N0} is kept.");
-                return stored.Treasury + carry;
-            }
-        }
+        // v1.1.13: court changes through one store run one at a time; the in-memory court only ever moves to a
+        // newer written version, so changes through two stores of one process never put an older copy back
+        private static readonly SemaphoreSlim LocalCourtGate = new(1, 1);
+        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<SqlSaveBackend, SemaphoreSlim> CourtGates = new();
+        private static SemaphoreSlim CourtGateFor(SqlSaveBackend? sql) => sql == null ? LocalCourtGate : CourtGates.GetValue(sql, _ => new SemaphoreSlim(1, 1));
+
+        /// <summary>v1.1.13: the shared court this session writes to (null: none; the in-memory court is the only one).</summary>
+        internal SqlSaveBackend? CourtStore => backend as SqlSaveBackend;
 
         /// <summary>
-        /// v1.1.13: move gold into (delta above 0) or out of (below 0) the stored treasury as one versioned step:
-        /// the stored court is loaded (with this process's unsaved treasury change), the move applied, and the
-        /// court written under the version loaded, retried on a conflict. True once the write holds the move;
-        /// the caller changes the player's gold only then. False, with nothing moved, when the king is no longer
-        /// expectedKing, a withdrawal exceeds the treasury, or the court kept changing. beforeWrite is a test hook.
-        /// Without a SQL backend the in-memory court is the only one.
+        /// v1.1.13: every change to an existing court goes through here. The stored court is read with its
+        /// version, change is applied to that fresh copy (the cost and the benefit together), and the copy is
+        /// written under that version; on a conflict the court is read again and change applied again. Once
+        /// the write lands the in-memory court is the written copy, at the written version. change returns
+        /// false to refuse (no king, a short treasury, a record gone): nothing is written and the in-memory
+        /// court is the stored one. The caller applies the player's side only on true. Without SQL the
+        /// in-memory court is the only one and change is applied to it the same way. beforeWrite is a test hook.
         /// </summary>
-        internal async Task<bool> TryMoveTreasuryAsync(string expectedKing, long delta, Func<Task>? beforeWrite = null)
+        internal static async Task<bool> ApplyCourtChangeAsync(SqlSaveBackend? sql, Func<RoyalCourtSaveData, bool> change, Func<Task>? beforeWrite = null)
         {
-            if (backend is not SqlSaveBackend sql)
+            var gate = CourtGateFor(sql);
+            await gate.WaitAsync();
+            try
             {
-                var local = global::CastleLocation.GetCurrentKing();
-                if (local == null || local.Name != expectedKing || local.Treasury + delta < 0) return false;
-                local.Treasury += delta;
+                if (sql == null)
+                {
+                    RoyalCourtSaveData local;
+                    lock (RoyalCourtVersionLock)
+                    {
+                        var king = global::CastleLocation.GetCurrentKing();
+                        if (king == null) return false;
+                        local = CourtData(king);
+                    }
+                    if (!change(local)) return false;
+                    lock (RoyalCourtVersionLock) ApplyCourtToKing(local, exact: true);
+                    return true;
+                }
+                for (int attempt = 0; attempt < 5; attempt++)
+                {
+                    long version = sql.GetWorldStateVersion("royal_court");   // read before the value, so a later write is a conflict
+                    var json = await sql.LoadWorldState("royal_court");
+                    RoyalCourtSaveData? court;
+                    if (string.IsNullOrEmpty(json))
+                    {
+                        // no court stored yet: this process's court is the first one
+                        lock (RoyalCourtVersionLock)
+                        {
+                            var king = global::CastleLocation.GetCurrentKing();
+                            court = version == 0 && king != null ? CourtData(king) : null;
+                        }
+                        if (court == null) return false;
+                    }
+                    else court = JsonSerializer.Deserialize<RoyalCourtSaveData>(json, CourtJsonOptions);
+                    if (court == null || string.IsNullOrEmpty(court.KingName) || court.ThroneVacant || !change(court))
+                    {
+                        // refused: the in-memory court becomes the stored one, as read
+                        if (!string.IsNullOrEmpty(json)) ApplyLoadedCourt(JsonSerializer.Deserialize<RoyalCourtSaveData>(json, CourtJsonOptions), version);
+                        return false;
+                    }
+                    if (beforeWrite != null) await beforeWrite();
+                    if (await sql.SaveWorldStateIfVersion("royal_court", JsonSerializer.Serialize(court, CourtJsonOptions), version))
+                    {
+                        lock (RoyalCourtVersionLock)
+                        {
+                            if (_royalCourtVersion == null || _royalCourtVersion <= version)
+                            {
+                                ApplyCourtToKing(court, exact: true);
+                                global::CastleLocation.RoyalCourtLoadedFromShared = true;
+                                _royalCourtVersion = version + 1;
+                            }
+                        }
+                        return true;
+                    }
+                }
+                DebugLogger.Instance.LogWarning("ONLINE", "Court change gave up: the royal court kept changing. Nothing was changed.");
+                long v = sql.GetWorldStateVersion("royal_court");
+                var latest = await sql.LoadWorldState("royal_court");
+                if (!string.IsNullOrEmpty(latest)) ApplyLoadedCourt(JsonSerializer.Deserialize<RoyalCourtSaveData>(latest, CourtJsonOptions), v);
+                return false;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("ONLINE", $"Court change failed: {ex.Message}");
+                return false;
+            }
+            finally { gate.Release(); }
+        }
+
+        /// <summary>v1.1.13: a court change against this session's shared court (see the static form).</summary>
+        internal Task<bool> TryApplyCourtChangeAsync(Func<RoyalCourtSaveData, bool> change, Func<Task>? beforeWrite = null) =>
+            ApplyCourtChangeAsync(CourtStore, change, beforeWrite);
+
+        /// <summary>
+        /// v1.1.13: the same guarded court change, for game logic written against King (the world sim's court
+        /// politics). change runs on a King made from the stored court, never the in-memory one; the court is
+        /// written only when change returns true and the court it leaves differs from the one read.
+        /// </summary>
+        internal static Task<bool> ApplyKingChangeAsync(SqlSaveBackend? sql, Func<King, bool> change, Func<Task>? beforeWrite = null) =>
+            ApplyCourtChangeAsync(sql, court =>
+            {
+                var working = KingFromCourt(court);
+                string before = JsonSerializer.Serialize(CourtData(working, court.MonarchHistory), CourtJsonOptions);
+                if (!change(working)) return false;
+                var after = CourtData(working, court.MonarchHistory);
+                if (JsonSerializer.Serialize(after, CourtJsonOptions) == before) return false;
+                foreach (var prop in typeof(RoyalCourtSaveData).GetProperties())
+                    if (prop.CanRead && prop.CanWrite) prop.SetValue(court, prop.GetValue(after));
                 return true;
-            }
-            for (int attempt = 0; attempt < 5; attempt++)
-            {
-                await LoadRoyalCourtFromWorldState();
-                var king = global::CastleLocation.GetCurrentKing();
-                long? version = RoyalCourtVersion;
-                if (version == null && sql.GetWorldStateVersion("royal_court") == 0) version = 0;   // no court stored yet
-                if (king == null || king.Name != expectedKing || version == null) return false;
-                if (king.Treasury + delta < 0) return false;
-                king.Treasury += delta;
-                if (beforeWrite != null) await beforeWrite();
-                if (await SaveRoyalCourtIfVersionAsync(version.Value, throneVacated: false)) return true;
-                king.Treasury -= delta;   // not stored; the next reload replaces the court anyway
-            }
-            DebugLogger.Instance.LogWarning("ONLINE", "Treasury move gave up: the royal court kept changing. Nothing was moved.");
-            await LoadRoyalCourtFromWorldState();
-            return false;
-        }
+            }, beforeWrite);
+
+        /// <summary>v1.1.13: the world sim's shared court when no session's is at hand (set by the running world sim).</summary>
+        internal static SqlSaveBackend? SimCourtStore;
+
+        /// <summary>v1.1.13: the shared court a change goes to: this session's, else the world sim's when online, else none.</summary>
+        internal static SqlSaveBackend? CourtStoreFor(OnlineStateManager? osm) =>
+            osm?.CourtStore ?? (DoorMode.IsOnlineMode ? SimCourtStore : null);
 
         /// <summary>v1.1.11: the stored court and the version it was read at (the version read first, so a later write is a conflict).</summary>
         internal async Task<(RoyalCourtSaveData? Court, long Version)> ReadRoyalCourtWithVersionAsync()
@@ -1073,11 +1125,9 @@ namespace UsurperRemake.Systems
             try
             {
                 if (backend is not SqlSaveBackend sql) return false;   // v1.1.13: no unversioned fallback
-                var king = global::CastleLocation.GetCurrentKing();
-                long treasury = 0;
-                string json = king == null ? EmptyRoyalCourtJson(throneVacated) : RoyalCourtJson(king, out treasury);
+                var (json, _) = SnapshotCourt(throneVacated);
                 if (!await sql.SaveWorldStateIfVersion("royal_court", json, version)) return false;
-                NoteRoyalCourtVersion(version + 1, king?.Name, treasury);   // v1.1.13: the in-memory court is now the stored one
+                NoteCourtWritten(version);   // v1.1.13: the in-memory court is now the stored one
                 return true;
             }
             catch (Exception ex)
@@ -1161,205 +1211,251 @@ namespace UsurperRemake.Systems
                 long version = (backend as SqlSaveBackend)?.GetWorldStateVersion("royal_court") ?? 0;   // v1.1.13: read before the value
                 var json = await backend.LoadWorldState("royal_court");
                 if (string.IsNullOrEmpty(json)) return;
-
-                var royalCourt = JsonSerializer.Deserialize<RoyalCourtSaveData>(json, jsonOptions);
-                var unsaved = UnsavedTreasury();   // v1.1.13: before the version is noted afresh
-                if (royalCourt != null) global::CastleLocation.RoyalCourtLoadedFromShared = true;   // v1.1.11
-                if (royalCourt != null) NoteRoyalCourtVersion(version);   // v1.1.13: the court the next save is checked against
-                if (royalCourt == null || global::CastleLocation.ApplySharedThroneVacancy(royalCourt)) return;   // v1.1.11
-                if (string.IsNullOrEmpty(royalCourt.KingName)) return;
-
-                var king = global::CastleLocation.GetCurrentKing();
-                long treasury = TreasuryAfterLoad(unsaved, royalCourt, version);   // v1.1.13: with this process's unsaved change
-
-                // Check if king identity is different from what NPCs say
-                if (king == null || king.Name != royalCourt.KingName)
-                {
-                    // Create king directly from saved data — don't use SetCurrentKing
-                    // which creates a fresh King with default treasury/empty guards
-                    king = new King
-                    {
-                        Name = royalCourt.KingName,
-                        AI = (CharacterAI)royalCourt.KingAI,
-                        Sex = (CharacterSex)royalCourt.KingSex,
-                        IsActive = true
-                    };
-                    global::CastleLocation.SetKing(king);
-                }
-
-                if (king != null)
-                {
-                    king.Treasury = treasury;
-                    king.TaxRate = royalCourt.TaxRate;
-                    king.TotalReign = royalCourt.TotalReign;
-                    king.KingTaxPercent = royalCourt.KingTaxPercent > 0 ? royalCourt.KingTaxPercent : 5;
-                    king.CityTaxPercent = royalCourt.CityTaxPercent > 0 ? royalCourt.CityTaxPercent : 2;
-                    king.DesignatedHeir = royalCourt.DesignatedHeir;
-
-                    // Restore coronation date and tax alignment
-                    if (!string.IsNullOrEmpty(royalCourt.CoronationDate))
-                    {
-                        if (DateTime.TryParse(royalCourt.CoronationDate, null, System.Globalization.DateTimeStyles.RoundtripKind, out var coronation))
-                            king.CoronationDate = coronation;
-                    }
-                    king.TaxAlignment = (GameConfig.TaxAlignment)royalCourt.TaxAlignment;
-
-                    // Restore monarch history
-                    if (royalCourt.MonarchHistory != null && royalCourt.MonarchHistory.Count > 0)
-                    {
-                        var history = royalCourt.MonarchHistory.Select(m => new MonarchRecord
-                        {
-                            Name = m.Name,
-                            Title = m.Title,
-                            DaysReigned = m.DaysReigned,
-                            CoronationDate = DateTime.TryParse(m.CoronationDate, null, System.Globalization.DateTimeStyles.RoundtripKind, out var cd) ? cd : DateTime.Now,
-                            EndReason = m.EndReason
-                        }).ToList();
-                        global::CastleLocation.SetMonarchHistory(history);
-                    }
-
-                    if (royalCourt.CourtMembers != null)
-                    {
-                        king.CourtMembers = royalCourt.CourtMembers.Select(m => new CourtMember
-                        {
-                            Name = m.Name,
-                            Faction = (CourtFaction)m.Faction,
-                            Influence = m.Influence,
-                            LoyaltyToKing = m.LoyaltyToKing,
-                            Role = m.Role,
-                            IsPlotting = m.IsPlotting
-                        }).ToList();
-                    }
-
-                    if (royalCourt.Heirs != null)
-                    {
-                        king.Heirs = royalCourt.Heirs.Select(h => new RoyalHeir
-                        {
-                            Name = h.Name,
-                            Age = h.Age,
-                            ClaimStrength = h.ClaimStrength,
-                            ParentName = h.ParentName,
-                            Sex = (CharacterSex)h.Sex,
-                            IsDesignated = h.IsDesignated
-                        }).ToList();
-                    }
-
-                    if (royalCourt.Spouse != null)
-                    {
-                        king.Spouse = new RoyalSpouse
-                        {
-                            Name = royalCourt.Spouse.Name,
-                            Sex = (CharacterSex)royalCourt.Spouse.Sex,
-                            OriginalFaction = (CourtFaction)royalCourt.Spouse.OriginalFaction,
-                            Dowry = royalCourt.Spouse.Dowry,
-                            Happiness = royalCourt.Spouse.Happiness
-                        };
-                    }
-                    else
-                    {
-                        king.Spouse = null; // Ensure old spouse doesn't carry over
-                    }
-
-                    if (royalCourt.ActivePlots != null)
-                    {
-                        king.ActivePlots = royalCourt.ActivePlots.Select(p => new CourtIntrigue
-                        {
-                            PlotType = p.PlotType,
-                            Conspirators = p.Conspirators ?? new List<string>(),
-                            Target = p.Target,
-                            Progress = p.Progress,
-                            IsDiscovered = p.IsDiscovered
-                        }).ToList();
-                    }
-
-                    // Restore guards
-                    if (royalCourt.Guards != null && royalCourt.Guards.Count > 0)
-                    {
-                        king.Guards = royalCourt.Guards.Select(g => new RoyalGuard
-                        {
-                            Name = g.Name,
-                            AI = (CharacterAI)g.AI,
-                            Sex = (CharacterSex)g.Sex,
-                            DailySalary = g.DailySalary,
-                            Loyalty = g.Loyalty,
-                            IsActive = g.IsActive
-                        }).ToList();
-                    }
-
-                    // Restore monster guards
-                    if (royalCourt.MonsterGuards != null && royalCourt.MonsterGuards.Count > 0)
-                    {
-                        king.MonsterGuards = royalCourt.MonsterGuards.Select(m => new MonsterGuard
-                        {
-                            Name = m.Name,
-                            Level = m.Level,
-                            HP = m.HP,
-                            MaxHP = m.MaxHP,
-                            Strength = m.Strength,
-                            Defence = m.Defence,
-                            WeapPow = m.WeapPow,
-                            ArmPow = m.ArmPow,
-                            MonsterType = m.MonsterType,
-                            PurchaseCost = m.PurchaseCost,
-                            DailyFeedingCost = m.DailyFeedingCost
-                        }).ToList();
-                    }
-
-                    // Phase 2 — restore previously unserialized fields
-                    if (royalCourt.Prisoners != null && royalCourt.Prisoners.Count > 0)
-                    {
-                        king.Prisoners = royalCourt.Prisoners.ToDictionary(
-                            p => p.CharacterName,
-                            p => new PrisonRecord
-                            {
-                                CharacterName = p.CharacterName,
-                                Crime = p.Crime,
-                                Sentence = p.Sentence,
-                                DaysServed = p.DaysServed,
-                                ImprisonmentDate = DateTime.TryParse(p.ImprisonmentDate, out var impDate) ? impDate : DateTime.Now,
-                                BailAmount = p.BailAmount
-                            });
-                    }
-
-                    if (royalCourt.Orphans != null && royalCourt.Orphans.Count > 0)
-                    {
-                        king.Orphans = royalCourt.Orphans.Select(o => new RoyalOrphan
-                        {
-                            Name = o.Name,
-                            Age = o.Age,
-                            Sex = (CharacterSex)o.Sex,
-                            ArrivalDate = DateTime.TryParse(o.ArrivalDate, out var arrDate) ? arrDate : DateTime.Now,
-                            BackgroundStory = o.BackgroundStory,
-                            Happiness = o.Happiness,
-                            MotherName = o.MotherName,
-                            FatherName = o.FatherName,
-                            MotherID = o.MotherID,
-                            FatherID = o.FatherID,
-                            Race = (CharacterRace)o.Race,
-                            BirthDate = DateTime.TryParse(o.BirthDate, out var bd) ? bd : DateTime.Now,
-                            Soul = o.Soul,
-                            IsRealOrphan = o.IsRealOrphan
-                        }).ToList();
-                    }
-
-                    king.MagicBudget = royalCourt.MagicBudget;
-
-                    if (royalCourt.EstablishmentStatus != null && royalCourt.EstablishmentStatus.Count > 0)
-                        king.EstablishmentStatus = new Dictionary<string, bool>(royalCourt.EstablishmentStatus);
-
-                    if (!string.IsNullOrEmpty(royalCourt.LastProclamation))
-                        king.LastProclamation = royalCourt.LastProclamation;
-
-                    if (!string.IsNullOrEmpty(royalCourt.LastProclamationDate) &&
-                        DateTime.TryParse(royalCourt.LastProclamationDate, out var procDate))
-                        king.LastProclamationDate = procDate;
-
-                }
+                ApplyLoadedCourt(JsonSerializer.Deserialize<RoyalCourtSaveData>(json, jsonOptions), version);
             }
             catch (Exception ex)
             {
                 DebugLogger.Instance.LogError("ONLINE", $"Failed to load royal court from world_state: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// v1.1.13: a court read from world_state at this version becomes the in-memory court, with the version
+        /// noted in the same step (both loaders). True when it was a marked vacancy that cleared the king.
+        /// </summary>
+        internal static bool ApplyLoadedCourt(RoyalCourtSaveData? royalCourt, long version)
+        {
+            if (royalCourt == null) return false;
+            lock (RoyalCourtVersionLock)
+            {
+                global::CastleLocation.RoyalCourtLoadedFromShared = true;   // v1.1.11
+                _royalCourtVersion = version;
+                if (global::CastleLocation.ApplySharedThroneVacancy(royalCourt)) return true;   // v1.1.11
+                if (string.IsNullOrEmpty(royalCourt.KingName)) return false;
+                ApplyCourtToKing(royalCourt, exact: false);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// v1.1.13: the stored form of a court applied to the in-memory king (a new King when the name differs).
+        /// exact: every record is replaced, empty lists too, so the in-memory court is the written copy; a load
+        /// (not exact) keeps the in-memory lists an older record left empty, as before. Fields the record does
+        /// not hold (recruitment and joining dates, the day's tax takings) are kept by name. Call under
+        /// RoyalCourtVersionLock.
+        /// </summary>
+        private static void ApplyCourtToKing(RoyalCourtSaveData royalCourt, bool exact)
+        {
+            var king = global::CastleLocation.GetCurrentKing();
+            if (king == null || king.Name != royalCourt.KingName)
+            {
+                // Create king directly from saved data - don't use SetCurrentKing
+                // which creates a fresh King with default treasury/empty guards
+                king = new King
+                {
+                    Name = royalCourt.KingName,
+                    AI = (CharacterAI)royalCourt.KingAI,
+                    Sex = (CharacterSex)royalCourt.KingSex,
+                    IsActive = true
+                };
+                global::CastleLocation.SetKing(king);
+            }
+            ApplyCourtTo(king, royalCourt, exact, history: true);
+        }
+
+        /// <summary>v1.1.13: a King made from a court record, apart from the in-memory court (a court change's working copy).</summary>
+        internal static King KingFromCourt(RoyalCourtSaveData royalCourt)
+        {
+            var king = new King
+            {
+                Name = royalCourt.KingName,
+                AI = (CharacterAI)royalCourt.KingAI,
+                Sex = (CharacterSex)royalCourt.KingSex,
+                IsActive = true
+            };
+            ApplyCourtTo(king, royalCourt, exact: true, history: false);
+            return king;
+        }
+
+        private static void ApplyCourtTo(King king, RoyalCourtSaveData royalCourt, bool exact, bool history)
+        {
+            king.Treasury = royalCourt.Treasury;
+            king.TaxRate = royalCourt.TaxRate;
+            king.TotalReign = royalCourt.TotalReign;
+            king.KingTaxPercent = royalCourt.KingTaxPercent > 0 ? royalCourt.KingTaxPercent : 5;
+            king.CityTaxPercent = royalCourt.CityTaxPercent > 0 ? royalCourt.CityTaxPercent : 2;
+            king.DesignatedHeir = royalCourt.DesignatedHeir;
+
+            // Restore coronation date and tax alignment
+            if (!string.IsNullOrEmpty(royalCourt.CoronationDate))
+            {
+                if (DateTime.TryParse(royalCourt.CoronationDate, null, System.Globalization.DateTimeStyles.RoundtripKind, out var coronation))
+                    king.CoronationDate = coronation;
+            }
+            king.TaxAlignment = (GameConfig.TaxAlignment)royalCourt.TaxAlignment;
+
+            // Restore monarch history
+            if (history && royalCourt.MonarchHistory != null && royalCourt.MonarchHistory.Count > 0)
+            {
+                var monarchs = royalCourt.MonarchHistory.Select(m => new MonarchRecord
+                {
+                    Name = m.Name,
+                    Title = m.Title,
+                    DaysReigned = m.DaysReigned,
+                    CoronationDate = DateTime.TryParse(m.CoronationDate, null, System.Globalization.DateTimeStyles.RoundtripKind, out var cd) ? cd : DateTime.Now,
+                    EndReason = m.EndReason
+                }).ToList();
+                global::CastleLocation.SetMonarchHistory(monarchs);
+            }
+
+            if (royalCourt.CourtMembers != null)
+            {
+                var joined = (king.CourtMembers ?? new List<CourtMember>()).GroupBy(m => m.Name).ToDictionary(g => g.Key, g => g.First().JoinedCourt);
+                king.CourtMembers = royalCourt.CourtMembers.Select(m => new CourtMember
+                {
+                    Name = m.Name,
+                    Faction = (CourtFaction)m.Faction,
+                    Influence = m.Influence,
+                    LoyaltyToKing = m.LoyaltyToKing,
+                    Role = m.Role,
+                    IsPlotting = m.IsPlotting,
+                    JoinedCourt = joined.TryGetValue(m.Name, out var j) ? j : DateTime.Now
+                }).ToList();
+            }
+
+            if (royalCourt.Heirs != null)
+            {
+                var born = (king.Heirs ?? new List<RoyalHeir>()).GroupBy(h => h.Name).ToDictionary(g => g.Key, g => g.First().BirthDate);
+                king.Heirs = royalCourt.Heirs.Select(h => new RoyalHeir
+                {
+                    Name = h.Name,
+                    Age = h.Age,
+                    ClaimStrength = h.ClaimStrength,
+                    ParentName = h.ParentName,
+                    Sex = (CharacterSex)h.Sex,
+                    IsDesignated = h.IsDesignated,
+                    BirthDate = born.TryGetValue(h.Name, out var b) ? b : DateTime.Now
+                }).ToList();
+            }
+
+            if (royalCourt.Spouse != null)
+            {
+                var married = king.Spouse?.Name == royalCourt.Spouse.Name ? king.Spouse.MarriageDate : DateTime.Now;
+                king.Spouse = new RoyalSpouse
+                {
+                    Name = royalCourt.Spouse.Name,
+                    Sex = (CharacterSex)royalCourt.Spouse.Sex,
+                    OriginalFaction = (CourtFaction)royalCourt.Spouse.OriginalFaction,
+                    Dowry = royalCourt.Spouse.Dowry,
+                    Happiness = royalCourt.Spouse.Happiness,
+                    MarriageDate = married
+                };
+            }
+            else
+            {
+                king.Spouse = null; // Ensure old spouse doesn't carry over
+            }
+
+            if (royalCourt.ActivePlots != null)
+            {
+                king.ActivePlots = royalCourt.ActivePlots.Select(p => new CourtIntrigue
+                {
+                    PlotType = p.PlotType,
+                    Conspirators = p.Conspirators ?? new List<string>(),
+                    Target = p.Target,
+                    Progress = p.Progress,
+                    IsDiscovered = p.IsDiscovered
+                }).ToList();
+            }
+
+            // Restore guards
+            if (royalCourt.Guards != null && (exact || royalCourt.Guards.Count > 0))
+            {
+                var recruited = (king.Guards ?? new List<RoyalGuard>()).GroupBy(g => g.Name).ToDictionary(g => g.Key, g => g.First().RecruitmentDate);
+                king.Guards = royalCourt.Guards.Select(g => new RoyalGuard
+                {
+                    Name = g.Name,
+                    AI = (CharacterAI)g.AI,
+                    Sex = (CharacterSex)g.Sex,
+                    DailySalary = g.DailySalary,
+                    Loyalty = g.Loyalty,
+                    IsActive = g.IsActive,
+                    RecruitmentDate = recruited.TryGetValue(g.Name, out var r) ? r : DateTime.Now
+                }).ToList();
+            }
+
+            // Restore monster guards
+            if (royalCourt.MonsterGuards != null && (exact || royalCourt.MonsterGuards.Count > 0))
+            {
+                var acquired = (king.MonsterGuards ?? new List<MonsterGuard>()).GroupBy(m => m.Name).ToDictionary(g => g.Key, g => g.First().AcquiredDate);
+                king.MonsterGuards = royalCourt.MonsterGuards.Select(m => new MonsterGuard
+                {
+                    Name = m.Name,
+                    Level = m.Level,
+                    HP = m.HP,
+                    MaxHP = m.MaxHP,
+                    Strength = m.Strength,
+                    Defence = m.Defence,
+                    WeapPow = m.WeapPow,
+                    ArmPow = m.ArmPow,
+                    MonsterType = m.MonsterType,
+                    PurchaseCost = m.PurchaseCost,
+                    DailyFeedingCost = m.DailyFeedingCost,
+                    AcquiredDate = acquired.TryGetValue(m.Name, out var a) ? a : DateTime.Now
+                }).ToList();
+            }
+
+            // Phase 2 - restore previously unserialized fields
+            if (royalCourt.Prisoners != null && (exact || royalCourt.Prisoners.Count > 0))
+            {
+                king.Prisoners = royalCourt.Prisoners.GroupBy(p => p.CharacterName).Select(g => g.Last()).ToDictionary(
+                    p => p.CharacterName,
+                    p => new PrisonRecord
+                    {
+                        CharacterName = p.CharacterName,
+                        Crime = p.Crime,
+                        Sentence = p.Sentence,
+                        DaysServed = p.DaysServed,
+                        ImprisonmentDate = DateTime.TryParse(p.ImprisonmentDate, out var impDate) ? impDate : DateTime.Now,
+                        BailAmount = p.BailAmount
+                    });
+            }
+
+            if (royalCourt.Orphans != null && (exact || royalCourt.Orphans.Count > 0))
+            {
+                king.Orphans = royalCourt.Orphans.Select(o => new RoyalOrphan
+                {
+                    Name = o.Name,
+                    Age = o.Age,
+                    Sex = (CharacterSex)o.Sex,
+                    ArrivalDate = DateTime.TryParse(o.ArrivalDate, out var arrDate) ? arrDate : DateTime.Now,
+                    BackgroundStory = o.BackgroundStory,
+                    Happiness = o.Happiness,
+                    MotherName = o.MotherName,
+                    FatherName = o.FatherName,
+                    MotherID = o.MotherID,
+                    FatherID = o.FatherID,
+                    Race = (CharacterRace)o.Race,
+                    BirthDate = DateTime.TryParse(o.BirthDate, out var bd) ? bd : DateTime.Now,
+                    Soul = o.Soul,
+                    IsRealOrphan = o.IsRealOrphan
+                }).ToList();
+            }
+
+            king.MagicBudget = royalCourt.MagicBudget;
+
+            // an empty list is an older record's, never a court with no establishments: the defaults stay
+            if (royalCourt.EstablishmentStatus != null && royalCourt.EstablishmentStatus.Count > 0)
+                king.EstablishmentStatus = new Dictionary<string, bool>(royalCourt.EstablishmentStatus);
+
+            if (exact || !string.IsNullOrEmpty(royalCourt.LastProclamation))
+                king.LastProclamation = royalCourt.LastProclamation ?? "";
+
+            if (!string.IsNullOrEmpty(royalCourt.LastProclamationDate) &&
+                DateTime.TryParse(royalCourt.LastProclamationDate, out var procDate))
+                king.LastProclamationDate = procDate;
+            else if (exact)
+                king.LastProclamationDate = DateTime.MinValue;
         }
 
         /// <summary>

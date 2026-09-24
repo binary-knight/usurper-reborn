@@ -135,6 +135,22 @@ public class CityControlSystem
     /// Calculate and distribute city tax share from a sale
     /// Called when any shop makes a sale
     /// </summary>
+    /// <summary>v1.1.13: the king's sales tax into the stored treasury (the shared court when online).</summary>
+    internal static async System.Threading.Tasks.Task<bool> AddSalesTaxAsync(long kingShare)
+    {
+        try
+        {
+            bool ok = await CastleLocation.CourtChangeAsync(CastleLocation.TreasuryOsm(), court => { court.Treasury += kingShare; return true; });
+            if (!ok) UsurperRemake.Systems.DebugLogger.Instance.LogWarning("TAX", $"Sales tax of {kingShare:N0} not added: the royal court kept changing or has no king.");
+            return ok;
+        }
+        catch (Exception ex)
+        {
+            UsurperRemake.Systems.DebugLogger.Instance.LogError("TAX", $"Sales tax failed: {ex.Message}");
+            return false;
+        }
+    }
+
     public void ProcessSaleTax(long saleAmount)
     {
         var king = CastleLocation.GetCurrentKing();
@@ -146,7 +162,9 @@ public class CityControlSystem
         {
             // Minimum 1 gold tax to match what the buyer was charged
             long kingShare = Math.Max(1, (saleAmount * kingTaxPercent) / 100);
-            king.Treasury += kingShare;
+            // v1.1.13: into the stored treasury as one guarded court change (not awaited: the sale is done);
+            // the day's takings are counted in memory, where the daily court change reads them
+            _ = AddSalesTaxAsync(kingShare);
             king.DailyTaxRevenue += kingShare;
         }
 

@@ -361,15 +361,14 @@ public class DeleteFollowUpTests : IDisposable
             {
                 // a fresh database with no court: absent changes nothing
                 var sim = new WorldSimService(_db);
-                var simVersion = typeof(WorldSimService).GetField("lastRoyalCourtVersion", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
                 sim.LoadRoyalCourtFromWorldState();
                 CastleLocation.GetCurrentKing().Should().BeSameAs(bob);
 
                 // control: the sim's court save does write its king when it holds the current version
                 await _db.SaveWorldState("royal_court", CourtJson(new RoyalCourtSaveData { KingName = "Bob", KingAI = (int)CharacterAI.Human }));
-                simVersion.SetValue(sim, _db.GetWorldStateVersion("royal_court"));
+                OnlineStateManager.NoteRoyalCourtVersion(_db.GetWorldStateVersion("royal_court"));   // v1.1.13: the process-wide court version
                 await _db.SaveWorldState("royal_court", CourtJson(new RoyalCourtSaveData { KingName = "Nobody", KingAI = 1 }));
-                simVersion.SetValue(sim, _db.GetWorldStateVersion("royal_court"));
+                OnlineStateManager.NoteRoyalCourtVersion(_db.GetWorldStateVersion("royal_court"));   // v1.1.13: the process-wide court version
                 await sim.SaveRoyalCourtToWorldState();
                 (await _db.LoadWorldState("royal_court")).Should().Contain("\"Bob\"", "the save path is live");
 
@@ -384,7 +383,7 @@ public class DeleteFollowUpTests : IDisposable
                 (CastleLocation.GetCurrentKing()?.Name).Should().NotBe("Bob", "the world sim's copy of the deleted king is cleared");
                 bob.IsActive.Should().BeFalse();
 
-                simVersion.SetValue(sim, _db.GetWorldStateVersion("royal_court"));   // the sim holds the vacancy's version
+                OnlineStateManager.NoteRoyalCourtVersion(_db.GetWorldStateVersion("royal_court"));   // v1.1.13: the process-wide court version   // the sim holds the vacancy's version
                 await sim.SaveRoyalCourtToWorldState();
                 var stored = System.Text.Json.JsonSerializer.Deserialize<RoyalCourtSaveData>((await _db.LoadWorldState("royal_court"))!,
                     new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;

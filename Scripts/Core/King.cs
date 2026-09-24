@@ -165,43 +165,35 @@ public class King
     }
     
     /// <summary>
-    /// Process daily royal court activities
+    /// v1.1.13: the day's royal court activities on the stored court (income less expenses into the
+    /// treasury, the reign's day, prisoners' time served and release, the magic budget's top-up), as one
+    /// guarded court change. The day's sales-tax takings are counted from the in-memory court, which then
+    /// starts the next day at zero. Returns false (nothing done) when the court kept changing or has no king.
     /// </summary>
-    public void ProcessDailyActivities()
+    public static async System.Threading.Tasks.Task<bool> ProcessDailyActivitiesAsync(UsurperRemake.Systems.SqlSaveBackend? sql,
+        Func<UsurperRemake.Systems.RoyalCourtSaveData, bool>? alsoToday = null, Func<System.Threading.Tasks.Task>? beforeWrite = null)
     {
-        var expenses = CalculateDailyExpenses();
-        var income = CalculateDailyIncome();
-
-        Treasury += income - expenses;
+        var king = CastleLocation.GetCurrentKing();
+        if (king == null) return false;
+        long salesTax = king.DailyTaxRevenue;
+        var released = new List<string>();
+        bool done = await UsurperRemake.Systems.OnlineStateManager.ApplyCourtChangeAsync(sql, court =>
+        {
+            released = ApplyDailyActivities(court, salesTax);
+            return alsoToday == null || alsoToday(court);
+        }, beforeWrite);
+        if (!done) return false;
 
         // Reset daily tax revenue accumulators for the next day
-        DailyTaxRevenue = 0;
-        DailyCityTaxRevenue = 0;
-        
-        // Ensure treasury doesn't go negative
-        if (Treasury < 0)
+        var now = CastleLocation.GetCurrentKing();
+        if (now != null)
         {
-            Treasury = 0;
+            now.DailyTaxRevenue = 0;
+            now.DailyCityTaxRevenue = 0;
         }
-        
-        TotalReign++;
-        
-        // Process prisoner time served
-        var prisonersToRelease = new List<string>();
-        foreach (var prisoner in Prisoners)
+        // Also clear a released NPC's prison state
+        foreach (var prisonerId in released)
         {
-            prisoner.Value.DaysServed++;
-            if (prisoner.Value.DaysServed >= prisoner.Value.Sentence)
-            {
-                prisonersToRelease.Add(prisoner.Key);
-            }
-        }
-        
-        // Release prisoners who have served their time
-        foreach (var prisonerId in prisonersToRelease)
-        {
-            Prisoners.Remove(prisonerId);
-            // Also clear the NPC's prison state
             var npc = UsurperRemake.Systems.NPCSpawnSystem.Instance?.GetNPCByName(prisonerId, includeDead: true);
             if (npc != null)
             {
@@ -209,40 +201,85 @@ public class King
                 npc.CurrentLocation = "MainStreet";
             }
         }
+        return true;
+    }
+
+    /// <summary>v1.1.13: the day's court activities applied to a court record; returns the prisoners released.</summary>
+    internal static List<string> ApplyDailyActivities(UsurperRemake.Systems.RoyalCourtSaveData court, long salesTaxIncome)
+    {
+        var income = DailyIncomeOf(court, salesTaxIncome);
+        var expenses = DailyExpensesOf(court);
+
+        // Ensure treasury doesn't go negative
+        court.Treasury = Math.Max(0, court.Treasury + income - expenses);
+
+        court.TotalReign++;
+
+        // Process prisoner time served; release prisoners who have served their time
+        var released = new List<string>();
+        foreach (var prisoner in court.Prisoners)
+        {
+            prisoner.DaysServed++;
+            if (prisoner.DaysServed >= prisoner.Sentence) released.Add(prisoner.CharacterName);
+        }
+        court.Prisoners.RemoveAll(p => released.Contains(p.CharacterName));
 
         // Replenish magic budget from treasury (up to cap)
-        long magicReplenish = Math.Min(GameConfig.DailyMagicReplenishment, Treasury);
-        magicReplenish = Math.Min(magicReplenish, GameConfig.MaxMagicBudget - MagicBudget);
+        long magicReplenish = Math.Min(GameConfig.DailyMagicReplenishment, court.Treasury);
+        magicReplenish = Math.Min(magicReplenish, GameConfig.MaxMagicBudget - court.MagicBudget);
         if (magicReplenish > 0)
         {
-            MagicBudget += magicReplenish;
-            Treasury -= magicReplenish;
+            court.MagicBudget += magicReplenish;
+            court.Treasury -= magicReplenish;
         }
+        return released;
     }
-    
+
+    /// <summary>v1.1.13: CalculateDailyExpenses for a court record.</summary>
+    internal static long DailyExpensesOf(UsurperRemake.Systems.RoyalCourtSaveData court)
+    {
+        long expenses = 0;
+        foreach (var guard in court.Guards) expenses += guard.DailySalary;
+        foreach (var monster in court.MonsterGuards) expenses += monster.DailyFeedingCost;
+        expenses += court.Orphans.Count * GameConfig.OrphanCareCost;
+        expenses += GameConfig.BaseCourtMaintenance;
+        return expenses;
+    }
+
+    /// <summary>v1.1.13: CalculateDailyIncome for a court record (its tax rate and alignment).</summary>
+    internal static long DailyIncomeOf(UsurperRemake.Systems.RoyalCourtSaveData court, long salesTaxIncome)
+    {
+        var probe = new King { TaxRate = court.TaxRate, TaxAlignment = (GameConfig.TaxAlignment)court.TaxAlignment, DailyTaxRevenue = salesTaxIncome };
+        return probe.CalculateDailyIncome();
+    }
+
     /// <summary>
-    /// Add an NPC guard to the royal guard
+    /// Add an NPC guard to a king being set up (v1.1.13: no cost; a reigning court hires through the
+    /// court-record form below, which pays from the stored treasury in the same change)
     /// </summary>
     public bool AddGuard(string guardName, CharacterAI ai, CharacterSex sex, long salary)
     {
         if (Guards.Count >= MaxNPCGuards)
             return false;
 
-        if (Treasury < GameConfig.GuardRecruitmentCost)
-            return false;
-
-        var guard = new RoyalGuard
+        Guards.Add(new RoyalGuard
         {
             Name = guardName,
             AI = ai,
             Sex = sex,
             DailySalary = salary,
             RecruitmentDate = DateTime.Now
-        };
+        });
+        return true;
+    }
 
-        Guards.Add(guard);
-        Treasury -= GameConfig.GuardRecruitmentCost;
-
+    /// <summary>v1.1.13: hire a guard on a court record: the guard joins and the recruitment cost leaves the treasury together.</summary>
+    internal static bool AddGuard(UsurperRemake.Systems.RoyalCourtSaveData court, string guardName, CharacterAI ai, CharacterSex sex, long salary)
+    {
+        if (court.Guards.Count >= MaxNPCGuards || court.Treasury < GameConfig.GuardRecruitmentCost)
+            return false;
+        court.Guards.Add(new UsurperRemake.Systems.RoyalGuardSaveData { Name = guardName, AI = (int)ai, Sex = (int)sex, DailySalary = salary, Loyalty = 100, IsActive = true });
+        court.Treasury -= GameConfig.GuardRecruitmentCost;
         return true;
     }
 
@@ -261,17 +298,18 @@ public class King
     }
 
     /// <summary>
-    /// Add a monster guard - monsters cost more but are stronger
+    /// Add a monster guard - monsters cost more but are stronger. v1.1.13: on a court record, the monster
+    /// joins and its cost leaves the treasury together.
     /// </summary>
-    public bool AddMonsterGuard(string monsterName, int level, long purchaseCost)
+    internal static bool AddMonsterGuard(UsurperRemake.Systems.RoyalCourtSaveData court, string monsterName, int level, long purchaseCost)
     {
-        if (MonsterGuards.Count >= MaxMonsterGuards)
+        if (court.MonsterGuards.Count >= MaxMonsterGuards)
             return false;
 
         // Monster cost scales with level and count
-        long actualCost = purchaseCost + (MonsterGuards.Count * 500);
+        long actualCost = purchaseCost + (court.MonsterGuards.Count * 500);
 
-        if (Treasury < actualCost)
+        if (court.Treasury < actualCost)
             return false;
 
         // Stats scale quadratically at higher levels to make endgame guards formidable
@@ -281,7 +319,7 @@ public class King
         int guardWeapPow = 15 + level * 3;
         int guardArmPow = 10 + level * 2;
 
-        var monster = new MonsterGuard
+        court.MonsterGuards.Add(new UsurperRemake.Systems.MonsterGuardSaveData
         {
             Name = monsterName,
             Level = level,
@@ -292,12 +330,9 @@ public class King
             WeapPow = guardWeapPow,
             ArmPow = guardArmPow,
             PurchaseCost = actualCost,
-            DailyFeedingCost = 50 + (level * 10) + (level > 30 ? (level - 30) * 20 : 0),
-            AcquiredDate = DateTime.Now
-        };
-
-        MonsterGuards.Add(monster);
-        Treasury -= actualCost;
+            DailyFeedingCost = 50 + (level * 10) + (level > 30 ? (level - 30) * 20 : 0)
+        });
+        court.Treasury -= actualCost;
 
         return true;
     }

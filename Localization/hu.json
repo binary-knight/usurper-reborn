@@ -2722,6 +2722,7 @@
   "castle.treasury_not_enough": "A kincstárban nincs ennyi arany!",
   "castle.withdrew_gold": "Kivettél {0} aranyat a kincstárból.",
   "castle.treasury_move_failed": "A kincstár megváltozott, mielőtt az aranyat mozgatni lehetett volna. Semmi sem mozdult.",
+  "castle.court_change_failed": "A királyi udvar megváltozott, vagy nem tudta megfizetni, mielőtt ez megtörténhetett volna. Semmi sem változott.",
   "castle.deposit_prompt": "Mennyit kívánsz befizetni? (Nálad van: {0}): ",
   "castle.not_enough_gold": "Nincs ennyi aranyad!",
   "castle.deposited_gold": "Befizettél {0} aranyat a kincstárba.",
