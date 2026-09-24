@@ -5672,7 +5672,7 @@ public class CastleLocation : BaseLocation
                 var backend = UsurperRemake.Systems.SaveSystem.Instance?.Backend as UsurperRemake.Systems.SqlSaveBackend;
                 if (backend != null)
                 {
-                    var kingSave = backend.ReadGameData(currentKing.Name.ToLowerInvariant()).GetAwaiter().GetResult();
+                    var kingSave = backend.ReadKingSave(currentKing.Name).GetAwaiter().GetResult();   // v1.1.13: by save key
                     if (kingSave?.Player != null)
                         return kingSave.Player.Level;
                 }
@@ -5993,7 +5993,7 @@ public class CastleLocation : BaseLocation
                 var backend = SaveSystem.Instance?.Backend as SqlSaveBackend;
                 if (backend != null)
                 {
-                    var kingSave = await backend.ReadGameData(currentKing.Name.ToLowerInvariant());
+                    var kingSave = await backend.ReadKingSave(currentKing.Name);   // v1.1.13: by save key, not the display name
                     if (kingSave?.Player != null)
                     {
                         kingData = kingSave.Player;
@@ -8986,7 +8986,7 @@ public class CastleLocation : BaseLocation
                 var sqlBackend = SaveSystem.Instance?.Backend as SqlSaveBackend;
                 if (sqlBackend != null)
                 {
-                    var kingSave = await sqlBackend.ReadGameData(currentKing.Name.ToLowerInvariant());
+                    var kingSave = await sqlBackend.ReadKingSave(currentKing.Name);   // v1.1.13: by save key
                     if (kingSave?.Player != null)
                     {
                         pStr = kingSave.Player.Strength;

@@ -4624,20 +4624,8 @@ public class HomeLocation : BaseLocation
         }
 
         var selectedPartner = partners[partnerIdx - 1].npc;
+        // v1.1.13: every move is saved as it happens, in the order for its direction
         await ManageCharacterEquipment(selectedPartner);
-
-        // Sync equipment changes to canonical NPC in ActiveNPCs (handles orphaned references)
-        CombatEngine.SyncNPCTeammateToActiveNPCs(selectedPartner);
-
-        // Auto-save after equipment changes to persist NPC equipment state
-        await SaveSystem.Instance.AutoSave(currentPlayer);
-
-        // Force NPC world_state save so equipment survives world-sim reload cycles
-        if (DoorMode.IsOnlineMode && OnlineStateManager.Instance != null)
-        {
-            try { await OnlineStateManager.Instance.SaveAllSharedState(); }
-            catch (Exception ex) { DebugLogger.Instance.LogError("HOME", $"SaveAllSharedState failed after equipment change: {ex.Message}"); }
-        }
     }
 
     /// <summary>
@@ -4722,43 +4710,27 @@ public class HomeLocation : BaseLocation
 
             var choice = (await terminal.ReadLineAsync()).ToUpper().Trim();
 
-            bool edited = false;
+            // v1.1.13: each move saves itself at once (SaveGearGivenToNpc / SaveGearTakenFromNpc); one save
+            // here, player first for moves both ways, could copy a taken item on a crash between the two writes
             switch (choice)
             {
                 case "E":
                     await EquipItemToCharacter(target);
-                    edited = true;
                     break;
                 case "B":
                     // v0.64.2 (player request): auto-equip best applicable gear
                     // from the player's backpack across all slots.
                     await RunEquipBestGear(target);
-                    edited = true;
                     break;
                 case "U":
                     await UnequipItemFromCharacter(target);
-                    edited = true;
                     break;
                 case "T":
                     await TakeAllEquipment(target);
-                    edited = true;
                     break;
                 case "Q":
                 case "":
                     return;
-            }
-
-            // v0.57.1 — save per-edit (not just on menu exit) so a mid-loop disconnect/crash doesn't
-            // lose spouse/lover equipment changes. TeamCornerLocation already follows this pattern.
-            if (edited)
-            {
-                CombatEngine.SyncNPCTeammateToActiveNPCs(target);
-                await SaveSystem.Instance.AutoSave(currentPlayer);
-                if (DoorMode.IsOnlineMode && OnlineStateManager.Instance != null)
-                {
-                    try { await OnlineStateManager.Instance.SaveAllSharedState(); }
-                    catch (Exception ex) { DebugLogger.Instance.LogError("HOME", $"SaveAllSharedState failed after equipment change: {ex.Message}"); }
-                }
             }
         }
     }
@@ -4842,7 +4814,7 @@ public class HomeLocation : BaseLocation
                 continue;
             }
 
-            var (selectedItem, wasEquipped, sourceSlot) = equipmentItems[itemIdx - 1];
+            var (selectedItem, wasEquipped, sourceSlot, sourceItem) = equipmentItems[itemIdx - 1];
 
             // Block unidentified items
             if (!selectedItem.IsIdentified)
@@ -4865,23 +4837,13 @@ public class HomeLocation : BaseLocation
             // Use the slot the player already picked (no need to ask which hand)
             EquipmentSlot? targetSlot = selectedSlot.Value;
 
-            // Remove from player
-            if (wasEquipped && sourceSlot.HasValue)
+            // Remove from player. v1.1.13: the listed instance, and nothing is equipped if nothing came off
+            if (!TakeFromPlayerForEquip(selectedItem, wasEquipped, sourceSlot, sourceItem))
             {
-                currentPlayer.UnequipSlot(sourceSlot.Value);
-                currentPlayer.RecalculateStats();
-            }
-            else
-            {
-                // Remove from inventory (find by name)
-                // Two-pass match: first try Name+Attack+ArmorClass for precision, then fallback to name-only
-                var invItem = currentPlayer.Inventory.FirstOrDefault(i =>
-                    i.Name == selectedItem.Name && i.Attack == selectedItem.WeaponPower && i.Armor == selectedItem.ArmorClass)
-                    ?? currentPlayer.Inventory.FirstOrDefault(i => i.Name == selectedItem.Name);
-                if (invItem != null)
-                {
-                    currentPlayer.Inventory.Remove(invItem);
-                }
+                terminal.SetColor("red");
+                terminal.WriteLine(Loc.Get("team.equip_item_gone", selectedItem.Name));
+                await Task.Delay(2000);
+                continue;
             }
 
             // Track items in target's inventory BEFORE equipping, so we can move displaced items to player
@@ -4893,7 +4855,9 @@ public class HomeLocation : BaseLocation
 
             if (result)
             {
-                // Move any items that were added to target's inventory (displaced equipment) to player's inventory
+                // v1.1.13: the give is saved first (player, then NPC) with the displaced items still in the target's
+                // bag; then they come back to the player, saved NPC side first (companions sync in both saves)
+                await SaveGearGivenToNpc(target);
                 if (target.Inventory.Count > targetInventoryBefore)
                 {
                     var displacedItems = target.Inventory.Skip(targetInventoryBefore).ToList();
@@ -4902,15 +4866,8 @@ public class HomeLocation : BaseLocation
                         target.Inventory.Remove(displaced);
                         currentPlayer.Inventory.Add(displaced);
                     }
+                    await SaveGearTakenFromNpc(target);
                 }
-
-                // v0.57.7 (Hesperos report): `target` is a WRAPPER Character built fresh by
-                // CompanionSystem.GetCompanionsAsCharacters() — edits to wrapper.EquippedItems
-                // don't mutate the underlying Companion unless we explicitly sync. Without this
-                // call Lyris reverted to her EquipStartingGear set on next wrapper regeneration.
-                // Safe no-op for non-companion targets (spouse/lover/child/team NPC).
-                if (target.IsCompanion)
-                    CompanionSystem.Instance?.SyncCompanionEquipment(target);
 
                 terminal.WriteLine("");
                 terminal.SetColor("bright_green");
@@ -4923,8 +4880,8 @@ public class HomeLocation : BaseLocation
             }
             else
             {
-                // Failed - return item to player
-                var legacyItem = ConvertEquipmentToItem(selectedItem);
+                // Failed - return item to player (v1.1.13: the pack item itself when it came from the pack)
+                var legacyItem = sourceItem ?? ConvertEquipmentToItem(selectedItem);
                 currentPlayer.Inventory.Add(legacyItem);
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("home.equip_failed", message));
@@ -5019,6 +4976,7 @@ public class HomeLocation : BaseLocation
                 CompanionSystem.Instance?.SyncCompanionEquipment(target);
             var legacyItem = ConvertEquipmentToItem(unequipped);
             currentPlayer.Inventory.Add(legacyItem);
+            await SaveGearTakenFromNpc(target);   // v1.1.13: NPC side first, then the player
 
             terminal.WriteLine("");
             terminal.SetColor("bright_green");
@@ -5084,6 +5042,7 @@ public class HomeLocation : BaseLocation
         // v0.57.7 — sync wrapper take-all back to Companion (see EquipItemToCharacter comment)
         if (itemsTaken > 0 && target.IsCompanion)
             CompanionSystem.Instance?.SyncCompanionEquipment(target);
+        if (itemsTaken > 0) await SaveGearTakenFromNpc(target);   // v1.1.13: NPC side first, then the player
 
         terminal.WriteLine("");
         if (itemsTaken > 0)

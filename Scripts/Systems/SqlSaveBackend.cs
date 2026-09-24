@@ -1235,7 +1235,11 @@ namespace UsurperRemake.Systems
                 // attacker/defender, etc. Clear all of them.
                 // v1.1.12: mail to the key is kept when another character goes by that name (account "bob" playing
                 // "Alice" beside a character "Bob"), as the alias clause below does
-                ExecPurge(connection, tx, "messages",          "LOWER(from_player) = LOWER(@u) OR (LOWER(to_player) = LOWER(@u) " +
+                // v1.1.13: the same for mail from the key, which may be another character's sent mail
+                ExecPurge(connection, tx, "messages",          "(LOWER(from_player) = LOWER(@u) " +
+                    "AND NOT EXISTS (SELECT 1 FROM players p WHERE LOWER(p.username) != LOWER(@u) AND (LOWER(p.display_name) = LOWER(messages.from_player) " +
+                    "OR LOWER(CASE WHEN json_valid(p.player_data) THEN json_extract(p.player_data, '$.player.name2') END) = LOWER(messages.from_player)))) " +
+                    "OR (LOWER(to_player) = LOWER(@u) " +
                     "AND NOT EXISTS (SELECT 1 FROM players p WHERE LOWER(p.username) != LOWER(@u) AND (LOWER(p.display_name) = LOWER(messages.to_player) " +
                     "OR LOWER(CASE WHEN json_valid(p.player_data) THEN json_extract(p.player_data, '$.player.name2') END) = LOWER(messages.to_player))))", username);
                 ExecPurge(connection, tx, "trade_offers",      "LOWER(from_player) = LOWER(@u) OR LOWER(to_player) = LOWER(@u)", username);
@@ -6290,6 +6294,35 @@ namespace UsurperRemake.Systems
             return cmd.ExecuteScalar()?.ToString();
         }
         catch { return null; }
+    }
+
+    /// <summary>
+    /// v1.1.13: the save key of a player king. The throne keeps the display name (with any married surname),
+    /// so that is matched first, then the character name (crowned before a marriage), then a username.
+    /// Null when no player goes by the name.
+    /// </summary>
+    public string? ResolveKingSaveKey(string kingName)
+    {
+        if (string.IsNullOrWhiteSpace(kingName)) return null;
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            const string name2 = "LOWER(CASE WHEN json_valid(player_data) THEN json_extract(player_data, '$.player.name2') END)";
+            cmd.CommandText = "SELECT username FROM players WHERE username NOT LIKE 'emergency_%' AND LENGTH(player_data) > 2 " +
+                $"AND (LOWER(display_name) = LOWER(@name) OR {name2} = LOWER(@name) OR LOWER(username) = LOWER(@name)) " +
+                $"ORDER BY (LOWER(display_name) = LOWER(@name)) DESC, ({name2} = LOWER(@name)) DESC LIMIT 1;";
+            cmd.Parameters.AddWithValue("@name", kingName);
+            return cmd.ExecuteScalar()?.ToString();
+        }
+        catch { return null; }
+    }
+
+    /// <summary>v1.1.13: the player king's save, read by its resolved key; null when no player matches.</summary>
+    public async Task<SaveGameData?> ReadKingSave(string kingName)
+    {
+        var key = ResolveKingSaveKey(kingName);
+        return key == null ? null : await ReadGameData(key);
     }
 
     public async Task<List<PlayerMessage>> GetMailInbox(string username, int limit = 20, int offset = 0)
