@@ -295,7 +295,50 @@ public class TeamCornerFixes1112Tests : IDisposable
             hero.Gold.Should().Be(5000);
             hero.TeamWarsToday.Should().Be(0);
             TeamCornerRig.Scalar(path, "SELECT status FROM team_wars").Should().Be("abandoned");
+            // v1.1.12: the settled war is not refunded again by the stale cleanup
+            TeamCornerRig.Exec(path, "UPDATE team_wars SET started_at = datetime('now', '-20 minutes');");
+            db.ExpireStaleTeamWars().Should().Be(0);
+            Convert.ToInt64(TeamCornerRig.Scalar(path, "SELECT COUNT(*) FROM pending_gold_transfers")).Should().Be(0, "refunded once, at the war");
         });
+    }
+
+    [Fact]
+    public async Task AWarWithNoRound_WhoseSettlementFails_IsNotRefundedAtOnce_AndTheCleanupRefundsItOnce()
+    {
+        await TeamCornerRig.Online(async (db, path) =>
+        {
+            await db.CreatePlayerTeam("Home Side", "x", "war hero");
+            await db.CreatePlayerTeam("Away Side", "x", "ghost");
+            TeamCornerRig.PlayerRow(path, "mate", "Home Side", rawPlayer: "{\"team\":\"Home Side\",\"level\":\"bad\"}");
+            TeamCornerRig.PlayerRow(path, "ghost", "Away Side", rawPlayer: "{\"team\":\"Away Side\",\"level\":\"bad\"}");
+            // the settlement write fails (as a DB error would), leaving the war active
+            TeamCornerRig.Exec(path, "CREATE TRIGGER no_settle BEFORE UPDATE OF status ON team_wars WHEN NEW.status = 'abandoned' BEGIN SELECT RAISE(ABORT, 'test'); END;");
+            var hero = TeamCornerRig.Hero(name: "War Hero", team: "Home Side", gold: 5000);
+            hero.Level = 1;
+            string shown = await new TeamCornerRig(hero, new[] { "1", "y", "", "" }).Run("ChallengeTeamWar", db);
+            shown.Should().Contain(Loc.Get("team.war_no_rounds_pending", $"{1000:N0}"));
+            hero.Gold.Should().Be(4000, "not refunded while the war is unsettled");
+            TeamCornerRig.Scalar(path, "SELECT status FROM team_wars").Should().Be("active");
+
+            TeamCornerRig.Exec(path, "DROP TRIGGER no_settle; UPDATE team_wars SET started_at = datetime('now', '-20 minutes');");
+            db.ExpireStaleTeamWars().Should().Be(1);
+            db.ExpireStaleTeamWars().Should().Be(0);
+            Convert.ToInt64(TeamCornerRig.Scalar(path, "SELECT COUNT(*) FROM pending_gold_transfers WHERE amount = 1000")).Should().Be(1, "one refund in all");
+            Convert.ToInt64(TeamCornerRig.Scalar(path, "SELECT COUNT(*) FROM pending_gold_transfers")).Should().Be(1);
+        });
+    }
+
+    [Fact]
+    public async Task CompleteTeamWar_OnAWarNoLongerActive_DoesNotLand()
+    {
+        int id = War("Reds", "Blues", minutesAgo: 20, 0, 0);
+        _db.ExpireStaleTeamWars().Should().Be(1);
+        (await _db.CompleteTeamWar(id, "abandoned")).Should().BeFalse("the cleanup settled it first");
+        (await _db.CompleteTeamWar(id, "challenger_won")).Should().BeFalse();
+        Scalar($"SELECT status FROM team_wars WHERE id = {id}").Should().Be("abandoned");
+        int live = War("Greens", "Golds", minutesAgo: 1, 1, 0);
+        (await _db.CompleteTeamWar(live, "challenger_won")).Should().BeTrue();
+        (await _db.CompleteTeamWar(live, "abandoned")).Should().BeFalse("settled once");
     }
 
     [Fact]
@@ -440,6 +483,77 @@ public class TeamCornerFixes1112Tests : IDisposable
             hero.Team.Should().BeEmpty();
         }
         finally { NPCSpawnSystem.Instance.ActiveNPCs.RemoveAll(n => n.ID.StartsWith("tc_jfull_")); }
+    }
+
+    [Fact]
+    public async Task Join_ATeamThatFillsDuringThePassword_IsRefused()
+    {
+        var npcs = Enumerable.Range(1, 4).Select(i => TeamCornerRig.Npc($"tc_jlate_{i}", $"Late {i}", "Late House")).ToList();
+        NPCSpawnSystem.Instance.ActiveNPCs.AddRange(npcs);
+        try
+        {
+            var hero = TeamCornerRig.Hero();
+            // line 1 is the password; a fifth member joins while it is asked
+            var rig = new TeamCornerRig(hero, new[] { "late house", "pw", "" },
+                i => { if (i == 1) NPCSpawnSystem.Instance.ActiveNPCs.Add(TeamCornerRig.Npc("tc_jlate_5", "Late 5", "Late House")); });
+            string shown = await rig.Run("JoinTeam");
+            shown.Should().Contain(Loc.Get("team.join_team_full", "Late House", 5));
+            shown.Should().NotContain(Loc.Get("team.joined_team", "Late House"));
+            hero.Team.Should().BeEmpty();
+        }
+        finally { NPCSpawnSystem.Instance.ActiveNPCs.RemoveAll(n => n.ID.StartsWith("tc_jlate_")); }
+    }
+
+    [Fact]
+    public async Task Join_APlayerTeamThatFillsDuringThePassword_IsRefused()
+    {
+        var npcs = Enumerable.Range(1, 4).Select(i => TeamCornerRig.Npc($"tc_jlp_{i}", $"Lodge {i}", "Late Lodge")).ToList();
+        NPCSpawnSystem.Instance.ActiveNPCs.AddRange(npcs);
+        try
+        {
+            await TeamCornerRig.Online(async (db, path) =>
+            {
+                (await db.CreatePlayerTeam("Late Lodge", SqlSaveBackend.HashTeamPassword("secret"), "boss")).Should().BeTrue();
+                var hero = TeamCornerRig.Hero();
+                // a player joins the team while the password is asked
+                var rig = new TeamCornerRig(hero, new[] { "late lodge", "secret", "" },
+                    i => { if (i == 1) TeamCornerRig.PlayerRow(path, "tomas", "Late Lodge"); });
+                string shown = await rig.Run("JoinTeam");
+                shown.Should().Contain(Loc.Get("team.join_team_full", "Late Lodge", 5));
+                hero.Team.Should().BeEmpty();
+            });
+        }
+        finally { NPCSpawnSystem.Instance.ActiveNPCs.RemoveAll(n => n.ID.StartsWith("tc_jlp_")); }
+    }
+
+    [Fact]
+    public async Task Sack_AnNpcThatLeftTheTeamAtTheGearPrompt_KeepsItsGear()
+    {
+        int shield = EquipmentDatabase.GetShields().First().Id;
+        var npc = TeamCornerRig.Npc("tc_sgear_1", "Geared Npc", "Gear Crew");
+        npc.EquippedItems[EquipmentSlot.OffHand] = shield;
+        NPCSpawnSystem.Instance.ActiveNPCs.Add(npc);
+        try
+        {
+            var hero = TeamCornerRig.Hero(team: "Gear Crew");
+            int packBefore = hero.Inventory.Count;
+            NPC? live = null;
+            // line 2 answers the take-gear prompt; before it the NPC is reloaded onto another team
+            var rig = new TeamCornerRig(hero, new[] { "geared", "y", "y", "" }, i =>
+            {
+                if (i != 2) return;
+                live = TeamCornerRig.Reload(npc);
+                live.EquippedItems[EquipmentSlot.OffHand] = shield;
+                live.Team = "Other Crew";
+            });
+            string shown = await rig.Run("SackMember");
+            live.Should().NotBeNull();
+            shown.Should().Contain(Loc.Get("team.sack_gear_gone", "Geared Npc"));
+            live!.GetEquipment(EquipmentSlot.OffHand).Should().NotBeNull("nothing is taken from an NPC off the team");
+            hero.Inventory.Count.Should().Be(packBefore);
+            live.Team.Should().Be("Other Crew");
+        }
+        finally { NPCSpawnSystem.Instance.ActiveNPCs.RemoveAll(n => n.ID == "tc_sgear_1"); }
     }
 
     [Fact]

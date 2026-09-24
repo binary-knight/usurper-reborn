@@ -6989,18 +6989,22 @@ namespace UsurperRemake.Systems
         catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to update war score: {ex.Message}"); }
     }
 
-    public async Task CompleteTeamWar(int warId, string result)
+    /// <summary>
+    /// v1.1.12: guarded on the war still being 'active' (the same flip ExpireStaleTeamWars makes), so a war
+    /// is settled once. True only when this call settled it; a caller refunds only then.
+    /// </summary>
+    public async Task<bool> CompleteTeamWar(int warId, string result)
     {
         try
         {
             using var connection = OpenConnection();
             using var cmd = connection.CreateCommand();
-            cmd.CommandText = @"UPDATE team_wars SET status = @result, finished_at = datetime('now') WHERE id = @id;";
+            cmd.CommandText = @"UPDATE team_wars SET status = @result, finished_at = datetime('now') WHERE id = @id AND status = 'active';";
             cmd.Parameters.AddWithValue("@id", warId);
             cmd.Parameters.AddWithValue("@result", result);
-            await cmd.ExecuteNonQueryAsync();
+            return await cmd.ExecuteNonQueryAsync() == 1;
         }
-        catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to complete team war: {ex.Message}"); }
+        catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to complete team war: {ex.Message}"); return false; }
     }
 
     public async Task<List<TeamWarInfo>> GetTeamWarHistory(string teamName, int limit = 10)

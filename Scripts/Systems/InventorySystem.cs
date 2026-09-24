@@ -1270,6 +1270,20 @@ namespace UsurperRemake.Systems
                     return;
                 }
             }
+            else if (item.IsCursed)
+            {
+                // v1.1.12: a cursed item is confirmed into an empty slot too; the prompt above only runs when
+                // something is already equipped there
+                terminal.SetColor("white");
+                terminal.Write(Loc.Get("inventory.equip_confirm"));
+                if (!GameConfig.IsAffirmative(await terminal.GetInput("")))
+                {
+                    terminal.SetColor("gray");
+                    terminal.WriteLine(Loc.Get("ui.cancelled"));
+                    await Task.Delay(1000);
+                    return;
+                }
+            }
 
             // Equip the new item (EquipItem handles old equipment management)
             if (player.EquipItem(equipment, finalSlot, out string message))

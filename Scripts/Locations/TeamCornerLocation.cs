@@ -1180,6 +1180,21 @@ public class TeamCornerLocation : BaseLocation
         NPCSpawnSystem.Instance.ActiveNPCs.Any(n => !string.IsNullOrEmpty(n.Team) && string.Equals(n.Team, teamName, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
+    /// v1.1.12: true (and says so) when the team has no free slot. Join checks before the password and
+    /// again after it, as another player can join while the prompt is up.
+    /// </summary>
+    private async Task<bool> RefuseJoinIfFull(string teamName)
+    {
+        if (await TeamSlotsUsed(teamName) < MaxTeamSize) return false;
+        terminal.WriteLine("");
+        terminal.SetColor("red");
+        terminal.WriteLine(Loc.Get("team.join_team_full", teamName, MaxTeamSize));
+        terminal.WriteLine("");
+        await Task.Delay(2000);
+        return true;
+    }
+
+    /// <summary>
     /// Join an existing team
     /// </summary>
     private async Task JoinTeam()
@@ -1222,15 +1237,7 @@ public class TeamCornerLocation : BaseLocation
 
         // v1.1.12: five members at most, players and NPCs together, the dead holding their slot. Checked
         // before the password, whose check stamps the team's last join.
-        if (await TeamSlotsUsed(teamName) >= MaxTeamSize)
-        {
-            terminal.WriteLine("");
-            terminal.SetColor("red");
-            terminal.WriteLine(Loc.Get("team.join_team_full", teamName, MaxTeamSize));
-            terminal.WriteLine("");
-            await Task.Delay(2000);
-            return;
-        }
+        if (await RefuseJoinIfFull(teamName)) return;
 
         // Online mode: check player_teams table first
         if (DoorMode.IsOnlineMode)
@@ -1248,6 +1255,7 @@ public class TeamCornerLocation : BaseLocation
                 var (exists, pwCorrect) = await backend.VerifyPlayerTeam(teamName, password);
                 if (exists && pwCorrect)
                 {
+                    if (await RefuseJoinIfFull(teamName)) return;
                     currentPlayer.Team = teamName;
                     currentPlayer.TeamPW = password;
                     currentPlayer.CTurf = false;
@@ -1304,6 +1312,7 @@ public class TeamCornerLocation : BaseLocation
 
         if (npcPassword == teamMember.TeamPW)
         {
+            if (await RefuseJoinIfFull(teamName)) return;
             currentPlayer.Team = teamName;
             currentPlayer.TeamPW = npcPassword;
             currentPlayer.CTurf = teamMember.CTurf;
@@ -2503,9 +2512,18 @@ public class TeamCornerLocation : BaseLocation
             terminal.Write(Loc.Get("team.sack_take_gear_prompt"));
             if (GameConfig.IsAffirmative(await terminal.ReadLineAsync()))
             {
-                // v1.1.12: the live copy, a reload can have come while the prompts were up
+                // v1.1.12: the live copy, checked still on this team before any gear comes off; a reload or
+                // a move while the prompts were up means nothing is taken
                 var liveForGear = LiveTeamNpc(member);
-                if (liveForGear != null) { member = liveForGear; tookGear = await TakeAllEquipment(member, confirm: false) > 0; }
+                if (liveForGear == null || liveForGear.Team != currentPlayer.Team)
+                {
+                    terminal.SetColor("red");
+                    terminal.WriteLine(Loc.Get("team.sack_gear_gone", member.DisplayName));
+                    await Task.Delay(2000);
+                    return;
+                }
+                member = liveForGear;
+                tookGear = await TakeAllEquipment(member, confirm: false) > 0;
             }
         }
 
@@ -3638,11 +3656,20 @@ public class TeamCornerLocation : BaseLocation
         // on a war that never ran. Now it is abandoned, the wager returned, and no daily war used.
         if (myWins + enemyWins == 0)
         {
-            await backend.CompleteTeamWar(warId, "abandoned");
-            currentPlayer.Gold += wager;
-            await ForcePlayerSave();
-            terminal.SetColor("yellow");
-            terminal.WriteLine(Loc.Get("team.war_no_rounds", $"{wager:N0}"));
+            // v1.1.12: refunded here only if this guarded flip landed; otherwise the war is still active
+            // and the stale cleanup refunds it once (ExpireStaleTeamWars), so it is never paid twice
+            if (await backend.CompleteTeamWar(warId, "abandoned"))
+            {
+                currentPlayer.Gold += wager;
+                await ForcePlayerSave();
+                terminal.SetColor("yellow");
+                terminal.WriteLine(Loc.Get("team.war_no_rounds", $"{wager:N0}"));
+            }
+            else
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine(Loc.Get("team.war_no_rounds_pending", $"{wager:N0}"));
+            }
             await terminal.PressAnyKey();
             return;
         }

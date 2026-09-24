@@ -166,12 +166,28 @@ public class PlaytestFixes1112Tests
     {
         var hero = Hero();
         hero.Inventory.Add(new Item { Name = "Grim Plate", Type = ObjType.Body, Armor = 10, Value = 100, IsCursed = true });
-        var (term, output) = Terminal("\n\n");
+        var (term, output) = Terminal("y\n\n");
         var inv = new InventorySystem(term, hero);
         await (Task)typeof(InventorySystem).GetMethod("EquipFromBackpack", F)!.Invoke(inv, new object?[] { 0, null })!;
-        Shown(term, output).Should().Contain(Loc.Get("inventory.cursed_equip_warning"));
+        Shown(term, output).Should().Contain(Loc.Get("inventory.cursed_equip_warning")).And.Contain(Loc.Get("inventory.equip_confirm").Trim(), "asked into an empty slot");
         hero.GetEquipment(EquipmentSlot.Body)!.IsCursed.Should().BeTrue();
         hero.UnequipSlot(EquipmentSlot.Body).Should().BeNull("a cursed item cannot be removed, as the warning says");
+    }
+
+    [Fact]
+    public async Task ACursedItem_IntoAnEmptySlot_IsConfirmed_AndNoLeavesTheSlotEmpty()
+    {
+        var hero = Hero();
+        hero.GetEquipment(EquipmentSlot.Body).Should().BeNull("the slot starts empty");
+        hero.Inventory.Add(new Item { Name = "Grim Plate", Type = ObjType.Body, Armor = 10, Value = 100, IsCursed = true });
+        var (term, output) = Terminal("n\n\n");
+        var inv = new InventorySystem(term, hero);
+        await (Task)typeof(InventorySystem).GetMethod("EquipFromBackpack", F)!.Invoke(inv, new object?[] { 0, null })!;
+        string shown = Shown(term, output);
+        shown.Should().Contain(Loc.Get("inventory.equip_confirm").Trim());
+        shown.Should().Contain(Loc.Get("ui.cancelled"));
+        hero.GetEquipment(EquipmentSlot.Body).Should().BeNull("declined");
+        hero.Inventory.Should().ContainSingle(i => i.Name == "Grim Plate");
     }
 
     // ---------- 3. one rest per floor ----------
