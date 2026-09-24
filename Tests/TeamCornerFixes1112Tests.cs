@@ -133,6 +133,28 @@ public class TeamCornerFixes1112Tests : IDisposable
     }
 
     [Fact]
+    public async Task Quit_TheLastPlayer_KeepsTheTeam_WhileADeadNpcMemberWillRespawn()
+    {
+        await TeamCornerRig.Online(async (db, path) =>
+        {
+            TeamCornerRig.Exec(path, "INSERT INTO player_teams (team_name, password_hash, created_by) VALUES ('Stayers', 'x', 'quit hero');");
+            TeamCornerRig.Exec(path, "INSERT INTO team_upgrades (team_name, upgrade_type, level) VALUES ('Stayers', 'vault', 3);");
+            TeamCornerRig.Exec(path, "INSERT INTO team_vault (team_name, gold) VALUES ('Stayers', 50000);");
+            var npc = TeamCornerRig.Npc("tc_quit_dead_1", "Fallen Npc", "Stayers", dead: true);
+            NPCSpawnSystem.Instance.ActiveNPCs.Add(npc);
+            try
+            {
+                var hero = TeamCornerRig.Hero(name: "Quit Hero", team: "Stayers");
+                await new TeamCornerRig(hero, new[] { "y", "" }).Run("QuitTeam");
+                Convert.ToInt64(TeamCornerRig.Scalar(path, "SELECT COUNT(*) FROM player_teams WHERE team_name = 'Stayers'")).Should().Be(1);
+                Convert.ToInt64(TeamCornerRig.Scalar(path, "SELECT gold FROM team_vault WHERE team_name = 'Stayers'")).Should().Be(50000, "the dead member respawns on the team");
+                Convert.ToInt64(TeamCornerRig.Scalar(path, "SELECT level FROM team_upgrades WHERE team_name = 'Stayers'")).Should().Be(3);
+            }
+            finally { NPCSpawnSystem.Instance.ActiveNPCs.Remove(npc); }
+        });
+    }
+
+    [Fact]
     public void Quit_SavesOnce()
     {
         string body = MethodBody("QuitTeam");
