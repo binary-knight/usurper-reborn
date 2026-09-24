@@ -77,6 +77,7 @@ namespace UsurperRemake.Systems
 
             // Phase 1: Initialize minimal systems
             InitializeSystems();
+            WorldEditLog.NoteLockOwnerId(_heartbeatOwnerId);   // v1.1.13: the lock this process's world sim holds
 
             // Phase 2: Load NPC state from database
             await LoadWorldState();
@@ -91,6 +92,9 @@ namespace UsurperRemake.Systems
             LoadWorldEventsState();
             LoadSettlementState();
             LoadUsedNamesState();
+
+            // v1.1.13: the owner re-applies the world edits to what it just loaded (roster, court, registry)
+            ReapplyWorldEdits();
 
             // Load last world daily reset time from world_state
             LoadLastWorldDailyReset();
@@ -469,6 +473,9 @@ namespace UsurperRemake.Systems
                     lastRoyalCourtVersion = currentRoyalCourtVersion;
                 }
 
+                // v1.1.13: before every save and after any reload above, the owner re-applies the world edits
+                var editsInPass = ReapplyWorldEdits();
+
                 // Save our NPC state (either fresh from reload or accumulated simulation changes)
                 // Dirty-check: hash the serialized JSON and skip the DB write if nothing changed.
                 // The NPC blob is ~18 MB, so avoiding unnecessary writes saves significant I/O.
@@ -511,6 +518,8 @@ namespace UsurperRemake.Systems
                         // merge that write was owed.
                         lastNpcVersion = lastNpcVersion + 1;
                         DebugLogger.Instance.LogInfo("WORLDSIM", $"State saved (v{lastNpcVersion}): {aliveCount} alive NPCs at {DateTime.UtcNow:HH:mm:ss}");
+                        // v1.1.13: the roster edits are applied once this versioned write holds them
+                        MarkEditsApplied(editsInPass, WorldEditLog.ForgetCharacter);
                     }
                     else
                     {
@@ -536,7 +545,9 @@ namespace UsurperRemake.Systems
                 // Save royal court to world_state (authoritative - world sim maintains this).
                 // Version tracking happens inside (CAS local increment); re-reading
                 // here would reintroduce the concurrent-version-adoption race.
-                await SaveRoyalCourtToWorldState();
+                // v1.1.13: a throne edit is applied once this versioned write holds it
+                if (await SaveRoyalCourtToWorldState())
+                    MarkEditsApplied(editsInPass, WorldEditLog.VacateThrone);
 
                 // Save economy summary for the dashboard
                 await SaveEconomyState();
@@ -572,11 +583,55 @@ namespace UsurperRemake.Systems
 
                 // v1.1.11: then teams whose leader has left them
                 PassLeadershipOfDepartedLeaders();
+
+                // v1.1.13: applied world edits go after 7 days; unapplied ones stay and are reported
+                if (WorldEditLog.IsOwnerProcess(sqlBackend))
+                {
+                    sqlBackend.PruneAppliedWorldEdits(WorldEditLog.PruneAppliedDays);
+                    WorldEditLog.ReportUnapplied(sqlBackend);
+                }
             }
             catch (Exception ex)
             {
                 DebugLogger.Instance.LogError("WORLDSIM", $"Failed to save world state: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// v1.1.13: in the owner process, apply every world edit still owed (WorldEditLog) to the live world.
+        /// Returns the edits not yet marked applied; while there are any, the next roster write is forced
+        /// (the dirty-check would skip it when the edit changed nothing), so the mark follows a real write.
+        /// </summary>
+        internal List<WorldEdit> ReapplyWorldEdits()
+        {
+            try
+            {
+                if (!WorldEditLog.IsOwnerProcess(sqlBackend)) return new List<WorldEdit>();
+                var edits = sqlBackend.GetWorldEditsToApply(WorldEditLog.ReapplyHours);
+                if (edits.Count == 0) return edits;
+                var kingBefore = CastleLocation.GetCurrentKing();
+                int changed = WorldEditLog.Apply(sqlBackend, edits);
+                if (!ReferenceEquals(kingBefore, CastleLocation.GetCurrentKing())) _courtChangedByEdit = true;
+                if (changed > 0)
+                    DebugLogger.Instance.LogInfo("WORLD_EDITS", $"Re-applied {edits.Count} world edit(s): {changed} change(s) to the live world.");
+                var owed = edits.Where(e => e.AppliedAt == null).ToList();
+                if (owed.Count > 0 || changed > 0) _lastNpcJsonHash = null;
+                return owed;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("WORLD_EDITS", $"Re-applying world edits failed: {ex.Message}");
+                return new List<WorldEdit>();
+            }
+        }
+
+        // v1.1.13: a re-applied vacate_throne changed the king, so the court is written even when vacant
+        private bool _courtChangedByEdit;
+
+        private void MarkEditsApplied(List<WorldEdit> edits, string kind)
+        {
+            var ids = edits.Where(e => e.Kind == kind).Select(e => e.Id).ToList();
+            if (ids.Count > 0) sqlBackend.MarkWorldEditsApplied(ids, WorldEditLog.ProcessLabel);
         }
 
         /// <summary>
@@ -810,12 +865,24 @@ namespace UsurperRemake.Systems
         /// Save current royal court state to world_state.
         /// This is the authoritative write - the world sim maintains this data.
         /// </summary>
-        internal async Task SaveRoyalCourtToWorldState()
+        /// <returns>v1.1.13: true when the stored court is this process's court (written now, or already it).</returns>
+        internal async Task<bool> SaveRoyalCourtToWorldState()
         {
             try
             {
                 var king = CastleLocation.GetCurrentKing();
-                if (king == null) return;
+                if (king == null)
+                {
+                    // v1.1.13: a vacancy a throne edit made here is written as one; otherwise nothing to write
+                    if (!_courtChangedByEdit)
+                        return lastRoyalCourtVersion == sqlBackend.GetWorldStateVersion("royal_court");
+                    if (!await sqlBackend.SaveWorldStateIfVersion("royal_court", OnlineStateManager.EmptyRoyalCourtJson(throneVacated: true), lastRoyalCourtVersion))
+                        return false;
+                    lastRoyalCourtVersion = lastRoyalCourtVersion + 1;
+                    OnlineStateManager.NoteRoyalCourtVersion(lastRoyalCourtVersion);
+                    _courtChangedByEdit = false;
+                    return true;
+                }
 
                 var data = new RoyalCourtSaveData
                 {
@@ -947,6 +1014,8 @@ namespace UsurperRemake.Systems
                     // version and skip the reload it was owed).
                     lastRoyalCourtVersion = lastRoyalCourtVersion + 1;
                     OnlineStateManager.NoteRoyalCourtVersion(lastRoyalCourtVersion);   // v1.1.13: sessions share this court
+                    _courtChangedByEdit = false;
+                    return true;
                 }
                 else
                 {
@@ -959,11 +1028,13 @@ namespace UsurperRemake.Systems
 
                     DebugLogger.Instance.LogInfo("WORLDSIM",
                         "Royal court save skipped: version conflict or write error (likely a player write during our save window). Will reload next cycle.");
+                    return false;
                 }
             }
             catch (Exception ex)
             {
                 DebugLogger.Instance.LogError("WORLDSIM", $"Failed to save royal court to world_state: {ex.Message}");
+                return false;
             }
         }
 
@@ -1535,6 +1606,7 @@ namespace UsurperRemake.Systems
             // session mid-login can otherwise read this roster while it is half
             // rebuilt and wrongly retire a living partner.
             NPCSpawnSystem.Instance.IsRebuilding = true;
+            var memoryLoadTime = DateTime.Now;   // v1.1.13: one load time for every restored memory
             try
             {
             // Clear existing NPCs
@@ -1832,11 +1904,11 @@ namespace UsurperRemake.Systems
                                     Type = memType,
                                     Description = memData.Description,
                                     InvolvedCharacter = memData.InvolvedCharacter,
-                                    Timestamp = memData.Timestamp,
+                                    Timestamp = MemorySystem.RestoredTimestamp(memData.Timestamp, data.MemoryTimesKept, memoryLoadTime),   // v1.1.13
                                     Importance = memData.Importance,
                                     EmotionalImpact = memData.EmotionalImpact
                                 };
-                                npc.Brain.Memory?.RecordEvent(memory);
+                                npc.Brain.Memory?.RecordEvent(memory, keepTimestamp: true);   // v1.1.13: the saved time
                             }
                         }
                     }

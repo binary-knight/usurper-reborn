@@ -1339,6 +1339,7 @@ namespace UsurperRemake.Systems
                     // AI state
                     PersonalityProfile = SerializePersonality(npc.Brain?.Personality),
                     Memories = SerializeMemories(npc.Brain?.Memory),
+                    MemoryTimesKept = true,   // v1.1.13
                     CurrentGoals = SerializeGoals(npc.Brain?.Goals),
                     EmotionalState = SerializeEmotionalState(npc.Brain?.Emotions),
 

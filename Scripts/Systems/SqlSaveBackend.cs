@@ -867,6 +867,11 @@ namespace UsurperRemake.Systems
                         claimed_by TEXT,
                         claimed_at TEXT DEFAULT (datetime('now'))
                     );
+
+                    -- v1.1.13: idempotent edits of the shared world records (a deleted character's grudges,
+                    -- marriages, throne) that the owner process re-applies after stale writes. See WorldEditLog.
+                    CREATE TABLE IF NOT EXISTS world_edits (id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL, payload TEXT NOT NULL, created_at TEXT DEFAULT (datetime('now')), created_by TEXT, applied_at TEXT, applied_by TEXT);
+                    CREATE INDEX IF NOT EXISTS idx_world_edits_created ON world_edits(created_at);
                 ";
                 cmd.ExecuteNonQuery();
             }
@@ -983,6 +988,15 @@ namespace UsurperRemake.Systems
                 migCmd.ExecuteNonQuery();
             }
             catch (Exception ex) { DebugLogger.Instance.LogWarning("SQL", $"bounty_claims not ensured: {ex.Message}"); }
+
+            // v1.1.13: the world edits log, also on a database made by an older release
+            try
+            {
+                using var migCmd = connection.CreateCommand();
+                migCmd.CommandText = "CREATE TABLE IF NOT EXISTS world_edits (id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL, payload TEXT NOT NULL, created_at TEXT DEFAULT (datetime('now')), created_by TEXT, applied_at TEXT, applied_by TEXT); CREATE INDEX IF NOT EXISTS idx_world_edits_created ON world_edits(created_at);";
+                migCmd.ExecuteNonQuery();
+            }
+            catch (Exception ex) { DebugLogger.Instance.LogWarning("SQL", $"world_edits not ensured: {ex.Message}"); }
 
             MigrateWorldBossTables(connection); // v1.1.4
 
@@ -2183,6 +2197,150 @@ namespace UsurperRemake.Systems
                 DebugLogger.Instance.LogError("SQL", $"Atomic update failed for '{key}': {ex.Message}");
                 return false;
             }
+        }
+
+        // --- v1.1.13: World edits ---
+        // Idempotent edits of the shared world records, appended by the process that makes them and
+        // re-applied by the owner process (WorldEditLog). Times are SQLite datetime('now'), UTC.
+
+        /// <summary>v1.1.13: append an edit; returns its id, or 0 when the write failed.</summary>
+        public long AppendWorldEdit(string kind, string payloadJson, string createdBy)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "INSERT INTO world_edits (kind, payload, created_by) VALUES (@k, @p, @b); SELECT last_insert_rowid();";
+                cmd.Parameters.AddWithValue("@k", kind);
+                cmd.Parameters.AddWithValue("@p", payloadJson);
+                cmd.Parameters.AddWithValue("@b", createdBy ?? "");
+                return Convert.ToInt64(cmd.ExecuteScalar());
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"AppendWorldEdit('{kind}') failed: {ex.Message}");
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// v1.1.13: the edits the owner applies: every edit not yet applied, whatever its age, and every
+        /// edit made in the last reapplyHours (applied or not), oldest first.
+        /// </summary>
+        public List<WorldEdit> GetWorldEditsToApply(int reapplyHours = 24) =>
+            QueryWorldEdits("applied_at IS NULL OR created_at >= datetime('now', @h)", $"-{reapplyHours} hours");
+
+        /// <summary>v1.1.13: edits never applied that are older than hours (for the warning line).</summary>
+        public List<WorldEdit> GetUnappliedWorldEditsOlderThan(int hours) =>
+            QueryWorldEdits("applied_at IS NULL AND created_at < datetime('now', @h)", $"-{hours} hours");
+
+        private List<WorldEdit> QueryWorldEdits(string where, string span)
+        {
+            var list = new List<WorldEdit>();
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = $"SELECT id, kind, payload, created_at, created_by, applied_at, applied_by FROM world_edits WHERE {where} ORDER BY id;";
+                cmd.Parameters.AddWithValue("@h", span);
+                using var r = cmd.ExecuteReader();
+                while (r.Read())
+                    list.Add(new WorldEdit
+                    {
+                        Id = r.GetInt64(0), Kind = r.GetString(1), Payload = r.GetString(2),
+                        CreatedAt = r.IsDBNull(3) ? "" : r.GetString(3), CreatedBy = r.IsDBNull(4) ? "" : r.GetString(4),
+                        AppliedAt = r.IsDBNull(5) ? null : r.GetString(5), AppliedBy = r.IsDBNull(6) ? null : r.GetString(6)
+                    });
+            }
+            catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"World edits read failed: {ex.Message}"); }
+            return list;
+        }
+
+        /// <summary>v1.1.13: mark edits applied; an edit already marked keeps its first mark. Returns the rows marked.</summary>
+        public int MarkWorldEditsApplied(IEnumerable<long> ids, string appliedBy)
+        {
+            int marked = 0;
+            try
+            {
+                using var connection = OpenConnection();
+                foreach (var id in ids)
+                {
+                    using var cmd = connection.CreateCommand();
+                    cmd.CommandText = "UPDATE world_edits SET applied_at = datetime('now'), applied_by = @b WHERE id = @id AND applied_at IS NULL;";
+                    cmd.Parameters.AddWithValue("@id", id);
+                    cmd.Parameters.AddWithValue("@b", appliedBy ?? "");
+                    marked += cmd.ExecuteNonQuery();
+                }
+            }
+            catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"MarkWorldEditsApplied failed: {ex.Message}"); }
+            return marked;
+        }
+
+        /// <summary>v1.1.13: delete edits applied more than days ago. An edit never applied is never deleted here.</summary>
+        public int PruneAppliedWorldEdits(int days = 7)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "DELETE FROM world_edits WHERE applied_at IS NOT NULL AND applied_at < datetime('now', @d);";
+                cmd.Parameters.AddWithValue("@d", $"-{days} days");
+                return cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"PruneAppliedWorldEdits failed: {ex.Message}");
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// v1.1.13: a character that came after the edit uses one of the names: a player row with a save
+        /// under the name (display name or Name2) created after the edit, saved after it, or on the deleted
+        /// character's own account (a same-account recreation keeps the account's created_at).
+        /// A failed read counts as a later character, so nothing untimed is re-applied on a doubt.
+        /// </summary>
+        public bool LaterCharacterUsesName(IEnumerable<string> names, string editCreatedAt, string? characterKey)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                foreach (var name in names)
+                {
+                    if (string.IsNullOrWhiteSpace(name)) continue;
+                    using var cmd = connection.CreateCommand();
+                    cmd.CommandText = "SELECT EXISTS (SELECT 1 FROM players WHERE player_data IS NOT NULL AND length(player_data) > 4 " +
+                        "AND (LOWER(display_name) = LOWER(@n) OR " +
+                        "LOWER(CASE WHEN json_valid(player_data) THEN json_extract(player_data, '$.player.name2') END) = LOWER(@n)) " +
+                        "AND (created_at > @t OR last_login > @t OR LOWER(username) = LOWER(@k)));";
+                    cmd.Parameters.AddWithValue("@n", name);
+                    cmd.Parameters.AddWithValue("@t", editCreatedAt ?? "");
+                    cmd.Parameters.AddWithValue("@k", characterKey ?? "");
+                    if (Convert.ToInt64(cmd.ExecuteScalar()) != 0) return true;
+                }
+                return false;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogWarning("SQL", $"LaterCharacterUsesName failed: {ex.Message}");
+                return true;
+            }
+        }
+
+        /// <summary>v1.1.13: the owner id in the world sim lock, or null when none is held.</summary>
+        public string? WorldSimLockOwner()
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT value FROM world_state WHERE key = @key;";
+                cmd.Parameters.AddWithValue("@key", WORLDSIM_LOCK_KEY);
+                if (cmd.ExecuteScalar() is not string json || string.IsNullOrEmpty(json)) return null;
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                return doc.RootElement.TryGetProperty("owner", out var o) ? o.GetString() : null;
+            }
+            catch { return null; }
         }
 
         // --- World Sim Lock ---
@@ -7792,6 +7950,27 @@ namespace UsurperRemake.Systems
             return commands;
         }
 
+        /// <summary>
+        /// v1.1.13: claim a pending admin command before running it. Only one of the game server and the
+        /// web server's withdrawal wins: true when this call moved the row from pending to executing.
+        /// </summary>
+        public bool TryClaimAdminCommand(int id)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "UPDATE admin_commands SET status = 'executing' WHERE id = @id AND status = 'pending';";
+                cmd.Parameters.AddWithValue("@id", id);
+                return cmd.ExecuteNonQuery() == 1;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"TryClaimAdminCommand failed: {ex.Message}");
+                return false;
+            }
+        }
+
         /// <summary>Mark an admin command as successfully executed.</summary>
         public void MarkAdminCommandExecuted(int id, string result)
         {
@@ -8167,6 +8346,18 @@ namespace UsurperRemake.Systems
     }
 
     /// <summary>Represents a pending admin command from the web dashboard.</summary>
+    /// <summary>v1.1.13: a row of world_edits. Times are SQLite UTC text.</summary>
+    public class WorldEdit
+    {
+        public long Id { get; set; }
+        public string Kind { get; set; } = "";
+        public string Payload { get; set; } = "";
+        public string CreatedAt { get; set; } = "";
+        public string CreatedBy { get; set; } = "";
+        public string? AppliedAt { get; set; }
+        public string? AppliedBy { get; set; }
+    }
+
     public class AdminCommand
     {
         public int Id { get; set; }

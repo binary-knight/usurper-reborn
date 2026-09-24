@@ -919,6 +919,7 @@ namespace UsurperRemake.Systems
         // AI state
         public PersonalityData? PersonalityProfile { get; set; }
         public List<MemoryData> Memories { get; set; } = new();
+        public bool MemoryTimesKept { get; set; }   // v1.1.13: the memory times are the real ones (restore keeps them)
         public List<GoalData> CurrentGoals { get; set; } = new();
         public EmotionalStateData? EmotionalState { get; set; }
 

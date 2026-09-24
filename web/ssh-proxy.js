@@ -3224,11 +3224,12 @@ async function handleAdminRequest(req, res) {
           .run('delete_player', playerUsername, null, 'admin-web');
         const readStatus = () => db.prepare("SELECT status, result FROM admin_commands WHERE id = ?").get(queued.lastInsertRowid);
         let row = null;
+        const running = r => r && (r.status === 'pending' || r.status === 'executing');
         const deadline = Date.now() + 20000;
         while (Date.now() < deadline) {
           await new Promise(r => setTimeout(r, 500));
           row = readStatus();
-          if (row && row.status !== 'pending') break;
+          if (!running(row)) break;
         }
         if (row && row.status === 'pending') {
           // withdraw it, so the game server cannot run it after the direct delete below
@@ -3236,6 +3237,13 @@ async function handleAdminRequest(req, res) {
             .run(queued.lastInsertRowid);
           if (withdrawn.changes === 0) row = readStatus();
         }
+        // v1.1.13: the game server claimed it (status 'executing'): wait for its outcome, never delete here too
+        const outcomeDeadline = Date.now() + 120000;
+        while (row && row.status === 'executing' && Date.now() < outcomeDeadline) {
+          await new Promise(r => setTimeout(r, 500));
+          row = readStatus();
+        }
+        if (row && row.status === 'executing') { sendJson(res, 504, { error: 'The game server is still deleting this character' }); return true; }
         if (row && row.status === 'executed') { sendJson(res, 200, { success: true, result: row.result }); return true; }
         if (row && row.status === 'failed') { sendJson(res, 500, { error: row.result }); return true; }
       }

@@ -19,9 +19,10 @@ public partial class MemorySystem
     public List<MemoryEvent> AllMemories => memories;
     public Dictionary<string, float> CharacterImpressions => characterImpressions;
 
-    public void RecordEvent(MemoryEvent memoryEvent)
+    /// <param name="keepTimestamp">v1.1.13: a memory restored from a save keeps the time it was recorded.</param>
+    public void RecordEvent(MemoryEvent memoryEvent, bool keepTimestamp = false)
     {
-        memoryEvent.Timestamp = DateTime.Now;
+        if (!keepTimestamp) memoryEvent.Timestamp = DateTime.Now;
         memories.Add(memoryEvent);
 
         // v0.57.15: STRICT memory cap. Previously the trim only removed memories
@@ -233,6 +234,19 @@ public partial class MemorySystem
         characterImpressions.Remove(characterId);
     }
     
+    /// <summary>
+    /// v1.1.13: the time a saved memory is restored with. A save made before memory times were kept
+    /// (keptTimes false) was re-stamped at every load, so a memory it holds that is older than the decay
+    /// window is stamped with the load time once, and nothing is forgotten on the first load. A missing
+    /// time is always stamped. Otherwise the saved time is kept and the 7-day decay runs on it.
+    /// </summary>
+    public static DateTime RestoredTimestamp(DateTime saved, bool keptTimes, DateTime loadTime)
+    {
+        if (saved == default) return loadTime;
+        if (!keptTimes && saved < loadTime.AddDays(-MEMORY_DECAY_DAYS)) return loadTime;
+        return saved;
+    }
+
     public void DecayMemories()
     {
         var cutoff = DateTime.Now.AddDays(-MEMORY_DECAY_DAYS);

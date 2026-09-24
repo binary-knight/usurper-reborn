@@ -2712,6 +2712,7 @@ public partial class GameEngine
                 if (sharedNpcs != null && sharedNpcs.Count > 0)
                 {
                     await RestoreNPCs(sharedNpcs);
+                    OnlineStateManager.Instance.NoteNpcBaseline();   // v1.1.13: what this session's save compares against
                     DebugLogger.Instance.LogInfo("ONLINE", $"NPCs overridden from world_state: {sharedNpcs.Count} NPCs loaded");
                 }
 
@@ -4707,6 +4708,7 @@ public partial class GameEngine
             if (sharedNpcs != null && sharedNpcs.Count > 0)
             {
                 await RestoreNPCs(sharedNpcs);
+                OnlineStateManager.Instance.NoteNpcBaseline();   // v1.1.13: what this session's save compares against
                 DebugLogger.Instance.LogInfo("ONLINE", $"NPCs overridden from world_state: {sharedNpcs.Count} NPCs loaded");
             }
 
@@ -6514,6 +6516,7 @@ public partial class GameEngine
         // observe a partially filled roster and wrongly conclude an NPC is gone.
         // Anything that DELETES state on a missed lookup must wait this out.
         NPCSpawnSystem.Instance.IsRebuilding = true;
+        var memoryLoadTime = DateTime.Now;   // v1.1.13: one load time for every restored memory
         try
         {
 
@@ -6758,11 +6761,11 @@ public partial class GameEngine
                                 Type = memType,
                                 Description = memData.Description,
                                 InvolvedCharacter = memData.InvolvedCharacter,
-                                Timestamp = memData.Timestamp,
+                                Timestamp = MemorySystem.RestoredTimestamp(memData.Timestamp, data.MemoryTimesKept, memoryLoadTime),   // v1.1.13
                                 Importance = memData.Importance,
                                 EmotionalImpact = memData.EmotionalImpact
                             };
-                            npc.Brain.Memory?.RecordEvent(memory);
+                            npc.Brain.Memory?.RecordEvent(memory, keepTimestamp: true);   // v1.1.13: the saved time
                         }
                     }
                     // GD.Print($"[GameEngine] Restored {data.Memories.Count} memories for {npc.Name}");

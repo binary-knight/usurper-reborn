@@ -480,8 +480,23 @@ namespace UsurperRemake.Systems
                 // v1.1.11: a deleted king abdicates through the normal path (history, NPC succession, persist)
                 // v1.1.11: a married name another living player now uses names their reign, not this one's
                 string? kingAlias = shown != null && aliases.Contains(shown, StringComparer.OrdinalIgnoreCase) ? shown : null;
+                // v1.1.13: a reigning character's delete is logged first, so the owner vacates the throne again
+                // over a stale or old-binary court write
+                long throneEdit = 0;
+                if (backend != null)
+                {
+                    bool reigns = global::CastleLocation.IsDeletedCharactersReign(global::CastleLocation.GetCurrentKing(), name, kingAlias);
+                    if (!reigns && UsurperRemake.BBS.DoorMode.IsOnlineMode && OnlineStateManager.IsActive)
+                        reigns = global::CastleLocation.SharedCourtNamesDeletedCharacter(await OnlineStateManager.Instance!.ReadRoyalCourtFromWorldState(), name, kingAlias);
+                    if (reigns)
+                        throneEdit = WorldEditLog.AppendVacateThrone(backend, name, kingAlias != null ? new[] { kingAlias } : Array.Empty<string>(), username);
+                }
                 if (await global::CastleLocation.AbdicateDeletedKingAsync(name, kingAlias, "left the throne and the realm"))
+                {
                     DebugLogger.Instance.LogInfo("DELETE", $"Deleted '{name}' held the throne; the reign has ended.");
+                    if (throneEdit > 0 && UsurperRemake.BBS.DoorMode.IsOnlineMode && WorldEditLog.IsOwnerProcess(backend))
+                        backend!.MarkWorldEditsApplied(new[] { throneEdit }, WorldEditLog.ProcessLabel);
+                }
             }
             catch (Exception tex) { DebugLogger.Instance.LogWarning("DELETE", $"Throne handover failed for '{name}': {tex.Message}"); }
 
@@ -492,7 +507,11 @@ namespace UsurperRemake.Systems
                 // they are cleared only while no other player row uses the name; a deferred purge runs after
                 // the account's rows are gone, so any row with the name is a later character.
                 bool untimedToo = backend == null || !questNames.Any(a => backend.IsNameUsedByAnotherPlayer(a, deferred ? "" : (username ?? "")));
-                int forgotten = await ForgetCharacterInNpcWorldAsync(backend, questNames, DateTime.Now, untimedToo);
+                var deletedAt = DateTime.Now;
+                // v1.1.13: logged first, so the owner re-applies it over any stale or old-binary write
+                long editId = backend != null ? WorldEditLog.AppendForgetCharacter(backend, questNames, username, deletedAt, untimedToo) : 0;
+                int forgotten = await ForgetCharacterInNpcWorldAsync(backend, questNames, deletedAt, untimedToo,
+                    onWritten: () => { if (editId > 0 && WorldEditLog.IsOwnerProcess(backend)) backend!.MarkWorldEditsApplied(new[] { editId }, WorldEditLog.ProcessLabel); });
                 if (forgotten > 0)
                     DebugLogger.Instance.LogInfo("DELETE", $"Cleared {forgotten} NPC grudge(s), enemy entries and marriage(s) of deleted '{name}'.");
             }
@@ -613,24 +632,21 @@ namespace UsurperRemake.Systems
         /// v1.1.13: the NPC half of the purge: grudges, Enemies and KnownCharacters, and marriages naming the
         /// character, on the live roster and registry, then written at once (OnlineStateManager.PersistNpcWorldNow).
         /// Nothing is awaited between the clean-up and the serialize, so a login's RestoreNPCs cannot put the
-        /// old roster back in between. Each retry after a reload re-applies it with the time of that attempt,
-        /// since a reload stamps every memory with the load time.
+        /// old roster back in between. A retry after a reload re-applies it with the same cut-off, the delete
+        /// time: a reload keeps each memory's recorded time (v1.1.13).
         /// </summary>
         internal static async Task<int> ForgetCharacterInNpcWorldAsync(SqlSaveBackend? backend, IReadOnlyList<string> names,
-            DateTime deletedAt, bool untimedToo, Func<List<NPCData>, Task>? reloadRoster = null, Func<Task>? beforeWrite = null)
+            DateTime deletedAt, bool untimedToo, Func<List<NPCData>, Task>? reloadRoster = null, Func<Task>? beforeWrite = null, Action? onWritten = null)
         {
-            bool first = true;
             var endedMarriages = new HashSet<string>();
             int CleanUp()
             {
-                var cutOff = first ? deletedAt : DateTime.Now;
-                first = false;
                 int n = 0;
-                foreach (var a in names) n += ForgetNpcGrudgesAgainst(a, cutOff, untimedToo) + ClearNpcSpousesOf(a, endedMarriages);
+                foreach (var a in names) n += ForgetNpcGrudgesAgainst(a, deletedAt, untimedToo) + ClearNpcSpousesOf(a, endedMarriages);
                 return n;
             }
             if (backend == null) return CleanUp();
-            return await OnlineStateManager.PersistNpcWorldNow(backend, CleanUp, endedMarriages, reloadRoster, beforeWrite);
+            return await OnlineStateManager.PersistNpcWorldNow(backend, CleanUp, endedMarriages, reloadRoster, beforeWrite, onWritten);
         }
     }
 }
