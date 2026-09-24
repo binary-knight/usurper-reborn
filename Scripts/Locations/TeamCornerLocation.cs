@@ -503,87 +503,13 @@ public class TeamCornerLocation : BaseLocation
         WriteBoxHeader(Loc.Get("team_corner.rankings_header"), "bright_magenta");
         terminal.WriteLine("");
 
-        // Get all teams from NPCs, then merge in the player's team
-        var allNPCs = NPCSpawnSystem.Instance.ActiveNPCs;
-        var teamGroups = allNPCs
-            .Where(n => !string.IsNullOrEmpty(n.Team) && n.IsAlive)
-            .GroupBy(n => n.Team)
-            .Select(g => new
-            {
-                TeamName = g.Key,
-                MemberCount = g.Count(),
-                TotalPower = (long)g.Sum(m => m.Level + (int)m.Strength + (int)m.Defence),
-                AverageLevel = (int)g.Average(m => m.Level),
-                ControlsTurf = g.Any(m => m.CTurf),
-                IsPlayerTeam = false
-            })
-            .ToList();
+        // v1.1.12: online, the player side is every player's save in one query (the viewer's own save left out,
+        // the in-memory character is added instead); offline it is only the in-memory character, as before
+        List<PlayerTeamInfo> playerTeams = new();
+        if (DoorMode.IsOnlineMode && SaveSystem.Instance.Backend is SqlSaveBackend backend)
+            playerTeams = await backend.GetTeamRankingStats(GameEngine.InheritanceKey(currentPlayer));
 
-        // Merge the player into the team list
-        if (!string.IsNullOrEmpty(currentPlayer.Team))
-        {
-            long playerPower = currentPlayer.Level + (long)currentPlayer.Strength + (long)currentPlayer.Defence;
-            var existingTeam = teamGroups.FirstOrDefault(t => t.TeamName == currentPlayer.Team);
-            if (existingTeam != null)
-            {
-                // Player's team has NPC members too - add the player's stats
-                teamGroups.Remove(existingTeam);
-                int totalMembers = existingTeam.MemberCount + 1;
-                long totalPower = existingTeam.TotalPower + playerPower;
-                int totalLevels = existingTeam.AverageLevel * existingTeam.MemberCount + currentPlayer.Level;
-                teamGroups.Add(new
-                {
-                    TeamName = existingTeam.TeamName,
-                    MemberCount = totalMembers,
-                    TotalPower = totalPower,
-                    AverageLevel = totalLevels / totalMembers,
-                    ControlsTurf = existingTeam.ControlsTurf || currentPlayer.CTurf,
-                    IsPlayerTeam = true
-                });
-            }
-            else
-            {
-                // Player-only team (no NPC members)
-                teamGroups.Add(new
-                {
-                    TeamName = currentPlayer.Team,
-                    MemberCount = 1,
-                    TotalPower = playerPower,
-                    AverageLevel = currentPlayer.Level,
-                    ControlsTurf = currentPlayer.CTurf,
-                    IsPlayerTeam = true
-                });
-            }
-        }
-
-        // Online mode: merge player teams from database
-        if (DoorMode.IsOnlineMode)
-        {
-            var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
-            if (backend != null)
-            {
-                var playerTeams = await backend.GetPlayerTeams();
-                foreach (var pt in playerTeams)
-                {
-                    // Skip if this team is already in the list (NPC team or player's own team)
-                    if (teamGroups.Any(t => t.TeamName == pt.TeamName))
-                        continue;
-
-                    teamGroups.Add(new
-                    {
-                        TeamName = pt.TeamName,
-                        MemberCount = pt.MemberCount,
-                        TotalPower = (long)(pt.MemberCount * 50), // Estimate power from member count
-                        AverageLevel = 0,
-                        ControlsTurf = pt.ControlsTurf,
-                        IsPlayerTeam = false
-                    });
-                }
-            }
-        }
-
-        // Sort by power descending
-        teamGroups = teamGroups.OrderByDescending(t => t.TotalPower).ToList();
+        var teamGroups = BuildTeamRankings(NPCSpawnSystem.Instance.ActiveNPCs, playerTeams, currentPlayer);
 
         if (teamGroups.Count == 0)
         {
@@ -626,6 +552,40 @@ public class TeamCornerLocation : BaseLocation
         terminal.SetColor("darkgray");
         terminal.WriteLine(Loc.Get("ui.press_enter"));
         await terminal.ReadKeyAsync();
+    }
+
+    internal sealed record TeamRankingRow(string TeamName, int MemberCount, long TotalPower, int AverageLevel, bool ControlsTurf, bool IsPlayerTeam);
+
+    /// <summary>
+    /// v1.1.12: one row per team: living NPC members, the player members from the saves (playerTeams, which
+    /// must not include the viewer's save) and the viewer from memory, each counted once. Power is
+    /// level + strength + defence summed; a team with no members is left out. Sorted by power.
+    /// </summary>
+    internal static List<TeamRankingRow> BuildTeamRankings(IEnumerable<NPC> npcs, IEnumerable<PlayerTeamInfo> playerTeams, Character? viewer)
+    {
+        var acc = new Dictionary<string, (int Members, long LevelSum, long Power, bool Turf)>(StringComparer.Ordinal);
+        var order = new List<string>();
+        void Add(string team, int members, long levels, long power, bool turf)
+        {
+            if (!acc.TryGetValue(team, out var a)) { order.Add(team); a = default; }
+            acc[team] = (a.Members + members, a.LevelSum + levels, a.Power + power, a.Turf || turf);
+        }
+
+        foreach (var n in npcs)
+            if (!string.IsNullOrEmpty(n.Team) && n.IsAlive)
+                Add(n.Team, 1, n.Level, n.Level + (long)n.Strength + (long)n.Defence, n.CTurf);
+        if (viewer != null && !string.IsNullOrEmpty(viewer.Team))
+            Add(viewer.Team, 1, viewer.Level, viewer.Level + (long)viewer.Strength + (long)viewer.Defence, viewer.CTurf);
+        foreach (var pt in playerTeams)
+            if (!string.IsNullOrEmpty(pt.TeamName))
+                Add(pt.TeamName, pt.MemberCount, pt.LevelSum, pt.PowerSum, pt.ControlsTurf);
+
+        return order
+            .Where(t => acc[t].Members > 0)
+            .Select(t => new TeamRankingRow(t, acc[t].Members, acc[t].Power, (int)(acc[t].LevelSum / acc[t].Members), acc[t].Turf,
+                viewer != null && t == viewer.Team))
+            .OrderByDescending(r => r.TotalPower)
+            .ToList();
     }
 
     /// <summary>

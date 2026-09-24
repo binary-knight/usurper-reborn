@@ -5702,41 +5702,114 @@ namespace UsurperRemake.Systems
         }
     }
 
+    /// <summary>
+    /// One row per player_teams row, with the player member count and sums from one pass over the saves.
+    /// </summary>
     public async Task<List<PlayerTeamInfo>> GetPlayerTeams()
     {
-        var teams = new List<PlayerTeamInfo>();
         try
         {
-            using var connection = OpenConnection();
-            using var cmd = connection.CreateCommand();
-            // v1.1.11: the member count is counted here; the stored column was refreshed only when someone
-            // opened that team's roster, so the rankings showed teams with players in them as empty
-            cmd.CommandText = @"
-                SELECT t.team_name, t.created_by,
-                       (SELECT COUNT(*) FROM players p
-                        WHERE (CASE WHEN json_valid(p.player_data) THEN json_extract(p.player_data, '$.player.team') END) = t.team_name
-                        AND p.player_data != '{}' AND LENGTH(p.player_data) > 2
-                        AND p.is_banned = 0 AND p.username NOT LIKE 'emergency_%') AS members,
-                       t.controls_turf, t.created_at
-                FROM player_teams t ORDER BY members DESC;";
-            using var reader = await Task.Run(() => cmd.ExecuteReader());
-            while (reader.Read())
+            return await Task.Run(() =>
             {
-                teams.Add(new PlayerTeamInfo
-                {
-                    TeamName = reader.GetString(0),
-                    CreatedBy = reader.GetString(1),
-                    MemberCount = reader.GetInt32(2),
-                    ControlsTurf = reader.GetInt32(3) != 0,
-                    CreatedAt = DateTime.TryParse(reader.GetString(4), out var dt) ? dt : DateTime.Now
-                });
-            }
+                using var connection = OpenConnection();
+                var stats = ReadTeamPlayerStats(connection, null);
+                return ReadTeamRows(connection, stats).OrderByDescending(t => t.MemberCount).ToList();
+            });
         }
         catch (Exception ex)
         {
             DebugLogger.Instance.LogError("SQL", $"Failed to get player teams: {ex.Message}");
+            return new List<PlayerTeamInfo>();
+        }
+    }
+
+    /// <summary>
+    /// v1.1.12: the team rankings' player side: every player_teams row plus every team named only in player
+    /// saves (HasTeamRow false), with the viewer's own save left out (excludeSaveKey, the players.username key)
+    /// so the caller adds the in-memory character once, with its current level and team.
+    /// </summary>
+    public async Task<List<PlayerTeamInfo>> GetTeamRankingStats(string? excludeSaveKey)
+    {
+        try
+        {
+            return await Task.Run(() =>
+            {
+                using var connection = OpenConnection();
+                var stats = ReadTeamPlayerStats(connection, excludeSaveKey);
+                var teams = ReadTeamRows(connection, stats);
+                var named = teams.Select(t => t.TeamName).ToHashSet(StringComparer.Ordinal);
+                foreach (var (team, st) in stats)
+                    if (!named.Contains(team))
+                        teams.Add(new PlayerTeamInfo { TeamName = team, MemberCount = st.Members, LevelSum = st.LevelSum, PowerSum = st.PowerSum, HasTeamRow = false });
+                return teams;
+            });
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to get team ranking stats: {ex.Message}");
+            return new List<PlayerTeamInfo>();
+        }
+    }
+
+    // v1.1.12: TOTAL, not SUM, since SUM throws on overflow and one absurd stat would blank the list
+    private static long ClampToLong(double v) => v >= long.MaxValue ? long.MaxValue : v <= long.MinValue ? long.MinValue : (long)v;
+
+    private static List<PlayerTeamInfo> ReadTeamRows(SqliteConnection connection, Dictionary<string, (int Members, long LevelSum, long PowerSum)> stats)
+    {
+        var teams = new List<PlayerTeamInfo>();
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT team_name, created_by, controls_turf, created_at FROM player_teams;";
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            var name = reader.GetString(0);
+            stats.TryGetValue(name, out var st);
+            teams.Add(new PlayerTeamInfo
+            {
+                TeamName = name,
+                CreatedBy = reader.GetString(1),
+                MemberCount = st.Members,
+                LevelSum = st.LevelSum,
+                PowerSum = st.PowerSum,
+                ControlsTurf = reader.GetInt32(2) != 0,
+                CreatedAt = DateTime.TryParse(reader.GetString(3), out var dt) ? dt : DateTime.Now
+            });
         }
         return teams;
+    }
+
+    /// <summary>
+    /// v1.1.12: player members per team in ONE pass over players. The v1.1.11 query counted each team with
+    /// its own scan, so 66 teams parsed about 2.4 GB of save JSON (6.1 s on a 38 MB test set, now 0.1 s).
+    /// The multi-path json_extract parses each blob once; MATERIALIZED stops SQLite from inlining it into
+    /// each '$[n]' read below (inlined was twice as slow). json_valid keeps one malformed save from failing
+    /// every team, and a team value that is not text is ignored.
+    /// </summary>
+    private static Dictionary<string, (int Members, long LevelSum, long PowerSum)> ReadTeamPlayerStats(SqliteConnection connection, string? excludeSaveKey)
+    {
+        var stats = new Dictionary<string, (int, long, long)>(StringComparer.Ordinal);
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = @"
+            WITH s AS MATERIALIZED (
+                SELECT CASE WHEN json_valid(player_data)
+                            THEN json_extract(player_data, '$.player.team', '$.player.level', '$.player.strength', '$.player.defence') END AS v
+                FROM players
+                WHERE player_data != '{}' AND LENGTH(player_data) > 2
+                  AND is_banned = 0 AND username NOT LIKE 'emergency_%'
+                  AND (@me IS NULL OR LOWER(username) != @me))
+            SELECT json_extract(v, '$[0]') AS team, COUNT(*),
+                   TOTAL(COALESCE(CAST(json_extract(v, '$[1]') AS INTEGER), 0)),
+                   TOTAL(COALESCE(CAST(json_extract(v, '$[1]') AS INTEGER), 0)
+                     + COALESCE(CAST(json_extract(v, '$[2]') AS INTEGER), 0)
+                     + COALESCE(CAST(json_extract(v, '$[3]') AS INTEGER), 0))
+            FROM s
+            WHERE json_type(v, '$[0]') = 'text' AND json_extract(v, '$[0]') != ''
+            GROUP BY team;";
+        cmd.Parameters.AddWithValue("@me", string.IsNullOrEmpty(excludeSaveKey) ? DBNull.Value : excludeSaveKey.ToLowerInvariant());
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+            stats[reader.GetString(0)] = (reader.GetInt32(1), ClampToLong(reader.GetDouble(2)), ClampToLong(reader.GetDouble(3)));
+        return stats;
     }
 
     /// <summary>
