@@ -231,6 +231,20 @@ public class TeamCornerFixes1112Tests : IDisposable
     }
 
     [Fact]
+    public async Task ASleepersTeam_IsReadFromTheirSave_SoTheirNpcTeammatesSpareThem()
+    {
+        // v1.1.12: the world sim excludes the sleeper's teammates from the attackers by this name; the
+        // lookup read '$.Player.Team', which a real save never has, and always returned ""
+        await _db.WriteGameData("sleepy", new SaveGameData
+        {
+            Version = GameConfig.SaveVersion,
+            Player = new PlayerData { Name1 = "sleepy", Name2 = "Sleepy", Team = "Night Watch", Level = 12, HP = 90, MaxHP = 90 }
+        });
+        _db.GetPlayerTeamName("sleepy").Should().Be("Night Watch");
+        _db.GetPlayerTeamName("nobody").Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task ANewTeam_StartsWithoutAnOldTeamsLeftoverUpgradesAndVault()
     {
         // v1.1.12: 1.1.11's last-member dissolve left these under the name for the next team of that name

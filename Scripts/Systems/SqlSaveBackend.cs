@@ -1152,7 +1152,9 @@ namespace UsurperRemake.Systems
                 using var connection = OpenConnection();
                 using var cmd = connection.CreateCommand();
                 cmd.CommandText = @"
-                    SELECT json_extract(player_data, '$.Player.Team')
+                    -- v1.1.12: the save's keys are camelCase; '$.Player.Team' never matched, so the sleeper's
+                    -- team was always empty and their NPC teammates could attack them
+                    SELECT CASE WHEN json_valid(player_data) THEN json_extract(player_data, '$.player.team') END
                     FROM players
                     WHERE LOWER(username) = LOWER(@username) AND is_banned = 0
                     ORDER BY (username = LOWER(@username)) DESC, LENGTH(player_data) DESC LIMIT 1;";
