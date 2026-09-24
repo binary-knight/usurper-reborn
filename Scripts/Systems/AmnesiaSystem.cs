@@ -15,6 +15,11 @@ namespace UsurperRemake.Systems
     /// </summary>
     public class AmnesiaSystem
     {
+        // v1.1.12: MemoriesRecovered needs 4. Only the floor 10/25/50/75 memories and the full truth
+        // can be recovered (no call passes the rest-, god-, death- or seal-triggers), and the full
+        // truth already grants TrueIdentityRevealed, so the four floor memories are the threshold.
+        public const int MemoriesRecoveredThreshold = 4;
+
         private static AmnesiaSystem? _fallbackInstance;
         public static AmnesiaSystem Instance
         {
@@ -332,7 +337,7 @@ namespace UsurperRemake.Systems
                 // GD.Print($"[Amnesia] Recovered memory: {data.Title}");
 
                 // Notify the Ocean Philosophy system
-                if (RecoveredMemories.Count >= MemoryData.Count - 2)
+                if (RecoveredMemories.Count >= MemoriesRecoveredThreshold)
                 {
                     OceanPhilosophySystem.Instance.ExperienceMoment(AwakeningMoment.MemoriesRecovered);
                 }

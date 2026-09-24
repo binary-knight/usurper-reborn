@@ -5897,7 +5897,7 @@ public class InnLocation : BaseLocation
         }
 
         // Guards defeated — fight the sleeper with inn defense boost
-        var victim = PlayerCharacterLoader.CreateFromSaveData(victimSave.Player, target.Username);
+        var victim = PlayerCharacterLoader.CreateFromSaveData(victimSave.Player, target.Username, story: victimSave.StorySystems);
         long victimGold = victim.Gold;
         victim.Gold = 0;
 

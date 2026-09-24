@@ -53,11 +53,26 @@ namespace UsurperRemake.Systems
         public static double XPMultiplier(Character c) => 1.0 + Training(c) * TrainingPerLevel;
         public static double PotionHealMultiplier(Character c) => 1.0 + Infirmary(c) * InfirmaryPerLevel;
 
+        // v1.1.12: the awakening boons (AwakeningBonus) ride on these three, in the same place and order,
+        // multiplied with the HQ factor and rounded once. They apply offline too, and only to a player with a stage of their own (AwakeningBonus.StageOf).
+
         /// <summary>Damage dealt by the player, after every other modifier.</summary>
-        public static long ApplyAttack(Character c, long damage) => Armory(c) > 0 ? (long)Math.Round(damage * AttackMultiplier(c)) : damage;
+        public static long ApplyAttack(Character c, long damage)
+        {
+            double m = (Armory(c) > 0 ? AttackMultiplier(c) : 1.0) * AwakeningBonus.DamageMultiplier(c);
+            return m != 1.0 ? (long)Math.Round(damage * m) : damage;
+        }
         /// <summary>Damage taken by the player, after every other modifier and before any floor.</summary>
-        public static long ApplyDefense(Character c, long damage) => Barracks(c) > 0 ? (long)Math.Round(damage / DefenseMultiplier(c)) : damage;
-        public static long ApplyXP(Character c, long xp) => Training(c) > 0 ? (long)Math.Round(xp * XPMultiplier(c)) : xp;
+        public static long ApplyDefense(Character c, long damage)
+        {
+            double m = AwakeningBonus.DefenseFactor(c) / (Barracks(c) > 0 ? DefenseMultiplier(c) : 1.0);
+            return m != 1.0 ? (long)Math.Round(damage * m) : damage;
+        }
+        public static long ApplyXP(Character c, long xp)
+        {
+            double m = (Training(c) > 0 ? XPMultiplier(c) : 1.0) * AwakeningBonus.XPMultiplier(c);
+            return m != 1.0 ? (long)Math.Round(xp * m) : xp;
+        }
         public static long ApplyPotionHeal(Character c, long heal) => Infirmary(c) > 0 ? (long)Math.Round(heal * PotionHealMultiplier(c)) : heal;
 
         /// <summary>

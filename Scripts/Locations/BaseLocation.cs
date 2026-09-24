@@ -740,6 +740,9 @@ public abstract class BaseLocation
                 terminal.WriteLine("");
             }
 
+            // v1.1.12: an awakening stage risen since the last menu, shown once at this clean boundary
+            await AwakeningScreens.ShowPending(terminal, currentPlayer);
+
             // Show deferred daily reset banner at a clean display boundary
             // (instead of mid-shop or mid-interaction where PeriodicUpdate fires)
             if (DailySystemManager.Instance.PendingDailyResetDisplay)
@@ -1422,7 +1425,7 @@ public abstract class BaseLocation
         // Apply awakening gain
         if (stage.AwakeningGain > 0)
         {
-            OceanPhilosophySystem.Instance.GainInsight(stage.AwakeningGain * 10);
+            OceanPhilosophySystem.Instance.GainInsight($"npc:{npcKey}:{stage.StageId}"); // v1.1.12: one insight per story stage
             terminal.SetColor("magenta");
             terminal.WriteLine(Loc.Get("base.deeper_understanding"));
         }
@@ -5038,6 +5041,88 @@ public abstract class BaseLocation
     }
 
     /// <summary>
+    /// v1.1.12: choose one entry from a list, shaped on the Inn patron list. Pages of 10, numbers count
+    /// across pages, N/P page, a typed name or the unique start of one also chooses (an exact name wins
+    /// over a longer one), a part that fits several lists only those, and Enter or 0 cancels (with a name
+    /// filter on, Enter first brings the full list back). Null when cancelled or the list is empty.
+    /// </summary>
+    protected internal async Task<T?> PickFromList<T>(IReadOnlyList<T> items, Func<T, string> rowFormatter,
+        Func<T, string> nameSelector, string titleKey, Func<T, string>? rowColor = null, params object[] titleArgs) where T : class
+    {
+        if (items == null || items.Count == 0) return null;
+        const int pageSize = 10;
+        var all = items.ToList();
+        var shown = all;
+        string? filter = null;
+        int pageIndex = 0;
+        while (true)
+        {
+            int totalPages = Math.Max(1, (shown.Count + pageSize - 1) / pageSize);
+            pageIndex = Math.Clamp(pageIndex, 0, totalPages - 1);
+            var pageRows = shown.Skip(pageIndex * pageSize).Take(pageSize).ToList();
+
+            terminal.ClearScreen();
+            WriteSectionHeader(Loc.Get(titleKey, titleArgs), "bright_cyan");
+            terminal.WriteLine("");
+            if (filter != null)
+            {
+                terminal.SetColor("white");
+                terminal.WriteLine(Loc.Get("base.pick_matching", filter));
+                terminal.WriteLine("");
+            }
+            for (int i = 0; i < pageRows.Count; i++)
+            {
+                int number = pageIndex * pageSize + i + 1;
+                terminal.SetColor(rowColor?.Invoke(pageRows[i]) ?? "white");
+                terminal.WriteLine(IsScreenReader ? $"  {number}. {rowFormatter(pageRows[i])}" : $"  [{number}] {rowFormatter(pageRows[i])}");
+            }
+            terminal.WriteLine("");
+            if (totalPages > 1)
+            {
+                terminal.SetColor("darkgray");
+                terminal.WriteLine(Loc.Get("team.recruit_page_footer", pageIndex * pageSize + 1, pageIndex * pageSize + pageRows.Count, shown.Count, pageIndex + 1, totalPages));
+            }
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine(IsScreenReader ? $"0. {Loc.Get("ui.cancel")}" : $"[0] {Loc.Get("ui.cancel")}");
+            terminal.WriteLine("");
+
+            string input = ((await terminal.GetInput(Loc.Get(totalPages > 1 ? "base.pick_nav_pages" : "base.pick_nav"))) ?? "").Trim();
+            if (input.Length == 0 && filter != null) { shown = all; filter = null; pageIndex = 0; continue; }
+            if (input.Length == 0 || input == "0") return null;
+            string upper = input.ToUpperInvariant();
+            if (upper == "N" && totalPages > 1) { if (pageIndex + 1 < totalPages) pageIndex++; continue; }
+            if (upper == "P" && totalPages > 1) { if (pageIndex > 0) pageIndex--; continue; }
+
+            if (int.TryParse(input, out int pick))
+            {
+                if (pick >= 1 && pick <= shown.Count) return shown[pick - 1];
+                terminal.SetColor("gray");
+                terminal.WriteLine(Loc.Get("base.pick_no_number", pick, shown.Count));
+                await terminal.PressAnyKey();
+                continue;
+            }
+
+            // v1.1.12: a name typed in its exact case wins, so two names differing only in case can each be chosen
+            var sameCase = all.Where(x => string.Equals(nameSelector(x) ?? "", input, StringComparison.Ordinal)).ToList();
+            if (sameCase.Count == 1) return sameCase[0];
+            var exact = all.Where(x => string.Equals(nameSelector(x) ?? "", input, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (exact.Count == 1) return exact[0];
+            var matches = all.Where(x => (nameSelector(x) ?? "").StartsWith(input, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (matches.Count == 0)
+                matches = all.Where(x => (nameSelector(x) ?? "").Contains(input, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (matches.Count == 1) return matches[0];
+            if (matches.Count == 0)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine(Loc.Get("base.pick_no_match", input));
+                await terminal.PressAnyKey();
+                continue;
+            }
+            shown = matches; filter = input; pageIndex = 0;
+        }
+    }
+
+    /// <summary>
     /// Check if we're running inside WezTerm (which supports font switching).
     /// </summary>
     internal static bool IsRunningInWezTerm()
@@ -6935,21 +7020,19 @@ public abstract class BaseLocation
         if (ocean != null)
         {
             var awakeningLevel = ocean.AwakeningLevel;
-            var awakeningLabel = awakeningLevel switch
-            {
-                0 => Loc.Get("base.awakening_dormant"),
-                1 => Loc.Get("base.awakening_stirring"),
-                2 => Loc.Get("base.awakening_aware"),
-                3 => Loc.Get("base.awakening_seeking"),
-                4 => Loc.Get("base.awakening_illuminated"),
-                5 => Loc.Get("base.awakening_transcendent"),
-                6 => Loc.Get("base.awakening_enlightened"),
-                7 => Loc.Get("base.awakening_awakened"),
-                _ => Loc.Get("base.awakening_dormant")
-            };
+            var awakeningLabel = AwakeningScreens.StageName(awakeningLevel); // v1.1.12: one set of labels
             terminal.SetColor("dark_magenta");
             terminal.WriteLine(Loc.Get("base.stat_awakening", awakeningLabel, awakeningLevel));
+            var awakeningBoons = AwakeningBonus.ActiveAt(awakeningLevel); // v1.1.12
+            if (awakeningBoons.Count > 0)
+            {
+                terminal.SetColor("bright_green");
+                terminal.WriteLine($"  {Loc.Get("ocean.journal_boons", string.Join(", ", awakeningBoons))}");
+            }
+            terminal.SetColor("gray");
+            terminal.WriteLine($"  {Loc.Get("base.stat_awakening_hint")}"); // v1.1.12
             terminal.SetColor("white");
+            HintSystem.Instance.TryShowHint(HintSystem.HINT_AWAKENING, terminal, currentPlayer?.HintsShown); // v1.1.12
             terminal.WriteLine("");
         }
 
@@ -10432,6 +10515,43 @@ public abstract class BaseLocation
         return null;
     }
 
+    /// <summary>v1.1.12: test hook; when set, the gear saves below call it ("shared" or "player") instead of saving.</summary>
+    internal static Func<string, Task>? GearSaveHookForTests;
+
+    /// <summary>v1.1.12: gear moved from an NPC to the player: the shared NPC state is saved first, then the
+    /// player, so a crash between loses the item rather than copying it.</summary>
+    protected internal async Task SaveGearTakenFromNpc(Character? npc)
+    {
+        if (npc != null) CombatEngine.SyncNPCTeammateToActiveNPCs(npc);
+        await SaveSharedStateForGear();
+        await SavePlayerForGear();
+    }
+
+    /// <summary>v1.1.12: gear moved from the player to an NPC: the player is saved first, then the shared NPC
+    /// state, for the same reason.</summary>
+    protected internal async Task SaveGearGivenToNpc(Character? npc)
+    {
+        await SavePlayerForGear();
+        if (npc != null) CombatEngine.SyncNPCTeammateToActiveNPCs(npc);
+        await SaveSharedStateForGear();
+    }
+
+    private async Task SaveSharedStateForGear()
+    {
+        if (GearSaveHookForTests != null) { await GearSaveHookForTests("shared"); return; }
+        if (!DoorMode.IsOnlineMode || OnlineStateManager.Instance == null) return;
+        try { await OnlineStateManager.Instance.SaveAllSharedState(); }
+        catch (Exception ex) { DebugLogger.Instance.LogError("EQUIP", $"SaveAllSharedState failed after moving gear: {ex.Message}"); }
+    }
+
+    // v1.1.12: online the throttle is skipped (this write must land); single-player is one save for both sides
+    private async Task SavePlayerForGear()
+    {
+        if (GearSaveHookForTests != null) { await GearSaveHookForTests("player"); return; }
+        try { await SaveSystem.Instance.AutoSave(currentPlayer, force: DoorMode.IsOnlineMode); }
+        catch (Exception ex) { DebugLogger.Instance.LogError("EQUIP", $"Player save failed after moving gear: {ex.Message}"); }
+    }
+
     // v0.64.2: promoted from InnLocation so Home / Team Corner / Dungeon
     // party menus can offer the same auto-equip-best flow (player request:
     // outfitting a naked recruit slot-by-slot was painful).
@@ -10462,6 +10582,7 @@ public abstract class BaseLocation
         terminal.WriteLine("");
 
         int equippedCount = 0;
+        var displacedAll = new List<Item>();
 
         // Process each equipment slot
         var slotsToCheck = new[] {
@@ -10486,7 +10607,15 @@ public abstract class BaseLocation
             var candidates = GetItemsForSlot(slot)
                 .Where(x => !x.isEquipped && x.item.IsIdentified && !x.item.IsCursed)
                 .Where(x => x.item.CanEquip(target, out _))
+                .Select(x => (x.item, fromBag: (Item?)null))
                 .ToList();
+            // v1.1.12: gear displaced earlier in this pass is still in the target's bag; it competes for this slot too
+            foreach (var bagItem in displacedAll)
+            {
+                var eq = ConvertInventoryItemToEquipment(bagItem);
+                if (eq != null && ItemMatchesSlot(eq, slot) && eq.IsIdentified && !eq.IsCursed && eq.CanEquip(target, out _))
+                    candidates.Add((eq, bagItem));
+            }
 
             if (candidates.Count == 0)
             {
@@ -10512,10 +10641,12 @@ public abstract class BaseLocation
                 continue;
             }
 
-            // Remove from player inventory (find by name match)
-            var invItem = currentPlayer.Inventory.FirstOrDefault(i => i.Name == bestCandidate.item.Name);
+            // Remove from player inventory (find by name match); v1.1.12: or take it back out of the target's bag
+            var fromBag = bestCandidate.fromBag;
+            var invItem = fromBag ?? currentPlayer.Inventory.FirstOrDefault(i => i.Name == bestCandidate.item.Name);
             if (invItem == null) continue;
-            currentPlayer.Inventory.Remove(invItem);
+            if (fromBag != null) { target.Inventory.Remove(fromBag); displacedAll.Remove(fromBag); }
+            else currentPlayer.Inventory.Remove(invItem);
 
             // Track items before equipping so displaced items go to player
             var targetInventoryBefore = target.Inventory.Count;
@@ -10523,16 +10654,9 @@ public abstract class BaseLocation
             // Equip to target
             if (target.EquipItem(bestCandidate.item, slot, out string message))
             {
-                // Move displaced items back to player inventory
+                // v1.1.12: displaced items stay in the target's bag until the give is saved (below)
                 if (target.Inventory.Count > targetInventoryBefore)
-                {
-                    var displacedItems = target.Inventory.Skip(targetInventoryBefore).ToList();
-                    foreach (var displaced in displacedItems)
-                    {
-                        target.Inventory.Remove(displaced);
-                        currentPlayer.Inventory.Add(displaced);
-                    }
-                }
+                    displacedAll.AddRange(target.Inventory.Skip(targetInventoryBefore));
 
                 equippedCount++;
                 terminal.SetColor("bright_green");
@@ -10543,8 +10667,9 @@ public abstract class BaseLocation
             }
             else
             {
-                // Failed - return item to player
-                currentPlayer.Inventory.Add(invItem);
+                // Failed - return item to player (v1.1.12: or to the target's bag it came from)
+                if (fromBag != null) { target.Inventory.Add(fromBag); displacedAll.Add(fromBag); }
+                else currentPlayer.Inventory.Add(invItem);
             }
         }
 
@@ -10561,14 +10686,17 @@ public abstract class BaseLocation
             // below persists them).
             if (target.IsCompanion)
                 UsurperRemake.Systems.CompanionSystem.Instance?.SyncCompanionEquipment(target);
-            UsurperRemake.Systems.SaveSystem.Instance.ResetAutoSaveThrottle();
-            await UsurperRemake.Systems.SaveSystem.Instance.AutoSave(currentPlayer);
-
-            // Online mode: persist companion equipment to shared state
-            if (UsurperRemake.BBS.DoorMode.IsOnlineMode && UsurperRemake.Systems.OnlineStateManager.Instance != null)
+            // v1.1.12: the give is saved player first, then the displaced items come back, saved NPC side first,
+            // so a crash between any two saves never leaves an item on both sides
+            await SaveGearGivenToNpc(target);
+            if (displacedAll.Count > 0)
             {
-                try { await UsurperRemake.Systems.OnlineStateManager.Instance.SaveAllSharedState(); }
-                catch (Exception ex) { UsurperRemake.Systems.DebugLogger.Instance.LogError("EQUIP", $"SaveAllSharedState failed after EquipBest: {ex.Message}"); }
+                foreach (var displaced in displacedAll)
+                {
+                    target.Inventory.Remove(displaced);
+                    currentPlayer.Inventory.Add(displaced);
+                }
+                await SaveGearTakenFromNpc(target);
             }
         }
         else

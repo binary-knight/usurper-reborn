@@ -904,6 +904,15 @@ namespace UsurperRemake.Systems
             }
             catch { /* Column already exists - expected */ }
 
+            // v1.1.12: who paid a team war's wager, so a war left active by a lost session can be refunded
+            try
+            {
+                using var migCmd = connection.CreateCommand();
+                migCmd.CommandText = "ALTER TABLE team_wars ADD COLUMN challenger_key TEXT;";
+                migCmd.ExecuteNonQuery();
+            }
+            catch { /* Column already exists - expected */ }
+
             // v0.60.5: add created_ip column for per-IP registration rate limiting
             try
             {
@@ -969,6 +978,8 @@ namespace UsurperRemake.Systems
         {
             var connection = new SqliteConnection(connectionString);
             connection.Open();
+            // v1.1.12: SQLite LOWER() folds ASCII only; ulower folds case as C# does (the team name guards)
+            connection.CreateFunction("ulower", (string? s) => s?.ToLowerInvariant());
             return connection;
         }
 
@@ -1060,6 +1071,28 @@ namespace UsurperRemake.Systems
             }
         }
 
+        /// <summary>
+        /// v1.1.12: the save's Name2 for one key, banned accounts included (ReadGameData skips them), for the
+        /// admin deletes: a married display name is not the name children and quests record. Null if none.
+        /// </summary>
+        public string? GetStoredName2(string username)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT CASE WHEN json_valid(player_data) THEN json_extract(player_data, '$.player.name2') END FROM players " +
+                                  "WHERE LOWER(username) = LOWER(@u) ORDER BY LENGTH(player_data) DESC LIMIT 1;";
+                cmd.Parameters.AddWithValue("@u", username);
+                return cmd.ExecuteScalar() is string s && !string.IsNullOrWhiteSpace(s) ? s : null;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogWarning("SQL", $"GetStoredName2('{username}') failed: {ex.Message}");
+                return null;
+            }
+        }
+
         public async Task<SaveGameData?> ReadGameData(string playerName)
         {
             try
@@ -1119,7 +1152,9 @@ namespace UsurperRemake.Systems
                 using var connection = OpenConnection();
                 using var cmd = connection.CreateCommand();
                 cmd.CommandText = @"
-                    SELECT json_extract(player_data, '$.Player.Team')
+                    -- v1.1.12: the save's keys are camelCase; '$.Player.Team' never matched, so the sleeper's
+                    -- team was always empty and their NPC teammates could attack them
+                    SELECT CASE WHEN json_valid(player_data) THEN json_extract(player_data, '$.player.team') END
                     FROM players
                     WHERE LOWER(username) = LOWER(@username) AND is_banned = 0
                     ORDER BY (username = LOWER(@username)) DESC, LENGTH(player_data) DESC LIMIT 1;";
@@ -1198,7 +1233,11 @@ namespace UsurperRemake.Systems
 
                 // Multi-column tables: the username can appear as sender/recipient,
                 // attacker/defender, etc. Clear all of them.
-                ExecPurge(connection, tx, "messages",          "LOWER(from_player) = LOWER(@u) OR LOWER(to_player) = LOWER(@u)", username);
+                // v1.1.12: mail to the key is kept when another character goes by that name (account "bob" playing
+                // "Alice" beside a character "Bob"), as the alias clause below does
+                ExecPurge(connection, tx, "messages",          "LOWER(from_player) = LOWER(@u) OR (LOWER(to_player) = LOWER(@u) " +
+                    "AND NOT EXISTS (SELECT 1 FROM players p WHERE LOWER(p.username) != LOWER(@u) AND (LOWER(p.display_name) = LOWER(messages.to_player) " +
+                    "OR LOWER(CASE WHEN json_valid(p.player_data) THEN json_extract(p.player_data, '$.player.name2') END) = LOWER(messages.to_player))))", username);
                 ExecPurge(connection, tx, "trade_offers",      "LOWER(from_player) = LOWER(@u) OR LOWER(to_player) = LOWER(@u)", username);
                 ExecPurge(connection, tx, "bounties",          "LOWER(target_player) = LOWER(@u) OR LOWER(placed_by) = LOWER(@u) OR LOWER(claimed_by) = LOWER(@u)", username);
                 // v1.1.11: only the character's own listings, under each name it may have listed as (the key,
@@ -1238,6 +1277,14 @@ namespace UsurperRemake.Systems
                 ExecPurge(connection, tx, "pending_inheritance",    "LOWER(player_username) = LOWER(@u)", username);
                 ExecPurge(connection, tx, "pending_gold_transfers", "LOWER(recipient_username) = LOWER(@u)", username);
                 ExecPurge(connection, tx, "world_boss_rewards",     "LOWER(player_name) = LOWER(@u) AND COALESCE(delivered, 0) = 0", username);
+                // v1.1.12: an unfinished war's refund would otherwise be queued later under this reused key
+                using (var wars = connection.CreateCommand())
+                {
+                    wars.Transaction = tx;
+                    wars.CommandText = "UPDATE team_wars SET challenger_key = NULL WHERE LOWER(challenger_key) = LOWER(@u) AND status = 'active';";
+                    wars.Parameters.AddWithValue("@u", username);
+                    wars.ExecuteNonQuery();
+                }
 
                 // v1.1.11: mail and auctions also key on the display name (mail to Name2, auction sellers
                 // are DisplayName.ToLower(), the married surname form comes from players.display_name).
@@ -1247,7 +1294,10 @@ namespace UsurperRemake.Systems
                     const string ownNames = "(SELECT LOWER(display_name) FROM players WHERE LOWER(username) = LOWER(@u) AND display_name IS NOT NULL)";
                     ExecPurge(connection, tx, "messages",
                         $"to_player != '*' AND (LOWER(to_player) = LOWER(@d) OR LOWER(to_player) IN {ownNames}) " +
-                        "AND NOT EXISTS (SELECT 1 FROM players p WHERE LOWER(p.username) = LOWER(messages.to_player) AND LOWER(p.username) != LOWER(@u))",
+                        "AND NOT EXISTS (SELECT 1 FROM players p WHERE LOWER(p.username) = LOWER(messages.to_player) AND LOWER(p.username) != LOWER(@u)) " +
+                        // v1.1.12: nor a name another character goes by (a married "Bob Smith" beside a player "Bob Smith")
+                        "AND NOT EXISTS (SELECT 1 FROM players p WHERE LOWER(p.username) != LOWER(@u) AND (LOWER(p.display_name) = LOWER(messages.to_player) " +
+                        "OR LOWER(CASE WHEN json_valid(p.player_data) THEN json_extract(p.player_data, '$.player.name2') END) = LOWER(messages.to_player)))",
                         username, displayName);
                 }
 
@@ -5160,23 +5210,64 @@ namespace UsurperRemake.Systems
 
     // ========== Player Teams ==========
 
+    /// <summary>
+    /// v1.1.12: one guarded INSERT, so of two sessions creating the same name only one gets the row; a name
+    /// that differs only in case counts as taken (the protection list ignores case). The join stamp gives
+    /// the founder's save time to land before the empty-team cleanup looks at it. False when not created.
+    /// </summary>
     public async Task<bool> CreatePlayerTeam(string teamName, string passwordHash, string createdBy)
     {
         try
         {
-            using var connection = OpenConnection();
-            using var cmd = connection.CreateCommand();
-            cmd.CommandText = "INSERT INTO player_teams (team_name, password_hash, created_by) VALUES (@name, @hash, @creator);";
-            cmd.Parameters.AddWithValue("@name", teamName);
-            cmd.Parameters.AddWithValue("@hash", passwordHash);
-            cmd.Parameters.AddWithValue("@creator", createdBy.ToLower());
-            await Task.Run(() => cmd.ExecuteNonQuery());
-            return true;
+            return await Task.Run(() =>
+            {
+                using var connection = OpenConnection();
+                using var tx = connection.BeginTransaction();
+                using var cmd = connection.CreateCommand();
+                cmd.Transaction = tx;
+                cmd.CommandText = @"INSERT INTO player_teams (team_name, password_hash, created_by, last_join_at)
+                    SELECT @name, @hash, @creator, datetime('now')
+                    WHERE NOT EXISTS (SELECT 1 FROM player_teams WHERE ulower(team_name) = ulower(@name));";
+                cmd.Parameters.AddWithValue("@name", teamName);
+                cmd.Parameters.AddWithValue("@hash", passwordHash);
+                cmd.Parameters.AddWithValue("@creator", createdBy.ToLower());
+                if (cmd.ExecuteNonQuery() != 1) return false;
+                // v1.1.12: a new team starts bare; before this release a team dissolved by its last member
+                // left its upgrades and vault under the name for the next team of that name
+                foreach (var table in new[] { "team_upgrades", "team_vault" })
+                {
+                    using var clear = connection.CreateCommand();
+                    clear.Transaction = tx;
+                    clear.CommandText = $"DELETE FROM {table} WHERE ulower(team_name) = ulower(@name);";
+                    clear.Parameters.AddWithValue("@name", teamName);
+                    clear.ExecuteNonQuery();
+                }
+                tx.Commit();
+                return true;
+            });
         }
         catch (Exception ex)
         {
             DebugLogger.Instance.LogError("SQL", $"Failed to create player team '{teamName}': {ex.Message}");
             return false;
+        }
+    }
+
+    /// <summary>v1.1.12: whether a team has a player_teams row (an NPC-founded team has none); null on a DB error.</summary>
+    public bool? HasPlayerTeamRow(string teamName)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT COUNT(*) FROM player_teams WHERE team_name = @name;";
+            cmd.Parameters.AddWithValue("@name", teamName);
+            return Convert.ToInt64(cmd.ExecuteScalar()) > 0;
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to look up team '{teamName}': {ex.Message}");
+            return null;
         }
     }
 
@@ -5702,41 +5793,114 @@ namespace UsurperRemake.Systems
         }
     }
 
+    /// <summary>
+    /// One row per player_teams row, with the player member count and sums from one pass over the saves.
+    /// </summary>
     public async Task<List<PlayerTeamInfo>> GetPlayerTeams()
     {
-        var teams = new List<PlayerTeamInfo>();
         try
         {
-            using var connection = OpenConnection();
-            using var cmd = connection.CreateCommand();
-            // v1.1.11: the member count is counted here; the stored column was refreshed only when someone
-            // opened that team's roster, so the rankings showed teams with players in them as empty
-            cmd.CommandText = @"
-                SELECT t.team_name, t.created_by,
-                       (SELECT COUNT(*) FROM players p
-                        WHERE (CASE WHEN json_valid(p.player_data) THEN json_extract(p.player_data, '$.player.team') END) = t.team_name
-                        AND p.player_data != '{}' AND LENGTH(p.player_data) > 2
-                        AND p.is_banned = 0 AND p.username NOT LIKE 'emergency_%') AS members,
-                       t.controls_turf, t.created_at
-                FROM player_teams t ORDER BY members DESC;";
-            using var reader = await Task.Run(() => cmd.ExecuteReader());
-            while (reader.Read())
+            return await Task.Run(() =>
             {
-                teams.Add(new PlayerTeamInfo
-                {
-                    TeamName = reader.GetString(0),
-                    CreatedBy = reader.GetString(1),
-                    MemberCount = reader.GetInt32(2),
-                    ControlsTurf = reader.GetInt32(3) != 0,
-                    CreatedAt = DateTime.TryParse(reader.GetString(4), out var dt) ? dt : DateTime.Now
-                });
-            }
+                using var connection = OpenConnection();
+                var stats = ReadTeamPlayerStats(connection, null);
+                return ReadTeamRows(connection, stats).OrderByDescending(t => t.MemberCount).ToList();
+            });
         }
         catch (Exception ex)
         {
             DebugLogger.Instance.LogError("SQL", $"Failed to get player teams: {ex.Message}");
+            return new List<PlayerTeamInfo>();
+        }
+    }
+
+    /// <summary>
+    /// v1.1.12: the team rankings' player side: every player_teams row plus every team named only in player
+    /// saves (HasTeamRow false), with the viewer's own save left out (excludeSaveKey, the players.username key)
+    /// so the caller adds the in-memory character once, with its current level and team.
+    /// </summary>
+    public async Task<List<PlayerTeamInfo>> GetTeamRankingStats(string? excludeSaveKey)
+    {
+        try
+        {
+            return await Task.Run(() =>
+            {
+                using var connection = OpenConnection();
+                var stats = ReadTeamPlayerStats(connection, excludeSaveKey);
+                var teams = ReadTeamRows(connection, stats);
+                var named = teams.Select(t => t.TeamName).ToHashSet(StringComparer.Ordinal);
+                foreach (var (team, st) in stats)
+                    if (!named.Contains(team))
+                        teams.Add(new PlayerTeamInfo { TeamName = team, MemberCount = st.Members, LevelSum = st.LevelSum, PowerSum = st.PowerSum, HasTeamRow = false });
+                return teams;
+            });
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to get team ranking stats: {ex.Message}");
+            return new List<PlayerTeamInfo>();
+        }
+    }
+
+    // v1.1.12: TOTAL, not SUM, since SUM throws on overflow and one absurd stat would blank the list
+    private static long ClampToLong(double v) => v >= long.MaxValue ? long.MaxValue : v <= long.MinValue ? long.MinValue : (long)v;
+
+    private static List<PlayerTeamInfo> ReadTeamRows(SqliteConnection connection, Dictionary<string, (int Members, long LevelSum, long PowerSum)> stats)
+    {
+        var teams = new List<PlayerTeamInfo>();
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT team_name, created_by, controls_turf, created_at FROM player_teams;";
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            var name = reader.GetString(0);
+            stats.TryGetValue(name, out var st);
+            teams.Add(new PlayerTeamInfo
+            {
+                TeamName = name,
+                CreatedBy = reader.GetString(1),
+                MemberCount = st.Members,
+                LevelSum = st.LevelSum,
+                PowerSum = st.PowerSum,
+                ControlsTurf = reader.GetInt32(2) != 0,
+                CreatedAt = DateTime.TryParse(reader.GetString(3), out var dt) ? dt : DateTime.Now
+            });
         }
         return teams;
+    }
+
+    /// <summary>
+    /// v1.1.12: player members per team in ONE pass over players. The v1.1.11 query counted each team with
+    /// its own scan, so 66 teams parsed about 2.4 GB of save JSON (6.1 s on a 38 MB test set, now 0.1 s).
+    /// The multi-path json_extract parses each blob once; MATERIALIZED stops SQLite from inlining it into
+    /// each '$[n]' read below (inlined was twice as slow). json_valid keeps one malformed save from failing
+    /// every team, and a team value that is not text is ignored.
+    /// </summary>
+    private static Dictionary<string, (int Members, long LevelSum, long PowerSum)> ReadTeamPlayerStats(SqliteConnection connection, string? excludeSaveKey)
+    {
+        var stats = new Dictionary<string, (int, long, long)>(StringComparer.Ordinal);
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = @"
+            WITH s AS MATERIALIZED (
+                SELECT CASE WHEN json_valid(player_data)
+                            THEN json_extract(player_data, '$.player.team', '$.player.level', '$.player.strength', '$.player.defence') END AS v
+                FROM players
+                WHERE player_data != '{}' AND LENGTH(player_data) > 2
+                  AND is_banned = 0 AND username NOT LIKE 'emergency_%'
+                  AND (@me IS NULL OR LOWER(username) != @me))
+            SELECT json_extract(v, '$[0]') AS team, COUNT(*),
+                   TOTAL(COALESCE(CAST(json_extract(v, '$[1]') AS INTEGER), 0)),
+                   TOTAL(COALESCE(CAST(json_extract(v, '$[1]') AS INTEGER), 0)
+                     + COALESCE(CAST(json_extract(v, '$[2]') AS INTEGER), 0)
+                     + COALESCE(CAST(json_extract(v, '$[3]') AS INTEGER), 0))
+            FROM s
+            WHERE json_type(v, '$[0]') = 'text' AND json_extract(v, '$[0]') != ''
+            GROUP BY team;";
+        cmd.Parameters.AddWithValue("@me", string.IsNullOrEmpty(excludeSaveKey) ? DBNull.Value : excludeSaveKey.ToLowerInvariant());
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+            stats[reader.GetString(0)] = (reader.GetInt32(1), ClampToLong(reader.GetDouble(2)), ClampToLong(reader.GetDouble(3)));
+        return stats;
     }
 
     /// <summary>
@@ -5885,22 +6049,6 @@ namespace UsurperRemake.Systems
         }
     }
 
-    public async Task DeletePlayerTeam(string teamName)
-    {
-        try
-        {
-            using var connection = OpenConnection();
-            using var cmd = connection.CreateCommand();
-            cmd.CommandText = "DELETE FROM player_teams WHERE team_name = @name;";
-            cmd.Parameters.AddWithValue("@name", teamName);
-            await Task.Run(() => cmd.ExecuteNonQuery());
-        }
-        catch (Exception ex)
-        {
-            DebugLogger.Instance.LogError("SQL", $"Failed to delete player team '{teamName}': {ex.Message}");
-        }
-    }
-
     public async Task UpdatePlayerTeamMemberCount(string teamName)
     {
         try
@@ -5930,7 +6078,8 @@ namespace UsurperRemake.Systems
         {
             using var connection = OpenConnection();
             using var cmd = connection.CreateCommand();
-            cmd.CommandText = "SELECT COUNT(*) FROM player_teams WHERE team_name = @name;";
+            // v1.1.12: ignores case, as the protection list and the create guard do
+            cmd.CommandText = "SELECT COUNT(*) FROM player_teams WHERE ulower(team_name) = ulower(@name);";
             cmd.Parameters.AddWithValue("@name", teamName);
             var count = Convert.ToInt32(cmd.ExecuteScalar());
             return count > 0;
@@ -5945,6 +6094,42 @@ namespace UsurperRemake.Systems
     public static string HashTeamPassword(string password)
     {
         return HashPassword(password);
+    }
+
+    /// <summary>
+    /// v1.1.12: the team password lives in password_hash, which a join checks; the change used to set only
+    /// the in-memory copies, so the new password was refused and the old one still worked. Only the leader
+    /// (created_by) may change it, and only while the old password still matches (a compare-and-swap on
+    /// the stored hash). True when the row changed.
+    /// </summary>
+    public bool ChangeTeamPassword(string teamName, string leaderKey, string oldPassword, string newPassword)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            string? stored;
+            using (var read = connection.CreateCommand())
+            {
+                read.CommandText = "SELECT password_hash FROM player_teams WHERE team_name = @name AND created_by = @leader;";
+                read.Parameters.AddWithValue("@name", teamName);
+                read.Parameters.AddWithValue("@leader", leaderKey.ToLowerInvariant());
+                stored = read.ExecuteScalar()?.ToString();
+            }
+            if (stored == null || !VerifyPassword(oldPassword, stored)) return false;
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"UPDATE player_teams SET password_hash = @hash
+                WHERE team_name = @name AND created_by = @leader AND password_hash = @old;";
+            cmd.Parameters.AddWithValue("@hash", HashTeamPassword(newPassword));
+            cmd.Parameters.AddWithValue("@name", teamName);
+            cmd.Parameters.AddWithValue("@leader", leaderKey.ToLowerInvariant());
+            cmd.Parameters.AddWithValue("@old", stored);
+            return cmd.ExecuteNonQuery() == 1;
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to change the password of team '{teamName}': {ex.Message}");
+            return false;
+        }
     }
 
     // ========== Offline Mail ==========
@@ -6790,21 +6975,80 @@ namespace UsurperRemake.Systems
     // Team Wars
     // ═══════════════════════════════════════════════════════════════════════════
 
-    public async Task<int> CreateTeamWar(string challengerTeam, string defenderTeam, long goldWagered)
+    /// <summary>
+    /// v1.1.12: guarded, so two challenges at once cannot both start a war for the same team; the payer's
+    /// key (the pending_gold_transfers recipient) is kept for a refund if the war is abandoned. -1 when
+    /// not created.
+    /// </summary>
+    public async Task<int> CreateTeamWar(string challengerTeam, string defenderTeam, long goldWagered, string challengerKey = "")
     {
         try
         {
+            ExpireStaleTeamWars();
             using var connection = OpenConnection();
             using var cmd = connection.CreateCommand();
-            cmd.CommandText = @"INSERT INTO team_wars (challenger_team, defender_team, status, gold_wagered)
-                                VALUES (@challenger, @defender, 'active', @gold) RETURNING id;";
+            cmd.CommandText = @"INSERT INTO team_wars (challenger_team, defender_team, status, gold_wagered, challenger_key)
+                                SELECT @challenger, @defender, 'active', @gold, @key
+                                WHERE NOT EXISTS (SELECT 1 FROM team_wars WHERE status = 'active'
+                                    AND (challenger_team IN (@challenger, @defender) OR defender_team IN (@challenger, @defender)))
+                                RETURNING id;";
             cmd.Parameters.AddWithValue("@challenger", challengerTeam);
             cmd.Parameters.AddWithValue("@defender", defenderTeam);
             cmd.Parameters.AddWithValue("@gold", goldWagered);
+            cmd.Parameters.AddWithValue("@key", (challengerKey ?? "").ToLowerInvariant());
             var result = await cmd.ExecuteScalarAsync();
-            return Convert.ToInt32(result);
+            return result == null || result is DBNull ? -1 : Convert.ToInt32(result);
         }
         catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to create team war: {ex.Message}"); return -1; }
+    }
+
+    /// <summary>
+    /// v1.1.12: a war still 'active' after GameConfig.TeamWarStaleMinutes was left by a lost session and
+    /// would block both teams for ever. It is marked 'abandoned'; if no round was recorded, the wager goes
+    /// back to its payer by a queued transfer, in the same transaction and only by the process that flipped
+    /// the row. A war with rounds recorded is not refunded, so leaving a losing war does not pay. It is not
+    /// settled by score either, since a challenger could leave while ahead; this holds too for a fought war
+    /// whose own completion failed (TeamCornerLocation pays nothing then). Returns the number expired.
+    /// </summary>
+    public int ExpireStaleTeamWars(int? staleMinutes = null)
+    {
+        int expired = 0;
+        try
+        {
+            using var connection = OpenConnection();
+            using var tx = connection.BeginTransaction();
+            var stale = new List<(int Id, long Wager, int Wins, string Key, string Team)>();
+            using (var q = connection.CreateCommand())
+            {
+                q.Transaction = tx;
+                q.CommandText = @"SELECT id, gold_wagered, challenger_wins + defender_wins, COALESCE(challenger_key, ''), challenger_team
+                                  FROM team_wars WHERE status = 'active' AND started_at < datetime('now', '-' || @mins || ' minutes');";
+                q.Parameters.AddWithValue("@mins", staleMinutes ?? GameConfig.TeamWarStaleMinutes);
+                using var r = q.ExecuteReader();
+                while (r.Read()) stale.Add((r.GetInt32(0), r.GetInt64(1), r.GetInt32(2), r.GetString(3), r.GetString(4)));
+            }
+            foreach (var war in stale)
+            {
+                using var flip = connection.CreateCommand();
+                flip.Transaction = tx;
+                flip.CommandText = "UPDATE team_wars SET status = 'abandoned', finished_at = datetime('now') WHERE id = @id AND status = 'active';";
+                flip.Parameters.AddWithValue("@id", war.Id);
+                if (flip.ExecuteNonQuery() != 1) continue;
+                expired++;
+                if (war.Wins != 0 || war.Wager <= 0 || string.IsNullOrEmpty(war.Key)) continue;
+                using var refund = connection.CreateCommand();
+                refund.Transaction = tx;
+                refund.CommandText = @"INSERT INTO pending_gold_transfers (recipient_username, sender_display, amount, note)
+                                       VALUES (@user, @sender, @amount, 'Team war refund');";
+                refund.Parameters.AddWithValue("@user", war.Key);
+                refund.Parameters.AddWithValue("@sender", war.Team);
+                refund.Parameters.AddWithValue("@amount", war.Wager);
+                refund.ExecuteNonQuery();
+            }
+            tx.Commit();
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to expire stale team wars: {ex.Message}"); }
+        return expired;
     }
 
     public async Task UpdateTeamWarScore(int warId, bool challengerWon)
@@ -6822,18 +7066,36 @@ namespace UsurperRemake.Systems
         catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to update war score: {ex.Message}"); }
     }
 
-    public async Task CompleteTeamWar(int warId, string result)
+    /// <summary>
+    /// v1.1.12: guarded on the war still being 'active' (the same flip ExpireStaleTeamWars makes), so a war
+    /// is settled once. True only when this call settled it; a caller refunds only then.
+    /// </summary>
+    public async Task<bool> CompleteTeamWar(int warId, string result)
     {
         try
         {
             using var connection = OpenConnection();
             using var cmd = connection.CreateCommand();
-            cmd.CommandText = @"UPDATE team_wars SET status = @result, finished_at = datetime('now') WHERE id = @id;";
+            cmd.CommandText = @"UPDATE team_wars SET status = @result, finished_at = datetime('now') WHERE id = @id AND status = 'active';";
             cmd.Parameters.AddWithValue("@id", warId);
             cmd.Parameters.AddWithValue("@result", result);
-            await cmd.ExecuteNonQueryAsync();
+            return await cmd.ExecuteNonQueryAsync() == 1;
         }
-        catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to complete team war: {ex.Message}"); }
+        catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to complete team war: {ex.Message}"); return false; }
+    }
+
+    /// <summary>v1.1.12: a war's status ('active', a result, or 'abandoned'); null if it cannot be read.</summary>
+    public async Task<string?> GetTeamWarStatus(int warId)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT status FROM team_wars WHERE id = @id;";
+            cmd.Parameters.AddWithValue("@id", warId);
+            return (await cmd.ExecuteScalarAsync())?.ToString();
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to read team war status: {ex.Message}"); return null; }
     }
 
     public async Task<List<TeamWarInfo>> GetTeamWarHistory(string teamName, int limit = 10)
@@ -6875,6 +7137,7 @@ namespace UsurperRemake.Systems
     {
         try
         {
+            ExpireStaleTeamWars();   // v1.1.12: a war a lost session left active no longer blocks both teams
             using var connection = OpenConnection();
             using var cmd = connection.CreateCommand();
             cmd.CommandText = @"SELECT COUNT(*) FROM team_wars
@@ -7140,25 +7403,50 @@ namespace UsurperRemake.Systems
         return upgrades;
     }
 
-    public async Task<bool> UpgradeTeamFacility(string teamName, string upgradeType, long cost)
+    /// <summary>
+    /// v1.1.12: raises a facility one level only if it is still at expectedLevel and below the cap, so two
+    /// members upgrading at once cannot both land (or pass the cap). When payFromVault, the cost comes out
+    /// of the vault in the same transaction, and nothing changes unless both land. True when it landed.
+    /// </summary>
+    public bool TryUpgradeTeamFacility(string teamName, string upgradeType, int expectedLevel, long cost, bool payFromVault)
     {
         try
         {
             using var connection = OpenConnection();
+            using var tx = connection.BeginTransaction();
+            if (payFromVault)
+            {
+                using var pay = connection.CreateCommand();
+                pay.Transaction = tx;
+                pay.CommandText = "UPDATE team_vault SET gold = gold - @cost WHERE team_name = @team AND gold >= @cost;";
+                pay.Parameters.AddWithValue("@team", teamName);
+                pay.Parameters.AddWithValue("@cost", cost);
+                if (pay.ExecuteNonQuery() != 1) return false;
+            }
             using var cmd = connection.CreateCommand();
-            cmd.CommandText = @"INSERT INTO team_upgrades (team_name, upgrade_type, level, invested_gold)
-                                VALUES (@team, @type, 1, @cost)
-                                ON CONFLICT(team_name, upgrade_type) DO UPDATE SET
-                                    level = level + 1,
-                                    invested_gold = invested_gold + @cost;";
+            cmd.Transaction = tx;
+            cmd.CommandText = expectedLevel == 0
+                ? @"INSERT INTO team_upgrades (team_name, upgrade_type, level, invested_gold)
+                    VALUES (@team, @type, 1, @cost)
+                    ON CONFLICT(team_name, upgrade_type) DO UPDATE SET
+                        level = level + 1, invested_gold = invested_gold + @cost
+                    WHERE team_upgrades.level = 0;"
+                : @"UPDATE team_upgrades SET level = level + 1, invested_gold = invested_gold + @cost
+                    WHERE team_name = @team AND upgrade_type = @type AND level = @expected AND level < @cap;";
             cmd.Parameters.AddWithValue("@team", teamName);
             cmd.Parameters.AddWithValue("@type", upgradeType);
             cmd.Parameters.AddWithValue("@cost", cost);
-            await cmd.ExecuteNonQueryAsync();
+            cmd.Parameters.AddWithValue("@expected", expectedLevel);
+            cmd.Parameters.AddWithValue("@cap", GameConfig.MaxTeamFacilityLevel);
+            if (cmd.ExecuteNonQuery() != 1) return false;
+            tx.Commit();
             return true;
         }
         catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to upgrade facility: {ex.Message}"); return false; }
     }
+
+    /// <summary>v1.1.12: the vault's size at a vault level.</summary>
+    public static long TeamVaultCapacity(int vaultLevel) => GameConfig.TeamVaultBaseCapacity + vaultLevel * GameConfig.TeamVaultCapacityPerLevel;
 
     public async Task<long> GetTeamVaultGold(string teamName)
     {
@@ -7180,12 +7468,19 @@ namespace UsurperRemake.Systems
         {
             using var connection = OpenConnection();
             using var cmd = connection.CreateCommand();
-            cmd.CommandText = @"INSERT INTO team_vault (team_name, gold) VALUES (@team, @amount)
-                                ON CONFLICT(team_name) DO UPDATE SET gold = gold + @amount;";
+            // v1.1.12: the capacity is enforced here, from the vault level in the same statement, so two
+            // deposits at once cannot overfill it; false when it would not fit
+            cmd.CommandText = @"WITH cap AS (SELECT @base + @per * COALESCE((SELECT level FROM team_upgrades
+                                    WHERE team_name = @team AND upgrade_type = 'vault'), 0) AS c)
+                                INSERT INTO team_vault (team_name, gold)
+                                SELECT @team, @amount WHERE @amount > 0 AND @amount <= (SELECT c FROM cap)
+                                ON CONFLICT(team_name) DO UPDATE SET gold = gold + @amount
+                                WHERE team_vault.gold + @amount <= (SELECT c FROM cap);";
             cmd.Parameters.AddWithValue("@team", teamName);
             cmd.Parameters.AddWithValue("@amount", amount);
-            await cmd.ExecuteNonQueryAsync();
-            return true;
+            cmd.Parameters.AddWithValue("@base", GameConfig.TeamVaultBaseCapacity);
+            cmd.Parameters.AddWithValue("@per", GameConfig.TeamVaultCapacityPerLevel);
+            return await cmd.ExecuteNonQueryAsync() == 1;
         }
         catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to deposit to vault: {ex.Message}"); return false; }
     }

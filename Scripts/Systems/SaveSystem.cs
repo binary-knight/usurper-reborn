@@ -1098,6 +1098,7 @@ namespace UsurperRemake.Systems
                     IsPermanentlyClear = state.IsPermanentlyClear,
                     BossDefeated = state.BossDefeated,
                     CompletionBonusAwarded = state.CompletionBonusAwarded,
+                    RestedOnThisFloor = state.RestedOnThisFloor,
                     CurrentRoomId = state.CurrentRoomId,
                     Rooms = new List<DungeonRoomStateData>()
                 };
@@ -1878,6 +1879,7 @@ namespace UsurperRemake.Systems
                 data.AwakeningLevel = ocean.AwakeningLevel;
                 data.CollectedFragments = ocean.CollectedFragments.Select(f => (int)f).ToList();
                 data.ExperiencedMoments = ocean.ExperiencedMoments.Select(m => (int)m).ToList();
+                data.OceanInsightIds = ocean.InsightIds.ToList(); // v1.1.12
             }
             catch (Exception ex) { DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"System not initialized: {ex.Message}"); }
 
@@ -2403,23 +2405,14 @@ namespace UsurperRemake.Systems
             // Ocean Philosophy - restore fragments one by one
             try
             {
+                // v1.1.12: fragments, moments and insights replay without announcing, and the level is
+                // at least the saved level, so a change to the points model never lowers a player
                 var ocean = OceanPhilosophySystem.Instance;
-                foreach (var fragmentInt in data.CollectedFragments)
-                {
-                    var fragment = (WaveFragment)fragmentInt;
-                    if (!ocean.CollectedFragments.Contains(fragment))
-                    {
-                        ocean.CollectFragment(fragment);
-                    }
-                }
-                foreach (var momentInt in data.ExperiencedMoments)
-                {
-                    var moment = (AwakeningMoment)momentInt;
-                    if (!ocean.ExperiencedMoments.Contains(moment))
-                    {
-                        ocean.ExperienceMoment(moment);
-                    }
-                }
+                ocean.RestoreFromSave(
+                    data.CollectedFragments.Select(f => (WaveFragment)f),
+                    data.ExperiencedMoments.Select(m => (AwakeningMoment)m),
+                    data.OceanInsightIds,
+                    data.AwakeningLevel);
             }
             catch (Exception ex) { DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "LOAD", $"System not available: {ex.Message}"); }
 

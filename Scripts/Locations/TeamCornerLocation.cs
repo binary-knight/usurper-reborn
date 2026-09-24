@@ -211,6 +211,7 @@ public class TeamCornerLocation : BaseLocation
             WriteSRMenuOption("2", Loc.Get("team_corner.sack"));
             WriteSRMenuOption("G", Loc.Get("team_corner.equip"));
             WriteSRMenuOption("X", Loc.Get("team_corner.specialize"));
+            WriteSRMenuOption("V", Loc.Get("team.menu_view_inventories").Trim());   // v1.1.12: was missing here
         }
         terminal.WriteLine("");
 
@@ -332,14 +333,14 @@ public class TeamCornerLocation : BaseLocation
         else
         {
             ShowBBSMenuRow(("L", "bright_yellow", Loc.Get("team.bbs_quit_team")), ("N", "bright_yellow", Loc.Get("team.bbs_recruit_npc")), ("2", "bright_yellow", Loc.Get("team.bbs_sack_member")), ("G", "bright_yellow", Loc.Get("team.bbs_equip_mbr")), ("X", "bright_yellow", Loc.Get("team.bbs_specialize")));
-            // Message gated on online-mode; Resurrect always shown when in-team.
+            // Message gated on online-mode; Resurrect always shown when in-team. v1.1.12: View Inventories added.
             if (showMessageBbs)
             {
-                ShowBBSMenuRow(("M", "bright_yellow", Loc.Get("team.bbs_message")), ("U", "bright_yellow", Loc.Get("team.bbs_resurrect")));
+                ShowBBSMenuRow(("M", "bright_yellow", Loc.Get("team.bbs_message")), ("U", "bright_yellow", Loc.Get("team.bbs_resurrect")), ("V", "bright_yellow", Loc.Get("team.bbs_inventories")));
             }
             else
             {
-                ShowBBSMenuRow(("U", "bright_yellow", Loc.Get("team.bbs_resurrect")));
+                ShowBBSMenuRow(("U", "bright_yellow", Loc.Get("team.bbs_resurrect")), ("V", "bright_yellow", Loc.Get("team.bbs_inventories")));
             }
             if (DoorMode.IsOnlineMode)
             {
@@ -499,133 +500,141 @@ public class TeamCornerLocation : BaseLocation
     /// </summary>
     private async Task ShowTeamRankings()
     {
-        terminal.ClearScreen();
-        WriteBoxHeader(Loc.Get("team_corner.rankings_header"), "bright_magenta");
-        terminal.WriteLine("");
-
-        // Get all teams from NPCs, then merge in the player's team
-        var allNPCs = NPCSpawnSystem.Instance.ActiveNPCs;
-        var teamGroups = allNPCs
-            .Where(n => !string.IsNullOrEmpty(n.Team) && n.IsAlive)
-            .GroupBy(n => n.Team)
-            .Select(g => new
-            {
-                TeamName = g.Key,
-                MemberCount = g.Count(),
-                TotalPower = (long)g.Sum(m => m.Level + (int)m.Strength + (int)m.Defence),
-                AverageLevel = (int)g.Average(m => m.Level),
-                ControlsTurf = g.Any(m => m.CTurf),
-                IsPlayerTeam = false
-            })
-            .ToList();
-
-        // Merge the player into the team list
-        if (!string.IsNullOrEmpty(currentPlayer.Team))
-        {
-            long playerPower = currentPlayer.Level + (long)currentPlayer.Strength + (long)currentPlayer.Defence;
-            var existingTeam = teamGroups.FirstOrDefault(t => t.TeamName == currentPlayer.Team);
-            if (existingTeam != null)
-            {
-                // Player's team has NPC members too - add the player's stats
-                teamGroups.Remove(existingTeam);
-                int totalMembers = existingTeam.MemberCount + 1;
-                long totalPower = existingTeam.TotalPower + playerPower;
-                int totalLevels = existingTeam.AverageLevel * existingTeam.MemberCount + currentPlayer.Level;
-                teamGroups.Add(new
-                {
-                    TeamName = existingTeam.TeamName,
-                    MemberCount = totalMembers,
-                    TotalPower = totalPower,
-                    AverageLevel = totalLevels / totalMembers,
-                    ControlsTurf = existingTeam.ControlsTurf || currentPlayer.CTurf,
-                    IsPlayerTeam = true
-                });
-            }
-            else
-            {
-                // Player-only team (no NPC members)
-                teamGroups.Add(new
-                {
-                    TeamName = currentPlayer.Team,
-                    MemberCount = 1,
-                    TotalPower = playerPower,
-                    AverageLevel = currentPlayer.Level,
-                    ControlsTurf = currentPlayer.CTurf,
-                    IsPlayerTeam = true
-                });
-            }
-        }
-
-        // Online mode: merge player teams from database
-        if (DoorMode.IsOnlineMode)
-        {
-            var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
-            if (backend != null)
-            {
-                var playerTeams = await backend.GetPlayerTeams();
-                foreach (var pt in playerTeams)
-                {
-                    // Skip if this team is already in the list (NPC team or player's own team)
-                    if (teamGroups.Any(t => t.TeamName == pt.TeamName))
-                        continue;
-
-                    teamGroups.Add(new
-                    {
-                        TeamName = pt.TeamName,
-                        MemberCount = pt.MemberCount,
-                        TotalPower = (long)(pt.MemberCount * 50), // Estimate power from member count
-                        AverageLevel = 0,
-                        ControlsTurf = pt.ControlsTurf,
-                        IsPlayerTeam = false
-                    });
-                }
-            }
-        }
-
-        // Sort by power descending
-        teamGroups = teamGroups.OrderByDescending(t => t.TotalPower).ToList();
+        var teamGroups = await LoadTeamRankings();
 
         if (teamGroups.Count == 0)
         {
+            terminal.ClearScreen();
+            WriteBoxHeader(Loc.Get("team_corner.rankings_header"), "bright_magenta");
+            terminal.WriteLine("");
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("team.no_teams_yet"));
             terminal.WriteLine(Loc.Get("team.be_first"));
+            terminal.WriteLine("");
+            terminal.SetColor("darkgray");
+            terminal.WriteLine(Loc.Get("ui.press_enter"));
+            await terminal.ReadKeyAsync();
+            return;
         }
-        else
+
+        // v1.1.12: the name column is as wide as the longest name (a long name pushed the columns out of line),
+        // and the list pages
+        string NameDisplay(TeamRankingRow t) => t.IsPlayerTeam ? $"{t.TeamName} {Loc.Get("team.you_suffix")}" : t.TeamName;
+        int nameWidth = Math.Max(24, teamGroups.Max(t => NameDisplay(t).Length));
+        await ShowPaged(teamGroups,
+            header: () =>
+            {
+                terminal.ClearScreen();
+                WriteBoxHeader(Loc.Get("team_corner.rankings_header"), "bright_magenta");
+                terminal.WriteLine("");
+                terminal.SetColor("white");
+                terminal.WriteLine($"{Loc.Get("team.rank_col_rank"),-5} {Loc.Get("team.rank_col_name").PadRight(nameWidth)} {Loc.Get("team.rank_col_mbrs"),-6} {Loc.Get("team.rank_col_power"),-8} {Loc.Get("team.rank_col_avg_lvl"),-8} {Loc.Get("team.rank_col_turf"),-5}");
+                if (!IsScreenReader)
+                {
+                    terminal.SetColor("darkgray");
+                    terminal.WriteLine(new string('─', 36 + nameWidth));
+                }
+            },
+            renderRow: (team, index) =>
+            {
+                terminal.SetColor(team.ControlsTurf ? "bright_yellow" : team.IsPlayerTeam ? "bright_cyan" : "white");
+                string turfMark = team.ControlsTurf ? "*" : "-";
+                terminal.WriteLine($"{index + 1,-5} {NameDisplay(team).PadRight(nameWidth)} {team.MemberCount,-6} {team.TotalPower,-8} {team.AverageLevel,-8} {turfMark,-5}");
+            },
+            footer: () =>
+            {
+                terminal.WriteLine("");
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine(Loc.Get("team.turf_legend"));
+            });
+    }
+
+    /// <summary>
+    /// v1.1.12: the rankings rows (the teams, their members, power and level), read the way the rankings
+    /// screen reads them; [I] Info and [J] Join list the same rows.
+    /// </summary>
+    private async Task<List<TeamRankingRow>> LoadTeamRankings()
+    {
+        // online, the player side is every player's save in one query (the viewer's own save left out,
+        // the in-memory character is added instead); offline it is only the in-memory character
+        List<PlayerTeamInfo> playerTeams = new();
+        if (DoorMode.IsOnlineMode && SaveSystem.Instance.Backend is SqlSaveBackend backend)
+            playerTeams = await backend.GetTeamRankingStats(GameEngine.InheritanceKey(currentPlayer));
+        return BuildTeamRankings(NPCSpawnSystem.Instance.ActiveNPCs, playerTeams, currentPlayer);
+    }
+
+    /// <summary>v1.1.12: one team as a picker row, with the rankings' numbers.</summary>
+    private static string TeamPickRow(TeamRankingRow t) =>
+        Loc.Get("team.pick_team_row", t.TeamName, t.MemberCount, t.AverageLevel, t.TotalPower)
+        + (t.ControlsTurf ? " " + Loc.Get("team.pick_team_turf") : "")
+        + (t.IsPlayerTeam ? " " + Loc.Get("team.you_suffix") : "");
+
+    /// <summary>
+    /// v1.1.12: a read-only list shown a page at a time (N/P page, Enter leaves). header draws the screen
+    /// top, renderRow one row by its index in the whole list, footer what follows the rows.
+    /// </summary>
+    private async Task ShowPaged<T>(IReadOnlyList<T> rows, Action header, Action<T, int> renderRow, Action? footer = null, int pageSize = 15)
+    {
+        int pageIndex = 0;
+        while (true)
         {
-            terminal.SetColor("white");
-            terminal.WriteLine($"{Loc.Get("team.rank_col_rank"),-5} {Loc.Get("team.rank_col_name"),-24} {Loc.Get("team.rank_col_mbrs"),-6} {Loc.Get("team.rank_col_power"),-8} {Loc.Get("team.rank_col_avg_lvl"),-8} {Loc.Get("team.rank_col_turf"),-5}");
-            if (!IsScreenReader)
+            int totalPages = Math.Max(1, (rows.Count + pageSize - 1) / pageSize);
+            pageIndex = Math.Clamp(pageIndex, 0, totalPages - 1);
+            header();
+            int first = pageIndex * pageSize;
+            var page = rows.Skip(first).Take(pageSize).ToList();
+            for (int i = 0; i < page.Count; i++) renderRow(page[i], first + i);
+            footer?.Invoke();
+            terminal.WriteLine("");
+            if (totalPages <= 1)
             {
                 terminal.SetColor("darkgray");
-                terminal.WriteLine(new string('─', 60));
+                terminal.WriteLine(Loc.Get("ui.press_enter"));
+                await terminal.ReadKeyAsync();
+                return;
             }
+            terminal.SetColor("darkgray");
+            terminal.WriteLine(Loc.Get("team.recruit_page_footer", first + 1, first + page.Count, rows.Count, pageIndex + 1, totalPages));
+            string input = ((await terminal.GetInput(Loc.Get("team.page_nav"))) ?? "").Trim().ToUpperInvariant();
+            if (input == "N") { pageIndex++; continue; }
+            if (input == "P") { pageIndex--; continue; }
+            return;
+        }
+    }
 
-            int rank = 1;
-            foreach (var team in teamGroups)
-            {
-                if (team.ControlsTurf)
-                    terminal.SetColor("bright_yellow");
-                else if (team.IsPlayerTeam)
-                    terminal.SetColor("bright_cyan");
-                else
-                    terminal.SetColor("white");
+    internal sealed record TeamRankingRow(string TeamName, int MemberCount, long TotalPower, int AverageLevel, bool ControlsTurf, bool IsPlayerTeam);
 
-                string turfMark = team.ControlsTurf ? "*" : "-";
-                string nameDisplay = team.IsPlayerTeam ? $"{team.TeamName} {Loc.Get("team.you_suffix")}" : team.TeamName;
-                terminal.WriteLine($"{rank,-5} {nameDisplay,-24} {team.MemberCount,-6} {team.TotalPower,-8} {team.AverageLevel,-8} {turfMark,-5}");
-                rank++;
-            }
-
-            terminal.WriteLine("");
-            terminal.SetColor("bright_yellow");
-            terminal.WriteLine(Loc.Get("team.turf_legend"));
+    /// <summary>
+    /// v1.1.12: one row per team: living NPC members, the player members from the saves (playerTeams, which
+    /// must not include the viewer's save) and the viewer from memory, each counted once. Power is
+    /// level + strength + defence summed; a team with no members is left out. Sorted by power.
+    /// </summary>
+    internal static List<TeamRankingRow> BuildTeamRankings(IEnumerable<NPC> npcs, IEnumerable<PlayerTeamInfo> playerTeams, Character? viewer)
+    {
+        // v1.1.12: grouped by the exact name; older case variants are separate teams (a join checks the exact name)
+        var acc = new Dictionary<string, (int Members, long LevelSum, long Power, bool Turf)>(StringComparer.Ordinal);
+        var order = new List<string>();
+        void Add(string team, int members, long levels, long power, bool turf)
+        {
+            if (!acc.TryGetValue(team, out var a)) { order.Add(team); a = default; }
+            acc[team] = (a.Members + members, a.LevelSum + levels, a.Power + power, a.Turf || turf);
         }
 
-        terminal.WriteLine("");
-        terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        foreach (var n in npcs)
+            if (!string.IsNullOrEmpty(n.Team) && n.IsAlive)
+                Add(n.Team, 1, n.Level, n.Level + (long)n.Strength + (long)n.Defence, n.CTurf);
+        if (viewer != null && !string.IsNullOrEmpty(viewer.Team))
+            Add(viewer.Team, 1, viewer.Level, viewer.Level + (long)viewer.Strength + (long)viewer.Defence, viewer.CTurf);
+        foreach (var pt in playerTeams)
+            if (!string.IsNullOrEmpty(pt.TeamName))
+                Add(pt.TeamName, pt.MemberCount, pt.LevelSum, pt.PowerSum, pt.ControlsTurf);
+
+        return order
+            .Where(t => acc[t].Members > 0)
+            .Select(t => new TeamRankingRow(t, acc[t].Members, acc[t].Power, (int)(acc[t].LevelSum / acc[t].Members), acc[t].Turf,
+                viewer != null && string.Equals(t, viewer.Team, StringComparison.Ordinal)))
+            .OrderByDescending(r => r.TotalPower)
+            .ToList();
     }
 
     /// <summary>
@@ -633,14 +642,20 @@ public class TeamCornerLocation : BaseLocation
     /// </summary>
     private async Task ShowTeamInfo()
     {
-        terminal.WriteLine("");
-        terminal.SetColor("cyan");
-        terminal.Write(Loc.Get("team.which_team_info"));
-        terminal.SetColor("white");
-        string teamName = await terminal.ReadLineAsync();
-
-        if (string.IsNullOrEmpty(teamName))
+        // v1.1.12: the teams are listed (the rankings' rows) instead of asking for an exact name
+        var teams = await LoadTeamRankings();
+        if (teams.Count == 0)
+        {
+            terminal.WriteLine("");
+            terminal.SetColor("yellow");
+            terminal.WriteLine(Loc.Get("team.no_teams_yet"));
+            await Task.Delay(2000);
             return;
+        }
+        var picked = await PickFromList(teams, TeamPickRow, t => t.TeamName, "team.pick_team_info_title",
+            t => t.ControlsTurf ? "bright_yellow" : t.IsPlayerTeam ? "bright_cyan" : "white");
+        if (picked == null) return;
+        string teamName = picked.TeamName;
 
         terminal.ClearScreen();
         WriteSectionHeader(Loc.Get("team.info_header", teamName), "bright_cyan");
@@ -731,6 +746,171 @@ public class TeamCornerLocation : BaseLocation
         }
     }
 
+    /// <summary>v1.1.12: online, a save that must land now (gold or items moved against a shared row); AutoSave's
+    /// throttle would otherwise skip it for up to a minute. Single-player keeps the player and the NPCs in
+    /// one save, so there is no second row to keep in step; true there. True when written.</summary>
+    private async Task<bool> ForcePlayerSave()
+    {
+        if (!DoorMode.IsOnlineMode) return true;
+        try { return await SaveSystem.Instance.AutoSave(currentPlayer, force: true); }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("TEAM", $"Forced save failed: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>v1.1.12: one member of the viewer's team for the pickers: an NPC, or a player (the viewer or a save).</summary>
+    internal sealed record TeamMemberEntry(NPC? Npc, PlayerSummary? Player, bool IsViewer = false)
+    {
+        public string Name => Npc?.DisplayName ?? Player?.DisplayName ?? "";
+    }
+
+    /// <summary>v1.1.12: every member of the viewer's team: the viewer (if asked), the player members from
+    /// the saves (online), then the NPCs, the dead included.</summary>
+    private async Task<List<TeamMemberEntry>> GetTeamMemberEntries(bool includeViewer)
+    {
+        var list = new List<TeamMemberEntry>();
+        string team = currentPlayer.Team;
+        if (includeViewer)
+            list.Add(new TeamMemberEntry(null, new PlayerSummary
+            {
+                Username = GameEngine.InheritanceKey(currentPlayer),
+                DisplayName = currentPlayer.DisplayName,
+                Level = currentPlayer.Level,
+                ClassId = (int)currentPlayer.Class,
+                IsOnline = true,
+            }, IsViewer: true));
+        if (DoorMode.IsOnlineMode && SaveSystem.Instance.Backend is SqlSaveBackend backend)
+        {
+            // v1.1.12: the viewer is left out by save key; a teammate may share the viewer's display name
+            string myKey = GameEngine.InheritanceKey(currentPlayer);
+            foreach (var pm in await backend.GetPlayerTeamMembers(team))
+                if (!string.Equals(pm.Username, myKey, StringComparison.OrdinalIgnoreCase))
+                    list.Add(new TeamMemberEntry(null, pm));
+        }
+        foreach (var npc in NPCSpawnSystem.Instance.ActiveNPCs.Where(n => n.Team == team).OrderByDescending(n => n.Level))
+            list.Add(new TeamMemberEntry(npc, null));
+        return list;
+    }
+
+    private static string SpecTag(NPC npc) => npc.Specialization == ClassSpecialization.None ? ""
+        : $" [{UsurperRemake.Data.SpecializationData.GetSpec(npc.Specialization)?.Name ?? npc.Specialization.ToString()}]";
+
+    private static string MemberPickRow(TeamMemberEntry e)
+    {
+        if (e.Npc != null)
+        {
+            var n = e.Npc;
+            string state = n.IsAlive ? "" : n.IsPermaDead || n.IsAgedDeath ? " " + Loc.Get("team.pick_gone_tag") : Loc.Get("team.member_dead_tag");
+            return $"{n.DisplayName} - {Loc.Get("inn.npc_level_class", n.Level, GameConfig.GetLocalizedClassName(n.Class))}{SpecTag(n)}{state}";
+        }
+        var p = e.Player!;
+        string tag = e.IsViewer ? " " + Loc.Get("team.you_suffix") : " " + Loc.Get("team.pick_player_tag") + (p.IsOnline ? Loc.Get("team.online_tag") : "");
+        return $"{p.DisplayName} - {Loc.Get("inn.npc_level_class", p.Level, GameConfig.GetLocalizedClassName(p.ClassId))}{tag}";
+    }
+
+    private static string MemberPickColor(TeamMemberEntry e) => e.Npc == null ? "bright_cyan" : e.Npc.IsAlive ? "white" : "red";
+
+    /// <summary>
+    /// v1.1.12: the live copy of an NPC picked from a list. A world_state reload while the player sat at a
+    /// prompt replaces every NPC object, and a change to the old one is lost (the Recruit fix, v0.57.x,
+    /// ConfirmAndRecruit). Null when that NPC is gone.
+    /// </summary>
+    internal static NPC? LiveTeamNpc(NPC captured)
+    {
+        var active = NPCSpawnSystem.Instance.ActiveNPCs;
+        if (string.IsNullOrEmpty(captured.ID)) return active.Contains(captured) ? captured : null;
+        return active.FirstOrDefault(n => n.ID == captured.ID);
+    }
+
+    /// <summary>
+    /// v1.1.12: the slots a team uses, of MaxTeamSize: its NPCs, the dead included (a dead member holds the
+    /// slot until sacked; one who can never come back does not), plus its players.
+    /// </summary>
+    internal static int CountTeamSlots(IEnumerable<NPC> npcs, string team, int playerMembers) =>
+        npcs.Count(n => n.Team == team && !n.IsPermaDead && !n.IsAgedDeath) + playerMembers;
+
+    /// <summary>v1.1.12: CountTeamSlots for a team, with its player members from the saves online (the viewer
+    /// counted from memory when on it) and only the viewer offline.</summary>
+    private async Task<int> TeamSlotsUsed(string team)
+    {
+        int players = team == currentPlayer.Team ? 1 : 0;
+        if (DoorMode.IsOnlineMode && SaveSystem.Instance.Backend is SqlSaveBackend backend)
+        {
+            // v1.1.12: the viewer is left out by save key; a display name can be another member's too
+            string myKey = GameEngine.InheritanceKey(currentPlayer);
+            players += (await backend.GetPlayerTeamMembers(team)).Count(m => !string.Equals(m.Username, myKey, StringComparison.OrdinalIgnoreCase));
+        }
+        return CountTeamSlots(NPCSpawnSystem.Instance.ActiveNPCs, team, players);
+    }
+
+    private void WriteMemberStatLines(Character c)
+    {
+        terminal.WriteLine(Loc.Get("team.examine_stats1", c.Strength, c.Dexterity, c.Agility, c.Constitution));
+        terminal.WriteLine(Loc.Get("team.examine_stats2", c.Intelligence, c.Wisdom, c.Charisma, c.Defence));
+        terminal.WriteLine(Loc.Get("team.examine_stats3", c.Stamina, c.WeapPow, c.ArmPow));
+    }
+
+    /// <summary>v1.1.12: a player member's card: the viewer from memory, anyone else from their save.</summary>
+    private async Task ExaminePlayerMember(TeamMemberEntry entry)
+    {
+        var summary = entry.Player!;
+        Character? c = entry.IsViewer ? currentPlayer : null;
+        if (c == null && SaveSystem.Instance.Backend is SqlSaveBackend backend)
+        {
+            try
+            {
+                string key = !string.IsNullOrEmpty(summary.Username) ? summary.Username : backend.ResolvePlayerUsername(summary.DisplayName) ?? summary.DisplayName;
+                var data = await backend.ReadGameData(key);
+                if (data?.Player != null)
+                {
+                    c = PlayerCharacterLoader.CreateFromSaveData(data.Player, summary.DisplayName, story: data.StorySystems);
+                    // v1.1.12: the combat loader starts at full HP and mana and has no age; show the saved ones,
+                    // and the saved maxima.
+                    if (data.Player.MaxHP > 0) c.MaxHP = data.Player.MaxHP;
+                    if (data.Player.MaxMana > 0) c.MaxMana = data.Player.MaxMana;
+                    c.HP = Math.Min(data.Player.HP, c.MaxHP);
+                    c.Mana = Math.Min(data.Player.Mana, c.MaxMana);
+                    c.Age = data.Player.Age;
+                }
+            }
+            catch (Exception ex) { DebugLogger.Instance.LogWarning("TEAM", $"Could not load the save of {summary.DisplayName}: {ex.Message}"); }
+        }
+
+        terminal.ClearScreen();
+        WriteSectionHeader(summary.DisplayName.ToUpper(), "bright_cyan");
+        terminal.WriteLine("");
+        terminal.SetColor("bright_white");
+        terminal.WriteLine(Loc.Get("team.examine_section_identity"));
+        terminal.SetColor("white");
+        terminal.WriteLine($"  {Loc.Get("status.class")}: {GameConfig.GetLocalizedClassName(summary.ClassId)}");
+        if (c != null)
+        {
+            terminal.WriteLine($"  {Loc.Get("status.race")}: {GameConfig.GetLocalizedRaceName(c.Race)}");
+            terminal.WriteLine($"  {Loc.Get("team.examine_sex")}: {GameConfig.GetLocalizedSexName(c.Sex)}");
+            terminal.WriteLine($"  {Loc.Get("team.examine_age")}: {c.Age}");
+        }
+        terminal.WriteLine($"  {Loc.Get("ui.level")}: {c?.Level ?? summary.Level}");
+        terminal.SetColor(summary.IsOnline ? "bright_green" : "gray");
+        terminal.WriteLine($"  {(summary.IsOnline ? Loc.Get("team.status_online") : Loc.Get("team.status_offline"))}");
+        terminal.WriteLine("");
+        if (c != null)
+        {
+            terminal.SetColor("bright_white");
+            terminal.WriteLine(Loc.Get("team.examine_section_combat"));
+            terminal.SetColor("white");
+            terminal.WriteLine($"  {Loc.Get("combat.bar_hp")}: {c.HP}/{c.MaxHP}");
+            terminal.WriteLine($"  {Loc.Get("ui.mana_label")}: {c.Mana}/{c.MaxMana}");
+            terminal.WriteLine("");
+            WriteMemberStatLines(c);
+            terminal.WriteLine("");
+        }
+        terminal.SetColor("darkgray");
+        terminal.WriteLine(Loc.Get("ui.press_enter"));
+        await terminal.ReadKeyAsync();
+    }
+
     private async Task ShowTeamMembers(string teamName, bool detailed)
     {
         WriteSectionHeader(Loc.Get("team_corner.members"), "cyan");
@@ -749,8 +929,10 @@ public class TeamCornerLocation : BaseLocation
             var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
             if (backend != null)
             {
-                string myUsername = currentPlayer.DisplayName.ToLower();
-                playerMembers = await backend.GetPlayerTeamMembers(teamName, myUsername);
+                // v1.1.12: the viewer is left out by save key; a teammate may share the viewer's display name
+                string myKey = GameEngine.InheritanceKey(currentPlayer);
+                playerMembers = (await backend.GetPlayerTeamMembers(teamName))
+                    .Where(m => !string.Equals(m.Username, myKey, StringComparison.OrdinalIgnoreCase)).ToList();
             }
         }
 
@@ -800,7 +982,7 @@ public class TeamCornerLocation : BaseLocation
             foreach (var pm in playerMembers)
             {
                 terminal.SetColor("bright_cyan");
-                string className = pm.ClassId >= 0 ? ((CharacterClass)pm.ClassId).ToString() : "?";
+                string className = GameConfig.GetLocalizedClassName(pm.ClassId);   // v1.1.12: localized, was the enum name
                 string onlineStatus = pm.IsOnline ? Loc.Get("team.status_online") : Loc.Get("team.status_offline");
                 terminal.WriteLine($"{pm.DisplayName,-20} {className,-12} {pm.Level,-5} {"?",-12} {"?",-15} {onlineStatus,-8}");
             }
@@ -809,7 +991,7 @@ public class TeamCornerLocation : BaseLocation
             foreach (var member in teamMembers)
             {
                 string hpDisplay = $"{member.HP}/{member.MaxHP}";
-                string location = member.CurrentLocation ?? "Unknown";
+                string location = member.CurrentLocation ?? Loc.Get("team.unknown");
                 if (location.Length > 14) location = location.Substring(0, 14);
 
                 if (member.IsAlive)
@@ -817,9 +999,9 @@ public class TeamCornerLocation : BaseLocation
                 else
                     terminal.SetColor("red");
 
-                string specTag = member.Specialization != ClassSpecialization.None ? $" [{member.Specialization}]" : "";
                 string status = member.IsAlive ? Loc.Get("team.status_alive") : (member.IsPermaDead ? Loc.Get("team.status_gone") : Loc.Get("team.status_dead_label"));
-                terminal.WriteLine($"{member.DisplayName,-20} {member.Class}{specTag,-12} {member.Level,-5} {hpDisplay,-12} {location,-15} {status,-8}");
+                string classCol = GameConfig.GetLocalizedClassName(member.Class) + SpecTag(member);   // v1.1.12: localized class
+                terminal.WriteLine($"{member.DisplayName,-20} {classCol,-12} {member.Level,-5} {hpDisplay,-12} {location,-15} {status,-8}");
             }
 
             terminal.WriteLine("");
@@ -832,19 +1014,18 @@ public class TeamCornerLocation : BaseLocation
             // Show player members
             foreach (var pm in playerMembers)
             {
-                string className = pm.ClassId >= 0 ? ((CharacterClass)pm.ClassId).ToString() : "?";
+                string className = GameConfig.GetLocalizedClassName(pm.ClassId);
                 string onlineTag = pm.IsOnline ? Loc.Get("team.online_tag") : "";
                 terminal.SetColor("bright_cyan");
-                terminal.WriteLine($"  {pm.DisplayName} - Level {pm.Level} {className}{onlineTag}");
+                terminal.WriteLine($"  {pm.DisplayName} - {Loc.Get("inn.npc_level_class", pm.Level, className)}{onlineTag}");
             }
 
             // Show NPC members
             foreach (var member in teamMembers)
             {
-                string specTag = member.Specialization != ClassSpecialization.None ? $" [{member.Specialization}]" : "";
                 string status = member.IsAlive ? "" : Loc.Get("team.member_dead_tag");
                 terminal.SetColor("white");
-                terminal.WriteLine($"  {member.DisplayName} - Level {member.Level} {member.ClassName}{specTag}{status}");
+                terminal.WriteLine($"  {member.DisplayName} - {Loc.Get("inn.npc_level_class", member.Level, GameConfig.GetLocalizedClassName(member.Class))}{SpecTag(member)}{status}");
             }
         }
     }
@@ -908,10 +1089,10 @@ public class TeamCornerLocation : BaseLocation
         terminal.WriteLine(Loc.Get("team.registration_fee", $"{creationCost:N0}"));
         terminal.WriteLine("");
 
-        // Get team name
+        // Get team name. v1.1.12: trimmed; a blank name is refused
         terminal.SetColor("white");
         terminal.Write(Loc.Get("team.enter_gang_name"));
-        string teamName = await terminal.ReadLineAsync();
+        string teamName = ((await terminal.ReadLineAsync()) ?? "").Trim();
 
         if (string.IsNullOrEmpty(teamName) || teamName.Length > 40)
         {
@@ -921,9 +1102,9 @@ public class TeamCornerLocation : BaseLocation
             return;
         }
 
-        // Check if team name already exists (NPC teams + player teams)
-        var allNPCs = NPCSpawnSystem.Instance.ActiveNPCs;
-        if (allNPCs.Any(n => n.Team == teamName))
+        // Check if team name already exists (NPC teams + player teams). v1.1.12: ignoring case, as the
+        // protection list does (WorldSimulator._playerTeamNames)
+        if (IsNpcTeamName(teamName))
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.team_name_exists"));
@@ -931,17 +1112,13 @@ public class TeamCornerLocation : BaseLocation
             return;
         }
 
-        // Online mode: also check player_teams table
-        if (DoorMode.IsOnlineMode)
+        SqlSaveBackend? backend = DoorMode.IsOnlineMode ? SaveSystem.Instance.Backend as SqlSaveBackend : null;
+        if (backend != null && backend.IsTeamNameTaken(teamName))
         {
-            var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
-            if (backend != null && backend.IsTeamNameTaken(teamName))
-            {
-                terminal.SetColor("red");
-                terminal.WriteLine(Loc.Get("team.player_team_exists"));
-                await Task.Delay(2000);
-                return;
-            }
+            terminal.SetColor("red");
+            terminal.WriteLine(Loc.Get("team.player_team_exists"));
+            await Task.Delay(2000);
+            return;
         }
 
         // Get password
@@ -954,6 +1131,36 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine(Loc.Get("team.invalid_password"));
             await Task.Delay(2000);
             return;
+        }
+
+        // v1.1.12: the gold can have gone while the prompts were up
+        if (currentPlayer.Gold < creationCost)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine(Loc.Get("team.you_only_have", $"{currentPlayer.Gold:N0}"));
+            await Task.Delay(2000);
+            return;
+        }
+
+        // Online: register in player_teams FIRST. v1.1.12: the fee was taken before this insert and its
+        // result ignored, so a name taken a moment earlier by another session (the check above is not a
+        // lock) cost the fee and left a member of a team with no row. The insert is guarded; only a
+        // created row is paid for.
+        if (backend != null)
+        {
+            string hashedPW = SqlSaveBackend.HashTeamPassword(password);
+            // v1.1.10: the team's leader key is the save key that queued bequests are delivered
+            // under (GameEngine.InheritanceKey), not the display name, which differs for an alt
+            // and changes with a marriage. created_by is read only to find where a dying NPC
+            // member's belongings go (WorldSimulator.BequeathItemsToTeamLeader).
+            string username = GameEngine.InheritanceKey(currentPlayer);
+            if (!await backend.CreatePlayerTeam(teamName, hashedPW, username))
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine(Loc.Get("team.player_team_exists"));
+                await Task.Delay(2000);
+                return;
+            }
         }
 
         // Deduct the creation cost
@@ -970,22 +1177,6 @@ public class TeamCornerLocation : BaseLocation
         // Register so WorldSimulator protects this team from NPC AI
         WorldSimulator.RegisterPlayerTeam(teamName);
 
-        // Online mode: register in player_teams table
-        if (DoorMode.IsOnlineMode)
-        {
-            var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
-            if (backend != null)
-            {
-                string hashedPW = SqlSaveBackend.HashTeamPassword(password);
-                // v1.1.10: the team's leader key is the save key that queued bequests are delivered
-                // under (GameEngine.InheritanceKey), not the display name, which differs for an alt
-                // and changes with a marriage. created_by is read only to find where a dying NPC
-                // member's belongings go (WorldSimulator.BequeathItemsToTeamLeader).
-                string username = GameEngine.InheritanceKey(currentPlayer);
-                await backend.CreatePlayerTeam(teamName, hashedPW, username);
-            }
-        }
-
         terminal.WriteLine("");
         terminal.SetColor("bright_green");
         terminal.WriteLine(Loc.Get("team.gang_created", teamName));
@@ -995,14 +1186,33 @@ public class TeamCornerLocation : BaseLocation
         terminal.WriteLine("");
 
         // Generate news
-        NewsSystem.Instance.Newsy(true, $"{currentPlayer.DisplayName} formed a new team: '{teamName}'!");
+        NewsSystem.Instance.Newsy(true, Loc.Get("team.news_formed", currentPlayer.DisplayName, teamName));
         if (DoorMode.IsOnlineMode)
             UsurperRemake.Systems.OnlineStateManager.Instance?.AddNews(
-                $"{currentPlayer.DisplayName} formed a new team: '{teamName}'!", "team");
+                Loc.Get("team.news_formed", currentPlayer.DisplayName, teamName), "team");
 
         terminal.SetColor("darkgray");
         terminal.WriteLine(Loc.Get("ui.press_enter"));
         await terminal.ReadKeyAsync();
+    }
+
+    /// <summary>v1.1.12: an NPC team goes by this name, in any case.</summary>
+    private static bool IsNpcTeamName(string teamName) =>
+        NPCSpawnSystem.Instance.ActiveNPCs.Any(n => !string.IsNullOrEmpty(n.Team) && string.Equals(n.Team, teamName, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// v1.1.12: true (and says so) when the team has no free slot. Join checks before the password and
+    /// again after it, as another player can join while the prompt is up.
+    /// </summary>
+    private async Task<bool> RefuseJoinIfFull(string teamName)
+    {
+        if (await TeamSlotsUsed(teamName) < MaxTeamSize) return false;
+        terminal.WriteLine("");
+        terminal.SetColor("red");
+        terminal.WriteLine(Loc.Get("team.join_team_full", teamName, MaxTeamSize));
+        terminal.WriteLine("");
+        await Task.Delay(2000);
+        return true;
     }
 
     /// <summary>
@@ -1031,14 +1241,24 @@ public class TeamCornerLocation : BaseLocation
             return;
         }
 
-        terminal.WriteLine("");
-        terminal.SetColor("cyan");
-        terminal.Write(Loc.Get("team.which_gang_join"));
-        terminal.SetColor("white");
-        string teamName = await terminal.ReadLineAsync();
-
-        if (string.IsNullOrEmpty(teamName))
+        // v1.1.12: the teams are listed (the rankings' rows) instead of asking for an exact name
+        var teams = await LoadTeamRankings();
+        if (teams.Count == 0)
+        {
+            terminal.WriteLine("");
+            terminal.SetColor("yellow");
+            terminal.WriteLine(Loc.Get("team.no_teams_yet"));
+            await Task.Delay(2000);
             return;
+        }
+        var picked = await PickFromList(teams, TeamPickRow, t => t.TeamName, "team.pick_team_join_title",
+            t => t.ControlsTurf ? "bright_yellow" : "white");
+        if (picked == null) return;
+        string teamName = picked.TeamName;
+
+        // v1.1.12: five members at most, players and NPCs together, the dead holding their slot. Checked
+        // before the password, whose check stamps the team's last join.
+        if (await RefuseJoinIfFull(teamName)) return;
 
         // Online mode: check player_teams table first
         if (DoorMode.IsOnlineMode)
@@ -1056,6 +1276,7 @@ public class TeamCornerLocation : BaseLocation
                 var (exists, pwCorrect) = await backend.VerifyPlayerTeam(teamName, password);
                 if (exists && pwCorrect)
                 {
+                    if (await RefuseJoinIfFull(teamName)) return;
                     currentPlayer.Team = teamName;
                     currentPlayer.TeamPW = password;
                     currentPlayer.CTurf = false;
@@ -1070,10 +1291,10 @@ public class TeamCornerLocation : BaseLocation
                     terminal.WriteLine(Loc.Get("team.joined_team", teamName));
                     terminal.WriteLine("");
 
-                    NewsSystem.Instance.Newsy(true, $"{currentPlayer.DisplayName} joined the team '{teamName}'!");
+                    NewsSystem.Instance.Newsy(true, Loc.Get("team.news_joined", currentPlayer.DisplayName, teamName));
                     if (DoorMode.IsOnlineMode)
                         UsurperRemake.Systems.OnlineStateManager.Instance?.AddNews(
-                            $"{currentPlayer.DisplayName} joined the team '{teamName}'!", "team");
+                            Loc.Get("team.news_joined", currentPlayer.DisplayName, teamName), "team");
 
                     terminal.SetColor("darkgray");
                     terminal.WriteLine(Loc.Get("ui.press_enter"));
@@ -1112,6 +1333,7 @@ public class TeamCornerLocation : BaseLocation
 
         if (npcPassword == teamMember.TeamPW)
         {
+            if (await RefuseJoinIfFull(teamName)) return;
             currentPlayer.Team = teamName;
             currentPlayer.TeamPW = npcPassword;
             currentPlayer.CTurf = teamMember.CTurf;
@@ -1125,10 +1347,10 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine(Loc.Get("team.joined_team", teamName));
             terminal.WriteLine("");
 
-            NewsSystem.Instance.Newsy(true, $"{currentPlayer.DisplayName} joined the team '{teamName}'!");
+            NewsSystem.Instance.Newsy(true, Loc.Get("team.news_joined", currentPlayer.DisplayName, teamName));
             if (DoorMode.IsOnlineMode)
                 UsurperRemake.Systems.OnlineStateManager.Instance?.AddNews(
-                    $"{currentPlayer.DisplayName} joined the team '{teamName}'!", "team");
+                    Loc.Get("team.news_joined", currentPlayer.DisplayName, teamName), "team");
 
             terminal.SetColor("darkgray");
             terminal.WriteLine(Loc.Get("ui.press_enter"));
@@ -1171,38 +1393,42 @@ public class TeamCornerLocation : BaseLocation
             currentPlayer.TeamPW = "";
             currentPlayer.CTurf = false;
             currentPlayer.TeamRec = 0;
+            // Online, this save lands before the member count below, or the SQL count still finds the
+            // quitting player in the team. v1.1.12: the second, throttle-reset AutoSave that followed was
+            // the same write again and is gone.
             await PersistTeamMembershipChange();
 
-            WorldSimulator.UnregisterPlayerTeam(oldTeam);
-
-            // Online mode: save player data FIRST so the DB reflects the team change,
-            // THEN update member count. Without this, the SQL count still finds the
-            // quitting player in the team (stale player_data) and never reaches 0.
-            if (DoorMode.IsOnlineMode)
+            var backend = DoorMode.IsOnlineMode ? SaveSystem.Instance.Backend as SqlSaveBackend : null;
+            if (backend == null)
             {
-                SaveSystem.Instance.ResetAutoSaveThrottle();
-                await SaveSystem.Instance.AutoSave(currentPlayer);
+                // single-player: no other player can be on the team
+                WorldSimulator.UnregisterPlayerTeam(oldTeam);
+            }
+            else
+            {
+                await backend.UpdatePlayerTeamMemberCount(oldTeam);
 
-                var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
-                if (backend != null)
-                {
-                    await backend.UpdatePlayerTeamMemberCount(oldTeam);
+                // v1.1.11: a leader who quits passes the team to the highest-level player left in it
+                string myKey = GameEngine.InheritanceKey(currentPlayer);
+                if (string.Equals(await backend.GetTeamLeaderUsername(oldTeam), myKey, StringComparison.Ordinal))
+                    backend.TryPassTeamLeadership(oldTeam, myKey, myKey, requireOldLeaderGone: true, out _);
 
-                    // v1.1.11: a leader who quits passes the team to the highest-level player left in it
-                    string myKey = GameEngine.InheritanceKey(currentPlayer);
-                    if (string.Equals(await backend.GetTeamLeaderUsername(oldTeam), myKey, StringComparison.Ordinal))
-                        backend.TryPassTeamLeadership(oldTeam, myKey, myKey, requireOldLeaderGone: true, out _);
+                var remainingPlayers = await backend.GetPlayerTeamMembers(oldTeam);
+                // v1.1.12: a dead NPC member respawns on the team, so it still counts (the 5-slot rule too)
+                var remainingNPCs = NPCSpawnSystem.Instance.ActiveNPCs
+                    .Count(n => n.Team == oldTeam && !n.IsPermaDead && !n.IsAgedDeath);   // as CountTeamSlots
 
-                    // If team is now empty (no players AND no NPCs), delete it
-                    var remainingPlayers = await backend.GetPlayerTeamMembers(oldTeam);
-                    var remainingNPCs = NPCSpawnSystem.Instance.ActiveNPCs
-                        .Count(n => n.Team == oldTeam && !n.IsDead && !n.IsPermaDead);
-                    if (remainingPlayers.Count == 0 && remainingNPCs == 0)
-                    {
-                        await backend.DeletePlayerTeam(oldTeam);
-                        DebugLogger.Instance.LogInfo("TEAM", $"Team '{oldTeam}' dissolved — no members remaining");
-                    }
-                }
+                // v1.1.12: the protection is kept while a player is still on the team; it was dropped on
+                // every quit, which left the members still in it open to the NPC AI
+                if (remainingPlayers.Count == 0)
+                    WorldSimulator.UnregisterPlayerTeam(oldTeam);
+
+                // If team is now empty (no players AND no NPCs), delete it. v1.1.12: with its upgrades and
+                // vault (a later team of the same name inherited them), and not within the join grace; a
+                // team left then is the empty-team sweep's to remove
+                // v1.1.12: a roster being rebuilt can show no NPC members; the empty-team sweep removes it later
+                if (remainingPlayers.Count == 0 && remainingNPCs == 0 && !NPCSpawnSystem.Instance.IsRebuilding && backend.DeleteEmptyTeam(oldTeam))
+                    DebugLogger.Instance.LogInfo("TEAM", $"Team '{oldTeam}' dissolved, no members remaining");
             }
 
             terminal.WriteLine("");
@@ -1210,10 +1436,10 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine(Loc.Get("team.left_team"));
             terminal.WriteLine("");
 
-            NewsSystem.Instance.Newsy(true, $"{currentPlayer.DisplayName} left the team '{oldTeam}'!");
+            NewsSystem.Instance.Newsy(true, Loc.Get("team.news_left", currentPlayer.DisplayName, oldTeam));
             if (DoorMode.IsOnlineMode)
                 UsurperRemake.Systems.OnlineStateManager.Instance?.AddNews(
-                    $"{currentPlayer.DisplayName} left the team '{oldTeam}'!", "team");
+                    Loc.Get("team.news_left", currentPlayer.DisplayName, oldTeam), "team");
 
             terminal.SetColor("darkgray");
             terminal.WriteLine(Loc.Get("ui.press_enter"));
@@ -1254,9 +1480,10 @@ public class TeamCornerLocation : BaseLocation
             return;
         }
 
-        // Count current team size (include dead members — they still occupy a slot until dismissed or permadead)
+        // Count current team size. v1.1.12: the comment said the dead hold a slot but the code left them out,
+        // and player members were not counted at all; both count now (TeamSlotsUsed)
         var allNPCs = NPCSpawnSystem.Instance.ActiveNPCs;
-        var currentTeamSize = allNPCs.Count(n => n.Team == currentPlayer.Team && !n.IsDead) + 1; // +1 for player
+        var currentTeamSize = await TeamSlotsUsed(currentPlayer.Team);
 
         if (currentTeamSize >= MaxTeamSize)
         {
@@ -1507,6 +1734,17 @@ public class TeamCornerLocation : BaseLocation
         _ => role.ToString(),
     };
 
+    /// <summary>v1.1.12: one specialization role, named (the raw enum name was shown).</summary>
+    private static string SpecRoleName(UsurperRemake.Data.SpecRole role) => role switch
+    {
+        UsurperRemake.Data.SpecRole.Tank    => Loc.Get("team.spec_role_tank"),
+        UsurperRemake.Data.SpecRole.DPS     => Loc.Get("team.spec_role_dps"),
+        UsurperRemake.Data.SpecRole.Healer  => Loc.Get("team.spec_role_healer"),
+        UsurperRemake.Data.SpecRole.Utility => Loc.Get("team.spec_role_utility"),
+        UsurperRemake.Data.SpecRole.Debuff  => Loc.Get("team.spec_role_debuff"),
+        _ => role.ToString(),
+    };
+
     /// <summary>
     /// v0.57.11: prompts the player to pick a role to filter by, or clear the
     /// filter. Returns the new filter value (null = "all roles").
@@ -1588,7 +1826,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine(Loc.Get("team.recruit_multiple_matches_header"));
             terminal.SetColor("white");
             for (int i = 0; i < disamb.Count; i++)
-                terminal.WriteLine($"  {i + 1}. {disamb[i].DisplayName} ({disamb[i].ClassName}, Lv.{disamb[i].Level})");
+                terminal.WriteLine($"  {i + 1}. {disamb[i].DisplayName} ({Loc.Get("inn.npc_level_class", disamb[i].Level, disamb[i].ClassName)})");
             terminal.WriteLine("");
             terminal.SetColor("cyan");
             terminal.Write(Loc.Get("team.recruit_pick_match"));
@@ -1713,6 +1951,19 @@ public class TeamCornerLocation : BaseLocation
         // recruit list re-shows the NPC. Defense: re-resolve `recruit` to a
         // live ActiveNPCs reference by ID before any mutation. If the live
         // NPC is gone (rare — permadied or evicted by another path), refuse.
+        // v1.1.12: the team can have filled while the list was up; checked before the live lookup below, since
+        // the query yields and a roster reload in that wait would leave the looked-up NPC stale
+        if (await TeamSlotsUsed(currentPlayer.Team) >= MaxTeamSize)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine(Loc.Get("team.team_full", MaxTeamSize));
+            terminal.WriteLine("");
+            terminal.SetColor("darkgray");
+            terminal.WriteLine(Loc.Get("ui.press_enter"));
+            await terminal.ReadKeyAsync();
+            return;
+        }
+
         var liveRecruit = NPCSpawnSystem.Instance.ActiveNPCs
             .FirstOrDefault(n => !string.IsNullOrEmpty(n.ID) && n.ID == recruit.ID);
         if (liveRecruit == null)
@@ -1809,7 +2060,7 @@ public class TeamCornerLocation : BaseLocation
         terminal.SetColor("bright_cyan");
         terminal.WriteLine(Loc.Get("team.recruit_quote", recruit.DisplayName));
 
-        NewsSystem.Instance.Newsy(true, $"{currentPlayer.DisplayName} recruited {recruit.DisplayName} into team '{currentPlayer.Team}'!");
+        NewsSystem.Instance.Newsy(true, Loc.Get("team.news_recruited", currentPlayer.DisplayName, recruit.DisplayName, currentPlayer.Team));
 
         if (DoorMode.IsOnlineMode && OnlineStateManager.Instance != null)
         {
@@ -1838,35 +2089,17 @@ public class TeamCornerLocation : BaseLocation
             return;
         }
 
-        terminal.WriteLine("");
-        terminal.SetColor("cyan");
-        terminal.WriteLine(Loc.Get("team.examine_prompt"));
-        terminal.Write(": ");
-        terminal.SetColor("white");
-        string memberName = await terminal.ReadLineAsync();
-
-        if (memberName == "?")
+        // v1.1.12: every member is listed, players too (the name prompt found NPCs only, so a player member
+        // could not be examined)
+        var entries = await GetTeamMemberEntries(includeViewer: true);
+        var pickedEntry = await PickFromList(entries, MemberPickRow, e => e.Name, "team.pick_examine_title", MemberPickColor);
+        if (pickedEntry == null) return;
+        if (pickedEntry.Npc == null)
         {
-            await ShowTeamMembers(currentPlayer.Team, true);
-            terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await ExaminePlayerMember(pickedEntry);
             return;
         }
-
-        // Find the member
-        var allNPCs = NPCSpawnSystem.Instance.ActiveNPCs;
-        var member = allNPCs.FirstOrDefault(n =>
-            n.Team == currentPlayer.Team &&
-            n.DisplayName.Equals(memberName, StringComparison.OrdinalIgnoreCase));
-
-        if (member == null)
-        {
-            terminal.SetColor("red");
-            terminal.WriteLine(Loc.Get("team.member_not_found", memberName));
-            await Task.Delay(2000);
-            return;
-        }
+        var member = pickedEntry.Npc;
 
         // Show detailed stats. Expanded v0.61.5: identity (age/sex/race/class),
         // alignment, attitude (NPC dominant emotion + impression of player),
@@ -1914,11 +2147,11 @@ public class TeamCornerLocation : BaseLocation
         {
             var specDef = UsurperRemake.Data.SpecializationData.GetSpec(member.Specialization);
             terminal.SetColor("cyan");
-            terminal.WriteLine($"  {Loc.Get("spec.label")}: {specDef?.Name ?? member.Specialization.ToString()} ({specDef?.Role})");
+            terminal.WriteLine($"  {Loc.Get("spec.label")}: {specDef?.Name ?? member.Specialization.ToString()} ({(specDef != null ? SpecRoleName(specDef.Role) : "")})");
             terminal.SetColor("white");
         }
-        terminal.WriteLine($"  {Loc.Get("status.race")}: {member.Race}");
-        terminal.WriteLine($"  {Loc.Get("team.examine_sex")}: {member.Sex}");
+        terminal.WriteLine($"  {Loc.Get("status.race")}: {GameConfig.GetLocalizedRaceName(member.Race)}");   // v1.1.12: localized
+        terminal.WriteLine($"  {Loc.Get("team.examine_sex")}: {GameConfig.GetLocalizedSexName(member.Sex)}");
         terminal.WriteLine($"  {Loc.Get("team.examine_age")}: {member.Age}");
         terminal.WriteLine($"  {Loc.Get("ui.level")}: {member.Level}");
 
@@ -1946,7 +2179,14 @@ public class TeamCornerLocation : BaseLocation
         terminal.WriteLine($"  {Loc.Get("team.examine_chivalry")}: {member.Chivalry}   {Loc.Get("team.examine_darkness")}: {member.Darkness}");
         if (member.NPCFaction.HasValue)
         {
-            terminal.WriteLine($"  {Loc.Get("team.examine_faction")}: {member.NPCFaction.Value}");
+            string facName = member.NPCFaction.Value switch   // v1.1.12: localized, was the enum name
+            {
+                Faction.TheCrown => Loc.Get("faction.name_crown"),
+                Faction.TheShadows => Loc.Get("faction.name_shadows"),
+                Faction.TheFaith => Loc.Get("faction.name_faith"),
+                _ => member.NPCFaction.Value.ToString()
+            };
+            terminal.WriteLine($"  {Loc.Get("team.examine_faction")}: {facName}");
         }
         if (!string.IsNullOrEmpty(member.WorshippedGod))
         {
@@ -2064,12 +2304,10 @@ public class TeamCornerLocation : BaseLocation
         terminal.WriteLine($"  {Loc.Get("ui.mana_label")}: {member.Mana}/{member.MaxMana}");
         terminal.WriteLine($"  {Loc.Get("ui.gold")}: {member.Gold:N0}");
         terminal.WriteLine("");
-        terminal.WriteLine($"  STR: {member.Strength}  DEX: {member.Dexterity}  AGI: {member.Agility}  CON: {member.Constitution}");
-        terminal.WriteLine($"  INT: {member.Intelligence}  WIS: {member.Wisdom}  CHA: {member.Charisma}  DEF: {member.Defence}");
-        terminal.WriteLine($"  STA: {member.Stamina}  WeapPow: {member.WeapPow}  ArmPow: {member.ArmPow}");
+        WriteMemberStatLines(member);
         terminal.WriteLine("");
 
-        terminal.WriteLine($"{Loc.Get("ui.location")}: {member.CurrentLocation ?? "Unknown"}");
+        terminal.WriteLine($"{Loc.Get("ui.location")}: {member.CurrentLocation ?? Loc.Get("team.unknown")}");
         terminal.WriteLine("");
 
         terminal.SetColor("darkgray");
@@ -2092,13 +2330,46 @@ public class TeamCornerLocation : BaseLocation
             return;
         }
 
+        // v1.1.12: online, the password a join checks is player_teams.password_hash, and only the leader may
+        // change it; the change used to set only the in-memory copies, so the new password was refused and
+        // the old one kept working
+        var backend = DoorMode.IsOnlineMode ? SaveSystem.Instance.Backend as SqlSaveBackend : null;
+        string myKey = GameEngine.InheritanceKey(currentPlayer);
+        // v1.1.12: a team an NPC founded has no player_teams row; its password is the one its NPCs hold, which
+        // a join checks, so it is changed as before (the old password checked against that one)
+        bool? hasRow = backend?.HasPlayerTeamRow(currentPlayer.Team);
+        if (backend != null && hasRow == null)
+        {
+            terminal.WriteLine("");
+            terminal.SetColor("red");
+            terminal.WriteLine(Loc.Get("team.failed_generic"));
+            await Task.Delay(2000);
+            return;
+        }
+        bool npcTeam = hasRow == false;
+        if (npcTeam) backend = null;
+        if (backend != null && !string.Equals(await backend.GetTeamLeaderUsername(currentPlayer.Team), myKey, StringComparison.Ordinal))
+        {
+            terminal.WriteLine("");
+            terminal.SetColor("red");
+            terminal.WriteLine(Loc.Get("team.password_leader_only"));
+            terminal.WriteLine("");
+            await Task.Delay(2000);
+            return;
+        }
+
         terminal.WriteLine("");
         terminal.SetColor("cyan");
         terminal.Write(Loc.Get("team.enter_current_password"));
         terminal.SetColor("white");
         string currentPassword = await terminal.ReadLineAsync();
 
-        if (currentPassword != currentPlayer.TeamPW)
+        // offline the in-memory copy is the password; an NPC team's is the one its NPCs hold (checked if set);
+        // a player team's stored hash is checked below
+        string heldPassword = npcTeam
+            ? NPCSpawnSystem.Instance.ActiveNPCs.FirstOrDefault(n => n.Team == currentPlayer.Team && n.IsAlive)?.TeamPW ?? currentPlayer.TeamPW ?? ""
+            : currentPlayer.TeamPW;
+        if (backend == null && (!npcTeam || !string.IsNullOrEmpty(heldPassword)) && currentPassword != heldPassword)
         {
             terminal.WriteLine("");
             terminal.SetColor("red");
@@ -2115,7 +2386,16 @@ public class TeamCornerLocation : BaseLocation
 
         if (!string.IsNullOrEmpty(newPassword) && newPassword.Length <= 20)
         {
-            string oldPassword = currentPlayer.TeamPW;
+            if (backend != null && !backend.ChangeTeamPassword(currentPlayer.Team, myKey, currentPassword, newPassword))
+            {
+                terminal.WriteLine("");
+                terminal.SetColor("red");
+                terminal.WriteLine(Loc.Get("team.wrong_password_short"));
+                terminal.WriteLine("");
+                await Task.Delay(2000);
+                return;
+            }
+
             currentPlayer.TeamPW = newPassword;
 
             // Update all team members' passwords
@@ -2179,7 +2459,8 @@ public class TeamCornerLocation : BaseLocation
             // is the SQL one), under the mailbox's daily send cap.
             var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
             var members = backend != null
-                ? await backend.GetPlayerTeamMembers(currentPlayer.Team, excludeDisplayName: currentPlayer.DisplayName)
+                ? (await backend.GetPlayerTeamMembers(currentPlayer.Team))   // v1.1.12: the sender left out by save key
+                    .Where(m => !string.Equals(m.Username, GameEngine.InheritanceKey(currentPlayer), StringComparison.OrdinalIgnoreCase)).ToList()
                 : new List<PlayerSummary>();
 
             terminal.WriteLine("");
@@ -2206,7 +2487,7 @@ public class TeamCornerLocation : BaseLocation
                     var memberUser = member.IsOnline ? backend.ResolvePlayerUsername(member.DisplayName) : null;
                     if (memberUser != null)
                         UsurperRemake.Server.MudServer.Instance?.SendToPlayer(memberUser,
-                            $"\u001b[35m  [Mail] {currentPlayer.DisplayName}: {body}\u001b[0m");
+                            $"\u001b[35m  {Loc.Get("team.mail_push_tag")} {currentPlayer.DisplayName}: {body}\u001b[0m");
                 }
                 terminal.SetColor("bright_green");
                 terminal.WriteLine(Loc.Get("team.message_mailed", members.Count));
@@ -2234,75 +2515,142 @@ public class TeamCornerLocation : BaseLocation
             return;
         }
 
-        terminal.WriteLine("");
-        terminal.SetColor("cyan");
-        terminal.WriteLine(Loc.Get("team.sack_prompt"));
-        terminal.Write(": ");
-        terminal.SetColor("white");
-        string memberName = await terminal.ReadLineAsync();
-
-        if (memberName == "?")
+        // v1.1.12: every member is listed, players too. A player cannot be sacked: their membership is in
+        // their own save, which only their session writes (no cross-session save writes), so they leave
+        // with [L] themselves.
+        var entries = await GetTeamMemberEntries(includeViewer: false);
+        if (entries.Count == 0)
         {
-            await ShowTeamMembers(currentPlayer.Team, true);
-            terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            terminal.WriteLine("");
+            terminal.SetColor("yellow");
+            terminal.WriteLine(Loc.Get("team.only_member"));
+            await Task.Delay(2000);
             return;
         }
-
-        if (!string.IsNullOrEmpty(memberName))
+        var picked = await PickFromList(entries, MemberPickRow, e => e.Name, "team.pick_sack_title", MemberPickColor);
+        if (picked == null) return;
+        if (picked.Npc == null)
         {
-            var allNPCs = NPCSpawnSystem.Instance.ActiveNPCs;
-            var member = allNPCs.FirstOrDefault(n =>
-                n.Team == currentPlayer.Team &&
-                n.DisplayName.Equals(memberName, StringComparison.OrdinalIgnoreCase));
-
-            if (member == null)
-            {
-                terminal.SetColor("red");
-                terminal.WriteLine(Loc.Get("team.member_not_found", memberName));
-                await Task.Delay(2000);
-                return;
-            }
-
+            terminal.WriteLine("");
             terminal.SetColor("yellow");
-            terminal.Write(Loc.Get("team.confirm_sack", member.DisplayName));
-            string response = await terminal.ReadLineAsync();
+            terminal.WriteLine(Loc.Get("team.sack_player_refused", picked.Name));
+            await Task.Delay(2500);
+            return;
+        }
+        var member = picked.Npc;
 
-            if (GameConfig.IsAffirmative(response))
+        terminal.WriteLine("");
+        terminal.SetColor("yellow");
+        terminal.Write(Loc.Get("team.confirm_sack", member.DisplayName));
+        string response = await terminal.ReadLineAsync();
+        if (!GameConfig.IsAffirmative(response)) return;
+
+        // v1.1.12: the NPC keeps what they wear when they go; offer to take it first
+        bool tookGear = false;
+        var recovered = new List<(EquipmentSlot Slot, int Id, string Name)>();
+        if (HasRemovableEquipment(member))
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine(Loc.Get("team.sack_gear_warning", member.DisplayName));
+            terminal.Write(Loc.Get("team.sack_take_gear_prompt"));
+            if (GameConfig.IsAffirmative(await terminal.ReadLineAsync()))
             {
-                member.Team = "";
-                member.TeamPW = "";
-                member.CTurf = false;
-
-                terminal.WriteLine("");
-                terminal.SetColor("bright_green");
-                terminal.WriteLine(Loc.Get("team.member_sacked", member.DisplayName));
-                terminal.WriteLine("");
-
-                NewsSystem.Instance.Newsy(true, $"{member.DisplayName} was kicked out of team '{currentPlayer.Team}'!");
-
-                // Persist NPC team removal immediately. v0.57.11 (spudman
-                // report: "Sacking members that died didn't seem to have any
-                // effects other than history log"). Changed from fire-and-forget
-                // `_ = Task.Run(...)` to `await` because if another online
-                // session triggers a world_state reload between the `Team = ""`
-                // mutation and the Task completing, the cleared Team field
-                // gets overwritten from the stale snapshot and the sack is
-                // silently undone. Same class of bug as the v0.57.10 Coosh
-                // turf-reverts-on-relog issue.
-                if (DoorMode.IsOnlineMode && OnlineStateManager.Instance != null)
+                // v1.1.12: the live copy, checked still on this team before any gear comes off; a reload or
+                // a move while the prompts were up means nothing is taken
+                var liveForGear = LiveTeamNpc(member);
+                if (liveForGear == null || liveForGear.Team != currentPlayer.Team)
                 {
-                    try { await OnlineStateManager.Instance.SaveAllSharedState(); }
-                    catch (Exception ex) { DebugLogger.Instance.LogError("TEAM", $"SaveAllSharedState failed after sack: {ex.Message}"); }
+                    terminal.SetColor("red");
+                    terminal.WriteLine(Loc.Get("team.sack_gear_gone", member.DisplayName));
+                    await Task.Delay(2000);
+                    return;
                 }
-
-                terminal.SetColor("darkgray");
-                terminal.WriteLine(Loc.Get("ui.press_enter"));
-                await terminal.ReadKeyAsync();
+                member = liveForGear;
+                // v1.1.12: saved straight after the move, nothing awaited between, so a roster reload in the
+                // pause below loads the NPC without the gear
+                var cursed = new List<string>();
+                recovered = MoveEquipmentToPlayer(member, cursed);
+                tookGear = recovered.Count > 0;
+                if (tookGear) await SaveRecoveredGear();
+                await ReportEquipmentTaken(member, recovered.Count, cursed);
             }
         }
+
+        // v1.1.12: the NPC is looked up again by ID; a world_state reload while the prompts were up replaced
+        // the object picked from the list, and clearing its Team changed nothing
+        var live = LiveTeamNpc(member);
+        // v1.1.12: a reload read before the save can bring the NPC back wearing what was taken; it comes off
+        bool stripped = live != null && StripRecoveredGear(live, recovered) > 0;
+        if (live == null || live.Team != currentPlayer.Team)
+        {
+            if (stripped) await SaveRecoveredGear();
+            terminal.SetColor("red");
+            terminal.WriteLine(Loc.Get("team.member_gone_now", member.DisplayName));
+            await Task.Delay(2000);
+            return;
+        }
+        live.Team = "";
+        live.TeamPW = "";
+        live.CTurf = false;
+
+        terminal.WriteLine("");
+        terminal.SetColor("bright_green");
+        terminal.WriteLine(Loc.Get("team.member_sacked", live.DisplayName));
+        terminal.WriteLine("");
+
+        NewsSystem.Instance.Newsy(true, Loc.Get("team.news_sacked", live.DisplayName, currentPlayer.Team));
+
+        // Persist NPC team removal immediately. v0.57.11 (spudman
+        // report: "Sacking members that died didn't seem to have any
+        // effects other than history log"). Changed from fire-and-forget
+        // `_ = Task.Run(...)` to `await` because if another online
+        // session triggers a world_state reload between the `Team = ""`
+        // mutation and the Task completing, the cleared Team field
+        // gets overwritten from the stale snapshot and the sack is
+        // silently undone. Same class of bug as the v0.57.10 Coosh
+        // turf-reverts-on-relog issue.
+        if (DoorMode.IsOnlineMode && OnlineStateManager.Instance != null)
+        {
+            try { await OnlineStateManager.Instance.SaveAllSharedState(); }
+            catch (Exception ex) { DebugLogger.Instance.LogError("TEAM", $"SaveAllSharedState failed after sack: {ex.Message}"); }
+        }
+
+        terminal.SetColor("darkgray");
+        terminal.WriteLine(Loc.Get("ui.press_enter"));
+        await terminal.ReadKeyAsync();
     }
+
+    /// <summary>v1.1.12: the gear taken on a sack, saved at once: the NPC's side first, then the player's (a
+    /// crash between loses it rather than copying it).</summary>
+    private Task SaveRecoveredGear() => SaveGearTakenFromNpc(null);
+
+    /// <summary>v1.1.12: takes off the NPC whatever it still wears of the gear recovered from it, as a reloaded copy
+    /// of it can: the same slot and the same item, by ID or by name (a reload registers looted gear under a new
+    /// ID, GameEngine's NPC restore). The items are the player's now; they are not handed out again. Returns
+    /// the count taken off.</summary>
+    internal static int StripRecoveredGear(Character npc, IEnumerable<(EquipmentSlot Slot, int Id, string Name)> recovered)
+    {
+        int stripped = 0;
+        foreach (var (slot, id, name) in recovered)
+        {
+            if (!npc.EquippedItems.TryGetValue(slot, out var worn) || worn <= 0) continue;
+            if (worn != id && EquipmentDatabase.GetById(worn)?.Name != name) continue;
+            if (npc.UnequipSlot(slot) != null) stripped++;
+        }
+        if (stripped > 0)
+        {
+            npc.RecalculateStats();
+            if (npc.IsCompanion) CompanionSystem.Instance?.SyncCompanionEquipment(npc);
+        }
+        return stripped;
+    }
+
+    /// <summary>v1.1.12: the character wears something that can be taken off (not cursed).</summary>
+    private static bool HasRemovableEquipment(Character c) =>
+        Enum.GetValues(typeof(EquipmentSlot)).Cast<EquipmentSlot>()
+            .Where(slot => slot != EquipmentSlot.None)
+            .Select(c.GetEquipment)
+            .Any(item => item != null && !item.IsCursed);
 
     /// <summary>
     /// Resurrect a dead teammate
@@ -2341,7 +2689,7 @@ public class TeamCornerLocation : BaseLocation
                 foreach (var pd in permadeadMembers)
                 {
                     string reason = pd.IsAgedDeath ? Loc.Get("team.permadead_reason_age") : Loc.Get("team.permadead_reason_slain");
-                    terminal.WriteLine($"  {pd.DisplayName} — {reason}");
+                    terminal.WriteLine($"  {pd.DisplayName} - {reason}");
                 }
             }
             else
@@ -2354,53 +2702,84 @@ public class TeamCornerLocation : BaseLocation
             return;
         }
 
+        // v1.1.12: listed in the shared picker, and the cost confirmed before it is paid
+        var toResurrect = await PickFromList(deadMembers,
+            d => Loc.Get("team.pick_resurrect_row", d.DisplayName, Loc.Get("inn.npc_level_class", d.Level, GameConfig.GetLocalizedClassName(d.Class)), $"{ResurrectionCost(d):N0}"),
+            d => d.DisplayName, "team.dead_members_header", _ => "white");
+        if (toResurrect == null) return;
+
+        long cost = ResurrectionCost(toResurrect);
         terminal.WriteLine("");
-        terminal.SetColor("cyan");
-        terminal.WriteLine(Loc.Get("team.dead_members_header"));
-        for (int i = 0; i < deadMembers.Count; i++)
+        if (currentPlayer.Gold < cost)
         {
-            var dead = deadMembers[i];
-            long cost = dead.Level * 1000; // Resurrection cost
-            terminal.SetColor("white");
-            terminal.WriteLine($"{i + 1}. {dead.DisplayName} (Level {dead.Level}) - Cost: {cost:N0} gold");
+            terminal.SetColor("red");
+            terminal.WriteLine(Loc.Get("team.need_gold_resurrect", $"{cost:N0}", toResurrect.DisplayName));
+            await Task.Delay(2000);
+            return;
+        }
+        terminal.SetColor("yellow");
+        terminal.Write(Loc.Get("team.confirm_resurrect", toResurrect.DisplayName, $"{cost:N0}"));
+        if (!GameConfig.IsAffirmative(await terminal.ReadLineAsync())) return;
+
+        // v1.1.12: a dead member holds a slot, so a revival adds no slot; it may bring the living up to
+        // MaxTeamSize and no further (a team from before the cap, with more, keeps its members). Checked before the
+        // live lookup below, since the query yields
+        int deadHere = NPCSpawnSystem.Instance.ActiveNPCs.Count(n => n.Team == currentPlayer.Team && (n.IsDead || !n.IsAlive) && !n.IsPermaDead && !n.IsAgedDeath);
+        if (await TeamSlotsUsed(currentPlayer.Team) - deadHere >= MaxTeamSize)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine(Loc.Get("team.team_full", MaxTeamSize));
+            await Task.Delay(2000);
+            return;
         }
 
-        terminal.WriteLine("");
-        terminal.SetColor("cyan");
-        terminal.Write(Loc.Get("team.enter_number_resurrect"));
-        terminal.SetColor("white");
-        string input = await terminal.ReadLineAsync();
-
-        if (int.TryParse(input, out int choice) && choice >= 1 && choice <= deadMembers.Count)
+        // v1.1.12: the NPC is looked up again by ID; a world_state reload while the prompts were up replaced
+        // the object picked from the list, and the gold paid revived no one
+        var live = LiveTeamNpc(toResurrect);
+        if (live == null || live.Team != currentPlayer.Team || (live.IsAlive && !live.IsDead) || live.IsPermaDead || live.IsAgedDeath)
         {
-            var toResurrect = deadMembers[choice - 1];
-            long cost = toResurrect.Level * 1000;
-
-            if (currentPlayer.Gold < cost)
-            {
-                terminal.SetColor("red");
-                terminal.WriteLine(Loc.Get("team.need_gold_resurrect", $"{cost:N0}", toResurrect.DisplayName));
-            }
-            else
-            {
-                currentPlayer.Gold -= cost;
-                toResurrect.HP = toResurrect.MaxHP / 2; // Resurrect at half HP
-                toResurrect.IsDead = false; // Clear permanent death flag - IsAlive is computed from HP > 0
-
-                terminal.WriteLine("");
-                terminal.SetColor("bright_green");
-                terminal.WriteLine(Loc.Get("team.member_resurrected", toResurrect.DisplayName));
-                terminal.WriteLine(Loc.Get("team.resurrect_cost", $"{cost:N0}"));
-
-                NewsSystem.Instance.Newsy(true, $"{toResurrect.DisplayName} was resurrected by their team '{currentPlayer.Team}'!");
-            }
+            terminal.SetColor("red");
+            terminal.WriteLine(Loc.Get("team.member_gone_now", toResurrect.DisplayName));
+            await Task.Delay(2000);
+            return;
         }
+
+        cost = ResurrectionCost(live);
+        if (currentPlayer.Gold < cost)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine(Loc.Get("team.need_gold_resurrect", $"{cost:N0}", live.DisplayName));
+            await Task.Delay(2000);
+            return;
+        }
+
+        currentPlayer.Gold -= cost;
+        live.HP = live.MaxHP / 2; // Resurrect at half HP
+        live.IsDead = false; // Clear permanent death flag - IsAlive is computed from HP > 0
+
+        terminal.WriteLine("");
+        terminal.SetColor("bright_green");
+        terminal.WriteLine(Loc.Get("team.member_resurrected", live.DisplayName));
+        terminal.WriteLine(Loc.Get("team.resurrect_cost", $"{cost:N0}"));
+
+        NewsSystem.Instance.Newsy(true, Loc.Get("team.news_resurrected", live.DisplayName, currentPlayer.Team));
+
+        // v1.1.12: saved at once, as Sack and Specialize do (the revival was lost to the next reload), and
+        // the gold with it
+        if (DoorMode.IsOnlineMode && OnlineStateManager.Instance != null)
+        {
+            try { await OnlineStateManager.Instance.SaveAllSharedState(); }
+            catch (Exception ex) { DebugLogger.Instance.LogError("TEAM", $"SaveAllSharedState failed after resurrect: {ex.Message}"); }
+        }
+        await ForcePlayerSave();
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
         terminal.WriteLine(Loc.Get("ui.press_enter"));
         await terminal.ReadKeyAsync();
     }
+
+    private static long ResurrectionCost(NPC npc) => npc.Level * 1000L;
 
     /// <summary>
     /// Recruit a player's echo as a dungeon ally (online mode only).
@@ -2422,8 +2801,11 @@ public class TeamCornerLocation : BaseLocation
         var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
         if (backend == null) return;
 
-        string myUsername = currentPlayer.DisplayName.ToLower();
-        var teammates = await backend.GetPlayerTeamMembers(currentPlayer.Team, myUsername);
+        // v1.1.12: the viewer is left out by save key; a teammate may share the viewer's display name
+        string myKey = GameEngine.InheritanceKey(currentPlayer);
+        var members = await backend.GetPlayerTeamMembers(currentPlayer.Team);
+        var teammates = members
+            .Where(m => !string.Equals(m.Username, myKey, StringComparison.OrdinalIgnoreCase)).ToList();
 
         if (teammates.Count == 0)
         {
@@ -2450,10 +2832,14 @@ public class TeamCornerLocation : BaseLocation
         // landed (echo never appeared in dungeon) and re-tried, was told
         // "already in party" with no way to verify or recover.
         var currentRecruits = GameEngine.Instance?.DungeonPartyPlayerNames ?? new List<string>();
+        // v1.1.12: an entry is a save key (an older one a display name); shown by the teammate's display name
+        string RecruitLabel(string entry) =>
+            teammates.FirstOrDefault(t => t.Username.Equals(entry, StringComparison.OrdinalIgnoreCase))?.DisplayName ?? entry;
+        bool IsRecruited(PlayerSummary tm) => IsEchoRecruited(currentRecruits, members.Select(m => m.Username).Append(myKey), tm);
         if (currentRecruits.Count > 0)
         {
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine(Loc.Get("team.echo_currently_recruited", string.Join(", ", currentRecruits)));
+            terminal.WriteLine(Loc.Get("team.echo_currently_recruited", string.Join(", ", currentRecruits.Select(RecruitLabel))));
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("team.echo_unrecruit_hint"));
             terminal.WriteLine("");
@@ -2473,11 +2859,11 @@ public class TeamCornerLocation : BaseLocation
         for (int i = 0; i < teammates.Count; i++)
         {
             var tm = teammates[i];
-            string className = tm.ClassId >= 0 ? ((CharacterClass)tm.ClassId).ToString() : "Unknown";
+            string className = GameConfig.GetLocalizedClassName(tm.ClassId);   // v1.1.12: localized
             string status = tm.IsOnline ? Loc.Get("team.status_online") : Loc.Get("team.status_offline");
             // Mark teammates already recruited with a [recruited] tag so the
             // player can see at a glance which slots are filled.
-            bool alreadyRecruited = currentRecruits.Contains(tm.DisplayName, StringComparer.OrdinalIgnoreCase);
+            bool alreadyRecruited = IsRecruited(tm);
             string tag = alreadyRecruited ? " " + Loc.Get("team.echo_recruited_tag") : "";
             terminal.WriteLine($"{i + 1,-3} {tm.DisplayName,-18} {className,-12} {tm.Level,-6} {status,-10}{tag}");
         }
@@ -2497,7 +2883,7 @@ public class TeamCornerLocation : BaseLocation
         // path for the v0.61.5 "echo recruited but never materialized" bug.
         if (!string.IsNullOrEmpty(input) && input.Trim().Equals("U", StringComparison.OrdinalIgnoreCase))
         {
-            await UnrecruitPlayerAlly(currentRecruits);
+            await UnrecruitPlayerAlly(currentRecruits, RecruitLabel);
             return;
         }
 
@@ -2507,7 +2893,7 @@ public class TeamCornerLocation : BaseLocation
 
             // Check if already recruited
             var partyNames = GameEngine.Instance?.DungeonPartyPlayerNames ?? new List<string>();
-            if (partyNames.Contains(selected.DisplayName, StringComparer.OrdinalIgnoreCase))
+            if (IsRecruited(selected))
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine(Loc.Get("team.echo_already_in_party", selected.DisplayName));
@@ -2517,8 +2903,9 @@ public class TeamCornerLocation : BaseLocation
                 return;
             }
 
-            // Add to dungeon party
-            var names = new List<string>(partyNames) { selected.DisplayName };
+            // Add to dungeon party. v1.1.12: by save key; the display name can be another account's username,
+            // whose save (even the viewer's own) the dungeon would otherwise load
+            var names = new List<string>(partyNames) { selected.Username };
             GameEngine.Instance?.SetDungeonPartyPlayers(names);
 
             terminal.WriteLine("");
@@ -2554,6 +2941,16 @@ public class TeamCornerLocation : BaseLocation
         await terminal.ReadKeyAsync();
     }
 
+    /// <summary>v1.1.12: whether a teammate is in the echo recruit list. An entry that is a team member's save key
+    /// matches that member only; an older entry (a display name, no member's key) matches by display name.</summary>
+    internal static bool IsEchoRecruited(IEnumerable<string> recruits, IEnumerable<string> memberKeys, PlayerSummary tm)
+    {
+        var keys = new HashSet<string>(memberKeys.Where(k => !string.IsNullOrEmpty(k)), StringComparer.OrdinalIgnoreCase);
+        return recruits.Any(e => keys.Contains(e)
+            ? e.Equals(tm.Username, StringComparison.OrdinalIgnoreCase)
+            : e.Equals(tm.DisplayName, StringComparison.OrdinalIgnoreCase));
+    }
+
     /// <summary>
     /// Manual un-recruit flow for player echoes. Lets the player dismiss an
     /// echo from `DungeonPartyPlayerNames` without entering the dungeon.
@@ -2561,7 +2958,7 @@ public class TeamCornerLocation : BaseLocation
     /// materialize (save deleted, off-team, load error) -- and also lets
     /// players who change their mind un-recruit cleanly.
     /// </summary>
-    private async Task UnrecruitPlayerAlly(List<string> currentRecruits)
+    private async Task UnrecruitPlayerAlly(List<string> currentRecruits, Func<string, string> label)
     {
         if (currentRecruits.Count == 0)
         {
@@ -2577,7 +2974,7 @@ public class TeamCornerLocation : BaseLocation
         terminal.SetColor("white");
         for (int i = 0; i < currentRecruits.Count; i++)
         {
-            terminal.WriteLine($"  [{i + 1}] {currentRecruits[i]}");
+            terminal.WriteLine($"  [{i + 1}] {label(currentRecruits[i])}");
         }
         terminal.WriteLine("");
         terminal.SetColor("cyan");
@@ -2591,7 +2988,7 @@ public class TeamCornerLocation : BaseLocation
             var cleaned = currentRecruits.Where(n => !n.Equals(toRemove, StringComparison.OrdinalIgnoreCase)).ToList();
             GameEngine.Instance?.SetDungeonPartyPlayers(cleaned);
             terminal.SetColor("bright_yellow");
-            terminal.WriteLine(Loc.Get("team.echo_unrecruit_done", toRemove));
+            terminal.WriteLine(Loc.Get("team.echo_unrecruit_done", label(toRemove)));
             await Task.Delay(2000);
         }
     }
@@ -2630,55 +3027,17 @@ public class TeamCornerLocation : BaseLocation
             return;
         }
 
-        terminal.ClearScreen();
-        WriteBoxHeader(Loc.Get("team_corner.equip_header"), "bright_cyan");
-        terminal.WriteLine("");
+        // v1.1.12: the shared picker (a number, or a name or the start of one)
+        var selectedMember = await PickFromList(teamMembers,
+            m => $"{m.DisplayName} ({Loc.Get("inn.npc_level_class", m.Level, GameConfig.GetLocalizedClassName(m.Class))})",
+            m => m.DisplayName, "team_corner.equip_header");
+        if (selectedMember == null) return;
 
-        // List team members
-        terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("team.team_members_label"));
-        terminal.WriteLine("");
-
-        for (int i = 0; i < teamMembers.Count; i++)
-        {
-            var member = teamMembers[i];
-            terminal.SetColor("bright_yellow");
-            terminal.Write($"  {i + 1}. ");
-            terminal.SetColor("white");
-            terminal.Write($"{member.DisplayName} ");
-            terminal.SetColor("gray");
-            terminal.WriteLine($"(Lv {member.Level} {member.ClassName})");
-        }
-
-        terminal.WriteLine("");
-        terminal.SetColor("cyan");
-        terminal.Write(Loc.Get("team.select_member_equip"));
-        terminal.SetColor("white");
-
-        var input = await terminal.ReadLineAsync();
-        if (!int.TryParse(input, out int memberIdx) || memberIdx < 1 || memberIdx > teamMembers.Count)
-        {
-            terminal.SetColor("gray");
-            terminal.WriteLine(Loc.Get("ui.cancelled"));
-            await Task.Delay(1000);
-            return;
-        }
-
-        var selectedMember = teamMembers[memberIdx - 1];
         await ManageCharacterEquipment(selectedMember);
 
         // Sync equipment changes to canonical NPC in ActiveNPCs (handles orphaned references)
         CombatEngine.SyncNPCTeammateToActiveNPCs(selectedMember);
-
-        // Auto-save after equipment changes to persist NPC equipment state
-        await SaveSystem.Instance.AutoSave(currentPlayer);
-
-        // Force NPC world_state save so equipment survives world-sim reload cycles
-        if (DoorMode.IsOnlineMode && OnlineStateManager.Instance != null)
-        {
-            try { await OnlineStateManager.Instance.SaveAllSharedState(); }
-            catch (Exception ex) { DebugLogger.Instance.LogError("TEAM", $"SaveAllSharedState failed after equipment change: {ex.Message}"); }
-        }
+        // v1.1.12: each move was saved when it was made, in the order for its direction (BaseLocation gear saves)
     }
 
     /// <summary>
@@ -2695,7 +3054,7 @@ public class TeamCornerLocation : BaseLocation
 
             // Show target's stats
             terminal.SetColor("white");
-            terminal.WriteLine(Loc.Get("team.examine_level", target.Level, GameConfig.GetLocalizedClassName(target.Class), target.Race));
+            terminal.WriteLine(Loc.Get("team.examine_level", target.Level, GameConfig.GetLocalizedClassName(target.Class), GameConfig.GetLocalizedRaceName(target.Race)));
             terminal.WriteLine(Loc.Get("team.examine_hp", target.HP, target.MaxHP, target.Mana, target.MaxMana));
             terminal.WriteLine(Loc.Get("team.examine_stats1", target.Strength, target.Dexterity, target.Agility, target.Constitution));
             terminal.WriteLine(Loc.Get("team.examine_stats2", target.Intelligence, target.Wisdom, target.Charisma, target.Defence));
@@ -2797,7 +3156,7 @@ public class TeamCornerLocation : BaseLocation
             {
                 terminal.WriteLine("");
                 terminal.SetColor("yellow");
-                terminal.WriteLine("  No items available for this slot.");
+                terminal.WriteLine(Loc.Get("team.equip_no_items_for_slot"));
                 await Task.Delay(2000);
                 continue;
             }
@@ -2806,18 +3165,18 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine("");
             var currentItem = target.GetEquipment(selectedSlot.Value);
             terminal.SetColor("white");
-            terminal.Write($"  Current: ");
+            terminal.Write($"  {Loc.Get("weapon_shop.current_prefix")}");
             if (currentItem != null)
             {
                 terminal.SetColor(currentItem.IsIdentified ? currentItem.GetRarityColor() : "magenta");
-                terminal.Write(currentItem.IsIdentified ? currentItem.Name : "Unidentified");
+                terminal.Write(currentItem.IsIdentified ? currentItem.Name : Loc.Get("ui.unidentified"));
                 if (currentItem.IsIdentified) WriteEquipmentStatSummary(currentItem);
                 terminal.WriteLine("");
             }
             else
             {
                 terminal.SetColor("darkgray");
-                terminal.WriteLine("Empty");
+                terminal.WriteLine(Loc.Get("ui.empty"));
             }
             terminal.WriteLine("");
 
@@ -2847,7 +3206,7 @@ public class TeamCornerLocation : BaseLocation
             if (!selectedItem.IsIdentified)
             {
                 terminal.SetColor("yellow");
-                terminal.WriteLine("  Must identify the item first.");
+                terminal.WriteLine(Loc.Get("team.equip_identify_first"));
                 await Task.Delay(2000);
                 continue;
             }
@@ -2864,23 +3223,14 @@ public class TeamCornerLocation : BaseLocation
             // Use the slot the player already picked (no need to ask which hand)
             EquipmentSlot? targetSlot = selectedSlot.Value;
 
-            // Remove from player
-            if (wasEquipped && sourceSlot.HasValue)
+            // Remove from player. v1.1.12: if nothing came off the player, nothing is equipped (the item
+            // was equipped anyway, a copy)
+            if (!TakeFromPlayerForEquip(selectedItem, wasEquipped, sourceSlot))
             {
-                currentPlayer.UnequipSlot(sourceSlot.Value);
-                currentPlayer.RecalculateStats();
-            }
-            else
-            {
-                // Remove from inventory (find by name)
-                // Two-pass match: first try Name+Attack+ArmorClass for precision, then fallback to name-only
-                var invItem = currentPlayer.Inventory.FirstOrDefault(i =>
-                    i.Name == selectedItem.Name && i.Attack == selectedItem.WeaponPower && i.Armor == selectedItem.ArmorClass)
-                    ?? currentPlayer.Inventory.FirstOrDefault(i => i.Name == selectedItem.Name);
-                if (invItem != null)
-                {
-                    currentPlayer.Inventory.Remove(invItem);
-                }
+                terminal.SetColor("red");
+                terminal.WriteLine(Loc.Get("team.equip_item_gone", selectedItem.Name));
+                await Task.Delay(2000);
+                continue;
             }
 
             // Track items in target's inventory BEFORE equipping, so we can move displaced items to player
@@ -2892,7 +3242,9 @@ public class TeamCornerLocation : BaseLocation
 
             if (result)
             {
-                // Move any items that were added to target's inventory (displaced equipment) to player's inventory
+                // v1.1.12: the give is saved first (player, then NPC) with the displaced items still in the target's
+                // bag; then they come back to the player, saved NPC side first. No crash point copies an item.
+                await SaveGearGivenToNpc(target);
                 if (target.Inventory.Count > targetInventoryBefore)
                 {
                     var displacedItems = target.Inventory.Skip(targetInventoryBefore).ToList();
@@ -2901,6 +3253,7 @@ public class TeamCornerLocation : BaseLocation
                         target.Inventory.Remove(displaced);
                         currentPlayer.Inventory.Add(displaced);
                     }
+                    await SaveGearTakenFromNpc(target);
                 }
 
                 // v0.57.7 (Hesperos report): `target` is a WRAPPER Character built fresh by
@@ -2931,6 +3284,25 @@ public class TeamCornerLocation : BaseLocation
 
             await Task.Delay(2000);
         }
+    }
+
+    /// <summary>
+    /// v1.1.12: takes the item being given from the player: off the slot it is worn in, or out of the pack
+    /// (matched on name and power first, then on name). False when nothing was removed, and then nothing
+    /// may be equipped.
+    /// </summary>
+    internal bool TakeFromPlayerForEquip(Equipment selectedItem, bool wasEquipped, EquipmentSlot? sourceSlot)
+    {
+        if (wasEquipped && sourceSlot.HasValue)
+        {
+            if (currentPlayer.UnequipSlot(sourceSlot.Value) == null) return false;
+            currentPlayer.RecalculateStats();
+            return true;
+        }
+        var invItem = currentPlayer.Inventory.FirstOrDefault(i =>
+            i.Name == selectedItem.Name && i.Attack == selectedItem.WeaponPower && i.Armor == selectedItem.ArmorClass)
+            ?? currentPlayer.Inventory.FirstOrDefault(i => i.Name == selectedItem.Name);
+        return invItem != null && currentPlayer.Inventory.Remove(invItem);
     }
 
     /// <summary>
@@ -2978,7 +3350,7 @@ public class TeamCornerLocation : BaseLocation
             if (item.IsCursed)
             {
                 terminal.SetColor("red");
-                terminal.Write(" (CURSED)");
+                terminal.Write(Loc.Get("inn.cursed_label"));
             }
             terminal.WriteLine("");
         }
@@ -3018,6 +3390,7 @@ public class TeamCornerLocation : BaseLocation
                 CompanionSystem.Instance?.SyncCompanionEquipment(target);
             var legacyItem = ConvertEquipmentToItem(unequipped);
             currentPlayer.Inventory.Add(legacyItem);
+            await SaveGearTakenFromNpc(target);   // v1.1.12: NPC side first, then the player
 
             terminal.WriteLine("");
             terminal.SetColor("bright_green");
@@ -3045,8 +3418,8 @@ public class TeamCornerLocation : BaseLocation
         terminal.Write(Loc.Get("team.take_all_warning"));
         terminal.SetColor("white");
 
-        var confirm = await terminal.ReadLineAsync();
-        if (!GameConfig.IsAffirmative(confirm))
+        var answer = await terminal.ReadLineAsync();
+        if (!GameConfig.IsAffirmative(answer))
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("ui.cancelled"));
@@ -3054,8 +3427,18 @@ public class TeamCornerLocation : BaseLocation
             return;
         }
 
-        int itemsTaken = 0;
         var cursedItems = new List<string>();
+        int itemsTaken = MoveEquipmentToPlayer(target, cursedItems).Count;
+        if (itemsTaken > 0) await SaveGearTakenFromNpc(target);   // v1.1.12: NPC side first, then the player
+        await ReportEquipmentTaken(target, itemsTaken, cursedItems);
+    }
+
+    /// <summary>v1.1.12: moves everything the character wears but the cursed items into the player's pack, with
+    /// nothing awaited; returns the slot, item ID and name of each piece moved (Sack saves at once, then strips a
+    /// reloaded copy of the NPC by them).</summary>
+    internal List<(EquipmentSlot Slot, int Id, string Name)> MoveEquipmentToPlayer(Character target, List<string> cursedItems)
+    {
+        var taken = new List<(EquipmentSlot Slot, int Id, string Name)>();
 
         foreach (EquipmentSlot slot in Enum.GetValues(typeof(EquipmentSlot)))
         {
@@ -3069,21 +3452,26 @@ public class TeamCornerLocation : BaseLocation
                     continue;
                 }
 
+                int id = target.EquippedItems[slot];
                 var unequipped = target.UnequipSlot(slot);
                 if (unequipped != null)
                 {
                     var legacyItem = ConvertEquipmentToItem(unequipped);
                     currentPlayer.Inventory.Add(legacyItem);
-                    itemsTaken++;
+                    taken.Add((slot, id, unequipped.Name));
                 }
             }
         }
 
         target.RecalculateStats();
         // v0.57.7 — sync wrapper take-all back to Companion (Hesperos report)
-        if (itemsTaken > 0 && target.IsCompanion)
+        if (taken.Count > 0 && target.IsCompanion)
             CompanionSystem.Instance?.SyncCompanionEquipment(target);
+        return taken;
+    }
 
+    private async Task ReportEquipmentTaken(Character target, int itemsTaken, List<string> cursedItems)
+    {
         terminal.WriteLine("");
         if (itemsTaken > 0)
         {
@@ -3206,7 +3594,7 @@ public class TeamCornerLocation : BaseLocation
 
         // Show available teams to challenge
         var allTeams = await backend.GetPlayerTeams();
-        var opponents = allTeams.Where(t => t.TeamName != myTeam && t.MemberCount > 0).ToList();
+        var opponents = allTeams.Where(t => !string.Equals(t.TeamName, myTeam, StringComparison.OrdinalIgnoreCase) && t.MemberCount > 0).ToList();
         if (opponents.Count == 0)
         {
             terminal.SetColor("gray");
@@ -3247,7 +3635,7 @@ public class TeamCornerLocation : BaseLocation
         var recentHistory = await backend.GetTeamWarHistory(myTeam, limit: 20);
         var cooldownCutoff = DateTime.UtcNow.AddHours(-GameConfig.TeamWarOpponentCooldownHours);
         var recentVsThisOpponent = recentHistory.FirstOrDefault(w =>
-            w.StartedAt > cooldownCutoff &&
+            w.StartedAt > cooldownCutoff && w.Status != "abandoned" &&   // v1.1.12: a war that never ran does not count
             ((w.ChallengerTeam == myTeam && w.DefenderTeam == enemyTeam.TeamName) ||
              (w.DefenderTeam == myTeam && w.ChallengerTeam == enemyTeam.TeamName)));
         if (recentVsThisOpponent != null)
@@ -3278,8 +3666,6 @@ public class TeamCornerLocation : BaseLocation
             return;
         }
 
-        currentPlayer.Gold -= wager;
-
         // Load both teams' members for combat
         var myMembers = await backend.GetPlayerTeamMembers(myTeam);
         var enemyMembers = await backend.GetPlayerTeamMembers(enemyTeam.TeamName);
@@ -3288,15 +3674,31 @@ public class TeamCornerLocation : BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.no_members_war"));
-            currentPlayer.Gold += wager; // refund
             await Task.Delay(1500);
             return;
         }
 
-        int warId = await backend.CreateTeamWar(myTeam, enemyTeam.TeamName, wager);
+        // v1.1.12: the wager is taken and SAVED before the war row exists. A war a lost session leaves
+        // active is refunded from the row (SqlSaveBackend.ExpireStaleTeamWars), so the payment must be on
+        // disk first, or the refund would pay a wager that was never taken.
+        currentPlayer.Gold -= wager;
+        if (!await ForcePlayerSave())
+        {
+            currentPlayer.Gold += wager;
+            terminal.SetColor("red");
+            terminal.WriteLine(Loc.Get("team.failed_generic"));
+            await Task.Delay(1500);
+            return;
+        }
+
+        int warId = await backend.CreateTeamWar(myTeam, enemyTeam.TeamName, wager, GameEngine.GoldTransferKey(currentPlayer));
         if (warId < 0)
         {
             currentPlayer.Gold += wager; // refund
+            await ForcePlayerSave();
+            terminal.SetColor("red");
+            terminal.WriteLine($"  {Loc.Get("team.active_war_exists")}");
+            await Task.Delay(2000);
             return;
         }
 
@@ -3320,8 +3722,8 @@ public class TeamCornerLocation : BaseLocation
             var enemyData = await backend.ReadGameData((string.IsNullOrEmpty(enemySummary.Username) ? backend.ResolvePlayerUsername(enemySummary.DisplayName) : enemySummary.Username) ?? enemySummary.DisplayName);
             if (myData?.Player == null || enemyData?.Player == null) continue;
 
-            var myFighter = PlayerCharacterLoader.CreateFromSaveData(myData.Player, mySummary.DisplayName);
-            var enemyFighter = PlayerCharacterLoader.CreateFromSaveData(enemyData.Player, enemySummary.DisplayName);
+            var myFighter = PlayerCharacterLoader.CreateFromSaveData(myData.Player, mySummary.DisplayName, story: myData.StorySystems);
+            var enemyFighter = PlayerCharacterLoader.CreateFromSaveData(enemyData.Player, enemySummary.DisplayName, story: enemyData.StorySystems);
 
             // Quick auto-resolved combat (no UI, just determine winner by stats)
             long myPower = myFighter.Level * 10 + myFighter.Strength + myFighter.WeapPow + myFighter.Dexterity;
@@ -3336,7 +3738,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.SetColor(myWin ? "bright_green" : "bright_red");
             terminal.Write(Loc.Get("team.round_label", i + 1));
             terminal.SetColor("white");
-            terminal.Write($"{mySummary.DisplayName} (Lv{mySummary.Level}) vs {enemySummary.DisplayName} (Lv{enemySummary.Level}) ");
+            terminal.Write(Loc.Get("team.war_round_line", mySummary.DisplayName, mySummary.Level, enemySummary.DisplayName, enemySummary.Level));
             terminal.SetColor(myWin ? "bright_green" : "bright_red");
             terminal.WriteLine(myWin ? Loc.Get("team.fighter_wins", mySummary.DisplayName) : Loc.Get("team.fighter_wins", enemySummary.DisplayName));
 
@@ -3345,9 +3747,44 @@ public class TeamCornerLocation : BaseLocation
         }
 
         terminal.WriteLine("");
+
+        // v1.1.12: no round could be fought (no save loaded); this counted as a defender win, the wager lost
+        // on a war that never ran. Now it is abandoned, the wager returned, and no daily war used.
+        if (myWins + enemyWins == 0)
+        {
+            // v1.1.12: refunded here only if this guarded flip landed; otherwise the war is still active
+            // and the stale cleanup refunds it once (ExpireStaleTeamWars), so it is never paid twice
+            if (await backend.CompleteTeamWar(warId, "abandoned"))
+            {
+                currentPlayer.Gold += wager;
+                await ForcePlayerSave();
+                terminal.SetColor("yellow");
+                terminal.WriteLine(Loc.Get("team.war_no_rounds", $"{wager:N0}"));
+            }
+            else
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine(Loc.Get("team.war_no_rounds_pending", $"{wager:N0}"));
+            }
+            await terminal.PressAnyKey();
+            return;
+        }
+
         bool weWon = myWins > enemyWins;
         string result = weWon ? "challenger_won" : "defender_won";
-        await backend.CompleteTeamWar(warId, result);
+        // v1.1.12: paid or charged only if this guarded flip landed, as in the no-round path. Otherwise nothing
+        // changes hands here: the stale cleanup (ExpireStaleTeamWars) closes the war once, refunding the wager
+        // only if no round was recorded, so a won war can never pay twice.
+        if (!await backend.CompleteTeamWar(warId, result))
+        {
+            string? status = await backend.GetTeamWarStatus(warId);
+            bool closed = status != null && status != "active";
+            terminal.SetColor("yellow");
+            terminal.WriteLine(Loc.Get("team.war_score", myWins, enemyWins));
+            terminal.WriteLine(closed ? Loc.Get("team.war_already_closed") : Loc.Get("team.war_result_pending", $"{wager:N0}"));
+            await terminal.PressAnyKey();
+            return;
+        }
 
         // v0.57.17 — increment daily counter regardless of outcome (ran a war = burned a slot)
         currentPlayer.TeamWarsToday++;
@@ -3371,6 +3808,9 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine(Loc.Get("team.war_lost_gold", $"{wager:N0}"));
         }
 
+        // v1.1.12: the daily count and the spoils are saved now, not at the next throttled autosave
+        await ForcePlayerSave();
+
         if (UsurperRemake.Systems.OnlineStateManager.IsActive)
         {
             string winner = weWon ? myTeam : enemyTeam.TeamName;
@@ -3384,37 +3824,42 @@ public class TeamCornerLocation : BaseLocation
     private async Task ShowWarHistory(SqlSaveBackend backend)
     {
         string myTeam = currentPlayer.Team;
-        var wars = await backend.GetTeamWarHistory(myTeam);
+        // v1.1.12: more than the last ten, a page at a time; a war still running is left out, and one that
+        // was abandoned says so instead of counting as a loss
+        var wars = (await backend.GetTeamWarHistory(myTeam, limit: 100)).Where(w => w.Status != "active").ToList();
 
-        terminal.ClearScreen();
-        terminal.WriteLine("");
-        WriteSectionHeader(Loc.Get("team_corner.war_history_header"), "bright_red");
+        void Header()
+        {
+            terminal.ClearScreen();
+            terminal.WriteLine("");
+            WriteSectionHeader(Loc.Get("team_corner.war_history_header"), "bright_red");
+        }
 
         if (wars.Count == 0)
         {
+            Header();
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("team.no_wars_yet"));
+            await terminal.PressAnyKey();
+            return;
         }
-        else
+
+        await ShowPaged(wars, Header, (war, _) =>
         {
-            foreach (var war in wars)
-            {
-                bool weChallenger = war.ChallengerTeam == myTeam;
-                string opponent = weChallenger ? war.DefenderTeam : war.ChallengerTeam;
-                int ourWins = weChallenger ? war.ChallengerWins : war.DefenderWins;
-                int theirWins = weChallenger ? war.DefenderWins : war.ChallengerWins;
-                bool weWon = ourWins > theirWins;
+            bool weChallenger = string.Equals(war.ChallengerTeam, myTeam, StringComparison.OrdinalIgnoreCase);
+            string opponent = weChallenger ? war.DefenderTeam : war.ChallengerTeam;
+            int ourWins = weChallenger ? war.ChallengerWins : war.DefenderWins;
+            int theirWins = weChallenger ? war.DefenderWins : war.ChallengerWins;
+            bool abandoned = war.Status == "abandoned";
+            bool weWon = ourWins > theirWins;
 
-                terminal.SetColor(weWon ? "bright_green" : "bright_red");
-                terminal.Write($"  {(weWon ? Loc.Get("team.war_win") : Loc.Get("team.war_loss"))} ");
-                terminal.SetColor("white");
-                terminal.Write(Loc.Get("team.war_vs", opponent));
-                terminal.SetColor("gray");
-                terminal.WriteLine(Loc.Get("team.war_record", ourWins, theirWins, $"{war.GoldWagered:N0}"));
-            }
-        }
-
-        await terminal.PressAnyKey();
+            terminal.SetColor(abandoned ? "gray" : weWon ? "bright_green" : "bright_red");
+            terminal.Write($"  {(abandoned ? Loc.Get("team.war_abandoned") : weWon ? Loc.Get("team.war_win") : Loc.Get("team.war_loss"))} ");
+            terminal.SetColor("white");
+            terminal.Write(Loc.Get("team.war_vs", opponent));
+            terminal.SetColor("gray");
+            terminal.WriteLine(Loc.Get("team.war_record", ourWins, theirWins, $"{war.GoldWagered:N0}"));
+        });
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -3462,7 +3907,7 @@ public class TeamCornerLocation : BaseLocation
             var upgrades = await backend.GetTeamUpgrades(teamName);
             long vaultGold = await backend.GetTeamVaultGold(teamName);
             int vaultLevel = backend.GetTeamUpgradeLevel(teamName, "vault");
-            long vaultCapacity = 50000 + (vaultLevel * 50000);
+            long vaultCapacity = SqlSaveBackend.TeamVaultCapacity(vaultLevel);
 
             WriteSectionHeader(Loc.Get("team_corner.facilities"), "bright_yellow");
             terminal.WriteLine("");
@@ -3525,7 +3970,7 @@ public class TeamCornerLocation : BaseLocation
         var def = UpgradeDefinitions[key];
         int currentLevel = backend.GetTeamUpgradeLevel(teamName, key);
 
-        if (currentLevel >= 10)
+        if (currentLevel >= GameConfig.MaxTeamFacilityLevel)
         {
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("team.max_level_reached"));
@@ -3552,6 +3997,11 @@ public class TeamCornerLocation : BaseLocation
         terminal.Write(Loc.Get("team.pay_personal"));
         string payChoice = (await terminal.ReadLineAsync())?.Trim().ToUpper() ?? "";
 
+        // v1.1.12: the level rises only if it is still the one priced (and below the cap), so two members
+        // upgrading at once cannot both pay and both raise it. Paid from the vault, the payment and the
+        // level change are one transaction. Paid personally, the gold is taken and saved first and given
+        // back if the upgrade does not land (the bool was ignored, the gold kept).
+        bool landed;
         if (payChoice == "V")
         {
             if (vaultGold < cost)
@@ -3561,8 +4011,7 @@ public class TeamCornerLocation : BaseLocation
                 await Task.Delay(1500);
                 return;
             }
-            bool withdrawn = await backend.WithdrawFromTeamVault(teamName, cost);
-            if (!withdrawn) { terminal.SetColor("red"); terminal.WriteLine(Loc.Get("team.failed_generic")); await Task.Delay(1500); return; }
+            landed = backend.TryUpgradeTeamFacility(teamName, key, currentLevel, cost, payFromVault: true);
         }
         else if (payChoice == "P")
         {
@@ -3574,10 +4023,31 @@ public class TeamCornerLocation : BaseLocation
                 return;
             }
             currentPlayer.Gold -= cost;
+            if (!await ForcePlayerSave())
+            {
+                currentPlayer.Gold += cost;
+                landed = false;
+            }
+            else
+            {
+                landed = backend.TryUpgradeTeamFacility(teamName, key, currentLevel, cost, payFromVault: false);
+                if (!landed)
+                {
+                    currentPlayer.Gold += cost;
+                    await ForcePlayerSave();
+                }
+            }
         }
         else return;
 
-        await backend.UpgradeTeamFacility(teamName, key, cost);
+        if (!landed)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine(Loc.Get("team.upgrade_not_landed"));
+            await Task.Delay(2000);
+            return;
+        }
+
         terminal.SetColor("bright_green");
         terminal.WriteLine(Loc.Get("team.facility_upgraded", Loc.Get(def.NameKey), currentLevel + 1));
 
@@ -3590,7 +4060,7 @@ public class TeamCornerLocation : BaseLocation
     private async Task DepositToVault(SqlSaveBackend backend, string teamName)
     {
         int vaultLevel = backend.GetTeamUpgradeLevel(teamName, "vault");
-        long vaultCapacity = 50000 + (vaultLevel * 50000);
+        long vaultCapacity = SqlSaveBackend.TeamVaultCapacity(vaultLevel);
         long currentVault = await backend.GetTeamVaultGold(teamName);
         long space = vaultCapacity - currentVault;
 
@@ -3610,8 +4080,20 @@ public class TeamCornerLocation : BaseLocation
         amount = Math.Min(amount, Math.Min(space, currentPlayer.Gold));
         if (amount <= 0) return;
 
+        // v1.1.12: the vault row was credited at once but the gold left the player only in memory, so a
+        // crash before the next autosave kept both. Now the gold is taken and saved first, then the vault
+        // is credited (capacity checked in the SQL); if the credit fails the gold comes back.
         currentPlayer.Gold -= amount;
-        await backend.DepositToTeamVault(teamName, amount);
+        bool deposited = await ForcePlayerSave() && await backend.DepositToTeamVault(teamName, amount);
+        if (!deposited)
+        {
+            currentPlayer.Gold += amount;
+            await ForcePlayerSave();
+            terminal.SetColor("red");
+            terminal.WriteLine(Loc.Get("team.vault_full"));
+            await Task.Delay(1500);
+            return;
+        }
         terminal.SetColor("bright_green");
         terminal.WriteLine(Loc.Get("team.deposited", $"{amount:N0}"));
         await Task.Delay(1500);
@@ -3634,10 +4116,19 @@ public class TeamCornerLocation : BaseLocation
         if (!long.TryParse(input, out long amount) || amount <= 0) return;
 
         amount = Math.Min(amount, currentVault);
+
+        // v1.1.12: asked first, the vault is the whole team's
+        terminal.SetColor("yellow");
+        terminal.Write(Loc.Get("team.confirm_withdraw", $"{amount:N0}"));
+        if (!GameConfig.IsAffirmative(await terminal.ReadLineAsync())) return;
+
         bool success = await backend.WithdrawFromTeamVault(teamName, amount);
         if (success)
         {
+            // v1.1.12: saved at once; the vault was debited at once while the gold waited for the next
+            // throttled autosave, and a crash between lost it
             currentPlayer.Gold += amount;
+            await ForcePlayerSave();
             terminal.SetColor("bright_green");
             terminal.WriteLine(Loc.Get("team.withdrew", $"{amount:N0}"));
         }
@@ -3710,43 +4201,12 @@ public class TeamCornerLocation : BaseLocation
             return;
         }
 
-        // List team members with current spec
-        terminal.ClearScreen();
-        terminal.SetColor("bright_cyan");
-        terminal.WriteLine(Loc.Get("spec.title"));
-        terminal.WriteLine("");
-
-        for (int i = 0; i < teamMembers.Count; i++)
-        {
-            var member = teamMembers[i];
-            string specLabel = member.Specialization != ClassSpecialization.None
-                ? $"[{member.Specialization}]"
-                : Loc.Get("spec.none_label");
-
-            terminal.SetColor("bright_yellow");
-            terminal.Write($"  {i + 1}. ");
-            terminal.SetColor("white");
-            terminal.Write($"{member.DisplayName} ");
-            terminal.SetColor("gray");
-            terminal.Write($"(Lv {member.Level} {member.ClassName}) ");
-            terminal.SetColor("cyan");
-            terminal.WriteLine(specLabel);
-        }
-
-        terminal.WriteLine("");
-        terminal.SetColor("yellow");
-        string input = await terminal.GetInput(Loc.Get("spec.choose_member"));
-        if (string.IsNullOrWhiteSpace(input)) return;
-
-        if (!int.TryParse(input, out int memberIndex) || memberIndex < 1 || memberIndex > teamMembers.Count)
-        {
-            terminal.SetColor("red");
-            terminal.WriteLine(Loc.Get("spec.invalid_choice"));
-            await Task.Delay(1500);
-            return;
-        }
-
-        var selectedNPC = teamMembers[memberIndex - 1];
+        // v1.1.12: the shared picker
+        var selectedNPC = await PickFromList(teamMembers,
+            m => $"{m.DisplayName} ({Loc.Get("inn.npc_level_class", m.Level, GameConfig.GetLocalizedClassName(m.Class))}) "
+                 + (m.Specialization != ClassSpecialization.None ? SpecTag(m).Trim() : Loc.Get("spec.none_label")),
+            m => m.DisplayName, "spec.title");
+        if (selectedNPC == null) return;
         await ShowSpecOptions(selectedNPC);
     }
 
@@ -3771,7 +4231,7 @@ public class TeamCornerLocation : BaseLocation
 
         // Show current spec
         string currentSpecName = npc.Specialization != ClassSpecialization.None
-            ? npc.Specialization.ToString()
+            ? (UsurperRemake.Data.SpecializationData.GetSpec(npc.Specialization)?.Name ?? npc.Specialization.ToString())
             : Loc.Get("spec.unspecialized");
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("spec.current_spec", currentSpecName));
@@ -3795,7 +4255,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.SetColor(isCurrentSpec ? "bright_green" : "white");
             terminal.Write($"{spec.Name} ");
             terminal.SetColor("cyan");
-            terminal.Write($"({spec.Role}) ");
+            terminal.Write($"({SpecRoleName(spec.Role)}) ");
             if (isCurrentSpec)
             {
                 terminal.SetColor("bright_green");
@@ -3809,17 +4269,17 @@ public class TeamCornerLocation : BaseLocation
 
             // Stat growth bonuses
             var bonuses = new List<string>();
-            if (spec.BonusStrength > 0) bonuses.Add($"+{spec.BonusStrength} STR");
-            if (spec.BonusConstitution > 0) bonuses.Add($"+{spec.BonusConstitution} CON");
-            if (spec.BonusMaxHP > 0) bonuses.Add($"+{spec.BonusMaxHP} HP");
-            if (spec.BonusDefence > 0) bonuses.Add($"+{spec.BonusDefence} DEF");
-            if (spec.BonusIntelligence > 0) bonuses.Add($"+{spec.BonusIntelligence} INT");
-            if (spec.BonusWisdom > 0) bonuses.Add($"+{spec.BonusWisdom} WIS");
-            if (spec.BonusCharisma > 0) bonuses.Add($"+{spec.BonusCharisma} CHA");
-            if (spec.BonusMaxMana > 0) bonuses.Add($"+{spec.BonusMaxMana} Mana");
-            if (spec.BonusDexterity > 0) bonuses.Add($"+{spec.BonusDexterity} DEX");
-            if (spec.BonusAgility > 0) bonuses.Add($"+{spec.BonusAgility} AGI");
-            if (spec.BonusStamina > 0) bonuses.Add($"+{spec.BonusStamina} STA");
+            if (spec.BonusStrength > 0) bonuses.Add($"+{spec.BonusStrength} {Loc.Get("stats.str")}");
+            if (spec.BonusConstitution > 0) bonuses.Add($"+{spec.BonusConstitution} {Loc.Get("stats.con")}");
+            if (spec.BonusMaxHP > 0) bonuses.Add($"+{spec.BonusMaxHP} {Loc.Get("ui.stat_hp")}");
+            if (spec.BonusDefence > 0) bonuses.Add($"+{spec.BonusDefence} {Loc.Get("stats.def")}");
+            if (spec.BonusIntelligence > 0) bonuses.Add($"+{spec.BonusIntelligence} {Loc.Get("stats.int")}");
+            if (spec.BonusWisdom > 0) bonuses.Add($"+{spec.BonusWisdom} {Loc.Get("stats.wis")}");
+            if (spec.BonusCharisma > 0) bonuses.Add($"+{spec.BonusCharisma} {Loc.Get("stats.cha")}");
+            if (spec.BonusMaxMana > 0) bonuses.Add($"+{spec.BonusMaxMana} {Loc.Get("ui.stat_mana")}");
+            if (spec.BonusDexterity > 0) bonuses.Add($"+{spec.BonusDexterity} {Loc.Get("stats.dex")}");
+            if (spec.BonusAgility > 0) bonuses.Add($"+{spec.BonusAgility} {Loc.Get("stats.agi")}");
+            if (spec.BonusStamina > 0) bonuses.Add($"+{spec.BonusStamina} {Loc.Get("stats.sta")}");
 
             if (bonuses.Count > 0)
             {
@@ -3866,8 +4326,17 @@ public class TeamCornerLocation : BaseLocation
             return;
         }
 
-        // Apply specialization
-        var oldSpec = npc.Specialization;
+        // Apply specialization. v1.1.12: to the live NPC, looked up again by ID; a world_state reload while
+        // the menu was up replaced the object listed, and the change was lost
+        var live = LiveTeamNpc(npc);
+        if (live == null || live.Team != currentPlayer.Team)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine(Loc.Get("team.member_gone_now", npc.DisplayName));
+            await Task.Delay(2000);
+            return;
+        }
+        npc = live;
         npc.Specialization = newSpec;
 
         terminal.WriteLine("");
@@ -3880,7 +4349,7 @@ public class TeamCornerLocation : BaseLocation
         {
             var specDef = UsurperRemake.Data.SpecializationData.GetSpec(newSpec);
             terminal.SetColor("bright_green");
-            terminal.WriteLine(Loc.Get("spec.set", npc.DisplayName, specDef?.Name ?? newSpec.ToString(), specDef?.Role.ToString() ?? ""));
+            terminal.WriteLine(Loc.Get("spec.set", npc.DisplayName, specDef?.Name ?? newSpec.ToString(), specDef != null ? SpecRoleName(specDef.Role) : ""));
         }
 
         terminal.SetColor("gray");

@@ -568,6 +568,12 @@ namespace UsurperRemake.Systems
                     };
                     terminal.SetColor(itemColor);
                     terminal.Write(item.Name);
+                    if (item.IsCursed)
+                    {
+                        // v1.1.12: cursed items are tagged in the backpack list.
+                        terminal.SetColor("red");
+                        terminal.Write(Loc.Get("shop.cursed_tag"));
+                    }
 
                     terminal.SetColor("gray");
                     terminal.Write($" - {item.Value:N0}g");
@@ -913,7 +919,14 @@ namespace UsurperRemake.Systems
             if (item.IsIdentified)
             {
                 terminal.SetColor("yellow");
-                terminal.WriteLine($"  {item.Name}");
+                terminal.Write($"  {item.Name}");
+                if (item.IsCursed)
+                {
+                    // v1.1.12: and in the item view.
+                    terminal.SetColor("red");
+                    terminal.Write(Loc.Get("shop.cursed_tag"));
+                }
+                terminal.WriteLine("");
                 terminal.SetColor("gray");
                 terminal.WriteLine($"  {Loc.Get("inventory.value")}: {item.Value:N0} {Loc.Get("ui.gold_word")}");
                 terminal.WriteLine($"  {Loc.Get("inventory.type")}: {item.Type}");
@@ -1130,6 +1143,13 @@ namespace UsurperRemake.Systems
                 }
             }
 
+            // v1.1.12: a cursed item cannot be unequipped (UnequipSlot refuses it); say so first.
+            if (item.IsCursed)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine(Loc.Get("inventory.cursed_equip_warning"));
+            }
+
             // Show comparison with currently equipped item
             EquipmentSlot compareSlot = finalSlot ?? targetSlot;
             var currentEquip = player.GetEquipment(compareSlot);
@@ -1243,6 +1263,20 @@ namespace UsurperRemake.Systems
                 terminal.Write(Loc.Get("inventory.equip_confirm"));
                 var confirm = await terminal.GetInput("");
                 if (!GameConfig.IsAffirmative(confirm))
+                {
+                    terminal.SetColor("gray");
+                    terminal.WriteLine(Loc.Get("ui.cancelled"));
+                    await Task.Delay(1000);
+                    return;
+                }
+            }
+            else if (item.IsCursed)
+            {
+                // v1.1.12: a cursed item is confirmed into an empty slot too; the prompt above only runs when
+                // something is already equipped there
+                terminal.SetColor("white");
+                terminal.Write(Loc.Get("inventory.equip_confirm"));
+                if (!GameConfig.IsAffirmative(await terminal.GetInput("")))
                 {
                     terminal.SetColor("gray");
                     terminal.WriteLine(Loc.Get("ui.cancelled"));

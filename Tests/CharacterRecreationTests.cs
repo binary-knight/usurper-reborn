@@ -556,6 +556,32 @@ public class CharacterRecreationTests : IDisposable
     }
 
     [Fact]
+    public void TheAdminDeletes_ReadTheName2_OfABannedCharacterToo()
+    {
+        // v1.1.12: ReadGameData skips banned accounts, so a banned married Bob was purged as "Bob Smith"
+        // and kept his children for a later "Bob"
+        _db = new SqlSaveBackend(_path);
+        Players(("bob_acct", "Bob Smith", "{\"player\":{\"name2\":\"Bob\"}}"),
+                ("carol", "Carol Jones", "not json"));
+        using (var conn = new SqliteConnection($"Data Source={_path}"))
+        {
+            conn.Open();
+            using var ban = conn.CreateCommand();
+            ban.CommandText = "UPDATE players SET is_banned = 1 WHERE username = 'bob_acct';";
+            ban.ExecuteNonQuery();
+        }
+        _db.GetStoredName2("bob_acct").Should().Be("Bob");
+        _db.GetStoredName2("carol").Should().BeNull("an unreadable save has no Name2");
+        _db.GetStoredName2("nobody").Should().BeNull();
+        foreach (var file in new[] { "OnlineAdminConsole.cs", "SysOpConsoleManager.cs" })
+        {
+            string src = CodeOnly(Source("Systems", file));
+            src.Should().Contain("GetStoredName2(target.Username)");
+            src.Should().NotContain("deletedSave?.Player?.Name2");
+        }
+    }
+
+    [Fact]
     public void AnotherPlayersUseOfAName_IsFoundByDisplayNameOrName2_AndABadSaveIsSkipped()
     {
         _db = new SqlSaveBackend(_path);

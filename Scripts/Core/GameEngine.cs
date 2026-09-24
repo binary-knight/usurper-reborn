@@ -2845,6 +2845,7 @@ public partial class GameEngine
             // entry for a deleted same-name character was restored with any save.
             string? godRestoreFilter = GodRestoreFilterFor(currentPlayer);
             SaveSystem.Instance.RestoreStorySystems(saveData.StorySystems, godRestoreFilter);
+            AwakeningBonus.RecalculateAfterRestore(currentPlayer, saveData.Player?.HP ?? 0, saveData.Player?.Mana ?? 0); // v1.1.12
 
             // Migration: sync RelationshipSystem with RomanceTracker for saves affected by
             // the bidirectional key bug (pre-v0.42.4). If RomanceTracker says Lover/Spouse/FWB
@@ -4343,19 +4344,29 @@ public partial class GameEngine
     /// before the normal session save persists the credit loses the gold to the
     /// sink rather than duplicating it.
     /// </summary>
+    /// <summary>
+    /// v1.1.12: the key pending_gold_transfers are queued and delivered under: the save key of the character
+    /// being played (InheritanceKey). Every producer queues under players.username, which is the save key
+    /// ("name__alt" for an alt); the account name used here gave an alt's rows to its main.
+    /// </summary>
+    internal static string GoldTransferKey(Character player) => player == null ? "" : InheritanceKey(player);
+
     private async Task DeliverPendingGoldTransfers(SqlSaveBackend backend)
     {
         if (currentPlayer == null) return;
-        var username = UsurperRemake.Server.SessionContext.Current?.Username
-            ?? UsurperRemake.BBS.DoorMode.GetPlayerName()?.ToLowerInvariant()
-            ?? currentPlayer.Name2?.ToLowerInvariant()
-            ?? "";
-        if (string.IsNullOrEmpty(username)) return;
+        await DeliverPendingGoldTransfers(currentPlayer, terminal, backend);
+    }
+
+    /// <summary>v1.1.12: login delivery of queued transfers to this character's bank; returns the gold delivered.</summary>
+    internal static async Task<long> DeliverPendingGoldTransfers(Character currentPlayer, TerminalEmulator terminal, SqlSaveBackend backend)
+    {
+        var username = GoldTransferKey(currentPlayer);
+        if (string.IsNullOrEmpty(username)) return 0;
 
         try
         {
             var pending = backend.GetPendingGoldTransfers(username);
-            if (pending.Count == 0) return;
+            if (pending.Count == 0) return 0;
 
             var deliveredIds = new List<long>();
             long totalReceived = 0;
@@ -4385,11 +4396,13 @@ public partial class GameEngine
             backend.ClearGoldTransfers(deliveredIds);
             DebugLogger.Instance.LogInfo("GOLD", $"WIRE DELIVERY: '{username}' received {totalReceived:N0}g to bank from {pending.Count} transfer(s)");
             await Task.Delay(1500);
+            return totalReceived;
         }
         catch (Exception ex)
         {
             DebugLogger.Instance.LogError("WIRE", $"Failed to deliver pending gold transfers: {ex.Message}");
         }
+        return 0;
     }
 
     /// <summary>
@@ -4706,6 +4719,7 @@ public partial class GameEngine
         // snapshots would overwrite their current worship choices in the shared GodSystem.
         string? godFilter = GodRestoreFilterFor(currentPlayer); // v1.1.11: single-player too
         SaveSystem.Instance.RestoreStorySystems(saveData.StorySystems, godFilter);
+        AwakeningBonus.RecalculateAfterRestore(currentPlayer, saveData.Player?.HP ?? 0, saveData.Player?.Mana ?? 0); // v1.1.12
 
         // In online mode, override royal court, children, and marriages with world_state
         // (authoritative source). RestoreStorySystems loaded stale data from the player's
@@ -6336,6 +6350,7 @@ public partial class GameEngine
                 IsPermanentlyClear = saved.IsPermanentlyClear,
                 BossDefeated = saved.BossDefeated,
                 CompletionBonusAwarded = saved.CompletionBonusAwarded,
+                RestedOnThisFloor = saved.RestedOnThisFloor,
                 CurrentRoomId = saved.CurrentRoomId,
                 RoomStates = new Dictionary<string, UsurperRemake.Systems.DungeonRoomState>()
             };

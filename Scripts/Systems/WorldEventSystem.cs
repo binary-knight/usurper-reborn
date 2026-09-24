@@ -628,6 +628,10 @@ namespace UsurperRemake.Systems
             return (long)(baseGold * GlobalGoldModifier);
         }
 
+        // v1.1.12: the world event's own share of a reward, for the combat bonus line.
+        public long GetWorldEventXPBonus(long baseXP) => GetAdjustedXP(baseXP) - baseXP;
+        public long GetWorldEventGoldBonus(long baseGold) => GetAdjustedGold(baseGold) - baseGold;
+
         /// <summary>
         /// Check if a location is accessible based on current events
         /// </summary>

@@ -45,7 +45,7 @@ namespace UsurperRemake.Systems
                 return new DialogueResult { Completed = false, EndNode = null };
             }
 
-            // GD.Print($"[Dialogue] Starting dialogue tree: {treeId}");
+            RecordDialogueMoments(treeId); // v1.1.12
 
             currentNode = tree.RootNode;
             var result = await ProcessDialogueTree(tree);
@@ -54,6 +54,13 @@ namespace UsurperRemake.Systems
             dialogueHistory.Add(treeId);
 
             return result;
+        }
+
+        /// <summary>v1.1.12: meeting the Creator is an awakening moment.</summary>
+        internal static void RecordDialogueMoments(string treeId)
+        {
+            if (treeId == "manwe_encounter")
+                OceanPhilosophySystem.Instance.ExperienceMoment(AwakeningMoment.MetManwe);
         }
 
         /// <summary>
@@ -424,7 +431,7 @@ namespace UsurperRemake.Systems
                     return false;
 
                 case ConditionType.HasOceanInsight:
-                    return OceanPhilosophySystem.Instance.Insights.Count >= condition.IntValue;
+                    return OceanPhilosophySystem.Instance.InsightIds.Count >= condition.IntValue; // v1.1.12: distinct insights
 
                 case ConditionType.ExperiencedMoment:
                     if (Enum.TryParse<AwakeningMoment>(condition.StringValue, out var moment))
@@ -469,7 +476,7 @@ namespace UsurperRemake.Systems
 
             foreach (var effect in node.Effects)
             {
-                ApplyEffect(effect);
+                ApplyEffect(effect, node.Id);
             }
         }
 
@@ -482,14 +489,14 @@ namespace UsurperRemake.Systems
 
             foreach (var effect in choice.Effects)
             {
-                ApplyEffect(effect);
+                ApplyEffect(effect, currentNode?.Id ?? "");
             }
         }
 
         /// <summary>
         /// Apply a single dialogue effect
         /// </summary>
-        private void ApplyEffect(DialogueEffect effect)
+        private void ApplyEffect(DialogueEffect effect, string sourceNodeId)
         {
             if (currentPlayer == null) return;
             var story = StoryProgressionSystem.Instance;
@@ -618,7 +625,7 @@ namespace UsurperRemake.Systems
 
                 // Ocean Philosophy effects
                 case EffectType.GainOceanInsight:
-                    OceanPhilosophySystem.Instance.GainInsight(effect.IntValue);
+                    OceanPhilosophySystem.Instance.GainInsight("dialogue:" + sourceNodeId); // v1.1.12: one insight per node
                     terminal?.WriteLine("(A deeper understanding settles within you)", "bright_cyan");
                     break;
 
@@ -2757,7 +2764,7 @@ namespace UsurperRemake.Systems
                 {
                     new() { Type = EffectType.SetStoryFlag, StringValue = "manwe_ally" },
                     new() { Type = EffectType.GainOceanInsight, IntValue = 30 },
-                    new() { Type = EffectType.CollectWaveFragment, StringValue = "CreatorsRest" }
+                    new() { Type = EffectType.CollectWaveFragment, StringValue = "TheChoice" } // v1.1.12: was "CreatorsRest", not a fragment
                 }
             };
             tree.AllNodes[alliance.Id] = alliance;

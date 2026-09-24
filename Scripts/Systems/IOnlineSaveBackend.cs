@@ -225,6 +225,12 @@ namespace UsurperRemake.Systems
         public int MemberCount { get; set; }
         public bool ControlsTurf { get; set; }
         public DateTime CreatedAt { get; set; }
+        /// <summary>v1.1.12: sum of the player members' levels, from the same pass as MemberCount.</summary>
+        public long LevelSum { get; set; }
+        /// <summary>v1.1.12: sum of level + strength + defence over the player members (the rankings' power).</summary>
+        public long PowerSum { get; set; }
+        /// <summary>v1.1.12: false for a team named only in player saves (an NPC team players joined).</summary>
+        public bool HasTeamRow { get; set; } = true;
     }
 
     /// <summary>

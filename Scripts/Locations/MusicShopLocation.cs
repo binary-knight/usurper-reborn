@@ -1259,8 +1259,9 @@ public class MusicShopLocation : BaseLocation
 
             try
             {
-                // GainInsight grants real awakening points (unlike ExperienceMoment which is one-time-only)
-                OceanPhilosophySystem.Instance?.GainInsight(1);
+                // v1.1.12: each god's song is its own insight; the first song is also a moment
+                OceanPhilosophySystem.Instance?.GainInsight("song:" + god);
+                OceanPhilosophySystem.Instance?.ExperienceMoment(AwakeningMoment.HeardOldGodLoreSong);
             }
             catch { }
         }

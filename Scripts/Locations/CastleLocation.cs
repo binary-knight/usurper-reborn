@@ -5987,6 +5987,7 @@ public class CastleLocation : BaseLocation
         {
             // Player King (offline) — try loading from database
             PlayerData kingData = null;
+            StorySystemsData? kingStory = null;   // v1.1.12: the king fights with its own awakening
             try
             {
                 var backend = SaveSystem.Instance?.Backend as SqlSaveBackend;
@@ -5994,14 +5995,17 @@ public class CastleLocation : BaseLocation
                 {
                     var kingSave = await backend.ReadGameData(currentKing.Name.ToLowerInvariant());
                     if (kingSave?.Player != null)
+                    {
                         kingData = kingSave.Player;
+                        kingStory = kingSave.StorySystems;
+                    }
                 }
             }
             catch { /* Fall through */ }
 
             if (kingData != null)
             {
-                kingCharacter = PlayerCharacterLoader.CreateFromSaveData(kingData, currentKing.Name);
+                kingCharacter = PlayerCharacterLoader.CreateFromSaveData(kingData, currentKing.Name, story: kingStory);
             }
             else
             {
@@ -8677,7 +8681,10 @@ public class CastleLocation : BaseLocation
         terminal.WriteLine("");
 
         // Load team members for the assault
-        var teamMembers = await backend.GetPlayerTeamMembers(currentPlayer.Team, currentPlayer.DisplayName);
+        // v1.1.12: the player is left out by save key; a teammate may share the player's display name
+        string myKey = GameEngine.InheritanceKey(currentPlayer);
+        var teamMembers = (await backend.GetPlayerTeamMembers(currentPlayer.Team))
+            .Where(m => !string.Equals(m.Username, myKey, StringComparison.OrdinalIgnoreCase)).ToList();
         terminal.SetColor("bright_cyan");
         terminal.WriteLine(Loc.Get("castle.siege_your_force"));
         terminal.SetColor("bright_green");

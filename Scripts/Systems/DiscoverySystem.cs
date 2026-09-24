@@ -80,7 +80,7 @@ namespace UsurperRemake.Systems
             switch (o.Kind)
             {
                 case DiscoveryKind.Narrative:
-                    await ApplyEffects(o.Effects, player, floor, terminal, outcome, teammates);
+                    await ApplyEffects(def.Id, o.Effects, player, floor, terminal, outcome, teammates);
                     break;
                 case DiscoveryKind.Choice:
                     await RunChoice(def, player, floor, terminal, outcome, teammates);
@@ -130,7 +130,7 @@ namespace UsurperRemake.Systems
             foreach (var line in ResolveArray(def.Id, $"choice{idx}.result", chosen.ResultLines))
                 terminal.WriteLine("  " + line);
             if (!chosen.IsWalkAway)
-                await ApplyEffects(chosen.Effects, player, floor, terminal, outcome, teammates);
+                await ApplyEffects(def.Id, chosen.Effects, player, floor, terminal, outcome, teammates);
         }
 
         private async Task RunSkillTest(DiscoveryDefinition def, Character player, int floor,
@@ -165,14 +165,14 @@ namespace UsurperRemake.Systems
                 terminal.SetColor("bright_green");
                 foreach (var line in ResolveArray(def.Id, "test.success", o.SuccessLines))
                     terminal.WriteLine("  " + line);
-                await ApplyEffects(o.SuccessEffects, player, floor, terminal, outcome, teammates);
+                await ApplyEffects(def.Id, o.SuccessEffects, player, floor, terminal, outcome, teammates);
             }
             else
             {
                 terminal.SetColor("red");
                 foreach (var line in ResolveArray(def.Id, "test.fail", o.FailLines))
                     terminal.WriteLine("  " + line);
-                await ApplyEffects(o.FailEffects, player, floor, terminal, outcome, teammates);
+                await ApplyEffects(def.Id, o.FailEffects, player, floor, terminal, outcome, teammates);
                 outcome.Success = false;
             }
         }
@@ -204,14 +204,14 @@ namespace UsurperRemake.Systems
                 terminal.SetColor("bright_green");
                 foreach (var line in ResolveArray(def.Id, "risk.success", o.SuccessLines))
                     terminal.WriteLine("  " + line);
-                await ApplyEffects(o.SuccessEffects, player, floor, terminal, outcome, teammates);
+                await ApplyEffects(def.Id, o.SuccessEffects, player, floor, terminal, outcome, teammates);
             }
             else
             {
                 terminal.SetColor("red");
                 foreach (var line in ResolveArray(def.Id, "risk.fail", o.FailLines))
                     terminal.WriteLine("  " + line);
-                await ApplyEffects(o.FailEffects, player, floor, terminal, outcome, teammates);
+                await ApplyEffects(def.Id, o.FailEffects, player, floor, terminal, outcome, teammates);
                 outcome.Success = false;
             }
         }
@@ -221,25 +221,25 @@ namespace UsurperRemake.Systems
         {
             terminal.SetColor("red");
             // Intro already shown; apply the trap's effects.
-            await ApplyEffects(def.Root.Effects, player, floor, terminal, outcome, teammates);
+            await ApplyEffects(def.Id, def.Root.Effects, player, floor, terminal, outcome, teammates);
             outcome.Success = false;
         }
 
         // ---------- effect application ----------
 
-        private async Task ApplyEffects(List<DiscEffect> effects, Character player, int floor,
+        private async Task ApplyEffects(string discoveryId, List<DiscEffect> effects, Character player, int floor,
             TerminalEmulator terminal, FeatureOutcome outcome, List<Character> teammates)
         {
             if (effects == null) return;
             foreach (var e in effects)
             {
-                try { ApplyEffect(e, player, floor, terminal, outcome, teammates); }
+                try { ApplyEffect(discoveryId, e, player, floor, terminal, outcome, teammates); }
                 catch (Exception ex) { DebugLogger.Instance?.LogError("DISCOVERY", $"effect {e.Type} failed: {ex.Message}"); }
                 await Task.Delay(250);
             }
         }
 
-        private void ApplyEffect(DiscEffect e, Character player, int floor,
+        private void ApplyEffect(string discoveryId, DiscEffect e, Character player, int floor,
             TerminalEmulator terminal, FeatureOutcome outcome, List<Character> teammates)
         {
             switch (e.Type)
@@ -357,12 +357,12 @@ namespace UsurperRemake.Systems
                     Msg(terminal, "bright_cyan", Loc.Get("discovery.effect.lore"));
                     break;
                 case DiscEffectType.Ocean:
-                    OceanPhilosophySystem.Instance.GainInsight(e.A);
+                    OceanPhilosophySystem.Instance.GainInsight("discovery:" + discoveryId); // v1.1.12: one insight per discovery
                     outcome.OceanInsightGained = true;
                     Msg(terminal, "bright_blue", Loc.Get("discovery.effect.ocean"));
                     break;
                 case DiscEffectType.Awakening:
-                    OceanPhilosophySystem.Instance.GainInsight(Math.Max(5, e.A * 5));
+                    OceanPhilosophySystem.Instance.GainInsight("discovery:" + discoveryId + ":awaken"); // v1.1.12: the deeper one counts apart
                     outcome.OceanInsightGained = true;
                     Msg(terminal, "bright_magenta", Loc.Get("discovery.effect.awakening"));
                     break;
@@ -389,7 +389,10 @@ namespace UsurperRemake.Systems
                     if (item != null)
                     {
                         player.Inventory.Add(item);
-                        Msg(terminal, "bright_green", Loc.Get("discovery.effect.loot", item.Name));
+                        // v1.1.12: an unidentified find keeps its disguise, as combat loot does.
+                        string shownName = item.IsIdentified ? item.Name : LootGenerator.GetUnidentifiedName(item);
+                        Msg(terminal, "bright_green", Loc.Get("discovery.effect.loot", shownName));
+                        ShowFoundGear(terminal, player, item);
                         return;
                     }
                 }
@@ -399,6 +402,32 @@ namespace UsurperRemake.Systems
             long gold = Scaled(floor, 80, 160);
             player.Gold += gold; outcome.GoldGained += gold;
             Msg(terminal, "bright_yellow", Loc.Get("discovery.effect.loot_gold", gold));
+        }
+
+        /// <summary>
+        /// v1.1.12: a found weapon or armour gets the combat loot comparison and curse warning.
+        /// Unidentified items show nothing, as in combat.
+        /// </summary>
+        internal static void ShowFoundGear(TerminalEmulator terminal, Character player, Item item)
+        {
+            if (!item.IsIdentified) return;
+            switch (item.Type)
+            {
+                case ObjType.Weapon: case ObjType.Shield: case ObjType.Body: case ObjType.Head:
+                case ObjType.Arms: case ObjType.Hands: case ObjType.Legs: case ObjType.Feet:
+                case ObjType.Waist: case ObjType.Neck: case ObjType.Face: case ObjType.Fingers:
+                case ObjType.Abody:
+                    break;
+                default:
+                    return;
+            }
+            if (item.IsCursed)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine(Loc.Get("combat.loot_cursed_warning"));
+                terminal.WriteLine(Loc.Get("combat.loot_cursed_hint"));
+            }
+            CombatEngine.ShowEquipmentComparison(terminal, item, player);
         }
 
         // v0.62.0 fix: discovery combat boons must SURVIVE into the next fight. TempAttackBonus /

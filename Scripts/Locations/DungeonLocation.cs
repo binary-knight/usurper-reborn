@@ -79,6 +79,7 @@ public class DungeonLocation : BaseLocation
             var floorResult = GenerateOrRestoreFloor(currentPlayer, currentDungeonLevel);
             currentFloor = floorResult.Floor;
             roomsExploredThisFloor = currentFloor.Rooms.Count(r => r.IsExplored);
+            hasCampedThisFloor = floorResult.RestedOnThisFloor; // v1.1.12
         }
         else
         {
@@ -205,7 +206,8 @@ public class DungeonLocation : BaseLocation
             bool didRespawn = floorResult.DidRespawn;
 
             roomsExploredThisFloor = wasRestored ? currentFloor.Rooms.Count(r => r.IsExplored) : 0;
-            hasCampedThisFloor = false;
+            // v1.1.12: the rest limit comes from the floor's saved state.
+            hasCampedThisFloor = floorResult.RestedOnThisFloor;
 
             // Reset companion idle comment history so comments can repeat on new dungeon runs
             CompanionSystem.ResetIdleCommentHistory();
@@ -384,6 +386,10 @@ public class DungeonLocation : BaseLocation
             if (HintSystem.Instance.TryShowHint(HintSystem.HINT_FIRST_DUNGEON, term, player.HintsShown))
                 await term.PressAnyKey();
         }
+
+        // v1.1.12: explain lives once, on the first dungeon entry (online permadeath only).
+        if (HintSystem.Instance.TryShowLivesHint(player, term))
+            await term.PressAnyKey();
 
         // Captain Aldric's Mission — dungeon entry objective
         if (player.HintsShown.Contains("aldric_quest_active") && !player.HintsShown.Contains("quest_scout_enter_dungeon"))
@@ -1387,29 +1393,18 @@ public class DungeonLocation : BaseLocation
         // hit the same failure forever. Now we track stuck names and prune them
         // after the loop so Team Corner reflects reality.
         var stuckNames = new List<string>();
+        // v1.1.12: the viewer's own save is never echoed
+        string viewerKey = currentPlayer != null ? GameEngine.InheritanceKey(currentPlayer) : "";
 
         foreach (var name in playerNames)
         {
-            // Skip if already in party
-            if (teammates.Any(t => t.DisplayName.Equals(name, StringComparison.OrdinalIgnoreCase)))
+            // Skip if already in party (v1.1.12: by save key; never an NPC's name)
+            if (EchoAlreadyInParty(teammates, name, name.ToLowerInvariant()))
                 continue;
 
             try
             {
-                // Load player's save data from database. The recruit list stores the
-                // player's DISPLAY name, which since v0.65.1 can include a family
-                // surname (e.g. "Imperius Ashwick"), but saves are keyed by account
-                // username (e.g. "imperius") -- so a surnamed character's echo failed
-                // to load with "save data cannot be found". If the direct lookup misses,
-                // resolve the display name to the canonical username and retry. This
-                // also self-heals echoes that were already stuck from earlier sessions.
-                var saveData = await backend.ReadGameData(name.ToLower());
-                if (saveData?.Player == null)
-                {
-                    var resolvedUser = backend.ResolvePlayerUsername(name);
-                    if (!string.IsNullOrEmpty(resolvedUser) && !resolvedUser.Equals(name, StringComparison.OrdinalIgnoreCase))
-                        saveData = await backend.ReadGameData(resolvedUser.ToLower());
-                }
+                var (saveData, echoKey) = await LoadEchoSave(backend, name, viewerKey);
                 if (saveData?.Player == null)
                 {
                     term.SetColor("yellow");
@@ -1417,6 +1412,9 @@ public class DungeonLocation : BaseLocation
                     stuckNames.Add(name);
                     continue;
                 }
+                // v1.1.12: an older entry (a display name) resolved to a key; skip it if that echo is already here
+                if (EchoAlreadyInParty(teammates, name, echoKey!))
+                    continue;
 
                 // Verify they're still on the same team
                 if (currentPlayer != null && !string.IsNullOrEmpty(currentPlayer.Team))
@@ -1424,7 +1422,7 @@ public class DungeonLocation : BaseLocation
                     if (saveData.Player.Team != currentPlayer.Team)
                     {
                         term.SetColor("yellow");
-                        term.WriteLine(Loc.Get("dungeon.not_on_team", name));
+                        term.WriteLine(Loc.Get("dungeon.not_on_team", saveData.Player.Name2 ?? name));
                         stuckNames.Add(name);
                         continue;
                     }
@@ -1443,11 +1441,12 @@ public class DungeonLocation : BaseLocation
 
                 // Create echo character
                 var ally = PlayerCharacterLoader.CreateFromSaveData(saveData.Player, name, isEcho: true);
+                ally.EchoSaveKey = echoKey ?? "";   // v1.1.12: kept in the recruit list by this key
                 teammates.Add(ally);
                 restoredCount++;
 
                 term.SetColor("bright_cyan");
-                term.WriteLine(Loc.Get("dungeon.echo_materializes", name));
+                term.WriteLine(Loc.Get("dungeon.echo_materializes", ally.DisplayName));
             }
             catch (Exception ex)
             {
@@ -1570,6 +1569,41 @@ public class DungeonLocation : BaseLocation
     }
 
     /// <summary>
+    /// v1.1.12: whether the echo a recruit-list entry names is already in the party. Only echoes count: by save key,
+    /// or by display name when the entry is an older one holding a name (it did not load under its own text).
+    /// An NPC is never matched, so a key "robin" still loads beside an NPC named "Robin".
+    /// </summary>
+    internal static bool EchoAlreadyInParty(IEnumerable<Character> party, string entry, string echoKey)
+    {
+        bool legacyName = !echoKey.Equals(entry, StringComparison.OrdinalIgnoreCase);
+        return party.Any(t => t.IsEcho && !t.IsCompanion && !t.IsGroupedPlayer
+            && (t.EchoSaveKey.Equals(echoKey, StringComparison.OrdinalIgnoreCase)
+                || (legacyName && t.DisplayName.Equals(entry, StringComparison.OrdinalIgnoreCase))));
+    }
+
+    /// <summary>
+    /// v1.1.12: the save an echo entry names, and the key it was read under. The entry is the teammate's save key
+    /// (players.username, recruited since v1.1.12) or, in an older recruit list, a display name: a direct read,
+    /// then the name resolved to a username (a surnamed display name). Null when nothing loads or when the save
+    /// found is the viewer's own (an account "robin" playing "Alice" beside a teammate named "Robin").
+    /// </summary>
+    internal static async Task<(SaveGameData? Save, string? Key)> LoadEchoSave(SqlSaveBackend backend, string entry, string viewerKey)
+    {
+        bool IsViewer(string key) => !string.IsNullOrEmpty(viewerKey) && key.Equals(viewerKey, StringComparison.OrdinalIgnoreCase);
+        string key = entry.ToLowerInvariant();
+        var saveData = IsViewer(key) ? null : await backend.ReadGameData(key);
+        if (saveData?.Player == null)
+        {
+            var resolvedUser = backend.ResolvePlayerUsername(entry);
+            if (string.IsNullOrEmpty(resolvedUser) || resolvedUser.Equals(entry, StringComparison.OrdinalIgnoreCase)) return (null, null);
+            key = resolvedUser.ToLowerInvariant();
+            if (IsViewer(key)) return (null, null);
+            saveData = await backend.ReadGameData(key);
+        }
+        return saveData?.Player == null ? (null, null) : (saveData, key);
+    }
+
+    /// <summary>
     /// Sync the current dungeon party to GameEngine for persistence.
     ///
     /// Player report: removing a player echo from the party did NOT remove their name
@@ -1590,7 +1624,7 @@ public class DungeonLocation : BaseLocation
 
         var echoNames = teammates
             .Where(t => t.IsEcho && !t.IsCompanion && !t.IsGroupedPlayer)
-            .Select(t => t.DisplayName)
+            .Select(t => string.IsNullOrEmpty(t.EchoSaveKey) ? t.DisplayName : t.EchoSaveKey)   // v1.1.12: the save key
             .Where(n => !string.IsNullOrEmpty(n))
             .ToList();
         GameEngine.Instance?.SetDungeonPartyPlayers(echoNames);
@@ -4909,7 +4943,7 @@ public class DungeonLocation : BaseLocation
         // Apply awakening gain if any
         if (vision.AwakeningGain > 0)
         {
-            OceanPhilosophySystem.Instance.GainInsight(vision.AwakeningGain * 10);
+            OceanPhilosophySystem.Instance.GainInsight("vision:" + vision.Id); // v1.1.12: one insight per vision
             terminal.SetColor("cyan");
             terminal.WriteLine(Loc.Get("dungeon.vision_memory_stirs"));
         }
@@ -6203,6 +6237,18 @@ public class DungeonLocation : BaseLocation
         public DungeonFloor Floor;
         public bool WasRestored;  // True if floor was restored from save
         public bool DidRespawn;   // True if monsters respawned (24h passed)
+        public bool RestedOnThisFloor; // v1.1.12: the floor's one rest is already spent
+    }
+
+    /// <summary>
+    /// v1.1.12: spend the floor's one rest, in memory and in the floor's saved state,
+    /// so a logout and login on the same floor does not give a second rest.
+    /// </summary>
+    private void MarkRestedOnThisFloor(Character? player)
+    {
+        hasCampedThisFloor = true;
+        if (player?.DungeonFloorStates != null && player.DungeonFloorStates.TryGetValue(currentDungeonLevel, out var floorState))
+            floorState.RestedOnThisFloor = true;
     }
 
     /// <summary>
@@ -6221,6 +6267,10 @@ public class DungeonLocation : BaseLocation
             var floor = DungeonGenerator.GenerateFloor(floorLevel);
 
             bool shouldRespawn = savedState.ShouldRespawn();
+
+            // v1.1.12: a respawned floor is fresh, so its rest is available again.
+            if (shouldRespawn && !savedState.IsPermanentlyClear)
+                savedState.RestedOnThisFloor = false;
 
             // Restore room states
             foreach (var room in floor.Rooms)
@@ -6334,7 +6384,8 @@ public class DungeonLocation : BaseLocation
             {
                 Floor = floor,
                 WasRestored = true,
-                DidRespawn = shouldRespawn && !savedState.IsPermanentlyClear
+                DidRespawn = shouldRespawn && !savedState.IsPermanentlyClear,
+                RestedOnThisFloor = savedState.RestedOnThisFloor
             };
         }
 
@@ -6748,7 +6799,7 @@ public class DungeonLocation : BaseLocation
         currentDungeonLevel = nextLevel;
         if (player != null) { player.CurrentLocation = $"Dungeon Floor {currentDungeonLevel}"; player.LastDungeonFloor = currentDungeonLevel; }
         roomsExploredThisFloor = floorResult.WasRestored ? currentFloor.Rooms.Count(r => r.IsExplored) : 0;
-        hasCampedThisFloor = false;
+        hasCampedThisFloor = floorResult.RestedOnThisFloor; // v1.1.12
         consecutiveMonsterRooms = 0;
 
         // Update quest progress for reaching this floor
@@ -6901,7 +6952,10 @@ public class DungeonLocation : BaseLocation
         terminal.SetColor("cyan");
         terminal.WriteLine($"{Loc.Get("combat.bar_hp")}: {player.HP}/{player.MaxHP}  {Loc.Get("combat.bar_mp")}: {player.Mana}/{player.MaxMana}  {Loc.Get("combat.bar_st")}: {player.CurrentCombatStamina}/{player.MaxCombatStamina}");
 
-        hasCampedThisFloor = true;
+        MarkRestedOnThisFloor(player);
+        // v1.1.12: the camp and a sanctuary share one rest per floor.
+        terminal.SetColor("gray");
+        terminal.WriteLine(Loc.Get("dungeon.rest_once_per_floor"));
 
         // Advance game time for camping (single-player only)
         if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
@@ -7069,7 +7123,7 @@ public class DungeonLocation : BaseLocation
             currentDungeonLevel = targetLevel;
             if (player != null) { player.CurrentLocation = $"Dungeon Floor {currentDungeonLevel}"; player.LastDungeonFloor = currentDungeonLevel; }
             roomsExploredThisFloor = floorResult.WasRestored ? currentFloor.Rooms.Count(r => r.IsExplored) : 0;
-            hasCampedThisFloor = false;
+            hasCampedThisFloor = floorResult.RestedOnThisFloor; // v1.1.12
             consecutiveMonsterRooms = 0;
 
             // Log floor change
@@ -9773,16 +9827,9 @@ public class DungeonLocation : BaseLocation
             terminal.SetColor("cyan");
             terminal.WriteLine($"  {item.Description}");
 
-            if (item.LootItem.Type == ObjType.Weapon)
-            {
-                terminal.SetColor("gray");
-                terminal.WriteLine($"  {Loc.Get("dungeon.merchant_current_weapon", player.WeapPow)}");
-            }
-            else if (item.LootItem.Armor > 0)
-            {
-                terminal.SetColor("gray");
-                terminal.WriteLine($"  {Loc.Get("dungeon.merchant_current_armor", player.ArmPow)}");
-            }
+            // v1.1.12: the same per-slot comparison as combat loot, not the raw WeapPow/ArmPow totals.
+            if (item.LootItem.Type == ObjType.Weapon || item.LootItem.Armor > 0)
+                CombatEngine.ShowEquipmentComparison(terminal, item.LootItem, player);
             terminal.WriteLine("");
         }
 
@@ -10109,6 +10156,7 @@ public class DungeonLocation : BaseLocation
             var floorResult = GenerateOrRestoreFloor(player, nextLevel);
             currentFloor = floorResult.Floor;
             currentDungeonLevel = nextLevel;
+            hasCampedThisFloor = floorResult.RestedOnThisFloor; // v1.1.12: this path never reset it
             if (player != null) { player.CurrentLocation = $"Dungeon Floor {currentDungeonLevel}"; player.LastDungeonFloor = currentDungeonLevel; }
             terminal.WriteLine(Loc.Get("dungeon.descend_to", currentDungeonLevel), "yellow");
 
@@ -15064,7 +15112,9 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("dungeon.sanctuary_cure_poison"), "cyan");
             }
 
-            hasCampedThisFloor = true;
+            MarkRestedOnThisFloor(player);
+            // v1.1.12: the sanctuary and the [R] camp share one rest per floor.
+            terminal.WriteLine(Loc.Get("dungeon.rest_once_per_floor"), "gray");
 
             // Reduce fatigue from dungeon rest (single-player only)
             if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
@@ -15250,6 +15300,8 @@ public class DungeonLocation : BaseLocation
         {
             terminal.WriteLine(Loc.Get("dungeon.sanctuary_already_rested"), "gray");
             terminal.WriteLine(Loc.Get("dungeon.sanctuary_no_benefit"));
+            // v1.1.12: say why: a camp or an earlier sanctuary used this floor's rest.
+            terminal.WriteLine(Loc.Get("dungeon.rest_once_per_floor"), "gray");
         }
 
         await Task.Delay(1500);
@@ -15618,7 +15670,7 @@ public class DungeonLocation : BaseLocation
             // Ocean philosophy riddles grant awakening insight
             if (riddle.IsOceanPhilosophy)
             {
-                ocean.GainInsight(20);
+                ocean.GainInsight("riddle:" + riddle.Id); // v1.1.12
                 terminal.WriteLine(Loc.Get("dungeon.riddle_deeper"), "magenta");
             }
         }
@@ -18022,6 +18074,7 @@ public class DungeonLocation : BaseLocation
         player.RemoteTerminal = term;
         player.GroupPlayerUsername = ctx.Username;
         player.CombatInputChannel = System.Threading.Channels.Channel.CreateBounded<string>(1);
+        AwakeningBonus.Stamp(player);   // v1.1.12: stamped here, in the follower's own session, before the leader's party uses it
 
         // Add to leader's teammates list
         lock (leaderDungeon.teammates)

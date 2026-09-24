@@ -34,6 +34,8 @@ namespace UsurperRemake.Systems
         public const string HINT_COMPANION_VEX_TEASER = "companion_vex_teaser";
         public const string HINT_COMPANION_LYRIS_TEASER = "companion_lyris_teaser";
         public const string HINT_COMPANION_MIRA_TEASER = "companion_mira_teaser";
+        public const string HINT_LIVES = "lives"; // v1.1.12
+        public const string HINT_AWAKENING = "awakening"; // v1.1.12
 
         // Hint definitions. Title and message text are resolved at display time
         // from loc keys derived from the hint ID (`hint.<id>.title` /
@@ -56,7 +58,9 @@ namespace UsurperRemake.Systems
             [HINT_MANA_SPELLS] = new HintDefinition("bright_cyan"),
             [HINT_QUEST_SYSTEM] = new HintDefinition("bright_green"),
             [HINT_GETTING_STARTED] = new HintDefinition("bright_cyan"),
-            [HINT_FIRST_COMBAT_CLASS] = new HintDefinition("bright_green")
+            [HINT_FIRST_COMBAT_CLASS] = new HintDefinition("bright_green"),
+            [HINT_LIVES] = new HintDefinition("bright_yellow"),
+            [HINT_AWAKENING] = new HintDefinition("bright_cyan")
         };
 
         /// <summary>
@@ -86,7 +90,7 @@ namespace UsurperRemake.Systems
         /// Try to show a hint if the player hasn't seen it before.
         /// Returns true if hint was shown, false if already seen.
         /// </summary>
-        public bool TryShowHint(string hintId, TerminalEmulator terminal, HashSet<string>? shownHints)
+        public bool TryShowHint(string hintId, TerminalEmulator terminal, HashSet<string>? shownHints, params object[] msgArgs)
         {
             if (shownHints == null)
                 return false;
@@ -101,8 +105,20 @@ namespace UsurperRemake.Systems
             shownHints.Add(hintId);
 
             // Display the hint
-            ShowHintBox(hintId, hint, terminal);
+            ShowHintBox(hintId, hint, terminal, msgArgs);
             return true;
+        }
+
+        /// <summary>
+        /// v1.1.12: the lives hint, once per character. Lives exist only in online permadeath mode
+        /// (PermadeathHelper, Character.RaiseLevel and the Rite of Return share this gate).
+        /// </summary>
+        public bool TryShowLivesHint(Character player, TerminalEmulator terminal)
+        {
+            if (!UsurperRemake.BBS.DoorMode.IsOnlineMode || !GameConfig.OnlinePermadeathEnabled)
+                return false;
+            return TryShowHint(HINT_LIVES, terminal, player.HintsShown,
+                Math.Max(0, player.Resurrections), Math.Max(1, player.MaxResurrections));
         }
 
         /// <summary>
@@ -116,11 +132,13 @@ namespace UsurperRemake.Systems
         /// <summary>
         /// Display a hint in a nice box format
         /// </summary>
-        private void ShowHintBox(string hintId, HintDefinition hint, TerminalEmulator terminal)
+        private void ShowHintBox(string hintId, HintDefinition hint, TerminalEmulator terminal, object[]? msgArgs = null)
         {
             // Resolve localized title/message from keys derived from the hint ID.
             string title = Loc.Get($"hint.{hintId}.title");
-            string message = Loc.Get($"hint.{hintId}.msg");
+            string message = msgArgs != null && msgArgs.Length > 0
+                ? Loc.Get($"hint.{hintId}.msg", msgArgs)
+                : Loc.Get($"hint.{hintId}.msg");
             string tipLabel = Loc.Get("hint.tip_label");
 
             terminal.WriteLine("");

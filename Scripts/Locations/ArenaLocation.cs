@@ -343,7 +343,7 @@ public class ArenaLocation : BaseLocation
             return;
         }
 
-        var opponent = CreateCombatCharacterFromSave(opponentSave.Player, target.DisplayName);
+        var opponent = CreateCombatCharacterFromSave(opponentSave.Player, target.DisplayName, opponentSave.StorySystems);
 
         // Save defender's actual gold for 10% steal calculation, then zero
         // to prevent CombatEngine from applying its own 50% gold steal
@@ -369,9 +369,9 @@ public class ArenaLocation : BaseLocation
     /// Create a combat-ready Character from saved PlayerData.
     /// Delegates to the shared PlayerCharacterLoader utility.
     /// </summary>
-    private Character CreateCombatCharacterFromSave(PlayerData playerData, string displayName)
+    private Character CreateCombatCharacterFromSave(PlayerData playerData, string displayName, StorySystemsData? story)
     {
-        return PlayerCharacterLoader.CreateFromSaveData(playerData, displayName);
+        return PlayerCharacterLoader.CreateFromSaveData(playerData, displayName, story: story);   // v1.1.12: its own awakening
     }
 
     /// <summary>

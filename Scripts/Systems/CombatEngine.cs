@@ -6782,6 +6782,7 @@ public partial class CombatEngine
                         terminal.WriteLine($"  {Loc.Get("combat.manwe_smiles")}", "bright_yellow");
                         terminal.WriteLine($"  {Loc.Get("combat.manwe_thank_you")}", "bright_white");
                         if (BossContext != null) BossContext.BossSaved = true;
+                        OceanPhilosophySystem.Instance.ExperienceMoment(AwakeningMoment.LetGoOfPower); // v1.1.12: the Creator spared, not taken
                         monster.HP = 0; // End combat peacefully
                         result.CombatLog.Add("Player accepts The Offer — Manwe spared");
                     }
@@ -7093,6 +7094,9 @@ public partial class CombatEngine
         // Apply world event modifiers
         long expReward = WorldEventSystem.Instance.GetAdjustedXP(baseExpReward);
         long goldReward = WorldEventSystem.Instance.GetAdjustedGold(baseGoldReward);
+        // v1.1.12: the event's share alone; later multipliers are not the event's.
+        long worldEventXP = WorldEventSystem.Instance.GetWorldEventXPBonus(baseExpReward);
+        long worldEventGold = WorldEventSystem.Instance.GetWorldEventGoldBonus(baseGoldReward);
 
         // Blood Moon multipliers (v0.52.0)
         if (result.Player.IsBloodMoon)
@@ -7314,14 +7318,7 @@ public partial class CombatEngine
         terminal.WriteLine(Loc.Get("combat.gold_gained", goldReward));
 
         // Show bonus from world events if any
-        if (expReward > baseExpReward + spouseBonus || goldReward > baseGoldReward)
-        {
-            terminal.SetColor("bright_cyan");
-            if (expReward > baseExpReward + spouseBonus)
-                terminal.WriteLine($"  {Loc.Get("combat.world_event_xp", (expReward - baseExpReward - spouseBonus).ToString())}");
-            if (goldReward > baseGoldReward)
-                terminal.WriteLine($"  {Loc.Get("combat.world_event_gold", (goldReward - baseGoldReward).ToString())}");
-        }
+        ShowWorldEventBonus(terminal, worldEventXP, worldEventGold);
 
         // Show spouse bonus if applicable
         if (spouseBonus > 0)
@@ -9842,7 +9839,7 @@ public partial class CombatEngine
                 lootBroadcastSb.AppendLine("\u001b[31m  WARNING: CURSED!\u001b[0m");
             }
 
-            await ShowEquipmentComparison(lootItem, character, lootBroadcastSb);
+            ShowEquipmentComparison(terminal, lootItem, character, lootBroadcastSb);
         }
         else
         {
@@ -11163,9 +11160,34 @@ public partial class CombatEngine
     }
 
     /// <summary>
+    /// v1.1.12: non-casters always see ST; a caster sees it only with a stamina ability on the quickbar.
+    /// </summary>
+    internal static bool ShowsStaminaBar(Character player)
+    {
+        if (!ClassAbilitySystem.IsSpellcaster(player.Class)) return true;
+        if (player.CurrentCombatStamina < player.MaxCombatStamina) return true;   // v1.1.12: spent on Power Attack or the like
+        return player.Quickbar?.Any(id => !string.IsNullOrEmpty(id) && !id.StartsWith("spell:")
+            && (ClassAbilitySystem.GetAbility(id)?.StaminaCost ?? 0) > 0) ?? false;
+    }
+
+    /// <summary>
+    /// v1.1.12: prints the world event's own share of a reward, only when it is positive.
+    /// </summary>
+    internal static void ShowWorldEventBonus(TerminalEmulator terminal, long worldEventXP, long worldEventGold)
+    {
+        if (worldEventXP <= 0 && worldEventGold <= 0) return;
+        terminal.SetColor("bright_cyan");
+        if (worldEventXP > 0)
+            terminal.WriteLine($"  {Loc.Get("combat.world_event_xp", worldEventXP.ToString())}");
+        if (worldEventGold > 0)
+            terminal.WriteLine($"  {Loc.Get("combat.world_event_gold", worldEventGold.ToString())}");
+    }
+
+    /// <summary>
     /// Show comparison between dropped item and currently equipped item
     /// </summary>
-    private async Task ShowEquipmentComparison(Item lootItem, Character character, System.Text.StringBuilder lootBroadcastSb)
+    // v1.1.12: static and shared, so dungeon finds and the dungeon merchant show the same comparison.
+    internal static void ShowEquipmentComparison(TerminalEmulator terminal, Item lootItem, Character character, System.Text.StringBuilder? lootBroadcastSb = null)
     {
         terminal.WriteLine("");
         terminal.SetColor("gray");
@@ -11213,7 +11235,7 @@ public partial class CombatEngine
                 terminal.WriteLine(Loc.Get("combat.loot_spell_req_warning", GameConfig.GetLocalizedClassName(character.Class), spellReq));
                 terminal.WriteLine(Loc.Get("combat.loot_spell_req_block", inferredType));
                 terminal.WriteLine("");
-                lootBroadcastSb.AppendLine($"\u001b[31m  NOTE: Requires {spellReq} for spells\u001b[0m");
+                lootBroadcastSb?.AppendLine($"\u001b[31m  NOTE: Requires {spellReq} for spells\u001b[0m");
             }
 
             // Check class ability requirements (Ranger→Bow, Assassin→Dagger)
@@ -11457,8 +11479,6 @@ public partial class CombatEngine
         terminal.SetColor("gray");
         if (!GameConfig.ScreenReaderMode)
             terminal.WriteLine("  ─────────────────────────────────────");
-
-        await Task.CompletedTask; // Keep async signature for consistency
     }
 
     /// <summary>
@@ -11984,12 +12004,17 @@ public partial class CombatEngine
         terminal.WriteLine("");
 
         // Player line 2: ST + ATK + DEF + status effects
+        // v1.1.12: ST only where the quickbar can spend it (casters' bars hold spells).
+        if (ShowsStaminaBar(player))
+        {
+            terminal.SetColor("gray");
+            terminal.Write($" {Loc.Get("combat.bar_st")}:");
+            terminal.SetColor("yellow");
+            terminal.Write($"{player.CurrentCombatStamina}/{player.MaxCombatStamina}");
+            terminal.Write(" ");
+        }
         terminal.SetColor("gray");
-        terminal.Write($" {Loc.Get("combat.bar_st")}:");
-        terminal.SetColor("yellow");
-        terminal.Write($"{player.CurrentCombatStamina}/{player.MaxCombatStamina}");
-        terminal.SetColor("gray");
-        terminal.Write($"  {Loc.Get("combat.bar_atk")}:");
+        terminal.Write($" {Loc.Get("combat.bar_atk")}:");
         terminal.SetColor("bright_yellow");
         terminal.Write($"{player.Strength + player.WeapPow}");
         terminal.SetColor("gray");
@@ -20540,6 +20565,9 @@ public partial class CombatEngine
         // Apply world event modifiers
         long adjustedExp = WorldEventSystem.Instance.GetAdjustedXP(totalExp);
         long adjustedGold = WorldEventSystem.Instance.GetAdjustedGold(totalGold);
+        // v1.1.12: the event's share alone; later multipliers are not the event's.
+        long worldEventXP = WorldEventSystem.Instance.GetWorldEventXPBonus(totalExp);
+        long worldEventGold = WorldEventSystem.Instance.GetWorldEventGoldBonus(totalGold);
 
         // Blood Moon multipliers (v0.52.0)
         if (result.Player.IsBloodMoon)
@@ -20781,14 +20809,7 @@ public partial class CombatEngine
         PrintPartyFightSummary(result); // v1.1.3 (council ruling 5)
 
         // Show bonus from world events if any
-        if (adjustedExp > totalExp || adjustedGold > totalGold)
-        {
-            terminal.SetColor("bright_cyan");
-            if (adjustedExp > totalExp)
-                terminal.WriteLine($"  {Loc.Get("combat.world_event_xp", (adjustedExp - totalExp).ToString())}");
-            if (adjustedGold > totalGold)
-                terminal.WriteLine($"  {Loc.Get("combat.world_event_gold", (adjustedGold - totalGold).ToString())}");
-        }
+        ShowWorldEventBonus(terminal, worldEventXP, worldEventGold);
 
         // First kill bonus for brand new players
         if (isFirstKillMulti)
@@ -21174,6 +21195,9 @@ public partial class CombatEngine
         // Apply world event modifiers
         long adjustedExp = WorldEventSystem.Instance.GetAdjustedXP(totalExp);
         long adjustedGold = WorldEventSystem.Instance.GetAdjustedGold(totalGold);
+        // v1.1.12: the event's share alone; later multipliers are not the event's.
+        long worldEventXP = WorldEventSystem.Instance.GetWorldEventXPBonus(totalExp);
+        long worldEventGold = WorldEventSystem.Instance.GetWorldEventGoldBonus(totalGold);
 
         // Blood Moon multipliers (v0.52.0)
         if (result.Player.IsBloodMoon)
@@ -21312,14 +21336,7 @@ public partial class CombatEngine
         terminal.WriteLine(Loc.Get("combat.gold_gained", $"{adjustedGold:N0}"));
 
         // Show bonus from world events if any
-        if (adjustedExp > totalExp || adjustedGold > totalGold)
-        {
-            terminal.SetColor("bright_cyan");
-            if (adjustedExp > totalExp)
-                terminal.WriteLine($"  {Loc.Get("combat.world_event_xp", (adjustedExp - totalExp).ToString())}");
-            if (adjustedGold > totalGold)
-                terminal.WriteLine($"  {Loc.Get("combat.world_event_gold", (adjustedGold - totalGold).ToString())}");
-        }
+        ShowWorldEventBonus(terminal, worldEventXP, worldEventGold);
         terminal.WriteLine("");
 
         await Task.Delay(GetCombatDelay(2000));
@@ -26101,6 +26118,7 @@ public partial class CombatEngine
         if (spared)
         {
             result.Outcome = CombatOutcome.OpponentSpared;
+            OceanPhilosophySystem.Instance.ExperienceMoment(AwakeningMoment.SparedAnEnemy); // v1.1.12
 
             // v0.64.1 audit fix: scrub combat statuses + persistent poison so
             // a leaked DoT can't kill the spared NPC out-of-combat one tick

@@ -159,6 +159,57 @@ public class DeleteFollowUpTests : IDisposable
         Count("SELECT COUNT(*) FROM messages WHERE to_player = 'bob';").Should().Be(1);
     }
 
+    [Fact]
+    public async Task MailToANameAnotherCharacterGoesBy_IsKept()
+    {
+        // v1.1.12: deleting a married "Bob Smith" erased the mail of another character named "Bob Smith"
+        Player("bob_account", "Bob Smith");
+        Exec("INSERT INTO players (username, display_name, player_data) VALUES ('bsmith', 'Robert', '{\"player\":{\"name2\":\"Bob Smith\"}}');");
+        await _db.SendMessage("System", "Bob Smith", "mail", "for the other Bob Smith");
+        await _db.SendMessage("System", "Bob", "mail", "for the deleted Bob");
+        WithCompleteRoster(() => _db.PurgePlayerWorldState("bob_account", "Bob"));
+        Count("SELECT COUNT(*) FROM messages WHERE to_player = 'Bob Smith';").Should().Be(1);
+        Count("SELECT COUNT(*) FROM messages WHERE to_player = 'Bob';").Should().Be(0);
+    }
+
+    [Fact]
+    public async Task MailToTheKey_IsKept_WhenAnotherCharacterGoesByThatName()
+    {
+        // v1.1.12: account "bob" deleting its character "Alice" erased the mail of another account's character "Bob"
+        Player("bob", "Alice");
+        Exec("INSERT INTO players (username, display_name, player_data) VALUES ('robin', 'Robin', '{\"player\":{\"name2\":\"Bob\"}}');");
+        await _db.SendMessage("System", "Bob", "mail", "for the other Bob");
+        await _db.SendMessage("System", "Alice", "mail", "for the deleted Alice");
+        await _db.SendMessage("bob", "Robin", "mail", "sent by the deleted key");
+        WithCompleteRoster(() => _db.PurgePlayerWorldState("bob", "Alice"));
+        Count("SELECT COUNT(*) FROM messages WHERE to_player = 'Bob';").Should().Be(1, "another character's name2 is Bob");
+        Count("SELECT COUNT(*) FROM messages WHERE to_player = 'Alice';").Should().Be(0);
+        Count("SELECT COUNT(*) FROM messages WHERE from_player = 'bob';").Should().Be(0);
+    }
+
+    [Fact]
+    public async Task MailToTheKey_IsPurged_WhenNoOtherCharacterGoesByThatName()
+    {
+        Player("bob", "Alice");
+        Player("robin", "Robin");
+        await _db.SendMessage("System", "bob", "mail", "for the deleted key");
+        WithCompleteRoster(() => _db.PurgePlayerWorldState("bob", "Alice"));
+        Count("SELECT COUNT(*) FROM messages WHERE LOWER(to_player) = 'bob';").Should().Be(0);
+    }
+
+    [Fact]
+    public void NoTeamOrSiegeScreen_LeavesTheViewerOutByDisplayName()
+    {
+        // v1.1.12: a display name can be a teammate's too; the viewer is left out by save key
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "Scripts"))) dir = dir.Parent;
+        foreach (var file in new[] { "TeamCornerLocation.cs", "CastleLocation.cs" })
+        {
+            string src = File.ReadAllText(Path.Combine(dir!.FullName, "Scripts", "Locations", file));
+            System.Text.RegularExpressions.Regex.Matches(src, @"GetPlayerTeamMembers\([^)]*,").Count.Should().Be(0, file);
+        }
+    }
+
     /// <summary>Runs the purge with a roster complete enough to rule out an NPC of the name (NPCSpawnSystem.IsCountPlausible).</summary>
     private static void WithCompleteRoster(Action run, params NPC[] members)
     {
