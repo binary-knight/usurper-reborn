@@ -2,12 +2,17 @@
 
 ## Team HQ
 
-- **Every upgrade reaches everything it names.** The Armory adds 5 percent
-  per level to every hit a player makes, the Barracks divides every hit a
-  player takes by 1 plus 5 percent per level (level 2: about 9 percent
-  less), the Infirmary adds 10 percent per
-  level to every healing potion, and Training adds 5 percent per level to
-  every combat XP award, once.
+- **Every upgrade reaches everything it names.**
+  - The Armory adds 5 percent per level to every hit a player makes, PvE
+    and PvP. Effects that follow a hit (riders, reflect, damage-over-time
+    ticks) are not boosted again.
+  - The Barracks divides every hit an enemy lands on a player by 1 plus 5
+    percent per level (level 2: about 9 percent less). Status ticks
+    (poison, disease) and self-inflicted drains are not reduced.
+  - The Infirmary adds 10 percent per level to what every healing potion
+    restores, in and out of combat.
+  - Training adds 5 percent per level to every combat XP award, once, on
+    the player's own share.
 - **The levels are the team's current ones.** A player who joins a team
   gets its upgrades at once, a teammate's upgrade reaches everyone within
   a minute, and a player who leaves loses them straight away.

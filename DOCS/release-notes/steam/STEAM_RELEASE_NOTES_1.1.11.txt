@@ -1,7 +1,7 @@
 [h1]Usurper Reborn 1.1.11[/h1]
 
 [list]
-[*]Team HQ upgrades reach everything they name: every hit you make and take, every healing potion and every combat XP award. Joining or leaving a team takes effect at once.
+[*]Team HQ upgrades reach everything they name: your hits (not damage-over-time ticks), the enemy hits you take (not poison or disease ticks), every healing potion and every combat XP award. Joining or leaving a team takes effect at once.
 [*]Team rankings count real members, empty teams are cleared, and a team or guild passes to its next highest-level member when the leader leaves.
 [*]Beating a WANTED target counts wherever it happens, and a Crown bounty on a player is paid to whoever beats them in a duel.
 [*]A new character with a deleted one's name starts clean. Deleting a character also ends its reign and removes its mail and auction listings.
