@@ -69,6 +69,8 @@
 
 - Deleting a character does not yet clear NPC grudges against it or an
   NPC's marriage to it; that comes in 1.1.12.
+- A Crown bounty posted on a player before 1.1.11 is not paid in a duel;
+  bounties posted from this version are.
 - Noctura's betrayal pays both of its rewards, and secret bosses pay
   their flat XP on top of the fight, as designed.
 
