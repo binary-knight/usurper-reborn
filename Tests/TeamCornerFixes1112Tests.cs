@@ -361,6 +361,22 @@ public class TeamCornerFixes1112Tests : IDisposable
     }
 
     [Fact]
+    public void ADeletedPayersUnfinishedWar_IsNotRefunded_ToANewCharacterOnTheSameKey()
+    {
+        // v1.1.12: the wager belonged to the deleted character; a recreated one on the same key must not collect it
+        int id = War("Reds", "Blues", minutesAgo: 1, 0, 0, key: "bran", wager: 50000);
+        _db.PurgePlayerWorldState("bran");
+        Exec($"UPDATE team_wars SET started_at = datetime('now', '-20 minutes') WHERE id = {id};");
+        _db.ExpireStaleTeamWars().Should().Be(1);
+        Scalar($"SELECT status FROM team_wars WHERE id = {id}").Should().Be("abandoned");
+        Long("SELECT COUNT(*) FROM pending_gold_transfers").Should().Be(0);
+
+        War("Greens", "Golds", minutesAgo: 20, 0, 0, key: "tomas");
+        _db.ExpireStaleTeamWars().Should().Be(1);
+        Long("SELECT COUNT(*) FROM pending_gold_transfers WHERE recipient_username = 'tomas'").Should().Be(1, "another payer's refund is untouched");
+    }
+
+    [Fact]
     public void AStaleWarWithRounds_IsAbandoned_WithoutARefund_AndAFreshWarStillBlocks()
     {
         int played = War("Reds", "Blues", minutesAgo: 20, 1, 0);

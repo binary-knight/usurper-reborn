@@ -1249,6 +1249,14 @@ namespace UsurperRemake.Systems
                 ExecPurge(connection, tx, "pending_inheritance",    "LOWER(player_username) = LOWER(@u)", username);
                 ExecPurge(connection, tx, "pending_gold_transfers", "LOWER(recipient_username) = LOWER(@u)", username);
                 ExecPurge(connection, tx, "world_boss_rewards",     "LOWER(player_name) = LOWER(@u) AND COALESCE(delivered, 0) = 0", username);
+                // v1.1.12: an unfinished war's refund would otherwise be queued later under this reused key
+                using (var wars = connection.CreateCommand())
+                {
+                    wars.Transaction = tx;
+                    wars.CommandText = "UPDATE team_wars SET challenger_key = NULL WHERE LOWER(challenger_key) = LOWER(@u) AND status = 'active';";
+                    wars.Parameters.AddWithValue("@u", username);
+                    wars.ExecuteNonQuery();
+                }
 
                 // v1.1.11: mail and auctions also key on the display name (mail to Name2, auction sellers
                 // are DisplayName.ToLower(), the married surname form comes from players.display_name).
