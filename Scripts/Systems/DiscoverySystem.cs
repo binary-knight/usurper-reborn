@@ -389,7 +389,10 @@ namespace UsurperRemake.Systems
                     if (item != null)
                     {
                         player.Inventory.Add(item);
-                        Msg(terminal, "bright_green", Loc.Get("discovery.effect.loot", item.Name));
+                        // v1.1.12: an unidentified find keeps its disguise, as combat loot does.
+                        string shownName = item.IsIdentified ? item.Name : LootGenerator.GetUnidentifiedName(item);
+                        Msg(terminal, "bright_green", Loc.Get("discovery.effect.loot", shownName));
+                        ShowFoundGear(terminal, player, item);
                         return;
                     }
                 }
@@ -399,6 +402,32 @@ namespace UsurperRemake.Systems
             long gold = Scaled(floor, 80, 160);
             player.Gold += gold; outcome.GoldGained += gold;
             Msg(terminal, "bright_yellow", Loc.Get("discovery.effect.loot_gold", gold));
+        }
+
+        /// <summary>
+        /// v1.1.12: a found weapon or armour gets the combat loot comparison and curse warning.
+        /// Unidentified items show nothing, as in combat.
+        /// </summary>
+        internal static void ShowFoundGear(TerminalEmulator terminal, Character player, Item item)
+        {
+            if (!item.IsIdentified) return;
+            switch (item.Type)
+            {
+                case ObjType.Weapon: case ObjType.Shield: case ObjType.Body: case ObjType.Head:
+                case ObjType.Arms: case ObjType.Hands: case ObjType.Legs: case ObjType.Feet:
+                case ObjType.Waist: case ObjType.Neck: case ObjType.Face: case ObjType.Fingers:
+                case ObjType.Abody:
+                    break;
+                default:
+                    return;
+            }
+            if (item.IsCursed)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine(Loc.Get("combat.loot_cursed_warning"));
+                terminal.WriteLine(Loc.Get("combat.loot_cursed_hint"));
+            }
+            CombatEngine.ShowEquipmentComparison(terminal, item, player);
         }
 
         // v0.62.0 fix: discovery combat boons must SURVIVE into the next fight. TempAttackBonus /

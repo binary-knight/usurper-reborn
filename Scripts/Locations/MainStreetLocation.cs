@@ -482,7 +482,10 @@ public class MainStreetLocation : BaseLocation
             terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("F"); terminal.SetColor("darkgray"); terminal.Write("]");
             terminal.SetColor("white"); terminal.Write(Loc.Get("main_street.menu_fame_suffix"));
             terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("E"); terminal.SetColor("darkgray"); terminal.Write("]");
-            terminal.SetColor("bright_green"); terminal.WriteLine(Loc.Get("main_street.menu_explore_suffix"));
+            terminal.SetColor("bright_green"); terminal.Write(Loc.Get("main_street.menu_explore_suffix"));
+            // v1.1.12: the $ key worked but was never drawn.
+            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("$"); terminal.SetColor("darkgray"); terminal.Write("]");
+            terminal.SetColor("white"); terminal.WriteLine(Loc.Get("main_street.menu_events_suffix"));
         }
 
         // Tier 3 (Level 5+): Full menu
@@ -887,7 +890,8 @@ public class MainStreetLocation : BaseLocation
             MI("S", Loc.Get("menu.action.status"), "white", C);
             MI("N", Loc.Get("menu.action.news"), "white", C);
             MI("F", Loc.Get("menu.action.fame"), "white", C);
-            ML("E", Loc.Get("menu.action.explore"), "bright_green");
+            MI("E", Loc.Get("menu.action.explore"), "bright_green", C);
+            ML("$", Loc.Get("menu.action.world_events"), "white"); // v1.1.12
         }
         else
         {
@@ -1066,6 +1070,7 @@ public class MainStreetLocation : BaseLocation
             terminal.WriteLine($"  S - {Loc.Get("menu.action.status")}");
             terminal.WriteLine($"  N - {Loc.Get("menu.action.news")}");
             terminal.WriteLine($"  F - {Loc.Get("menu.action.fame")}");
+            terminal.WriteLine($"  $ - {Loc.Get("menu.action.world_events")}"); // v1.1.12
             if (tier >= 3)
             {
                 terminal.WriteLine($"  = - {Loc.Get("menu.action.stats_record")}");

@@ -385,6 +385,10 @@ public class DungeonLocation : BaseLocation
                 await term.PressAnyKey();
         }
 
+        // v1.1.12: explain lives once, on the first dungeon entry (online permadeath only).
+        if (HintSystem.Instance.TryShowLivesHint(player, term))
+            await term.PressAnyKey();
+
         // Captain Aldric's Mission — dungeon entry objective
         if (player.HintsShown.Contains("aldric_quest_active") && !player.HintsShown.Contains("quest_scout_enter_dungeon"))
         {
@@ -6902,6 +6906,9 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine($"{Loc.Get("combat.bar_hp")}: {player.HP}/{player.MaxHP}  {Loc.Get("combat.bar_mp")}: {player.Mana}/{player.MaxMana}  {Loc.Get("combat.bar_st")}: {player.CurrentCombatStamina}/{player.MaxCombatStamina}");
 
         hasCampedThisFloor = true;
+        // v1.1.12: the camp and a sanctuary share one rest per floor.
+        terminal.SetColor("gray");
+        terminal.WriteLine(Loc.Get("dungeon.rest_once_per_floor"));
 
         // Advance game time for camping (single-player only)
         if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
@@ -9773,16 +9780,9 @@ public class DungeonLocation : BaseLocation
             terminal.SetColor("cyan");
             terminal.WriteLine($"  {item.Description}");
 
-            if (item.LootItem.Type == ObjType.Weapon)
-            {
-                terminal.SetColor("gray");
-                terminal.WriteLine($"  {Loc.Get("dungeon.merchant_current_weapon", player.WeapPow)}");
-            }
-            else if (item.LootItem.Armor > 0)
-            {
-                terminal.SetColor("gray");
-                terminal.WriteLine($"  {Loc.Get("dungeon.merchant_current_armor", player.ArmPow)}");
-            }
+            // v1.1.12: the same per-slot comparison as combat loot, not the raw WeapPow/ArmPow totals.
+            if (item.LootItem.Type == ObjType.Weapon || item.LootItem.Armor > 0)
+                CombatEngine.ShowEquipmentComparison(terminal, item.LootItem, player);
             terminal.WriteLine("");
         }
 
@@ -15065,6 +15065,8 @@ public class DungeonLocation : BaseLocation
             }
 
             hasCampedThisFloor = true;
+            // v1.1.12: the sanctuary and the [R] camp share one rest per floor.
+            terminal.WriteLine(Loc.Get("dungeon.rest_once_per_floor"), "gray");
 
             // Reduce fatigue from dungeon rest (single-player only)
             if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
@@ -15250,6 +15252,8 @@ public class DungeonLocation : BaseLocation
         {
             terminal.WriteLine(Loc.Get("dungeon.sanctuary_already_rested"), "gray");
             terminal.WriteLine(Loc.Get("dungeon.sanctuary_no_benefit"));
+            // v1.1.12: say why: a camp or an earlier sanctuary used this floor's rest.
+            terminal.WriteLine(Loc.Get("dungeon.rest_once_per_floor"), "gray");
         }
 
         await Task.Delay(1500);
