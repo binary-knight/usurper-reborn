@@ -1098,7 +1098,43 @@ public static partial class GameConfig
     public const float Floor1MonsterStatMultiplier = 0.5f;  // floor 1: 50% stats (unchanged)
     public const float Floor2MonsterStatMultiplier = 0.65f; // floor 2: 65% (was a 100% cliff)
     public const float Floor3MonsterStatMultiplier = 0.8f;  // floor 3: 80%
-    public const int EarlyFloorSofteningMaxFloor = 3;
+    // v1.1.13: the ramp runs on through floors 4-6, so full strength arrives at floor 7.
+    public const float Floor4MonsterStatMultiplier = 0.85f;
+    public const float Floor5MonsterStatMultiplier = 0.9f;
+    public const float Floor6MonsterStatMultiplier = 0.95f;
+    public const int EarlyFloorSofteningMaxFloor = 6;
+
+    // v1.1.13: auto-combat drinks a healing potion at or below this share of max HP (a player preference)
+    public const int AutoCombatHealPercentMin = 20;
+    public const int AutoCombatHealPercentMax = 70;
+    public const int AutoCombatHealPercentStep = 10;
+    public const int AutoCombatHealPercentDefault = 50;
+
+    /// <summary>v1.1.13: a saved or edited threshold, kept in range and on a step of 10.</summary>
+    public static int ClampAutoCombatHealPercent(int percent)
+    {
+        int clamped = Math.Clamp(percent, AutoCombatHealPercentMin, AutoCombatHealPercentMax);
+        return (int)Math.Round(clamped / (double)AutoCombatHealPercentStep) * AutoCombatHealPercentStep;
+    }
+
+    /// <summary>v1.1.13: the next threshold in the preferences cycle, wrapping from the top to the bottom.</summary>
+    public static int NextAutoCombatHealPercent(int percent)
+    {
+        int next = ClampAutoCombatHealPercent(percent) + AutoCombatHealPercentStep;
+        return next > AutoCombatHealPercentMax ? AutoCombatHealPercentMin : next;
+    }
+
+    /// <summary>v1.1.13: the early-floor stat factor, by floor; index 0 is unused.</summary>
+    public static readonly float[] EarlyFloorMonsterStatMultipliers =
+    {
+        1.0f,
+        Floor1MonsterStatMultiplier, Floor2MonsterStatMultiplier, Floor3MonsterStatMultiplier,
+        Floor4MonsterStatMultiplier, Floor5MonsterStatMultiplier, Floor6MonsterStatMultiplier,
+    };
+
+    /// <summary>v1.1.13: the monster stat factor for a dungeon floor; 1.0 from floor 7 on.</summary>
+    public static float GetEarlyFloorMonsterStatMultiplier(int floor) =>
+        floor >= 1 && floor <= EarlyFloorSofteningMaxFloor ? EarlyFloorMonsterStatMultipliers[floor] : 1.0f;
 
     // Barbarian innate early sustain (v0.65.3). Barbarian had the most deaths of any class (avg
     // ~lvl 13) because its only self-heal, Bloodlust (heal-on-kill), is gated at level 36 -- so the

@@ -952,8 +952,22 @@ public partial class TerminalEmulator
         // For now, we'll just track position for box drawing
     }
     
+    // v1.1.13: a line typed at a pause in a line-based mode, handed to the next prompt instead of being lost
+    private string? _pendingLine;
+    internal bool HasPendingLine => _pendingLine != null;
+
     public async Task<string> GetInput(string prompt = "> ")
     {
+        // v1.1.13: a command typed at a pause is the answer to this prompt
+        if (_pendingLine != null)
+        {
+            string typed = _pendingLine;
+            _pendingLine = null;
+            Write(prompt, "bright_white");
+            WriteLine(typed, "white");
+            return typed;
+        }
+
         // Electron graphical client — signal that we're waiting for input
         if (GameConfig.ElectronMode)
         {
@@ -1491,24 +1505,18 @@ public partial class TerminalEmulator
     
     public async Task PressAnyKey(string? message = null)
     {
-        message ??= UsurperRemake.Systems.Loc.Get("ui.press_any_key");
-
         // Electron graphical client — signal press-any-key
         ElectronBridge.EmitPressAnyKey();
 
-        // MUD stream mode — must use line input (Enter to continue)
-        if (_streamWriter != null && _streamReader != null)
+        // MUD stream mode (MUD, telnet, web, relay) and BBS socket mode read a whole line.
+        // v1.1.13: so the prompt asks for Enter, and a command typed here is kept for the next prompt.
+        if (IsLineBasedPause)
         {
-            await GetInput(message);
+            await PauseForLine(message ?? UsurperRemake.Systems.Loc.Get("ui.press_enter"));
             return;
         }
 
-        // BBS socket mode — delegate to adapter
-        if (ShouldUseBBSAdapter())
-        {
-            await GetInput(message);
-            return;
-        }
+        message ??= UsurperRemake.Systems.Loc.Get("ui.press_any_key");
 
         // Console mode (Steam/WezTerm/local) — accept any single keypress
         Write(message, "bright_white");
@@ -1543,6 +1551,50 @@ public partial class TerminalEmulator
             _idleWarningShown = false;
             _consecutiveEmptyInputs = 0;
         }
+    }
+
+    /// <summary>v1.1.13: invalid answers a menu takes before it falls back to its leave option.</summary>
+    internal const int MaxInvalidChoiceAttempts = 3;
+
+    /// <summary>
+    /// v1.1.13: a menu prompt that says what is valid and asks again on an invalid answer, instead of
+    /// reading a typo as "leave". Returns the chosen key in upper case. After MaxInvalidChoiceAttempts
+    /// invalid answers, or when the connection is gone, returns the fallback (the menu's leave key), so
+    /// a dead peer reading empty lines cannot spin here.
+    /// </summary>
+    public async Task<string> GetValidChoice(string prompt, IReadOnlyCollection<string> validKeys, string fallback, string? validHint = null)
+    {
+        var keys = validKeys.Select(k => k.ToUpperInvariant()).ToList();
+        validHint ??= string.Join(", ", keys);
+        for (int attempt = 0; attempt < MaxInvalidChoiceAttempts; attempt++)
+        {
+            string input = (await GetInput(prompt)).Trim().ToUpperInvariant();
+            if (keys.Contains(input)) return input;
+            if (DoorMode.IsDisconnected) break;
+            WriteLine(UsurperRemake.Systems.Loc.Get("ui.invalid_choice_choose", validHint), "red");
+        }
+        return fallback.ToUpperInvariant();
+    }
+
+    /// <summary>v1.1.13: GetValidChoice for a numbered list 1..max with 0 to cancel; returns the number, 0 on cancel.</summary>
+    public async Task<int> GetValidNumber(string prompt, int max)
+    {
+        var keys = Enumerable.Range(0, max + 1).Select(i => i.ToString()).ToList();
+        string hint = UsurperRemake.Systems.Loc.Get("ui.choice_range_or_zero", max <= 1 ? "1" : $"1-{max}");
+        return int.Parse(await GetValidChoice(prompt, keys, "0", hint));
+    }
+
+    /// <summary>v1.1.13: MUD stream (MUD, telnet, web, relay) and BBS socket modes read a whole line at a pause.</summary>
+    private bool IsLineBasedPause => (_streamWriter != null && _streamReader != null) || ShouldUseBBSAdapter();
+
+    /// <summary>v1.1.13: a pause that reads a line; a non-empty line is kept as the next prompt's answer.</summary>
+    private async Task PauseForLine(string message)
+    {
+        // a line already kept waits for the real prompt; this pause still waits for Enter
+        string? kept = _pendingLine;
+        _pendingLine = null;
+        string line = await GetInput(message);
+        _pendingLine = !string.IsNullOrWhiteSpace(line) ? line.Trim() : kept;
     }
 
     // Missing API methods for compatibility
@@ -1624,7 +1676,8 @@ public partial class TerminalEmulator
     
     public async Task WaitForKeyPress(string message = "Press Enter to continue...")
     {
-        await GetInput(message);
+        // v1.1.13: a pause; a command typed here is kept for the next prompt
+        await PauseForLine(message);
     }
     
     // Additional compatibility methods
@@ -1726,6 +1779,13 @@ public partial class TerminalEmulator
     
     public async Task<string> ReadKeyAsync()
     {
+        // v1.1.13: every caller uses this as a pause; in stream mode (which reads a line) a command typed
+        // here is kept. The BBS socket reads a real single key here, so it is left alone.
+        if (_streamWriter != null && _streamReader != null)
+        {
+            await PauseForLine("");
+            return "";
+        }
         return await GetKeyInput();
     }
     
@@ -2001,6 +2061,7 @@ public partial class TerminalEmulator
     /// </summary>
     public void FlushPendingInput()
     {
+        _pendingLine = null; // v1.1.13: a flush discards a line kept from a pause too
         try
         {
             // Clear the background stdin read task if it completed

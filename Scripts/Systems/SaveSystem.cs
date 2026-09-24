@@ -775,6 +775,7 @@ namespace UsurperRemake.Systems
                 ColorTheme = player.ColorTheme,
                 AutoLevelUp = player.AutoLevelUp,
                 AutoEquipDisabled = player.AutoEquipDisabled,
+                AutoCombatHealPercent = player.AutoCombatHealPercent, // v1.1.13: auto-combat potion threshold
                 DateFormatPreference = player.DateFormatPreference,
                 AutoRedistributeXP = player.AutoRedistributeXP,
                 Specialization = (int)player.Specialization,

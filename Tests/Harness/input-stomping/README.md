@@ -40,6 +40,12 @@ creates the account, then `WEB` and `SSH` log the same character in over the oth
 transports. Each run checks the name in `/who`, a tell addressed by the accented
 name, a tell by username, and a `/say`, and prints True for each.
 
+`pause_typeahead.py MUD|WEB [command]` (v1.1.13) answers the first "Press Enter to continue"
+pause after entering the dungeon with a command (default `/time`) instead of a bare Enter. Pass:
+the pause says "Press Enter" (not "any key"), and the next prompt echoes and runs the command with
+no further line sent. On a new character the next prompt is the dungeon tutorial's Y/N, which
+takes the command as its answer; run it a second time to see it reach the dungeon prompt.
+
 `hardclose.py town|fight` drops the socket at a prompt without logging out and
 checks the server log for "Connection lost" and "Session ended" with no CRASH line,
 then that server CPU is back at zero (v1.1.1: a closed peer used to read as empty

@@ -787,6 +787,12 @@ public class LevelMasterLocation : BaseLocation
         terminal.WriteLine(Loc.Get("level_master.training_total", currentPlayer.TrainingPoints));
         terminal.SetColor("gray");
         terminal.WriteLine(Loc.Get("level_master.training_hint"));
+        // v1.1.13: level 10 is a milestone worth a line of its own
+        if (BaseLocation.ReachedLevelTenWithPoints(startLevel + 1, currentPlayer.Level, currentPlayer.TrainingPoints))
+        {
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine($"  {Loc.Get("base.level_ten_milestone", currentPlayer.TrainingPoints)}");
+        }
         terminal.WriteLine("");
 
         await terminal.PressAnyKey("  Press Enter to continue...");

@@ -712,6 +712,12 @@ public abstract class BaseLocation
                     terminal.SetColor("yellow");
                     if (currentPlayer.TrainingPoints > 0)
                         terminal.WriteLine($"  {Loc.Get("base.training_points_hint")}");
+                    // v1.1.13: level 10 is a milestone worth a line of its own
+                    if (ReachedLevelTenWithPoints(fromLevel, currentPlayer.Level, currentPlayer.TrainingPoints))
+                    {
+                        terminal.SetColor("bright_yellow");
+                        terminal.WriteLine($"  {Loc.Get("base.level_ten_milestone", currentPlayer.TrainingPoints)}");
+                    }
                     terminal.SetColor("white");
                     terminal.WriteLine("");
 
@@ -2731,6 +2737,32 @@ public abstract class BaseLocation
         }
     }
 
+    /// <summary>v1.1.13: /train goes where the town map allows a direct walk to the Level Master (Main Street).</summary>
+    internal static bool CanTravelToLevelMaster(GameLocation from) =>
+        from != GameLocation.Master && LocationManager.Instance.CanNavigateTo(from, GameLocation.Master);
+
+    /// <summary>v1.1.13: /train. Moves to the Level Master the way a menu exit does, or says how to get there.</summary>
+    protected async Task GoToLevelMaster()
+    {
+        if (LocationId == GameLocation.Master)
+        {
+            terminal.WriteLine($"  {Loc.Get("base.train_already_here")}", "yellow");
+            await Task.Delay(800);
+            return;
+        }
+        if (CanTravelToLevelMaster(LocationId))
+        {
+            await NavigateToLocation(GameLocation.Master); // throws LocationExitException, like a menu exit
+            return;
+        }
+        terminal.WriteLine($"  {Loc.Get("base.train_how")}", "yellow");
+        await Task.Delay(1500);
+    }
+
+    /// <summary>v1.1.13: true when a level-up took the player to level 10 (or past it) with points to spend.</summary>
+    internal static bool ReachedLevelTenWithPoints(int fromLevel, int toLevel, int trainingPoints) =>
+        fromLevel <= 10 && toLevel >= 10 && trainingPoints > 0;
+
     /// <summary>
     /// Process slash commands like /stats, /quests, /time, etc.
     /// </summary>
@@ -2782,6 +2814,12 @@ public abstract class BaseLocation
             case "todo":
                 // v0.64.2: The Adventurer's Journal -- "what should I do now?"
                 await ShowJournal();
+                return (true, false);
+
+            case "train":
+            case "training":
+                // v1.1.13: to the Level Master, or how to get there
+                await GoToLevelMaster();
                 return (true, false);
 
             case "path":
@@ -3067,6 +3105,7 @@ public abstract class BaseLocation
         WriteCmdAlias("/quests", "/q", Loc.Get("base.help_quests"));
         WriteCmdAlias("/journal", "/next", Loc.Get("journal.help")); // v0.64.2
         WriteCmdAlias("/path", "/roadmap", Loc.Get("base.help_path")); // v1.0.5: was only reachable by knowing the command
+        WriteCmd("/train", Loc.Get("base.help_train")); // v1.1.13: /train
         if (UsurperRemake.BBS.DoorMode.IsMudServerMode)
             WriteCmd("look", Loc.Get("base.help_look")); // v0.64.2: prompt hint removed; documented here instead
         WriteCmdAlias("/gold", "/g", Loc.Get("base.help_gold"));
@@ -3183,6 +3222,7 @@ public abstract class BaseLocation
         terminal.WriteLine($"/inventory or * {Loc.Get("base.help_inventory")}");
         terminal.WriteLine($"/quests or /q {Loc.Get("base.help_quests")}");
         terminal.WriteLine($"/journal or /next {Loc.Get("journal.help")}");
+        terminal.WriteLine($"/train {Loc.Get("base.help_train")}"); // v1.1.13: /train
         if (UsurperRemake.BBS.DoorMode.IsMudServerMode)
             terminal.WriteLine($"look {Loc.Get("base.help_look")}");
         terminal.WriteLine($"/gold or /g {Loc.Get("base.help_gold")}");
@@ -4170,6 +4210,7 @@ public abstract class BaseLocation
                 if (UsurperRemake.BBS.DoorMode.IsMudServerMode)
                     terminal.WriteLine($"  {Loc.Get("prefs.auto_look")}: {(currentPlayer.AutoLook ? Loc.Get("prefs.enabled") : Loc.Get("prefs.disabled"))}");
                 terminal.WriteLine($"  {Loc.Get("prefs.auto_equip")}: {(currentPlayer.AutoEquipDisabled ? Loc.Get("prefs.disabled") : Loc.Get("prefs.enabled"))}");
+                terminal.WriteLine($"  {Loc.Get("prefs.auto_combat_heal")}: {currentPlayer.AutoCombatHealPercent}%"); // v1.1.13: heal threshold
                 terminal.WriteLine("");
 
                 string srDateFormat = currentPlayer.DateFormatPreference switch { 1 => "DD/MM/YYYY", 2 => "YYYY-MM-DD", _ => "MM/DD/YYYY" };
@@ -4182,6 +4223,7 @@ public abstract class BaseLocation
                     terminal.WriteLine($"  5. {Loc.Get("prefs.difficulty")} ({DifficultySystem.GetLocalizedName(currentPlayer.Difficulty)})");
                 terminal.WriteLine($"  8. {Loc.Get("prefs.toggle", Loc.Get("prefs.auto_level"))}");
                 terminal.WriteLine($"  A. {Loc.Get("prefs.toggle", Loc.Get("prefs.auto_equip"))}");
+                terminal.WriteLine($"  H. {Loc.Get("prefs.auto_combat_heal")} ({currentPlayer.AutoCombatHealPercent}%)"); // v1.1.13: heal threshold
                 terminal.WriteLine(Loc.Get("base.prefs_display"));
                 terminal.WriteLine($"  6. {Loc.Get("prefs.color_theme")}");
                 terminal.WriteLine($"  9. {Loc.Get("prefs.toggle", Loc.Get("prefs.compact_mode"))}");
@@ -4246,6 +4288,7 @@ public abstract class BaseLocation
                     WriteMenuOption("5", $"{Loc.Get("prefs.difficulty")}: {DifficultySystem.GetLocalizedName(currentPlayer.Difficulty)}");
                 WriteMenuOption("8", $"{Loc.Get("prefs.auto_level")}: {onOff(currentPlayer.AutoLevelUp)}");
                 WriteMenuOption("A", $"{Loc.Get("prefs.auto_equip")}: {onOff(!currentPlayer.AutoEquipDisabled)}");
+                WriteMenuOption("H", $"{Loc.Get("prefs.auto_combat_heal")}: {currentPlayer.AutoCombatHealPercent}%"); // v1.1.13: heal threshold
                 terminal.WriteLine("");
 
                 // -- DISPLAY --
@@ -4414,6 +4457,14 @@ public abstract class BaseLocation
                     }
                     await GameEngine.Instance.SaveCurrentGame();
                     await Task.Delay(1000);
+                    break;
+
+                case "H":
+                    // v1.1.13: auto-combat potion threshold, 20-70% in steps of 10
+                    currentPlayer.AutoCombatHealPercent = GameConfig.NextAutoCombatHealPercent(currentPlayer.AutoCombatHealPercent);
+                    terminal.WriteLine(Loc.Get("base.pref_auto_combat_heal_set", currentPlayer.AutoCombatHealPercent), "green");
+                    await GameEngine.Instance.SaveCurrentGame();
+                    await Task.Delay(800);
                     break;
 
                 case "A":

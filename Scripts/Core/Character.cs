@@ -148,6 +148,7 @@ public class Character
     public ColorThemeType ColorTheme { get; set; } = ColorThemeType.Default;  // player-selected color theme
     public bool AutoLevelUp { get; set; } = true;  // auto-level when XP threshold met (on by default)
     public bool AutoEquipDisabled { get; set; }      // when true, shop purchases go straight to inventory
+    public int AutoCombatHealPercent { get; set; } = GameConfig.AutoCombatHealPercentDefault; // v1.1.13: auto-combat drinks a potion at or below this HP %
     public int DateFormatPreference { get; set; }    // 0=MM/DD/YYYY, 1=DD/MM/YYYY, 2=YYYY-MM-DD
     public bool AutoRedistributeXP { get; set; } = true; // auto-redistribute XP when teammates die in combat
     public int[] TeamXPPercent { get; set; } = new int[] { 100, 0, 0, 0, 0 };  // per-slot XP percentage (player + 4 teammates, aggregate <= 100)
@@ -2202,6 +2203,21 @@ public class Character
             _ => false
         };
     }
+
+    /// <summary>
+    /// v1.1.13: the damage one tick of a damage-over-time status does, lowest and highest, from the
+    /// formulas in ProcessStatusEffects below (keep the two in step); null for a status that does none.
+    /// </summary>
+    public static (int min, int max)? StatusDamagePerTurn(StatusEffect status, long level) => status switch
+    {
+        StatusEffect.Poisoned => (2 + (int)(level / 10), 5 + (int)(level / 10)),
+        StatusEffect.Bleeding => (1 + (int)(level / 5), 6 + (int)(level / 5)),
+        StatusEffect.Burning => (2 + (int)(level / 4), 8 + (int)(level / 4)),
+        StatusEffect.Frozen => (1 + (int)(level / 8), 3 + (int)(level / 8)),
+        StatusEffect.Cursed => (1 + (int)(level / 10), 2 + (int)(level / 10)),
+        StatusEffect.Diseased => (1 + (int)(level / 15), 1 + (int)(level / 15)),
+        _ => null
+    };
 
     public void ApplyStatus(StatusEffect status, int duration)
     {

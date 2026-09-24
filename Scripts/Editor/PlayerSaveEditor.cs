@@ -1582,6 +1582,8 @@ internal static class PlayerSaveEditor
         p.ColorTheme = EditorIO.PromptEnum("ColorTheme", p.ColorTheme);
         p.AutoLevelUp = EditorIO.PromptBool("AutoLevelUp on XP threshold", p.AutoLevelUp);
         p.AutoEquipDisabled = EditorIO.PromptBool("AutoEquipDisabled (shop purchases go to inventory)", p.AutoEquipDisabled);
+        // v1.1.13: auto-combat potion threshold
+        p.AutoCombatHealPercent = GameConfig.ClampAutoCombatHealPercent(EditorIO.PromptInt("Auto-combat heals at or below HP % (20-70, steps of 10)", p.AutoCombatHealPercent, min: 20, max: 70));
         p.DateFormatPreference = EditorIO.PromptInt("DateFormat (0=MM/DD, 1=DD/MM, 2=YYYY-MM-DD)", p.DateFormatPreference, min: 0, max: 2);
         p.AutoRedistributeXP = EditorIO.PromptBool("Auto-redistribute XP when teammates die", p.AutoRedistributeXP);
     }

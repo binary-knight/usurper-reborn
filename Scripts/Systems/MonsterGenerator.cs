@@ -313,12 +313,7 @@ public static class MonsterGenerator
         // negligible and floored by Math.Max below.
         if (level >= 1 && level <= GameConfig.EarlyFloorSofteningMaxFloor)
         {
-            float fm = level switch
-            {
-                1 => GameConfig.Floor1MonsterStatMultiplier,
-                2 => GameConfig.Floor2MonsterStatMultiplier,
-                _ => GameConfig.Floor3MonsterStatMultiplier,
-            };
+            float fm = GameConfig.GetEarlyFloorMonsterStatMultiplier(level); // v1.1.13: floors 1-6, from the table
             hp = (long)(hp * fm);
             strength = (long)(strength * fm);
             defence = (long)(defence * fm);
