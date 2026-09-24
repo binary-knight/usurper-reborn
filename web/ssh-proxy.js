@@ -3210,8 +3210,45 @@ async function handleAdminRequest(req, res) {
   }
 
   // DELETE /api/admin/players/:username
+  // v1.1.13: the game server deletes (DeleteGameData, then the world purge of grudges, marriages, throne).
+  // With no game-server heartbeat, or no answer in time, the rows are deleted here and the purge is
+  // queued in pending_purges for the game server's next start.
   if (method === 'DELETE' && playerUsername && playerAction === '') {
     try {
+      let beat = null;
+      try {
+        beat = db.prepare("SELECT 1 AS ok FROM mud_heartbeat WHERE id = 1 AND beat_at >= datetime('now', '-15 seconds')").get();
+      } catch (e) { /* table not created yet: an older game server */ }
+      if (beat) {
+        const queued = dbWrite.prepare("INSERT INTO admin_commands (command, target_username, args, created_by) VALUES (?, ?, ?, ?)")
+          .run('delete_player', playerUsername, null, 'admin-web');
+        const readStatus = () => db.prepare("SELECT status, result FROM admin_commands WHERE id = ?").get(queued.lastInsertRowid);
+        let row = null;
+        const deadline = Date.now() + 20000;
+        while (Date.now() < deadline) {
+          await new Promise(r => setTimeout(r, 500));
+          row = readStatus();
+          if (row && row.status !== 'pending') break;
+        }
+        if (row && row.status === 'pending') {
+          // withdraw it, so the game server cannot run it after the direct delete below
+          const withdrawn = dbWrite.prepare("UPDATE admin_commands SET status = 'expired', result = 'No answer; deleted by the web server', executed_at = datetime('now') WHERE id = ? AND status = 'pending'")
+            .run(queued.lastInsertRowid);
+          if (withdrawn.changes === 0) row = readStatus();
+        }
+        if (row && row.status === 'executed') { sendJson(res, 200, { success: true, result: row.result }); return true; }
+        if (row && row.status === 'failed') { sendJson(res, 500, { error: row.result }); return true; }
+      }
+
+      // Fallback: queue the world purge (names read before the row goes), then delete directly
+      const who = db.prepare("SELECT display_name, CASE WHEN json_valid(player_data) THEN json_extract(player_data, '$.player.name2') END AS name2 FROM players WHERE LOWER(username) = LOWER(?)")
+        .get(playerUsername);
+      if (who) {
+        dbWrite.prepare("CREATE TABLE IF NOT EXISTS pending_purges (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL, name2 TEXT, display_name TEXT, deleted_at TEXT DEFAULT (datetime('now')), created_by TEXT DEFAULT 'admin-web')").run();
+        dbWrite.prepare("INSERT INTO pending_purges (username, name2, display_name, created_by) VALUES (?, ?, ?, ?)")
+          .run(playerUsername, who.name2 || null, who.display_name || null, 'admin-web');
+      }
+
       // Kick if online first
       const online = db.prepare("SELECT username FROM online_players WHERE LOWER(username) = LOWER(?)").get(playerUsername);
       if (online) {

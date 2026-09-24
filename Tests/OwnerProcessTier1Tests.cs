@@ -332,6 +332,120 @@ public class OwnerProcessTier1Tests : IDisposable
         Source("Systems", "SaveSystem.cs").Should().Contain("OnlineStateManager.Instance.SaveRoyalCourtToWorldState()");
     }
 
+    private long Count(string sql)
+    {
+        using var conn = new SqliteConnection($"Data Source={_path}");
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = sql;
+        return Convert.ToInt64(cmd.ExecuteScalar());
+    }
+
+    private string? Scalar(string sql)
+    {
+        using var conn = new SqliteConnection($"Data Source={_path}");
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = sql;
+        return cmd.ExecuteScalar() as string;
+    }
+
+    /// <summary>
+    /// A MudServer with only its admin-command state, made without its constructor so the static
+    /// MudServer.Instance (which switches the NPC roster to snapshot mode) stays unset.
+    /// </summary>
+    private UsurperRemake.Server.MudServer AdminOnlyServer()
+    {
+        var t = typeof(UsurperRemake.Server.MudServer);
+        var server = (UsurperRemake.Server.MudServer)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(t);
+        const System.Reflection.BindingFlags F = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        t.GetField("_sqlBackend", F)!.SetValue(server, _db);
+        t.GetField("<ActiveSessions>k__BackingField", F)!.SetValue(server,
+            new System.Collections.Concurrent.ConcurrentDictionary<string, UsurperRemake.Server.PlayerSession>());
+        return server;
+    }
+
+    private Task RunAdminCommands(UsurperRemake.Server.MudServer server)
+    {
+        var exec = typeof(UsurperRemake.Server.MudServer).GetMethod("ExecuteAdminCommand",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+        return Task.WhenAll(_db.GetPendingAdminCommands().Select(c => (Task)exec.Invoke(server, new object[] { c })!));
+    }
+
+    private void BobsRow() =>
+        Exec("INSERT INTO players (username, display_name, player_data) VALUES ('bob_account', 'Bob', '{\"player\":{\"name2\":\"Bob\"}}');");
+
+    [Fact]
+    public async Task AWebDelete_Row_RunsTheDelete_ThenThePurge()
+    {
+        var npc = Npc("npc_web_1", "Grudger");
+        Remember(npc, MemoryType.Attacked, "Bob", DateTime.Now.AddMinutes(-5));
+        npc.Enemies.Add("Bob");
+        await SeedStoredRoster();
+        BobsRow();
+        // what web/ssh-proxy.js now inserts
+        Exec("INSERT INTO admin_commands (command, target_username, args, created_by) VALUES ('delete_player', 'bob_account', NULL, 'admin-web');");
+
+        await RunAdminCommands(AdminOnlyServer());
+
+        Scalar("SELECT status FROM admin_commands WHERE command = 'delete_player';").Should().Be("executed");
+        Scalar("SELECT player_data FROM players WHERE username = 'bob_account';").Should().Be("{}", "DeleteGameData cleared the row");
+        Count("SELECT COUNT(*) FROM deleted_characters WHERE username = 'bob_account';").Should().Be(1, "archived for /restore");
+        npc.Brain!.Memory.AllMemories.Should().NotContain(m => m.InvolvedCharacter == "Bob", "the purge ran");
+        npc.Enemies.Should().NotContain("Bob");
+        (await StoredRoster()).Single(d => d.Name == "Grudger").Memories.Should().NotContain(m => m.InvolvedCharacter == "Bob",
+            "and was persisted");
+    }
+
+    [Fact]
+    public async Task AWebDelete_OfNoSuchPlayer_Fails_AndPurgesNothing()
+    {
+        var npc = Npc("npc_web_2", "Grudger");
+        Remember(npc, MemoryType.Attacked, "ghost", DateTime.Now.AddMinutes(-5));
+        Exec("INSERT INTO admin_commands (command, target_username, args, created_by) VALUES ('delete_player', 'ghost', NULL, 'admin-web');");
+
+        await RunAdminCommands(AdminOnlyServer());
+
+        Scalar("SELECT status FROM admin_commands WHERE command = 'delete_player';").Should().Be("failed");
+        npc.Brain!.Memory.AllMemories.Should().Contain(m => m.InvolvedCharacter == "ghost", "no purge without a successful delete");
+    }
+
+    [Fact]
+    public async Task AQueuedPurge_FromAWebDeleteWithNoMud_RunsAtTheNextStart()
+    {
+        var npc = Npc("npc_web_3", "Grudger");
+        Remember(npc, MemoryType.Attacked, "Bob", DateTime.Now.AddMinutes(-5));
+        var wife = Npc("npc_web_wife", "Wife");
+        wife.SpouseName = "Bob"; wife.Married = true; wife.IsMarried = true;
+        await SeedStoredRoster();
+        // what web/ssh-proxy.js does when the MUD does not answer: the direct delete, then the queue row
+        Exec("INSERT INTO pending_purges (username, name2, display_name) VALUES ('bob_account', 'Bob', 'Bob Smith');");
+
+        (await UsurperRemake.Server.MudServer.DrainPendingPurgesAsync(_db)).Should().Be(1);
+
+        Count("SELECT COUNT(*) FROM pending_purges;").Should().Be(0);
+        npc.Brain!.Memory.AllMemories.Should().NotContain(m => m.InvolvedCharacter == "Bob");
+        wife.SpouseName.Should().BeEmpty();
+        var stored = await StoredRoster();
+        stored.Single(d => d.Name == "Wife").SpouseName.Should().BeEmpty("the drained purge was persisted");
+        (await UsurperRemake.Server.MudServer.DrainPendingPurgesAsync(_db)).Should().Be(0, "each queued purge runs once");
+    }
+
+    [Fact]
+    public void TheWebDelete_QueuesTheCommand_AndFallsBackWithAQueuedPurge()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "web"))) dir = dir.Parent;
+        var js = File.ReadAllText(Path.Combine(dir!.FullName, "web", "ssh-proxy.js"));
+        int start = js.IndexOf("// DELETE /api/admin/players/:username", StringComparison.Ordinal);
+        var route = js.Substring(start, js.IndexOf("// POST /api/admin/commands", start, StringComparison.Ordinal) - start);
+        route.Should().Contain("'delete_player'");
+        route.Should().Contain("mud_heartbeat");
+        route.Should().Contain("INSERT INTO pending_purges");
+        route.IndexOf("INSERT INTO pending_purges", StringComparison.Ordinal)
+            .Should().BeLessThan(route.IndexOf("DELETE FROM ${table}", StringComparison.Ordinal), "the purge is queued before the rows go");
+    }
+
     private static string Source(string folder, string file)
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
