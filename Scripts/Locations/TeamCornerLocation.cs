@@ -2622,15 +2622,7 @@ public class TeamCornerLocation : BaseLocation
 
     /// <summary>v1.1.12: the gear taken on a sack, saved at once: the NPC's side first, then the player's (a
     /// crash between loses it rather than copying it).</summary>
-    private async Task SaveRecoveredGear()
-    {
-        if (DoorMode.IsOnlineMode && OnlineStateManager.Instance != null)
-        {
-            try { await OnlineStateManager.Instance.SaveAllSharedState(); }
-            catch (Exception ex) { DebugLogger.Instance.LogError("TEAM", $"SaveAllSharedState failed after taking gear: {ex.Message}"); }
-        }
-        await ForcePlayerSave();
-    }
+    private Task SaveRecoveredGear() => SaveGearTakenFromNpc(null);
 
     /// <summary>v1.1.12: takes off the NPC whatever it still wears of the gear recovered from it, as a reloaded copy
     /// of it can: the same slot and the same item, by ID or by name (a reload registers looted gear under a new
@@ -2839,10 +2831,15 @@ public class TeamCornerLocation : BaseLocation
         // landed (echo never appeared in dungeon) and re-tried, was told
         // "already in party" with no way to verify or recover.
         var currentRecruits = GameEngine.Instance?.DungeonPartyPlayerNames ?? new List<string>();
+        // v1.1.12: an entry is a save key (an older one a display name); shown by the teammate's display name
+        string RecruitLabel(string entry) =>
+            teammates.FirstOrDefault(t => t.Username.Equals(entry, StringComparison.OrdinalIgnoreCase))?.DisplayName ?? entry;
+        bool IsRecruited(PlayerSummary tm) => currentRecruits.Any(e =>
+            e.Equals(tm.Username, StringComparison.OrdinalIgnoreCase) || e.Equals(tm.DisplayName, StringComparison.OrdinalIgnoreCase));
         if (currentRecruits.Count > 0)
         {
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine(Loc.Get("team.echo_currently_recruited", string.Join(", ", currentRecruits)));
+            terminal.WriteLine(Loc.Get("team.echo_currently_recruited", string.Join(", ", currentRecruits.Select(RecruitLabel))));
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("team.echo_unrecruit_hint"));
             terminal.WriteLine("");
@@ -2866,7 +2863,7 @@ public class TeamCornerLocation : BaseLocation
             string status = tm.IsOnline ? Loc.Get("team.status_online") : Loc.Get("team.status_offline");
             // Mark teammates already recruited with a [recruited] tag so the
             // player can see at a glance which slots are filled.
-            bool alreadyRecruited = currentRecruits.Contains(tm.DisplayName, StringComparer.OrdinalIgnoreCase);
+            bool alreadyRecruited = IsRecruited(tm);
             string tag = alreadyRecruited ? " " + Loc.Get("team.echo_recruited_tag") : "";
             terminal.WriteLine($"{i + 1,-3} {tm.DisplayName,-18} {className,-12} {tm.Level,-6} {status,-10}{tag}");
         }
@@ -2886,7 +2883,7 @@ public class TeamCornerLocation : BaseLocation
         // path for the v0.61.5 "echo recruited but never materialized" bug.
         if (!string.IsNullOrEmpty(input) && input.Trim().Equals("U", StringComparison.OrdinalIgnoreCase))
         {
-            await UnrecruitPlayerAlly(currentRecruits);
+            await UnrecruitPlayerAlly(currentRecruits, RecruitLabel);
             return;
         }
 
@@ -2896,7 +2893,7 @@ public class TeamCornerLocation : BaseLocation
 
             // Check if already recruited
             var partyNames = GameEngine.Instance?.DungeonPartyPlayerNames ?? new List<string>();
-            if (partyNames.Contains(selected.DisplayName, StringComparer.OrdinalIgnoreCase))
+            if (IsRecruited(selected))
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine(Loc.Get("team.echo_already_in_party", selected.DisplayName));
@@ -2906,8 +2903,9 @@ public class TeamCornerLocation : BaseLocation
                 return;
             }
 
-            // Add to dungeon party
-            var names = new List<string>(partyNames) { selected.DisplayName };
+            // Add to dungeon party. v1.1.12: by save key; the display name can be another account's username,
+            // whose save (even the viewer's own) the dungeon would otherwise load
+            var names = new List<string>(partyNames) { selected.Username };
             GameEngine.Instance?.SetDungeonPartyPlayers(names);
 
             terminal.WriteLine("");
@@ -2950,7 +2948,7 @@ public class TeamCornerLocation : BaseLocation
     /// materialize (save deleted, off-team, load error) -- and also lets
     /// players who change their mind un-recruit cleanly.
     /// </summary>
-    private async Task UnrecruitPlayerAlly(List<string> currentRecruits)
+    private async Task UnrecruitPlayerAlly(List<string> currentRecruits, Func<string, string> label)
     {
         if (currentRecruits.Count == 0)
         {
@@ -2966,7 +2964,7 @@ public class TeamCornerLocation : BaseLocation
         terminal.SetColor("white");
         for (int i = 0; i < currentRecruits.Count; i++)
         {
-            terminal.WriteLine($"  [{i + 1}] {currentRecruits[i]}");
+            terminal.WriteLine($"  [{i + 1}] {label(currentRecruits[i])}");
         }
         terminal.WriteLine("");
         terminal.SetColor("cyan");
@@ -2980,7 +2978,7 @@ public class TeamCornerLocation : BaseLocation
             var cleaned = currentRecruits.Where(n => !n.Equals(toRemove, StringComparison.OrdinalIgnoreCase)).ToList();
             GameEngine.Instance?.SetDungeonPartyPlayers(cleaned);
             terminal.SetColor("bright_yellow");
-            terminal.WriteLine(Loc.Get("team.echo_unrecruit_done", toRemove));
+            terminal.WriteLine(Loc.Get("team.echo_unrecruit_done", label(toRemove)));
             await Task.Delay(2000);
         }
     }
@@ -3029,18 +3027,7 @@ public class TeamCornerLocation : BaseLocation
 
         // Sync equipment changes to canonical NPC in ActiveNPCs (handles orphaned references)
         CombatEngine.SyncNPCTeammateToActiveNPCs(selectedMember);
-
-        // v1.1.12: online, the player's side is written now (the throttled AutoSave could skip it for a minute
-        // while the NPC side below is written at once, so a crash between them could copy an item), then the NPCs
-        if (DoorMode.IsOnlineMode) await ForcePlayerSave();
-        else await SaveSystem.Instance.AutoSave(currentPlayer);
-
-        // Force NPC world_state save so equipment survives world-sim reload cycles
-        if (DoorMode.IsOnlineMode && OnlineStateManager.Instance != null)
-        {
-            try { await OnlineStateManager.Instance.SaveAllSharedState(); }
-            catch (Exception ex) { DebugLogger.Instance.LogError("TEAM", $"SaveAllSharedState failed after equipment change: {ex.Message}"); }
-        }
+        // v1.1.12: each move was saved when it was made, in the order for its direction (BaseLocation gear saves)
     }
 
     /// <summary>
@@ -3245,7 +3232,9 @@ public class TeamCornerLocation : BaseLocation
 
             if (result)
             {
-                // Move any items that were added to target's inventory (displaced equipment) to player's inventory
+                // v1.1.12: the give is saved first (player, then NPC) with the displaced items still in the target's
+                // bag; then they come back to the player, saved NPC side first. No crash point copies an item.
+                await SaveGearGivenToNpc(target);
                 if (target.Inventory.Count > targetInventoryBefore)
                 {
                     var displacedItems = target.Inventory.Skip(targetInventoryBefore).ToList();
@@ -3254,6 +3243,7 @@ public class TeamCornerLocation : BaseLocation
                         target.Inventory.Remove(displaced);
                         currentPlayer.Inventory.Add(displaced);
                     }
+                    await SaveGearTakenFromNpc(target);
                 }
 
                 // v0.57.7 (Hesperos report): `target` is a WRAPPER Character built fresh by
@@ -3390,6 +3380,7 @@ public class TeamCornerLocation : BaseLocation
                 CompanionSystem.Instance?.SyncCompanionEquipment(target);
             var legacyItem = ConvertEquipmentToItem(unequipped);
             currentPlayer.Inventory.Add(legacyItem);
+            await SaveGearTakenFromNpc(target);   // v1.1.12: NPC side first, then the player
 
             terminal.WriteLine("");
             terminal.SetColor("bright_green");
@@ -3428,6 +3419,7 @@ public class TeamCornerLocation : BaseLocation
 
         var cursedItems = new List<string>();
         int itemsTaken = MoveEquipmentToPlayer(target, cursedItems).Count;
+        if (itemsTaken > 0) await SaveGearTakenFromNpc(target);   // v1.1.12: NPC side first, then the player
         await ReportEquipmentTaken(target, itemsTaken, cursedItems);
     }
 

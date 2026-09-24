@@ -1231,7 +1231,11 @@ namespace UsurperRemake.Systems
 
                 // Multi-column tables: the username can appear as sender/recipient,
                 // attacker/defender, etc. Clear all of them.
-                ExecPurge(connection, tx, "messages",          "LOWER(from_player) = LOWER(@u) OR LOWER(to_player) = LOWER(@u)", username);
+                // v1.1.12: mail to the key is kept when another character goes by that name (account "bob" playing
+                // "Alice" beside a character "Bob"), as the alias clause below does
+                ExecPurge(connection, tx, "messages",          "LOWER(from_player) = LOWER(@u) OR (LOWER(to_player) = LOWER(@u) " +
+                    "AND NOT EXISTS (SELECT 1 FROM players p WHERE LOWER(p.username) != LOWER(@u) AND (LOWER(p.display_name) = LOWER(messages.to_player) " +
+                    "OR LOWER(CASE WHEN json_valid(p.player_data) THEN json_extract(p.player_data, '$.player.name2') END) = LOWER(messages.to_player))))", username);
                 ExecPurge(connection, tx, "trade_offers",      "LOWER(from_player) = LOWER(@u) OR LOWER(to_player) = LOWER(@u)", username);
                 ExecPurge(connection, tx, "bounties",          "LOWER(target_player) = LOWER(@u) OR LOWER(placed_by) = LOWER(@u) OR LOWER(claimed_by) = LOWER(@u)", username);
                 // v1.1.11: only the character's own listings, under each name it may have listed as (the key,

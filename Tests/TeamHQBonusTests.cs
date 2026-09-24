@@ -123,7 +123,7 @@ public class TeamHQBonusTests : IDisposable
         // would mark any character loaded from it, and the HQ bookkeeping is the team's, read from the database.
         var names = typeof(PlayerData).GetMembers(BindingFlags.Public | BindingFlags.Instance).Select(m => m.Name).ToList();
         // v1.1.12: AwakeningStage is stamped by the owning session; the story data is the saved source.
-        names.Should().NotContain(new[] { "IsLoadedPlayer", "HQLevelsTeam", "HQLevelsReadAt", "AwakeningStage" });
+        names.Should().NotContain(new[] { "IsLoadedPlayer", "HQLevelsTeam", "HQLevelsReadAt", "AwakeningStage", "EchoSaveKey" });
         typeof(Character).GetProperty("IsLoadedPlayer").Should().NotBeNull("the check above must name a real member");
         var stage = typeof(Character).GetProperty("AwakeningStage");
         stage.Should().NotBeNull("the check above must name a real member");

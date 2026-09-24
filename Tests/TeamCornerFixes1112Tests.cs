@@ -625,14 +625,6 @@ public class TeamCornerFixes1112Tests : IDisposable
         body.IndexOf("if (!TakeFromPlayerForEquip(").Should().BeGreaterThan(0).And.BeLessThan(body.IndexOf("target.EquipItem("));
     }
 
-    [Fact]
-    public void Equip_ForcesThePlayerSave_BeforeTheSharedState()
-    {
-        string body = MethodBody("EquipMember");
-        body.Should().Contain("ForcePlayerSave()");
-        body.IndexOf("ForcePlayerSave()").Should().BeLessThan(body.IndexOf("SaveAllSharedState"));
-    }
-
     // ---------- 9. team size ----------
 
     [Fact]
@@ -970,5 +962,115 @@ public class TeamCornerFixes1112Tests : IDisposable
             });
         }
         finally { NPCSpawnSystem.Instance.ActiveNPCs.Remove(npc); }
+    }
+
+    // ---------- third review ----------
+
+    [Fact]
+    public async Task GearSaves_TakeSavesTheSharedStateFirst_GiveSavesThePlayerFirst()
+    {
+        // v1.1.12: a crash between the two saves loses gear rather than copying it
+        var order = new System.Collections.Generic.List<string>();
+        BaseLocation.GearSaveHookForTests = step => { order.Add(step); return Task.CompletedTask; };
+        try
+        {
+            var rig = new TeamCornerRig(TeamCornerRig.Hero(team: "Gear Band"), Array.Empty<string>());
+            await rig.Loc.SaveGearTakenFromNpc(null);
+            order.Should().Equal("shared", "player");
+            order.Clear();
+            await rig.Loc.SaveGearGivenToNpc(null);
+            order.Should().Equal("player", "shared");
+        }
+        finally { BaseLocation.GearSaveHookForTests = null; }
+    }
+
+    [Fact]
+    public void EveryEquipMenuMove_IsSavedAtOnce_InTheOrderForItsDirection()
+    {
+        // take all and unequip: saved NPC side first, straight after the move
+        string takeAll = MethodBody("TakeAllEquipment");
+        int move = takeAll.IndexOf("MoveEquipmentToPlayer(target, cursedItems)");
+        int save = takeAll.IndexOf("await SaveGearTakenFromNpc(target)");
+        move.Should().BeGreaterThan(0);
+        save.Should().BeGreaterThan(move).And.BeLessThan(takeAll.IndexOf("ReportEquipmentTaken("));
+        takeAll.Substring(move, save - move).Should().NotContain("await ");
+        string unequip = MethodBody("UnequipItemFromCharacter");
+        move = unequip.IndexOf("currentPlayer.Inventory.Add(legacyItem)");
+        save = unequip.IndexOf("await SaveGearTakenFromNpc(target)");
+        move.Should().BeGreaterThan(0);
+        save.Should().BeGreaterThan(move);
+        unequip.Substring(move, save - move).Should().NotContain("await ");
+        File.ReadAllText(Path.Combine(RepoRoot(), "Scripts/Locations/TeamCornerLocation.cs"))
+            .Should().Contain("private Task SaveRecoveredGear() => SaveGearTakenFromNpc(null);", "a sack saves the same way");
+
+        // equip: the give is saved first (player side first), then the displaced items come back and are saved as a take
+        string equip = MethodBody("EquipItemToCharacter");
+        int give = equip.IndexOf("await SaveGearGivenToNpc(target)");
+        int back = equip.IndexOf("currentPlayer.Inventory.Add(displaced)");
+        int take = equip.IndexOf("await SaveGearTakenFromNpc(target)");
+        give.Should().BeGreaterThan(equip.IndexOf("target.EquipItem("));
+        back.Should().BeGreaterThan(give);
+        take.Should().BeGreaterThan(back);
+
+        // the menu no longer saves once at the end, in one order for moves both ways
+        string menu = MethodBody("EquipMember");
+        menu.Should().NotContain("ForcePlayerSave").And.NotContain("SaveAllSharedState").And.NotContain("AutoSave");
+
+        // equip best (BaseLocation): the same two steps
+        string src = File.ReadAllText(Path.Combine(RepoRoot(), "Scripts/Locations/BaseLocation.cs"));
+        int start = src.IndexOf("protected async Task RunEquipBestGear(");
+        string best = src.Substring(start, src.IndexOf("protected static int ScoreEquipment(") - start);
+        give = best.IndexOf("await SaveGearGivenToNpc(target)");
+        back = best.IndexOf("currentPlayer.Inventory.Add(displaced)");
+        take = best.IndexOf("await SaveGearTakenFromNpc(target)");
+        give.Should().BeGreaterThan(0);
+        back.Should().BeGreaterThan(give);
+        take.Should().BeGreaterThan(back);
+        best.Should().NotContain("SaveAllSharedState()").And.NotContain("AutoSave(");
+    }
+
+    [Fact]
+    public async Task ARecruitedEcho_IsStoredAndLoadedByItsSaveKey_NeverAsTheViewersOwnSave()
+    {
+        // v1.1.12: account "robin" plays "Alice"; a teammate on account "sam" is named "Robin". The echo list kept
+        // "Robin", and the dungeon read that as a username: the viewer's own save.
+        var saved = UsurperRemake.Server.SessionContext.Current;
+        var partyBefore = GameEngine.Instance.DungeonPartyPlayerNames.ToList();
+        try
+        {
+            await TeamCornerRig.Online(async (db, path) =>
+            {
+                await db.CreatePlayerTeam("Echo Band", "x", "robin");
+                await db.WriteGameData("robin", new SaveGameData { Version = GameConfig.SaveVersion,
+                    Player = new PlayerData { Name1 = "robin", Name2 = "Alice", Team = "Echo Band", Level = 7, HP = 50, MaxHP = 50 } });
+                await db.WriteGameData("sam", new SaveGameData { Version = GameConfig.SaveVersion,
+                    Player = new PlayerData { Name1 = "sam", Name2 = "Robin", Team = "Echo Band", Level = 9, HP = 60, MaxHP = 60 } });
+                UsurperRemake.Server.SessionContext.Current = new UsurperRemake.Server.SessionContext
+                    { InputStream = Stream.Null, OutputStream = Stream.Null, Username = "robin", CharacterKey = "robin" };
+                GameEngine.Instance.SetDungeonPartyPlayers(Array.Empty<string>());
+
+                var hero = TeamCornerRig.Hero(name: "Alice", team: "Echo Band");
+                await new TeamCornerRig(hero, new[] { "1", "" }).Run("RecruitPlayerAlly");
+                GameEngine.Instance.DungeonPartyPlayerNames.Should().Equal(new[] { "sam" }, "the teammate's save key is stored");
+
+                var (echo, key) = await DungeonLocation.LoadEchoSave(db, "sam", "robin");
+                echo!.Player.Name2.Should().Be("Robin");
+                key.Should().Be("sam");
+                // an entry from an older recruit list holds the display name; it never loads the viewer's own save
+                var (legacy, _) = await DungeonLocation.LoadEchoSave(db, "Robin", "robin");
+                legacy.Should().BeNull();
+                var (self, _) = await DungeonLocation.LoadEchoSave(db, "robin", "robin");
+                self.Should().BeNull();
+                // an older entry, a display name that is no username, still loads through the name
+                var (old, oldKey) = await DungeonLocation.LoadEchoSave(db, "Alice", "someone_else");
+                old!.Player.Name2.Should().Be("Alice");
+                oldKey.Should().Be("robin");
+            });
+        }
+        finally
+        {
+            UsurperRemake.Server.SessionContext.Current = saved;
+            GameEngine.Instance.SetDungeonPartyPlayers(partyBefore);
+        }
     }
 }

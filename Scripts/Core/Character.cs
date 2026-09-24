@@ -358,6 +358,9 @@ public class Character
 
     // Player echo (loaded from DB for cooperative dungeons)
     public bool IsEcho { get; set; } = false;
+    /// <summary>v1.1.12: an echo's save key (players.username), the entry the recruit list keeps. Runtime only.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string EchoSaveKey { get; set; } = "";
 
     // Royal mercenary (hired bodyguard for king's dungeon party)
     public bool IsMercenary { get; set; } = false;

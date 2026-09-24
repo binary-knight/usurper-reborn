@@ -10515,6 +10515,43 @@ public abstract class BaseLocation
         return null;
     }
 
+    /// <summary>v1.1.12: test hook; when set, the gear saves below call it ("shared" or "player") instead of saving.</summary>
+    internal static Func<string, Task>? GearSaveHookForTests;
+
+    /// <summary>v1.1.12: gear moved from an NPC to the player: the shared NPC state is saved first, then the
+    /// player, so a crash between loses the item rather than copying it.</summary>
+    protected internal async Task SaveGearTakenFromNpc(Character? npc)
+    {
+        if (npc != null) CombatEngine.SyncNPCTeammateToActiveNPCs(npc);
+        await SaveSharedStateForGear();
+        await SavePlayerForGear();
+    }
+
+    /// <summary>v1.1.12: gear moved from the player to an NPC: the player is saved first, then the shared NPC
+    /// state, for the same reason.</summary>
+    protected internal async Task SaveGearGivenToNpc(Character? npc)
+    {
+        await SavePlayerForGear();
+        if (npc != null) CombatEngine.SyncNPCTeammateToActiveNPCs(npc);
+        await SaveSharedStateForGear();
+    }
+
+    private async Task SaveSharedStateForGear()
+    {
+        if (GearSaveHookForTests != null) { await GearSaveHookForTests("shared"); return; }
+        if (!DoorMode.IsOnlineMode || OnlineStateManager.Instance == null) return;
+        try { await OnlineStateManager.Instance.SaveAllSharedState(); }
+        catch (Exception ex) { DebugLogger.Instance.LogError("EQUIP", $"SaveAllSharedState failed after moving gear: {ex.Message}"); }
+    }
+
+    // v1.1.12: online the throttle is skipped (this write must land); single-player is one save for both sides
+    private async Task SavePlayerForGear()
+    {
+        if (GearSaveHookForTests != null) { await GearSaveHookForTests("player"); return; }
+        try { await SaveSystem.Instance.AutoSave(currentPlayer, force: DoorMode.IsOnlineMode); }
+        catch (Exception ex) { DebugLogger.Instance.LogError("EQUIP", $"Player save failed after moving gear: {ex.Message}"); }
+    }
+
     // v0.64.2: promoted from InnLocation so Home / Team Corner / Dungeon
     // party menus can offer the same auto-equip-best flow (player request:
     // outfitting a naked recruit slot-by-slot was painful).
@@ -10545,6 +10582,7 @@ public abstract class BaseLocation
         terminal.WriteLine("");
 
         int equippedCount = 0;
+        var displacedAll = new List<Item>();
 
         // Process each equipment slot
         var slotsToCheck = new[] {
@@ -10606,16 +10644,9 @@ public abstract class BaseLocation
             // Equip to target
             if (target.EquipItem(bestCandidate.item, slot, out string message))
             {
-                // Move displaced items back to player inventory
+                // v1.1.12: displaced items stay in the target's bag until the give is saved (below)
                 if (target.Inventory.Count > targetInventoryBefore)
-                {
-                    var displacedItems = target.Inventory.Skip(targetInventoryBefore).ToList();
-                    foreach (var displaced in displacedItems)
-                    {
-                        target.Inventory.Remove(displaced);
-                        currentPlayer.Inventory.Add(displaced);
-                    }
-                }
+                    displacedAll.AddRange(target.Inventory.Skip(targetInventoryBefore));
 
                 equippedCount++;
                 terminal.SetColor("bright_green");
@@ -10644,14 +10675,17 @@ public abstract class BaseLocation
             // below persists them).
             if (target.IsCompanion)
                 UsurperRemake.Systems.CompanionSystem.Instance?.SyncCompanionEquipment(target);
-            UsurperRemake.Systems.SaveSystem.Instance.ResetAutoSaveThrottle();
-            await UsurperRemake.Systems.SaveSystem.Instance.AutoSave(currentPlayer);
-
-            // Online mode: persist companion equipment to shared state
-            if (UsurperRemake.BBS.DoorMode.IsOnlineMode && UsurperRemake.Systems.OnlineStateManager.Instance != null)
+            // v1.1.12: the give is saved player first, then the displaced items come back, saved NPC side first,
+            // so a crash between any two saves never leaves an item on both sides
+            await SaveGearGivenToNpc(target);
+            if (displacedAll.Count > 0)
             {
-                try { await UsurperRemake.Systems.OnlineStateManager.Instance.SaveAllSharedState(); }
-                catch (Exception ex) { UsurperRemake.Systems.DebugLogger.Instance.LogError("EQUIP", $"SaveAllSharedState failed after EquipBest: {ex.Message}"); }
+                foreach (var displaced in displacedAll)
+                {
+                    target.Inventory.Remove(displaced);
+                    currentPlayer.Inventory.Add(displaced);
+                }
+                await SaveGearTakenFromNpc(target);
             }
         }
         else

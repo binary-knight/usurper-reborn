@@ -173,6 +173,31 @@ public class DeleteFollowUpTests : IDisposable
     }
 
     [Fact]
+    public async Task MailToTheKey_IsKept_WhenAnotherCharacterGoesByThatName()
+    {
+        // v1.1.12: account "bob" deleting its character "Alice" erased the mail of another account's character "Bob"
+        Player("bob", "Alice");
+        Exec("INSERT INTO players (username, display_name, player_data) VALUES ('robin', 'Robin', '{\"player\":{\"name2\":\"Bob\"}}');");
+        await _db.SendMessage("System", "Bob", "mail", "for the other Bob");
+        await _db.SendMessage("System", "Alice", "mail", "for the deleted Alice");
+        await _db.SendMessage("bob", "Robin", "mail", "sent by the deleted key");
+        WithCompleteRoster(() => _db.PurgePlayerWorldState("bob", "Alice"));
+        Count("SELECT COUNT(*) FROM messages WHERE to_player = 'Bob';").Should().Be(1, "another character's name2 is Bob");
+        Count("SELECT COUNT(*) FROM messages WHERE to_player = 'Alice';").Should().Be(0);
+        Count("SELECT COUNT(*) FROM messages WHERE from_player = 'bob';").Should().Be(0);
+    }
+
+    [Fact]
+    public async Task MailToTheKey_IsPurged_WhenNoOtherCharacterGoesByThatName()
+    {
+        Player("bob", "Alice");
+        Player("robin", "Robin");
+        await _db.SendMessage("System", "bob", "mail", "for the deleted key");
+        WithCompleteRoster(() => _db.PurgePlayerWorldState("bob", "Alice"));
+        Count("SELECT COUNT(*) FROM messages WHERE LOWER(to_player) = 'bob';").Should().Be(0);
+    }
+
+    [Fact]
     public void NoTeamOrSiegeScreen_LeavesTheViewerOutByDisplayName()
     {
         // v1.1.12: a display name can be a teammate's too; the viewer is left out by save key
