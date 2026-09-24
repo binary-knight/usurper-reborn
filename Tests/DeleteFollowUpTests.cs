@@ -396,7 +396,7 @@ public class DeleteFollowUpTests : IDisposable
         string osm = Source("Systems", "OnlineStateManager.cs");
         osm.Should().Contain("global::CastleLocation.ApplySharedThroneVacancy(royalCourt)", "the login loader honours it too");
         osm.Should().Contain("ThroneVacant = throneVacated");
-        osm.Should().Contain("if (KeepsStoredVacancy(await ReadRoyalCourtFromWorldState(), throneVacated)) return;");
+        osm.Should().Contain("if (king == null && KeepsStoredVacancy(await ReadRoyalCourtFromWorldState(), throneVacated)) return;");   // v1.1.13
         OnlineStateManager.KeepsStoredVacancy(new RoyalCourtSaveData { ThroneVacant = true }, throneVacated: false)
             .Should().BeTrue("a later session's plain empty save does not hide the vacancy from the world sim");
         OnlineStateManager.KeepsStoredVacancy(new RoyalCourtSaveData { ThroneVacant = true }, throneVacated: true).Should().BeFalse();

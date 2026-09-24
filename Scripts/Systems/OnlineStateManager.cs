@@ -555,20 +555,23 @@ namespace UsurperRemake.Systems
         {
             try
             {
+                if (backend is not SqlSaveBackend sql) return;
                 var king = global::CastleLocation.GetCurrentKing();
-                if (king == null)
+                // v1.1.11: an unmarked empty court never replaces a marked vacancy the world sim has yet to act on
+                if (king == null && KeepsStoredVacancy(await ReadRoyalCourtFromWorldState(), throneVacated)) return;
+
+                // v1.1.13: written only over the stored court this process's court was loaded from. A court never
+                // loaded here may write only where none is stored yet.
+                long? loadedAt = RoyalCourtVersion;
+                if (loadedAt == null && sql.GetWorldStateVersion("royal_court") == 0) loadedAt = 0;
+                if (loadedAt != null && await SaveRoyalCourtIfVersionAsync(loadedAt.Value, throneVacated))
                 {
-                    // v1.1.11: an unmarked empty court never replaces a marked vacancy the world sim has yet to act on
-                    if (KeepsStoredVacancy(await ReadRoyalCourtFromWorldState(), throneVacated)) return;
-                    // Throne is vacant — save empty state so other sessions see it
-                    var backend = SaveSystem.Instance?.Backend as SqlSaveBackend;
-                    if (backend != null) await backend.SaveWorldState("royal_court", EmptyRoyalCourtJson(throneVacated));
+                    DebugLogger.Instance.LogDebug("ONLINE", $"Royal court saved to world_state: {king?.Name ?? "(vacant)"}");
                     return;
                 }
-
-                var json = RoyalCourtJson(king);
-                await backend.SaveWorldState("royal_court", json);
-                DebugLogger.Instance.LogDebug("ONLINE", $"Royal court saved to world_state: {king.Name}");
+                // v1.1.13: another writer changed the court; this stale copy is dropped and the stored court loaded
+                DebugLogger.Instance.LogInfo("ONLINE", "Royal court save skipped: the stored court changed since it was loaded. Reloading it.");
+                await LoadRoyalCourtFromWorldState();
             }
             catch (Exception ex)
             {
@@ -705,6 +708,15 @@ namespace UsurperRemake.Systems
             return JsonSerializer.Serialize(data, jsonOptions);
         }
 
+        // v1.1.13: the stored royal_court version the in-memory court was loaded from or last written as. The
+        // king is a process-wide static, so this is too: the world sim and every session share one court.
+        private static readonly object RoyalCourtVersionLock = new();
+        private static long? _royalCourtVersion;
+
+        internal static long? RoyalCourtVersion { get { lock (RoyalCourtVersionLock) return _royalCourtVersion; } }
+
+        internal static void NoteRoyalCourtVersion(long? version) { lock (RoyalCourtVersionLock) _royalCourtVersion = version; }
+
         /// <summary>v1.1.11: the stored court and the version it was read at (the version read first, so a later write is a conflict).</summary>
         internal async Task<(RoyalCourtSaveData? Court, long Version)> ReadRoyalCourtWithVersionAsync()
         {
@@ -720,10 +732,12 @@ namespace UsurperRemake.Systems
         {
             try
             {
-                if (backend is not SqlSaveBackend sql) { await SaveRoyalCourtToWorldState(throneVacated); return true; }
+                if (backend is not SqlSaveBackend sql) return false;   // v1.1.13: no unversioned fallback
                 var king = global::CastleLocation.GetCurrentKing();
                 string json = king == null ? EmptyRoyalCourtJson(throneVacated) : RoyalCourtJson(king);
-                return await sql.SaveWorldStateIfVersion("royal_court", json, version);
+                if (!await sql.SaveWorldStateIfVersion("royal_court", json, version)) return false;
+                NoteRoyalCourtVersion(version + 1);   // v1.1.13: the in-memory court is now the stored one
+                return true;
             }
             catch (Exception ex)
             {
@@ -803,11 +817,13 @@ namespace UsurperRemake.Systems
         {
             try
             {
+                long version = (backend as SqlSaveBackend)?.GetWorldStateVersion("royal_court") ?? 0;   // v1.1.13: read before the value
                 var json = await backend.LoadWorldState("royal_court");
                 if (string.IsNullOrEmpty(json)) return;
 
                 var royalCourt = JsonSerializer.Deserialize<RoyalCourtSaveData>(json, jsonOptions);
                 if (royalCourt != null) global::CastleLocation.RoyalCourtLoadedFromShared = true;   // v1.1.11
+                if (royalCourt != null) NoteRoyalCourtVersion(version);   // v1.1.13: the court the next save is checked against
                 if (royalCourt == null || global::CastleLocation.ApplySharedThroneVacancy(royalCourt)) return;   // v1.1.11
                 if (string.IsNullOrEmpty(royalCourt.KingName)) return;
 

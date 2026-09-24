@@ -263,6 +263,75 @@ public class OwnerProcessTier1Tests : IDisposable
         purge.Should().Contain("ForgetCharacterInNpcWorldAsync(");
     }
 
+    /// <summary>Runs the body with the given king and no recorded court version, then puts both back.</summary>
+    private static async Task WithKing(King king, Func<Task> body)
+    {
+        var before = CastleLocation.GetCurrentKing();
+        var history = CastleLocation.GetMonarchHistory().ToList();
+        var version = OnlineStateManager.RoyalCourtVersion;
+        CastleLocation.SetKing(king);
+        OnlineStateManager.NoteRoyalCourtVersion(null);
+        try { await body(); }
+        finally
+        {
+            CastleLocation.SetKing(before);
+            CastleLocation.SetMonarchHistory(history);
+            OnlineStateManager.NoteRoyalCourtVersion(version);
+        }
+    }
+
+    [Fact]
+    public async Task AStaleCourt_CannotOverwriteTheCurrentKing()
+    {
+        var osm = NewOsm(_db);
+        await WithKing(King.CreateNewKing("Alice", CharacterAI.Human, CharacterSex.Female), async () =>
+        {
+            await osm.SaveRoyalCourtToWorldState();   // nothing stored yet, so the first court may write
+            (await osm.ReadRoyalCourtFromWorldState())!.KingName.Should().Be("Alice");
+            await osm.LoadRoyalCourtFromWorldState();
+            CastleLocation.GetCurrentKing()!.Treasury = 500;
+            await osm.SaveRoyalCourtToWorldState();   // this process's own later write is not a conflict
+            (await osm.ReadRoyalCourtFromWorldState())!.Treasury.Should().Be(500);
+
+            // another process crowns Carol; this process still holds Alice
+            var carol = new RoyalCourtSaveData { KingName = "Carol", KingAI = (int)CharacterAI.Human, Treasury = 42 };
+            await _db.SaveWorldState("royal_court", JsonSerializer.Serialize(carol, Json));
+            long v = _db.GetWorldStateVersion("royal_court");
+            CastleLocation.GetCurrentKing()!.Treasury = 9999;
+
+            await osm.SaveRoyalCourtToWorldState();
+
+            (await osm.ReadRoyalCourtFromWorldState())!.KingName.Should().Be("Carol", "the stale court is not written");
+            _db.GetWorldStateVersion("royal_court").Should().Be(v);
+            CastleLocation.GetCurrentKing()!.Name.Should().Be("Carol", "the stored court is loaded instead");
+            OnlineStateManager.RoyalCourtVersion.Should().Be(v);
+        });
+    }
+
+    [Fact]
+    public async Task ACourtNeverLoaded_DoesNotOverwriteAStoredOne()
+    {
+        var osm = NewOsm(_db);
+        var carol = new RoyalCourtSaveData { KingName = "Carol", KingAI = (int)CharacterAI.Human };
+        await _db.SaveWorldState("royal_court", JsonSerializer.Serialize(carol, Json));
+        await WithKing(King.CreateNewKing("Alice", CharacterAI.Human, CharacterSex.Female), async () =>
+        {
+            await osm.SaveRoyalCourtToWorldState();
+            (await osm.ReadRoyalCourtFromWorldState())!.KingName.Should().Be("Carol");
+        });
+    }
+
+    [Fact]
+    public void TheOrdinarySave_HasNoUnconditionalRoyalCourtWrite()
+    {
+        var osm = Source("Systems", "OnlineStateManager.cs");
+        osm.Should().NotContain("SaveWorldState(\"royal_court\"");
+        int start = osm.IndexOf("public async Task SaveRoyalCourtToWorldState", StringComparison.Ordinal);
+        var body = osm.Substring(start, osm.IndexOf("private static string EmptyRoyalCourtJson", start, StringComparison.Ordinal) - start);
+        body.Should().Contain("SaveRoyalCourtIfVersionAsync(loadedAt.Value").And.Contain("await LoadRoyalCourtFromWorldState();");
+        Source("Systems", "SaveSystem.cs").Should().Contain("OnlineStateManager.Instance.SaveRoyalCourtToWorldState()");
+    }
+
     private static string Source(string folder, string file)
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);

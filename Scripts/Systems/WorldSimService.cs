@@ -590,11 +590,13 @@ namespace UsurperRemake.Systems
         {
             try
             {
+                long version = sqlBackend.GetWorldStateVersion("royal_court");   // v1.1.13: read before the value
                 var json = sqlBackend.LoadWorldState("royal_court").GetAwaiter().GetResult();
                 if (string.IsNullOrEmpty(json)) return;
 
                 var royalCourt = JsonSerializer.Deserialize<RoyalCourtSaveData>(json, jsonOptions);
                 if (royalCourt != null) CastleLocation.RoyalCourtLoadedFromShared = true;   // v1.1.11
+                if (royalCourt != null) OnlineStateManager.NoteRoyalCourtVersion(version);   // v1.1.13: the process-wide court
                 if (royalCourt == null) return;
                 if (CastleLocation.ApplySharedThroneVacancy(royalCourt))
                 {
@@ -944,6 +946,7 @@ namespace UsurperRemake.Systems
                     // (a re-read could adopt a concurrent player write's
                     // version and skip the reload it was owed).
                     lastRoyalCourtVersion = lastRoyalCourtVersion + 1;
+                    OnlineStateManager.NoteRoyalCourtVersion(lastRoyalCourtVersion);   // v1.1.13: sessions share this court
                 }
                 else
                 {
