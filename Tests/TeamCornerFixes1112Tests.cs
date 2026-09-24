@@ -155,6 +155,28 @@ public class TeamCornerFixes1112Tests : IDisposable
     }
 
     [Fact]
+    public async Task Quit_TheLastPlayer_DissolvesATeamWhoseOnlyNpcDiedOfAge()
+    {
+        // v1.1.12: death by age is permanent (IsAgedDeath without IsPermaDead), so it holds no place
+        await TeamCornerRig.Online(async (db, path) =>
+        {
+            TeamCornerRig.Exec(path, "INSERT INTO player_teams (team_name, password_hash, created_by) VALUES ('Elders', 'x', 'quit hero');");
+            WorldSimulator.RegisterPlayerTeam("Elders");
+            var npc = TeamCornerRig.Npc("tc_quit_aged_1", "Aged Npc", "Elders", dead: true);
+            npc.IsAgedDeath = true;
+            NPCSpawnSystem.Instance.ActiveNPCs.Add(npc);
+            try
+            {
+                var hero = TeamCornerRig.Hero(name: "Quit Hero", team: "Elders");
+                await new TeamCornerRig(hero, new[] { "y", "" }).Run("QuitTeam");
+                WorldSimulator.IsPlayerTeam("Elders").Should().BeFalse();
+                Convert.ToInt64(TeamCornerRig.Scalar(path, "SELECT COUNT(*) FROM player_teams WHERE team_name = 'Elders'")).Should().Be(0);
+            }
+            finally { NPCSpawnSystem.Instance.ActiveNPCs.Remove(npc); }
+        });
+    }
+
+    [Fact]
     public void Quit_SavesOnce()
     {
         string body = MethodBody("QuitTeam");

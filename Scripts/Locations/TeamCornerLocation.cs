@@ -1405,7 +1405,7 @@ public class TeamCornerLocation : BaseLocation
                 var remainingPlayers = await backend.GetPlayerTeamMembers(oldTeam);
                 // v1.1.12: a dead NPC member respawns on the team, so it still counts (the 5-slot rule too)
                 var remainingNPCs = NPCSpawnSystem.Instance.ActiveNPCs
-                    .Count(n => n.Team == oldTeam && !n.IsPermaDead);
+                    .Count(n => n.Team == oldTeam && !n.IsPermaDead && !n.IsAgedDeath);   // as CountTeamSlots
 
                 // v1.1.12: the protection is kept while a player is still on the team; it was dropped on
                 // every quit, which left the members still in it open to the NPC AI
