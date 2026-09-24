@@ -109,6 +109,12 @@ namespace UsurperRemake.Systems
         {
             try
             {
+                // v1.1.13: a process that is not the owner writes only under the version it loaded
+                if (backend is SqlSaveBackend sql && !WorldEditLog.IsOwnerProcess(sql))
+                {
+                    await SaveSharedNPCsVersionedAsync(sql, npcData);
+                    return;
+                }
                 var json = JsonSerializer.Serialize(npcData, jsonOptions);
                 await backend.SaveWorldState(KEY_NPCS, json);
                 DebugLogger.Instance.LogDebug("ONLINE", $"Saved {npcData.Count} NPCs to shared state");
@@ -119,6 +125,88 @@ namespace UsurperRemake.Systems
             }
         }
 
+        // v1.1.13: the stored npcs version this session's roster was loaded from or last written as, and a
+        // hash per NPC of the roster as loaded, so the NPCs this session changed are known on a conflict.
+        private long? _npcsVersion;
+        private Dictionary<string, string>? _npcBaseline;
+
+        internal long? NpcsVersion => _npcsVersion;
+
+        private static string NpcKey(NPCData d) => !string.IsNullOrEmpty(d.Id) ? d.Id : "name:" + d.Name;
+
+        private Dictionary<string, string> HashRoster(IEnumerable<NPCData> roster)
+        {
+            var map = new Dictionary<string, string>();
+            using var sha = System.Security.Cryptography.SHA256.Create();
+            foreach (var d in roster)
+            {
+                // the emotional state drifts with time on every read, so it is no sign of a change
+                var node = JsonSerializer.SerializeToNode(d, jsonOptions) as System.Text.Json.Nodes.JsonObject;
+                node?.Remove("emotionalState");
+                map[NpcKey(d)] = Convert.ToHexString(sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(node?.ToJsonString() ?? "")));
+            }
+            return map;
+        }
+
+        /// <summary>v1.1.13: call after RestoreNPCs of the loaded shared roster: the NPCs as this session has them now.</summary>
+        public void NoteNpcBaseline() => _npcBaseline = HashRoster(SerializeCurrentNPCs());
+
+        /// <summary>
+        /// v1.1.13: the ordinary save of a process that is not the owner (a door session). The whole roster is
+        /// written only under the version this session loaded, after the world edits are applied to it. On a
+        /// conflict the stored roster is loaded, with this session's own changes laid over it: each NPC whose
+        /// data differs from the roster as this session loaded it replaces the stored copy of that NPC (an NPC
+        /// the stored roster no longer has is not brought back). The edits are applied again and the write
+        /// retried under the new version. Another process's changes to the other NPCs are kept; to an NPC both
+        /// changed, this session's copy wins, as every door write did before. Returns true once written.
+        /// </summary>
+        internal async Task<bool> SaveSharedNPCsVersionedAsync(SqlSaveBackend sql, List<NPCData> npcData,
+            Func<List<NPCData>, Task>? reloadRoster = null, Func<Task>? beforeWrite = null)
+        {
+            reloadRoster ??= list => GameEngine.Instance.RestoreNPCs(list);
+            var edits = sql.GetWorldEditsToApply(WorldEditLog.ReapplyHours);
+            if (edits.Count > 0 && WorldEditLog.Apply(sql, edits) > 0) npcData = SerializeCurrentNPCs();   // applied, never marked here
+            long version = _npcsVersion ?? (sql.GetWorldStateVersion(KEY_NPCS) == 0 ? 0 : -1);
+            for (int attempt = 0; attempt < 5; attempt++)
+            {
+                if (version >= 0)
+                {
+                    if (beforeWrite != null) await beforeWrite();
+                    if (await sql.SaveWorldStateIfVersion(KEY_NPCS, JsonSerializer.Serialize(npcData, jsonOptions), version))
+                    {
+                        _npcsVersion = version + 1;
+                        _npcBaseline = HashRoster(npcData);
+                        DebugLogger.Instance.LogDebug("ONLINE", $"Saved {npcData.Count} NPCs to shared state (v{version + 1})");
+                        return true;
+                    }
+                }
+                version = sql.GetWorldStateVersion(KEY_NPCS);
+                var storedJson = await sql.LoadWorldState(KEY_NPCS);
+                var stored = string.IsNullOrEmpty(storedJson) ? null : JsonSerializer.Deserialize<List<NPCData>>(storedJson, jsonOptions);
+                if (stored == null || stored.Count == 0) { version = 0; continue; }
+
+                var baseline = _npcBaseline ?? new Dictionary<string, string>();
+                var current = HashRoster(npcData);
+                var mine = npcData.Where(d => _npcBaseline != null
+                                              && (!baseline.TryGetValue(NpcKey(d), out var h) || h != current[NpcKey(d)]))
+                                  .GroupBy(NpcKey).ToDictionary(g => g.Key, g => g.First());
+                int kept = 0;
+                for (int i = 0; i < stored.Count; i++)
+                    if (mine.TryGetValue(NpcKey(stored[i]), out var own)) { stored[i] = own; kept++; }
+                await reloadRoster(stored);
+                WorldEditLog.Apply(sql, edits);
+                npcData = SerializeCurrentNPCs();
+                // the NPCs laid over stay this session's own changes if this write conflicts too
+                _npcBaseline = HashRoster(npcData);
+                foreach (var key in mine.Keys) _npcBaseline.Remove(key);
+                DebugLogger.Instance.LogInfo("ONLINE",
+                    $"NPC roster changed by another process since this session loaded it (now v{version}): reloaded it, kept {kept} NPC(s) this session changed, retrying.");
+            }
+            _npcsVersion = version;
+            DebugLogger.Instance.LogWarning("ONLINE", "Shared NPC save gave up: the npcs record kept changing. The reloaded roster is kept; the next save tries again.");
+            return false;
+        }
+
         /// <summary>
         /// Load NPC data from shared world state.
         /// Returns null if no shared NPCs exist yet (first player initializes them).
@@ -127,7 +215,9 @@ namespace UsurperRemake.Systems
         {
             try
             {
+                long version = (backend as SqlSaveBackend)?.GetWorldStateVersion(KEY_NPCS) ?? 0;   // v1.1.13: read before the value
                 var json = await backend.LoadWorldState(KEY_NPCS);
+                _npcsVersion = version;
                 if (string.IsNullOrEmpty(json))
                     return null;
 

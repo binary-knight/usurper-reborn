@@ -2712,6 +2712,7 @@ public partial class GameEngine
                 if (sharedNpcs != null && sharedNpcs.Count > 0)
                 {
                     await RestoreNPCs(sharedNpcs);
+                    OnlineStateManager.Instance.NoteNpcBaseline();   // v1.1.13: what this session's save compares against
                     DebugLogger.Instance.LogInfo("ONLINE", $"NPCs overridden from world_state: {sharedNpcs.Count} NPCs loaded");
                 }
 
@@ -4707,6 +4708,7 @@ public partial class GameEngine
             if (sharedNpcs != null && sharedNpcs.Count > 0)
             {
                 await RestoreNPCs(sharedNpcs);
+                OnlineStateManager.Instance.NoteNpcBaseline();   // v1.1.13: what this session's save compares against
                 DebugLogger.Instance.LogInfo("ONLINE", $"NPCs overridden from world_state: {sharedNpcs.Count} NPCs loaded");
             }
 

@@ -505,6 +505,112 @@ public class OwnerProcessTier2Tests : IDisposable
         mark.Should().BeGreaterThan(sim.IndexOf("lastNpcVersion = lastNpcVersion + 1;", save, StringComparison.Ordinal), "marked only after the versioned write");
     }
 
+    // ─── Door writers: two backends on one file ───
+
+    private static OnlineStateManager NewOsm(SqlSaveBackend db) =>
+        (OnlineStateManager)Activator.CreateInstance(typeof(OnlineStateManager),
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance, null, new object[] { db, "door_a" }, null)!;
+
+    /// <summary>Door process A: loads the stored roster as a login does and holds it at that version.</summary>
+    private static async Task<OnlineStateManager> DoorLogin(SqlSaveBackend db)
+    {
+        var osm = NewOsm(db);
+        await GameEngine.Instance.RestoreNPCs((await osm.LoadSharedNPCs())!);
+        osm.NoteNpcBaseline();
+        return osm;
+    }
+
+    private const string StaleMarriages =
+        "{\"marriages\":[{\"npc1Id\":\"player_bob_id\",\"npc2Id\":\"npc_d_w\"},{\"npc1Id\":\"npc_x\",\"npc2Id\":\"npc_y\"}],\"affairs\":[]}";
+
+    [Fact]
+    public async Task ADoorsStaleSave_FailsTheVersionCheck_AndRetries_KeepingItsOwnChanges_AndThePurge()
+    {
+        var dbA = new SqlSaveBackend(_path);   // door A; _db is process B, the deleting one
+        var grudger = Npc("npc_d_g", "Grudger");
+        Remember(grudger, MemoryType.Attacked, "Bob", DateTime.Now.AddMinutes(-5));
+        grudger.Enemies.Add("Bob");
+        MarriedToBob("npc_d_w", "Wife");
+        Npc("npc_d_s", "Smith");
+        Npc("npc_d_b", "Baker");
+        await dbA.SaveWorldState(OnlineStateManager.KEY_NPCS, RosterJson());
+        await dbA.SaveWorldState(OnlineStateManager.KEY_MARRIAGES, StaleMarriages);
+        string staleNpcs = (await dbA.LoadWorldState(OnlineStateManager.KEY_NPCS))!;
+        WorldEditLog.OwnerOverride = false;
+
+        var osmA = await DoorLogin(dbA);
+        long v1 = osmA.NpcsVersion!.Value;
+        Find("Smith")!.Level = 42;   // A's own unsaved change
+
+        // B deletes Bob: the edit, then its versioned writes of the clean roster (with a change of its own) and marriages
+        var b = await StoredRoster();
+        b.Single(d => d.Name == "Grudger").Memories.RemoveAll(m => m.InvolvedCharacter == "Bob");
+        b.Single(d => d.Name == "Grudger").Enemies.Remove("Bob");
+        var bw = b.Single(d => d.Name == "Wife"); bw.SpouseName = ""; bw.IsMarried = false; bw.Married = false;
+        b.Single(d => d.Name == "Baker").Gold = 777;
+        WorldEditLog.AppendForgetCharacter(_db, new[] { "Bob" }, "bob_account", DateTime.Now, true);
+        (await _db.SaveWorldStateIfVersion(OnlineStateManager.KEY_NPCS, JsonSerializer.Serialize(b, Json), v1)).Should().BeTrue();
+        (await OnlineStateManager.RemoveStoredMarriagesAsync(_db, new[] { "npc_d_w" })).Should().Be(1);
+
+        // A, still holding the grudge and the marriage, saves through the ordinary path
+        int writes = 0;
+        (await osmA.SaveSharedNPCsVersionedAsync(dbA, OnlineStateManager.SerializeCurrentNPCs(), beforeWrite: () => { writes++; return Task.CompletedTask; }))
+            .Should().BeTrue();
+        writes.Should().Be(2, "the stale write failed its version check; the retry landed");
+        dbA.GetWorldStateVersion(OnlineStateManager.KEY_NPCS).Should().Be(v1 + 2);
+        osmA.NpcsVersion.Should().Be(v1 + 2);
+
+        var stored = await StoredRoster();
+        stored.Single(d => d.Name == "Grudger").Memories.Should().NotContain(m => m.InvolvedCharacter == "Bob");
+        stored.Single(d => d.Name == "Grudger").Enemies.Should().NotContain("Bob");
+        stored.Single(d => d.Name == "Wife").SpouseName.Should().BeEmpty();
+        stored.Single(d => d.Name == "Smith").Level.Should().Be(42, "A's own change was laid over the reloaded roster");
+        stored.Single(d => d.Name == "Baker").Gold.Should().Be(777, "B's change to another NPC was kept");
+        Find("Grudger")!.Brain!.Memory.AllMemories.Should().NotContain(m => m.InvolvedCharacter == "Bob");
+        EditMark("forget_character").AppliedAt.Should().BeNull("a door never marks an edit");
+        (await _db.LoadWorldState(OnlineStateManager.KEY_MARRIAGES)).Should().NotContain("npc_d_w", "doors do not write the marriages record");
+
+        // an old binary's unconditional writes land anyway; the owner's save re-applies and they are gone again
+        long beforeOld = _db.GetWorldStateVersion(OnlineStateManager.KEY_NPCS);
+        await _db.SaveWorldState(OnlineStateManager.KEY_NPCS, staleNpcs);
+        await _db.SaveWorldState(OnlineStateManager.KEY_MARRIAGES, StaleMarriages);
+        WorldEditLog.OwnerOverride = null;
+        await GameEngine.Instance.RestoreNPCs(JsonSerializer.Deserialize<List<NPCData>>(staleNpcs, Json)!);   // what the owner held
+        await SimSave(OwnerSim("owner_t", beforeOld));
+
+        stored = await StoredRoster();
+        stored.Single(d => d.Name == "Grudger").Memories.Should().NotContain(m => m.InvolvedCharacter == "Bob");
+        stored.Single(d => d.Name == "Wife").SpouseName.Should().BeEmpty();
+        var marriages = (await _db.LoadWorldState(OnlineStateManager.KEY_MARRIAGES))!;
+        marriages.Should().NotContain("npc_d_w", "the owner's registry lost the marriage in the re-apply and replaced the record");
+        EditMark("forget_character").AppliedBy.Should().Be("owner_t");
+    }
+
+    [Fact]
+    public async Task ANonOwner_NeverWritesTheRosterUnconditionally()
+    {
+        Npc("npc_d_2", "Smith");
+        await _db.SaveWorldState(OnlineStateManager.KEY_NPCS, RosterJson());
+        WorldEditLog.OwnerOverride = false;
+        var osm = await DoorLogin(_db);
+        await _db.SaveWorldState(OnlineStateManager.KEY_NPCS, "[]");   // another writer empties it (a stored roster of none)
+        var other = new List<NPCData> { OnlineStateManager.SerializeCurrentNPCs().Single() };
+        other[0].Name = "Newcomer"; other[0].Id = "npc_d_new";
+        await _db.SaveWorldState(OnlineStateManager.KEY_NPCS, JsonSerializer.Serialize(other, Json));
+
+        await osm.SaveSharedNPCs(OnlineStateManager.SerializeCurrentNPCs());
+
+        (await StoredRoster()).Select(d => d.Name).Should().Equal(new[] { "Newcomer" },
+            "the stored roster is reloaded; Smith, unchanged by this session, is not written over it");
+
+        var src = Source("Systems", "OnlineStateManager.cs");
+        int save = src.IndexOf("public async Task SaveSharedNPCs(", StringComparison.Ordinal);
+        src.IndexOf("!WorldEditLog.IsOwnerProcess(sql)", save, StringComparison.Ordinal)
+            .Should().BeLessThan(src.IndexOf("await backend.SaveWorldState(KEY_NPCS, json);", save, StringComparison.Ordinal));
+        Source("Systems", "SaveSystem.cs").Should().Contain("await OnlineStateManager.Instance.SaveSharedNPCs(sharedNpcData);");
+        Source("Core", "GameEngine.cs").Split("OnlineStateManager.Instance.NoteNpcBaseline();").Length.Should().Be(3, "both online loads record the baseline");
+    }
+
     private static string WebSource()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
