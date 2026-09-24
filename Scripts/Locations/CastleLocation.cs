@@ -8681,7 +8681,10 @@ public class CastleLocation : BaseLocation
         terminal.WriteLine("");
 
         // Load team members for the assault
-        var teamMembers = await backend.GetPlayerTeamMembers(currentPlayer.Team, currentPlayer.DisplayName);
+        // v1.1.12: the player is left out by save key; a teammate may share the player's display name
+        string myKey = GameEngine.InheritanceKey(currentPlayer);
+        var teamMembers = (await backend.GetPlayerTeamMembers(currentPlayer.Team))
+            .Where(m => !string.Equals(m.Username, myKey, StringComparison.OrdinalIgnoreCase)).ToList();
         terminal.SetColor("bright_cyan");
         terminal.WriteLine(Loc.Get("castle.siege_your_force"));
         terminal.SetColor("bright_green");

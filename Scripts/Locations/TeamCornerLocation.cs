@@ -929,8 +929,10 @@ public class TeamCornerLocation : BaseLocation
             var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
             if (backend != null)
             {
-                string myUsername = currentPlayer.DisplayName.ToLower();
-                playerMembers = await backend.GetPlayerTeamMembers(teamName, myUsername);
+                // v1.1.12: the viewer is left out by save key; a teammate may share the viewer's display name
+                string myKey = GameEngine.InheritanceKey(currentPlayer);
+                playerMembers = (await backend.GetPlayerTeamMembers(teamName))
+                    .Where(m => !string.Equals(m.Username, myKey, StringComparison.OrdinalIgnoreCase)).ToList();
             }
         }
 
@@ -2807,8 +2809,10 @@ public class TeamCornerLocation : BaseLocation
         var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
         if (backend == null) return;
 
-        string myUsername = currentPlayer.DisplayName.ToLower();
-        var teammates = await backend.GetPlayerTeamMembers(currentPlayer.Team, myUsername);
+        // v1.1.12: the viewer is left out by save key; a teammate may share the viewer's display name
+        string myKey = GameEngine.InheritanceKey(currentPlayer);
+        var teammates = (await backend.GetPlayerTeamMembers(currentPlayer.Team))
+            .Where(m => !string.Equals(m.Username, myKey, StringComparison.OrdinalIgnoreCase)).ToList();
 
         if (teammates.Count == 0)
         {

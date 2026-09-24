@@ -1288,7 +1288,10 @@ namespace UsurperRemake.Systems
                     const string ownNames = "(SELECT LOWER(display_name) FROM players WHERE LOWER(username) = LOWER(@u) AND display_name IS NOT NULL)";
                     ExecPurge(connection, tx, "messages",
                         $"to_player != '*' AND (LOWER(to_player) = LOWER(@d) OR LOWER(to_player) IN {ownNames}) " +
-                        "AND NOT EXISTS (SELECT 1 FROM players p WHERE LOWER(p.username) = LOWER(messages.to_player) AND LOWER(p.username) != LOWER(@u))",
+                        "AND NOT EXISTS (SELECT 1 FROM players p WHERE LOWER(p.username) = LOWER(messages.to_player) AND LOWER(p.username) != LOWER(@u)) " +
+                        // v1.1.12: nor a name another character goes by (a married "Bob Smith" beside a player "Bob Smith")
+                        "AND NOT EXISTS (SELECT 1 FROM players p WHERE LOWER(p.username) != LOWER(@u) AND (LOWER(p.display_name) = LOWER(messages.to_player) " +
+                        "OR LOWER(CASE WHEN json_valid(p.player_data) THEN json_extract(p.player_data, '$.player.name2') END) = LOWER(messages.to_player)))",
                         username, displayName);
                 }
 
