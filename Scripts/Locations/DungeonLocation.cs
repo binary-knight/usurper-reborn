@@ -79,6 +79,7 @@ public class DungeonLocation : BaseLocation
             var floorResult = GenerateOrRestoreFloor(currentPlayer, currentDungeonLevel);
             currentFloor = floorResult.Floor;
             roomsExploredThisFloor = currentFloor.Rooms.Count(r => r.IsExplored);
+            hasCampedThisFloor = floorResult.RestedOnThisFloor; // v1.1.12
         }
         else
         {
@@ -205,7 +206,8 @@ public class DungeonLocation : BaseLocation
             bool didRespawn = floorResult.DidRespawn;
 
             roomsExploredThisFloor = wasRestored ? currentFloor.Rooms.Count(r => r.IsExplored) : 0;
-            hasCampedThisFloor = false;
+            // v1.1.12: the rest limit comes from the floor's saved state.
+            hasCampedThisFloor = floorResult.RestedOnThisFloor;
 
             // Reset companion idle comment history so comments can repeat on new dungeon runs
             CompanionSystem.ResetIdleCommentHistory();
@@ -6207,6 +6209,18 @@ public class DungeonLocation : BaseLocation
         public DungeonFloor Floor;
         public bool WasRestored;  // True if floor was restored from save
         public bool DidRespawn;   // True if monsters respawned (24h passed)
+        public bool RestedOnThisFloor; // v1.1.12: the floor's one rest is already spent
+    }
+
+    /// <summary>
+    /// v1.1.12: spend the floor's one rest, in memory and in the floor's saved state,
+    /// so a logout and login on the same floor does not give a second rest.
+    /// </summary>
+    private void MarkRestedOnThisFloor(Character? player)
+    {
+        hasCampedThisFloor = true;
+        if (player?.DungeonFloorStates != null && player.DungeonFloorStates.TryGetValue(currentDungeonLevel, out var floorState))
+            floorState.RestedOnThisFloor = true;
     }
 
     /// <summary>
@@ -6225,6 +6239,10 @@ public class DungeonLocation : BaseLocation
             var floor = DungeonGenerator.GenerateFloor(floorLevel);
 
             bool shouldRespawn = savedState.ShouldRespawn();
+
+            // v1.1.12: a respawned floor is fresh, so its rest is available again.
+            if (shouldRespawn && !savedState.IsPermanentlyClear)
+                savedState.RestedOnThisFloor = false;
 
             // Restore room states
             foreach (var room in floor.Rooms)
@@ -6338,7 +6356,8 @@ public class DungeonLocation : BaseLocation
             {
                 Floor = floor,
                 WasRestored = true,
-                DidRespawn = shouldRespawn && !savedState.IsPermanentlyClear
+                DidRespawn = shouldRespawn && !savedState.IsPermanentlyClear,
+                RestedOnThisFloor = savedState.RestedOnThisFloor
             };
         }
 
@@ -6752,7 +6771,7 @@ public class DungeonLocation : BaseLocation
         currentDungeonLevel = nextLevel;
         if (player != null) { player.CurrentLocation = $"Dungeon Floor {currentDungeonLevel}"; player.LastDungeonFloor = currentDungeonLevel; }
         roomsExploredThisFloor = floorResult.WasRestored ? currentFloor.Rooms.Count(r => r.IsExplored) : 0;
-        hasCampedThisFloor = false;
+        hasCampedThisFloor = floorResult.RestedOnThisFloor; // v1.1.12
         consecutiveMonsterRooms = 0;
 
         // Update quest progress for reaching this floor
@@ -6905,7 +6924,7 @@ public class DungeonLocation : BaseLocation
         terminal.SetColor("cyan");
         terminal.WriteLine($"{Loc.Get("combat.bar_hp")}: {player.HP}/{player.MaxHP}  {Loc.Get("combat.bar_mp")}: {player.Mana}/{player.MaxMana}  {Loc.Get("combat.bar_st")}: {player.CurrentCombatStamina}/{player.MaxCombatStamina}");
 
-        hasCampedThisFloor = true;
+        MarkRestedOnThisFloor(player);
         // v1.1.12: the camp and a sanctuary share one rest per floor.
         terminal.SetColor("gray");
         terminal.WriteLine(Loc.Get("dungeon.rest_once_per_floor"));
@@ -7076,7 +7095,7 @@ public class DungeonLocation : BaseLocation
             currentDungeonLevel = targetLevel;
             if (player != null) { player.CurrentLocation = $"Dungeon Floor {currentDungeonLevel}"; player.LastDungeonFloor = currentDungeonLevel; }
             roomsExploredThisFloor = floorResult.WasRestored ? currentFloor.Rooms.Count(r => r.IsExplored) : 0;
-            hasCampedThisFloor = false;
+            hasCampedThisFloor = floorResult.RestedOnThisFloor; // v1.1.12
             consecutiveMonsterRooms = 0;
 
             // Log floor change
@@ -10109,6 +10128,7 @@ public class DungeonLocation : BaseLocation
             var floorResult = GenerateOrRestoreFloor(player, nextLevel);
             currentFloor = floorResult.Floor;
             currentDungeonLevel = nextLevel;
+            hasCampedThisFloor = floorResult.RestedOnThisFloor; // v1.1.12: this path never reset it
             if (player != null) { player.CurrentLocation = $"Dungeon Floor {currentDungeonLevel}"; player.LastDungeonFloor = currentDungeonLevel; }
             terminal.WriteLine(Loc.Get("dungeon.descend_to", currentDungeonLevel), "yellow");
 
@@ -15064,7 +15084,7 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("dungeon.sanctuary_cure_poison"), "cyan");
             }
 
-            hasCampedThisFloor = true;
+            MarkRestedOnThisFloor(player);
             // v1.1.12: the sanctuary and the [R] camp share one rest per floor.
             terminal.WriteLine(Loc.Get("dungeon.rest_once_per_floor"), "gray");
 

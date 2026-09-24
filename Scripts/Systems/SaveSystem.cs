@@ -1098,6 +1098,7 @@ namespace UsurperRemake.Systems
                     IsPermanentlyClear = state.IsPermanentlyClear,
                     BossDefeated = state.BossDefeated,
                     CompletionBonusAwarded = state.CompletionBonusAwarded,
+                    RestedOnThisFloor = state.RestedOnThisFloor,
                     CurrentRoomId = state.CurrentRoomId,
                     Rooms = new List<DungeonRoomStateData>()
                 };

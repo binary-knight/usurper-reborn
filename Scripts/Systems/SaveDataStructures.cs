@@ -1796,6 +1796,7 @@ namespace UsurperRemake.Systems
         public bool IsPermanentlyClear { get; set; } = false;       // Boss/seal floors stay cleared forever
         public bool BossDefeated { get; set; } = false;             // True if the actual boss room boss was defeated
         public bool CompletionBonusAwarded { get; set; } = false;   // Completion XP/gold bonus already paid out
+        public bool RestedOnThisFloor { get; set; } = false;        // v1.1.12: the one rest per floor is spent
         public string CurrentRoomId { get; set; } = "";      // Where player left off
         public List<DungeonRoomStateData> Rooms { get; set; } = new();
     }

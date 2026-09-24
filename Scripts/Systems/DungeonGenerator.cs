@@ -1320,6 +1320,7 @@ namespace UsurperRemake.Systems
         public bool IsPermanentlyClear { get; set; } = false;       // Boss/seal floors
         public bool BossDefeated { get; set; } = false;             // True if boss room boss was actually defeated
         public bool CompletionBonusAwarded { get; set; } = false;   // Completion XP/gold bonus already paid out
+        public bool RestedOnThisFloor { get; set; } = false;        // v1.1.12: the one rest per floor is spent
         public string CurrentRoomId { get; set; } = "";
 
         // Room-level state

@@ -6342,6 +6342,7 @@ public partial class GameEngine
                 IsPermanentlyClear = saved.IsPermanentlyClear,
                 BossDefeated = saved.BossDefeated,
                 CompletionBonusAwarded = saved.CompletionBonusAwarded,
+                RestedOnThisFloor = saved.RestedOnThisFloor,
                 CurrentRoomId = saved.CurrentRoomId,
                 RoomStates = new Dictionary<string, UsurperRemake.Systems.DungeonRoomState>()
             };
