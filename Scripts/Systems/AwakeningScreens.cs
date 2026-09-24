@@ -122,6 +122,7 @@ namespace UsurperRemake.Systems
             var pending = OceanPhilosophySystem.Instance?.TakePendingAnnouncement();
             if (pending == null || term == null) return false;
             var (from, to) = pending.Value;
+            player?.RecalculateStats(); // v1.1.12: the new Wisdom, max HP and max mana, at a safe point
 
             term.ClearScreen();
             term.WriteLine("");

@@ -282,15 +282,15 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// v1.1.12: a stage rise queues its announcement for the next safe point and applies the
-        /// run-time boosts. A restore does neither: the stages were announced when they happened.
+        /// v1.1.12: a stage rise queues its announcement for the next safe point, which also
+        /// recalculates the player's stats (never mid-fight). A restore queues nothing: the stages
+        /// were announced when they happened.
         /// </summary>
         private void OnStageRose(int oldLevel, int newLevel)
         {
             if (_restoring) return;
             if (PendingAnnouncementStage == 0) PendingAnnouncementFromStage = oldLevel;
             PendingAnnouncementStage = Math.Max(PendingAnnouncementStage, newLevel);
-            try { GameEngine.Instance?.CurrentPlayer?.RecalculateStats(); } catch { /* boosts apply at the next recalculation */ }
         }
 
         /// <summary>

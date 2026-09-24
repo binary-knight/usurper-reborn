@@ -315,7 +315,13 @@ public class Awakening1112Tests : IDisposable
     public void TheAnnouncement_WaitsForTheLocationLoop()
     {
         string loop = Source("Scripts/Locations/BaseLocation.cs");
-        loop.Should().Contain("await AwakeningScreens.ShowPending(terminal, currentPlayer);");
+        // inside the per-command loop, before the command runs: every dungeon room action comes back here
+        int loopStart = loop.IndexOf("while (!exitLocation && currentPlayer.IsAlive)");
+        int show = loop.IndexOf("await AwakeningScreens.ShowPending(terminal, currentPlayer);");
+        int process = loop.IndexOf("exitLocation = await ProcessChoice(choice);");
+        loopStart.Should().BeGreaterThan(0);
+        show.Should().BeGreaterThan(loopStart).And.BeLessThan(process);
+        Source("Scripts/Locations/DungeonLocation.cs").Should().NotContain("override async Task LocationLoop");
         Source("Scripts/Systems/CombatEngine.cs").Should().NotContain("AwakeningScreens.ShowPending");
         Source("Scripts/Systems/DialogueSystem.cs").Should().NotContain("AwakeningScreens.ShowPending");
     }
@@ -431,6 +437,15 @@ public class Awakening1112Tests : IDisposable
         finally { engine.CurrentPlayer = old; }
     }
 
+    private static async Task AsPlayerAsync(Character hero, Func<Task> body)
+    {
+        var engine = GameEngine.Instance;
+        var old = engine.CurrentPlayer;
+        engine.CurrentPlayer = hero;
+        try { await body(); }
+        finally { engine.CurrentPlayer = old; }
+    }
+
     private static void ToStage(int stage)
     {
         if (stage >= 7) Ocean.ExperienceMoment(AwakeningMoment.TrueIdentityRevealed);
@@ -537,6 +552,22 @@ public class Awakening1112Tests : IDisposable
             ToStage(7);
             TeamHQBonus.ApplyDefense(hero, 1000).Should().Be(920);
             return 0;
+        });
+    }
+
+    [Fact]
+    public async Task ARise_RecalculatesAtTheSafePoint_NotAtOnce()
+    {
+        var hero = Caster();
+        await AsPlayerAsync(hero, async () =>
+        {
+            hero.RecalculateStats();
+            long h0 = hero.MaxHP;
+            ToStage(4);
+            hero.MaxHP.Should().Be(h0, "a rise mid-fight leaves the stats alone");
+            var (term, _) = Terminal("\n\n\n");
+            await AwakeningScreens.ShowPending(term, hero);
+            hero.MaxHP.Should().Be(h0 + (long)(h0 * 0.05));
         });
     }
 
