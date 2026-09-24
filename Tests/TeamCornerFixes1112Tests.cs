@@ -203,6 +203,25 @@ public class TeamCornerFixes1112Tests : IDisposable
     }
 
     [Fact]
+    public async Task Create_RefusesAnAccentedCaseVariant_OnAFreshConnection()
+    {
+        // v1.1.12: SQLite LOWER() leaves accented letters alone; the guards fold case as C# does
+        (await _db.CreatePlayerTeam("\u00c9lite", "x", "a")).Should().BeTrue();
+        SqliteConnection.ClearAllPools();
+        var fresh = new SqlSaveBackend(_path);
+        fresh.IsTeamNameTaken("\u00e9lite").Should().BeTrue();
+        (await fresh.CreatePlayerTeam("\u00e9lite", "x", "b")).Should().BeFalse("a name that differs only in case is taken");
+        Long("SELECT COUNT(*) FROM player_teams WHERE team_name = '\u00e9lite'").Should().Be(0);
+
+        // variants already in the table stay separate teams, each joined by its exact name
+        Exec("INSERT INTO player_teams (team_name, password_hash, created_by) VALUES ('\u00e9lite', '" + SqlSaveBackend.HashTeamPassword("low") + "', 'c');");
+        Exec("UPDATE player_teams SET password_hash = '" + SqlSaveBackend.HashTeamPassword("up") + "' WHERE team_name = '\u00c9lite';");
+        (await fresh.VerifyPlayerTeam("\u00e9lite", "low")).passwordCorrect.Should().BeTrue();
+        (await fresh.VerifyPlayerTeam("\u00c9lite", "up")).passwordCorrect.Should().BeTrue();
+        (await fresh.VerifyPlayerTeam("\u00c9lite", "low")).passwordCorrect.Should().BeFalse();
+    }
+
+    [Fact]
     public void Rankings_KeepCaseVariants_AsSeparateTeams()
     {
         // v1.1.12: older data can hold "Grey Band" and "grey band"; each stays its own row, joined by its exact name
@@ -263,8 +282,61 @@ public class TeamCornerFixes1112Tests : IDisposable
     {
         MethodBody("ResurrectTeammate").Should().Contain("SaveAllSharedState()");
         string sack = MethodBody("SackMember");
-        sack.Should().Contain("team.sack_gear_warning").And.Contain("TakeAllEquipment(member, confirm: false)");
-        sack.IndexOf("TakeAllEquipment(").Should().BeLessThan(sack.IndexOf("live.Team = \"\""), "the gear is offered before the NPC goes");
+        sack.Should().Contain("team.sack_gear_warning").And.Contain("MoveEquipmentToPlayer(member, cursed)");
+        sack.IndexOf("MoveEquipmentToPlayer(").Should().BeLessThan(sack.IndexOf("live.Team = \"\""), "the gear is offered before the NPC goes");
+    }
+
+    [Fact]
+    public void Sack_SavesTheGearAtOnce_AndStripsAReloadedCopy_SoItIsInOnePlace()
+    {
+        // v1.1.12: the move is followed by the save with nothing awaited between, before the pause and the report
+        string sack = MethodBody("SackMember");
+        int move = sack.IndexOf("recovered = MoveEquipmentToPlayer(");
+        int save = sack.IndexOf("if (tookGear) await SaveRecoveredGear();");
+        move.Should().BeGreaterThan(0);
+        save.Should().BeGreaterThan(move);
+        sack.Substring(move, save - move).Should().NotContain("await", "nothing awaited between the move and the save");
+        save.Should().BeLessThan(sack.IndexOf("ReportEquipmentTaken("));
+        sack.IndexOf("StripRecoveredGear(live, recovered)").Should().BeGreaterThan(sack.IndexOf("var live = LiveTeamNpc(member);"))
+            .And.BeLessThan(sack.IndexOf("live.Team = \"\""));
+
+        var sword = new Equipment { Name = "Sack Test Blade", Slot = EquipmentSlot.MainHand, WeaponPower = 12, Value = 100 };
+        var helm = new Equipment { Name = "Sack Test Helm", Slot = EquipmentSlot.Head, ArmorClass = 4, Value = 100 };
+        int swordId = EquipmentDatabase.RegisterDynamic(sword), helmId = EquipmentDatabase.RegisterDynamic(helm);
+        var npc = TeamCornerRig.Npc("tc_sack_gear_1", "Gear Npc", "Sack Band");
+        npc.EquippedItems[EquipmentSlot.MainHand] = swordId;
+        npc.EquippedItems[EquipmentSlot.Head] = helmId;
+        var bystander = TeamCornerRig.Npc("tc_sack_gear_2", "Gear Npc", "Sack Band");   // same name, other ID
+        bystander.EquippedItems[EquipmentSlot.MainHand] = swordId;
+        NPCSpawnSystem.Instance.ActiveNPCs.Add(npc);
+        NPCSpawnSystem.Instance.ActiveNPCs.Add(bystander);
+        try
+        {
+            var hero = TeamCornerRig.Hero(team: "Sack Band");
+            var rig = new TeamCornerRig(hero, Array.Empty<string>());
+            var recovered = rig.Loc.MoveEquipmentToPlayer(npc, new System.Collections.Generic.List<string>());
+            recovered.Should().HaveCount(2);
+
+            // the roster is rebuilt from a snapshot read before the save: the copy still wears the gear, the looted
+            // blade registered again under a new ID as the NPC restore does, the helm under its own
+            var copy = TeamCornerRig.Reload(npc);
+            int reloadedSwordId = EquipmentDatabase.RegisterDynamic(new Equipment { Name = "Sack Test Blade", Slot = EquipmentSlot.MainHand, WeaponPower = 12, Value = 100 });
+            reloadedSwordId.Should().NotBe(swordId);
+            copy.EquippedItems[EquipmentSlot.MainHand] = reloadedSwordId;
+            copy.EquippedItems[EquipmentSlot.Head] = helmId;
+
+            var live = TeamCornerLocation.LiveTeamNpc(npc);
+            live.Should().BeSameAs(copy);
+            TeamCornerLocation.StripRecoveredGear(live!, recovered).Should().Be(2);
+
+            copy.EquippedItems.Should().BeEmpty("the reloaded copy no longer wears what was taken");
+            hero.Inventory.Count(i => i.Name == "Sack Test Blade").Should().Be(1);
+            hero.Inventory.Count(i => i.Name == "Sack Test Helm").Should().Be(1);
+            NPCSpawnSystem.Instance.ActiveNPCs.Where(n => n.ID == "tc_sack_gear_1")
+                .Should().OnlyContain(n => n.EquippedItems.Count == 0);
+            bystander.EquippedItems[EquipmentSlot.MainHand].Should().Be(swordId, "matched by ID, never by name");
+        }
+        finally { NPCSpawnSystem.Instance.ActiveNPCs.RemoveAll(n => n.ID is "tc_sack_gear_1" or "tc_sack_gear_2"); }
     }
 
     // ---------- 6. team wars ----------

@@ -978,6 +978,8 @@ namespace UsurperRemake.Systems
         {
             var connection = new SqliteConnection(connectionString);
             connection.Open();
+            // v1.1.12: SQLite LOWER() folds ASCII only; ulower folds case as C# does (the team name guards)
+            connection.CreateFunction("ulower", (string? s) => s?.ToLowerInvariant());
             return connection;
         }
 
@@ -5182,7 +5184,7 @@ namespace UsurperRemake.Systems
             using var cmd = connection.CreateCommand();
             cmd.CommandText = @"INSERT INTO player_teams (team_name, password_hash, created_by, last_join_at)
                 SELECT @name, @hash, @creator, datetime('now')
-                WHERE NOT EXISTS (SELECT 1 FROM player_teams WHERE LOWER(team_name) = LOWER(@name));";
+                WHERE NOT EXISTS (SELECT 1 FROM player_teams WHERE ulower(team_name) = ulower(@name));";
             cmd.Parameters.AddWithValue("@name", teamName);
             cmd.Parameters.AddWithValue("@hash", passwordHash);
             cmd.Parameters.AddWithValue("@creator", createdBy.ToLower());
@@ -6021,7 +6023,7 @@ namespace UsurperRemake.Systems
             using var connection = OpenConnection();
             using var cmd = connection.CreateCommand();
             // v1.1.12: ignores case, as the protection list and the create guard do
-            cmd.CommandText = "SELECT COUNT(*) FROM player_teams WHERE LOWER(team_name) = LOWER(@name);";
+            cmd.CommandText = "SELECT COUNT(*) FROM player_teams WHERE ulower(team_name) = ulower(@name);";
             cmd.Parameters.AddWithValue("@name", teamName);
             var count = Convert.ToInt32(cmd.ExecuteScalar());
             return count > 0;

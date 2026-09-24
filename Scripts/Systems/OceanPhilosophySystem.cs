@@ -313,16 +313,20 @@ namespace UsurperRemake.Systems
         /// v1.1.12: the stage the points and moments reach. Stages 1-6 by points; stage 7 needs the
         /// stage 6 points and AllSealsCollected, or TrueIdentityRevealed alone.
         /// </summary>
-        private int CalculateAwakeningLevel()
-        {
-            if (ExperiencedMoments.Contains(AwakeningMoment.TrueIdentityRevealed)) return MaxStage;
+        private int CalculateAwakeningLevel() => StageFor(ExperiencedMoments, CollectedFragments.Count, InsightIds.Count);
 
-            int points = Points;
+        /// <summary>v1.1.12: the points function, without the session's state: the stage the distinct moments,
+        /// the fragment count and the distinct insight count reach (also a loaded save, AwakeningBonus.StageFromSave).</summary>
+        public static int StageFor(ICollection<AwakeningMoment> moments, int fragments, int insights)
+        {
+            if (moments.Contains(AwakeningMoment.TrueIdentityRevealed)) return MaxStage;
+
+            int points = moments.Count * PointsPerMoment + fragments * PointsPerFragment + insights * PointsPerInsight;
             int level = 0;
             for (int stage = 1; stage < StageThresholds.Length; stage++)
                 if (points >= StageThresholds[stage]) level = stage;
 
-            if (level == StageThresholds.Length - 1 && ExperiencedMoments.Contains(AwakeningMoment.AllSealsCollected))
+            if (level == StageThresholds.Length - 1 && moments.Contains(AwakeningMoment.AllSealsCollected))
                 level = MaxStage;
 
             return level;

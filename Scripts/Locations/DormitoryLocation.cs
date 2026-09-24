@@ -697,7 +697,7 @@ public class DormitoryLocation : BaseLocation
         await Task.Delay(1500);
 
         // No guards in dormitory — fight the sleeper directly
-        var victim = PlayerCharacterLoader.CreateFromSaveData(victimSave.Player, target.Username);
+        var victim = PlayerCharacterLoader.CreateFromSaveData(victimSave.Player, target.Username, story: victimSave.StorySystems);
         long victimGold = victim.Gold;
         victim.Gold = 0; // prevent CombatEngine from applying its own gold steal
 

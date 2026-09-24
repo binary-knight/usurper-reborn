@@ -10,7 +10,9 @@ public static class PlayerCharacterLoader
     /// Create a combat-ready Character from saved PlayerData.
     /// The character starts at full HP and is AI-controlled.
     /// </summary>
-    public static Character CreateFromSaveData(PlayerData playerData, string displayName, bool isEcho = false)
+    /// <remarks>v1.1.12: story is the save's own StorySystems; the character is stamped with the awakening
+    /// stage it reaches, before the one recalculation below, so the boons apply once. An echo gets 0.</remarks>
+    public static Character CreateFromSaveData(PlayerData playerData, string displayName, bool isEcho = false, StorySystemsData? story = null)
     {
         var character = new Character
         {
@@ -54,6 +56,8 @@ public static class PlayerCharacterLoader
             AI = CharacterAI.Computer,
             IsEcho = isEcho,
             IsLoadedPlayer = !isEcho,   // v1.1.11: a player's own save, so a bounty on them can be paid
+            // v1.1.12: its own awakening, as with its own team's HQ levels; an echo is only a copy and keeps none
+            AwakeningStage = isEcho ? 0 : AwakeningBonus.StageFromSave(story),
             // Restore base stats for RecalculateStats
             BaseStrength = playerData.BaseStrength > 0 ? playerData.BaseStrength : playerData.Strength,
             BaseDexterity = playerData.BaseDexterity > 0 ? playerData.BaseDexterity : playerData.Dexterity,

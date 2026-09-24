@@ -690,4 +690,96 @@ public class Awakening1112Tests : IDisposable
         Ocean.InsightIds.Should().BeEmpty();
         Ocean.Points.Should().Be(0);
     }
+
+    // ---------- a duel defender's own awakening (v1.1.12 design change) ----------
+
+    private static PlayerData SaveOf(Character c) => new()
+    {
+        Name1 = c.Name1, Name2 = c.Name2, Level = c.Level, Class = c.Class, Race = c.Race,
+        MaxHP = c.BaseMaxHP, MaxMana = c.BaseMaxMana,
+        BaseStrength = c.BaseStrength, BaseDexterity = c.BaseDexterity, BaseConstitution = c.BaseConstitution,
+        BaseIntelligence = c.BaseIntelligence, BaseWisdom = c.BaseWisdom, BaseCharisma = c.BaseCharisma,
+        BaseMaxHP = c.BaseMaxHP, BaseMaxMana = c.BaseMaxMana, BaseDefence = c.BaseDefence,
+        BaseStamina = c.BaseStamina, BaseAgility = c.BaseAgility,
+    };
+
+    private static StorySystemsData StoryWith(int insights, int savedLevel = 0, params AwakeningMoment[] moments) => new()
+    {
+        AwakeningLevel = savedLevel,
+        OceanInsightIds = Enumerable.Range(0, insights).Select(i => "saved" + i).ToList(),
+        ExperiencedMoments = moments.Select(m => (int)m).ToList(),
+    };
+
+    [Fact]
+    public void AStage4Defender_UnderAStage0Attacker_FightsWithItsOwnStage()
+    {
+        var own = Caster();
+        var (ownHP, ownMana, ownWis) = AsPlayer(own, () => { ToStage(4); own.RecalculateStats(); return (own.MaxHP, own.MaxMana, own.Wisdom); });
+        Ocean.Reset();
+
+        var attacker = Caster(); attacker.Name1 = "atk"; attacker.Name2 = "Atk";
+        AsPlayer(attacker, () =>
+        {
+            var save = SaveOf(Caster());
+            save.MaxHP = ownHP; save.MaxMana = ownMana;   // the maxima its own session saved
+            var d = PlayerCharacterLoader.CreateFromSaveData(save, "Tide", story: StoryWith(34));
+            d.AwakeningStage.Should().Be(4, "34 points, from its own saved insights");
+            AwakeningBonus.StageOf(d).Should().Be(4);
+            d.MaxHP.Should().Be(ownHP, "what its own session computes at stage 4, the boon applied once");
+            d.HP.Should().Be(ownHP);
+            d.MaxMana.Should().Be(ownMana);
+            d.Wisdom.Should().Be(ownWis);
+            TeamHQBonus.ApplyXP(d, 1000).Should().Be(1050);
+            TeamHQBonus.ApplyAttack(d, 1000).Should().Be(1000, "the damage boon starts at stage 5");
+
+            PlayerCharacterLoader.CreateFromSaveData(SaveOf(Caster()), "Tide", story: StoryWith(0, savedLevel: 4))
+                .AwakeningStage.Should().Be(4, "the saved level is the floor");
+            var seven = PlayerCharacterLoader.CreateFromSaveData(SaveOf(Caster()), "Tide", story: StoryWith(0, 0, AwakeningMoment.TrueIdentityRevealed));
+            TeamHQBonus.ApplyAttack(seven, 1000).Should().Be(1080);
+            TeamHQBonus.ApplyDefense(seven, 1000).Should().Be(920);
+
+            PlayerCharacterLoader.CreateFromSaveData(SaveOf(Caster()), "Tide", isEcho: true, story: StoryWith(34))
+                .AwakeningStage.Should().Be(0, "an echo is only a copy");
+            Ocean.AwakeningLevel.Should().Be(0, "the session's Ocean is not touched");
+            AwakeningBonus.StageOf(attacker).Should().Be(0);
+            return 0;
+        });
+    }
+
+    [Fact]
+    public void AStage0Defender_UnderAStage7Attacker_GetsNothing()
+    {
+        var plain = Caster(); plain.Name1 = "plain"; plain.Name2 = "Plain";
+        var attacker = Caster(); attacker.Name1 = "atk"; attacker.Name2 = "Atk";
+        AsPlayer(attacker, () =>
+        {
+            ToStage(7);
+            plain.RecalculateStats();
+            var d = PlayerCharacterLoader.CreateFromSaveData(SaveOf(Caster()), "Tide", story: StoryWith(3));
+            AwakeningBonus.StageOf(d).Should().Be(0);
+            d.MaxHP.Should().Be(plain.MaxHP);
+            d.MaxMana.Should().Be(plain.MaxMana);
+            TeamHQBonus.ApplyAttack(d, 1000).Should().Be(1000);
+            TeamHQBonus.ApplyDefense(d, 1000).Should().Be(1000);
+            PlayerCharacterLoader.CreateFromSaveData(SaveOf(Caster()), "Tide").AwakeningStage.Should().Be(0, "no story data, no stage");
+            return 0;
+        });
+        foreach (var f in new[] { "Scripts/Locations/ArenaLocation.cs", "Scripts/Locations/DormitoryLocation.cs", "Scripts/Locations/InnLocation.cs",
+                                  "Scripts/Systems/WorldSimulator.cs", "Scripts/Locations/CastleLocation.cs" })
+            Source(f).Should().MatchRegex(@"StorySystems|story: kingStory", $"{f} passes the save's own story data");
+    }
+
+    [Fact]
+    public void AnUnstampedCharacter_ThatIsNotTheSessionsPlayer_StillReadsZero()
+    {
+        var attacker = Caster(); attacker.Name1 = "atk"; attacker.Name2 = "Atk";
+        var other = Caster(); other.Name1 = "other"; other.Name2 = "Other";
+        AsPlayer(attacker, () =>
+        {
+            ToStage(7);
+            other.AwakeningStage.Should().Be(-1);
+            AwakeningBonus.StageOf(other).Should().Be(0, "the session's stage is never borrowed");
+            return 0;
+        });
+    }
 }

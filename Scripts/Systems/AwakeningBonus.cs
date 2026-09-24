@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace UsurperRemake.Systems
 {
@@ -13,8 +14,9 @@ namespace UsurperRemake.Systems
     ///   Stage 5  +3% damage dealt
     ///   Stage 6  3% less damage taken
     ///   Stage 7  +5 more to each percentage above, and the title "the Awakened"
-    /// Only a player has an awakening, stamped on their Character by their own session (AwakeningStage):
-    /// companions, NPCs and characters loaded from other players' saves get nothing from it. Damage, defence and XP go through TeamHQBonus.Apply*, so they follow its
+    /// Only a player has an awakening, stamped on their Character by their own session (AwakeningStage), or
+    /// by PlayerCharacterLoader from their own save (a duel defender fights with its own): companions, NPCs
+    /// and echoes get nothing from it. Damage, defence and XP go through TeamHQBonus.Apply*, so they follow its
     /// ordering rule (after every other modifier, before any floor, cap or minimum).
     /// </summary>
     public static class AwakeningBonus
@@ -74,6 +76,19 @@ namespace UsurperRemake.Systems
         {
             if (player == null || player is NPC) return;
             player.AwakeningStage = stage ?? OceanPhilosophySystem.Instance?.AwakeningLevel ?? 0;
+        }
+
+        /// <summary>v1.1.12: the stage a player's own saved story data reaches, as their session restores it
+        /// (OceanPhilosophySystem.RestoreFromSave): the points function over the distinct fragments, moments and
+        /// insights, at least the saved level. Never reads the current session's Ocean. 0 without the data.</summary>
+        public static int StageFromSave(StorySystemsData? story)
+        {
+            if (story == null) return 0;
+            var moments = new HashSet<AwakeningMoment>((story.ExperiencedMoments ?? new()).Select(m => (AwakeningMoment)m));
+            int fragments = (story.CollectedFragments ?? new()).Distinct().Count();
+            int insights = (story.OceanInsightIds ?? new()).Where(id => !string.IsNullOrEmpty(id)).Distinct().Count();
+            int stage = OceanPhilosophySystem.StageFor(moments, fragments, insights);
+            return Math.Max(stage, Math.Clamp(story.AwakeningLevel, 0, OceanPhilosophySystem.MaxStage));
         }
 
         private static int P(double pct) => (int)Math.Round(pct * 100);

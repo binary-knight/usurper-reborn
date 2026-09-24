@@ -5987,6 +5987,7 @@ public class CastleLocation : BaseLocation
         {
             // Player King (offline) — try loading from database
             PlayerData kingData = null;
+            StorySystemsData? kingStory = null;   // v1.1.12: the king fights with its own awakening
             try
             {
                 var backend = SaveSystem.Instance?.Backend as SqlSaveBackend;
@@ -5994,14 +5995,17 @@ public class CastleLocation : BaseLocation
                 {
                     var kingSave = await backend.ReadGameData(currentKing.Name.ToLowerInvariant());
                     if (kingSave?.Player != null)
+                    {
                         kingData = kingSave.Player;
+                        kingStory = kingSave.StorySystems;
+                    }
                 }
             }
             catch { /* Fall through */ }
 
             if (kingData != null)
             {
-                kingCharacter = PlayerCharacterLoader.CreateFromSaveData(kingData, currentKing.Name);
+                kingCharacter = PlayerCharacterLoader.CreateFromSaveData(kingData, currentKing.Name, story: kingStory);
             }
             else
             {

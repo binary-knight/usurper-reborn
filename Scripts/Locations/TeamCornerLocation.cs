@@ -856,9 +856,9 @@ public class TeamCornerLocation : BaseLocation
                 var data = await backend.ReadGameData(key);
                 if (data?.Player != null)
                 {
-                    c = PlayerCharacterLoader.CreateFromSaveData(data.Player, summary.DisplayName);
-                    // v1.1.12: the combat loader starts at full HP and mana and has no age; show the saved ones.
-                    // The saved maxima too: the loader's lack the member's awakening boons.
+                    c = PlayerCharacterLoader.CreateFromSaveData(data.Player, summary.DisplayName, story: data.StorySystems);
+                    // v1.1.12: the combat loader starts at full HP and mana and has no age; show the saved ones,
+                    // and the saved maxima.
                     if (data.Player.MaxHP > 0) c.MaxHP = data.Player.MaxHP;
                     if (data.Player.MaxMana > 0) c.MaxMana = data.Player.MaxMana;
                     c.HP = Math.Min(data.Player.HP, c.MaxHP);
@@ -2532,6 +2532,7 @@ public class TeamCornerLocation : BaseLocation
 
         // v1.1.12: the NPC keeps what they wear when they go; offer to take it first
         bool tookGear = false;
+        var recovered = new List<(EquipmentSlot Slot, int Id, string Name)>();
         if (HasRemovableEquipment(member))
         {
             terminal.SetColor("yellow");
@@ -2550,15 +2551,24 @@ public class TeamCornerLocation : BaseLocation
                     return;
                 }
                 member = liveForGear;
-                tookGear = await TakeAllEquipment(member, confirm: false) > 0;
+                // v1.1.12: saved straight after the move, nothing awaited between, so a roster reload in the
+                // pause below loads the NPC without the gear
+                var cursed = new List<string>();
+                recovered = MoveEquipmentToPlayer(member, cursed);
+                tookGear = recovered.Count > 0;
+                if (tookGear) await SaveRecoveredGear();
+                await ReportEquipmentTaken(member, recovered.Count, cursed);
             }
         }
 
         // v1.1.12: the NPC is looked up again by ID; a world_state reload while the prompts were up replaced
         // the object picked from the list, and clearing its Team changed nothing
         var live = LiveTeamNpc(member);
+        // v1.1.12: a reload read before the save can bring the NPC back wearing what was taken; it comes off
+        bool stripped = live != null && StripRecoveredGear(live, recovered) > 0;
         if (live == null || live.Team != currentPlayer.Team)
         {
+            if (stripped) await SaveRecoveredGear();
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.member_gone_now", member.DisplayName));
             await Task.Delay(2000);
@@ -2589,13 +2599,43 @@ public class TeamCornerLocation : BaseLocation
             try { await OnlineStateManager.Instance.SaveAllSharedState(); }
             catch (Exception ex) { DebugLogger.Instance.LogError("TEAM", $"SaveAllSharedState failed after sack: {ex.Message}"); }
         }
-        // v1.1.12: the gear taken is in the player's pack; saved after the NPC's side (a crash between loses
-        // it rather than copying it)
-        if (tookGear) await ForcePlayerSave();
 
         terminal.SetColor("darkgray");
         terminal.WriteLine(Loc.Get("ui.press_enter"));
         await terminal.ReadKeyAsync();
+    }
+
+    /// <summary>v1.1.12: the gear taken on a sack, saved at once: the NPC's side first, then the player's (a
+    /// crash between loses it rather than copying it).</summary>
+    private async Task SaveRecoveredGear()
+    {
+        if (DoorMode.IsOnlineMode && OnlineStateManager.Instance != null)
+        {
+            try { await OnlineStateManager.Instance.SaveAllSharedState(); }
+            catch (Exception ex) { DebugLogger.Instance.LogError("TEAM", $"SaveAllSharedState failed after taking gear: {ex.Message}"); }
+        }
+        await ForcePlayerSave();
+    }
+
+    /// <summary>v1.1.12: takes off the NPC whatever it still wears of the gear recovered from it, as a reloaded copy
+    /// of it can: the same slot and the same item, by ID or by name (a reload registers looted gear under a new
+    /// ID, GameEngine's NPC restore). The items are the player's now; they are not handed out again. Returns
+    /// the count taken off.</summary>
+    internal static int StripRecoveredGear(Character npc, IEnumerable<(EquipmentSlot Slot, int Id, string Name)> recovered)
+    {
+        int stripped = 0;
+        foreach (var (slot, id, name) in recovered)
+        {
+            if (!npc.EquippedItems.TryGetValue(slot, out var worn) || worn <= 0) continue;
+            if (worn != id && EquipmentDatabase.GetById(worn)?.Name != name) continue;
+            if (npc.UnequipSlot(slot) != null) stripped++;
+        }
+        if (stripped > 0)
+        {
+            npc.RecalculateStats();
+            if (npc.IsCompanion) CompanionSystem.Instance?.SyncCompanionEquipment(npc);
+        }
+        return stripped;
     }
 
     /// <summary>v1.1.12: the character wears something that can be taken off (not cursed).</summary>
@@ -3351,29 +3391,34 @@ public class TeamCornerLocation : BaseLocation
     /// <summary>
     /// Take all equipment from a character
     /// </summary>
-    /// <remarks>v1.1.12: confirm false skips the question (Sack asks its own); returns the items taken.</remarks>
-    private async Task<int> TakeAllEquipment(Character target, bool confirm = true)
+    private async Task TakeAllEquipment(Character target)
     {
-        if (confirm)
-        {
-            terminal.WriteLine("");
-            terminal.SetColor("yellow");
-            terminal.WriteLine(Loc.Get("team.take_all_confirm", target.DisplayName));
-            terminal.Write(Loc.Get("team.take_all_warning"));
-            terminal.SetColor("white");
+        terminal.WriteLine("");
+        terminal.SetColor("yellow");
+        terminal.WriteLine(Loc.Get("team.take_all_confirm", target.DisplayName));
+        terminal.Write(Loc.Get("team.take_all_warning"));
+        terminal.SetColor("white");
 
-            var answer = await terminal.ReadLineAsync();
-            if (!GameConfig.IsAffirmative(answer))
-            {
-                terminal.SetColor("gray");
-                terminal.WriteLine(Loc.Get("ui.cancelled"));
-                await Task.Delay(1000);
-                return 0;
-            }
+        var answer = await terminal.ReadLineAsync();
+        if (!GameConfig.IsAffirmative(answer))
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine(Loc.Get("ui.cancelled"));
+            await Task.Delay(1000);
+            return;
         }
 
-        int itemsTaken = 0;
         var cursedItems = new List<string>();
+        int itemsTaken = MoveEquipmentToPlayer(target, cursedItems).Count;
+        await ReportEquipmentTaken(target, itemsTaken, cursedItems);
+    }
+
+    /// <summary>v1.1.12: moves everything the character wears but the cursed items into the player's pack, with
+    /// nothing awaited; returns the slot, item ID and name of each piece moved (Sack saves at once, then strips a
+    /// reloaded copy of the NPC by them).</summary>
+    internal List<(EquipmentSlot Slot, int Id, string Name)> MoveEquipmentToPlayer(Character target, List<string> cursedItems)
+    {
+        var taken = new List<(EquipmentSlot Slot, int Id, string Name)>();
 
         foreach (EquipmentSlot slot in Enum.GetValues(typeof(EquipmentSlot)))
         {
@@ -3387,21 +3432,26 @@ public class TeamCornerLocation : BaseLocation
                     continue;
                 }
 
+                int id = target.EquippedItems[slot];
                 var unequipped = target.UnequipSlot(slot);
                 if (unequipped != null)
                 {
                     var legacyItem = ConvertEquipmentToItem(unequipped);
                     currentPlayer.Inventory.Add(legacyItem);
-                    itemsTaken++;
+                    taken.Add((slot, id, unequipped.Name));
                 }
             }
         }
 
         target.RecalculateStats();
         // v0.57.7 — sync wrapper take-all back to Companion (Hesperos report)
-        if (itemsTaken > 0 && target.IsCompanion)
+        if (taken.Count > 0 && target.IsCompanion)
             CompanionSystem.Instance?.SyncCompanionEquipment(target);
+        return taken;
+    }
 
+    private async Task ReportEquipmentTaken(Character target, int itemsTaken, List<string> cursedItems)
+    {
         terminal.WriteLine("");
         if (itemsTaken > 0)
         {
@@ -3421,7 +3471,6 @@ public class TeamCornerLocation : BaseLocation
         }
 
         await Task.Delay(2000);
-        return itemsTaken;
     }
 
     /// <summary>
@@ -3653,8 +3702,8 @@ public class TeamCornerLocation : BaseLocation
             var enemyData = await backend.ReadGameData((string.IsNullOrEmpty(enemySummary.Username) ? backend.ResolvePlayerUsername(enemySummary.DisplayName) : enemySummary.Username) ?? enemySummary.DisplayName);
             if (myData?.Player == null || enemyData?.Player == null) continue;
 
-            var myFighter = PlayerCharacterLoader.CreateFromSaveData(myData.Player, mySummary.DisplayName);
-            var enemyFighter = PlayerCharacterLoader.CreateFromSaveData(enemyData.Player, enemySummary.DisplayName);
+            var myFighter = PlayerCharacterLoader.CreateFromSaveData(myData.Player, mySummary.DisplayName, story: myData.StorySystems);
+            var enemyFighter = PlayerCharacterLoader.CreateFromSaveData(enemyData.Player, enemySummary.DisplayName, story: enemyData.StorySystems);
 
             // Quick auto-resolved combat (no UI, just determine winner by stats)
             long myPower = myFighter.Level * 10 + myFighter.Strength + myFighter.WeapPow + myFighter.Dexterity;

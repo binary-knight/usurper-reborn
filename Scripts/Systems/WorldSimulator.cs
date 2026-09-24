@@ -7577,7 +7577,7 @@ public class WorldSimulator
                 var saveData = SqlBackend.ReadGameData(sleeper.Username).GetAwaiter().GetResult();
                 if (saveData?.Player == null) continue;
 
-                var sleeperChar = PlayerCharacterLoader.CreateFromSaveData(saveData.Player, sleeper.Username);
+                var sleeperChar = PlayerCharacterLoader.CreateFromSaveData(saveData.Player, sleeper.Username, story: saveData.StorySystems);
 
                 // Apply Inn defense boost
                 if (sleeper.InnDefenseBoost)
