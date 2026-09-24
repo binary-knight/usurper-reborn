@@ -754,6 +754,21 @@ namespace UsurperRemake.Systems
                     CREATE INDEX IF NOT EXISTS idx_snoop_target ON snoop_buffer(target_username, id);
                     CREATE INDEX IF NOT EXISTS idx_admin_cmd_status ON admin_commands(status, id);
 
+                    -- v1.1.13: a web delete made while the MUD was down queues its world purge here;
+                    -- the MUD runs it once its world is loaded. mud_heartbeat is the admin poller's beat.
+                    CREATE TABLE IF NOT EXISTS pending_purges (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        username TEXT NOT NULL,
+                        name2 TEXT,
+                        display_name TEXT,
+                        deleted_at TEXT DEFAULT (datetime('now')),
+                        created_by TEXT DEFAULT 'admin-web'
+                    );
+                    CREATE TABLE IF NOT EXISTS mud_heartbeat (
+                        id INTEGER PRIMARY KEY CHECK (id = 1),
+                        beat_at TEXT NOT NULL
+                    );
+
                     -- v0.60.4: bot detection snapshot. Single-row table (id=1) holding
                     -- the latest BotDetectionSystem.Snapshot() output as JSON. Updated
                     -- periodically by the game process; read by the admin dashboard.
@@ -7845,6 +7860,52 @@ namespace UsurperRemake.Systems
                 cmd.ExecuteNonQuery();
             }
             catch { /* Best-effort cleanup */ }
+        }
+
+        /// <summary>v1.1.13: the MUD's admin poller is alive; the web delete checks this before queueing.</summary>
+        public void TouchMudHeartbeat()
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "INSERT INTO mud_heartbeat (id, beat_at) VALUES (1, datetime('now')) " +
+                                  "ON CONFLICT(id) DO UPDATE SET beat_at = datetime('now');";
+                cmd.ExecuteNonQuery();
+            }
+            catch { /* best-effort */ }
+        }
+
+        /// <summary>v1.1.13: world purges queued by a web delete made while the MUD was down, oldest first.</summary>
+        public List<(long Id, string Username, string? Name2, string? DisplayName)> GetPendingPurges()
+        {
+            var list = new List<(long, string, string?, string?)>();
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT id, username, name2, display_name FROM pending_purges ORDER BY id LIMIT 20;";
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                    list.Add((reader.GetInt64(0), reader.GetString(1),
+                              reader.IsDBNull(2) ? null : reader.GetString(2), reader.IsDBNull(3) ? null : reader.GetString(3)));
+            }
+            catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"GetPendingPurges failed: {ex.Message}"); }
+            return list;
+        }
+
+        /// <summary>v1.1.13: a queued purge that has run.</summary>
+        public void RemovePendingPurge(long id)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "DELETE FROM pending_purges WHERE id = @id;";
+                cmd.Parameters.AddWithValue("@id", id);
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"RemovePendingPurge failed: {ex.Message}"); }
         }
 
         /// <summary>Expire admin commands older than 60 seconds that are still pending.</summary>

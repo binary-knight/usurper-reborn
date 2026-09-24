@@ -409,7 +409,8 @@ namespace UsurperRemake.Systems
         /// DeleteGameData, which still archives the row for the 7-day /restore; as with permadeath,
         /// a restore does not bring back the world state cleared here.
         /// </summary>
-        public static async Task PurgeDeletedCharacterAsync(SqlSaveBackend? backend, string? username, string? displayName, global::Character? player = null)
+        /// <param name="deferred">v1.1.13: a purge queued by a web delete and run later, after the rows are gone.</param>
+        public static async Task PurgeDeletedCharacterAsync(SqlSaveBackend? backend, string? username, string? displayName, global::Character? player = null, bool deferred = false)
         {
             string name = !string.IsNullOrWhiteSpace(displayName) ? displayName! : (username ?? "");
             if (string.IsNullOrWhiteSpace(name)) return;
@@ -486,6 +487,19 @@ namespace UsurperRemake.Systems
 
             try
             {
+                // v1.1.13: NPC grudges and marriages naming the character, cleared on the live roster and
+                // persisted at once under the record's version. Enemies and KnownCharacters carry no time, so
+                // they are cleared only while no other player row uses the name; a deferred purge runs after
+                // the account's rows are gone, so any row with the name is a later character.
+                bool untimedToo = backend == null || !questNames.Any(a => backend.IsNameUsedByAnotherPlayer(a, deferred ? "" : (username ?? "")));
+                int forgotten = await ForgetCharacterInNpcWorldAsync(backend, questNames, DateTime.Now, untimedToo);
+                if (forgotten > 0)
+                    DebugLogger.Instance.LogInfo("DELETE", $"Cleared {forgotten} NPC grudge(s), enemy entries and marriage(s) of deleted '{name}'.");
+            }
+            catch (Exception mex) { DebugLogger.Instance.LogWarning("DELETE", $"NPC grudge and marriage clear failed for '{name}': {mex.Message}"); }
+
+            try
+            {
                 // Children match parents by name, so a same-name recreation would inherit them. The
                 // ID-first Character overload is used when the caller has the character (permadeath).
                 var family = FamilySystem.Instance;
@@ -521,6 +535,102 @@ namespace UsurperRemake.Systems
             foreach (var n in names)
                 if (!string.IsNullOrWhiteSpace(n) && !list.Any(x => string.Equals(x, n, StringComparison.OrdinalIgnoreCase))) list.Add(n!);
             return list;
+        }
+
+        /// <summary>
+        /// v1.1.13: every live NPC forgets its grudges against the name recorded at or before recordedBy
+        /// (MemorySystem.IsGrudge). With untimedToo, the name also leaves Enemies and KnownCharacters; those
+        /// lists carry no time, so the caller passes false when a later character may already use the name.
+        /// </summary>
+        public static int ForgetNpcGrudgesAgainst(string? name, DateTime? recordedBy = null, bool untimedToo = true)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return 0;
+            var npcs = NPCSpawnSystem.Instance?.ActiveNPCs;
+            if (npcs == null) return 0;
+            int removed = 0;
+            foreach (var npc in npcs.ToList())
+            {
+                if (npc == null) continue;
+                var brainMemory = npc.Brain?.Memory;
+                if (brainMemory != null) removed += brainMemory.ForgetGrudgesAgainst(name!, recordedBy);
+                if (npc.Memory != null && !ReferenceEquals(npc.Memory, brainMemory)) removed += npc.Memory.ForgetGrudgesAgainst(name!, recordedBy);
+                if (!untimedToo) continue;
+                if (brainMemory != null) removed += brainMemory.ForgetNegativeImpressionOf(name!);
+                if (npc.Memory != null && !ReferenceEquals(npc.Memory, brainMemory)) removed += npc.Memory.ForgetNegativeImpressionOf(name!);
+                removed += npc.Enemies?.RemoveAll(e => string.Equals(e, name, StringComparison.OrdinalIgnoreCase)) ?? 0;
+                removed += npc.KnownCharacters?.RemoveAll(e => string.Equals(e, name, StringComparison.OrdinalIgnoreCase)) ?? 0;
+            }
+            return removed;
+        }
+
+        /// <summary>
+        /// v1.1.13: end the marriage of any NPC whose spouse was the deleted character, clearing the three
+        /// flags a divorce clears and its registry entry. An NPC married to another NPC of that name is
+        /// left alone: the registry partner is a live NPC, or a live NPC of the name names it as spouse.
+        /// </summary>
+        public static int ClearNpcSpousesOf(string? name, ISet<string>? endedIds = null)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return 0;
+            var npcs = NPCSpawnSystem.Instance?.ActiveNPCs;
+            if (npcs == null) return 0;
+            int cleared = 0;
+            foreach (var npc in npcs.ToList())
+            {
+                if (npc == null || !string.Equals(npc.SpouseName, name, StringComparison.OrdinalIgnoreCase)) continue;
+                if (RegisteredToAnotherNpc(npc.ID, pid => IsActiveNpcId(pid, npc))) continue;
+                string own = npc.Name2 ?? npc.Name1 ?? "";
+                if (!string.IsNullOrEmpty(own) && npcs.Any(o => o != null && !ReferenceEquals(o, npc)
+                        && string.Equals(o.Name2 ?? o.Name1, name, StringComparison.OrdinalIgnoreCase)
+                        && string.Equals(o.SpouseName, own, StringComparison.OrdinalIgnoreCase))) continue;
+                npc.Married = false;
+                npc.IsMarried = false;
+                npc.SpouseName = "";
+                if (!string.IsNullOrEmpty(npc.ID))
+                {
+                    NPCMarriageRegistry.Instance.EndMarriage(npc.ID);   // v1.1.13: as a divorce does
+                    endedIds?.Add(npc.ID);
+                }
+                cleared++;
+            }
+            return cleared;
+        }
+
+        /// <summary>
+        /// v1.1.13: the registry marries this NPC to another NPC. The registry also holds player-NPC
+        /// marriages, so membership alone proves nothing: the partner must itself be a live NPC.
+        /// </summary>
+        internal static bool RegisteredToAnotherNpc(string? npcId, Func<string, bool> isNpcId)
+        {
+            if (string.IsNullOrEmpty(npcId)) return false;
+            var partner = NPCMarriageRegistry.Instance.GetSpouseId(npcId!);
+            return !string.IsNullOrEmpty(partner) && partner != npcId && isNpcId(partner!);
+        }
+
+        private static bool IsActiveNpcId(string id, NPC? self) =>
+            NPCSpawnSystem.Instance?.ActiveNPCs?.Any(n => n != null && !ReferenceEquals(n, self) && n.ID == id) == true;
+
+        /// <summary>
+        /// v1.1.13: the NPC half of the purge: grudges, Enemies and KnownCharacters, and marriages naming the
+        /// character, on the live roster and registry, then written at once (OnlineStateManager.PersistNpcWorldNow).
+        /// Nothing is awaited between the clean-up and the serialize, so a login's RestoreNPCs cannot put the
+        /// old roster back in between. Each retry after a reload re-applies it with the time of that attempt,
+        /// since a reload stamps every memory with the load time.
+        /// </summary>
+        internal static async Task<int> ForgetCharacterInNpcWorldAsync(SqlSaveBackend? backend, IReadOnlyList<string> names,
+            DateTime deletedAt, bool untimedToo, Func<List<NPCData>, Task>? reloadRoster = null, Func<Task>? beforeWrite = null)
+        {
+            bool first = true;
+            var endedMarriages = new HashSet<string>();
+            int CleanUp()
+            {
+                var cutOff = first ? deletedAt : DateTime.Now;
+                first = false;
+                int n = 0;
+                foreach (var a in names) n += ForgetNpcGrudgesAgainst(a, cutOff, untimedToo) + ClearNpcSpousesOf(a, endedMarriages);
+                return n;
+            }
+            if (backend == null) return CleanUp();
+            return await OnlineStateManager.PersistNpcWorldNow(backend, CleanUp, endedMarriages, reloadRoster, beforeWrite);
         }
     }
 }

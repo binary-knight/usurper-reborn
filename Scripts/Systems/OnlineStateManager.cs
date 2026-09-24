@@ -352,6 +352,93 @@ namespace UsurperRemake.Systems
             }
         }
 
+        /// <summary>v1.1.13: the options SaveSharedNPCs writes with, for the static persist below.</summary>
+        private static readonly JsonSerializerOptions PersistJsonOptions = new()
+        {
+            WriteIndented = false,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            IncludeFields = true,
+            NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowReadingFromString,
+            Converters = { new TolerantEnumReadOnlyConverterFactory() }
+        };
+
+        /// <summary>
+        /// v1.1.13: apply cleanUp to the live NPC roster and write it to world_state at once, under the
+        /// record's version, never unconditionally. From the clean-up to the serialize nothing is awaited,
+        /// so a login's RestoreNPCs(LoadSharedNPCs()) cannot put the old roster back in between. If another
+        /// writer got in first, the stored roster is loaded into the game, the clean-up re-applied to it
+        /// and the write retried (as RemoveSharedQuestsAsync does). The marriages record then loses every
+        /// marriage of endedMarriages (the NPC ids the clean-up divorced) the same way. The record is edited,
+        /// not replaced by this process's registry, since only the world sim's process loads the registry.
+        /// Returns what the first clean-up changed. beforeWrite is a test hook.
+        /// </summary>
+        public static async Task<int> PersistNpcWorldNow(SqlSaveBackend sql, Func<int> cleanUp, ISet<string> endedMarriages,
+            Func<List<NPCData>, Task>? reloadRoster = null, Func<Task>? beforeWrite = null)
+        {
+            long version = sql.GetWorldStateVersion(KEY_NPCS);   // read before the roster is serialized, so any later write is a conflict
+            int changed = cleanUp();
+            if (changed == 0) return 0;
+            string json = JsonSerializer.Serialize(SerializeCurrentNPCs(), PersistJsonOptions);
+            try
+            {
+                reloadRoster ??= list => GameEngine.Instance.RestoreNPCs(list);
+                bool saved = false;
+                for (int attempt = 0; attempt < 5 && !saved; attempt++)
+                {
+                    if (beforeWrite != null) await beforeWrite();
+                    if (await sql.SaveWorldStateIfVersion(KEY_NPCS, json, version)) { saved = true; break; }
+                    version = sql.GetWorldStateVersion(KEY_NPCS);
+                    var storedJson = await sql.LoadWorldState(KEY_NPCS);
+                    var stored = string.IsNullOrEmpty(storedJson) ? null : JsonSerializer.Deserialize<List<NPCData>>(storedJson, PersistJsonOptions);
+                    if (stored == null || stored.Count == 0) break;
+                    await reloadRoster(stored);
+                    if (cleanUp() == 0) { saved = true; break; }   // the stored roster is already clean
+                    json = JsonSerializer.Serialize(SerializeCurrentNPCs(), PersistJsonOptions);
+                }
+                if (!saved)
+                    DebugLogger.Instance.LogWarning("ONLINE", "PersistNpcWorldNow gave up: the npcs record kept changing.");
+                if (endedMarriages.Count > 0)
+                    await RemoveStoredMarriagesAsync(sql, endedMarriages);
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("ONLINE", $"PersistNpcWorldNow failed: {ex.Message}");
+            }
+            return changed;
+        }
+
+        /// <summary>
+        /// v1.1.13: remove every marriage naming one of the NPC ids from world_state["marriages"], under its
+        /// version, re-reading and re-applying on a conflict. Everything else in the record is kept as stored.
+        /// </summary>
+        internal static async Task<int> RemoveStoredMarriagesAsync(SqlSaveBackend sql, ICollection<string> npcIds, Func<Task>? beforeWrite = null)
+        {
+            for (int attempt = 0; attempt < 5; attempt++)
+            {
+                long version = sql.GetWorldStateVersion(KEY_MARRIAGES);
+                var json = await sql.LoadWorldState(KEY_MARRIAGES);
+                if (string.IsNullOrEmpty(json)) return 0;
+                if (System.Text.Json.Nodes.JsonNode.Parse(json) is not System.Text.Json.Nodes.JsonObject root
+                    || root["marriages"] is not System.Text.Json.Nodes.JsonArray list) return 0;
+                int removed = 0;
+                for (int i = list.Count - 1; i >= 0; i--)
+                {
+                    string a = IdOf(list[i], "npc1Id"), b = IdOf(list[i], "npc2Id");
+                    if (npcIds.Contains(a) || npcIds.Contains(b)) { list.RemoveAt(i); removed++; }
+                }
+                if (removed == 0) return 0;
+                if (beforeWrite != null) await beforeWrite();
+                if (await sql.SaveWorldStateIfVersion(KEY_MARRIAGES, root.ToJsonString(), version)) return removed;
+            }
+            DebugLogger.Instance.LogWarning("ONLINE", "RemoveStoredMarriagesAsync gave up: the marriages record kept changing.");
+            return 0;
+        }
+
+        private static string IdOf(System.Text.Json.Nodes.JsonNode? node, string key)
+        {
+            try { return node?[key]?.GetValue<string>() ?? ""; } catch { return ""; }
+        }
+
         /// <summary>
         /// Save quest data to shared state.
         /// </summary>
@@ -468,20 +555,23 @@ namespace UsurperRemake.Systems
         {
             try
             {
+                if (backend is not SqlSaveBackend sql) return;
                 var king = global::CastleLocation.GetCurrentKing();
-                if (king == null)
+                // v1.1.11: an unmarked empty court never replaces a marked vacancy the world sim has yet to act on
+                if (king == null && KeepsStoredVacancy(await ReadRoyalCourtFromWorldState(), throneVacated)) return;
+
+                // v1.1.13: written only over the stored court this process's court was loaded from. A court never
+                // loaded here may write only where none is stored yet.
+                long? loadedAt = RoyalCourtVersion;
+                if (loadedAt == null && sql.GetWorldStateVersion("royal_court") == 0) loadedAt = 0;
+                if (loadedAt != null && await SaveRoyalCourtIfVersionAsync(loadedAt.Value, throneVacated))
                 {
-                    // v1.1.11: an unmarked empty court never replaces a marked vacancy the world sim has yet to act on
-                    if (KeepsStoredVacancy(await ReadRoyalCourtFromWorldState(), throneVacated)) return;
-                    // Throne is vacant — save empty state so other sessions see it
-                    var backend = SaveSystem.Instance?.Backend as SqlSaveBackend;
-                    if (backend != null) await backend.SaveWorldState("royal_court", EmptyRoyalCourtJson(throneVacated));
+                    DebugLogger.Instance.LogDebug("ONLINE", $"Royal court saved to world_state: {king?.Name ?? "(vacant)"}");
                     return;
                 }
-
-                var json = RoyalCourtJson(king);
-                await backend.SaveWorldState("royal_court", json);
-                DebugLogger.Instance.LogDebug("ONLINE", $"Royal court saved to world_state: {king.Name}");
+                // v1.1.13: another writer changed the court; this stale copy is dropped and the stored court loaded
+                DebugLogger.Instance.LogInfo("ONLINE", "Royal court save skipped: the stored court changed since it was loaded. Reloading it.");
+                await LoadRoyalCourtFromWorldState();
             }
             catch (Exception ex)
             {
@@ -618,6 +708,15 @@ namespace UsurperRemake.Systems
             return JsonSerializer.Serialize(data, jsonOptions);
         }
 
+        // v1.1.13: the stored royal_court version the in-memory court was loaded from or last written as. The
+        // king is a process-wide static, so this is too: the world sim and every session share one court.
+        private static readonly object RoyalCourtVersionLock = new();
+        private static long? _royalCourtVersion;
+
+        internal static long? RoyalCourtVersion { get { lock (RoyalCourtVersionLock) return _royalCourtVersion; } }
+
+        internal static void NoteRoyalCourtVersion(long? version) { lock (RoyalCourtVersionLock) _royalCourtVersion = version; }
+
         /// <summary>v1.1.11: the stored court and the version it was read at (the version read first, so a later write is a conflict).</summary>
         internal async Task<(RoyalCourtSaveData? Court, long Version)> ReadRoyalCourtWithVersionAsync()
         {
@@ -633,10 +732,12 @@ namespace UsurperRemake.Systems
         {
             try
             {
-                if (backend is not SqlSaveBackend sql) { await SaveRoyalCourtToWorldState(throneVacated); return true; }
+                if (backend is not SqlSaveBackend sql) return false;   // v1.1.13: no unversioned fallback
                 var king = global::CastleLocation.GetCurrentKing();
                 string json = king == null ? EmptyRoyalCourtJson(throneVacated) : RoyalCourtJson(king);
-                return await sql.SaveWorldStateIfVersion("royal_court", json, version);
+                if (!await sql.SaveWorldStateIfVersion("royal_court", json, version)) return false;
+                NoteRoyalCourtVersion(version + 1);   // v1.1.13: the in-memory court is now the stored one
+                return true;
             }
             catch (Exception ex)
             {
@@ -716,11 +817,13 @@ namespace UsurperRemake.Systems
         {
             try
             {
+                long version = (backend as SqlSaveBackend)?.GetWorldStateVersion("royal_court") ?? 0;   // v1.1.13: read before the value
                 var json = await backend.LoadWorldState("royal_court");
                 if (string.IsNullOrEmpty(json)) return;
 
                 var royalCourt = JsonSerializer.Deserialize<RoyalCourtSaveData>(json, jsonOptions);
                 if (royalCourt != null) global::CastleLocation.RoyalCourtLoadedFromShared = true;   // v1.1.11
+                if (royalCourt != null) NoteRoyalCourtVersion(version);   // v1.1.13: the court the next save is checked against
                 if (royalCourt == null || global::CastleLocation.ApplySharedThroneVacancy(royalCourt)) return;   // v1.1.11
                 if (string.IsNullOrEmpty(royalCourt.KingName)) return;
 
