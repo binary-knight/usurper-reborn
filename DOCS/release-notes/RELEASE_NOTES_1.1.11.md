@@ -76,4 +76,4 @@
 
 ## Tests
 
-1,567 passing, up from 1,377.
+1,568 passing, up from 1,377.
