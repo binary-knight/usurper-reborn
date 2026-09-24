@@ -8047,6 +8047,19 @@ public class CastleLocation : BaseLocation
         return false;
     }
 
+    /// <summary>
+    /// v1.1.13: the vacate_throne world edit's re-apply: ends this process's reign of the deleted character if
+    /// it is still the king here (a stale court brought it back), with the usual NPC succession, unpersisted;
+    /// the owner's versioned court save writes it. False when another king reigns, so a re-apply is idempotent.
+    /// </summary>
+    internal static bool VacateDeletedKingLocally(string? name, string? displayName)
+    {
+        var king = GetCurrentKing();
+        if (!IsDeletedCharactersReign(king, name, displayName)) return false;
+        EndPlayerReign(king!.Name, "left the throne and the realm", persist: false);
+        return true;
+    }
+
     /// <summary>v1.1.11: the stored court's king is the deleted character (a reigning player of that name).</summary>
     internal static bool SharedCourtNamesDeletedCharacter(RoyalCourtSaveData? court, string? name, string? displayName)
     {

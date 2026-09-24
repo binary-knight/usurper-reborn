@@ -327,7 +327,7 @@ public class OwnerProcessTier1Tests : IDisposable
         var osm = Source("Systems", "OnlineStateManager.cs");
         osm.Should().NotContain("SaveWorldState(\"royal_court\"");
         int start = osm.IndexOf("public async Task SaveRoyalCourtToWorldState", StringComparison.Ordinal);
-        var body = osm.Substring(start, osm.IndexOf("private static string EmptyRoyalCourtJson", start, StringComparison.Ordinal) - start);
+        var body = osm.Substring(start, osm.IndexOf("internal static string EmptyRoyalCourtJson", start, StringComparison.Ordinal) - start);
         body.Should().Contain("SaveRoyalCourtIfVersionAsync(loadedAt.Value").And.Contain("await LoadRoyalCourtFromWorldState();");
         Source("Systems", "SaveSystem.cs").Should().Contain("OnlineStateManager.Instance.SaveRoyalCourtToWorldState()");
     }

@@ -545,7 +545,9 @@ namespace UsurperRemake.Systems
                 // Save royal court to world_state (authoritative - world sim maintains this).
                 // Version tracking happens inside (CAS local increment); re-reading
                 // here would reintroduce the concurrent-version-adoption race.
-                await SaveRoyalCourtToWorldState();
+                // v1.1.13: a throne edit is applied once this versioned write holds it
+                if (await SaveRoyalCourtToWorldState())
+                    MarkEditsApplied(editsInPass, WorldEditLog.VacateThrone);
 
                 // Save economy summary for the dashboard
                 await SaveEconomyState();
@@ -607,7 +609,9 @@ namespace UsurperRemake.Systems
                 if (!WorldEditLog.IsOwnerProcess(sqlBackend)) return new List<WorldEdit>();
                 var edits = sqlBackend.GetWorldEditsToApply(WorldEditLog.ReapplyHours);
                 if (edits.Count == 0) return edits;
+                var kingBefore = CastleLocation.GetCurrentKing();
                 int changed = WorldEditLog.Apply(sqlBackend, edits);
+                if (!ReferenceEquals(kingBefore, CastleLocation.GetCurrentKing())) _courtChangedByEdit = true;
                 if (changed > 0)
                     DebugLogger.Instance.LogInfo("WORLD_EDITS", $"Re-applied {edits.Count} world edit(s): {changed} change(s) to the live world.");
                 var owed = edits.Where(e => e.AppliedAt == null).ToList();
@@ -620,6 +624,9 @@ namespace UsurperRemake.Systems
                 return new List<WorldEdit>();
             }
         }
+
+        // v1.1.13: a re-applied vacate_throne changed the king, so the court is written even when vacant
+        private bool _courtChangedByEdit;
 
         private void MarkEditsApplied(List<WorldEdit> edits, string kind)
         {
@@ -858,12 +865,24 @@ namespace UsurperRemake.Systems
         /// Save current royal court state to world_state.
         /// This is the authoritative write - the world sim maintains this data.
         /// </summary>
-        internal async Task SaveRoyalCourtToWorldState()
+        /// <returns>v1.1.13: true when the stored court is this process's court (written now, or already it).</returns>
+        internal async Task<bool> SaveRoyalCourtToWorldState()
         {
             try
             {
                 var king = CastleLocation.GetCurrentKing();
-                if (king == null) return;
+                if (king == null)
+                {
+                    // v1.1.13: a vacancy a throne edit made here is written as one; otherwise nothing to write
+                    if (!_courtChangedByEdit)
+                        return lastRoyalCourtVersion == sqlBackend.GetWorldStateVersion("royal_court");
+                    if (!await sqlBackend.SaveWorldStateIfVersion("royal_court", OnlineStateManager.EmptyRoyalCourtJson(throneVacated: true), lastRoyalCourtVersion))
+                        return false;
+                    lastRoyalCourtVersion = lastRoyalCourtVersion + 1;
+                    OnlineStateManager.NoteRoyalCourtVersion(lastRoyalCourtVersion);
+                    _courtChangedByEdit = false;
+                    return true;
+                }
 
                 var data = new RoyalCourtSaveData
                 {
@@ -995,6 +1014,8 @@ namespace UsurperRemake.Systems
                     // version and skip the reload it was owed).
                     lastRoyalCourtVersion = lastRoyalCourtVersion + 1;
                     OnlineStateManager.NoteRoyalCourtVersion(lastRoyalCourtVersion);   // v1.1.13: sessions share this court
+                    _courtChangedByEdit = false;
+                    return true;
                 }
                 else
                 {
@@ -1007,11 +1028,13 @@ namespace UsurperRemake.Systems
 
                     DebugLogger.Instance.LogInfo("WORLDSIM",
                         "Royal court save skipped: version conflict or write error (likely a player write during our save window). Will reload next cycle.");
+                    return false;
                 }
             }
             catch (Exception ex)
             {
                 DebugLogger.Instance.LogError("WORLDSIM", $"Failed to save royal court to world_state: {ex.Message}");
+                return false;
             }
         }
 

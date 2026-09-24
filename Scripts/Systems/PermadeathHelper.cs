@@ -480,8 +480,23 @@ namespace UsurperRemake.Systems
                 // v1.1.11: a deleted king abdicates through the normal path (history, NPC succession, persist)
                 // v1.1.11: a married name another living player now uses names their reign, not this one's
                 string? kingAlias = shown != null && aliases.Contains(shown, StringComparer.OrdinalIgnoreCase) ? shown : null;
+                // v1.1.13: a reigning character's delete is logged first, so the owner vacates the throne again
+                // over a stale or old-binary court write
+                long throneEdit = 0;
+                if (backend != null)
+                {
+                    bool reigns = global::CastleLocation.IsDeletedCharactersReign(global::CastleLocation.GetCurrentKing(), name, kingAlias);
+                    if (!reigns && UsurperRemake.BBS.DoorMode.IsOnlineMode && OnlineStateManager.IsActive)
+                        reigns = global::CastleLocation.SharedCourtNamesDeletedCharacter(await OnlineStateManager.Instance!.ReadRoyalCourtFromWorldState(), name, kingAlias);
+                    if (reigns)
+                        throneEdit = WorldEditLog.AppendVacateThrone(backend, name, kingAlias != null ? new[] { kingAlias } : Array.Empty<string>(), username);
+                }
                 if (await global::CastleLocation.AbdicateDeletedKingAsync(name, kingAlias, "left the throne and the realm"))
+                {
                     DebugLogger.Instance.LogInfo("DELETE", $"Deleted '{name}' held the throne; the reign has ended.");
+                    if (throneEdit > 0 && UsurperRemake.BBS.DoorMode.IsOnlineMode && WorldEditLog.IsOwnerProcess(backend))
+                        backend!.MarkWorldEditsApplied(new[] { throneEdit }, WorldEditLog.ProcessLabel);
+                }
             }
             catch (Exception tex) { DebugLogger.Instance.LogWarning("DELETE", $"Throne handover failed for '{name}': {tex.Message}"); }
 

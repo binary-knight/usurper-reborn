@@ -672,7 +672,7 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>v1.1.11: the stored form of an empty court; a reign that just ended with no successor is marked, so the loaders clear their king.</summary>
-        private static string EmptyRoyalCourtJson(bool throneVacated)
+        internal static string EmptyRoyalCourtJson(bool throneVacated)   // v1.1.13: internal for the world sim
         {
             // v1.1.11: the history goes too, with the reign the abdication just recorded
             var emptyData = new RoyalCourtSaveData { KingName = "", Treasury = 0, KingAI = 1, ThroneVacant = throneVacated,

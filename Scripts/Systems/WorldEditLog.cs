@@ -30,6 +30,13 @@ namespace UsurperRemake.Systems
             [JsonPropertyName("untimed")] public bool Untimed { get; set; }                 // no other player used the name at the delete
         }
 
+        public sealed class VacateThronePayload
+        {
+            [JsonPropertyName("king")] public string King { get; set; } = "";
+            [JsonPropertyName("aliases")] public List<string> Aliases { get; set; } = new();
+            [JsonPropertyName("character_key")] public string CharacterKey { get; set; } = "";
+        }
+
         // --- the owner ---
 
         private static string? _lockOwnerId;
@@ -63,6 +70,14 @@ namespace UsurperRemake.Systems
                 Untimed = untimed
             }), ProcessLabel);
 
+        public static long AppendVacateThrone(SqlSaveBackend sql, string king, IEnumerable<string> aliases, string? characterKey) =>
+            sql.AppendWorldEdit(VacateThrone, JsonSerializer.Serialize(new VacateThronePayload
+            {
+                King = king,
+                Aliases = aliases.Where(a => !string.IsNullOrWhiteSpace(a)).ToList(),
+                CharacterKey = characterKey ?? ""
+            }), ProcessLabel);
+
         // --- applying ---
 
         /// <summary>
@@ -81,6 +96,8 @@ namespace UsurperRemake.Systems
                 {
                     if (edit.Kind == ForgetCharacter)
                         changed += ApplyForgetCharacter(sql, edit, endedMarriages);
+                    else if (edit.Kind == VacateThrone)
+                        changed += ApplyVacateThrone(sql, edit);
                 }
                 catch (Exception ex)
                 {
@@ -104,6 +121,15 @@ namespace UsurperRemake.Systems
                 if (!later) n += PermadeathHelper.ClearNpcSpousesOf(a, endedMarriages);
             }
             return n;
+        }
+
+        private static int ApplyVacateThrone(SqlSaveBackend sql, WorldEdit edit)
+        {
+            var p = JsonSerializer.Deserialize<VacateThronePayload>(edit.Payload);
+            if (p == null || string.IsNullOrWhiteSpace(p.King)) return 0;
+            if (sql.LaterCharacterUsesName(p.Aliases.Append(p.King), edit.CreatedAt, p.CharacterKey)) return 0;
+            string? shown = p.Aliases.FirstOrDefault(a => !string.Equals(a, p.King, StringComparison.OrdinalIgnoreCase));
+            return global::CastleLocation.VacateDeletedKingLocally(p.King, shown) ? 1 : 0;
         }
 
         /// <summary>The delete time as a local time (memory times are DateTime.Now).</summary>

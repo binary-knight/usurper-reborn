@@ -611,6 +611,98 @@ public class OwnerProcessTier2Tests : IDisposable
         Source("Core", "GameEngine.cs").Split("OnlineStateManager.Instance.NoteNpcBaseline();").Length.Should().Be(3, "both online loads record the baseline");
     }
 
+    // ─── The throne edit ───
+
+    private static async Task WithKing(King? king, Func<Task> body)
+    {
+        var before = CastleLocation.GetCurrentKing();
+        var history = CastleLocation.GetMonarchHistory().ToList();
+        var version = OnlineStateManager.RoyalCourtVersion;
+        bool loaded = CastleLocation.RoyalCourtLoadedFromShared;
+        CastleLocation.SetKing(king);
+        OnlineStateManager.NoteRoyalCourtVersion(null);
+        try { await body(); }
+        finally
+        {
+            CastleLocation.SetKing(before);
+            CastleLocation.SetMonarchHistory(history);
+            OnlineStateManager.NoteRoyalCourtVersion(version);
+            CastleLocation.RoyalCourtLoadedFromShared = loaded;
+        }
+    }
+
+    private static string Court(string king) =>
+        JsonSerializer.Serialize(new RoyalCourtSaveData { KingName = king, KingAI = (int)CharacterAI.Human, Treasury = 100 }, Json);
+
+    private async Task<RoyalCourtSaveData> StoredCourt() =>
+        JsonSerializer.Deserialize<RoyalCourtSaveData>((await _db.LoadWorldState("royal_court"))!, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
+
+    [Fact]
+    public async Task ADeletedKing_StaysDeposed_ThroughAStaleDoorSave_AndAnOldBinarysCourtWrite()
+    {
+        Npc("npc_k_1", "Commoner");
+        await _db.SaveWorldState(OnlineStateManager.KEY_NPCS, RosterJson());
+        await WithKing(King.CreateNewKing("Bob", CharacterAI.Human, CharacterSex.Male), async () =>
+        {
+            var dbA = new SqlSaveBackend(_path);
+            await dbA.SaveWorldState("royal_court", Court("Bob"));
+            var osmA = NewOsm(dbA);
+            await osmA.LoadRoyalCourtFromWorldState();   // door A holds Bob's court at v1
+            long v1 = dbA.GetWorldStateVersion("royal_court");
+            OnlineStateManager.RoyalCourtVersion.Should().Be(v1);
+
+            // B deletes Bob while he reigns: the edit, then its versioned write of the vacancy
+            WorldEditLog.AppendVacateThrone(_db, "Bob", Array.Empty<string>(), "bob_account");
+            (await _db.SaveWorldStateIfVersion("royal_court", OnlineStateManager.EmptyRoyalCourtJson(throneVacated: true), v1)).Should().BeTrue();
+
+            // A's stale court save fails its version check and loads the stored vacancy instead
+            await osmA.SaveRoyalCourtToWorldState();
+            (await StoredCourt()).ThroneVacant.Should().BeTrue();
+            (CastleLocation.GetCurrentKing()?.Name).Should().NotBe("Bob");
+            EditMark("vacate_throne").AppliedAt.Should().BeNull();
+
+            // an old binary writes Bob's court back unconditionally; the owner's save reloads, vacates, writes, marks
+            var sim = OwnerSim("owner_t", _db.GetWorldStateVersion(OnlineStateManager.KEY_NPCS));
+            await _db.SaveWorldState("royal_court", Court("Bob"));
+            await SimSave(sim);
+
+            var court = await StoredCourt();
+            court.KingName.Should().NotBe("Bob", "the re-applied edit deposed him again and the owner wrote it");
+            (CastleLocation.GetCurrentKing()?.Name).Should().NotBe("Bob");
+            EditMark("vacate_throne").AppliedBy.Should().Be("owner_t");
+            WorldEditLog.Apply(_db, _db.GetWorldEditsToApply()).Should().Be(0, "a second pass changes nothing");
+        });
+    }
+
+    [Fact]
+    public async Task ANewSameNameKing_IsNotDeposedByTheEdit()
+    {
+        await WithKing(King.CreateNewKing("Bob", CharacterAI.Human, CharacterSex.Male), async () =>
+        {
+            await PermadeathHelper.PurgeDeletedCharacterAsync(_db, "bob_account", "Bob");
+            Scalar("SELECT COUNT(*) FROM world_edits WHERE kind = 'vacate_throne';").Should().Be("1", "the reigning character's delete logs it");
+            (CastleLocation.GetCurrentKing()?.Name).Should().NotBe("Bob");
+
+            // control: a stale copy of the old Bob back on the throne is deposed by the re-apply
+            CastleLocation.SetKing(King.CreateNewKing("Bob", CharacterAI.Human, CharacterSex.Male));
+            WorldEditLog.Apply(_db, _db.GetWorldEditsToApply()).Should().BeGreaterThan(0);
+            (CastleLocation.GetCurrentKing()?.Name).Should().NotBe("Bob");
+
+            // a new Bob, on an account made after the delete, takes the throne and keeps it
+            Exec("INSERT INTO players (username, display_name, player_data, created_at) VALUES ('bob_two', 'Bob', " +
+                 "'{\"player\":{\"name2\":\"Bob\"}}', datetime('now', '+1 minute'));");
+            CastleLocation.SetKing(King.CreateNewKing("Bob", CharacterAI.Human, CharacterSex.Male));
+            WorldEditLog.Apply(_db, _db.GetWorldEditsToApply()).Should().Be(0);
+            CastleLocation.GetCurrentKing()!.Name.Should().Be("Bob");
+        });
+
+        await WithKing(King.CreateNewKing("Carol", CharacterAI.Human, CharacterSex.Female), async () =>
+        {
+            await PermadeathHelper.PurgeDeletedCharacterAsync(_db, "dave_account", "Dave");
+            Scalar("SELECT COUNT(*) FROM world_edits WHERE kind = 'vacate_throne';").Should().Be("1", "no edit for a character who did not reign");
+        });
+    }
+
     private static string WebSource()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
