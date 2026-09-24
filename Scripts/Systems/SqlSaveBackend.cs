@@ -8138,6 +8138,42 @@ namespace UsurperRemake.Systems
             return list;
         }
 
+        /// <summary>
+        /// v1.1.13: a character was made on this key, or under one of these names, after deletedAt (local time): a
+        /// player row with a save whose created_at or last_login (every save sets it) is at or after the delete.
+        /// A queued purge then leaves that character's rows alone. A failed read counts as made again.
+        /// </summary>
+        public bool WasRecreatedSince(string username, IEnumerable<string> names, DateTime deletedAt)
+        {
+            try
+            {
+                string at = deletedAt.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture);
+                var lowered = names.Where(n => !string.IsNullOrWhiteSpace(n)).Select(n => n.ToLowerInvariant()).Distinct().ToList();
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                var named = new List<string>();
+                for (int i = 0; i < lowered.Count; i++)
+                {
+                    named.Add($"@n{i}");
+                    cmd.Parameters.AddWithValue($"@n{i}", lowered[i]);
+                }
+                string nameClause = named.Count == 0 ? "" :
+                    $" OR LOWER(display_name) IN ({string.Join(",", named)}) " +
+                    $"OR LOWER(CASE WHEN json_valid(player_data) THEN json_extract(player_data, '$.player.name2') END) IN ({string.Join(",", named)})";
+                cmd.CommandText = "SELECT EXISTS (SELECT 1 FROM players WHERE (LOWER(username) = LOWER(@u)" + nameClause + ") " +
+                                  "AND player_data IS NOT NULL AND player_data != '{}' AND length(player_data) > 4 " +
+                                  "AND (created_at >= @t OR last_login >= @t));";
+                cmd.Parameters.AddWithValue("@u", username);
+                cmd.Parameters.AddWithValue("@t", at);
+                return Convert.ToInt64(cmd.ExecuteScalar()) != 0;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogWarning("SQL", $"WasRecreatedSince('{username}') failed: {ex.Message}");
+                return true;
+            }
+        }
+
         /// <summary>v1.1.13: a queued purge that has run.</summary>
         public void RemovePendingPurge(long id)
         {

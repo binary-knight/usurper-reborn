@@ -420,8 +420,16 @@ namespace UsurperRemake.Systems
             string name = !string.IsNullOrWhiteSpace(displayName) ? displayName! : (username ?? "");
             if (string.IsNullOrWhiteSpace(name)) return;
 
+            // v1.1.13: a queued purge whose account or name was made again after the delete (a save created or
+            // played since) leaves every row, quest, guild, throne and child alone: they are the new character's.
+            // Only the timed NPC clean-up below (memories up to the delete) still runs.
+            bool recreated = deferred && deletedAt != null && backend != null && !string.IsNullOrWhiteSpace(username)
+                             && backend.WasRecreatedSince(username!, CharacterAliases(name, null, shownName), deletedAt.Value);
+            if (recreated)
+                DebugLogger.Instance.LogInfo("DELETE", $"Queued purge for '{username}' ({name}): the character was made again after the delete; its rows are left alone, only NPC memories up to the delete are cleared.");
+
             // SQL rows keyed by the character key, then PermadeathPurgeHook (god worship, relationships).
-            if (backend != null && !string.IsNullOrWhiteSpace(username))
+            if (!recreated && backend != null && !string.IsNullOrWhiteSpace(username))
                 backend.PurgePlayerWorldState(username!, name);
 
             // v1.1.11: every name the character was known by; a royal-debt bounty names the married display name
@@ -436,6 +444,7 @@ namespace UsurperRemake.Systems
                 aliases = aliases.Where(a => questNames.Any(n => string.Equals(n, a, StringComparison.OrdinalIgnoreCase))
                                              || !backend.IsNameUsedByAnotherPlayer(a, username!)).ToList();
 
+            if (!recreated)   // v1.1.13
             try
             {
                 // Claimed quests (Occupier / OfferedTo = display name) and the King's WANTED bounty on
@@ -460,6 +469,7 @@ namespace UsurperRemake.Systems
             }
             catch (Exception qex) { DebugLogger.Instance.LogWarning("DELETE", $"Quest purge failed for '{name}': {qex.Message}"); }
 
+            if (!recreated)   // v1.1.13
             try
             {
                 // The guild_members row went with the SQL purge; the cache is keyed by the character key
@@ -468,6 +478,7 @@ namespace UsurperRemake.Systems
             }
             catch (Exception gex) { DebugLogger.Instance.LogWarning("DELETE", $"Guild cache clear failed for '{name}': {gex.Message}"); }
 
+            if (!recreated)   // v1.1.13
             try
             {
                 // v1.1.11: a team or guild the character led passes to its highest-level remaining player
@@ -481,6 +492,7 @@ namespace UsurperRemake.Systems
             }
             catch (Exception lex) { DebugLogger.Instance.LogWarning("DELETE", $"Leadership succession failed for '{name}': {lex.Message}"); }
 
+            if (!recreated)   // v1.1.13
             try
             {
                 // v1.1.11: a deleted king abdicates through the normal path (history, NPC succession, persist)
@@ -530,6 +542,7 @@ namespace UsurperRemake.Systems
             }
             catch (Exception mex) { DebugLogger.Instance.LogWarning("DELETE", $"NPC grudge and marriage clear failed for '{name}': {mex.Message}"); }
 
+            if (!recreated)   // v1.1.13
             try
             {
                 // Children match parents by name, so a same-name recreation would inherit them. The
