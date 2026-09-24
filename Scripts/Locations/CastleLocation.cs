@@ -3993,10 +3993,10 @@ public class CastleLocation : BaseLocation
         if (availableNames.Length == 0)
             availableNames = namePool.Where(n => !usedNames.Contains(n)).ToArray();
         if (availableNames.Length == 0)
-            availableNames = namePool; // All used — suffixed below
+            availableNames = namePool; // All used; v1.1.13: a surname is added below
 
         string name = availableNames[random.Next(availableNames.Length)];
-        // Reserve for life; suffixed if the pool is exhausted
+        // Reserve for life; v1.1.13: a taken name gets a surname, never a numeral
         name = NPCSpawnSystem.Instance?.DisambiguateNPCName(name) ?? name;
 
         var orphan = new RoyalOrphan

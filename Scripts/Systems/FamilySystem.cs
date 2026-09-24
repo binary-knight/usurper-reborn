@@ -54,7 +54,7 @@ namespace UsurperRemake.Systems
             // v1.0.4: a child's name is reserved for life at birth, so no immigrant or
             // other child can take it before graduation. Suffixed if already in use.
             if (!string.IsNullOrEmpty(child.Name) && NPCSpawnSystem.Instance != null)
-                child.Name = NPCSpawnSystem.Instance.DisambiguateNPCName(child.Name);
+                child.Name = NPCSpawnSystem.Instance.DisambiguateNPCName(child.Name, keepSurname: true);
 
             _children.Add(child);
 
@@ -918,7 +918,7 @@ namespace UsurperRemake.Systems
             // RomanceTracker / NPCMarriageRegistry name-fallback lookups (per the
             // recurring v0.54 ID-drift fix) become ambiguous.
             // v1.0.4: the name was reserved at birth; only the live roster can still collide
-            string displayName = NPCSpawnSystem.Instance?.DisambiguateNPCName(child.Name, alreadyReserved: true) ?? child.Name;
+            string displayName = NPCSpawnSystem.Instance?.DisambiguateNPCName(child.Name, alreadyReserved: true, keepSurname: true) ?? child.Name;
 
             int level = 1;
             int strength = 10 + Random.Shared.Next(5);
@@ -1215,13 +1215,14 @@ namespace UsurperRemake.Systems
         #region NPC-NPC Children
 
         // Fantasy first-name pools for NPC children. v1.0.4: shared with immigrant
-        // generation (one expanded pool) so NPCNameRegistry rarely needs a suffix.
+        // generation (one expanded pool) so NPCNameRegistry rarely needs another surname.
         private static string[] MaleNames => NPCSpawnSystem.ImmigrantMaleNames;
         private static string[] FemaleNames => NPCSpawnSystem.ImmigrantFemaleNames;
 
         // Fantasy surnames for children whose fathers have no extractable surname
         // (alias NPCs, single-name NPCs, title-only NPCs, etc.)
-        private static readonly string[] GeneratedSurnames = new[]
+        // v1.1.13: internal so name disambiguation can read it; order is fixed by the hash below
+        internal static readonly string[] GeneratedSurnames = new[]
         {
             "Ashford", "Blackthorn", "Copperfield", "Dunmore", "Everhart",
             "Fairwind", "Greymane", "Holloway", "Ironwood", "Kettleburn",
@@ -1248,7 +1249,7 @@ namespace UsurperRemake.Systems
             if (fatherSurname == null)
                 fatherSurname = GenerateSurnameForParent(father.Name2 ?? father.Name);
             // v1.0.4: the surname is fixed, so roll first names until the full name
-            // has never been used (RegisterChild suffixes if every roll collides)
+            // has never been used (v1.1.13: RegisterChild adds a middle surname if every roll collides)
             string childName = "";
             for (int attempt = 0; attempt < 40; attempt++)
             {
@@ -1323,7 +1324,8 @@ namespace UsurperRemake.Systems
             // These are criminal/rogue NPCs known by nicknames, not real names.
             if (AliasNames.Contains(fullName)) return null;
 
-            var parts = fullName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            // v1.1.13: a legacy numeral is not a surname ("Halvar Copperfield II" gives "Copperfield")
+            var parts = NPCSpawnSystem.StripRomanNumeralSuffix(fullName).Split(' ', StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length < 2) return null;
 
             // Skip title-style names: "The Stranger", "The Executioner"
@@ -1453,6 +1455,7 @@ namespace UsurperRemake.Systems
         /// DisambiguateNPCName falls back to are deliberate uniqueness suffixes from
         /// NPCNameRegistry, and stripping one would recreate the duplicate it exists
         /// to prevent. Only a wrong surname is rewritten, and through the registry.
+        /// v1.1.13: new names carry no suffix; a middle surname is accepted as right.
         /// </summary>
         private void MigrateChildSurnames()
         {
@@ -1474,7 +1477,20 @@ namespace UsurperRemake.Systems
                     || child.Name.StartsWith(baseName + " ", StringComparison.Ordinal))
                     continue;
 
-                var correctName = NPCSpawnSystem.Instance?.DisambiguateNPCName(baseName) ?? baseName;
+                // v1.1.13: a disambiguated child carries a middle surname ("Wren Ashford Holloway")
+                if (child.Name.StartsWith(firstName + " ", StringComparison.Ordinal)
+                    && child.Name.EndsWith(" " + surname, StringComparison.Ordinal))
+                    continue;
+
+                // v1.1.13: a name built before numerals stopped counting as a surname
+                // (father "X II" gave "Y II") is left as it was; no renames
+                var fatherParts = child.Father.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                if (fatherParts.Length >= 2 && NPCSpawnSystem.IsRomanNumeralToken(fatherParts[^1])
+                    && (child.Name.Equals($"{firstName} {fatherParts[^1]}", StringComparison.Ordinal)
+                        || child.Name.StartsWith($"{firstName} {fatherParts[^1]} ", StringComparison.Ordinal)))
+                    continue;
+
+                var correctName = NPCSpawnSystem.Instance?.DisambiguateNPCName(baseName, keepSurname: true) ?? baseName;
 
                 if (!child.Name.Equals(correctName, StringComparison.Ordinal))
                 {
