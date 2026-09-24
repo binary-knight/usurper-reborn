@@ -2803,7 +2803,8 @@ public class TeamCornerLocation : BaseLocation
 
         // v1.1.12: the viewer is left out by save key; a teammate may share the viewer's display name
         string myKey = GameEngine.InheritanceKey(currentPlayer);
-        var teammates = (await backend.GetPlayerTeamMembers(currentPlayer.Team))
+        var members = await backend.GetPlayerTeamMembers(currentPlayer.Team);
+        var teammates = members
             .Where(m => !string.Equals(m.Username, myKey, StringComparison.OrdinalIgnoreCase)).ToList();
 
         if (teammates.Count == 0)
@@ -2834,8 +2835,7 @@ public class TeamCornerLocation : BaseLocation
         // v1.1.12: an entry is a save key (an older one a display name); shown by the teammate's display name
         string RecruitLabel(string entry) =>
             teammates.FirstOrDefault(t => t.Username.Equals(entry, StringComparison.OrdinalIgnoreCase))?.DisplayName ?? entry;
-        bool IsRecruited(PlayerSummary tm) => currentRecruits.Any(e =>
-            e.Equals(tm.Username, StringComparison.OrdinalIgnoreCase) || e.Equals(tm.DisplayName, StringComparison.OrdinalIgnoreCase));
+        bool IsRecruited(PlayerSummary tm) => IsEchoRecruited(currentRecruits, members.Select(m => m.Username).Append(myKey), tm);
         if (currentRecruits.Count > 0)
         {
             terminal.SetColor("bright_cyan");
@@ -2939,6 +2939,16 @@ public class TeamCornerLocation : BaseLocation
         terminal.SetColor("darkgray");
         terminal.WriteLine(Loc.Get("ui.press_enter"));
         await terminal.ReadKeyAsync();
+    }
+
+    /// <summary>v1.1.12: whether a teammate is in the echo recruit list. An entry that is a team member's save key
+    /// matches that member only; an older entry (a display name, no member's key) matches by display name.</summary>
+    internal static bool IsEchoRecruited(IEnumerable<string> recruits, IEnumerable<string> memberKeys, PlayerSummary tm)
+    {
+        var keys = new HashSet<string>(memberKeys.Where(k => !string.IsNullOrEmpty(k)), StringComparer.OrdinalIgnoreCase);
+        return recruits.Any(e => keys.Contains(e)
+            ? e.Equals(tm.Username, StringComparison.OrdinalIgnoreCase)
+            : e.Equals(tm.DisplayName, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>

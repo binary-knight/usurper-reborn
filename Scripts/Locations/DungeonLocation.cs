@@ -1398,9 +1398,8 @@ public class DungeonLocation : BaseLocation
 
         foreach (var name in playerNames)
         {
-            // Skip if already in party (v1.1.12: the entry is a save key now; older entries are display names)
-            if (teammates.Any(t => t.IsEcho && t.EchoSaveKey.Equals(name, StringComparison.OrdinalIgnoreCase))
-                || teammates.Any(t => t.DisplayName.Equals(name, StringComparison.OrdinalIgnoreCase)))
+            // Skip if already in party (v1.1.12: by save key; never an NPC's name)
+            if (EchoAlreadyInParty(teammates, name, name.ToLowerInvariant()))
                 continue;
 
             try
@@ -1413,6 +1412,9 @@ public class DungeonLocation : BaseLocation
                     stuckNames.Add(name);
                     continue;
                 }
+                // v1.1.12: an older entry (a display name) resolved to a key; skip it if that echo is already here
+                if (EchoAlreadyInParty(teammates, name, echoKey!))
+                    continue;
 
                 // Verify they're still on the same team
                 if (currentPlayer != null && !string.IsNullOrEmpty(currentPlayer.Team))
@@ -1564,6 +1566,19 @@ public class DungeonLocation : BaseLocation
             }
             term.WriteLine("");
         }
+    }
+
+    /// <summary>
+    /// v1.1.12: whether the echo a recruit-list entry names is already in the party. Only echoes count: by save key,
+    /// or by display name when the entry is an older one holding a name (it did not load under its own text).
+    /// An NPC is never matched, so a key "robin" still loads beside an NPC named "Robin".
+    /// </summary>
+    internal static bool EchoAlreadyInParty(IEnumerable<Character> party, string entry, string echoKey)
+    {
+        bool legacyName = !echoKey.Equals(entry, StringComparison.OrdinalIgnoreCase);
+        return party.Any(t => t.IsEcho && !t.IsCompanion && !t.IsGroupedPlayer
+            && (t.EchoSaveKey.Equals(echoKey, StringComparison.OrdinalIgnoreCase)
+                || (legacyName && t.DisplayName.Equals(entry, StringComparison.OrdinalIgnoreCase))));
     }
 
     /// <summary>

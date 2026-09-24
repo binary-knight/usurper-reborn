@@ -1073,4 +1073,118 @@ public class TeamCornerFixes1112Tests : IDisposable
             GameEngine.Instance.SetDungeonPartyPlayers(partyBefore);
         }
     }
+
+    // ---------- thirteenth review ----------
+
+    private static void SetViewer(string key) =>
+        UsurperRemake.Server.SessionContext.Current = new UsurperRemake.Server.SessionContext
+            { InputStream = Stream.Null, OutputStream = Stream.Null, Username = key, CharacterKey = key };
+
+    private static Task WriteSave(SqlSaveBackend db, string key, string name, int level) =>
+        db.WriteGameData(key, new SaveGameData { Version = GameConfig.SaveVersion,
+            Player = new PlayerData { Name1 = key, Name2 = name, Team = "Echo Band", Level = level, HP = 50, MaxHP = 50 } });
+
+    [Fact]
+    public async Task AnEchoKey_EqualToAnNpcsName_StillLoads_AndStaysRecruited()
+    {
+        // v1.1.12: account "robin" plays "Alice"; an NPC "Robin" in the party must not stand in for her echo
+        var saved = UsurperRemake.Server.SessionContext.Current;
+        var partyBefore = GameEngine.Instance.DungeonPartyPlayerNames.ToList();
+        try
+        {
+            await TeamCornerRig.Online(async (db, path) =>
+            {
+                await db.CreatePlayerTeam("Echo Band", "x", "carl");
+                await WriteSave(db, "robin", "Alice", 9);
+                await WriteSave(db, "sam", "Robin", 7);
+                SetViewer("carl");
+                GameEngine.Instance.SetDungeonPartyPlayers(new[] { "robin" });
+
+                var dungeon = new DungeonLocation();
+                var hero = TeamCornerRig.Hero(name: "Carl", team: "Echo Band");
+                typeof(BaseLocation).GetField("currentPlayer", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
+                    .SetValue(dungeon, hero);
+                dungeon.teammates.Clear();
+                dungeon.teammates.Add(TeamCornerRig.Npc("npc-robin", "Robin", "Echo Band"));
+                var term = new TeamCornerRig(hero, Array.Empty<string>()).Term;
+                var restore = typeof(DungeonLocation).GetMethod("RestorePlayerTeammates",
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+                await (Task)restore.Invoke(dungeon, new object[] { term })!;
+
+                var echo = dungeon.teammates.Single(t => t.IsEcho);
+                echo.DisplayName.Should().Be("Alice");
+                echo.EchoSaveKey.Should().Be("robin");
+                GameEngine.Instance.DungeonPartyPlayerNames.Should().Equal(new[] { "robin" }, "she stays recruited");
+
+                // a second pass, or an older entry naming her, does not add her twice
+                GameEngine.Instance.SetDungeonPartyPlayers(new[] { "robin", "Alice" });
+                await (Task)restore.Invoke(dungeon, new object[] { term })!;
+                dungeon.teammates.Count(t => t.IsEcho).Should().Be(1);
+
+                // Team Corner shows her as recruited, and the teammate named "Robin" can still be recruited
+                GameEngine.Instance.SetDungeonPartyPlayers(new[] { "robin" });
+                var rig = new TeamCornerRig(hero, new[] { "2", "" });
+                string shown = await rig.Run("RecruitPlayerAlly");
+                shown.Should().MatchRegex(@"Alice[^\n]*" + Regex.Escape(Loc.Get("team.echo_recruited_tag")));
+                GameEngine.Instance.DungeonPartyPlayerNames.Should().Equal(new[] { "robin", "sam" });
+            });
+        }
+        finally
+        {
+            UsurperRemake.Server.SessionContext.Current = saved;
+            GameEngine.Instance.SetDungeonPartyPlayers(partyBefore);
+        }
+    }
+
+    [Fact]
+    public void RecruitList_MatchesAKeyToItsMemberOnly_AndAnOlderNameByDisplayName()
+    {
+        var keys = new[] { "robin", "sam", "carl" };
+        var alice = new PlayerSummary { Username = "robin", DisplayName = "Alice" };
+        var robin = new PlayerSummary { Username = "sam", DisplayName = "Robin" };
+        TeamCornerLocation.IsEchoRecruited(new[] { "robin" }, keys, alice).Should().BeTrue();
+        TeamCornerLocation.IsEchoRecruited(new[] { "robin" }, keys, robin).Should().BeFalse("\"robin\" is Alice's key, not a name");
+        TeamCornerLocation.IsEchoRecruited(new[] { "Robin" }, new[] { "sam", "carl" }, robin).Should().BeTrue("an older entry is a name");
+    }
+
+    [Fact]
+    public async Task EquipBest_OffersDisplacedGearToTheRemainingSlots_AndNeverHoldsAnItemOnBothSides()
+    {
+        // v1.1.12: worn +10 and +2 Wisdom rings, a +20 in the pack: one pass gives +20 and +10, the +2 comes back
+        Equipment Ring(int wis)
+        {
+            var eq = new Equipment { Name = $"Test Wisdom Ring +{wis}", Slot = EquipmentSlot.LFinger, WisdomBonus = wis, MinLevel = 1 };
+            EquipmentDatabase.RegisterDynamic(eq);
+            return eq;
+        }
+        var npc = TeamCornerRig.Npc("npc-ringer", "Ringer", "");
+        npc.EquipItem(Ring(10), EquipmentSlot.LFinger, out _).Should().BeTrue();
+        npc.EquipItem(Ring(2), EquipmentSlot.RFinger, out _).Should().BeTrue();
+        var hero = TeamCornerRig.Hero();
+        hero.Inventory.Add(new Item { Name = "Test Wisdom Ring +20", Type = ObjType.Fingers, Wisdom = 20, IsIdentified = true });
+
+        var overlaps = new System.Collections.Generic.List<string>();
+        int saves = 0;
+        BaseLocation.GearSaveHookForTests = step =>
+        {
+            saves++;
+            var mine = hero.Inventory.Select(i => i.Name).ToList();
+            var theirs = npc.Inventory.Select(i => i.Name)
+                .Concat(new[] { EquipmentSlot.LFinger, EquipmentSlot.RFinger }.Select(s => npc.GetEquipment(s)?.Name ?? "")).ToList();
+            overlaps.AddRange(mine.Intersect(theirs));
+            return Task.CompletedTask;
+        };
+        try
+        {
+            await new TeamCornerRig(hero, new[] { "Y" }).Run("RunEquipBestGear", npc);
+        }
+        finally { BaseLocation.GearSaveHookForTests = null; }
+
+        npc.GetEquipment(EquipmentSlot.LFinger)!.WisdomBonus.Should().Be(20);
+        npc.GetEquipment(EquipmentSlot.RFinger)!.WisdomBonus.Should().Be(10);
+        npc.Inventory.Should().BeEmpty();
+        hero.Inventory.Select(i => i.Name).Should().Equal("Test Wisdom Ring +2");
+        saves.Should().Be(4, "the give, then the take");
+        overlaps.Should().BeEmpty();
+    }
 }

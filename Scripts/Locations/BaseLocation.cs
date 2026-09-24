@@ -10607,7 +10607,15 @@ public abstract class BaseLocation
             var candidates = GetItemsForSlot(slot)
                 .Where(x => !x.isEquipped && x.item.IsIdentified && !x.item.IsCursed)
                 .Where(x => x.item.CanEquip(target, out _))
+                .Select(x => (x.item, fromBag: (Item?)null))
                 .ToList();
+            // v1.1.12: gear displaced earlier in this pass is still in the target's bag; it competes for this slot too
+            foreach (var bagItem in displacedAll)
+            {
+                var eq = ConvertInventoryItemToEquipment(bagItem);
+                if (eq != null && ItemMatchesSlot(eq, slot) && eq.IsIdentified && !eq.IsCursed && eq.CanEquip(target, out _))
+                    candidates.Add((eq, bagItem));
+            }
 
             if (candidates.Count == 0)
             {
@@ -10633,10 +10641,12 @@ public abstract class BaseLocation
                 continue;
             }
 
-            // Remove from player inventory (find by name match)
-            var invItem = currentPlayer.Inventory.FirstOrDefault(i => i.Name == bestCandidate.item.Name);
+            // Remove from player inventory (find by name match); v1.1.12: or take it back out of the target's bag
+            var fromBag = bestCandidate.fromBag;
+            var invItem = fromBag ?? currentPlayer.Inventory.FirstOrDefault(i => i.Name == bestCandidate.item.Name);
             if (invItem == null) continue;
-            currentPlayer.Inventory.Remove(invItem);
+            if (fromBag != null) { target.Inventory.Remove(fromBag); displacedAll.Remove(fromBag); }
+            else currentPlayer.Inventory.Remove(invItem);
 
             // Track items before equipping so displaced items go to player
             var targetInventoryBefore = target.Inventory.Count;
@@ -10657,8 +10667,9 @@ public abstract class BaseLocation
             }
             else
             {
-                // Failed - return item to player
-                currentPlayer.Inventory.Add(invItem);
+                // Failed - return item to player (v1.1.12: or to the target's bag it came from)
+                if (fromBag != null) { target.Inventory.Add(fromBag); displacedAll.Add(fromBag); }
+                else currentPlayer.Inventory.Add(invItem);
             }
         }
 
