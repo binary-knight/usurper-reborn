@@ -4343,13 +4343,17 @@ public partial class GameEngine
     /// before the normal session save persists the credit loses the gold to the
     /// sink rather than duplicating it.
     /// </summary>
+    /// <summary>v1.1.12: the key pending_gold_transfers are delivered under for this session (shared with the team-war refund).</summary>
+    internal static string GoldTransferKey(Character player) =>
+        UsurperRemake.Server.SessionContext.Current?.Username
+            ?? UsurperRemake.BBS.DoorMode.GetPlayerName()?.ToLowerInvariant()
+            ?? player?.Name2?.ToLowerInvariant()
+            ?? "";
+
     private async Task DeliverPendingGoldTransfers(SqlSaveBackend backend)
     {
         if (currentPlayer == null) return;
-        var username = UsurperRemake.Server.SessionContext.Current?.Username
-            ?? UsurperRemake.BBS.DoorMode.GetPlayerName()?.ToLowerInvariant()
-            ?? currentPlayer.Name2?.ToLowerInvariant()
-            ?? "";
+        var username = GoldTransferKey(currentPlayer);
         if (string.IsNullOrEmpty(username)) return;
 
         try

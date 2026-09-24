@@ -5038,6 +5038,85 @@ public abstract class BaseLocation
     }
 
     /// <summary>
+    /// v1.1.12: choose one entry from a list, shaped on the Inn patron list. Pages of 10, numbers count
+    /// across pages, N/P page, a typed name or the unique start of one also chooses (an exact name wins
+    /// over a longer one), a part that fits several lists only those, and Enter or 0 cancels (with a name
+    /// filter on, Enter first brings the full list back). Null when cancelled or the list is empty.
+    /// </summary>
+    protected internal async Task<T?> PickFromList<T>(IReadOnlyList<T> items, Func<T, string> rowFormatter,
+        Func<T, string> nameSelector, string titleKey, Func<T, string>? rowColor = null, params object[] titleArgs) where T : class
+    {
+        if (items == null || items.Count == 0) return null;
+        const int pageSize = 10;
+        var all = items.ToList();
+        var shown = all;
+        string? filter = null;
+        int pageIndex = 0;
+        while (true)
+        {
+            int totalPages = Math.Max(1, (shown.Count + pageSize - 1) / pageSize);
+            pageIndex = Math.Clamp(pageIndex, 0, totalPages - 1);
+            var pageRows = shown.Skip(pageIndex * pageSize).Take(pageSize).ToList();
+
+            terminal.ClearScreen();
+            WriteSectionHeader(Loc.Get(titleKey, titleArgs), "bright_cyan");
+            terminal.WriteLine("");
+            if (filter != null)
+            {
+                terminal.SetColor("white");
+                terminal.WriteLine(Loc.Get("base.pick_matching", filter));
+                terminal.WriteLine("");
+            }
+            for (int i = 0; i < pageRows.Count; i++)
+            {
+                int number = pageIndex * pageSize + i + 1;
+                terminal.SetColor(rowColor?.Invoke(pageRows[i]) ?? "white");
+                terminal.WriteLine(IsScreenReader ? $"  {number}. {rowFormatter(pageRows[i])}" : $"  [{number}] {rowFormatter(pageRows[i])}");
+            }
+            terminal.WriteLine("");
+            if (totalPages > 1)
+            {
+                terminal.SetColor("darkgray");
+                terminal.WriteLine(Loc.Get("team.recruit_page_footer", pageIndex * pageSize + 1, pageIndex * pageSize + pageRows.Count, shown.Count, pageIndex + 1, totalPages));
+            }
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine(IsScreenReader ? $"0. {Loc.Get("ui.cancel")}" : $"[0] {Loc.Get("ui.cancel")}");
+            terminal.WriteLine("");
+
+            string input = ((await terminal.GetInput(Loc.Get(totalPages > 1 ? "base.pick_nav_pages" : "base.pick_nav"))) ?? "").Trim();
+            if (input.Length == 0 && filter != null) { shown = all; filter = null; pageIndex = 0; continue; }
+            if (input.Length == 0 || input == "0") return null;
+            string upper = input.ToUpperInvariant();
+            if (upper == "N" && totalPages > 1) { if (pageIndex + 1 < totalPages) pageIndex++; continue; }
+            if (upper == "P" && totalPages > 1) { if (pageIndex > 0) pageIndex--; continue; }
+
+            if (int.TryParse(input, out int pick))
+            {
+                if (pick >= 1 && pick <= shown.Count) return shown[pick - 1];
+                terminal.SetColor("gray");
+                terminal.WriteLine(Loc.Get("base.pick_no_number", pick, shown.Count));
+                await terminal.PressAnyKey();
+                continue;
+            }
+
+            var exact = all.Where(x => string.Equals(nameSelector(x) ?? "", input, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (exact.Count == 1) return exact[0];
+            var matches = all.Where(x => (nameSelector(x) ?? "").StartsWith(input, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (matches.Count == 0)
+                matches = all.Where(x => (nameSelector(x) ?? "").Contains(input, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (matches.Count == 1) return matches[0];
+            if (matches.Count == 0)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine(Loc.Get("base.pick_no_match", input));
+                await terminal.PressAnyKey();
+                continue;
+            }
+            shown = matches; filter = input; pageIndex = 0;
+        }
+    }
+
+    /// <summary>
     /// Check if we're running inside WezTerm (which supports font switching).
     /// </summary>
     internal static bool IsRunningInWezTerm()

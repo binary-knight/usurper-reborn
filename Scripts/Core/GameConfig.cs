@@ -1857,6 +1857,12 @@ public static partial class GameConfig
     public const int EmptyTeamGraceMinutes = 30;
     // v1.1.11: after a join, the team is left alone this long so the joiner's save can land (every process)
     public const int EmptyTeamJoinGraceMinutes = 10;
+    // v1.1.12: a team war still 'active' after this long was left by a lost session (a war takes seconds)
+    public const int TeamWarStaleMinutes = 10;
+    // v1.1.12: the highest level of a team headquarters facility, and the vault's size (base + per level)
+    public const int MaxTeamFacilityLevel = 10;
+    public const long TeamVaultBaseCapacity = 50000;
+    public const long TeamVaultCapacityPerLevel = 50000;
 
     // v1.1.10: regular dungeon monsters on the floors before an Old God's floor grow tougher, HP and
     // damage, by this much per floor: +5% five floors out, up to +25% on the floor before the god
@@ -2367,6 +2373,25 @@ public static partial class GameConfig
 
     /// <summary>Overload taking the enum directly.</summary>
     public static string GetLocalizedClassName(CharacterClass cls) => GetLocalizedClassName((int)cls);
+
+    /// <summary>v1.1.12: the race name in the session language (the race.* keys); the enum name if unknown.</summary>
+    public static string GetLocalizedRaceName(CharacterRace race) => race switch
+    {
+        CharacterRace.Human => Loc.Get("race.human"),
+        CharacterRace.Hobbit => Loc.Get("race.hobbit"),
+        CharacterRace.Elf => Loc.Get("race.elf"),
+        CharacterRace.HalfElf => Loc.Get("race.half_elf"),
+        CharacterRace.Dwarf => Loc.Get("race.dwarf"),
+        CharacterRace.Troll => Loc.Get("race.troll"),
+        CharacterRace.Orc => Loc.Get("race.orc"),
+        CharacterRace.Gnome => Loc.Get("race.gnome"),
+        CharacterRace.Gnoll => Loc.Get("race.gnoll"),
+        CharacterRace.Mutant => Loc.Get("race.mutant"),
+        _ => race.ToString(),
+    };
+
+    /// <summary>v1.1.12: Male or Female in the session language.</summary>
+    public static string GetLocalizedSexName(CharacterSex sex) => sex == CharacterSex.Male ? Loc.Get("base.male") : Loc.Get("base.female");
 
     /// <summary>
     /// Returns the localized display name of an equipment slot (e.g. "Main Hand",
