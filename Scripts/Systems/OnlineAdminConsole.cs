@@ -646,7 +646,19 @@ namespace UsurperRemake.Systems
                 return;
             }
 
-            backend.DeleteGameData(target.Username);
+            // v1.1.11: the same purge as permadeath, once the delete has succeeded (a failed delete must not
+            // leave a living character purged, review). display_name carries a married surname, so the
+            // character's Name2 is read from the save first.
+            var deletedSave = await backend.ReadGameData(target.Username);
+            if (!backend.DeleteGameData(target.Username))
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine($"Deleting '{target.DisplayName}' failed; nothing was changed.");
+                await ReadInput(Loc.Get("ui.press_enter"));
+                return;
+            }
+            await PermadeathHelper.PurgeDeletedCharacterAsync(backend, target.Username,
+                deletedSave?.Player?.Name2 ?? target.DisplayName);
             terminal.SetColor("green");
             terminal.WriteLine($"Player '{target.DisplayName}' has been permanently deleted.");
             DebugLogger.Instance.LogWarning("ADMIN", $"Player '{target.DisplayName}' deleted by {DoorMode.OnlineUsername}");

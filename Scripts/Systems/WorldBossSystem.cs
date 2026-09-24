@@ -528,6 +528,8 @@ namespace UsurperRemake.Systems
             string key = RowKey(player);
             var rows = backend.GetUndeliveredWorldBossRewards(key);
             if (rows.Count == 0) return;
+            // v1.1.11: the team's current Training level; a teammate may have upgraded since it was read (review)
+            TeamHQBonus.RefreshLevels(player, backend);
             bool headerShown = false;
             foreach (var r in rows)
             {
@@ -539,14 +541,16 @@ namespace UsurperRemake.Systems
                     terminal.SetColor("bright_yellow");
                     terminal.WriteLine(GameConfig.ScreenReaderMode ? $"  {Loc.Get("world_boss.rewards_delivered_header")}" : $"  ═══ {Loc.Get("world_boss.rewards_delivered_header")} ═══");
                 }
-                player.Experience += r.Xp;
+                // v1.1.11: Team HQ Training at delivery, where the player and their levels are loaded (after the settlement cap).
+                long xp = TeamHQBonus.ApplyXP(player, r.Xp);
+                player.Experience += xp;
                 player.Gold += r.Gold;
                 player.Fame += r.Fame;
                 terminal.SetColor("white");
                 terminal.WriteLine(r.Kind == "kill"
                     ? $"  {Loc.Get("world_boss.reward_kind_kill", r.BossName, r.Night, (int)(r.Score * 100), r.Mvp ? Loc.Get("world_boss.tier_mvp") : Loc.Get("world_boss.tier_contributor"))}"
                     : $"  {Loc.Get("world_boss.reward_kind_withdraw", r.BossName, r.Night)}");
-                terminal.WriteLine($"  {Loc.Get("world_boss.reward_xp", $"{r.Xp:N0}")}  {Loc.Get("world_boss.reward_gold", $"{r.Gold:N0}")}  {Loc.Get("world_boss.reward_fame", r.Fame)}");
+                terminal.WriteLine($"  {Loc.Get("world_boss.reward_xp", $"{xp:N0}")}  {Loc.Get("world_boss.reward_gold", $"{r.Gold:N0}")}  {Loc.Get("world_boss.reward_fame", r.Fame)}");
 
                 var boss = await backend.GetWorldBossById(r.BossId);
                 var bossDef = boss != null ? WorldBossDatabase.GetBossById(boss.DefinitionId) : null;
@@ -878,6 +882,9 @@ namespace UsurperRemake.Systems
         private async Task RunWorldBossCombat(Character player, TerminalEmulator terminal,
             SqlSaveBackend backend, WorldBossInfo boss)
         {
+            // v1.1.11: read the team's HQ levels when the fight starts.
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                TeamHQBonus.RefreshLevels(player);
             string playerKey = RowKey(player);
             // v1.1.4: the re-entry cooldown is on the player's row (two minutes after a retreat or the
             // fifty-round rest, five after a fall). There is no lock: retreat, fall, and rest all re-enter.
@@ -1073,6 +1080,8 @@ namespace UsurperRemake.Systems
                         // for the single caller whose conditional status-flip won the race; other
                         // concurrent callers who bring remainingHp to 0 in the same round see
                         // wasKillingBlow == false (v0.57.9 fix for duplicate kill-credit bug).
+                        // v1.1.11: Team HQ Armory, after every modifier and before the ratio and the cap.
+                        roundDamage = TeamHQBonus.ApplyAttack(player, roundDamage);
                         long cap = WorldBossMath.RoundCap(state.BossMaxHP, currentBoss.Staggered);
                         long toApply = WorldBossMath.Applied(roundDamage, state.Ratio, cap);
                         var (remainingHp, wasKillingBlow, applied) = await backend.RecordWorldBossDamage(
@@ -1429,6 +1438,7 @@ namespace UsurperRemake.Systems
                 ? (answered ? GameConfig.WorldBossTelegraphUnansweredPercent / 2 : GameConfig.WorldBossTelegraphUnansweredPercent)
                 : (answered ? GameConfig.WorldBossTelegraphAnsweredPercent : GameConfig.WorldBossTelegraphUnansweredPercent);
             long dmg = Math.Max(1, (long)(player.MaxHP * pct));
+            dmg = Math.Max(1, TeamHQBonus.ApplyDefense(player, dmg));   // v1.1.11: Team HQ Barracks on a telegraphed hit too
             player.HP = Math.Max(0, player.HP - dmg);
             terminal.SetColor(answered ? "yellow" : "bright_red");
             terminal.WriteLine(landed.Kind == "channel"
@@ -1744,6 +1754,7 @@ namespace UsurperRemake.Systems
             qty = Math.Min(qty, available);
 
             long perPotion = (long)(player.MaxHP * 0.3);
+            perPotion = PotionBonus.ApplyOwnerBonuses(player, perPotion); // v1.1.11: Infirmary, before the cap
             long totalHealed = 0;
             int drank = 0;
             for (int i = 0; i < qty && player.Healing > 0 && player.HP < player.MaxHP; i++)
@@ -1950,12 +1961,17 @@ namespace UsurperRemake.Systems
             double mult = focused ? GameConfig.WorldBossFocusMultiplier : GameConfig.WorldBossOffFocusMultiplier;
             for (int i = 0; i < attacks && player.HP > 0; i++)
             {
-                long bossDmg = Math.Max(1, (long)(CalculateBossBasicDamage(bossData, player, rng, defendingRounds) * mult));
+                long beforeBarracks = Math.Max(1, (long)(CalculateBossBasicDamage(bossData, player, rng, defendingRounds) * mult));
+                // v1.1.11: Team HQ Barracks last; the 20%-of-STR minimum holds where it held before.
+                long bossDmg = Math.Max(Math.Min(beforeBarracks, BossMinimumDamage(bossData)), TeamHQBonus.ApplyDefense(player, beforeBarracks));
                 player.HP = Math.Max(0, player.HP - bossDmg);
                 terminal.SetColor("bright_red");
                 terminal.WriteLine($"  {Loc.Get(focused ? "world_boss.boss_strikes_focused" : "world_boss.boss_strikes", bossDef.Name, $"{bossDmg:N0}", player.HP, player.MaxHP)}");
             }
         }
+
+        // Defense never takes a boss basic attack below 20% of the boss's strength.
+        private static long BossMinimumDamage(WorldBossRuntimeData bossData) => Math.Max(1, bossData.ScaledStrength / 5);
 
         private long CalculateBossBasicDamage(WorldBossRuntimeData bossData, Character player, Random rng,
             int defendingRounds)
@@ -1977,8 +1993,7 @@ namespace UsurperRemake.Systems
             // Defense can reduce damage but never below 20% of boss strength
             // World bosses are meant to be dangerous — pure defense stacking shouldn't trivialize them
             long raw = Math.Max(1, bossStr - playerDef / 2);
-            long minDamage = Math.Max(1, bossStr / 5);
-            raw = Math.Max(raw, minDamage);
+            raw = Math.Max(raw, BossMinimumDamage(bossData));
             double variance = 0.7 + rng.NextDouble() * 0.6;
             long final = Math.Max(1, (long)(raw * variance));
 

@@ -594,6 +594,13 @@ public class Character
     public int HQBarracksLevel { get; set; }  // +5% defense per level
     public int HQTrainingLevel { get; set; }  // +5% XP per level
     public int HQInfirmaryLevel { get; set; } // +10% healing per level
+    /// <summary>v1.1.11: the team the HQ levels above were read for; they count only while it is still the character's team (TeamHQBonus).</summary>
+    public string HQLevelsTeam { get; set; } = "";
+    /// <summary>v1.1.11: when the HQ levels were read (run time only); TeamHQBonus reads them again when old.</summary>
+    public DateTime HQLevelsReadAt { get; set; } = DateTime.MinValue;
+    /// <summary>v1.1.11: built from a real player's save (PlayerCharacterLoader), not a hired guard or an echo. Run time only.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsLoadedPlayer { get; set; }
 
     // Herb pouch inventory (v0.48.5)
     public int HerbHealing { get; set; }        // Healing Herbs (garden lv1)

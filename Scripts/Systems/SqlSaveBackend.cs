@@ -63,6 +63,9 @@ namespace UsurperRemake.Systems
         // already gone and any in-flight saves died with the old process.
         private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> RageEventErasedUsernames = new();
 
+        /// <summary>v1.1.11: the database file, for a system that opens its own connection (guild succession).</summary>
+        public string DatabasePath => databasePath;
+
         public SqlSaveBackend(string databasePath)
         {
             this.databasePath = databasePath;
@@ -476,7 +479,8 @@ namespace UsurperRemake.Systems
                         created_by TEXT NOT NULL,
                         created_at TEXT DEFAULT (datetime('now')),
                         member_count INTEGER DEFAULT 1,
-                        controls_turf INTEGER DEFAULT 0
+                        controls_turf INTEGER DEFAULT 0,
+                        last_join_at TEXT
                     );
 
                     CREATE TABLE IF NOT EXISTS trade_offers (
@@ -840,6 +844,14 @@ namespace UsurperRemake.Systems
                         UNIQUE(username, event)
                     );
                     CREATE INDEX IF NOT EXISTS idx_onboarding_event ON onboarding_events(event, created_at DESC);
+
+                    -- v1.1.11: one row per bounty paid, so a bounty is paid once across processes.
+                    -- v1.1.11: never pruned (a stale save can bring an old bounty back); one small row per bounty paid.
+                    CREATE TABLE IF NOT EXISTS bounty_claims (
+                        quest_id TEXT PRIMARY KEY,
+                        claimed_by TEXT,
+                        claimed_at TEXT DEFAULT (datetime('now'))
+                    );
                 ";
                 cmd.ExecuteNonQuery();
             }
@@ -878,6 +890,16 @@ namespace UsurperRemake.Systems
             {
                 using var migCmd = connection.CreateCommand();
                 migCmd.CommandText = "ALTER TABLE players ADD COLUMN last_login_ip TEXT;";
+                migCmd.ExecuteNonQuery();
+            }
+            catch { /* Column already exists - expected */ }
+
+            // v1.1.11: when a player last joined the team; the empty-team cleanup leaves a team alone for a
+            // while after a join, in every process (a join and the cleanup can run in different processes)
+            try
+            {
+                using var migCmd = connection.CreateCommand();
+                migCmd.CommandText = "ALTER TABLE player_teams ADD COLUMN last_join_at TEXT;";
                 migCmd.ExecuteNonQuery();
             }
             catch { /* Column already exists - expected */ }
@@ -928,6 +950,15 @@ namespace UsurperRemake.Systems
                 migCmd.ExecuteNonQuery();
             }
             catch { /* Column already exists - expected */ }
+
+            // v1.1.11: the one-time bounty claim table, also on a database made by an older release
+            try
+            {
+                using var migCmd = connection.CreateCommand();
+                migCmd.CommandText = "CREATE TABLE IF NOT EXISTS bounty_claims (quest_id TEXT PRIMARY KEY, claimed_by TEXT, claimed_at TEXT DEFAULT (datetime('now')));";
+                migCmd.ExecuteNonQuery();
+            }
+            catch (Exception ex) { DebugLogger.Instance.LogWarning("SQL", $"bounty_claims not ensured: {ex.Message}"); }
 
             MigrateWorldBossTables(connection); // v1.1.4
 
@@ -1170,7 +1201,24 @@ namespace UsurperRemake.Systems
                 ExecPurge(connection, tx, "messages",          "LOWER(from_player) = LOWER(@u) OR LOWER(to_player) = LOWER(@u)", username);
                 ExecPurge(connection, tx, "trade_offers",      "LOWER(from_player) = LOWER(@u) OR LOWER(to_player) = LOWER(@u)", username);
                 ExecPurge(connection, tx, "bounties",          "LOWER(target_player) = LOWER(@u) OR LOWER(placed_by) = LOWER(@u) OR LOWER(claimed_by) = LOWER(@u)", username);
-                ExecPurge(connection, tx, "auction_listings",  "LOWER(seller) = LOWER(@u) OR LOWER(buyer) = LOWER(@u)", username);
+                // v1.1.11: only the character's own listings, under each name it may have listed as (the key,
+                // the display name, the stored married display name). The buyer clause is gone: a sold row the
+                // seller has not collected holds that seller's gold, and the buyer already has the item. A
+                // seller name another player or an NPC may carry now is left alone, alias by alias.
+                string? storedDisplayName = null;
+                using (var dn = connection.CreateCommand())
+                {
+                    dn.Transaction = tx;
+                    dn.CommandText = "SELECT display_name FROM players WHERE LOWER(username) = LOWER(@u) AND display_name IS NOT NULL LIMIT 1;";
+                    dn.Parameters.AddWithValue("@u", username);
+                    storedDisplayName = dn.ExecuteScalar() as string;
+                }
+                foreach (var alias in AuctionSellerAliases(username, displayName, storedDisplayName))
+                {
+                    if (CouldBeNpcName(alias)) continue;
+                    ExecPurge(connection, tx, "auction_listings",
+                        $"LOWER(seller) = LOWER(@d) AND {SellerNotOtherPlayer}", username, alias);
+                }
                 ExecPurge(connection, tx, "world_boss_damage", "LOWER(player_name) = LOWER(@u)", username);
 
                 // v0.65.0: pvp_log was deliberately excluded in v0.60.5 ("history
@@ -1184,6 +1232,24 @@ namespace UsurperRemake.Systems
                 // was the LOSER -- those credit a win to a STILL-LIVING opponent
                 // and must not be deleted out from under them.
                 ExecPurge(connection, tx, "pvp_log", "LOWER(winner) = LOWER(@u)", username);
+
+                // v1.1.11: queued deliveries keyed by the character key. A new character on the same
+                // key used to collect the deleted one's inheritance, bank wires and boss rewards.
+                ExecPurge(connection, tx, "pending_inheritance",    "LOWER(player_username) = LOWER(@u)", username);
+                ExecPurge(connection, tx, "pending_gold_transfers", "LOWER(recipient_username) = LOWER(@u)", username);
+                ExecPurge(connection, tx, "world_boss_rewards",     "LOWER(player_name) = LOWER(@u) AND COALESCE(delivered, 0) = 0", username);
+
+                // v1.1.11: mail and auctions also key on the display name (mail to Name2, auction sellers
+                // are DisplayName.ToLower(), the married surname form comes from players.display_name).
+                // Only mail TO the character; a name that is another account's key is left alone.
+                if (!string.IsNullOrWhiteSpace(displayName))
+                {
+                    const string ownNames = "(SELECT LOWER(display_name) FROM players WHERE LOWER(username) = LOWER(@u) AND display_name IS NOT NULL)";
+                    ExecPurge(connection, tx, "messages",
+                        $"to_player != '*' AND (LOWER(to_player) = LOWER(@d) OR LOWER(to_player) IN {ownNames}) " +
+                        "AND NOT EXISTS (SELECT 1 FROM players p WHERE LOWER(p.username) = LOWER(messages.to_player) AND LOWER(p.username) != LOWER(@u))",
+                        username, displayName);
+                }
 
                 tx.Commit();
                 DebugLogger.Instance.LogInfo("PERMADEATH",
@@ -1207,7 +1273,60 @@ namespace UsurperRemake.Systems
             }
         }
 
-        private static void ExecPurge(SqliteConnection conn, SqliteTransaction tx, string table, string whereClause, string username)
+        // v1.1.11: an auction seller name that another player's row carries now, as its display name or
+        // its save's Name2, is that player's listing, never the deleted character's.
+        private const string SellerNotOtherPlayer =
+            "NOT EXISTS (SELECT 1 FROM players p WHERE LOWER(p.username) != LOWER(@u) AND (" +
+            "LOWER(p.display_name) = LOWER(auction_listings.seller) OR " +
+            "LOWER(CASE WHEN json_valid(p.player_data) THEN json_extract(p.player_data, '$.player.name2') END) = LOWER(auction_listings.seller)))";
+
+        /// <summary>
+        /// v1.1.11: every seller name the delete purge removes listings under: the key, the display name
+        /// given, and the display name stored on the players row (the married form). Each is checked
+        /// against the NPC guard by the caller; one list, so the guard and the DELETE cannot differ.
+        /// </summary>
+        internal static List<string> AuctionSellerAliases(string username, string? displayName, string? storedDisplayName) =>
+            new[] { username, displayName, storedDisplayName }
+                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .Select(n => n!)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+        // v1.1.11: a name an NPC may carry (one does, or the roster cannot rule it out)
+        private static bool CouldBeNpcName(string name)
+        {
+            var spawner = NPCSpawnSystem.Instance;
+            return spawner == null || !spawner.IsRosterTrustworthy || QuestSystem.IsNPCName(name);
+        }
+
+        /// <summary>
+        /// v1.1.11: claims a bounty for payout, once across every process on this database. True only for the
+        /// first claim of the quest id; false when another process (or an earlier claim) already took it, or
+        /// the claim could not be written.
+        /// </summary>
+        public bool TryClaimBounty(string questId, string claimer) => TryClaimBountyOrFail(questId, claimer) == true;
+
+        /// <summary>v1.1.11: as TryClaimBounty, but null when the claim could not be written, so the bounty stays open.</summary>
+        public bool? TryClaimBountyOrFail(string questId, string claimer)
+        {
+            if (string.IsNullOrWhiteSpace(questId)) return false;
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "INSERT OR IGNORE INTO bounty_claims (quest_id, claimed_by) VALUES (@q, @c);";
+                cmd.Parameters.AddWithValue("@q", questId);
+                cmd.Parameters.AddWithValue("@c", claimer ?? "");
+                return cmd.ExecuteNonQuery() == 1;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"TryClaimBounty failed for '{questId}': {ex.Message}");
+                return null;
+            }
+        }
+
+        private static void ExecPurge(SqliteConnection conn, SqliteTransaction tx, string table, string whereClause, string username, string? displayName = null)
         {
             try
             {
@@ -1215,6 +1334,7 @@ namespace UsurperRemake.Systems
                 cmd.Transaction = tx;
                 cmd.CommandText = $"DELETE FROM {table} WHERE {whereClause};";
                 cmd.Parameters.AddWithValue("@u", username);
+                if (displayName != null) cmd.Parameters.AddWithValue("@d", displayName);   // v1.1.11: display-name key
                 int rows = cmd.ExecuteNonQuery();
                 if (rows > 0)
                     DebugLogger.Instance.LogInfo("PERMADEATH", $"  {table}: removed {rows} row(s) for '{username}'");
@@ -5209,6 +5329,143 @@ namespace UsurperRemake.Systems
     }
 
     /// <summary>
+    /// v1.1.11: the successor to a team or guild leader: the highest level first; the same level goes
+    /// to the earliest joiner when a join time is recorded (guild_members.joined_at; teams record none,
+    /// players.created_at is the account's age and last_join_at is per team), then the username in
+    /// ordinal order. Null when there is no candidate.
+    /// </summary>
+    public static string? PickSuccessor(IEnumerable<(string Username, int Level, string? JoinedAt)> candidates) =>
+        candidates.OrderByDescending(c => c.Level)
+            .ThenBy(c => c.JoinedAt == null ? 1 : 0)
+            .ThenBy(c => c.JoinedAt ?? "", StringComparer.Ordinal)
+            .ThenBy(c => c.Username, StringComparer.Ordinal)
+            .Select(c => c.Username).FirstOrDefault();
+
+    /// <summary>
+    /// v1.1.11: passes a team's leader key (created_by) from oldKey to the highest-level remaining
+    /// player member, never excludeKey, a banned player or an emergency account. Only if the team still
+    /// has oldKey; with requireOldLeaderGone, also only if oldKey's save no longer names the team. The
+    /// key is left alone when there is no successor. True when the team was updated.
+    /// v1.1.11: with respectJoinGrace (the world-save pass), also only if nobody joined within
+    /// EmptyTeamJoinGraceMinutes, checked by the update itself: a returning leader's save may not have landed.
+    /// </summary>
+    /// <summary>v1.1.11: tests only; runs between the successor's selection and the update.</summary>
+    internal static Action<string>? BeforeTeamLeaderUpdateForTests;
+
+    public bool TryPassTeamLeadership(string teamName, string oldKey, string? excludeKey, bool requireOldLeaderGone, out string? newKey, bool respectJoinGrace = false)
+    {
+        newKey = null;
+        try
+        {
+            using var connection = OpenConnection();
+            var candidates = new List<(string, int, string?)>();
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = @"
+                    SELECT p.username, CAST(json_extract(p.player_data, '$.player.level') AS INTEGER)
+                    FROM players p
+                    WHERE (CASE WHEN json_valid(p.player_data) THEN json_extract(p.player_data, '$.player.team') END) = @team
+                    AND p.player_data != '{}' AND LENGTH(p.player_data) > 2
+                    AND p.is_banned = 0 AND p.username NOT LIKE 'emergency_%'
+                    AND LOWER(p.username) != LOWER(@old);";
+                cmd.Parameters.AddWithValue("@team", teamName);
+                cmd.Parameters.AddWithValue("@old", oldKey);
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    var key = reader.GetString(0);
+                    if (excludeKey != null && string.Equals(key, excludeKey, StringComparison.OrdinalIgnoreCase)) continue;
+                    candidates.Add((key, reader.IsDBNull(1) ? 0 : reader.GetInt32(1), null));
+                }
+            }
+            var successor = PickSuccessor(candidates);
+            if (successor == null) return false;
+            BeforeTeamLeaderUpdateForTests?.Invoke(successor);
+            using (var update = connection.CreateCommand())
+            {
+                // v1.1.11: a leader key changed meanwhile (an admin fix, another pass) wins, and the successor
+                // must still be eligible when the update runs (not banned since, still on the team)
+                update.CommandText = "UPDATE player_teams SET created_by = @new WHERE team_name = @team AND created_by = @old" + @"
+                    AND EXISTS (SELECT 1 FROM players s WHERE LOWER(s.username) = LOWER(@new)
+                        AND s.is_banned = 0 AND s.username NOT LIKE 'emergency_%'
+                        AND s.player_data != '{}' AND LENGTH(s.player_data) > 2
+                        AND (CASE WHEN json_valid(s.player_data) THEN json_extract(s.player_data, '$.player.team') END) = @team)" +
+                    (requireOldLeaderGone ? @"
+                    AND NOT EXISTS (SELECT 1 FROM players l WHERE l.username = @old
+                        AND (NOT json_valid(l.player_data)
+                             OR (CASE WHEN json_valid(l.player_data) THEN json_extract(l.player_data, '$.player.team') END) = @team))" : "") +
+                    (respectJoinGrace ? " AND (last_join_at IS NULL OR last_join_at < datetime('now', '-' || @joinGrace || ' minutes'))" : "") + ";";
+                if (respectJoinGrace) update.Parameters.AddWithValue("@joinGrace", GameConfig.EmptyTeamJoinGraceMinutes);
+                update.Parameters.AddWithValue("@new", successor.ToLowerInvariant());
+                update.Parameters.AddWithValue("@team", teamName);
+                update.Parameters.AddWithValue("@old", oldKey);
+                if (update.ExecuteNonQuery() != 1) return false;
+            }
+            newKey = successor.ToLowerInvariant();
+            DebugLogger.Instance.LogInfo("TEAM", $"Team '{teamName}' leadership passed from '{oldKey}' to '{newKey}'");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("TEAM", $"Failed to pass the leadership of team '{teamName}': {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>v1.1.11: passes on every team led by a character that is being deleted (its row still names the team).</summary>
+    public int PassTeamLeadershipOfDeleted(string characterKey)
+    {
+        if (string.IsNullOrWhiteSpace(characterKey)) return 0;
+        var teams = new List<(string Team, string Key)>();
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT team_name, created_by FROM player_teams WHERE LOWER(created_by) = LOWER(@key);";
+            cmd.Parameters.AddWithValue("@key", characterKey);
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read()) teams.Add((reader.GetString(0), reader.GetString(1)));
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("TEAM", $"Failed to list the teams led by '{characterKey}': {ex.Message}");
+        }
+        return teams.Count(t => TryPassTeamLeadership(t.Team, t.Key, characterKey, requireOldLeaderGone: false, out _));
+    }
+
+    /// <summary>
+    /// v1.1.11: teams whose leader key is a known character (a players row) whose valid save no longer
+    /// names the team, and that nobody joined within EmptyTeamJoinGraceMinutes (a joiner's save may not
+    /// have landed). A key that matches no character is the admin's Fix Team Leaders screen's to map,
+    /// so it is never listed here.
+    /// </summary>
+    public List<(string Team, string Leader)> GetTeamsLedByExMembers()
+    {
+        var teams = new List<(string, string)>();
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"
+                SELECT t.team_name, t.created_by FROM player_teams t
+                JOIN players l ON l.username = t.created_by
+                -- a deleted character's row stays with '{}' (DeleteGameData), which names no team
+                WHERE json_valid(l.player_data)
+                AND COALESCE((CASE WHEN json_valid(l.player_data) THEN json_extract(l.player_data, '$.player.team') END), '') != t.team_name
+                AND (t.last_join_at IS NULL OR t.last_join_at < datetime('now', '-' || @joinGrace || ' minutes'))
+                ORDER BY t.team_name;";
+            cmd.Parameters.AddWithValue("@joinGrace", GameConfig.EmptyTeamJoinGraceMinutes);
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read()) teams.Add((reader.GetString(0), reader.GetString(1)));
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("TEAM", $"Failed to list teams led by ex-members: {ex.Message}");
+        }
+        return teams;
+    }
+
+    /// <summary>
     /// v0.61.5: Queue an item for delivery to a player on their next login.
     /// Used when a team NPC dies of old age — their belongings go to the team
     /// leader. Each call queues one item (or a gold amount when itemJson is null).
@@ -5429,7 +5686,14 @@ namespace UsurperRemake.Systems
             var result = await Task.Run(() => cmd.ExecuteScalar());
             if (result == null) return (false, false);
             var storedHash = result.ToString() ?? "";
-            return (true, VerifyPassword(password, storedHash));
+            if (!VerifyPassword(password, storedHash)) return (true, false);
+            // v1.1.11: stamp the join, so the empty-team cleanup (in this process or another) leaves the team
+            // alone until the membership is saved; no row means it was removed a moment ago
+            using var stamp = connection.CreateCommand();
+            stamp.CommandText = "UPDATE player_teams SET last_join_at = datetime('now') WHERE team_name = @name;";
+            stamp.Parameters.AddWithValue("@name", teamName);
+            if (stamp.ExecuteNonQuery() != 1) return (false, false);
+            return (true, true);
         }
         catch (Exception ex)
         {
@@ -5445,7 +5709,16 @@ namespace UsurperRemake.Systems
         {
             using var connection = OpenConnection();
             using var cmd = connection.CreateCommand();
-            cmd.CommandText = "SELECT team_name, created_by, member_count, controls_turf, created_at FROM player_teams ORDER BY member_count DESC;";
+            // v1.1.11: the member count is counted here; the stored column was refreshed only when someone
+            // opened that team's roster, so the rankings showed teams with players in them as empty
+            cmd.CommandText = @"
+                SELECT t.team_name, t.created_by,
+                       (SELECT COUNT(*) FROM players p
+                        WHERE (CASE WHEN json_valid(p.player_data) THEN json_extract(p.player_data, '$.player.team') END) = t.team_name
+                        AND p.player_data != '{}' AND LENGTH(p.player_data) > 2
+                        AND p.is_banned = 0 AND p.username NOT LIKE 'emergency_%') AS members,
+                       t.controls_turf, t.created_at
+                FROM player_teams t ORDER BY members DESC;";
             using var reader = await Task.Run(() => cmd.ExecuteReader());
             while (reader.Read())
             {
@@ -5524,6 +5797,92 @@ namespace UsurperRemake.Systems
             DebugLogger.Instance.LogError("SQL", $"Failed to get player team members for '{teamName}': {ex.Message}");
         }
         return members;
+    }
+
+    /// <summary>
+    /// v1.1.11: player teams that no player's save names, banned players included (a ban can be lifted).
+    /// Whether an NPC or an online player still carries the name is for the caller to check
+    /// (WorldSimService.PruneEmptyTeams); only it knows the live roster.
+    /// </summary>
+    public List<string> GetTeamsWithoutPlayerMembers()
+    {
+        var teams = new List<string>();
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            // A malformed save cannot say which team it names, so while one exists no team counts as empty.
+            using (var bad = connection.CreateCommand())
+            {
+                bad.CommandText = "SELECT username FROM players WHERE NOT json_valid(player_data);";
+                using var badReader = bad.ExecuteReader();
+                var badKeys = new List<string>();
+                while (badReader.Read()) badKeys.Add(badReader.GetString(0));
+                if (badKeys.Count > 0)
+                {
+                    DebugLogger.Instance.LogWarning("SQL", $"Empty-team cleanup skipped: malformed save(s) for {string.Join(", ", badKeys)}");
+                    return teams;
+                }
+            }
+            // A character archived by permadeath can be restored within the window, so it is still a member (review).
+            cmd.CommandText = @"
+                SELECT t.team_name FROM player_teams t
+                WHERE NOT EXISTS (SELECT 1 FROM players p
+                    WHERE (CASE WHEN json_valid(p.player_data) THEN json_extract(p.player_data, '$.player.team') END) = t.team_name)
+                AND NOT EXISTS (SELECT 1 FROM deleted_characters d WHERE d.expires_at > datetime('now')
+                    AND (CASE WHEN json_valid(d.player_data) THEN json_extract(d.player_data, '$.player.team') END) = t.team_name);";
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read()) teams.Add(reader.GetString(0));
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to list teams without player members: {ex.Message}");
+        }
+        return teams;
+    }
+
+    /// <summary>
+    /// v1.1.11: removes a team nobody is in, with its upgrades and vault, in one transaction; only if no
+    /// player's save names it at the moment of the delete, and no save is malformed (it could name the
+    /// team). True when it was removed.
+    /// </summary>
+    public bool DeleteEmptyTeam(string teamName)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var tx = connection.BeginTransaction();
+            using (var team = connection.CreateCommand())
+            {
+                team.Transaction = tx;
+                team.CommandText = @"
+                    DELETE FROM player_teams WHERE team_name = @team
+                    AND NOT EXISTS (SELECT 1 FROM players p
+                        WHERE NOT json_valid(p.player_data)
+                        OR (CASE WHEN json_valid(p.player_data) THEN json_extract(p.player_data, '$.player.team') END) = @team)
+                    AND NOT EXISTS (SELECT 1 FROM deleted_characters d WHERE d.expires_at > datetime('now')
+                        AND (CASE WHEN json_valid(d.player_data) THEN json_extract(d.player_data, '$.player.team') END) = @team)
+                    AND (last_join_at IS NULL OR last_join_at < datetime('now', '-' || @joinGrace || ' minutes'));";
+                team.Parameters.AddWithValue("@team", teamName);
+                team.Parameters.AddWithValue("@joinGrace", GameConfig.EmptyTeamJoinGraceMinutes);
+                if (team.ExecuteNonQuery() != 1) return false;
+            }
+            foreach (var table in new[] { "team_upgrades", "team_vault" })
+            {
+                using var rest = connection.CreateCommand();
+                rest.Transaction = tx;
+                rest.CommandText = $"DELETE FROM {table} WHERE team_name = @team;";
+                rest.Parameters.AddWithValue("@team", teamName);
+                rest.ExecuteNonQuery();
+            }
+            tx.Commit();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to remove empty team '{teamName}': {ex.Message}");
+            return false;
+        }
     }
 
     public async Task DeletePlayerTeam(string teamName)
@@ -5620,6 +5979,70 @@ namespace UsurperRemake.Systems
         }
         catch { }
         return (false, "en");
+    }
+
+    /// <summary>
+    /// v1.1.11: another player's row (a different key) uses the name, as its display name or its save's
+    /// Name2. On a failed read the name counts as used, so the delete purge keeps that bounty.
+    /// </summary>
+    public bool IsNameUsedByAnotherPlayer(string name, string username)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return false;
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT EXISTS (SELECT 1 FROM players WHERE LOWER(username) != LOWER(@u) AND (" +
+                "LOWER(display_name) = LOWER(@n) OR " +
+                "LOWER(CASE WHEN json_valid(player_data) THEN json_extract(player_data, '$.player.name2') END) = LOWER(@n)));";
+            cmd.Parameters.AddWithValue("@u", username ?? "");
+            cmd.Parameters.AddWithValue("@n", name);
+            return Convert.ToInt64(cmd.ExecuteScalar()) != 0;
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogWarning("SQL", $"IsNameUsedByAnotherPlayer('{name}') failed: {ex.Message}");
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// v1.1.11: a player row of another character (its save Name2 is not ownName2) uses the name, as display
+    /// name or Name2. A failed read counts as used, so a bounty under a shared name is not paid.
+    /// </summary>
+    public bool IsNameUsedByAnotherCharacter(string name, string ownName2)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return false;
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT EXISTS (SELECT 1 FROM players p, " +
+                "(SELECT LOWER(CASE WHEN json_valid(player_data) THEN json_extract(player_data, '$.player.name2') END) AS n2, rowid AS rid FROM players) j " +
+                "WHERE j.rid = p.rowid AND COALESCE(j.n2, '') != LOWER(@own) AND (LOWER(p.display_name) = LOWER(@n) OR j.n2 = LOWER(@n)));";
+            cmd.Parameters.AddWithValue("@n", name);
+            cmd.Parameters.AddWithValue("@own", ownName2 ?? "");
+            return Convert.ToInt64(cmd.ExecuteScalar()) != 0;
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogWarning("SQL", $"IsNameUsedByAnotherCharacter('{name}') failed: {ex.Message}");
+            return true;
+        }
+    }
+
+    /// <summary>v1.1.11: the players.display_name of one key (the married surname form), or null.</summary>
+    public string? GetStoredDisplayName(string username)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT display_name FROM players WHERE LOWER(username) = LOWER(@u) LIMIT 1;";
+            cmd.Parameters.AddWithValue("@u", username);
+            return cmd.ExecuteScalar() as string;
+        }
+        catch { return null; }
     }
 
     /// <summary>
@@ -6781,6 +7204,26 @@ namespace UsurperRemake.Systems
             return affected > 0;
         }
         catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to withdraw from vault: {ex.Message}"); return false; }
+    }
+
+    /// <summary>v1.1.11: every upgrade level of a team in one read (TeamHQBonus.RefreshLevels).</summary>
+    public Dictionary<string, int> GetTeamUpgradeLevels(string teamName)
+    {
+        var levels = new Dictionary<string, int>();
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT upgrade_type, level FROM team_upgrades WHERE team_name = @team;";
+            cmd.Parameters.AddWithValue("@team", teamName);
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read()) levels[reader.GetString(0)] = reader.GetInt32(1);
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to read the upgrades of team '{teamName}': {ex.Message}");
+        }
+        return levels;
     }
 
     public int GetTeamUpgradeLevel(string teamName, string upgradeType)

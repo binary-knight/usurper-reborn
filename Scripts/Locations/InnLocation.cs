@@ -1006,6 +1006,7 @@ public class InnLocation : BaseLocation
                     xpReward /= 2;
                     goldReward /= 2;
                 }
+                xpReward = TeamHQBonus.ApplyXP(currentPlayer, xpReward); // v1.1.11: Team HQ Training, after the cut
 
                 currentPlayer.Experience += xpReward;
                 currentPlayer.Gold += goldReward;
@@ -1360,6 +1361,12 @@ public class InnLocation : BaseLocation
 
             // XP already awarded by combat engine — no double reward
             currentPlayer.PKills++;
+
+            // v1.1.11: a bounty or Defeat objective on this patron is met (player report: a WANTED target
+            // beaten four times stayed at 0/1)
+            long innBounty = QuestSystem.RecordNPCDefeat(currentPlayer, npc, killed: false);   // a brawl: the patron lives
+            if (innBounty > 0)
+                terminal.WriteLine(Loc.Get("street.fight.bounty_collected", innBounty.ToString("N0")), "bright_yellow");
             currentPlayer.InnDuelsToday++; // Count toward daily NPC duel limit (separate from Seth fights)
 
             // Update relationship negatively

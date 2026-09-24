@@ -963,6 +963,7 @@ public class TeamCornerLocation : BaseLocation
         currentPlayer.Team = teamName;
         currentPlayer.TeamPW = password;
         currentPlayer.CTurf = false;
+        TeamHQBonus.RefreshLevels(currentPlayer);   // v1.1.11
         currentPlayer.TeamRec = 0;
         await PersistTeamMembershipChange();
 
@@ -1050,12 +1051,15 @@ public class TeamCornerLocation : BaseLocation
                 terminal.SetColor("white");
                 string password = await terminal.ReadLineAsync();
 
+                // v1.1.11: a successful check stamps the team's last join, so the empty-team cleanup leaves it
+                // alone until this membership is saved (SqlSaveBackend.VerifyPlayerTeam / DeleteEmptyTeam)
                 var (exists, pwCorrect) = await backend.VerifyPlayerTeam(teamName, password);
                 if (exists && pwCorrect)
                 {
                     currentPlayer.Team = teamName;
                     currentPlayer.TeamPW = password;
                     currentPlayer.CTurf = false;
+                    TeamHQBonus.RefreshLevels(currentPlayer);   // v1.1.11: the team's upgrades count from joining
                     await PersistTeamMembershipChange();
 
                     WorldSimulator.RegisterPlayerTeam(teamName);
@@ -1111,6 +1115,7 @@ public class TeamCornerLocation : BaseLocation
             currentPlayer.Team = teamName;
             currentPlayer.TeamPW = npcPassword;
             currentPlayer.CTurf = teamMember.CTurf;
+            TeamHQBonus.RefreshLevels(currentPlayer);   // v1.1.11
             await PersistTeamMembershipChange();
 
             WorldSimulator.RegisterPlayerTeam(teamName);
@@ -1182,6 +1187,11 @@ public class TeamCornerLocation : BaseLocation
                 if (backend != null)
                 {
                     await backend.UpdatePlayerTeamMemberCount(oldTeam);
+
+                    // v1.1.11: a leader who quits passes the team to the highest-level player left in it
+                    string myKey = GameEngine.InheritanceKey(currentPlayer);
+                    if (string.Equals(await backend.GetTeamLeaderUsername(oldTeam), myKey, StringComparison.Ordinal))
+                        backend.TryPassTeamLeadership(oldTeam, myKey, myKey, requireOldLeaderGone: true, out _);
 
                     // If team is now empty (no players AND no NPCs), delete it
                     var remainingPlayers = await backend.GetPlayerTeamMembers(oldTeam);
@@ -3572,10 +3582,7 @@ public class TeamCornerLocation : BaseLocation
         terminal.WriteLine(Loc.Get("team.facility_upgraded", Loc.Get(def.NameKey), currentLevel + 1));
 
         // Refresh cached HQ upgrade levels on the player
-        currentPlayer.HQArmoryLevel = backend.GetTeamUpgradeLevel(teamName, "armory");
-        currentPlayer.HQBarracksLevel = backend.GetTeamUpgradeLevel(teamName, "barracks");
-        currentPlayer.HQTrainingLevel = backend.GetTeamUpgradeLevel(teamName, "training");
-        currentPlayer.HQInfirmaryLevel = backend.GetTeamUpgradeLevel(teamName, "infirmary");
+        TeamHQBonus.RefreshLevels(currentPlayer, backend);
 
         await Task.Delay(2000);
     }

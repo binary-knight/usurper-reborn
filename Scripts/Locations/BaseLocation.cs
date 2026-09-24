@@ -3987,6 +3987,7 @@ public abstract class BaseLocation
 
         // Use one potion
         long healAmount = 30 + currentPlayer.Level * 5 + Random.Shared.Next(10, 30);
+        healAmount = PotionBonus.ApplyOwnerBonuses(currentPlayer, healAmount); // v1.1.11: Infirmary, before the cap
         healAmount = Math.Min(healAmount, currentPlayer.MaxHP - currentPlayer.HP);
         currentPlayer.HP += healAmount;
         currentPlayer.Healing--;
@@ -6660,7 +6661,12 @@ public abstract class BaseLocation
         }
 
         // Show temporary combat buffs (well-rested, god slayer, song, herbs)
-        bool hasAnyBuff = currentPlayer.IsKnighted
+        // v1.1.11: the team's current HQ levels (a teammate may have upgraded since they were read)
+        if (UsurperRemake.BBS.DoorMode.IsOnlineMode) TeamHQBonus.RefreshLevels(currentPlayer);
+        bool hasTeamHQBonus = TeamHQBonus.Armory(currentPlayer) > 0 || TeamHQBonus.Barracks(currentPlayer) > 0
+            || TeamHQBonus.Training(currentPlayer) > 0 || TeamHQBonus.Infirmary(currentPlayer) > 0;
+        bool hasAnyBuff = hasTeamHQBonus   // v1.1.11: a class with no other buff never saw them
+            || currentPlayer.IsKnighted
             || currentPlayer.ArenaChampionTier >= (int)UsurperRemake.Data.GauntletChampionData.ArenaTier.GrandChampion
             || currentPlayer.HasActiveShrineAttunement
             || currentPlayer.WellRestedCombats > 0 || currentPlayer.HasGodSlayerBuff
@@ -6897,18 +6903,19 @@ public abstract class BaseLocation
                 terminal.WriteLine($"  - Divine Blessing ({currentPlayer.DivineBlessingCombats} combats)");
             }
             // Team HQ upgrade bonuses
-            if (currentPlayer.HQArmoryLevel > 0 || currentPlayer.HQBarracksLevel > 0 ||
-                currentPlayer.HQTrainingLevel > 0 || currentPlayer.HQInfirmaryLevel > 0)
+            if (hasTeamHQBonus)
             {
                 terminal.SetColor("bright_yellow");
-                if (currentPlayer.HQArmoryLevel > 0)
-                    terminal.WriteLine($"  - Team Armory Lv{currentPlayer.HQArmoryLevel}: +{currentPlayer.HQArmoryLevel * 5}% attack");
-                if (currentPlayer.HQBarracksLevel > 0)
-                    terminal.WriteLine($"  - Team Barracks Lv{currentPlayer.HQBarracksLevel}: +{currentPlayer.HQBarracksLevel * 5}% defense");
-                if (currentPlayer.HQTrainingLevel > 0)
-                    terminal.WriteLine($"  - Team Training Lv{currentPlayer.HQTrainingLevel}: +{currentPlayer.HQTrainingLevel * 5}% XP");
-                if (currentPlayer.HQInfirmaryLevel > 0)
-                    terminal.WriteLine($"  - Team Infirmary Lv{currentPlayer.HQInfirmaryLevel}: +{currentPlayer.HQInfirmaryLevel * 10}% potion healing");
+                int armory = TeamHQBonus.Armory(currentPlayer), barracks = TeamHQBonus.Barracks(currentPlayer);
+                int training = TeamHQBonus.Training(currentPlayer), infirmary = TeamHQBonus.Infirmary(currentPlayer);
+                if (armory > 0)
+                    terminal.WriteLine($"  - {Loc.Get("base.hq_armory", armory, (int)Math.Round(armory * TeamHQBonus.ArmoryPerLevel * 100))}");
+                if (barracks > 0)
+                    terminal.WriteLine($"  - {Loc.Get("base.hq_barracks", barracks, (int)Math.Round((1.0 - 1.0 / TeamHQBonus.DefenseMultiplier(currentPlayer)) * 100))}");   // v1.1.11: the real reduction (damage / (1 + 5% per level))
+                if (training > 0)
+                    terminal.WriteLine($"  - {Loc.Get("base.hq_training", training, (int)Math.Round(training * TeamHQBonus.TrainingPerLevel * 100))}");
+                if (infirmary > 0)
+                    terminal.WriteLine($"  - {Loc.Get("base.hq_infirmary", infirmary, (int)Math.Round(infirmary * TeamHQBonus.InfirmaryPerLevel * 100))}");
             }
             // Session XP diminishing returns indicator (online mode only)
             long sessionThreshold = GameConfig.GetSessionXPThreshold(currentPlayer.Level);

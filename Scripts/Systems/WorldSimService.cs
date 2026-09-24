@@ -566,6 +566,12 @@ namespace UsurperRemake.Systems
 
                 // Clean up orphaned data from deleted players
                 await sqlBackend.PruneOrphanedPlayerData();
+
+                // v1.1.11: teams nobody is in any more
+                PruneEmptyTeams();
+
+                // v1.1.11: then teams whose leader has left them
+                PassLeadershipOfDepartedLeaders();
             }
             catch (Exception ex)
             {
@@ -580,7 +586,7 @@ namespace UsurperRemake.Systems
         /// read/write this key. The world sim is the primary maintainer; player actions
         /// (throne challenges, tax changes) write updates to this key immediately.
         /// </summary>
-        private void LoadRoyalCourtFromWorldState()
+        internal void LoadRoyalCourtFromWorldState()
         {
             try
             {
@@ -588,7 +594,15 @@ namespace UsurperRemake.Systems
                 if (string.IsNullOrEmpty(json)) return;
 
                 var royalCourt = JsonSerializer.Deserialize<RoyalCourtSaveData>(json, jsonOptions);
-                if (royalCourt == null || string.IsNullOrEmpty(royalCourt.KingName)) return;
+                if (royalCourt != null) CastleLocation.RoyalCourtLoadedFromShared = true;   // v1.1.11
+                if (royalCourt == null) return;
+                if (CastleLocation.ApplySharedThroneVacancy(royalCourt))
+                {
+                    // v1.1.11: the NPC succession used whenever there is no king fills it now
+                    ChallengeSystem.Instance.ClaimEmptyThroneIfVacant();
+                    return;
+                }
+                if (string.IsNullOrEmpty(royalCourt.KingName)) return;
 
                 var king = CastleLocation.GetCurrentKing();
 
@@ -794,7 +808,7 @@ namespace UsurperRemake.Systems
         /// Save current royal court state to world_state.
         /// This is the authoritative write - the world sim maintains this data.
         /// </summary>
-        private async Task SaveRoyalCourtToWorldState()
+        internal async Task SaveRoyalCourtToWorldState()
         {
             try
             {
@@ -1390,6 +1404,89 @@ namespace UsurperRemake.Systems
             {
                 DebugLogger.Instance.LogError("WORLDSIM", $"Failed to load settlement state: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// v1.1.11: removes player teams that nobody is in: no player's save names the team, no NPC
+        /// (living or dead) carries it, and no player online has it in hand, e.g. between joining and
+        /// the save that records it. The team's upgrades and vault go with it.
+        /// </summary>
+        // v1.1.11: when each candidate team was first seen empty. A team is removed only when it is still
+        // empty at least EmptyTeamGraceMinutes later, so a transient view cannot delete it: an NPC roster
+        // being rebuilt, or a player who joined and whose save has not landed yet (Codex review).
+        private readonly Dictionary<string, DateTime> _teamEmptySince = new(StringComparer.Ordinal);
+
+        internal int PruneEmptyTeams() => PruneEmptyTeams(DateTime.UtcNow);
+
+        internal int PruneEmptyTeams(DateTime now)
+        {
+            int removed = 0;
+            try
+            {
+                // an NPC roster being rebuilt (login restores clear and refill it) is not evidence of anything
+                var spawner = NPCSpawnSystem.Instance;
+                var roster = spawner.ActiveNPCs.ToList();
+                if (spawner.IsRebuilding || !spawner.IsCountPlausible(roster.Count)) return 0;
+
+                var npcTeams = new HashSet<string>(roster.Where(n => !string.IsNullOrEmpty(n.Team)).Select(n => n.Team!));
+                var candidates = new HashSet<string>(sqlBackend.GetTeamsWithoutPlayerMembers().Where(t => !npcTeams.Contains(t) && !IsTeamOnline(t)));
+
+                foreach (var gone in _teamEmptySince.Keys.Where(k => !candidates.Contains(k)).ToList())
+                    _teamEmptySince.Remove(gone);   // someone is back in it
+
+                var deleted = new List<string>();
+                foreach (var team in candidates)
+                {
+                    if (!_teamEmptySince.TryGetValue(team, out var since)) { _teamEmptySince[team] = now; continue; }
+                    if (now - since < TimeSpan.FromMinutes(GameConfig.EmptyTeamGraceMinutes)) continue;
+                    // a join in any process stamps the team first, and the delete refuses a recent stamp
+                    if (IsTeamOnline(team)) { _teamEmptySince.Remove(team); continue; }
+                    if (!sqlBackend.DeleteEmptyTeam(team)) continue;
+                    _teamEmptySince.Remove(team);
+                    deleted.Add(team);
+                    DebugLogger.Instance.LogInfo("WORLDSIM", $"Removed empty team '{team}'");
+                }
+                removed = deleted.Count;
+                if (removed > 0)
+                {
+                    // the protection list ignores case: keep a name another team or an NPC still has
+                    var kept = sqlBackend.GetPlayerTeams().GetAwaiter().GetResult().Select(t => t.TeamName)
+                        .Concat(npcTeams).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                    foreach (var team in deleted)
+                        if (!kept.Contains(team)) WorldSimulator.UnregisterPlayerTeam(team);
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("WORLDSIM", $"Failed to prune empty teams: {ex.Message}");
+            }
+            return removed;
+        }
+
+        /// <summary>
+        /// v1.1.11: a team whose leader key is a character that is no longer on it passes to the
+        /// highest-level remaining player member (SqlSaveBackend.TryPassTeamLeadership). A key matching
+        /// no character is left to the admin's Fix Team Leaders screen.
+        /// </summary>
+        internal int PassLeadershipOfDepartedLeaders()
+        {
+            int passed = 0;
+            try
+            {
+                foreach (var (team, leader) in sqlBackend.GetTeamsLedByExMembers())
+                    if (sqlBackend.TryPassTeamLeadership(team, leader, leader, requireOldLeaderGone: true, out _, respectJoinGrace: true)) passed++;   // v1.1.11: rechecks the join grace
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("TEAM", $"Failed to pass on the leadership of teams: {ex.Message}");
+            }
+            return passed;
+        }
+
+        private static bool IsTeamOnline(string team)
+        {
+            var sessions = UsurperRemake.Server.MudServer.Instance?.ActiveSessions.Values;
+            return sessions != null && sessions.ToList().Any(sess => sess.Context?.Player?.Team == team);
         }
 
         /// <summary>

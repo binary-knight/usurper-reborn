@@ -189,7 +189,8 @@ public class MudServer
                 // god's believer count atomically.
                 try
                 {
-                    GodSystemSingleton.Instance.SetPlayerGod(primaryKey, "");
+                    // v1.1.11: in any letter case; the worship dictionary is case-sensitive.
+                    GodSystemSingleton.Instance.ClearPlayerGodAnyCase(primaryKey);
                     if (!string.Equals(primaryKey, username, StringComparison.OrdinalIgnoreCase))
                         GodSystemSingleton.Instance.SetPlayerGod(username, "");
                 }

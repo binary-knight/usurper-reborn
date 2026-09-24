@@ -2434,7 +2434,7 @@ namespace UsurperRemake.Systems
                     terminal.SetColor("green");
                     terminal.WriteLine(Loc.Get("encounter.ratking.fight_slay"));
                     player.Gold += level * 1200;  // Increased from 400 for economic balance
-                    player.Experience += level * 200;
+                    player.Experience += level * 200; // hq-training: out (a dice roll, no fight)
                 }
             }
             else

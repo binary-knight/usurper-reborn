@@ -16,6 +16,11 @@ public static class PlayerCharacterLoader
         {
             Name1 = playerData.Name1,
             Name2 = playerData.Name2 ?? displayName,
+            // v1.1.11: the married surname, so DisplayName ("Bob Smith") matches the live character's (bounties)
+            FamilySurname = playerData.FamilySurname ?? "",
+            // v1.1.11: a duel defender fights with its own team's HQ levels (CombatEngine.PlayerVsPlayer reads
+            // them by team); without the team it had none (review). An echo is only a copy and keeps none.
+            Team = isEcho ? "" : (playerData.Team ?? ""),
             Level = playerData.Level,
             HP = playerData.MaxHP,
             MaxHP = playerData.MaxHP,
@@ -48,6 +53,7 @@ public static class PlayerCharacterLoader
             BonusArmPow = playerData.BonusArmPow,
             AI = CharacterAI.Computer,
             IsEcho = isEcho,
+            IsLoadedPlayer = !isEcho,   // v1.1.11: a player's own save, so a bounty on them can be paid
             // Restore base stats for RecalculateStats
             BaseStrength = playerData.BaseStrength > 0 ? playerData.BaseStrength : playerData.Strength,
             BaseDexterity = playerData.BaseDexterity > 0 ? playerData.BaseDexterity : playerData.Dexterity,

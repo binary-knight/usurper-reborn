@@ -938,6 +938,7 @@ namespace UsurperRemake.Systems
                 IsActive = true,
                 CanSpeak = true,
                 Phrase = boss.LocIntro().Length > 0 ? boss.LocIntro()[0] : "",
+                // the fight's victory pays this to the whole party; HandleBossDefeated adds the leader's reward
                 Experience = boss.Level * 2000,
                 Gold = boss.Level * 500,
             };
@@ -1081,7 +1082,7 @@ namespace UsurperRemake.Systems
         {
             if (wasSaved)
             {
-                return await HandleBossSaved(combatResult.Player, boss, terminal);
+                return await HandleBossSaved(combatResult.Player, boss, terminal, inCombat: true);
             }
             else if (combatResult.Outcome == CombatOutcome.Victory)
             {
@@ -1121,7 +1122,7 @@ namespace UsurperRemake.Systems
         /// Handle boss being saved
         /// </summary>
         private async Task<BossEncounterResult> HandleBossSaved(
-            Character player, OldGodBossData boss, TerminalEmulator terminal)
+            Character player, OldGodBossData boss, TerminalEmulator terminal, bool inCombat = false)
         {
             terminal.Clear();
             terminal.WriteLine("");
@@ -1149,6 +1150,8 @@ namespace UsurperRemake.Systems
 
             // Award experience
             long xpReward = boss.Level * 1000;
+            // v1.1.11: Team HQ Training only when the save ended a fight, not when spared in dialogue.
+            if (inCombat) xpReward = TeamHQBonus.ApplyXP(player, xpReward);
             player.Experience += xpReward;
             terminal.WriteLine(Loc.Get("old_god.saved_xp", $"{xpReward:N0}"), "cyan");
 
@@ -1257,12 +1260,12 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("");
 
             // Award experience
-            long xpReward = boss.Level * 2000;
+            long xpReward = TeamHQBonus.ApplyXP(player, (long)boss.Level * GameConfig.OldGodDefeatXPPerLevel);
             player.Experience += xpReward;
             terminal.WriteLine(Loc.Get("old_god.defeated_xp", $"{xpReward:N0}"), "cyan");
 
             // Award gold
-            int goldReward = boss.Level * 500;
+            int goldReward = boss.Level * GameConfig.OldGodDefeatGoldPerLevel;
             player.Gold += goldReward;
             terminal.WriteLine(Loc.Get("old_god.defeated_gold", $"{goldReward:N0}"), "yellow");
 
@@ -1421,7 +1424,7 @@ namespace UsurperRemake.Systems
                 }
 
                 // Rewards
-                long xpReward = 300000;
+                long xpReward = TeamHQBonus.ApplyXP(player, 300000); // v1.1.11: Team HQ Training
                 int goldReward = 100000;
                 player.Experience += xpReward;
                 player.Gold += goldReward;

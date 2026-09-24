@@ -485,6 +485,7 @@ public partial class PrisonWalkLocation : BaseLocation
             {
                 // Player attacks first
                 int playerDamage = CalculateDamage(player, guard, random);
+                playerDamage = (int)TeamHQBonus.ApplyAttack(player, playerDamage); // v1.1.11: Team HQ Armory, last.
                 guard.HP = Math.Max(0, guard.HP - playerDamage);
 
                 await terminal.WriteAsync(Loc.Get("prison_walk.you_strike"));
@@ -500,6 +501,7 @@ public partial class PrisonWalkLocation : BaseLocation
 
                 // Guard counter-attacks
                 int guardDamage = CalculateDamage(guard, player, random);
+                guardDamage = (int)TeamHQBonus.ApplyDefense(player, guardDamage); // v1.1.11: Team HQ Barracks, last.
                 player.HP = Math.Max(0, player.HP - guardDamage);
 
                 await terminal.WriteAsync(Loc.Get("prison_walk.strikes_back", guard.Name2));
@@ -552,7 +554,7 @@ public partial class PrisonWalkLocation : BaseLocation
             await terminal.WriteLineAsync(Loc.Get("prison_walk.damage_taken", (playerStartHP - player.HP).ToString()));
 
             // Award experience for defeating guards
-            long expGained = guards.Sum(g => g.Level * 50);
+            long expGained = TeamHQBonus.ApplyXP(player, guards.Sum(g => g.Level * 50)); // v1.1.11: Team HQ Training
             player.Experience += expGained;
             await terminal.WriteLineAsync(Loc.Get("prison_walk.xp_gained", expGained.ToString()));
 

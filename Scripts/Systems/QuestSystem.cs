@@ -1122,6 +1122,8 @@ public partial class QuestSystem
                 OfferedTo = questData.OfferedTo,
                 Forced = questData.Forced,
                 TargetNPCName = questData.TargetNPCName ?? "",
+                IsPlayerBounty = questData.IsPlayerBounty,
+                BountyGold = questData.BountyGold,   // v1.1.11
                 Deleted = questData.Status == QuestStatus.Completed || questData.Status == QuestStatus.Failed || questData.Status == QuestStatus.Abandoned,
                 IsAbandoned = questData.Status == QuestStatus.Abandoned,
                 // v0.62.x Phase 4 (Mercenary board): restore faction-issued freelance contract fields.
@@ -1213,6 +1215,8 @@ public partial class QuestSystem
                 OfferedTo = questData.OfferedTo,
                 Forced = questData.Forced,
                 TargetNPCName = questData.TargetNPCName ?? "",
+                IsPlayerBounty = questData.IsPlayerBounty,
+                BountyGold = questData.BountyGold,   // v1.1.11
                 Deleted = questData.Status == QuestStatus.Completed || questData.Status == QuestStatus.Failed || questData.Status == QuestStatus.Abandoned,
                 IsAbandoned = questData.Status == QuestStatus.Abandoned,
                 // v0.62.x Phase 4 (Mercenary board): restore faction-issued freelance contract fields.
@@ -1285,6 +1289,45 @@ public partial class QuestSystem
     }
 
     /// <summary>
+    /// v1.1.11: remove the King's WANTED bounties posted on a player (PostBountyOnPlayer), so a deleted
+    /// character's bounty does not hang over a new character given the same name.
+    /// </summary>
+    public static int RemoveBountiesOnPlayer(string? playerName) => RemoveBountiesOnPlayer(playerName, null);
+
+    /// <summary>v1.1.11: claimKeys, when given, receives the claim key of every bounty removed.</summary>
+    public static int RemoveBountiesOnPlayer(string? playerName, ICollection<string>? claimKeys)
+    {
+        if (string.IsNullOrWhiteSpace(playerName)) return 0;
+        return questDatabase.RemoveAll(q =>
+        {
+            if (!IsBountyOnPlayer(q.Initiator, q.TitleKey, q.TargetNPCName, q.IsPlayerBounty, playerName)) return false;
+            claimKeys?.Add(BountyClaimKey(q));
+            return true;
+        });
+    }
+
+    /// <summary>
+    /// v1.1.11: a Crown bounty posted on a PLAYER (PostBountyOnPlayer), not one on an NPC of the same name.
+    /// NPC bounties always carry a TitleKey; player bounties never have (review: a character named after an
+    /// NPC removed a bounty on that NPC).
+    /// </summary>
+    public static bool IsBountyOnPlayer(string? initiator, string? titleKey, string? target, bool isPlayerBounty, string playerName)
+    {
+        if (initiator != KING_BOUNTY_INITIATOR || string.IsNullOrEmpty(target) || !target.Equals(playerName, StringComparison.OrdinalIgnoreCase))
+            return false;
+        if (isPlayerBounty) return true;   // marked since v1.1.11
+        // A bounty from before the mark: NPC bounties then could lack a TitleKey too, so it counts as a
+        // player's only when the NPC roster is complete and no NPC carries the name (review).
+        var spawner = NPCSpawnSystem.Instance;
+        return string.IsNullOrEmpty(titleKey) && spawner != null && spawner.IsRosterTrustworthy && !IsNPCName(playerName);
+    }
+
+    /// <summary>v1.1.11: whether an NPC in the world carries this name.</summary>
+    public static bool IsNPCName(string name) =>
+        NPCSpawnSystem.Instance?.ActiveNPCs?.ToList().Any(n => n != null &&
+            (string.Equals(n.Name2, name, StringComparison.OrdinalIgnoreCase) || string.Equals(n.Name, name, StringComparison.OrdinalIgnoreCase))) == true;
+
+    /// <summary>
     /// v0.65.0: drop any quest claimed by / offered to playerName whose Id is NOT
     /// in keepIds. Run AFTER MergeWorldQuests during load to close the
     /// re-injection window: MergePlayerQuests purges the dead character's quests
@@ -1346,6 +1389,8 @@ public partial class QuestSystem
                 OfferedTo = questData.OfferedTo,
                 Forced = questData.Forced,
                 TargetNPCName = questData.TargetNPCName ?? "",
+                IsPlayerBounty = questData.IsPlayerBounty,
+                BountyGold = questData.BountyGold,   // v1.1.11
                 Deleted = questData.Status == QuestStatus.Completed || questData.Status == QuestStatus.Failed || questData.Status == QuestStatus.Abandoned,
                 IsAbandoned = questData.Status == QuestStatus.Abandoned,
                 // v0.62.x Phase 4 (Mercenary board): restore faction-issued freelance contract fields.
@@ -1516,10 +1561,76 @@ public partial class QuestSystem
     }
 
     /// <summary>
+    /// v1.1.11: a Crown bounty posted on a player is paid to whoever beats that player in a duel (the arena,
+    /// a sleeping player at the Inn or Dormitory, the Dark Alley, the throne). Nothing paid it before. The
+    /// bounty is claimed under the payout lock before it is paid, so it is paid once; a player never
+    /// collects the bounty on themselves. Returns the bounties paid, for the caller to show and persist.
+    /// </summary>
+    public static List<Quest> CollectBountiesOnPlayer(Character winner, Character loser)
+    {
+        var names = new[] { loser.Name2, loser.DisplayName }.Where(n => !string.IsNullOrWhiteSpace(n)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        if (winner == null || names.Count == 0) return new List<Quest>();
+        if (!loser.IsLoadedPlayer) return new List<Quest>();   // v1.1.11: a hired guard or echo named like a player
+        // v1.1.11: a married display name another player also uses ("Bob Smith") names their bounty, not the loser's
+        if (SaveSystem.Instance?.Backend is SqlSaveBackend sqlNames)
+            names = names.Where(n => n.Equals(loser.Name2, StringComparison.OrdinalIgnoreCase) || !sqlNames.IsNameUsedByAnotherCharacter(n, loser.Name2)).ToList();
+        if (names.Count == 0) return new List<Quest>();
+        // v1.1.11: never the winner's own bounty; the winner is known by Name2, a married display name is cosmetic
+        if (ReferenceEquals(winner, loser) || string.Equals(winner.Name2, loser.Name2, StringComparison.OrdinalIgnoreCase))
+            return new List<Quest>();
+        names = names.Where(n => !n.Equals(winner.Name2, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (names.Count == 0) return new List<Quest>();
+
+        List<Quest> claimed;
+        lock (_bountyPayoutLock)
+        {
+            claimed = questDatabase.Where(q => !q.Deleted && q.IsPlayerBounty && q.Initiator == KING_BOUNTY_INITIATOR &&
+                !string.IsNullOrEmpty(q.TargetNPCName) && names.Any(n => q.TargetNPCName.Equals(n, StringComparison.OrdinalIgnoreCase))).ToList();
+            // v1.1.11: another process may hold the same bounty; only the one whose DB claim lands pays it.
+            // A bounty claimed elsewhere is marked Deleted here too, unpaid.
+            var found = claimed;
+            var outcome = found.Select(q => (Quest: q, Claim: ClaimAcrossProcesses(q, winner.Name2))).ToList();
+            claimed = outcome.Where(o => o.Claim == true).Select(o => o.Quest).ToList();
+            foreach (var o in outcome) if (o.Claim != null) o.Quest.Deleted = true;   // a failed claim write leaves it unpaid and open
+            foreach (var q in claimed) { q.Occupier = winner.Name2; q.OccupiedDays = 1; }
+        }
+
+        foreach (var bounty in claimed)
+        {
+            long reward = bounty.BountyGold > 0 ? bounty.BountyGold : bounty.Reward * 100L;
+            if (reward <= 0) reward = 500;
+            winner.Gold += reward;
+            long xpReward = TeamHQBonus.ApplyXP(winner, Math.Max(winner.Level * 50, reward / 5));
+            winner.Experience += xpReward;
+            DebugLogger.Instance.LogInfo("GOLD", $"PLAYER BOUNTY: {winner.DisplayName} +{reward:N0}g for the bounty on {bounty.TargetNPCName}");
+            StatisticsManager.Current?.RecordBountyComplete();
+            NewsSystem.Instance?.Newsy(true, Loc.Get("quest.bounty_collected_news", winner.Name2, bounty.TargetNPCName, reward));
+        }
+        return claimed;
+    }
+
+    public static long BountyReward(Quest q) => q.BountyGold > 0 ? q.BountyGold : Math.Max(500, q.Reward * 100L);
+
+    /// <summary>
+    /// v1.1.11: a player beat an NPC, by any route: a street fight, a duel, the pit, the Inn challenge,
+    /// or sparing one who surrendered. Pays any bounty on the NPC and records the Defeat objective.
+    /// Only the street fights did this, so a WANTED target beaten anywhere else stayed at 0/1
+    /// (player report). Returns the bounty paid.
+    /// </summary>
+    public static long RecordNPCDefeat(Character player, NPC npc, bool killed)
+    {
+        if (player == null || npc == null) return 0;
+        // a target beaten but left alive does not meet an assassination contract (Codex review)
+        long bounty = AutoCompleteBountyForNPC(player, npc.Name ?? npc.Name2 ?? "", includeKillContracts: killed);
+        OnNPCDefeated(player, npc, killed);
+        return bounty;
+    }
+
+    /// <summary>
     /// Update quest progress when player defeats an NPC (bounty system)
     /// Call this from StreetEncounterSystem and BaseLocation.ChallengeNPC when NPC is killed
     /// </summary>
-    public static void OnNPCDefeated(Character player, NPC defeatedNPC)
+    public static void OnNPCDefeated(Character player, NPC defeatedNPC, bool killed = true)
     {
         if (player == null || defeatedNPC == null) return;
 
@@ -1530,6 +1641,11 @@ public partial class QuestSystem
         var playerQuests = GetPlayerQuests(player.Name2);
         foreach (var quest in playerQuests)
         {
+            // v1.1.11: a target beaten and left alive does not meet an assassination contract, not even
+            // for a manual turn-in (review)
+            if (!killed && quest.QuestTarget == QuestTarget.Assassin) continue;
+            if (quest.IsPlayerBounty) continue;   // v1.1.11: a bounty on a player, not on this NPC
+
             // Check if this quest is a bounty targeting this specific NPC
             if (!string.IsNullOrEmpty(quest.TargetNPCName))
             {
@@ -1558,18 +1674,65 @@ public partial class QuestSystem
     /// Gives immediate reward without needing to claim first
     /// Returns the total bounty reward collected (0 if no bounties matched)
     /// </summary>
-    public static long AutoCompleteBountyForNPC(Character player, string npcName)
+    // v1.1.11: two sessions beating the same target at once each found the bounty before either marked
+    // it done, and both were paid (Codex review). Finding and marking now happen under one lock.
+    private static readonly object _bountyPayoutLock = new();
+
+    /// <summary>
+    /// v1.1.11: the one-time claim in the shared database, taken before any payout. The in-process lock
+    /// covers one process; separate door and world-sim processes each hold their own copy of the bounty.
+    /// Without an SQL backend (offline, file saves) the lock is enough. A quest with no id cannot be
+    /// claimed by id and is claimed under a key built from its fields (BountyClaimKey).
+    /// True: claimed here. False: claimed elsewhere. Null: the claim could not be written (a busy database).
+    /// </summary>
+    internal static bool? ClaimAcrossProcesses(Quest q, string claimer)
+    {
+        if (SaveSystem.Instance?.Backend is not SqlSaveBackend sql) return true;
+        return sql.TryClaimBountyOrFail(BountyClaimKey(q), claimer);
+    }
+
+    /// <summary>
+    /// v1.1.11: the key a bounty is claimed under: its id, or for a quest saved without one, "legacy:" and a
+    /// SHA-256 of its initiator, target and title, the same in every process that loaded the quest.
+    /// </summary>
+    internal static string BountyClaimKey(Quest q) => BountyClaimKey(q.Id, q.Initiator, q.TargetNPCName, q.Title);
+
+    /// <summary>v1.1.11: the same key for a stored quest, so the shared record is matched as the claim was.</summary>
+    internal static string BountyClaimKey(QuestData q) => BountyClaimKey(q.Id, q.Initiator, q.TargetNPCName, q.Title);
+
+    /// <summary>v1.1.11: the claim key from the fields both quest forms carry.</summary>
+    internal static string BountyClaimKey(string? id, string? initiator, string? targetName, string? title)
+    {
+        if (!string.IsNullOrEmpty(id)) return id!;
+        string basis = (initiator ?? "") + "|" + (targetName ?? "") + "|" + (title ?? "");
+        var hash = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(basis));
+        return "legacy:" + Convert.ToHexString(hash).ToLowerInvariant();
+    }
+
+    public static long AutoCompleteBountyForNPC(Character player, string npcName, bool includeKillContracts = true)
     {
         if (string.IsNullOrEmpty(npcName)) return 0;
 
         long totalReward = 0;
+        List<Quest> matchingBounties;
 
+        lock (_bountyPayoutLock)
+        {
         // Find ALL bounties targeting this NPC (claimed or unclaimed)
-        var matchingBounties = questDatabase.Where(q =>
+        matchingBounties = questDatabase.Where(q =>
             !q.Deleted &&
             !string.IsNullOrEmpty(q.TargetNPCName) &&
-            q.TargetNPCName.Equals(npcName, StringComparison.OrdinalIgnoreCase)
+            q.TargetNPCName.Equals(npcName, StringComparison.OrdinalIgnoreCase) &&
+            !q.IsPlayerBounty &&   // v1.1.11: beating an NPC never pays a bounty on a player of that name (review)
+            (includeKillContracts || q.QuestTarget != QuestTarget.Assassin)
         ).ToList();
+        // v1.1.11: another process may hold the same bounty; only the one whose DB claim lands pays it.
+        // A bounty claimed elsewhere is marked Deleted here too, unpaid.
+        var found = matchingBounties;
+        var outcome = found.Select(q => (Quest: q, Claim: ClaimAcrossProcesses(q, player?.Name2 ?? ""))).ToList();
+        matchingBounties = outcome.Where(o => o.Claim == true).Select(o => o.Quest).ToList();
+        foreach (var o in outcome) if (o.Claim != null) o.Quest.Deleted = true;   // a failed claim write leaves it open
+        }
 
         foreach (var bounty in matchingBounties)
         {
@@ -1581,6 +1744,7 @@ public partial class QuestSystem
             player.Gold += reward;
             DebugLogger.Instance.LogInfo("GOLD", $"BOUNTY REWARD: {player.DisplayName} +{reward:N0}g for bounty on {npcName} (gold now {player.Gold:N0})");
             long xpReward = Math.Max(player.Level * 50, reward / 5); // XP scales with player level and bounty
+            xpReward = TeamHQBonus.ApplyXP(player, xpReward); // v1.1.11: Team HQ Training, the kill paid it
             player.Experience += xpReward;
             totalReward += reward;
 
@@ -2130,21 +2294,24 @@ public partial class QuestSystem
     /// <summary>
     /// The King can post a bounty on the player if they commit crimes
     /// </summary>
-    public static void PostBountyOnPlayer(string playerName, string crime, long bountyAmount)
+    /// <param name="onPlayer">v1.1.11: false when the target is an NPC (a reported crime); only a bounty on a
+    /// player is marked IsPlayerBounty, which NPC defeats never pay (review).</param>
+    public static void PostBountyOnPlayer(string playerName, string crime, long bountyAmount, bool onPlayer = true)
     {
         var king = CastleLocation.GetCurrentKing();
         if (king == null) return;
 
         // Check if player already has an active bounty
-        var existingBounty = questDatabase.FirstOrDefault(q =>
-            q.Initiator == KING_BOUNTY_INITIATOR &&
-            q.TargetNPCName == playerName &&
-            !q.Deleted);
+        // v1.1.11: only a bounty on this PLAYER is topped up; an NPC of the same name keeps its own (review)
+        var existingBounty = questDatabase.FirstOrDefault(q => !q.Deleted && (onPlayer
+            ? IsBountyOnPlayer(q.Initiator, q.TitleKey, q.TargetNPCName, q.IsPlayerBounty, playerName)
+            : q.Initiator == KING_BOUNTY_INITIATOR && !q.IsPlayerBounty && string.Equals(q.TargetNPCName, playerName, StringComparison.OrdinalIgnoreCase)));
 
         if (existingBounty != null)
         {
             // Increase existing bounty
             existingBounty.BountyGold += bountyAmount;
+            if (onPlayer) existingBounty.IsPlayerBounty = true;   // a legacy one is marked from now on
             existingBounty.Comment += $" {Loc.Get("quest.bounty.additional_charge", crime)}";
             NewsSystem.Instance?.Newsy(true, Loc.Get("quest.bounty_increased_news", playerName, existingBounty.BountyGold));
             return;
@@ -2164,7 +2331,8 @@ public partial class QuestSystem
             DaysToComplete = 30, // Long duration for player bounties
             BountyGold = bountyAmount,  // Actual gold amount (not limited by byte Reward)
             RewardType = QuestRewardType.Money,
-            TargetNPCName = playerName
+            TargetNPCName = playerName,
+            IsPlayerBounty = onPlayer   // v1.1.11
         };
 
         bounty.Objectives.Add(new QuestObjective(

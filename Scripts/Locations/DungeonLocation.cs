@@ -1985,17 +1985,8 @@ public class DungeonLocation : BaseLocation
                     StoryProgressionSystem.Instance.CollectedArtifacts.Add(artifactType.Value);
                 }
 
-                // XP and gold reward
-                if (result.XPGained > 0)
-                {
-                    player.Experience += result.XPGained;
-                    term.WriteLine(Loc.Get("dungeon.xp_gained", result.XPGained), "green");
-                }
-                if (result.GoldGained > 0)
-                {
-                    player.Gold += result.GoldGained;
-                    term.WriteLine(Loc.Get("dungeon.gold_gained", result.GoldGained), "yellow");
-                }
+                // v1.1.11: the XP and gold were paid by OldGodBossSystem.HandleBossDefeated; adding
+                // result.XPGained and GoldGained here paid them again
 
                 // Chivalry impact — v0.57.12: paired movement (killing an Old God is evil, lowers chivalry)
                 AlignmentSystem.Instance.ChangeAlignment(player, 100, isGood: false, "dungeon.old_god_killed");
@@ -5481,7 +5472,7 @@ public class DungeonLocation : BaseLocation
                 long bossGold = currentDungeonLevel * 500 + dungeonRandom.Next(1000);
                 long bossExp = currentDungeonLevel * 300;
 
-                var (bossXPShare, bossGoldShare) = AwardDungeonReward(bossExp, bossGold, "Boss Defeated");
+                var (bossXPShare, bossGoldShare) = AwardDungeonReward(bossExp, bossGold, "Boss Defeated", fromCombat: true);
 
                 if (teammates.Count > 0)
                 {
@@ -5490,7 +5481,7 @@ public class DungeonLocation : BaseLocation
                 }
                 else
                 {
-                    terminal.WriteLine(Loc.Get("dungeon.boss_bonus", bossGold, bossExp));
+                    terminal.WriteLine(Loc.Get("dungeon.boss_bonus", bossGold, bossXPShare)); // v1.1.11: what was paid, with Training
                 }
 
                 // Artifact drop chance for specific floor bosses
@@ -7827,7 +7818,7 @@ public class DungeonLocation : BaseLocation
                     terminal.SetColor("green");
                     terminal.WriteLine(Loc.Get("dungeon.portal_guardian_crystal"));
                     long bonusGold = (long)(Math.Pow(currentDungeonLevel, 1.5) * 36);
-                    long bonusXp = (long)(Math.Pow(currentDungeonLevel, 1.5) * 45);
+                    long bonusXp = TeamHQBonus.ApplyXP(currentPlayer, (long)(Math.Pow(currentDungeonLevel, 1.5) * 45)); // v1.1.11: Team HQ Training
                     currentPlayer.Gold += bonusGold;
                     currentPlayer.Experience += bonusXp;
                 }
@@ -7839,7 +7830,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("dungeon.portal_study"));
             // Small XP for studying - about half a monster kill
             long xpGain = (long)(Math.Pow(currentDungeonLevel, 1.5) * 8);
-            currentPlayer.Experience += xpGain;
+            currentPlayer.Experience += xpGain; // hq-training: out (portal study, no fight)
             terminal.WriteLine(Loc.Get("dungeon.portal_learn_magic", xpGain));
         }
         else
@@ -7986,7 +7977,7 @@ public class DungeonLocation : BaseLocation
                 // Rewards scale with rivalry intensity - roughly 2-4 monster kills based on rivalry
                 int rivalryBonus = 1 + duelist.TimesEncountered / 3;
                 long goldReward = (long)(Math.Pow(currentDungeonLevel, 1.5) * 24 * rivalryBonus);
-                long xpReward = (long)(Math.Pow(currentDungeonLevel, 1.5) * 15 * (1 + rivalryBonus * 0.5));
+                long xpReward = TeamHQBonus.ApplyXP(currentPlayer, (long)(Math.Pow(currentDungeonLevel, 1.5) * 15 * (1 + rivalryBonus * 0.5))); // v1.1.11: Team HQ Training
                 currentPlayer.Gold += goldReward;
                 currentPlayer.Experience += xpReward;
                 AlignmentSystem.Instance.ChangeAlignment(currentPlayer, 5, isGood: true, "dungeon.duelist_victory"); // v0.57.12: paired movement
@@ -11695,7 +11686,7 @@ public class DungeonLocation : BaseLocation
                 potions = player is Player pp ? pp.Healing : 0,
                 maxPotions = player is Player pp2 ? pp2.MaxPotions : 0,
                 gold = player.Gold,
-                healAmount = player.MaxHP / 4,
+                healAmount = PotionBonus.ApplyOwnerBonuses(player, player.MaxHP / 4), // v1.1.11: Infirmary
                 potionCost = 50 + (player.Level * 10),
                 teammates = memberData,
             });
@@ -11752,6 +11743,7 @@ public class DungeonLocation : BaseLocation
 
             // Calculate heal amount (potions heal 25% of max HP)
             long healAmount = player.MaxHP / 4;
+            healAmount = PotionBonus.ApplyOwnerBonuses(player, healAmount); // v1.1.11: Infirmary
 
             terminal.SetColor("white");
             terminal.WriteLine(Loc.Get("dungeon.options"));
@@ -12451,6 +12443,7 @@ public class DungeonLocation : BaseLocation
         // Calculate potions needed
         long missingHP = target.MaxHP - target.HP;
         int healPerPotion = 30 + player.Level * 5 + 20;
+        healPerPotion = (int)PotionBonus.ApplyOwnerBonuses(player, healPerPotion); // v1.1.11: the giver's Infirmary
         int potionsNeeded = (int)Math.Ceiling((double)missingHP / healPerPotion);
         potionsNeeded = Math.Min(potionsNeeded, (int)player.Healing);
 
@@ -12515,6 +12508,7 @@ public class DungeonLocation : BaseLocation
         {
             player.Healing--;
             int healAmount = 30 + player.Level * 5 + dungeonRandom.Next(10, 31);
+            healAmount = (int)PotionBonus.ApplyOwnerBonuses(player, healAmount); // v1.1.11: the giver's Infirmary
             target.HP = Math.Min(target.MaxHP, target.HP + healAmount);
         }
         long totalHeal = target.HP - oldHP;
@@ -12554,6 +12548,7 @@ public class DungeonLocation : BaseLocation
     private async Task HealEntireParty(Character player, List<Character> companions)
     {
         int healPerPotion = 30 + player.Level * 5 + 20;
+        healPerPotion = (int)PotionBonus.ApplyOwnerBonuses(player, healPerPotion); // v1.1.11: the giver's Infirmary
         int totalPotionsUsed = 0;
         long totalHealing = 0;
 
@@ -12637,6 +12632,7 @@ public class DungeonLocation : BaseLocation
                 player.Healing--;
                 totalPotionsUsed++;
                 int healAmount = 30 + player.Level * 5 + dungeonRandom.Next(10, 31);
+                healAmount = (int)PotionBonus.ApplyOwnerBonuses(player, healAmount); // v1.1.11: Infirmary
                 player.HP = Math.Min(player.MaxHP, player.HP + healAmount);
             }
             long healed = player.HP - oldHP;
@@ -12656,6 +12652,7 @@ public class DungeonLocation : BaseLocation
                     player.Healing--;
                     totalPotionsUsed++;
                     int healAmount = 30 + player.Level * 5 + dungeonRandom.Next(10, 31);
+                    healAmount = (int)PotionBonus.ApplyOwnerBonuses(player, healAmount); // v1.1.11: the giver's Infirmary
                     companion.HP = Math.Min(companion.MaxHP, companion.HP + healAmount);
                 }
                 long healed = companion.HP - oldHP;
@@ -12711,6 +12708,7 @@ public class DungeonLocation : BaseLocation
         // Use one potion
         player.Healing--;
         long healAmount = player.MaxHP / 4;
+        healAmount = PotionBonus.ApplyOwnerBonuses(player, healAmount); // v1.1.11: Infirmary, before the cap
         long oldHP = player.HP;
         player.HP = Math.Min(player.MaxHP, player.HP + healAmount);
         long actualHeal = player.HP - oldHP;
@@ -12750,6 +12748,7 @@ public class DungeonLocation : BaseLocation
         }
 
         long healAmount = player.MaxHP / 4;
+        healAmount = PotionBonus.ApplyOwnerBonuses(player, healAmount); // v1.1.11: Infirmary, so potionsNeeded matches
         int potionsNeeded = (int)Math.Ceiling((double)(player.MaxHP - player.HP) / healAmount);
         int potionsToUse = Math.Min(potionsNeeded, (int)player.Healing);
 
@@ -16654,6 +16653,7 @@ public class DungeonLocation : BaseLocation
             if (playerJoins)
             {
                 long playerDmg = player.Strength + player.WeapPow + dungeonRandom.Next(50);
+                playerDmg = TeamHQBonus.ApplyAttack(player, playerDmg); // v1.1.11: Team HQ Armory, last.
                 malachar.HP -= (int)playerDmg;
                 terminal.WriteLine(Loc.Get("quest.aldric_ghosts.player_strike", playerDmg), "bright_cyan");
             }
@@ -16720,8 +16720,9 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("quest.aldric_ghosts.bonus"), "bright_cyan");
 
             // XP reward
-            player.Experience += 25000;
-            terminal.WriteLine(Loc.Get("quest.aldric_ghosts.xp_reward", "25,000"), "bright_green");
+            long malacharXP = TeamHQBonus.ApplyXP(player, 25000); // v1.1.11: Team HQ Training
+            player.Experience += malacharXP;
+            terminal.WriteLine(Loc.Get("quest.aldric_ghosts.xp_reward", $"{malacharXP:N0}"), "bright_green");
         }
 
         await terminal.PressAnyKey();
@@ -17834,7 +17835,7 @@ public class DungeonLocation : BaseLocation
     /// Companions are skipped (handled by CompanionSystem).
     /// Returns (leaderXP, leaderGold).
     /// </summary>
-    private (long leaderXP, long leaderGold) SplitPartyRewards(long totalXP, long totalGold, string source)
+    private (long leaderXP, long leaderGold) SplitPartyRewards(long totalXP, long totalGold, string source, bool fromCombat = false)
     {
         var player = GetCurrentPlayer();
         if (player == null) return (totalXP, totalGold);
@@ -17866,6 +17867,8 @@ public class DungeonLocation : BaseLocation
                 // Real players: full XP with level gap penalty
                 float groupXPMult = GroupSystem.GetGroupXPMultiplier(teammate.Level, highestLevel);
                 long memberXP = (long)(totalXP * groupXPMult);
+                // v1.1.11: a combat reward carries this player's own Team HQ Training.
+                if (fromCombat) memberXP = TeamHQBonus.ApplyXP(teammate, memberXP);
                 teammate.Experience += memberXP;
                 teammate.Statistics.RecordGoldChange(teammate.Gold);
 
@@ -17882,7 +17885,7 @@ public class DungeonLocation : BaseLocation
             {
                 // NPC teammates (spouses, mercenaries): 75% XP
                 long npcXP = (long)(totalXP * 0.75);
-                teammate.Experience += npcXP;
+                teammate.Experience += npcXP; // hq-training: out (NPC teammate share, never the leader's bonus)
             }
         }
 
@@ -17896,8 +17899,9 @@ public class DungeonLocation : BaseLocation
     /// <summary>
     /// Award XP and gold to the leader, splitting among party if in a group.
     /// Returns actual (xp, gold) awarded to the leader.
+    /// v1.1.11: fromCombat (the floor boss only) adds each real player's Team HQ Training to their own XP.
     /// </summary>
-    private (long xp, long gold) AwardDungeonReward(long xp, long gold, string source)
+    private (long xp, long gold) AwardDungeonReward(long xp, long gold, string source, bool fromCombat = false)
     {
         var player = GetCurrentPlayer();
         if (player == null) return (xp, gold);
@@ -17908,13 +17912,15 @@ public class DungeonLocation : BaseLocation
         lock (teammates) { hasGroupedPlayers = teammates.Any(t => t.IsGroupedPlayer); }
         if (hasGroupedPlayers)
         {
-            var (leaderXP, leaderGold) = SplitPartyRewards(xp, gold, source);
+            var (leaderXP, leaderGold) = SplitPartyRewards(xp, gold, source, fromCombat);
+            if (fromCombat) leaderXP = TeamHQBonus.ApplyXP(player, leaderXP);
             player.Gold += leaderGold;
             player.Experience += leaderXP;
             return (leaderXP, leaderGold);
         }
         else
         {
+            if (fromCombat) xp = TeamHQBonus.ApplyXP(player, xp);
             player.Gold += gold;
             player.Experience += xp;
             return (xp, gold);
@@ -18661,6 +18667,7 @@ public class DungeonLocation : BaseLocation
         {
             long oldHP = player.HP;
             int healAmount = 30 + player.Level * 5 + Random.Shared.Next(10, 31);
+            healAmount = (int)PotionBonus.ApplyOwnerBonuses(player, healAmount); // v1.1.11: the follower's own Infirmary
             player.HP = Math.Min(player.MaxHP, player.HP + healAmount);
             long actualHeal = player.HP - oldHP;
             player.Healing--;

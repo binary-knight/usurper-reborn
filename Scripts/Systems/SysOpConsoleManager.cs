@@ -698,7 +698,18 @@ namespace UsurperRemake.Systems
             var confirm2 = await terminal.GetInputAsync(" Type YES for final confirmation: ");
             if (confirm2 != "YES") { terminal.SetColor("gray"); terminal.WriteLine(" Cancelled."); await terminal.GetInputAsync(" Press Enter..."); return; }
 
-            sqlBackend.DeleteGameData(target.Username);
+            // v1.1.11: the same purge as permadeath, once the delete has succeeded (a failed delete must not
+            // leave a living character purged, review). The character's Name2 is read from the save first.
+            var deletedSave = await sqlBackend.ReadGameData(target.Username);
+            if (!sqlBackend.DeleteGameData(target.Username))
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine($" Deleting {target.DisplayName} failed; nothing was changed.");
+                await terminal.GetInputAsync(" Press Enter...");
+                return;
+            }
+            await PermadeathHelper.PurgeDeletedCharacterAsync(sqlBackend, target.Username,
+                deletedSave?.Player?.Name2 ?? target.DisplayName);
             terminal.SetColor("green");
             terminal.WriteLine($" {target.DisplayName} has been permanently deleted.");
             DebugLogger.Instance.LogWarning("SYSOP", $"Deleted player '{target.DisplayName}'");

@@ -10,7 +10,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "1.1.10";
+    public const string Version = "1.1.11";
     public const string VersionName = "Regalia"; // 1.1 line: the gear and reward loop
 
     // v0.57.12: Alignment scale cap. Character.Chivalry and Character.Darkness setters clamp to [0, AlignmentCap]
@@ -1848,6 +1848,15 @@ public static partial class GameConfig
     // 1.25 as written). Capped here until the gods are retuned against the dialogue; the softer
     // answers (down to 0.50) are not capped.
     public const double OldGodDialogueBossDamageCap = 1.10;
+    // v1.1.11: an Old God kill paid the god-defeated handler's reward twice (the handler, then the dungeon
+    // again). The fight's own victory pays the god's Level x 2000 XP / x 500 gold, shared by the party as any
+    // victory is; the handler pays the leader this, once, so the leader's total stays what it was.
+    public const int OldGodDefeatXPPerLevel = 4000;
+    public const int OldGodDefeatGoldPerLevel = 1000;
+    // v1.1.11: a player team is removed only after it has been seen empty this long (WorldSimService.PruneEmptyTeams)
+    public const int EmptyTeamGraceMinutes = 30;
+    // v1.1.11: after a join, the team is left alone this long so the joiner's save can land (every process)
+    public const int EmptyTeamJoinGraceMinutes = 10;
 
     // v1.1.10: regular dungeon monsters on the floors before an Old God's floor grow tougher, HP and
     // damage, by this much per floor: +5% five floors out, up to +25% on the floor before the god

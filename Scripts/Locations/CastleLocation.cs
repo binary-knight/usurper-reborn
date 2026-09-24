@@ -1874,11 +1874,14 @@ public class CastleLocation : BaseLocation
                 var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
                 if (backend != null)
                 {
-                    string username = currentPlayer.Name2?.ToLowerInvariant() ?? currentPlayer.Name1?.ToLowerInvariant() ?? "";
+                    // v1.1.11: the character's own key, as permadeath gets it (Name2 deleted 0 rows when it
+                    // differed from the key), and the shared purge before the delete.
+                    string username = (!string.IsNullOrEmpty(sctx?.CharacterKey) ? sctx!.CharacterKey : sctx?.Username) ?? currentPlayer.Name1 ?? currentPlayer.Name2 ?? "";
                     if (!string.IsNullOrEmpty(username))
                     {
                         try
                         {
+                            await PermadeathHelper.PurgeDeletedCharacterAsync(backend, username, currentPlayer.Name2 ?? currentPlayer.Name1, currentPlayer);
                             backend.DeleteGameData(username);
                             DebugLogger.Instance.LogInfo("REBELLION", $"Character '{kingName}' permanently deleted — coin was HEADS");
                         }
@@ -3521,7 +3524,12 @@ public class CastleLocation : BaseLocation
                 NewsSystem.Instance.Newsy(true, $"BOUNTY: {amount:N0} gold on {name} by order of {currentKing.GetTitle()} {currentKing.Name}!");
 
                 // Wire into QuestSystem so the bounty is trackable
-                QuestSystem.PostBountyOnPlayer(name, "Royal decree", amount);
+                // v1.1.11: the king names anyone. It is a bounty on a player only when a player has that name
+                // and no NPC does; an NPC briefly missing from a roster being rebuilt must not be taken for a
+                // player (review), and an NPC bounty is the one beating the target can pay.
+                bool onPlayer = SaveSystem.Instance.IsDisplayNameTaken(name, "")
+                    && NPCSpawnSystem.Instance.IsRosterTrustworthy && !QuestSystem.IsNPCName(name);
+                QuestSystem.PostBountyOnPlayer(name, "Royal decree", amount, onPlayer: onPlayer);
 
                 // Broadcast and persist
                 if (DoorMode.IsOnlineMode)
@@ -5958,7 +5966,8 @@ public class CastleLocation : BaseLocation
             terminal.WriteLine("");
 
             var combatEngine = new CombatEngine(terminal);
-            var kingResult = await combatEngine.PlayerVsPlayer(currentPlayer, kingCharacter, allowSurrender: false); // v0.64.1: throne challenge treats non-Victory as defeat
+            // v1.1.11: not lethal; the NPC king's HP is put back below, so a win is not a kill (an Assassin contract stays)
+            var kingResult = await combatEngine.PlayerVsPlayer(currentPlayer, kingCharacter, allowSurrender: false, lethal: false); // v0.64.1: throne challenge treats non-Victory as defeat
 
             // Restore original NPC stats after combat
             kingCharacter.Defence = origDef;
@@ -6009,7 +6018,8 @@ public class CastleLocation : BaseLocation
                     HP = 500,
                     MaxHP = 500,
                     AI = CharacterAI.Computer,
-                    Class = CharacterClass.Warrior
+                    Class = CharacterClass.Warrior,
+                    IsLoadedPlayer = true   // v1.1.11: stands in for the player king, so a bounty on them is paid
                 };
             }
 
@@ -6043,7 +6053,8 @@ public class CastleLocation : BaseLocation
                 HP = (long)((400 + kingLevel * 60) * GameConfig.KingDefenderHPBonus),
                 MaxHP = (long)((400 + kingLevel * 60) * GameConfig.KingDefenderHPBonus),
                 AI = CharacterAI.Computer,
-                Class = CharacterClass.Warrior
+                Class = CharacterClass.Warrior,
+                IsLoadedPlayer = currentKing.AI == CharacterAI.Human   // v1.1.11: a stand-in for a player king
             };
 
             terminal.SetColor("gray");
@@ -7184,7 +7195,7 @@ public class CastleLocation : BaseLocation
                         NewsSystem.Instance?.Newsy(true, $"A bounty has been placed on {target.Name} by royal decree!");
 
                         // Wire into QuestSystem so the bounty is trackable
-                        QuestSystem.PostBountyOnPlayer(target.Name, "Criminal activity", (int)Math.Min(bountyCost, int.MaxValue));
+                        QuestSystem.PostBountyOnPlayer(target.Name, "Criminal activity", (int)Math.Min(bountyCost, int.MaxValue), onPlayer: false);   // v1.1.11: an NPC
 
                         // Small chivalry boost for reporting — v0.57.12: paired movement
                         AlignmentSystem.Instance.ChangeAlignment(currentPlayer, 5, isGood: true, "castle.report_crime");
@@ -7804,6 +7815,31 @@ public class CastleLocation : BaseLocation
         monarchHistory = history ?? new List<MonarchRecord>();
     }
 
+    /// <summary>v1.1.11: the monarch history in its stored form (every royal_court payload carries it).</summary>
+    public static List<MonarchRecordSaveData> MonarchHistorySaveData() =>
+        monarchHistory?.Select(m => new MonarchRecordSaveData
+        {
+            Name = m.Name,
+            Title = m.Title,
+            DaysReigned = m.DaysReigned,
+            CoronationDate = m.CoronationDate.ToString("o"),
+            EndReason = m.EndReason
+        }).ToList() ?? new List<MonarchRecordSaveData>();
+
+    /// <summary>v1.1.11: take a stored monarch history; an empty or missing one leaves this process's as is.</summary>
+    public static void ImportMonarchHistory(List<MonarchRecordSaveData>? saved)
+    {
+        if (saved == null || saved.Count == 0) return;
+        SetMonarchHistory(saved.Select(m => new MonarchRecord
+        {
+            Name = m.Name,
+            Title = m.Title,
+            DaysReigned = m.DaysReigned,
+            CoronationDate = DateTime.TryParse(m.CoronationDate, null, System.Globalization.DateTimeStyles.RoundtripKind, out var cd) ? cd : DateTime.Now,
+            EndReason = m.EndReason
+        }).ToList());
+    }
+
     /// <summary>
     /// Notify a dethroned player via system message.
     /// Their King flag will sync from world_state on next login or castle entry.
@@ -7917,6 +7953,127 @@ public class CastleLocation : BaseLocation
     {
         if (player == null || !player.King) return;
 
+        // Clear player state
+        player.King = false;
+        if (player.NobleTitle == "King" || player.NobleTitle == "Queen")
+            player.NobleTitle = null;
+        player.RoyalMercenaries?.Clear();
+        player.RecalculateStats();
+
+        EndPlayerReign(player.DisplayName, reason);
+    }
+
+    /// <summary>
+    /// v1.1.11: a deleted character who holds the throne abdicates through the same path, so the normal
+    /// NPC succession runs. The deleted character has no loaded Character, so the match is by the
+    /// king's name (Name2, or the married DisplayName) and only a player king is removed.
+    /// </summary>
+    public static bool AbdicateDeletedKing(string? name, string? displayName, string reason)
+    {
+        var king = GetCurrentKing();
+        if (!IsDeletedCharactersReign(king, name, displayName)) return false;
+        EndPlayerReign(king!.Name, reason);
+        return true;
+    }
+
+    /// <summary>v1.1.11: set when this process has read the shared royal_court (the login, castle or world-sim loader).</summary>
+    public static bool RoyalCourtLoadedFromShared { get; set; }
+
+    /// <summary>v1.1.11: an active player king named by the deleted character's Name2 or display name.</summary>
+    internal static bool IsDeletedCharactersReign(King? king, string? name, string? displayName)
+    {
+        if (king == null || !king.IsActive || king.AI != CharacterAI.Human) return false;
+        bool named(string? n) => !string.IsNullOrWhiteSpace(n) && string.Equals(king.Name, n, StringComparison.OrdinalIgnoreCase);
+        return named(name) || named(displayName);
+    }
+
+    /// <summary>
+    /// v1.1.11: the delete path. Online, the authoritative royal_court is always read to decide, and the
+    /// ended reign is written back under the version read before returning.
+    /// </summary>
+    public static Task<bool> AbdicateDeletedKingAsync(string? name, string? displayName, string reason)
+    {
+        var osm = UsurperRemake.BBS.DoorMode.IsOnlineMode ? OnlineStateManager.Instance : null;
+        if (osm == null) return AbdicateDeletedKingAsync(name, displayName, reason, false, null, null, null);
+        return AbdicateDeletedKingAsync(name, displayName, reason, true,
+            osm.ReadRoyalCourtWithVersionAsync, osm.LoadRoyalCourtFromWorldState, v => osm.SaveRoyalCourtIfVersionAsync(v, throneVacated: true));
+    }
+
+    /// <summary>
+    /// v1.1.11: the delete path with the shared court calls passed in. The shared court decides, even in a
+    /// process that loaded it earlier (its copy may be stale): the reign ends only when the stored king is
+    /// the deleted character, and that court is loaded first. The write is guarded by the version read; on a
+    /// conflict the court is read and the decision made again, up to 3 times.
+    /// </summary>
+    internal static async Task<bool> AbdicateDeletedKingAsync(string? name, string? displayName, string reason, bool online,
+        Func<Task<(RoyalCourtSaveData? Court, long Version)>>? readShared, Func<Task>? loadShared, Func<long, Task<bool>>? saveSharedIfVersion)
+    {
+        if (!online || readShared == null)
+        {
+            var local = GetCurrentKing();
+            if (!IsDeletedCharactersReign(local, name, displayName)) return false;
+            EndPlayerReign(local!.Name, reason, persist: !online);
+            return true;
+        }
+
+        bool changedLocally = false;
+        var history = GetMonarchHistory().ToList();
+        for (int attempt = 0; attempt < 3; attempt++)
+        {
+            if (changedLocally) SetMonarchHistory(history.ToList());   // v1.1.11: a retry records the reign once
+            var (shared, version) = await readShared();
+            if (shared != null)
+            {
+                if (!SharedCourtNamesDeletedCharacter(shared, name, displayName))
+                {
+                    // v1.1.11: a lost race ended a reign locally that the shared court no longer holds
+                    if (changedLocally && loadShared != null) await loadShared();
+                    return false;
+                }
+                if (loadShared != null) await loadShared();
+            }
+            var king = GetCurrentKing();
+            if (!IsDeletedCharactersReign(king, name, displayName)) return false;
+            EndPlayerReign(king!.Name, reason, persist: false);
+            changedLocally = true;
+            if (saveSharedIfVersion == null || await saveSharedIfVersion(version)) return true;
+        }
+        DebugLogger.Instance.LogWarning("CASTLE", $"The reign of deleted '{name}' was not ended in the shared court: it kept changing.");
+        if (loadShared != null) await loadShared();
+        return false;
+    }
+
+    /// <summary>v1.1.11: the stored court's king is the deleted character (a reigning player of that name).</summary>
+    internal static bool SharedCourtNamesDeletedCharacter(RoyalCourtSaveData? court, string? name, string? displayName)
+    {
+        if (court == null || court.ThroneVacant || string.IsNullOrEmpty(court.KingName)) return false;
+        var king = new King { Name = court.KingName, AI = (CharacterAI)court.KingAI, IsActive = true };
+        return IsDeletedCharactersReign(king, name, displayName);
+    }
+
+    /// <summary>
+    /// v1.1.11: a court loader's handling of an explicit vacancy (ThroneVacant): this process's king is
+    /// cleared too. True when the court is a vacancy, and the loader applies nothing else from it.
+    /// </summary>
+    public static bool ApplySharedThroneVacancy(RoyalCourtSaveData court)
+    {
+        if (court == null || !court.ThroneVacant) return false;
+        ImportMonarchHistory(court.MonarchHistory);   // v1.1.11: the ended reign the vacancy carries
+        var king = currentKing;
+        if (king != null)
+        {
+            king.IsActive = false;
+            var npcs = NPCSpawnSystem.Instance?.ActiveNPCs;
+            if (npcs != null)
+                foreach (var npc in npcs.Where(n => n != null && n.King && n.Name == king.Name).ToList()) npc.King = false;
+            currentKing = null;
+        }
+        return true;
+    }
+
+    // v1.1.11: the throne side of AbdicatePlayerThrone, shared with AbdicateDeletedKing.
+    private static void EndPlayerReign(string kingDisplayName, string reason, bool persist = true)
+    {
         var king = GetCurrentKing();
 
         // Record monarch history
@@ -7937,17 +8094,10 @@ public class CastleLocation : BaseLocation
             king.IsActive = false;
         }
 
-        // Clear player state
-        player.King = false;
-        if (player.NobleTitle == "King" || player.NobleTitle == "Queen")
-            player.NobleTitle = null;
-        player.RoyalMercenaries?.Clear();
-        player.RecalculateStats();
-
         currentKing = null;
 
         // News
-        NewsSystem.Instance?.Newsy(true, $"{player.DisplayName} has {reason}! The kingdom is in chaos!");
+        NewsSystem.Instance?.Newsy(true, $"{kingDisplayName} has {reason}! The kingdom is in chaos!");
 
         // Trigger NPC succession (uses only static fields + singletons)
         var npcs = NPCSpawnSystem.Instance?.ActiveNPCs;
@@ -7971,15 +8121,15 @@ public class CastleLocation : BaseLocation
             }
         }
 
-        // Persist to world_state in online mode
-        if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
+        // Persist to world_state in online mode (v1.1.11: the delete path awaits its own write)
+        if (persist && UsurperRemake.BBS.DoorMode.IsOnlineMode)
         {
             var osm = OnlineStateManager.Instance;
             if (osm != null)
             {
                 _ = Task.Run(async () =>
                 {
-                    try { await osm.SaveRoyalCourtToWorldState(); }
+                    try { await osm.SaveRoyalCourtToWorldState(throneVacated: true); }   // v1.1.11: no NPC took it
                     catch (Exception ex)
                     {
                         DebugLogger.Instance.LogError("CASTLE", $"Failed to persist abdication: {ex.Message}");
@@ -8458,6 +8608,10 @@ public class CastleLocation : BaseLocation
             return;
         }
 
+        // v1.1.11: the team's current HQ levels; the siege fights outside CombatEngine, which reads them
+        // at a fight's start (review: a teammate's upgrade was not seen)
+        TeamHQBonus.RefreshLevels(currentPlayer, backend);
+
         // Must be on a team
         if (string.IsNullOrEmpty(currentPlayer.Team))
         {
@@ -8601,6 +8755,7 @@ public class CastleLocation : BaseLocation
                 // Team attacks (combined)
                 long teamDmg = Math.Max(1, teamPower - monsterDef);
                 teamDmg = (long)(teamDmg * (0.8 + random.NextDouble() * 0.4));
+                teamDmg = TeamHQBonus.ApplyAttack(currentPlayer, teamDmg); // v1.1.11: Team HQ Armory, last.
                 monsterHP -= teamDmg;
 
                 terminal.SetColor("bright_green");
@@ -8611,6 +8766,7 @@ public class CastleLocation : BaseLocation
                 // Monster retaliates
                 long monsterDmg = Math.Max(1, monsterStr - teamDefense / memberCount);
                 monsterDmg = (long)(monsterDmg * (0.8 + random.NextDouble() * 0.4));
+                monsterDmg = TeamHQBonus.ApplyDefense(currentPlayer, monsterDmg); // v1.1.11: Team HQ Barracks, last.
                 teamHP -= monsterDmg;
 
                 terminal.SetColor("red");
@@ -8671,6 +8827,7 @@ public class CastleLocation : BaseLocation
 
                     long teamDmg = Math.Max(1, teamPower - guardDef);
                     teamDmg = (long)(teamDmg * (0.8 + random.NextDouble() * 0.4));
+                    teamDmg = TeamHQBonus.ApplyAttack(currentPlayer, teamDmg); // v1.1.11: Team HQ Armory, last.
                     guardHP -= teamDmg;
 
                     terminal.SetColor("bright_green");
@@ -8680,6 +8837,7 @@ public class CastleLocation : BaseLocation
 
                     long guardDmg = Math.Max(1, guardStr - teamDefense / memberCount);
                     guardDmg = (long)(guardDmg * (0.8 + random.NextDouble() * 0.4));
+                    guardDmg = TeamHQBonus.ApplyDefense(currentPlayer, guardDmg); // v1.1.11: Team HQ Barracks, last.
                     teamHP -= guardDmg;
 
                     terminal.SetColor("red");
@@ -8871,6 +9029,7 @@ public class CastleLocation : BaseLocation
             // Player attacks (accounts for weapon and armor power)
             long playerDamage = Math.Max(1, currentPlayer.Strength + currentPlayer.WeapPow - siegeKingDef - siegeKingArmPow);
             playerDamage = (long)(playerDamage * (0.8 + random.NextDouble() * 0.4));
+            playerDamage = TeamHQBonus.ApplyAttack(currentPlayer, playerDamage); // v1.1.11: Team HQ Armory, last.
             kingHP -= playerDamage;
 
             terminal.SetColor("bright_green");
@@ -8881,6 +9040,7 @@ public class CastleLocation : BaseLocation
             // King attacks (accounts for weapon and armor power)
             long kingDamage = Math.Max(1, siegeKingStr + siegeKingWeapPow - currentPlayer.Defence - currentPlayer.ArmPow);
             kingDamage = (long)(kingDamage * (0.8 + random.NextDouble() * 0.4));
+            kingDamage = TeamHQBonus.ApplyDefense(currentPlayer, kingDamage);   // v1.1.11: Team HQ Barracks on the king's hits too
             playerHP -= kingDamage;
 
             terminal.SetColor("red");

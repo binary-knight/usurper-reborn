@@ -1354,7 +1354,8 @@ public class HomeLocation : BaseLocation
 
         // Use a potion
         currentPlayer.Healing--;
-        long healAmount = Math.Max(50, currentPlayer.MaxHP / 4); // Heal 25% or at least 50 HP
+        // v1.1.11: the Infirmary goes inside the 50 HP floor
+        long healAmount = Math.Max(50, PotionBonus.ApplyOwnerBonuses(currentPlayer, currentPlayer.MaxHP / 4)); // Heal 25% or at least 50 HP
         long oldHP = currentPlayer.HP;
         currentPlayer.HP = Math.Min(currentPlayer.HP + healAmount, currentPlayer.MaxHP);
         long actualHeal = currentPlayer.HP - oldHP;

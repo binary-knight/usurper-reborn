@@ -201,16 +201,43 @@ namespace UsurperRemake.Systems
         /// <summary>
         /// Delete a save file
         /// </summary>
-        public bool DeleteSave(string playerName)
+        // v1.1.11: displayName is the character's Name2 from the save. Worship is keyed by it, not by
+        // the save key, so clearing by the key alone left the god for a same-name recreation.
+        public bool DeleteSave(string playerName, string? displayName = null)
         {
             // Clear in-memory god worship mapping so it doesn't persist to a new character with the same name
             try
             {
                 UsurperRemake.GodSystemSingleton.Instance?.SetPlayerGod(playerName, "");
+                UsurperRemake.GodSystemSingleton.Instance?.ClearPlayerGodAnyCase(displayName);
             }
             catch (Exception ex) { DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"GodSystem not initialized: {ex.Message}"); }
 
             return backend.DeleteGameData(playerName);
+        }
+
+        /// <summary>
+        /// v1.1.11: delete every listed save of one character (the single-player slot delete, which
+        /// used to File.Delete each file itself). The primary save goes through DeleteSave so the god
+        /// entry is cleared by the Name2 each save names; the other files (autosaves, backups,
+        /// emergency dumps) are removed by name in the backend's save directory.
+        /// </summary>
+        public void DeleteSaves(string playerName, IEnumerable<SaveInfo> saves)
+        {
+            var list = saves?.ToList() ?? new List<SaveInfo>();
+            var names = list.Select(s => s.PlayerName).Where(n => !string.IsNullOrWhiteSpace(n))
+                .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            DeleteSave(playerName, names.FirstOrDefault());
+            foreach (var extra in names.Skip(1))
+            {
+                try { UsurperRemake.GodSystemSingleton.Instance?.ClearPlayerGodAnyCase(extra); }
+                catch (Exception ex) { DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"GodSystem not initialized: {ex.Message}"); }
+            }
+            if (backend is FileSaveBackend fileBackend)
+            {
+                foreach (var save in list)
+                    fileBackend.DeleteSaveFile(save.FileName);
+            }
         }
         
         /// <summary>
@@ -1590,6 +1617,8 @@ namespace UsurperRemake.Systems
                     OfferedTo = quest.OfferedTo,
                     Forced = quest.Forced,
                     TargetNPCName = quest.TargetNPCName ?? "",
+                    IsPlayerBounty = quest.IsPlayerBounty,
+                    BountyGold = quest.BountyGold,   // v1.1.11
                     Objectives = new List<QuestObjectiveData>(),
                     Monsters = new List<QuestMonsterData>(),
                     // v0.62.x Phase 4 (Mercenary board): faction-issued freelance contract fields.
@@ -2351,6 +2380,22 @@ namespace UsurperRemake.Systems
         /// Restore story systems state from save data
         /// Note: Restoration is best-effort - systems may not support all restore operations
         /// </summary>
+        /// <summary>
+        /// v1.1.11: the god worship part of RestoreStorySystems, split out so it can be tested. With a
+        /// filter, only that player's entry is restored (GameEngine.GodRestoreFilterFor).
+        /// </summary>
+        public static void RestorePlayerGods(GodSystem godSystem, Dictionary<string, string>? playerGods, string? onlyRestoreGodForPlayer)
+        {
+            if (godSystem == null || playerGods == null) return;
+            foreach (var kvp in playerGods)
+            {
+                if (onlyRestoreGodForPlayer != null &&
+                    !kvp.Key.Equals(onlyRestoreGodForPlayer, StringComparison.OrdinalIgnoreCase))
+                    continue;
+                godSystem.SetPlayerGod(kvp.Key, kvp.Value);
+            }
+        }
+
         public void RestoreStorySystems(StorySystemsData? data, string? onlyRestoreGodForPlayer = null)
         {
             if (data == null) return;
@@ -2468,14 +2513,7 @@ namespace UsurperRemake.Systems
             // in the snapshot may be stale and would overwrite their current worship choices.
             try
             {
-                var godSystem = UsurperRemake.GodSystemSingleton.Instance;
-                foreach (var kvp in data.PlayerGods)
-                {
-                    if (onlyRestoreGodForPlayer != null &&
-                        !kvp.Key.Equals(onlyRestoreGodForPlayer, StringComparison.OrdinalIgnoreCase))
-                        continue;
-                    godSystem.SetPlayerGod(kvp.Key, kvp.Value);
-                }
+                RestorePlayerGods(UsurperRemake.GodSystemSingleton.Instance, data.PlayerGods, onlyRestoreGodForPlayer);
             }
             catch (Exception ex) { DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "LOAD", $"System not available: {ex.Message}"); }
 

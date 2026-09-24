@@ -524,8 +524,13 @@ public partial class CombatEngine
         ScrubTransientCombatState(defender);
     }
 
-    public async Task<CombatResult> PlayerVsPlayer(Character attacker, Character defender, bool allowSurrender = true)
+    // v1.1.11: false for a duel whose caller brings the loser back (the Dormitory wake-up brawl), so a
+    // beaten NPC is not reported as killed (review)
+    private bool _pvpLethal = true;
+
+    public async Task<CombatResult> PlayerVsPlayer(Character attacker, Character defender, bool allowSurrender = true, bool lethal = true)
     {
+        _pvpLethal = lethal;
         // Wizard godmode: save HP/Mana before combat to restore after
         bool isGodMode = UsurperRemake.Server.SessionContext.IsActive
             && (UsurperRemake.Server.SessionContext.Current?.WizardGodMode ?? false);
@@ -630,6 +635,12 @@ public partial class CombatEngine
             CombatLog = new List<string>()
         };
         _combatOwner = attacker;
+        if (DoorMode.IsOnlineMode)
+        {
+            // v1.1.11: each fighter's own Team HQ levels, the defender's read by its team from the database
+            TeamHQBonus.RefreshLevels(attacker);
+            TeamHQBonus.RefreshLevels(defender);
+        }
         // v1.1.1: EndPvPCombat (buff consumption, disarm restore, scrub) runs in the finally
         // so a thrown disconnect mid-duel cannot leave either side with stale combat state.
         try
@@ -824,6 +835,15 @@ public partial class CombatEngine
 
         // Store player reference for combat speed setting
         currentPlayer = player;
+
+        // v1.1.11: the Team HQ levels of this moment (a teammate may have upgraded, or the player changed team)
+        if (DoorMode.IsOnlineMode)
+        {
+            TeamHQBonus.RefreshLevels(player);
+            if (teammates != null)
+                // a copy: other sessions add and remove followers from the live list (Codex review)
+                foreach (var mate in teammates.ToList().Where(t => t is not NPC)) TeamHQBonus.RefreshLevels(mate);
+        }
 
         // v0.65.6 Death's Door: once-per-combat burst rescue resets at combat start.
         player.DeathsDoorUsedThisCombat = false;
@@ -1506,7 +1526,7 @@ public partial class CombatEngine
                     long drainAmount = Math.Min(drugEffects.HPDrain, player.HP - 1); // Don't kill from drain (min 1 HP)
                     if (drainAmount > 0)
                     {
-                        player.HP -= drainAmount;
+                        player.HP -= drainAmount; // hq-barracks: out (drug drain, self-inflicted)
                         terminal.SetColor("dark_red");
                         terminal.WriteLine(Loc.Get("combat.drug_drain", drainAmount));
                     }
@@ -1521,7 +1541,7 @@ public partial class CombatEngine
                 int poisonIntensity = player.Poison / 5;
                 int poisonDmg = Math.Min(poisonBase + poisonLevel + poisonIntensity,
                     (int)Math.Max(3, player.MaxHP / 10));
-                player.HP = Math.Max(0, player.HP - poisonDmg);
+                player.HP = Math.Max(0, player.HP - poisonDmg); // hq-barracks: out (trap and event poison counter)
                 terminal.SetColor("dark_green");
                 terminal.WriteLine(Loc.Get("combat.poison_courses", poisonDmg));
 
@@ -2121,7 +2141,7 @@ public partial class CombatEngine
                     var underlying = player.PetRoster?.FirstOrDefault(p => string.Equals(p.Name, teammate.Name, StringComparison.OrdinalIgnoreCase));
                     if (underlying != null)
                     {
-                        underlying.Experience += Math.Max(5, result.ExperienceGained / 20); // ~5% of combat XP, min 5
+                        underlying.Experience += Math.Max(5, result.ExperienceGained / 20); // ~5% of combat XP, min 5; hq-training: out (pet, not a player)
                         // Pet level-up at simple thresholds (50 * Level XP per next level).
                         while (underlying.Experience >= underlying.Level * 50)
                         {
@@ -3828,11 +3848,6 @@ public partial class CombatEngine
             attackPower += (long)(attackPower * (attacker.PermanentDamageBonus / 100.0));
         }
 
-        // Team HQ Armory bonus: +5% attack per level
-        if (attacker.HQArmoryLevel > 0)
-        {
-            attackPower += (long)(attackPower * (attacker.HQArmoryLevel * 0.05));
-        }
 
         // Knighthood bonus: +5% damage for knighted players
         if (attacker.IsKnighted)
@@ -4151,11 +4166,9 @@ public partial class CombatEngine
             // Quick heal uses one potion
             player.Healing--;
             long healAmount = 30 + player.Level * 5 + random.Next(10, 30);
-            if (player.Class == CharacterClass.Alchemist)
-                healAmount = (long)(healAmount * (1.0 + GameConfig.AlchemistPotionMasteryBonus));
-            if (player.HQInfirmaryLevel > 0)
-                healAmount = (long)(healAmount * (1.0 + player.HQInfirmaryLevel * 0.10));
             healAmount = DifficultySystem.ApplyHealingMultiplier(healAmount);
+            // v1.1.11: the owner's Potion Mastery and Team HQ Infirmary, the last modifiers before the cap
+            healAmount = PotionBonus.ApplyOwnerBonuses(player, healAmount);
             healAmount = Math.Min(healAmount, player.MaxHP - player.HP);
             player.HP += healAmount;
             player.Statistics?.RecordPotionUsed(healAmount);
@@ -4172,6 +4185,7 @@ public partial class CombatEngine
             // Regular heal - ask how many potions to use for full control
             long missingHP = player.MaxHP - player.HP;
             long avgHealPerPotion = 50 + player.Level * 5;  // Average heal: 30 + level*5 + avg(10-30)
+            avgHealPerPotion = PotionBonus.ApplyOwnerBonuses(player, avgHealPerPotion); // v1.1.11: Infirmary
             int potionsToFullHeal = (int)Math.Ceiling((double)missingHP / avgHealPerPotion);
             potionsToFullHeal = Math.Min(potionsToFullHeal, (int)player.Healing);
 
@@ -4195,11 +4209,9 @@ public partial class CombatEngine
             {
                 player.Healing--;
                 long healAmount = 30 + player.Level * 5 + random.Next(10, 30);
-                if (player.Class == CharacterClass.Alchemist)
-                    healAmount = (long)(healAmount * (1.0 + GameConfig.AlchemistPotionMasteryBonus));
-                if (player.HQInfirmaryLevel > 0)
-                    healAmount = (long)(healAmount * (1.0 + player.HQInfirmaryLevel * 0.10));
                 healAmount = DifficultySystem.ApplyHealingMultiplier(healAmount);
+                // v1.1.11: the owner's Potion Mastery and Team HQ Infirmary, the last modifiers before the cap
+                healAmount = PotionBonus.ApplyOwnerBonuses(player, healAmount);
                 healAmount = Math.Min(healAmount, player.MaxHP - player.HP);
                 player.HP += healAmount;
                 totalHeal += healAmount;
@@ -4702,7 +4714,7 @@ public partial class CombatEngine
         {
             int baseDmg = Math.Max(4, (int)(monster.MaxHP * (0.04 + random.NextDouble() * 0.02)));
             int dmg = baseDmg + random.Next(1, player.Level / 5 + 2);
-            monster.HP = Math.Max(0, monster.HP - dmg);
+            monster.HP = Math.Max(0, monster.HP - dmg); // hq-armory: out (burn tick, no caster recorded)
             monster.BurnRounds--;
             terminal.WriteLine(Loc.Get("combat.fire_burn", monster.Name, dmg), "red");
             if (!monster.IsAlive)
@@ -4720,7 +4732,7 @@ public partial class CombatEngine
         {
             int baseDmg = Math.Max(3, (int)(monster.MaxHP * (0.03 + random.NextDouble() * 0.02)));
             int dmg = baseDmg + random.Next(1, player.Level / 5 + 2);
-            monster.HP = Math.Max(0, monster.HP - dmg);
+            monster.HP = Math.Max(0, monster.HP - dmg); // hq-armory: out (poison tick, no caster recorded)
             monster.PoisonRounds--;
             terminal.WriteLine(Loc.Get("combat.poison_burn", monster.Name, dmg), "dark_green");
             if (!monster.IsAlive)
@@ -4740,7 +4752,7 @@ public partial class CombatEngine
         if (firstActionThisRound && monster.CorruptingDotRounds > 0)
         {
             long corruptDmg = Math.Max(1, monster.CorruptingDotTickDamage);
-            monster.HP = Math.Max(0, monster.HP - corruptDmg);
+            monster.HP = Math.Max(0, monster.HP - corruptDmg); // hq-armory: out (Corrupting Touch tick, scaled once at cast)
             long heal = Math.Max(1, corruptDmg / 2);
             long oldHP = player.HP;
             player.HP = Math.Min(player.MaxHP, player.HP + heal);
@@ -4929,7 +4941,7 @@ public partial class CombatEngine
             else if (random.Next(100) < 25)
             {
                 long selfDmg = Math.Max(1, monster.Strength / 3);
-                monster.HP = Math.Max(0, monster.HP - selfDmg);
+                monster.HP = Math.Max(0, monster.HP - selfDmg); // hq-armory: out (confusion self-hit, not player damage)
                 terminal.SetColor("magenta");
                 terminal.WriteLine(Loc.Get("combat.confusion_self_damage", monster.Name, selfDmg));
                 if (monster.HP <= 0)
@@ -5308,12 +5320,6 @@ public partial class CombatEngine
             playerDefense += (long)(playerDefense * (player.PermanentDefenseBonus / 100.0));
         }
 
-        // Team HQ Barracks bonus: +5% defense per level
-        if (player.HQBarracksLevel > 0)
-        {
-            playerDefense += (long)(playerDefense * (player.HQBarracksLevel * 0.05));
-        }
-
         // Knighthood bonus: +5% defense for knighted players
         if (player.IsKnighted)
         {
@@ -5451,6 +5457,10 @@ public partial class CombatEngine
         // v0.65.8 (R3): failed flee this round -> guarded half-round
         actualDamage = ApplyFleeGrace(player, actualDamage);
 
+        // v1.1.11: Team HQ Barracks last, before divine intervention, sacrifice and reflect read the
+        // number; the anti-tank minimum holds where it held before.
+        actualDamage = Math.Max(Math.Min(actualDamage, minDamage), TeamHQBonus.ApplyDefense(player, actualDamage));
+
         // Invulnerable: divine shield blocks all damage. Checked BEFORE divine
         // intervention and companion sacrifice -- the sacrifice used to fire first,
         // permanently killing a companion to absorb a hit the shield would have
@@ -5496,7 +5506,7 @@ public partial class CombatEngine
             long reflect = (long)(actualDamage * (player.TempThornReflectPercent / 100.0));
             if (reflect > 0)
             {
-                monster.HP = Math.Max(0, monster.HP - reflect);
+                monster.HP = Math.Max(0, monster.HP - reflect); // hq-armory: out (thorn reflect, derived from damage taken)
                 terminal.WriteLine(Loc.Get("combat.divine_mandate_reflect", monster.Name, reflect), "bright_magenta");
                 // If reflect kills the monster, credit the kill so XP/gold/quests register
                 if (monster.HP <= 0 && !result.DefeatedMonsters.Contains(monster))
@@ -5542,7 +5552,7 @@ public partial class CombatEngine
         {
             float reflectPct = IsManweBattle && ArtifactSystem.Instance.HasVoidKey() ? 0.30f : 0.15f;
             long reflectedDamage = Math.Max(1, (long)(actualDamage * reflectPct));
-            monster.HP = Math.Max(0, monster.HP - reflectedDamage);
+            monster.HP = Math.Max(0, monster.HP - reflectedDamage); // hq-armory: out (Scales of Law reflect)
             terminal.WriteLine(Loc.Get("combat.scales_reflect", reflectedDamage, monster.Name), "gray");
             if (monster.HP <= 0)
             {
@@ -5557,7 +5567,7 @@ public partial class CombatEngine
         if (thornsPct > 0 && actualDamage > 0 && monster.IsAlive)
         {
             long thornsDamage = Math.Max(1, actualDamage * thornsPct / 100);
-            monster.HP = Math.Max(0, monster.HP - thornsDamage);
+            monster.HP = Math.Max(0, monster.HP - thornsDamage); // hq-armory: out (equipment thorns)
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("combat.thorns_reflect", thornsDamage, monster.Name));
             if (monster.HP <= 0)
@@ -5575,7 +5585,7 @@ public partial class CombatEngine
                 ? GameConfig.VoidreaverReflectionPercent
                 : GameConfig.WavecallerReflectionPercent;
             long reflectDamage = Math.Max(1, (long)(actualDamage * reflectPercent));
-            monster.HP = Math.Max(0, monster.HP - reflectDamage);
+            monster.HP = Math.Max(0, monster.HP - reflectDamage); // hq-armory: out (Reflecting status)
             if (player.Class == CharacterClass.Voidreaver)
             {
                 terminal.SetColor("dark_red");
@@ -5767,6 +5777,8 @@ public partial class CombatEngine
 
                 // v0.65.8 (R3): failed flee this round -> guarded half-round
                 actualDamage = ApplyFleeGrace(player, actualDamage);
+                // v1.1.11: Team HQ Barracks last; the anti-tank minimum holds where it held before.
+                actualDamage = Math.Max(Math.Min(actualDamage, GetMinIncomingDamage(player, abilityResult.DirectDamage)), TeamHQBonus.ApplyDefense(player, actualDamage));
 
                 player.HP = Math.Max(0, player.HP - actualDamage);
 
@@ -5776,7 +5788,7 @@ public partial class CombatEngine
                     long reflect = (long)(actualDamage * (player.TempThornReflectPercent / 100.0));
                     if (reflect > 0)
                     {
-                        monster.HP = Math.Max(0, monster.HP - reflect);
+                        monster.HP = Math.Max(0, monster.HP - reflect); // hq-armory: out (thorn reflect)
                         terminal.WriteLine(Loc.Get("combat.divine_mandate_reflect", monster.Name, reflect), "bright_magenta");
                         if (monster.HP <= 0 && !result.DefeatedMonsters.Contains(monster))
                             result.DefeatedMonsters.Add(monster);
@@ -5884,6 +5896,8 @@ public partial class CombatEngine
 
                 // v0.65.8 (R3): failed flee this round -> guarded half-round
                 damage = ApplyFleeGrace(player, damage);
+                // v1.1.11: Team HQ Barracks last, before the drain heal reads it; the minimum holds where it held.
+                damage = Math.Max(Math.Min(damage, GetMinIncomingDamage(player, rawLifeStealDamage)), TeamHQBonus.ApplyDefense(player, damage));
 
                 player.HP -= damage;
                 long healAmount = damage * abilityResult.LifeStealPercent / 100;
@@ -5945,6 +5959,8 @@ public partial class CombatEngine
 
                 // v0.65.8 (R3): failed flee this round -> guarded half-round
                 damage = ApplyFleeGrace(player, damage);
+                // v1.1.11: Team HQ Barracks last; the anti-tank minimum holds where it held before.
+                damage = Math.Max(Math.Min(damage, GetMinIncomingDamage(player, rawDamage)), TeamHQBonus.ApplyDefense(player, damage));
 
                 player.HP -= damage;
                 terminal.WriteLine(Loc.Get("combat.you_take_damage", damage), "red");
@@ -5955,7 +5971,7 @@ public partial class CombatEngine
                     long reflect = (long)(damage * (player.TempThornReflectPercent / 100.0));
                     if (reflect > 0)
                     {
-                        monster.HP = Math.Max(0, monster.HP - reflect);
+                        monster.HP = Math.Max(0, monster.HP - reflect); // hq-armory: out (thorn reflect)
                         terminal.WriteLine(Loc.Get("combat.divine_mandate_reflect", monster.Name, reflect), "bright_magenta");
                         if (monster.HP <= 0 && !result.DefeatedMonsters.Contains(monster))
                             result.DefeatedMonsters.Add(monster);
@@ -6059,6 +6075,7 @@ public partial class CombatEngine
 
         // Failed flee this round -> guarded half-round
         actualDamage = ApplyFleeGrace(player, actualDamage);
+        actualDamage = TeamHQBonus.ApplyDefense(player, actualDamage); // v1.1.11: Team HQ Barracks, last
 
         player.HP = Math.Max(0, player.HP - actualDamage);
 
@@ -6068,7 +6085,7 @@ public partial class CombatEngine
             long reflect = (long)(actualDamage * (player.TempThornReflectPercent / 100.0));
             if (reflect > 0)
             {
-                monster.HP = Math.Max(0, monster.HP - reflect);
+                monster.HP = Math.Max(0, monster.HP - reflect); // hq-armory: out (thorn reflect)
                 terminal.WriteLine(Loc.Get("combat.divine_mandate_reflect", monster.Name, reflect), "bright_magenta");
                 if (monster.HP <= 0 && !result.DefeatedMonsters.Contains(monster))
                     result.DefeatedMonsters.Add(monster);
@@ -6434,7 +6451,7 @@ public partial class CombatEngine
 
             case "Unmake":
             {
-                long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 2.5) - player.Defence));
+                long damage = TeamHQBonus.ApplyDefense(player, Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 2.5) - player.Defence))); // v1.1.11: Team HQ Barracks, last
                 if (player.HasStatus(StatusEffect.Invulnerable))
                 {
                     terminal.WriteLine($"  {Loc.Get("combat.manwe_unmake_shield")}", "bright_white");
@@ -6464,7 +6481,7 @@ public partial class CombatEngine
                 {
                     flavor = $"  {Loc.Get("combat.manwe_judgment_normal")}";
                 }
-                long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * mult) - player.Defence));
+                long damage = TeamHQBonus.ApplyDefense(player, Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * mult) - player.Defence))); // v1.1.11: Team HQ Barracks, last
                 if (player.HasStatus(StatusEffect.Invulnerable))
                 {
                     terminal.WriteLine($"  {Loc.Get("combat.manwe_judgment_block")}", "bright_white");
@@ -6519,7 +6536,7 @@ public partial class CombatEngine
                 else if (effect == 1)
                 {
                     // 1.5x damage
-                    long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 1.5) - player.Defence));
+                    long damage = TeamHQBonus.ApplyDefense(player, Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 1.5) - player.Defence))); // v1.1.11: Team HQ Barracks, last
                     if (!player.HasStatus(StatusEffect.Invulnerable))
                     {
                         player.HP -= damage;
@@ -6547,7 +6564,7 @@ public partial class CombatEngine
                     }
                     else
                     {
-                        long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 1.5) - player.Defence));
+                        long damage = TeamHQBonus.ApplyDefense(player, Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 1.5) - player.Defence))); // v1.1.11: Team HQ Barracks, last
                         if (!player.HasStatus(StatusEffect.Invulnerable))
                         {
                             player.HP -= damage;
@@ -6594,7 +6611,7 @@ public partial class CombatEngine
                 else
                 {
                     // Already split — do a heavy damage attack instead
-                    long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 2.0) - player.Defence));
+                    long damage = TeamHQBonus.ApplyDefense(player, Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 2.0) - player.Defence))); // v1.1.11: Team HQ Barracks, last
                     if (!player.HasStatus(StatusEffect.Invulnerable))
                     {
                         player.HP -= damage;
@@ -6608,7 +6625,7 @@ public partial class CombatEngine
 
             case "Light Incarnate":
             {
-                long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 3.0) - player.Defence));
+                long damage = TeamHQBonus.ApplyDefense(player, Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 3.0) - player.Defence))); // v1.1.11: Team HQ Barracks, last
                 if (player.HasStatus(StatusEffect.Invulnerable))
                 {
                     terminal.WriteLine($"  {Loc.Get("combat.manwe_light_block")}", "bright_white");
@@ -6626,7 +6643,7 @@ public partial class CombatEngine
 
             case "Shadow Incarnate":
             {
-                long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 2.0) - player.Defence));
+                long damage = TeamHQBonus.ApplyDefense(player, Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 2.0) - player.Defence))); // v1.1.11: Team HQ Barracks, last
                 long healAmt = damage * 30 / 100;
                 if (player.HasStatus(StatusEffect.Invulnerable))
                 {
@@ -6662,7 +6679,7 @@ public partial class CombatEngine
                 else
                 {
                     // The question IS the attack
-                    long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 3.0) - player.Defence));
+                    long damage = TeamHQBonus.ApplyDefense(player, Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 3.0) - player.Defence))); // v1.1.11: Team HQ Barracks, last
                     if (!player.HasStatus(StatusEffect.Invulnerable))
                     {
                         player.HP -= damage;
@@ -6679,7 +6696,7 @@ public partial class CombatEngine
 
             case "Final Word":
             {
-                long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 4.0) - player.Defence));
+                long damage = TeamHQBonus.ApplyDefense(player, Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 4.0) - player.Defence))); // v1.1.11: Team HQ Barracks, last
                 if (player.HasStatus(StatusEffect.Invulnerable))
                 {
                     terminal.WriteLine($"  {Loc.Get("combat.manwe_final_word_block")}", "bright_white");
@@ -6703,7 +6720,7 @@ public partial class CombatEngine
                     // Check for Worldstone protection
                     if (ArtifactSystem.Instance.HasArtifact(ArtifactType.Worldstone))
                     {
-                        long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 3.0) - player.Defence));
+                        long damage = TeamHQBonus.ApplyDefense(player, Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 3.0) - player.Defence))); // v1.1.11: Team HQ Barracks, last
                         if (!player.HasStatus(StatusEffect.Invulnerable))
                         {
                             player.HP -= damage;
@@ -6726,7 +6743,7 @@ public partial class CombatEngine
                 else
                 {
                     // Player HP too high for instant kill — heavy damage instead
-                    long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 3.5) - player.Defence));
+                    long damage = TeamHQBonus.ApplyDefense(player, Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 3.5) - player.Defence))); // v1.1.11: Team HQ Barracks, last
                     if (!player.HasStatus(StatusEffect.Invulnerable))
                     {
                         player.HP -= damage;
@@ -6779,7 +6796,7 @@ public partial class CombatEngine
                 else
                 {
                     // Already offered — use Final Word instead
-                    long damage = Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 4.0) - player.Defence));
+                    long damage = TeamHQBonus.ApplyDefense(player, Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 4.0) - player.Defence))); // v1.1.11: Team HQ Barracks, last
                     if (!player.HasStatus(StatusEffect.Invulnerable))
                     {
                         player.HP -= damage;
@@ -7213,12 +7230,6 @@ public partial class CombatEngine
             double guildMult = GuildSystem.Instance.GetGuildXPMultiplier(result.Player.Name1 ?? "");
             if (guildMult > 1.0)
                 expReward = (long)(expReward * guildMult);
-        }
-
-        // Team HQ Training bonus: +5% XP per level
-        if (result.Player.HQTrainingLevel > 0)
-        {
-            expReward += (long)(expReward * (result.Player.HQTrainingLevel * 0.05));
         }
 
         // Fatigue XP penalty — Exhausted tier only (single-player only)
@@ -8169,6 +8180,9 @@ public partial class CombatEngine
             terminal.WriteLine(Loc.Get("combat.marked_bonus", markedBonus));
         }
 
+        // v1.1.11: Team HQ Armory, after every other modifier of the hit.
+        actualDamage = TeamHQBonus.ApplyAttack(player, actualDamage);
+
         target.HP -= actualDamage;
         result.TotalDamageDealt += actualDamage;
         result.Player?.Statistics.RecordDamageDealt(actualDamage, crit || alreadyCrit);
@@ -8200,7 +8214,7 @@ public partial class CombatEngine
         if (!isSpellDamage && attacker.IsPet && attacker.PetSpeciesId == "storm_eagle" && target.IsAlive)
         {
             long lightningBonus = Math.Max(1, damage / 10);
-            target.HP = Math.Max(0, target.HP - lightningBonus);
+            target.HP = Math.Max(0, target.HP - lightningBonus); // hq-armory: out (Storm Eagle pet chip)
             terminal.WriteLine(Loc.Get("combat.storm_eagle_lightning", attackerName, target.Name, lightningBonus), "bright_cyan");
 
             if (target.IsAlive && random.Next(100) < 15)
@@ -8368,7 +8382,7 @@ public partial class CombatEngine
                 && (target.MonsterClass == MonsterClass.Undead || target.MonsterClass == MonsterClass.Demon))
             {
                 long smite = Math.Max(1, (long)(damage * smiteBonus));
-                target.HP = Math.Max(0, target.HP - smite);
+                target.HP = Math.Max(0, target.HP - smite); // hq-armory: out (post-hit rider)
                 terminal.WriteLine(Loc.Get("combat.holy_smite_passive", target.Name, smite), "bright_yellow");
             }
         }
@@ -8561,7 +8575,7 @@ public partial class CombatEngine
         if (targetAlive && weapon.HasFireEnchant && random.NextDouble() < GameConfig.FireEnchantProcChance)
         {
             long fireDamage = Math.Max(1, (long)(damage * GameConfig.FireEnchantDamageMultiplier));
-            target.HP = Math.Max(0, target.HP - fireDamage);
+            target.HP = Math.Max(0, target.HP - fireDamage); // hq-armory: out (post-hit rider)
             terminal.SetColor("bright_red");
             terminal.WriteLine(isPlayer
                 ? Loc.Get("combat.enchant_fire", fireDamage)
@@ -8596,7 +8610,7 @@ public partial class CombatEngine
         if (targetAlive && weapon.HasLightningEnchant && random.NextDouble() < GameConfig.LightningEnchantProcChance)
         {
             long lightningDamage = Math.Max(1, (long)(damage * GameConfig.LightningEnchantDamageMultiplier));
-            target.HP = Math.Max(0, target.HP - lightningDamage);
+            target.HP = Math.Max(0, target.HP - lightningDamage); // hq-armory: out (post-hit rider)
             // v0.60.0 stun-lock audit: route through TryStunMonster. Lightning enchant
             // was the highest-volume cheese vector (15% per attack, multi-attack/dual-wield
             // = ~50% per round, refresh-stack onto an already-stunned target).
@@ -8620,9 +8634,11 @@ public partial class CombatEngine
 
         if (targetAlive && weapon.HasPoisonEnchant && random.NextDouble() < GameConfig.PoisonEnchantProcChance)
         {
-            int poisonValue = weapon.PoisonDamage > 0 ? weapon.PoisonDamage : (int)(damage * 0.10);
-            long poisonDamage = Math.Max(1, poisonValue);
-            target.HP = Math.Max(0, target.HP - poisonDamage);
+            // v1.1.11: a fixed PoisonDamage does not come from the (Armory-boosted) hit, so it takes the Armory itself
+            long poisonDamage = weapon.PoisonDamage > 0
+                ? Math.Max(1, TeamHQBonus.ApplyAttack(attacker, weapon.PoisonDamage))
+                : Math.Max(1, (int)(damage * 0.10));
+            target.HP = Math.Max(0, target.HP - poisonDamage); // hq-armory: out (percentage rider of the boosted hit; the fixed value applies it above)
             terminal.SetColor("green");
             // v0.60.10 (druidah report): attribute teammate procs by name (see frost note above).
             terminal.WriteLine(isPlayer
@@ -8652,7 +8668,7 @@ public partial class CombatEngine
                 if (attacker.IsAttunedTo("aurelion"))
                     holyMult *= (1f + GameConfig.ShrineAurelionHolyProcBonus);
                 long holyDamage = Math.Max(1, (long)(damage * holyMult));
-                target.HP = Math.Max(0, target.HP - holyDamage);
+                target.HP = Math.Max(0, target.HP - holyDamage); // hq-armory: out (post-hit rider)
                 terminal.SetColor("bright_white");
                 // v0.60.10 (druidah report): attribute teammate procs by name (see frost note above).
                 if (isPlayer)
@@ -8680,7 +8696,7 @@ public partial class CombatEngine
             else
             {
                 long shadowDamage = Math.Max(1, (long)(damage * GameConfig.ShadowEnchantDamageMultiplier));
-                target.HP = Math.Max(0, target.HP - shadowDamage);
+                target.HP = Math.Max(0, target.HP - shadowDamage); // hq-armory: out (post-hit rider)
                 terminal.SetColor("dark_magenta");
                 // v0.60.10 (druidah report): attribute teammate procs by name (see frost note above).
                 terminal.WriteLine(isPlayer
@@ -8698,7 +8714,7 @@ public partial class CombatEngine
             && !IsDemonMonster(target) && random.NextDouble() < 0.12)
         {
             long wispDamage = Math.Max(1, (long)(damage * 0.10));
-            target.HP = Math.Max(0, target.HP - wispDamage);
+            target.HP = Math.Max(0, target.HP - wispDamage); // hq-armory: out (post-hit rider)
             terminal.SetColor("dark_magenta");
             terminal.WriteLine(Loc.Get("combat.bog_wisp_proc", wispDamage));
             result.TotalDamageDealt += wispDamage;
@@ -8876,6 +8892,7 @@ public partial class CombatEngine
         // Don't waste a potion if the deficit is trivial — only auto-heal
         // when missing at least half a potion's average healing value
         long avgPotionHeal = 30 + player.Level * 5 + 20; // midpoint of random(10,30)
+        avgPotionHeal = PotionBonus.ApplyOwnerBonuses(player, avgPotionHeal); // v1.1.11: Infirmary
         long hpDeficit = player.MaxHP - player.HP;
         if (hpDeficit < avgPotionHeal / 2)
             return;
@@ -8890,6 +8907,7 @@ public partial class CombatEngine
                 break;
 
             long healAmount = 30 + player.Level * 5 + random.Next(10, 30);
+            healAmount = PotionBonus.ApplyOwnerBonuses(player, healAmount); // v1.1.11: Infirmary, before the cap
             healAmount = Math.Min(healAmount, player.MaxHP - player.HP);
             player.HP += healAmount;
             totalHealed += healAmount;
@@ -12464,6 +12482,11 @@ public partial class CombatEngine
                 actualDamage += sleepBonus;
             }
 
+            // v1.1.11: Team HQ Armory, last. A null attacker is the player's own spell.
+            var armoryOwner = attacker ?? currentPlayer;
+            if (armoryOwner != null)
+                actualDamage = TeamHQBonus.ApplyAttack(armoryOwner, actualDamage);
+
             monster.HP -= actualDamage;
 
             // Track damage dealt statistics
@@ -12646,6 +12669,10 @@ public partial class CombatEngine
             terminal.WriteLine(Loc.Get("combat.sleep_bonus_damage", target.Name, sleepBonus));
         }
 
+        // v1.1.11: Team HQ Armory, after every other modifier of the hit (0 for NPCs and companions).
+        if (attacker != null)
+            actualDamage = TeamHQBonus.ApplyAttack(attacker, actualDamage);
+
         target.HP -= actualDamage;
 
         // Track damage dealt statistics (only for player attacks)
@@ -12769,6 +12796,7 @@ public partial class CombatEngine
             long shamanWeapPowMM = shamanWeaponMM?.WeaponPower ?? 0;
             long enchantDamage = (long)(shamanWeapPowMM * player.ShamanEnchantPower / 100.0);
             enchantDamage = Math.Max(1, enchantDamage);
+            enchantDamage = TeamHQBonus.ApplyAttack(player, enchantDamage);   // v1.1.11: from weapon power, not the hit, so it takes the Armory itself
             target.HP -= (int)enchantDamage;
             result.TotalDamageDealt += enchantDamage;
 
@@ -12994,8 +13022,6 @@ public partial class CombatEngine
                             attackPower += (long)(attackPower * GameConfig.PoisonCoatingDamageBonus);
                         if (player.PermanentDamageBonus > 0)
                             attackPower += (long)(attackPower * (player.PermanentDamageBonus / 100.0));
-                        if (player.HQArmoryLevel > 0)
-                            attackPower += (long)(attackPower * (player.HQArmoryLevel * 0.05));
                         if (player.IsKnighted)
                             attackPower += (long)(attackPower * GameConfig.KnightDamageBonus);
                         // v0.60.11: Grand Champion +3% damage stacks with knighthood.
@@ -13505,7 +13531,7 @@ public partial class CombatEngine
                         // All landed-swing on-hit effects (post-hit enchants + Shaman weapon-enchant
                         // rider + Ancestral Guidance) run through the shared helper so the [P] Power
                         // Attack fires the identical pipeline.
-                        ApplyPlayerSwingOnHitEffects(player, target, damage, isOffHandAttack, result);
+                        ApplyPlayerSwingOnHitEffects(player, target, TeamHQBonus.ApplyAttack(player, damage), isOffHandAttack, result);   // v1.1.11: riders scale from the hit, Armory included
                     }
                 }
                 break;
@@ -13826,7 +13852,7 @@ public partial class CombatEngine
         // procs, Sunforged, poison, Shaman rider). Gated on the swing landing so an evaded swing
         // (Incorporeal/Phase, ApplySingleMonsterDamage returns false) procs nothing.
         if (await ApplySingleMonsterDamage(target, powerDamage, result, "power attack", player))
-            ApplyPlayerSwingOnHitEffects(player, target, powerDamage, isOffHandAttack: false, result);
+            ApplyPlayerSwingOnHitEffects(player, target, TeamHQBonus.ApplyAttack(player, powerDamage), isOffHandAttack: false, result);   // v1.1.11
 
         // Follow up with off-hand attack if dual-wielding
         if (player.IsDualWielding)
@@ -13849,7 +13875,7 @@ public partial class CombatEngine
                 // Off-hand follow-up procs its enchants only if it actually connected (same evade
                 // gate + shared on-hit pipeline as the basic-attack off-hand swing).
                 if (await ApplySingleMonsterDamage(offHandTarget, ohDamage, result, "off-hand strike", player))
-                    ApplyPlayerSwingOnHitEffects(player, offHandTarget, ohDamage, isOffHandAttack: true, result);
+                    ApplyPlayerSwingOnHitEffects(player, offHandTarget, TeamHQBonus.ApplyAttack(player, ohDamage), isOffHandAttack: true, result);   // v1.1.11
             }
         }
     }
@@ -14382,6 +14408,9 @@ public partial class CombatEngine
                     terminal.WriteLine(Loc.Get("combat.marked_bonus", markedBonus));
                 }
 
+                // v1.1.11: Team HQ Armory, after every other modifier of the hit.
+                actualDamage = TeamHQBonus.ApplyAttack(player, actualDamage);
+
                 target.HP -= actualDamage;
                 result.TotalDamageDealt += actualDamage;
 
@@ -14498,7 +14527,7 @@ public partial class CombatEngine
                 // Off-hand follow-up only procs its enchants if it actually connected; an evaded
                 // swing (Incorporeal/Phase) passes through for 0 damage and must not lifesteal.
                 if (await ApplySingleMonsterDamage(offHandTarget, ohDamage, result, "off-hand strike", player))
-                    ApplyPostHitEnchantments(player, offHandTarget, ohDamage, result, weaponSlot: EquipmentSlot.OffHand);
+                    ApplyPostHitEnchantments(player, offHandTarget, TeamHQBonus.ApplyAttack(player, ohDamage), result, weaponSlot: EquipmentSlot.OffHand);   // v1.1.11: riders scale from the boosted hit, as at every other caller
             }
         }
 
@@ -14687,6 +14716,7 @@ public partial class CombatEngine
                     if (hpPercentMM < 0.30)
                     {
                         long executeBonusMM = abilityResult.Damage;
+                        executeBonusMM = TeamHQBonus.ApplyAttack(player, executeBonusMM); // v1.1.11: Team HQ Armory, last.
                         target.HP = Math.Max(0, target.HP - executeBonusMM);
                         result.TotalDamageDealt += executeBonusMM;
                         result.Player?.Statistics.RecordDamageDealt(executeBonusMM, false);
@@ -14696,6 +14726,7 @@ public partial class CombatEngine
                     else if (hpPercentMM < 0.50)
                     {
                         long executeBonusMM = abilityResult.Damage / 2;
+                        executeBonusMM = TeamHQBonus.ApplyAttack(player, executeBonusMM); // v1.1.11: Team HQ Armory, last.
                         target.HP = Math.Max(0, target.HP - executeBonusMM);
                         result.TotalDamageDealt += executeBonusMM;
                         result.Player?.Statistics.RecordDamageDealt(executeBonusMM, false);
@@ -14850,6 +14881,7 @@ public partial class CombatEngine
                 {
                     long desperateDmg = (long)(abilityResult.Damage * 0.5);
                     desperateDmg = Math.Max(1, desperateDmg - target.Defence / 4);
+                    desperateDmg = TeamHQBonus.ApplyAttack(player, desperateDmg); // v1.1.11: Team HQ Armory, last.
                     target.HP -= desperateDmg;
                     result.TotalDamageDealt += desperateDmg;
                     result.Player?.Statistics.RecordDamageDealt(desperateDmg, false);
@@ -14873,6 +14905,7 @@ public partial class CombatEngine
                     if (fireVulnerable)
                     {
                         long fireBonusDmg = abilityResult.Damage / 2;
+                        fireBonusDmg = TeamHQBonus.ApplyAttack(player, fireBonusDmg); // v1.1.11: Team HQ Armory, last.
                         target.HP -= fireBonusDmg;
                         result.TotalDamageDealt += fireBonusDmg;
                         result.Player?.Statistics.RecordDamageDealt(fireBonusDmg, false);
@@ -14912,6 +14945,7 @@ public partial class CombatEngine
                     // v0.61.0 Druid's Shrines: Aurelion attunement = +5% holy ability damage.
                     if (result.Player != null && result.Player.IsAttunedTo("aurelion"))
                         holyBonusDmg = (long)(holyBonusDmg * (1f + GameConfig.ShrineAurelionHolyDamageBonus));
+                    holyBonusDmg = TeamHQBonus.ApplyAttack(player, holyBonusDmg); // v1.1.11: Team HQ Armory, last.
                     target.HP -= holyBonusDmg;
                     result.TotalDamageDealt += holyBonusDmg;
                     result.Player?.Statistics.RecordDamageDealt(holyBonusDmg, false);
@@ -14938,6 +14972,7 @@ public partial class CombatEngine
                     (target.MonsterClass == MonsterClass.Undead || target.MonsterClass == MonsterClass.Demon || target.Undead > 0))
                 {
                     long avengerBonusDmg = (long)(abilityResult.Damage * 0.75);
+                    avengerBonusDmg = TeamHQBonus.ApplyAttack(player, avengerBonusDmg); // v1.1.11: Team HQ Armory, last.
                     target.HP -= avengerBonusDmg;
                     result.TotalDamageDealt += avengerBonusDmg;
                     result.Player?.Statistics.RecordDamageDealt(avengerBonusDmg, false);
@@ -15003,6 +15038,7 @@ public partial class CombatEngine
                             holyAoeDmg = (long)(holyAoeDmg * 1.5);
                         long actualHolyDmg = Math.Max(1, holyAoeDmg - m.ArmPow / 2);
                         if (m.IsSleeping) { actualHolyDmg += actualHolyDmg / 2; }
+                        actualHolyDmg = TeamHQBonus.ApplyAttack(player, actualHolyDmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= actualHolyDmg;
                         result.Player?.Statistics.RecordDamageDealt(actualHolyDmg, false);
                         result.TotalDamageDealt += actualHolyDmg;
@@ -15116,6 +15152,7 @@ public partial class CombatEngine
                     {
                         long frenzyDmg = Math.Max(1, abilityResult.Damage / 3 - target.Defence / 4);
                         frenzyDmg = (long)(frenzyDmg * (0.8 + random.NextDouble() * 0.4));
+                        frenzyDmg = TeamHQBonus.ApplyAttack(player, frenzyDmg); // v1.1.11: Team HQ Armory, last.
                         target.HP -= frenzyDmg;
                         result.TotalDamageDealt += frenzyDmg;
                         result.Player?.Statistics.RecordDamageDealt(frenzyDmg, false);
@@ -15145,6 +15182,7 @@ public partial class CombatEngine
                         bool isExecute = m.HP < m.MaxHP * 0.3;
                         if (isExecute) blossomDmg *= 2;
                         if (m.IsSleeping) blossomDmg += blossomDmg / 2;
+                        blossomDmg = TeamHQBonus.ApplyAttack(player, blossomDmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= blossomDmg;
                         result.TotalDamageDealt += blossomDmg;
                         result.Player?.Statistics.RecordDamageDealt(blossomDmg, false);
@@ -15348,6 +15386,7 @@ public partial class CombatEngine
                     var corrodeTarget = corrodeTargets[ci];
                     long corrodeDmg = abilityResult.Damage > 0 ? abilityResult.Damage : 50 + player.Intelligence * 2;
                     corrodeDmg = (long)(corrodeDmg * GetAoEDiminishingMultiplier(ci));
+                    corrodeDmg = TeamHQBonus.ApplyAttack(player, corrodeDmg); // v1.1.11: Team HQ Armory, last.
                     corrodeTarget.HP -= (int)corrodeDmg;
                     result.TotalDamageDealt += corrodeDmg;
                     corrodeTarget.IsCorroded = true;
@@ -15529,6 +15568,7 @@ public partial class CombatEngine
                         // AoE diminishing returns per target
                         float aoeMult = targetIdx switch { 0 => 1.0f, 1 => 0.75f, 2 => 0.50f, _ => 0.25f };
                         dmg = Math.Max(1, (int)(dmg * aoeMult));
+                        dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
                         totalHeal += (int)(dmg * 0.20);
                         terminal.SetColor(isHoly ? "bright_yellow" : "bright_cyan");
@@ -15686,6 +15726,7 @@ public partial class CombatEngine
                     {
                         var m = crescLiving[ci];
                         int dmg = (int)((abilityResult.Damage + bonusDmg) * GetAoEDiminishingMultiplier(ci));
+                        dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
                         terminal.SetColor("bright_cyan");
                         terminal.WriteLine(Loc.Get("combat.ability_crescendo_aoe", m.Name, dmg));
@@ -15731,6 +15772,7 @@ public partial class CombatEngine
                     {
                         var m = gfLiving[gi];
                         int dmg = (int)(abilityResult.Damage * GetAoEDiminishingMultiplier(gi));
+                        dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
                         terminal.SetColor("bright_magenta");
                         terminal.WriteLine(Loc.Get("combat.ability_grand_finale", m.Name, dmg));
@@ -15803,6 +15845,7 @@ public partial class CombatEngine
                     foreach (var m in monsters.Where(m => m.IsAlive))
                     {
                         int dmg = (int)(abilityResult.Damage * multiplier);
+                        dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
                         terminal.SetColor("bright_cyan");
                         terminal.WriteLine(Loc.Get("combat.ability_resonance_cascade", m.Name, dmg));
@@ -15867,6 +15910,7 @@ public partial class CombatEngine
                     foreach (var m in monsters.Where(m => m.IsAlive))
                     {
                         int dmg = abilityResult.Damage + bonusDmg;
+                        dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
                         terminal.SetColor("bright_yellow");
                         terminal.WriteLine(Loc.Get("combat.ability_grand_finale", m.Name, dmg));
@@ -15933,7 +15977,7 @@ public partial class CombatEngine
                     terminal.WriteLine(Loc.Get("combat.ability_echo_25", target.Name, dmg));
                     if (random.Next(100) < 25)
                     {
-                        target.HP -= dmg;
+                        target.HP -= dmg; // hq-armory: out (echo reuses the boosted helper hit)
                         terminal.SetColor("bright_magenta");
                         terminal.WriteLine(Loc.Get("combat.ability_echo_25_echo", dmg));
                     }
@@ -15965,6 +16009,7 @@ public partial class CombatEngine
                     {
                         var m = entropyLiving[ei];
                         int dmg = (int)(abilityResult.Damage * GetAoEDiminishingMultiplier(ei));
+                        dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
                         m.IsMarked = true;
                         m.MarkedDuration = Math.Max(m.MarkedDuration, abilityResult.Duration > 0 ? abilityResult.Duration : 4);
@@ -16027,6 +16072,7 @@ public partial class CombatEngine
                     {
                         int dmg = abilityResult.Damage;
                         if (m.Stunned || m.IsStunned) dmg *= 2;
+                        dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
                         terminal.SetColor("bright_magenta");
                         terminal.WriteLine(Loc.Get(m.Stunned ? "combat.ability_singularity_stun" : "combat.ability_singularity", m.Name, dmg));
@@ -16101,6 +16147,8 @@ public partial class CombatEngine
                 {
                     int dotRounds = abilityResult.Duration > 0 ? abilityResult.Duration : 5;
                     long tickDmg = Math.Max(1, abilityResult.Damage);
+                    // v1.1.11: Team HQ Armory, once at cast; the tick has no caster to read.
+                    tickDmg = TeamHQBonus.ApplyAttack(player, tickDmg);
                     target.CorruptingDotRounds = Math.Max(target.CorruptingDotRounds, dotRounds);
                     target.CorruptingDotTickDamage = Math.Max(target.CorruptingDotTickDamage, tickDmg);
                     terminal.SetColor("dark_red");
@@ -16150,7 +16198,7 @@ public partial class CombatEngine
                         {
                             var m = overflowLiving[oi];
                             int spreadDmg = (int)(spreadDmgBase * GetAoEDiminishingMultiplier(oi));
-                            m.HP -= spreadDmg;
+                            m.HP -= spreadDmg; // hq-armory: out (spread is derived from the boosted helper hit)
                             terminal.SetColor("bright_red");
                             terminal.WriteLine(Loc.Get("combat.ability_overflow_aoe_spread", m.Name, spreadDmg));
                             if (m.HP <= 0)
@@ -16202,6 +16250,7 @@ public partial class CombatEngine
                     foreach (var m in monsters.Where(m => m.IsAlive))
                     {
                         int dmg = abilityResult.Damage;
+                        dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
                         m.Poisoned = true;
                         m.PoisonRounds = Math.Max(m.PoisonRounds, 3);
@@ -16279,6 +16328,7 @@ public partial class CombatEngine
                     foreach (var m in monsters.Where(m => m.IsAlive))
                     {
                         int dmg = abilityResult.Damage;
+                        dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
                         terminal.SetColor("bright_red");
                         terminal.WriteLine(Loc.Get("combat.ability_abyss_unchained", m.Name, dmg));
@@ -16461,6 +16511,7 @@ public partial class CombatEngine
                     {
                         var m = vrLiving[vi];
                         int dmg = (int)(abilityResult.Damage * GetAoEDiminishingMultiplier(vi));
+                        dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
                         terminal.SetColor("bright_red");
                         terminal.WriteLine(Loc.Get("combat.ability_void_rupture", m.Name, dmg));
@@ -16478,6 +16529,7 @@ public partial class CombatEngine
                         foreach (var m in monsters.Where(m => m.IsAlive))
                         {
                             int explosionDmg = explosionBase * kills;
+                            explosionDmg = (int)TeamHQBonus.ApplyAttack(player, explosionDmg); // v1.1.11: Team HQ Armory, last.
                             m.HP -= explosionDmg;
                             terminal.SetColor("bright_red");
                             terminal.WriteLine(Loc.Get("combat.ability_void_rupture_explode", kills, m.Name, explosionDmg));
@@ -16631,9 +16683,10 @@ public partial class CombatEngine
                 // Hit primary target
                 if (target != null && target.IsAlive)
                 {
-                    target.HP -= (int)chainDamage;
-                    result.TotalDamageDealt += chainDamage;
-                    terminal.WriteLine(Loc.Get("combat.shaman_lightning_bolt", target.Name, chainDamage), "bright_yellow");
+                    long primaryHit = TeamHQBonus.ApplyAttack(player, chainDamage); // v1.1.11: Team HQ Armory, last.
+                    target.HP -= (int)primaryHit;
+                    result.TotalDamageDealt += primaryHit;
+                    terminal.WriteLine(Loc.Get("combat.shaman_lightning_bolt", target.Name, primaryHit), "bright_yellow");
                 }
                 // Chain to other living monsters at reduced damage
                 if (monsters != null)
@@ -16644,6 +16697,7 @@ public partial class CombatEngine
                     {
                         var m = chainTargets[chi];
                         long chainHit = (long)(chainReduced * GetAoEDiminishingMultiplier(chi));
+                        chainHit = TeamHQBonus.ApplyAttack(player, chainHit); // v1.1.11: Team HQ Armory, last.
                         m.HP -= (int)chainHit;
                         result.TotalDamageDealt += chainHit;
                         terminal.WriteLine(Loc.Get("combat.shaman_chain_lightning", m.Name, chainHit), "yellow");
@@ -17260,6 +17314,7 @@ public partial class CombatEngine
                 if (target.MonsterClass == MonsterClass.Undead || target.MonsterClass == MonsterClass.Demon)
                 {
                     long holyBonus = (long)(spellDamage * 0.5);
+                    holyBonus = TeamHQBonus.ApplyAttack(player, holyBonus); // v1.1.11: Team HQ Armory, last.
                     target.HP -= holyBonus;
                     terminal.WriteLine(Loc.Get("combat.spell_holy_bonus", target.Name, holyBonus), "bright_yellow");
                     result.CombatLog.Add($"Holy bonus: {holyBonus} vs {target.MonsterClass}");
@@ -17329,6 +17384,7 @@ public partial class CombatEngine
                 if (target.IsAlive && target.ArmPow > 0)
                 {
                     long bonusDmg = Math.Max(1, target.ArmPow);
+                    bonusDmg = TeamHQBonus.ApplyAttack(player, bonusDmg); // v1.1.11: Team HQ Armory, last.
                     target.HP -= bonusDmg;
                     terminal.SetColor("dark_red");
                     terminal.WriteLine(Loc.Get("combat.void_bolt_pierce", bonusDmg));
@@ -17346,6 +17402,7 @@ public partial class CombatEngine
                 if (target.IsAlive && target.ArmPow > 0)
                 {
                     long shadowBonus = Math.Max(1, target.ArmPow);
+                    shadowBonus = TeamHQBonus.ApplyAttack(player, shadowBonus); // v1.1.11: Team HQ Armory, last.
                     target.HP -= shadowBonus;
                     terminal.WriteLine(Loc.Get("combat.shadow_strike_bypass", shadowBonus), "dark_red");
                     if (target.HP <= 0)
@@ -17382,6 +17439,7 @@ public partial class CombatEngine
                 if (target.IsAlive && target.ArmPow > 0)
                 {
                     long halfDefBonus = Math.Max(1, target.ArmPow / 2);
+                    halfDefBonus = TeamHQBonus.ApplyAttack(player, halfDefBonus); // v1.1.11: Team HQ Armory, last.
                     target.HP -= halfDefBonus;
                     terminal.SetColor("cyan");
                     terminal.WriteLine(Loc.Get("combat.future_echo", target.Name, halfDefBonus));
@@ -17430,6 +17488,7 @@ public partial class CombatEngine
                 if (target.IsAlive && target.ArmPow > 0)
                 {
                     long pierceDmg = Math.Max(1, target.ArmPow);
+                    pierceDmg = TeamHQBonus.ApplyAttack(player, pierceDmg); // v1.1.11: Team HQ Armory, last.
                     target.HP -= pierceDmg;
                     result.TotalDamageDealt += pierceDmg;
                     terminal.WriteLine(Loc.Get("combat.flames_penetrate_armor", pierceDmg), "bright_red");
@@ -17489,7 +17548,7 @@ public partial class CombatEngine
                     long paradoxBonus = (long)(result.TotalDamageDealt * 0.10);
                     if (paradoxBonus > 0)
                     {
-                        target.HP -= (int)paradoxBonus;
+                        target.HP -= (int)paradoxBonus; // hq-armory: out (derived from TotalDamageDealt, which already carries it)
                         terminal.WriteLine(Loc.Get("combat.paradox_collapse_bonus", paradoxBonus), "bright_magenta");
                         if (target.HP <= 0)
                         {
@@ -17841,6 +17900,7 @@ public partial class CombatEngine
             // Calculate how much HP is missing
             long missingHP = targetAlly.MaxHP - targetAlly.HP;
             int healPerPotion = 30 + player.Level * 5 + 20; // Average heal per potion
+            healPerPotion = (int)PotionBonus.ApplyOwnerBonuses(player, healPerPotion); // v1.1.11: the giver's Infirmary
 
             // Ask if player wants to fully heal or use 1 potion
             int potionsNeeded = (int)Math.Ceiling((double)missingHP / healPerPotion);
@@ -17890,6 +17950,7 @@ public partial class CombatEngine
             {
                 player.Healing--;
                 int healAmount = 30 + player.Level * 5 + random.Next(10, 30);
+                healAmount = (int)PotionBonus.ApplyOwnerBonuses(player, healAmount); // v1.1.11: the giver's Infirmary
                 targetAlly.HP = Math.Min(targetAlly.MaxHP, targetAlly.HP + healAmount);
             }
 
@@ -18305,7 +18366,7 @@ public partial class CombatEngine
                 // Apply post-hit enchantment effects only if the attack landed -- an evaded swing
                 // (Incorporeal/Phase) must not proc the teammate's lifesteal/enchants either.
                 if (tmLanded)
-                    ApplyPostHitEnchantments(teammate, target, damage, result, weaponSlot: isOffHandAttack ? EquipmentSlot.OffHand : EquipmentSlot.MainHand);
+                    ApplyPostHitEnchantments(teammate, target, TeamHQBonus.ApplyAttack(teammate, damage), result, weaponSlot: isOffHandAttack ? EquipmentSlot.OffHand : EquipmentSlot.MainHand);   // v1.1.11 (0 for NPCs)
 
                 // If target died, retarget to next weakest
                 if (!target.IsAlive)
@@ -18570,6 +18631,7 @@ public partial class CombatEngine
     /// </summary>
     private async Task<bool> TeammateHealWithPotion(Character teammate, Character target, CombatResult result, bool fromPlayerBelt = false)
     {
+        Character potionOwner = teammate; // v1.1.11: whose Infirmary the potion carries
         if (fromPlayerBelt)
         {
             // v1.1.3 (council ruling 4): the ally drinks one of the player's potions. The player's
@@ -18577,6 +18639,7 @@ public partial class CombatEngine
             var owner = _combatOwner ?? currentPlayer;
             if (owner == null || !CanBorrowFromBelt(owner, teammate)) return false;
             owner.Healing--;
+            potionOwner = owner;
             _borrowedThisFight++;
             StatsFor(teammate).PotionsFromPlayer++;
         }
@@ -18593,6 +18656,7 @@ public partial class CombatEngine
 
         // Potion heals a fixed amount plus some randomness (same formula as player potions)
         int healAmount = 30 + teammate.Level * 5 + random.Next(10, 30);
+        healAmount = (int)PotionBonus.ApplyOwnerBonuses(potionOwner, healAmount); // v1.1.11: the potion owner's Infirmary
         long oldHP = target.HP;
         target.HP = Math.Min(target.MaxHP, target.HP + healAmount);
         long actualHeal = target.HP - oldHP;
@@ -18805,6 +18869,7 @@ public partial class CombatEngine
                 // announce the immunity-absorbs message once per AoE cast.
                 long adjustedDamage = ApplyBossSpellProtections(monster, damagePerTarget, announce: !immunityAnnounced);
                 if (monster.IsMagicalImmune) immunityAnnounced = true;
+                adjustedDamage = TeamHQBonus.ApplyAttack(teammate, adjustedDamage); // v1.1.11: Team HQ Armory, before the HP cap.
                 long actualDamage = Math.Min(adjustedDamage, monster.HP);
                 monster.HP -= actualDamage;
 
@@ -18841,6 +18906,7 @@ public partial class CombatEngine
                 // bypassed here, allowing e.g. a companion Power Word: Kill to hit Manwe at
                 // full damage despite magical immunity.
                 long adjustedDamage = ApplyBossSpellProtections(target, damage, announce: true);
+                adjustedDamage = TeamHQBonus.ApplyAttack(teammate, adjustedDamage); // v1.1.11: Team HQ Armory, before the HP cap.
                 long actualDamage = Math.Min(adjustedDamage, target.HP);
                 target.HP -= actualDamage;
 
@@ -19627,7 +19693,10 @@ public partial class CombatEngine
             }
         }
 
-        return CapTeammateDamageInOldGodFight(companion, damage);
+        damage = CapTeammateDamageInOldGodFight(companion, damage);
+        // v1.1.11: Team HQ Barracks last (0 for NPCs); the boss minimum holds where it held before.
+        long bossFloor = monster.IsBoss ? (long)(monster.Level * 1.5) : 1;
+        return Math.Max(Math.Min(damage, bossFloor), TeamHQBonus.ApplyDefense(companion, damage));
     }
 
     private async Task MonsterAttacksCompanion(Monster monster, Character companion, CombatResult result, List<Monster>? liveMonsterList = null)
@@ -19859,7 +19928,8 @@ public partial class CombatEngine
 
         // v0.57.14: companion incoming-damage floor scales with companion MaxHP for the same
         // reason it does for the player — high-tank companions can't tank indefinitely.
-        long actualDamage = Math.Max(GetMinIncomingDamage(companion, monsterAttack), monsterAttack - companionDefense);
+        long minDamage = GetMinIncomingDamage(companion, monsterAttack);
+        long actualDamage = Math.Max(minDamage, monsterAttack - companionDefense);
 
         // Show defense calculation
         if (companionDefense > 0 && companionDefense < monsterAttack)
@@ -19916,6 +19986,10 @@ public partial class CombatEngine
         // Old God fight cap applied last so tightest cap wins
         actualDamage = CapTeammateDamageInOldGodFight(companion, actualDamage);
 
+        // v1.1.11: Team HQ Barracks last (0 for NPCs); the floors hold where they held before.
+        long companionFloor = monster.IsBoss ? Math.Max(minDamage, (long)(monster.Level * 1.5)) : minDamage;
+        actualDamage = Math.Max(Math.Min(actualDamage, companionFloor), TeamHQBonus.ApplyDefense(companion, actualDamage));
+
         // Apply damage to companion
         RecordAllyHit(companion, actualDamage); // v1.1.3
         companion.HP = Math.Max(0, companion.HP - actualDamage);
@@ -19929,7 +20003,7 @@ public partial class CombatEngine
             long reflect = (long)(actualDamage * (companion.TempThornReflectPercent / 100.0));
             if (reflect > 0)
             {
-                monster.HP = Math.Max(0, monster.HP - reflect);
+                monster.HP = Math.Max(0, monster.HP - reflect); // hq-armory: out (thorn reflect)
                 if (monster.HP <= 0 && !result.DefeatedMonsters.Contains(monster))
                     result.DefeatedMonsters.Add(monster);
                 terminal.WriteLine(Loc.Get("combat.divine_mandate_reflect", monster.Name, reflect), "bright_magenta");
@@ -19941,7 +20015,7 @@ public partial class CombatEngine
         {
             float reflectPercent = GameConfig.WavecallerReflectionPercent;
             long reflectDamage = Math.Max(1, (long)(actualDamage * reflectPercent));
-            monster.HP = Math.Max(0, monster.HP - reflectDamage);
+            monster.HP = Math.Max(0, monster.HP - reflectDamage); // hq-armory: out (Reflecting status)
             terminal.SetColor("bright_cyan");
             terminal.WriteLine($"  {companion.DisplayName}'s tidal barrier reflects {reflectDamage} damage back at {monster.Name}!");
             if (monster.HP <= 0)
@@ -20605,12 +20679,6 @@ public partial class CombatEngine
                 adjustedExp = (long)(adjustedExp * guildMultMM);
         }
 
-        // Team HQ Training bonus: +5% XP per level — multi-monster path
-        if (result.Player.HQTrainingLevel > 0)
-        {
-            adjustedExp += (long)(adjustedExp * (result.Player.HQTrainingLevel * 0.05));
-        }
-
         // Fatigue XP penalty — Exhausted tier only (single-player only)
         if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && result.Player.Fatigue >= GameConfig.FatigueExhaustedThreshold)
         {
@@ -20634,6 +20702,8 @@ public partial class CombatEngine
         // Apply per-slot XP percentage distribution
         long totalXPPotMM = adjustedExp;
         long playerXPmm = (long)(totalXPPotMM * xpSharesMM[0] / 100.0);
+        // v1.1.11: Team HQ Training on the player's own share, after the split, so it stays out of the teammates' pot.
+        playerXPmm = TeamHQBonus.ApplyXP(result.Player, playerXPmm);
 
         // Apply rewards (player's percentage share)
         result.Player.Experience += playerXPmm;
@@ -21197,12 +21267,6 @@ public partial class CombatEngine
                 adjustedExp = (long)(adjustedExp * guildMultPV);
         }
 
-        // Team HQ Training bonus: +5% XP per level — berserker/special path
-        if (result.Player.HQTrainingLevel > 0)
-        {
-            adjustedExp += (long)(adjustedExp * (result.Player.HQTrainingLevel * 0.05));
-        }
-
         // v0.64.1 early-game XP multiplier (berserker / special path).
         double earlyGameMultPV = GameConfig.GetEarlyGameXPMultiplier((int)result.Player.Level);
         if (earlyGameMultPV > 1.0)
@@ -21217,6 +21281,8 @@ public partial class CombatEngine
         // Apply per-slot XP percentage distribution
         long totalXPPotPV = adjustedExp;
         long playerXPpv = (long)(totalXPPotPV * xpSharesPV[0] / 100.0);
+        // v1.1.11: Team HQ Training on the player's own share, after the split, so it stays out of the teammates' pot.
+        playerXPpv = TeamHQBonus.ApplyXP(result.Player, playerXPpv);
 
         result.Player.Experience += playerXPpv;
         result.Player.Gold += adjustedGold;
@@ -21351,7 +21417,9 @@ public partial class CombatEngine
         try
         {
             var ctx = UsurperRemake.Server.SessionContext.Current;
-            string username = ctx?.Username ?? player.Name1 ?? player.Name2 ?? "";
+            // v1.1.11: the character's key, as PermadeathHelper uses; the account name is the MAIN character's
+            // key, so on an alt the purge and the delete hit the main character (review)
+            string username = (!string.IsNullOrEmpty(ctx?.CharacterKey) ? ctx!.CharacterKey : ctx?.Username) ?? player.Name1 ?? player.Name2 ?? "";
             string displayName = player.Name2 ?? player.Name1 ?? username;
             string killerName = result.Monster?.Name ?? "an unknown end";
             int finalLevel = player.Level;
@@ -21359,6 +21427,8 @@ public partial class CombatEngine
 
             if (SaveSystem.Instance?.Backend is SqlSaveBackend sqlBackend && !string.IsNullOrEmpty(username))
             {
+                // v1.1.11: the same purge as every other delete, so a same-name character starts clean
+                await PermadeathHelper.PurgeDeletedCharacterAsync(sqlBackend, username, displayName, player);
                 sqlBackend.DeleteGameData(username, bypassArchive: false);
                 DebugLogger.Instance.LogWarning("DEATH_CAP",
                     $"Permadeleted '{username}' (display='{displayName}', lv={finalLevel}, class={className}) for excessive deaths ({player.PlaythroughDeaths} total, killed by {killerName}). 7-day /restore window active.");
@@ -22416,6 +22486,7 @@ public partial class CombatEngine
 
         long hpNeeded = player.MaxHP - player.HP;
         int healPerPotion = 30 + player.Level * 5 + random.Next(10, 30);
+        healPerPotion = (int)PotionBonus.ApplyOwnerBonuses(player, healPerPotion); // v1.1.11: Infirmary, so potionsNeeded shrinks too
         int potionsNeeded = (int)Math.Ceiling((double)hpNeeded / healPerPotion);
         potionsNeeded = Math.Min(potionsNeeded, (int)player.Healing);
         long actualHealing = Math.Min((long)potionsNeeded * healPerPotion, hpNeeded);
@@ -25036,6 +25107,8 @@ public partial class CombatEngine
                     foreach (var m in allLiving)
                     {
                         long searingDmg = player.ActiveTotemPower + random.Next(20);
+                        // v1.1.11: Team HQ Armory of the totem's owner.
+                        searingDmg = TeamHQBonus.ApplyAttack(player, searingDmg);
                         m.HP -= (int)searingDmg;
                         totalSearingDmg += searingDmg;
                         result.TotalDamageDealt += searingDmg;
@@ -25359,7 +25432,8 @@ public partial class CombatEngine
             defense = (long)(defense * 1.5);
         }
 
-        long damage = Math.Max(1, attackPower - defense);
+        // v1.1.11: Team HQ Armory on the hit, then the defender's Barracks, inside the floor.
+        long damage = Math.Max(1, TeamHQBonus.ApplyDefense(defender, TeamHQBonus.ApplyAttack(attacker, attackPower - defense)));
         defender.HP = Math.Max(0, defender.HP - damage);
 
         // Track statistics
@@ -25461,8 +25535,10 @@ public partial class CombatEngine
             // Apply damage to defender
             if (spellResult.Damage > 0)
             {
-                defender.HP = Math.Max(0, defender.HP - spellResult.Damage);
-                terminal.WriteLine(Loc.Get("combat.pvp_magical_damage", defender.DisplayName, spellResult.Damage), "bright_magenta");
+                // v1.1.11: Team HQ Armory, then the defender's Barracks, last.
+                long spellDamage = TeamHQBonus.ApplyDefense(defender, TeamHQBonus.ApplyAttack(attacker, spellResult.Damage));
+                defender.HP = Math.Max(0, defender.HP - spellDamage);
+                terminal.WriteLine(Loc.Get("combat.pvp_magical_damage", defender.DisplayName, spellDamage), "bright_magenta");
             }
 
             // Apply healing to self
@@ -25693,10 +25769,15 @@ public partial class CombatEngine
             }
 
             // Apply defense (abilities partially bypass defense)
+            // v1.1.11: Team HQ Armory, last, and inside the floor.
             if (abilityResult.SpecialEffect != "armor_pierce")
             {
                 long defense = defender.Defence / 2;
-                actualDamage = Math.Max(1, actualDamage - defense);
+                actualDamage = Math.Max(1, TeamHQBonus.ApplyDefense(defender, TeamHQBonus.ApplyAttack(attacker, actualDamage - defense)));
+            }
+            else
+            {
+                actualDamage = TeamHQBonus.ApplyDefense(defender, TeamHQBonus.ApplyAttack(attacker, actualDamage));
             }
 
             defender.HP = Math.Max(0, defender.HP - actualDamage);
@@ -25778,6 +25859,7 @@ public partial class CombatEngine
         {
             computer.Healing--;
             long heal = 30 + computer.Level * 5 + random.Next(10, 30);
+            heal = PotionBonus.ApplyOwnerBonuses(computer, heal); // v1.1.11: the defender's own Infirmary
             heal = Math.Min(heal, computer.MaxHP - computer.HP);
             computer.HP += heal;
             terminal.WriteLine(Loc.Get("combat.pvp_ai_heals", computer.DisplayName, heal), "green");
@@ -25810,6 +25892,8 @@ public partial class CombatEngine
                         long spellDamage = spellResult.Damage;
                         if (opponent.IsDefending || opponent.HasStatus(StatusEffect.Defending))
                             spellDamage = (long)Math.Ceiling(spellDamage / 2.0);
+                        spellDamage = TeamHQBonus.ApplyAttack(computer, spellDamage); // v1.1.11: Team HQ Armory, last.
+                        spellDamage = TeamHQBonus.ApplyDefense(opponent, spellDamage); // v1.1.11: then the human's Barracks.
                         opponent.HP = Math.Max(0, opponent.HP - spellDamage);
                         terminal.WriteLine(Loc.Get("combat.pvp_magical_damage", opponent.DisplayName, spellDamage), "bright_magenta");
                     }
@@ -25854,6 +25938,8 @@ public partial class CombatEngine
                     // human-attacker path, where the AI can never be defending).
                     if (opponent.IsDefending || opponent.HasStatus(StatusEffect.Defending))
                         actualDamage = (long)Math.Ceiling(actualDamage / 2.0);
+                    actualDamage = TeamHQBonus.ApplyAttack(computer, actualDamage); // v1.1.11: Team HQ Armory, last.
+                    actualDamage = TeamHQBonus.ApplyDefense(opponent, actualDamage); // v1.1.11: then the human's Barracks.
                     opponent.HP = Math.Max(0, opponent.HP - actualDamage);
                     terminal.WriteLine(Loc.Get("combat.pvp_ai_uses_ability", computer.DisplayName, chosen.Name, actualDamage), "bright_red");
                 }
@@ -25907,6 +25993,8 @@ public partial class CombatEngine
         // Honor the human's Defend stance in the AI's basic attack path.
         if (opponent.IsDefending || opponent.HasStatus(StatusEffect.Defending))
             damage = (long)Math.Ceiling(damage / 2.0);
+        damage = TeamHQBonus.ApplyAttack(computer, damage); // v1.1.11: Team HQ Armory, last.
+        damage = TeamHQBonus.ApplyDefense(opponent, damage); // v1.1.11: then the human's Barracks.
         opponent.HP = Math.Max(0, opponent.HP - damage);
         terminal.WriteLine(Loc.Get("combat.pvp_ai_strikes", computer.DisplayName, damage), "red");
         result.CombatLog.Add($"{computer.DisplayName} hits {opponent.DisplayName} for {damage}");
@@ -26053,6 +26141,37 @@ public partial class CombatEngine
         return false;
     }
 
+    /// <summary>
+    /// v1.1.11: a duel won against an NPC (killed or spared) pays its bounty and meets a Defeat objective,
+    /// as a street fight always did. A player loaded from a save is not an NPC and is left alone.
+    /// </summary>
+    private async Task ReportDuelDefeat(CombatResult result)
+    {
+        if (result.Player == null || result.Opponent == null) return;
+        long bounty;
+        if (result.Opponent is NPC npc)
+            bounty = QuestSystem.RecordNPCDefeat(result.Player, npc, killed: _pvpLethal && !npc.IsAlive);
+        else if (result.Opponent.IsLoadedPlayer)
+        {
+            // v1.1.11: a Crown bounty on a player is paid to the duel's winner, lethal or not (a duel won).
+            // Only a player loaded from a save; a hired guard or an echo may carry a player's name.
+            var paid = QuestSystem.CollectBountiesOnPlayer(result.Player, result.Opponent);
+            bounty = paid.Sum(QuestSystem.BountyReward);
+            if (paid.Count > 0 && UsurperRemake.BBS.DoorMode.IsOnlineMode && OnlineStateManager.IsActive)
+            {
+                // v1.1.11: matched by claim key, so one id-less bounty does not take the other id-less quests with it
+                var keys = paid.Select(q => QuestSystem.BountyClaimKey(q)).ToHashSet();
+                await OnlineStateManager.Instance!.RemoveSharedQuestsAsync(q => keys.Contains(QuestSystem.BountyClaimKey(q)));   // edited in place
+            }
+        }
+        else bounty = 0;
+        if (bounty > 0)
+        {
+            terminal.WriteLine(Loc.Get("street.fight.bounty_collected", bounty.ToString("N0")), "bright_yellow");
+            result.GoldGained += bounty;
+        }
+    }
+
     private async Task DeterminePvPOutcome(CombatResult result)
     {
         // v0.64.1 Slice 18: spared-NPC path. OfferNPCSurrenderAsync sets
@@ -26108,6 +26227,8 @@ public partial class CombatEngine
 
             // No XP/gold reward -- sparing isn't a kill. The alignment +
             // relationship swing is the reward.
+            // v1.1.11: but the NPC was beaten, so a bounty or Defeat objective on it is met
+            await ReportDuelDefeat(result);
             return;
         }
 
@@ -26169,6 +26290,8 @@ public partial class CombatEngine
             // Apply difficulty modifier (per-character difficulty + server-wide SysOp multiplier)
             float xpMult = DifficultySystem.GetExperienceMultiplier(DifficultySystem.CurrentDifficulty) * GameConfig.XPMultiplier;
             xpReward = (long)(xpReward * xpMult);
+            // v1.1.11: Team HQ Training last.
+            xpReward = TeamHQBonus.ApplyXP(result.Player, xpReward);
 
             // Calculate gold reward - take some of opponent's gold + level-based bonus
             long opponentGold = result.Opponent?.Gold ?? 0;
@@ -26191,6 +26314,7 @@ public partial class CombatEngine
             result.Player.Gold += goldReward;
             result.ExperienceGained = xpReward;
             result.GoldGained = goldReward;
+            await ReportDuelDefeat(result);   // v1.1.11
 
             // Track peak gold
             result.Player.Statistics?.RecordGoldChange(result.Player.Gold);
@@ -28163,7 +28287,7 @@ public partial class CombatEngine
         if (plagueDamage > 0)
         {
             plagueDamage = Math.Max(1, plagueDamage);
-            player.HP = Math.Max(0, player.HP - plagueDamage);
+            player.HP = Math.Max(0, player.HP - plagueDamage); // hq-barracks: out (disease tick, not an enemy hit)
 
             terminal.SetColor("yellow");
             terminal.WriteLine($"  {diseaseMessage} (-{plagueDamage} HP)");
@@ -28252,10 +28376,14 @@ public partial class CombatEngine
                 else if (!SpellSystem.HasRequiredSpellWeapon(player))
                 {
                     var reqType = SpellSystem.GetSpellWeaponRequirement(player.Class);
-                    displayName = $"{spell.Name} (Need {reqType})";
+                    displayName = Loc.Get("combat.qb_need_weapon", spell.Name, reqType);
                 }
                 else if (!player.CanCastSpells())
-                    displayName = $"{spell.Name} (SILENCED)";
+                    displayName = Loc.Get("combat.qb_silenced", spell.Name);
+                else if (player.Mana < manaCost)
+                    // v1.1.11: say why it cannot be cast (player report: a new Magician read "unavailable" and
+                    // suspected the staff)
+                    displayName = Loc.Get("combat.qb_need_mana", spell.Name, manaCost, player.Mana);
                 else
                     displayName = $"{spell.Name} ({manaCost} MP)";
                 actions.Add(((i + 1).ToString(), slotId, displayName, canCast));
@@ -28866,6 +28994,7 @@ public partial class CombatEngine
 
         int damagePerStack = BossContext?.CorruptionDamagePerStack ?? GameConfig.ModBossCorruptionDamageBase;
         long corruptionDamage = target.CorruptionStacks * damagePerStack;
+        corruptionDamage = TeamHQBonus.ApplyDefense(target, corruptionDamage); // v1.1.11: Team HQ Barracks (a boss hit, 0 for NPCs)
         target.HP = Math.Max(0, target.HP - corruptionDamage);
 
         terminal.SetColor("dark_magenta");
@@ -28968,6 +29097,7 @@ public partial class CombatEngine
                 long playerDmg = Math.Max(1, damage - (long)(Math.Sqrt(player.Defence) * 3));
                 // v0.65.8 (R3): failed flee this round -> guarded half-round
                 playerDmg = ApplyFleeGrace(player, playerDmg);
+                playerDmg = TeamHQBonus.ApplyDefense(player, playerDmg); // v1.1.11: Team HQ Barracks, last
                 player.HP = Math.Max(0, player.HP - playerDmg);
                 terminal.WriteLine($"  {player.DisplayName} takes {playerDmg} damage!");
             }
@@ -28979,6 +29109,7 @@ public partial class CombatEngine
                 {
                     long tmDmg = Math.Max(1, damage - (long)(Math.Sqrt(tm.Defence) * 3));
                     tmDmg = CapTeammateDamageInOldGodFight(tm, tmDmg);
+                    tmDmg = TeamHQBonus.ApplyDefense(tm, tmDmg); // v1.1.11: Team HQ Barracks, last (0 for NPCs)
                     RecordAllyHit(tm, tmDmg); // v1.1.3: the channel hits everyone; not a targeting choice
                     tm.HP = Math.Max(0, tm.HP - tmDmg);
                     terminal.WriteLine($"  {tm.DisplayName} takes {tmDmg} damage!");
@@ -29082,6 +29213,7 @@ public partial class CombatEngine
             // v0.65.8 (R3): failed flee this round -> guarded half-round (player only)
             if (target == player)
                 dmg = ApplyFleeGrace(player, dmg);
+            dmg = TeamHQBonus.ApplyDefense(target, dmg); // v1.1.11: Team HQ Barracks, last (0 for NPCs)
             target.HP = Math.Max(0, target.HP - dmg);
             string tankTag = (tank != null && target == tank) ? " [ABSORBING]" : "";
             terminal.WriteLine($"  {target.DisplayName} takes {dmg} damage!{tankTag}");
@@ -30412,10 +30544,6 @@ public partial class CombatEngine
                     playerExp = (long)(playerExp * gpGuildMult);
             }
 
-            // Team HQ Training bonus: +5% XP per level
-            if (groupedPlayer.HQTrainingLevel > 0)
-                playerExp += (long)(playerExp * (groupedPlayer.HQTrainingLevel * 0.05));
-
             // v0.64.1 early-game XP multiplier (per-grouped-player path).
             // Each grouped player's level keys into the curve independently
             // so a Lv 5 follower benefits even when grouped with a Lv 50 leader.
@@ -30427,6 +30555,9 @@ public partial class CombatEngine
             float groupXPMult = GroupSystem.GetGroupXPMultiplier(groupedPlayer.Level, highestLevel);
             if (groupXPMult < 1.0f)
                 playerExp = (long)(playerExp * groupXPMult);
+
+            // v1.1.11: Team HQ Training last, with the follower's own levels.
+            playerExp = TeamHQBonus.ApplyXP(groupedPlayer, playerExp);
 
             // Session XP diminishing returns removed in v0.54.7.
             groupedPlayer.SessionCombatCount++;
