@@ -588,6 +588,21 @@ public class Awakening1112Tests : IDisposable
         AwakeningBonus.ActiveAt(0).Should().BeEmpty();
     }
 
+    // ---------- 6. chapter 1 ----------
+
+    [Theory]
+    [InlineData("en", "The Drowning", "THE DROWNING")]
+    [InlineData("es", "El Ahogamiento", "EL AHOGAMIENTO")]
+    [InlineData("fr", "La Noyade", "LA NOYADE")]
+    [InlineData("hu", "A Fulladás", "A FULLADÁS")]
+    [InlineData("it", "L'Annegamento", "L'ANNEGAMENTO")]
+    public void Chapter1_IsTheDrowning_NotTheMetersName(string lang, string chapter, string banner)
+    {
+        var json = JsonDocument.Parse(Source($"Localization/{lang}.json")).RootElement;
+        json.GetProperty("dungeon.chapter_awakening").GetString().Should().StartWith(chapter);
+        json.GetProperty("opening_story.the_awakening").GetString().Should().Be(banner);
+    }
+
     [Fact]
     public void Reset_ClearsInsights()
     {
