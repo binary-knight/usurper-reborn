@@ -1886,6 +1886,14 @@ public class MudServer
     private async Task ExecuteAdminCommand(AdminCommand cmd)
     {
         if (_sqlBackend == null) return;
+        // v1.1.13: claimed first; a command the web server withdrew (or another poll claimed) is not run
+        if (!_sqlBackend.TryClaimAdminCommand(cmd.Id)) return;
+        await RunClaimedAdminCommand(cmd);
+    }
+
+    private async Task RunClaimedAdminCommand(AdminCommand cmd)
+    {
+        if (_sqlBackend == null) return;
 
         string? reason = null;
         string? message = null;

@@ -149,4 +149,129 @@ public class OwnerProcessTier2Tests : IDisposable
         MemoriesOf("Grudger").Select(m => m.Type).Should().Equal(new[] { MemoryType.Insulted },
             "the retry after the reload clears only what was recorded by the delete");
     }
+
+    // ─── The web delete's claim race ───
+
+    private void Exec(string sql)
+    {
+        using var conn = new SqliteConnection($"Data Source={_path}");
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = sql;
+        cmd.ExecuteNonQuery();
+    }
+
+    private string? Scalar(string sql)
+    {
+        using var conn = new SqliteConnection($"Data Source={_path}");
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = sql;
+        var v = cmd.ExecuteScalar();
+        return v == null || v == DBNull.Value ? null : Convert.ToString(v);
+    }
+
+    private UsurperRemake.Server.MudServer AdminOnlyServer()
+    {
+        var t = typeof(UsurperRemake.Server.MudServer);
+        var server = (UsurperRemake.Server.MudServer)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(t);
+        const System.Reflection.BindingFlags F = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        t.GetField("_sqlBackend", F)!.SetValue(server, _db);
+        t.GetField("<ActiveSessions>k__BackingField", F)!.SetValue(server,
+            new System.Collections.Concurrent.ConcurrentDictionary<string, UsurperRemake.Server.PlayerSession>());
+        return server;
+    }
+
+    private static Task Invoke(UsurperRemake.Server.MudServer server, string method, object cmd) =>
+        (Task)typeof(UsurperRemake.Server.MudServer).GetMethod(method, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
+            .Invoke(server, new[] { cmd })!;
+
+    private const string WithdrawStart = "UPDATE admin_commands SET status = 'expired', result = 'No answer; deleted by the web server'";
+
+    /// <summary>The web server's withdrawal, the statement as ssh-proxy.js has it; returns the rows it changed.</summary>
+    private int WebWithdraw(long id)
+    {
+        var js = WebSource();
+        int at = js.IndexOf(WithdrawStart, StringComparison.Ordinal);
+        at.Should().BeGreaterThan(0, "the withdrawal statement is in the web server");
+        string sql = js.Substring(at, js.IndexOf('"', at) - at);
+        using var conn = new SqliteConnection($"Data Source={_path}");
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = sql.Replace("?", "@id");
+        cmd.Parameters.AddWithValue("@id", id);
+        return cmd.ExecuteNonQuery();
+    }
+
+    private async Task<(NPC npc, AdminCommand cmd)> QueuedWebDelete()
+    {
+        var npc = Npc("npc_claim_1", "Grudger");
+        Remember(npc, MemoryType.Attacked, "Bob", DateTime.Now.AddMinutes(-5));
+        await _db.SaveWorldState(OnlineStateManager.KEY_NPCS, JsonSerializer.Serialize(OnlineStateManager.SerializeCurrentNPCs(), Json));
+        Exec("INSERT INTO players (username, display_name, player_data) VALUES ('bob_account', 'Bob', '{\"player\":{\"name2\":\"Bob\"}}');");
+        Exec("INSERT INTO admin_commands (command, target_username, args, created_by) VALUES ('delete_player', 'bob_account', NULL, 'admin-web');");
+        return (npc, _db.GetPendingAdminCommands().Single());
+    }
+
+    [Fact]
+    public async Task TheGameServersClaim_LandsFirst_TheWithdrawalFails_AndOnePurgeRuns()
+    {
+        var (npc, cmd) = await QueuedWebDelete();
+        var server = AdminOnlyServer();
+
+        _db.TryClaimAdminCommand(cmd.Id).Should().BeTrue("the game server claims the pending command");
+        WebWithdraw(cmd.Id).Should().Be(0, "the web server cannot withdraw a claimed command");
+        Scalar($"SELECT status FROM admin_commands WHERE id = {cmd.Id};").Should().Be("executing", "the web server keeps waiting on this");
+        await Invoke(server, "RunClaimedAdminCommand", cmd);
+        Scalar($"SELECT status FROM admin_commands WHERE id = {cmd.Id};").Should().Be("executed");
+        npc.Brain!.Memory.AllMemories.Should().NotContain(m => m.InvolvedCharacter == "Bob", "the purge ran");
+
+        // an overlapping poll that read the row while pending does not run it again: a second purge would
+        // clear this grudge too, since it is recorded before that purge's cut-off
+        Remember(npc, MemoryType.Insulted, "Bob", DateTime.Now.AddSeconds(-1));
+        await Invoke(server, "ExecuteAdminCommand", cmd);
+        Scalar($"SELECT status FROM admin_commands WHERE id = {cmd.Id};").Should().Be("executed");
+        npc.Brain!.Memory.AllMemories.Should().Contain(m => m.InvolvedCharacter == "Bob", "exactly one purge ran");
+        Scalar("SELECT COUNT(*) FROM deleted_characters WHERE username = 'bob_account';").Should().Be("1");
+    }
+
+    [Fact]
+    public async Task AWithdrawnCommand_IsNotRunByTheGameServer()
+    {
+        var (npc, cmd) = await QueuedWebDelete();
+
+        WebWithdraw(cmd.Id).Should().Be(1);
+        await Invoke(AdminOnlyServer(), "ExecuteAdminCommand", cmd);
+
+        Scalar($"SELECT status FROM admin_commands WHERE id = {cmd.Id};").Should().Be("expired");
+        Scalar("SELECT player_data FROM players WHERE username = 'bob_account';").Should().NotBe("{}", "the game server did not delete it");
+        npc.Brain!.Memory.AllMemories.Should().Contain(m => m.InvolvedCharacter == "Bob", "nor purge it; the web server's direct delete does");
+    }
+
+    [Fact]
+    public void TheWebDelete_WaitsForAClaimedCommand_AndNeverDeletesItToo()
+    {
+        var js = WebSource();
+        int start = js.IndexOf("// DELETE /api/admin/players/:username", StringComparison.Ordinal);
+        var route = js.Substring(start, js.IndexOf("// Fallback: queue the world purge", start, StringComparison.Ordinal) - start);
+        route.Should().Contain("r.status === 'pending' || r.status === 'executing'", "the first wait keeps waiting on a claimed command");
+        route.Should().Contain(WithdrawStart).And.Contain("WHERE id = ? AND status = 'pending'", "only a still-pending command is withdrawn");
+        route.Should().Contain("while (row && row.status === 'executing'");
+        route.Should().Contain("if (row && row.status === 'executing') { sendJson(res, 504", "a command still running is never followed by the direct delete");
+        Source("Server", "MudServer.cs").Should().Contain("if (!_sqlBackend.TryClaimAdminCommand(cmd.Id)) return;");
+    }
+
+    private static string WebSource()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "web"))) dir = dir.Parent;
+        return File.ReadAllText(Path.Combine(dir!.FullName, "web", "ssh-proxy.js"));
+    }
+
+    private static string Source(string folder, string file)
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "Scripts"))) dir = dir.Parent;
+        return File.ReadAllText(Path.Combine(dir!.FullName, "Scripts", folder, file));
+    }
 }

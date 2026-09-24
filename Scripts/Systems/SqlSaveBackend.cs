@@ -7792,6 +7792,27 @@ namespace UsurperRemake.Systems
             return commands;
         }
 
+        /// <summary>
+        /// v1.1.13: claim a pending admin command before running it. Only one of the game server and the
+        /// web server's withdrawal wins: true when this call moved the row from pending to executing.
+        /// </summary>
+        public bool TryClaimAdminCommand(int id)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "UPDATE admin_commands SET status = 'executing' WHERE id = @id AND status = 'pending';";
+                cmd.Parameters.AddWithValue("@id", id);
+                return cmd.ExecuteNonQuery() == 1;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"TryClaimAdminCommand failed: {ex.Message}");
+                return false;
+            }
+        }
+
         /// <summary>Mark an admin command as successfully executed.</summary>
         public void MarkAdminCommandExecuted(int id, string result)
         {
