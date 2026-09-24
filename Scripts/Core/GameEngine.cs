@@ -4344,23 +4344,29 @@ public partial class GameEngine
     /// before the normal session save persists the credit loses the gold to the
     /// sink rather than duplicating it.
     /// </summary>
-    /// <summary>v1.1.12: the key pending_gold_transfers are delivered under for this session (shared with the team-war refund).</summary>
-    internal static string GoldTransferKey(Character player) =>
-        UsurperRemake.Server.SessionContext.Current?.Username
-            ?? UsurperRemake.BBS.DoorMode.GetPlayerName()?.ToLowerInvariant()
-            ?? player?.Name2?.ToLowerInvariant()
-            ?? "";
+    /// <summary>
+    /// v1.1.12: the key pending_gold_transfers are queued and delivered under: the save key of the character
+    /// being played (InheritanceKey). Every producer queues under players.username, which is the save key
+    /// ("name__alt" for an alt); the account name used here gave an alt's rows to its main.
+    /// </summary>
+    internal static string GoldTransferKey(Character player) => player == null ? "" : InheritanceKey(player);
 
     private async Task DeliverPendingGoldTransfers(SqlSaveBackend backend)
     {
         if (currentPlayer == null) return;
+        await DeliverPendingGoldTransfers(currentPlayer, terminal, backend);
+    }
+
+    /// <summary>v1.1.12: login delivery of queued transfers to this character's bank; returns the gold delivered.</summary>
+    internal static async Task<long> DeliverPendingGoldTransfers(Character currentPlayer, TerminalEmulator terminal, SqlSaveBackend backend)
+    {
         var username = GoldTransferKey(currentPlayer);
-        if (string.IsNullOrEmpty(username)) return;
+        if (string.IsNullOrEmpty(username)) return 0;
 
         try
         {
             var pending = backend.GetPendingGoldTransfers(username);
-            if (pending.Count == 0) return;
+            if (pending.Count == 0) return 0;
 
             var deliveredIds = new List<long>();
             long totalReceived = 0;
@@ -4390,11 +4396,13 @@ public partial class GameEngine
             backend.ClearGoldTransfers(deliveredIds);
             DebugLogger.Instance.LogInfo("GOLD", $"WIRE DELIVERY: '{username}' received {totalReceived:N0}g to bank from {pending.Count} transfer(s)");
             await Task.Delay(1500);
+            return totalReceived;
         }
         catch (Exception ex)
         {
             DebugLogger.Instance.LogError("WIRE", $"Failed to deliver pending gold transfers: {ex.Message}");
         }
+        return 0;
     }
 
     /// <summary>

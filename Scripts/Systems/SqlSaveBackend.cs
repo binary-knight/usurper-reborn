@@ -5201,6 +5201,24 @@ namespace UsurperRemake.Systems
     /// Used by the NPC-old-age-death inheritance flow to find who should receive
     /// the deceased teammate's belongings.
     /// </summary>
+    /// <summary>v1.1.12: whether a team has a player_teams row (an NPC-founded team has none); null on a DB error.</summary>
+    public bool? HasPlayerTeamRow(string teamName)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT COUNT(*) FROM player_teams WHERE team_name = @name;";
+            cmd.Parameters.AddWithValue("@name", teamName);
+            return Convert.ToInt64(cmd.ExecuteScalar()) > 0;
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to look up team '{teamName}': {ex.Message}");
+            return null;
+        }
+    }
+
     public async Task<string?> GetTeamLeaderUsername(string teamName)
     {
         try
@@ -6930,8 +6948,9 @@ namespace UsurperRemake.Systems
     /// v1.1.12: a war still 'active' after GameConfig.TeamWarStaleMinutes was left by a lost session and
     /// would block both teams for ever. It is marked 'abandoned'; if no round was recorded, the wager goes
     /// back to its payer by a queued transfer, in the same transaction and only by the process that flipped
-    /// the row. A war with rounds recorded is not refunded, so leaving a losing war does not pay. Returns
-    /// the number of wars expired.
+    /// the row. A war with rounds recorded is not refunded, so leaving a losing war does not pay. It is not
+    /// settled by score either, since a challenger could leave while ahead; this holds too for a fought war
+    /// whose own completion failed (TeamCornerLocation pays nothing then). Returns the number expired.
     /// </summary>
     public int ExpireStaleTeamWars(int? staleMinutes = null)
     {
@@ -7005,6 +7024,20 @@ namespace UsurperRemake.Systems
             return await cmd.ExecuteNonQueryAsync() == 1;
         }
         catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to complete team war: {ex.Message}"); return false; }
+    }
+
+    /// <summary>v1.1.12: a war's status ('active', a result, or 'abandoned'); null if it cannot be read.</summary>
+    public async Task<string?> GetTeamWarStatus(int warId)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT status FROM team_wars WHERE id = @id;";
+            cmd.Parameters.AddWithValue("@id", warId);
+            return (await cmd.ExecuteScalarAsync())?.ToString();
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to read team war status: {ex.Message}"); return null; }
     }
 
     public async Task<List<TeamWarInfo>> GetTeamWarHistory(string teamName, int limit = 10)

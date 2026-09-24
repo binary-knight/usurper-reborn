@@ -582,4 +582,146 @@ public class TeamCornerFixes1112Tests : IDisposable
         MethodBody("DisplayLocationSR").Should().Contain("WriteSRMenuOption(\"V\"");
         MethodBody("DisplayLocationBBS").Should().Contain("(\"V\", \"bright_yellow\"");
     }
+
+    // ---------- second review ----------
+
+    /// <summary>A one-round war the challenger always wins: a strong mate against a weak defender.</summary>
+    private static async Task<(Character hero, string shown)> WinAWar(SqlSaveBackend db, string path, params string[] triggers)
+    {
+        await db.CreatePlayerTeam("Home Side", "x", "war hero");
+        await db.CreatePlayerTeam("Away Side", "x", "ghost");
+        await db.WriteGameData("mate", new SaveGameData { Version = GameConfig.SaveVersion,
+            Player = new PlayerData { Name1 = "mate", Name2 = "Mate", Team = "Home Side", Level = 100, Strength = 1000, BaseStrength = 1000, HP = 90, MaxHP = 90 } });
+        await db.WriteGameData("ghost", new SaveGameData { Version = GameConfig.SaveVersion,
+            Player = new PlayerData { Name1 = "ghost", Name2 = "Ghost", Team = "Away Side", Level = 1, Strength = 1, BaseStrength = 1, HP = 90, MaxHP = 90 } });
+        foreach (var t in triggers) TeamCornerRig.Exec(path, t);
+        var hero = TeamCornerRig.Hero(name: "War Hero", team: "Home Side", gold: 5000);
+        hero.Level = 1;
+        string shown = await new TeamCornerRig(hero, new[] { "1", "y", "", "" }).Run("ChallengeTeamWar", db);
+        return (hero, shown);
+    }
+
+    [Fact]
+    public async Task AWonWar_WhoseScoreAndSettlementFail_PaysNothing_AndTheCleanupRefundsTheWagerOnce()
+    {
+        await TeamCornerRig.Online(async (db, path) =>
+        {
+            var (hero, shown) = await WinAWar(db, path,
+                "CREATE TRIGGER no_score BEFORE UPDATE OF challenger_wins, defender_wins ON team_wars BEGIN SELECT RAISE(ABORT, 'test'); END;",
+                "CREATE TRIGGER no_result BEFORE UPDATE OF status ON team_wars WHEN NEW.status IN ('challenger_won', 'defender_won') BEGIN SELECT RAISE(ABORT, 'test'); END;");
+            shown.Should().Contain(Loc.Get("team.war_result_pending", $"{1000:N0}"));
+            hero.Gold.Should().Be(4000, "no spoils while the war is unsettled");
+            hero.TeamWarsToday.Should().Be(0);
+            TeamCornerRig.Scalar(path, "SELECT status FROM team_wars").Should().Be("active");
+
+            TeamCornerRig.Exec(path, "DROP TRIGGER no_score; DROP TRIGGER no_result; UPDATE team_wars SET started_at = datetime('now', '-20 minutes');");
+            db.ExpireStaleTeamWars().Should().Be(1);
+            db.ExpireStaleTeamWars().Should().Be(0);
+            Convert.ToInt64(TeamCornerRig.Scalar(path, "SELECT COUNT(*) FROM pending_gold_transfers WHERE amount = 1000")).Should().Be(1, "the wager, once");
+            Convert.ToInt64(TeamCornerRig.Scalar(path, "SELECT COUNT(*) FROM pending_gold_transfers")).Should().Be(1);
+        });
+    }
+
+    [Fact]
+    public async Task AWonWar_TheCleanupClosedFirst_PaysNothing_AndSaysSo()
+    {
+        await TeamCornerRig.Online(async (db, path) =>
+        {
+            // the stale sweep flips the war to abandoned between its round and its settlement
+            var (hero, shown) = await WinAWar(db, path,
+                "CREATE TRIGGER sweep AFTER UPDATE OF challenger_wins ON team_wars BEGIN UPDATE team_wars SET status = 'abandoned', finished_at = datetime('now') WHERE id = NEW.id; END;");
+            shown.Should().Contain(Loc.Get("team.war_already_closed"));
+            hero.Gold.Should().Be(4000, "the sweep closed it; the settlement pays zero");
+            TeamCornerRig.Scalar(path, "SELECT status FROM team_wars").Should().Be("abandoned");
+            Convert.ToInt64(TeamCornerRig.Scalar(path, "SELECT COUNT(*) FROM pending_gold_transfers")).Should().Be(0);
+        });
+    }
+
+    [Fact]
+    public async Task AnAltsWarRefund_IsDeliveredToTheAlt_NotToTheMain()
+    {
+        var saved = UsurperRemake.Server.SessionContext.Current;
+        try
+        {
+            void Playing(string key) => UsurperRemake.Server.SessionContext.Current = new UsurperRemake.Server.SessionContext
+                { InputStream = Stream.Null, OutputStream = Stream.Null, Username = "rage", CharacterKey = key };
+            var term = new TerminalEmulator(new MemoryStream(), new MemoryStream());
+
+            Playing("rage__alt");
+            var alt = new Character { Name1 = "rage__alt", Name2 = "Rager" };
+            int id = await _db.CreateTeamWar("Reds", "Blues", 700, GameEngine.GoldTransferKey(alt));
+            id.Should().BeGreaterThan(0);
+            Exec($"UPDATE team_wars SET started_at = datetime('now', '-20 minutes') WHERE id = {id};");
+            _db.ExpireStaleTeamWars().Should().Be(1);
+
+            Playing("rage");
+            var main = new Character { Name1 = "rage", Name2 = "Rage" };
+            (await GameEngine.DeliverPendingGoldTransfers(main, term, _db)).Should().Be(0, "the main did not pay");
+            main.BankGold.Should().Be(0);
+
+            Playing("rage__alt");
+            (await GameEngine.DeliverPendingGoldTransfers(alt, term, _db)).Should().Be(700);
+            alt.BankGold.Should().Be(700);
+            Long("SELECT COUNT(*) FROM pending_gold_transfers").Should().Be(0);
+        }
+        finally { UsurperRemake.Server.SessionContext.Current = saved; }
+    }
+
+    [Fact]
+    public async Task PasswordScreen_OnAnNpcFoundedTeam_ChangesTheNpcHeldPassword()
+    {
+        var npc = TeamCornerRig.Npc("tc_pw_npc_1", "Old Guard Npc", "Old Guard");
+        NPCSpawnSystem.Instance.ActiveNPCs.Add(npc);
+        try
+        {
+            await TeamCornerRig.Online(async (db, path) =>
+            {
+                // no player_teams row: joined from the NPCs
+                var hero = TeamCornerRig.Hero(name: "Npc Team Leader", team: "Old Guard");
+                hero.TeamPW = "pw";
+                string wrong = await new TeamCornerRig(hero, new[] { "nope", "x" }).Run("ChangeTeamPassword");
+                wrong.Should().Contain(Loc.Get("team.wrong_password_short"));
+                npc.TeamPW.Should().Be("pw");
+
+                string shown = await new TeamCornerRig(hero, new[] { "pw", "fresh" }).Run("ChangeTeamPassword");
+                shown.Should().Contain(Loc.Get("team.password_changed")).And.NotContain(Loc.Get("team.password_leader_only"));
+                npc.TeamPW.Should().Be("fresh", "a join checks the NPC-held password");
+                hero.TeamPW.Should().Be("fresh");
+
+                // a player team still needs its leader and its stored hash
+                await db.CreatePlayerTeam("Row Team", SqlSaveBackend.HashTeamPassword("theirs"), "someone_else");
+                var member = TeamCornerRig.Hero(name: "Row Member", team: "Row Team");
+                (await new TeamCornerRig(member, new[] { "theirs", "mine" }).Run("ChangeTeamPassword"))
+                    .Should().Contain(Loc.Get("team.password_leader_only"));
+                (await db.VerifyPlayerTeam("Row Team", "theirs")).passwordCorrect.Should().BeTrue();
+            });
+        }
+        finally { NPCSpawnSystem.Instance.ActiveNPCs.Remove(npc); }
+    }
+
+    [Fact]
+    public async Task Examine_APlayer_ShowsTheSavedHpManaAndAge()
+    {
+        var npc = TeamCornerRig.Npc("tc_exam_hp_1", "Hurt Band Npc", "Hurt Band");
+        NPCSpawnSystem.Instance.ActiveNPCs.Add(npc);
+        try
+        {
+            await TeamCornerRig.Online(async (db, path) =>
+            {
+                await db.WriteGameData("tomas", new SaveGameData
+                {
+                    Version = GameConfig.SaveVersion,
+                    Player = new PlayerData { Name1 = "tomas", Name2 = "Tomas", Team = "Hurt Band", Class = CharacterClass.Magician, Level = 12, Strength = 55, BaseStrength = 55,
+                                              Intelligence = 60, BaseIntelligence = 60, Wisdom = 60, BaseWisdom = 60,
+                                              HP = 20, MaxHP = 90, BaseMaxHP = 90, Mana = 5, MaxMana = 50, BaseMaxMana = 50, Age = 33 }
+                });
+                var hero = TeamCornerRig.Hero(team: "Hurt Band");
+                string shown = await new TeamCornerRig(hero, new[] { "tomas", "" }).Run("ExamineMember");
+                shown.Should().Contain($"{Loc.Get("combat.bar_hp")}: 20/", "the injured player's HP, not full");
+                shown.Should().Contain($"{Loc.Get("ui.mana_label")}: 5/");
+                shown.Should().Contain($"{Loc.Get("team.examine_age")}: 33");
+            });
+        }
+        finally { NPCSpawnSystem.Instance.ActiveNPCs.Remove(npc); }
+    }
 }

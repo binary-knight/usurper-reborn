@@ -12957,6 +12957,8 @@
   "team.war_round_line": "{0} (Niv{1}) contre {2} (Niv{3}) ",
   "team.war_no_rounds": "Aucune manche n'a pu être livrée. La guerre est annulée et votre mise de {0} pièces d'or vous est rendue.",
   "team.war_no_rounds_pending": "Aucune manche n'a pu être livrée. La guerre n'a pas pu être close pour l'instant ; votre mise de {0} pièces d'or vous sera rendue à son expiration.",
+  "team.war_result_pending": "Le résultat n'a pas pu être enregistré pour l'instant, donc rien n'est encore payé ni prélevé. La guerre sera close à son expiration ; votre mise de {0} pièces d'or ne vous sera rendue que si aucune de ses manches n'a été enregistrée.",
+  "team.war_already_closed": "Cette guerre était déjà close avant que son résultat puisse être enregistré, donc rien n'est payé ni prélevé ici. Tout remboursement dû arrive par virement bancaire.",
   "team.war_abandoned": "ABANDONNÉE",
   "team.upgrade_not_landed": "L'amélioration n'a pas eu lieu (quelqu'un l'a faite avant vous, ou le coffre manquait d'or). Rien n'a été prélevé.",
   "team.confirm_withdraw": "Retirer {0} pièces d'or du coffre de l'équipe ? (O/N) : ",

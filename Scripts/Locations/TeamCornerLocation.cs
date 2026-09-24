@@ -854,7 +854,14 @@ public class TeamCornerLocation : BaseLocation
             {
                 string key = !string.IsNullOrEmpty(summary.Username) ? summary.Username : backend.ResolvePlayerUsername(summary.DisplayName) ?? summary.DisplayName;
                 var data = await backend.ReadGameData(key);
-                if (data?.Player != null) c = PlayerCharacterLoader.CreateFromSaveData(data.Player, summary.DisplayName);
+                if (data?.Player != null)
+                {
+                    c = PlayerCharacterLoader.CreateFromSaveData(data.Player, summary.DisplayName);
+                    // v1.1.12: the combat loader starts at full HP and mana and has no age; show the saved ones
+                    c.HP = Math.Min(data.Player.HP, c.MaxHP);
+                    c.Mana = Math.Min(data.Player.Mana, c.MaxMana);
+                    c.Age = data.Player.Age;
+                }
             }
             catch (Exception ex) { DebugLogger.Instance.LogWarning("TEAM", $"Could not load the save of {summary.DisplayName}: {ex.Message}"); }
         }
@@ -2311,6 +2318,19 @@ public class TeamCornerLocation : BaseLocation
         // the old one kept working
         var backend = DoorMode.IsOnlineMode ? SaveSystem.Instance.Backend as SqlSaveBackend : null;
         string myKey = GameEngine.InheritanceKey(currentPlayer);
+        // v1.1.12: a team an NPC founded has no player_teams row; its password is the one its NPCs hold, which
+        // a join checks, so it is changed as before (the old password checked against that one)
+        bool? hasRow = backend?.HasPlayerTeamRow(currentPlayer.Team);
+        if (backend != null && hasRow == null)
+        {
+            terminal.WriteLine("");
+            terminal.SetColor("red");
+            terminal.WriteLine(Loc.Get("team.failed_generic"));
+            await Task.Delay(2000);
+            return;
+        }
+        bool npcTeam = hasRow == false;
+        if (npcTeam) backend = null;
         if (backend != null && !string.Equals(await backend.GetTeamLeaderUsername(currentPlayer.Team), myKey, StringComparison.Ordinal))
         {
             terminal.WriteLine("");
@@ -2327,8 +2347,12 @@ public class TeamCornerLocation : BaseLocation
         terminal.SetColor("white");
         string currentPassword = await terminal.ReadLineAsync();
 
-        // offline the in-memory copy is the password; online the stored hash is checked below
-        if (backend == null && currentPassword != currentPlayer.TeamPW)
+        // offline the in-memory copy is the password; an NPC team's is the one its NPCs hold (checked if set);
+        // a player team's stored hash is checked below
+        string heldPassword = npcTeam
+            ? NPCSpawnSystem.Instance.ActiveNPCs.FirstOrDefault(n => n.Team == currentPlayer.Team && n.IsAlive)?.TeamPW ?? currentPlayer.TeamPW ?? ""
+            : currentPlayer.TeamPW;
+        if (backend == null && (!npcTeam || !string.IsNullOrEmpty(heldPassword)) && currentPassword != heldPassword)
         {
             terminal.WriteLine("");
             terminal.SetColor("red");
@@ -3676,7 +3700,19 @@ public class TeamCornerLocation : BaseLocation
 
         bool weWon = myWins > enemyWins;
         string result = weWon ? "challenger_won" : "defender_won";
-        await backend.CompleteTeamWar(warId, result);
+        // v1.1.12: paid or charged only if this guarded flip landed, as in the no-round path. Otherwise nothing
+        // changes hands here: the stale cleanup (ExpireStaleTeamWars) closes the war once, refunding the wager
+        // only if no round was recorded, so a won war can never pay twice.
+        if (!await backend.CompleteTeamWar(warId, result))
+        {
+            string? status = await backend.GetTeamWarStatus(warId);
+            bool closed = status != null && status != "active";
+            terminal.SetColor("yellow");
+            terminal.WriteLine(Loc.Get("team.war_score", myWins, enemyWins));
+            terminal.WriteLine(closed ? Loc.Get("team.war_already_closed") : Loc.Get("team.war_result_pending", $"{wager:N0}"));
+            await terminal.PressAnyKey();
+            return;
+        }
 
         // v0.57.17 — increment daily counter regardless of outcome (ran a war = burned a slot)
         currentPlayer.TeamWarsToday++;
