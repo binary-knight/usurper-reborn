@@ -3,8 +3,12 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Reflection;
 using System.Text.Json;
+using System.Threading.Tasks;
 using FluentAssertions;
+using UsurperRemake;
+using UsurperRemake.Locations;
 using UsurperRemake.Systems;
 using Xunit;
 
@@ -111,6 +115,163 @@ public class Awakening1112Tests : IDisposable
         SaveSystem.Instance.RestoreStorySystems(back);
         Ocean.AwakeningLevel.Should().Be(2);
         Ocean.InsightIds.Should().BeEmpty();
+    }
+
+    // ---------- 2. the moments ----------
+
+    private const BindingFlags F = BindingFlags.NonPublic | BindingFlags.Instance;
+
+    private static (TerminalEmulator term, MemoryStream output) Terminal(string input = "")
+    {
+        var output = new MemoryStream();
+        return (new TerminalEmulator(new MemoryStream(Encoding.UTF8.GetBytes(input)), output), output);
+    }
+
+    private static string Shown(TerminalEmulator term, MemoryStream output)
+    {
+        term.StreamWriterInternal?.Flush();
+        return Encoding.UTF8.GetString(output.ToArray());
+    }
+
+    private static Character Hero() => new()
+    {
+        Name1 = "wave", Name2 = "Wave", Class = CharacterClass.Warrior, Level = 8, HP = 500, MaxHP = 500,
+        BaseMaxHP = 500, BaseWisdom = 10, Wisdom = 10, AI = CharacterAI.Human
+    };
+
+    private static string RepoRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !(Directory.Exists(Path.Combine(dir.FullName, "Scripts")) && Directory.Exists(Path.Combine(dir.FullName, "Localization"))))
+            dir = dir.Parent;
+        return dir!.FullName;
+    }
+
+    private static string Source(string relative) => File.ReadAllText(Path.Combine(RepoRoot(), relative));
+
+    [Fact]
+    public async Task SparingASurrenderedFoe_RecordsSparedAnEnemy()
+    {
+        var (term, _) = Terminal("1\n");
+        var engine = new CombatEngine(term);
+        var hero = Hero();
+        var npc = new NPC { ID = "npc_spare", Name1 = "Foe", Name2 = "Foe", Level = 5, HP = 0, MaxHP = 100, HpAtRoundStart = 100 };
+        var result = new CombatResult { Player = hero, Opponent = npc };
+        var offer = typeof(CombatEngine).GetMethod("OfferNPCSurrenderAsync", F)!;
+        bool spared = await (Task<bool>)offer.Invoke(engine, new object[] { hero, npc, result })!;
+        spared.Should().BeTrue();
+        Ocean.ExperiencedMoments.Should().Contain(AwakeningMoment.SparedAnEnemy);
+    }
+
+    [Fact]
+    public async Task FinishingASurrenderedFoe_RecordsNothing()
+    {
+        var (term, _) = Terminal("2\n");
+        var engine = new CombatEngine(term);
+        var hero = Hero();
+        var npc = new NPC { ID = "npc_finish", Name1 = "Foe", Name2 = "Foe", Level = 5, HP = 0, MaxHP = 100, HpAtRoundStart = 100 };
+        var offer = typeof(CombatEngine).GetMethod("OfferNPCSurrenderAsync", F)!;
+        await (Task<bool>)offer.Invoke(engine, new object[] { hero, npc, new CombatResult { Player = hero, Opponent = npc } })!;
+        Ocean.ExperiencedMoments.Should().NotContain(AwakeningMoment.SparedAnEnemy);
+    }
+
+    [Fact]
+    public void TheManweDialogue_RecordsMetManwe_AndStartDialogueCallsIt()
+    {
+        DialogueSystem.RecordDialogueMoments("veloura_encounter");
+        Ocean.ExperiencedMoments.Should().NotContain(AwakeningMoment.MetManwe);
+        DialogueSystem.RecordDialogueMoments("manwe_encounter");
+        Ocean.ExperiencedMoments.Should().Contain(AwakeningMoment.MetManwe);
+        Source("Scripts/Systems/DialogueSystem.cs").Should().Contain("RecordDialogueMoments(treeId);");
+    }
+
+    [Fact]
+    public void TheManweAlliance_GrantsARealFragment()
+    {
+        var ds = DialogueSystem.Instance;
+        var trees = (System.Collections.IDictionary)typeof(DialogueSystem).GetField("dialogueTrees", F)!.GetValue(ds)!;
+        var tree = (DialogueTree)trees["manwe_encounter"]!;
+        var node = tree.AllNodes["manwe_alliance"];
+        var old = typeof(DialogueSystem).GetField("currentPlayer", F)!.GetValue(ds);
+        try
+        {
+            typeof(DialogueSystem).GetField("currentPlayer", F)!.SetValue(ds, Hero());
+            typeof(DialogueSystem).GetMethod("ApplyNodeEffects", F)!.Invoke(ds, new object[] { node });
+            Ocean.CollectedFragments.Should().Contain(WaveFragment.TheChoice);
+            Ocean.InsightIds.Should().Contain("dialogue:manwe_alliance");
+        }
+        finally { typeof(DialogueSystem).GetField("currentPlayer", F)!.SetValue(ds, old); }
+    }
+
+    [Theory]
+    [InlineData("refuse_paradise", AwakeningMoment.RejectedParadise)]
+    [InlineData("take_darkness", AwakeningMoment.AbsorbedDarkness)]
+    [InlineData("refuse_power", AwakeningMoment.LetGoOfPower)]
+    public void TheParadoxChoices_RecordTheirMoments(string optionId, AwakeningMoment moment)
+    {
+        // the real options carry these ids
+        var paradoxes = (System.Collections.IDictionary)typeof(MoralParadoxSystem).GetField("paradoxes", F)!.GetValue(MoralParadoxSystem.Instance)!;
+        paradoxes.Values.Cast<MoralParadox>().SelectMany(p => p.Choices).Select(c => c.Id).Should().Contain(optionId);
+
+        MoralParadoxSystem.Instance.ApplyChoiceEffects(new ParadoxOption { Id = optionId }, Hero());
+        Ocean.ExperiencedMoments.Should().Contain(moment);
+    }
+
+    [Fact]
+    public void AcceptingManwesOffer_RecordsLetGoOfPower()
+    {
+        // the Offer is mid-fight against the Creator; the recording sits in the accept branch
+        string src = Source("Scripts/Systems/CombatEngine.cs");
+        int accept = src.IndexOf("Player accepts The Offer");
+        int record = src.LastIndexOf("ExperienceMoment(AwakeningMoment.LetGoOfPower)", accept);
+        record.Should().BeGreaterThan(src.LastIndexOf("if (GameConfig.IsAffirmative(response))", accept));
+    }
+
+    [Fact]
+    public async Task ALoreSong_RecordsHeardOldGodLoreSong()
+    {
+        var shop = new MusicShopLocation();
+        var hero = Hero();
+        var (term, _) = Terminal("\n\n");
+        typeof(BaseLocation).GetField("terminal", F)!.SetValue(shop, term);
+        typeof(BaseLocation).GetField("currentPlayer", F)!.SetValue(shop, hero);
+        var play = typeof(MusicShopLocation).GetMethod("PlayLoreSong", F)!;
+        await (Task)play.Invoke(shop, new object[] { OldGodType.Maelketh, "t", "white", new[] { "v" } })!;
+        Ocean.ExperiencedMoments.Should().Contain(AwakeningMoment.HeardOldGodLoreSong);
+        Ocean.InsightIds.Should().Contain("song:Maelketh");
+    }
+
+    [Fact]
+    public void ReachingAcceptance_RecordsAcceptedGrief()
+    {
+        var grief = GriefSystem.Instance;
+        grief.Reset();
+        try
+        {
+            grief.BeginNpcGrief("npc_grief_test", "Friend", DeathType.Combat);
+            for (int day = 1; day <= 6; day++) grief.UpdateGrief(day * 10000);
+            Ocean.ExperiencedMoments.Should().Contain(AwakeningMoment.AcceptedGrief);
+        }
+        finally { grief.Reset(); }
+    }
+
+    [Fact]
+    public void FourMemories_RecordMemoriesRecovered()
+    {
+        var amnesia = AmnesiaSystem.Instance;
+        var saved = amnesia.Serialize();
+        try
+        {
+            amnesia.Deserialize(new AmnesiaData());
+            amnesia.RecoverMemory(MemoryFragment.TheFirstThought);
+            amnesia.RecoverMemory(MemoryFragment.CreatingLight);
+            amnesia.RecoverMemory(MemoryFragment.WatchingThem);
+            Ocean.ExperiencedMoments.Should().NotContain(AwakeningMoment.MemoriesRecovered);
+            amnesia.RecoverMemory(MemoryFragment.TheDecision);
+            Ocean.ExperiencedMoments.Should().Contain(AwakeningMoment.MemoriesRecovered);
+            amnesia.TruthRevealed.Should().BeFalse("the floor memories are not the full truth");
+        }
+        finally { amnesia.Deserialize(saved); }
     }
 
     [Fact]

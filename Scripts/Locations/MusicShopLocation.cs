@@ -1259,8 +1259,9 @@ public class MusicShopLocation : BaseLocation
 
             try
             {
-                // v1.1.12: each god's song is its own insight
+                // v1.1.12: each god's song is its own insight; the first song is also a moment
                 OceanPhilosophySystem.Instance?.GainInsight("song:" + god);
+                OceanPhilosophySystem.Instance?.ExperienceMoment(AwakeningMoment.HeardOldGodLoreSong);
             }
             catch { }
         }

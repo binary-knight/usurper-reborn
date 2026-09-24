@@ -812,7 +812,7 @@ namespace UsurperRemake.Systems
         /// <summary>
         /// Apply the effects of the choice
         /// </summary>
-        private void ApplyChoiceEffects(ParadoxOption choice, Character player)
+        internal void ApplyChoiceEffects(ParadoxOption choice, Character player)
         {
             // Alignment changes
             if (choice.ChivalryChange != 0)
@@ -857,6 +857,11 @@ namespace UsurperRemake.Systems
                 StoryProgressionSystem.Instance.UpdateGodState(choice.GodAwakened.Value, GodStatus.Awakened);
             }
 
+            // v1.1.12: the awakening moments these choices are
+            var moment = MomentForChoice(choice.Id);
+            if (moment.HasValue)
+                OceanPhilosophySystem.Instance.ExperienceMoment(moment.Value);
+
             if (choice.OceanPhilosophyBonus)
             {
                 OceanPhilosophySystem.Instance.GainInsight("paradox:" + choice.Id); // v1.1.12
@@ -875,6 +880,15 @@ namespace UsurperRemake.Systems
 
             // GD.Print($"[MoralParadox] Applied effects for choice: {choice.Id}");
         }
+
+        /// <summary>v1.1.12: the awakening moment a paradox choice records, if any.</summary>
+        internal static AwakeningMoment? MomentForChoice(string optionId) => optionId switch
+        {
+            "refuse_paradise" => AwakeningMoment.RejectedParadise,
+            "take_darkness" => AwakeningMoment.AbsorbedDarkness,
+            "refuse_power" => AwakeningMoment.LetGoOfPower, // final_choice is never presented; Manwe's Offer also records it
+            _ => null
+        };
 
         /// <summary>
         /// Display Ocean Philosophy reflection

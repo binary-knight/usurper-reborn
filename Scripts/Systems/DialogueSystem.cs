@@ -45,7 +45,7 @@ namespace UsurperRemake.Systems
                 return new DialogueResult { Completed = false, EndNode = null };
             }
 
-            // GD.Print($"[Dialogue] Starting dialogue tree: {treeId}");
+            RecordDialogueMoments(treeId); // v1.1.12
 
             currentNode = tree.RootNode;
             var result = await ProcessDialogueTree(tree);
@@ -54,6 +54,13 @@ namespace UsurperRemake.Systems
             dialogueHistory.Add(treeId);
 
             return result;
+        }
+
+        /// <summary>v1.1.12: meeting the Creator is an awakening moment.</summary>
+        internal static void RecordDialogueMoments(string treeId)
+        {
+            if (treeId == "manwe_encounter")
+                OceanPhilosophySystem.Instance.ExperienceMoment(AwakeningMoment.MetManwe);
         }
 
         /// <summary>
@@ -2757,7 +2764,7 @@ namespace UsurperRemake.Systems
                 {
                     new() { Type = EffectType.SetStoryFlag, StringValue = "manwe_ally" },
                     new() { Type = EffectType.GainOceanInsight, IntValue = 30 },
-                    new() { Type = EffectType.CollectWaveFragment, StringValue = "CreatorsRest" }
+                    new() { Type = EffectType.CollectWaveFragment, StringValue = "TheChoice" } // v1.1.12: was "CreatorsRest", not a fragment
                 }
             };
             tree.AllNodes[alliance.Id] = alliance;

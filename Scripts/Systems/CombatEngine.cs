@@ -6782,6 +6782,7 @@ public partial class CombatEngine
                         terminal.WriteLine($"  {Loc.Get("combat.manwe_smiles")}", "bright_yellow");
                         terminal.WriteLine($"  {Loc.Get("combat.manwe_thank_you")}", "bright_white");
                         if (BossContext != null) BossContext.BossSaved = true;
+                        OceanPhilosophySystem.Instance.ExperienceMoment(AwakeningMoment.LetGoOfPower); // v1.1.12: the Creator spared, not taken
                         monster.HP = 0; // End combat peacefully
                         result.CombatLog.Add("Player accepts The Offer — Manwe spared");
                     }
@@ -26117,6 +26118,7 @@ public partial class CombatEngine
         if (spared)
         {
             result.Outcome = CombatOutcome.OpponentSpared;
+            OceanPhilosophySystem.Instance.ExperienceMoment(AwakeningMoment.SparedAnEnemy); // v1.1.12
 
             // v0.64.1 audit fix: scrub combat statuses + persistent poison so
             // a leaked DoT can't kill the spared NPC out-of-combat one tick

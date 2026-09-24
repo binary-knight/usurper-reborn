@@ -595,6 +595,7 @@ namespace UsurperRemake.Systems
                 // Grant wisdom
                 // GD.Print($"[Grief] Grief complete for {grief.CompanionName}. Player gains +5 Wisdom.");
 
+                OceanPhilosophySystem.Instance.ExperienceMoment(AwakeningMoment.AcceptedGrief); // v1.1.12
                 OnGriefComplete?.Invoke(grief.CompanionId);
             }
 
@@ -629,6 +630,7 @@ namespace UsurperRemake.Systems
                 // Grant wisdom
                 // GD.Print($"[Grief] NPC grief complete for {grief.CompanionName}. Player gains +5 Wisdom.");
 
+                OceanPhilosophySystem.Instance.ExperienceMoment(AwakeningMoment.AcceptedGrief); // v1.1.12
                 OnNpcGriefComplete?.Invoke(npcId);
             }
 

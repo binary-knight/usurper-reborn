@@ -358,10 +358,11 @@ namespace UsurperRemake.Systems
                     "Many times. An echo of ancient sorrow...",
                     2
                 ),
+                // v1.1.12: recorded when a companion joins you; the enum name stays for old saves
                 AwakeningMoment.SacrificedForAnother => new OceanInsight(
-                    "Water Flows Downhill",
-                    "In giving of yourself, the boundaries softened. " +
-                    "For a moment, there was no 'you' and 'them' - only love in motion. " +
+                    "Water Joins Water",
+                    "Another chose to walk your road. " +
+                    "For a moment, there was no 'you' and 'them' - two currents in one stream. " +
                     "Is this what the Ocean feels?",
                     3
                 ),
@@ -597,7 +598,7 @@ namespace UsurperRemake.Systems
     public enum AwakeningMoment
     {
         FirstCompanionDeath,    // Losing someone you cared about
-        SacrificedForAnother,   // Giving something precious for another
+        SacrificedForAnother,   // v1.1.12: a companion joined you (name kept for old saves)
         SparedAnEnemy,          // Showing mercy when you could destroy
         MetManwe,               // Encountering the Creator
         AllSealsCollected,      // Understanding the full history
