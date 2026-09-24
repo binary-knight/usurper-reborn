@@ -2721,6 +2721,7 @@
   "castle.withdraw_prompt": "¿Cuánto retirar? (Máx: {0}): ",
   "castle.treasury_not_enough": "¡El tesoro no tiene tanto!",
   "castle.withdrew_gold": "Retiraste {0} oro del tesoro.",
+  "castle.treasury_move_failed": "El tesoro cambió antes de poder mover el oro. No se movió nada.",
   "castle.deposit_prompt": "¿Cuánto depositar? (Tienes: {0}): ",
   "castle.not_enough_gold": "¡No tienes tanto oro!",
   "castle.deposited_gold": "Depositaste {0} oro en el tesoro.",

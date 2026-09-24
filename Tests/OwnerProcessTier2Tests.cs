@@ -33,6 +33,7 @@ public class OwnerProcessTier2Tests : IDisposable
         _db = new SqlSaveBackend(_path);
         _rosterBefore = NPCSpawnSystem.Instance.ActiveNPCs.ToList();
         NPCSpawnSystem.Instance.ActiveNPCs.Clear();
+        OnlineStateManager.NoteRosterRestored(null);   // v1.1.13: no stored roster held yet
     }
 
     public void Dispose()
@@ -139,6 +140,7 @@ public class OwnerProcessTier2Tests : IDisposable
         var npc = Npc("npc_mt_4", "Grudger");
         Remember(npc, MemoryType.Attacked, "Bob", deletedAt.AddMinutes(-5));
         await _db.SaveWorldState(OnlineStateManager.KEY_NPCS, JsonSerializer.Serialize(OnlineStateManager.SerializeCurrentNPCs(), Json));
+        OnlineStateManager.NoteRosterRestored(_db.GetWorldStateVersion(OnlineStateManager.KEY_NPCS));   // held at that version
         // another writer's roster: the old grudge, and one the new Bob earned after the delete
         var theirsNpc = Find("Grudger")!;
         var newGrudge = Remember(theirsNpc, MemoryType.Insulted, "Bob", deletedAt.AddMinutes(5));
@@ -515,7 +517,7 @@ public class OwnerProcessTier2Tests : IDisposable
     private static async Task<OnlineStateManager> DoorLogin(SqlSaveBackend db)
     {
         var osm = NewOsm(db);
-        await GameEngine.Instance.RestoreNPCs((await osm.LoadSharedNPCs())!);
+        await GameEngine.Instance.RestoreNPCs((await osm.LoadSharedNPCs())!, osm.NpcsVersion);   // v1.1.13: as a login does
         osm.NoteNpcBaseline();
         return osm;
     }

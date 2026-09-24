@@ -1860,9 +1860,11 @@ public class MudServer
     {
         string? name2 = db.GetStoredName2(username);
         string? displayName = db.GetStoredDisplayName(username);
+        string? characterId = db.GetStoredCharacterId(username);   // v1.1.13: read before the save is emptied
         if (!db.DeleteGameData(username))
             return (false, $"Deleting '{username}' failed; nothing was changed");
-        await PermadeathHelper.PurgeDeletedCharacterAsync(db, username, name2 ?? displayName ?? username);
+        await PermadeathHelper.PurgeDeletedCharacterAsync(db, username, name2 ?? displayName ?? username,
+            shownName: displayName, characterId: characterId);
         return (true, $"Deleted {username}");
     }
 
@@ -1878,7 +1880,9 @@ public class MudServer
             try
             {
                 string name = !string.IsNullOrWhiteSpace(p.Name2) ? p.Name2! : (!string.IsNullOrWhiteSpace(p.DisplayName) ? p.DisplayName! : p.Username);
-                await PermadeathHelper.PurgeDeletedCharacterAsync(db, p.Username, name, deferred: true);
+                // v1.1.13: every name, the ID, the delete time and the untimed finding the web delete recorded
+                await PermadeathHelper.PurgeDeletedCharacterAsync(db, p.Username, name, deferred: true,
+                    shownName: p.DisplayName, characterId: p.PlayerId, deletedAt: p.DeletedAt, untimedAtDelete: p.Untimed);
                 ran++;
             }
             catch (Exception ex) { Console.Error.WriteLine($"[MUD] Queued purge for '{p.Username}' failed: {ex.Message}"); }

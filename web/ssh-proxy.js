@@ -3249,12 +3249,19 @@ async function handleAdminRequest(req, res) {
       }
 
       // Fallback: queue the world purge (names read before the row goes), then delete directly
-      const who = db.prepare("SELECT display_name, CASE WHEN json_valid(player_data) THEN json_extract(player_data, '$.player.name2') END AS name2 FROM players WHERE LOWER(username) = LOWER(?)")
+      // v1.1.13: also the character ID (its registry marriages) and whether another player uses the name now
+      const who = db.prepare("SELECT display_name, CASE WHEN json_valid(player_data) THEN json_extract(player_data, '$.player.name2') END AS name2, CASE WHEN json_valid(player_data) THEN json_extract(player_data, '$.player.id') END AS player_id FROM players WHERE LOWER(username) = LOWER(?)")
         .get(playerUsername);
       if (who) {
-        dbWrite.prepare("CREATE TABLE IF NOT EXISTS pending_purges (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL, name2 TEXT, display_name TEXT, deleted_at TEXT DEFAULT (datetime('now')), created_by TEXT DEFAULT 'admin-web')").run();
-        dbWrite.prepare("INSERT INTO pending_purges (username, name2, display_name, created_by) VALUES (?, ?, ?, ?)")
-          .run(playerUsername, who.name2 || null, who.display_name || null, 'admin-web');
+        const purgeName = who.name2 || who.display_name || playerUsername;
+        const usedByOther = db.prepare("SELECT EXISTS (SELECT 1 FROM players WHERE LOWER(username) != LOWER(?) AND (LOWER(display_name) = LOWER(?) OR LOWER(CASE WHEN json_valid(player_data) THEN json_extract(player_data, '$.player.name2') END) = LOWER(?))) AS used")
+          .get(playerUsername, purgeName, purgeName);
+        dbWrite.prepare("CREATE TABLE IF NOT EXISTS pending_purges (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL, name2 TEXT, display_name TEXT, deleted_at TEXT DEFAULT (datetime('now')), created_by TEXT DEFAULT 'admin-web', player_id TEXT, untimed INTEGER)").run();
+        for (const col of ['player_id TEXT', 'untimed INTEGER']) {
+          try { dbWrite.prepare(`ALTER TABLE pending_purges ADD COLUMN ${col}`).run(); } catch (e) { /* already there */ }
+        }
+        dbWrite.prepare("INSERT INTO pending_purges (username, name2, display_name, created_by, player_id, untimed) VALUES (?, ?, ?, ?, ?, ?)")
+          .run(playerUsername, who.name2 || null, who.display_name || null, 'admin-web', who.player_id || null, usedByOther && usedByOther.used ? 0 : 1);
       }
 
       // Kick if online first

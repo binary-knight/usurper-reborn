@@ -3230,12 +3230,17 @@ public class CastleLocation : BaseLocation
             }
             else
             {
-                currentKing.Treasury -= amount;
-                currentPlayer.Gold += amount;
-                DebugLogger.Instance.LogInfo("GOLD", $"TREASURY WITHDRAW: {currentPlayer.DisplayName} withdrew {amount:N0}g from treasury (gold now {currentPlayer.Gold:N0}, treasury now {currentKing.Treasury:N0})");
+                // v1.1.13: the treasury's side lands first, as one versioned court write; then the player's
+                if (!await MoveTreasuryGoldAsync(TreasuryOsm(), currentPlayer, amount))
+                {
+                    terminal.SetColor("red");
+                    terminal.WriteLine(Loc.Get("castle.treasury_move_failed"));
+                    await Task.Delay(2000);
+                    return;
+                }
+                DebugLogger.Instance.LogInfo("GOLD", $"TREASURY WITHDRAW: {currentPlayer.DisplayName} withdrew {amount:N0}g from treasury (gold now {currentPlayer.Gold:N0}, treasury now {currentKing?.Treasury ?? 0:N0})");
                 terminal.SetColor("bright_green");
                 terminal.WriteLine(Loc.Get("castle.withdrew_gold", amount.ToString("N0")));
-                PersistRoyalCourtToWorldState();
             }
         }
 
@@ -3259,11 +3264,16 @@ public class CastleLocation : BaseLocation
             }
             else
             {
-                currentPlayer.Gold -= amount;
-                currentKing.Treasury += amount;
+                // v1.1.13: the player's gold leaves only once the treasury's versioned write holds it
+                if (!await MoveTreasuryGoldAsync(TreasuryOsm(), currentPlayer, -amount))
+                {
+                    terminal.SetColor("red");
+                    terminal.WriteLine(Loc.Get("castle.treasury_move_failed"));
+                    await Task.Delay(2000);
+                    return;
+                }
                 terminal.SetColor("bright_green");
                 terminal.WriteLine(Loc.Get("castle.deposited_gold", $"{amount:N0}"));
-                PersistRoyalCourtToWorldState();
             }
         }
 
@@ -7078,10 +7088,16 @@ public class CastleLocation : BaseLocation
             terminal.Write(Loc.Get("castle.loan_how_much", maxLoan));
             string input = await terminal.ReadLineAsync();
 
-            if (long.TryParse(input, out long amount) && amount > 0 && amount <= maxLoan)
+            // v1.1.13: the loan leaves the treasury in one versioned court write before the player has it
+            if (long.TryParse(input, out long amount) && amount > 0 && amount <= maxLoan
+                && !await MoveTreasuryGoldAsync(TreasuryOsm(), currentPlayer, amount))
             {
-                currentPlayer.Gold += amount;
-                currentKing.Treasury -= amount;
+                terminal.WriteLine("");
+                terminal.SetColor("red");
+                terminal.WriteLine(Loc.Get("castle.treasury_move_failed"));
+            }
+            else if (amount > 0 && amount <= maxLoan)
+            {
 
                 // Track the loan for repayment
                 currentPlayer.RoyalLoanAmount = amount;
@@ -7453,10 +7469,13 @@ public class CastleLocation : BaseLocation
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("castle.donate_not_enough"));
             }
+            else if (!await MoveTreasuryGoldAsync(TreasuryOsm(), currentPlayer, -amount))   // v1.1.13: the treasury's side first
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine(Loc.Get("castle.treasury_move_failed"));
+            }
             else
             {
-                currentPlayer.Gold -= amount;
-                currentKing.Treasury += amount;
                 int chivalryGain = (int)Math.Min(50, amount / 100);
                 AlignmentSystem.Instance.ChangeAlignment(currentPlayer, chivalryGain, isGood: true, "castle.donate_treasury"); // v0.57.12: paired movement
 
@@ -7644,6 +7663,32 @@ public class CastleLocation : BaseLocation
     /// <summary>
     /// Static version for use from other locations (e.g., PrisonLocation bail payment)
     /// </summary>
+    /// <summary>v1.1.13: the session's online state when the court is shared, else null (the in-memory court only).</summary>
+    private static OnlineStateManager? TreasuryOsm() =>
+        UsurperRemake.BBS.DoorMode.IsOnlineMode ? OnlineStateManager.Instance : null;
+
+    /// <summary>
+    /// v1.1.13: move gold between the treasury and a player (toPlayer above 0: out of the treasury). With a
+    /// shared court the treasury's side is one versioned court write (OnlineStateManager.TryMoveTreasuryAsync),
+    /// and the player's gold changes only once it holds; a move that fails changes neither side.
+    /// </summary>
+    internal static async Task<bool> MoveTreasuryGoldAsync(OnlineStateManager? osm, Character player, long toPlayer, Func<Task>? beforeWrite = null)
+    {
+        var king = currentKing;
+        if (king == null || player == null) return false;
+        if (osm != null)
+        {
+            if (!await osm.TryMoveTreasuryAsync(king.Name, -toPlayer, beforeWrite)) return false;
+        }
+        else
+        {
+            if (king.Treasury - toPlayer < 0) return false;
+            king.Treasury -= toPlayer;
+        }
+        player.Gold += toPlayer;
+        return true;
+    }
+
     public static void PersistRoyalCourtToWorldStateStatic()
     {
         if (!UsurperRemake.BBS.DoorMode.IsOnlineMode) return;

@@ -762,7 +762,9 @@ namespace UsurperRemake.Systems
                         name2 TEXT,
                         display_name TEXT,
                         deleted_at TEXT DEFAULT (datetime('now')),
-                        created_by TEXT DEFAULT 'admin-web'
+                        created_by TEXT DEFAULT 'admin-web',
+                        player_id TEXT,
+                        untimed INTEGER
                     );
                     CREATE TABLE IF NOT EXISTS mud_heartbeat (
                         id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -923,6 +925,18 @@ namespace UsurperRemake.Systems
                 migCmd.ExecuteNonQuery();
             }
             catch { /* Column already exists - expected */ }
+
+            // v1.1.13: a queued purge's character ID, and whether another player used the name at the delete
+            foreach (var column in new[] { "player_id TEXT", "untimed INTEGER" })
+            {
+                try
+                {
+                    using var migCmd = connection.CreateCommand();
+                    migCmd.CommandText = $"ALTER TABLE pending_purges ADD COLUMN {column};";
+                    migCmd.ExecuteNonQuery();
+                }
+                catch { /* Column already exists - expected */ }
+            }
 
             // v1.1.12: who paid a team war's wager, so a war left active by a lost session can be refunded
             try
@@ -1104,6 +1118,25 @@ namespace UsurperRemake.Systems
         /// v1.1.12: the save's Name2 for one key, banned accounts included (ReadGameData skips them), for the
         /// admin deletes: a married display name is not the name children and quests record. Null if none.
         /// </summary>
+        /// <summary>v1.1.13: the character ID in the account's save (null when none), read before the row is emptied.</summary>
+        public string? GetStoredCharacterId(string username)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT CASE WHEN json_valid(player_data) THEN json_extract(player_data, '$.player.id') END FROM players " +
+                                  "WHERE LOWER(username) = LOWER(@u) ORDER BY LENGTH(player_data) DESC LIMIT 1;";
+                cmd.Parameters.AddWithValue("@u", username);
+                return cmd.ExecuteScalar() is string s && !string.IsNullOrWhiteSpace(s) ? s : null;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogWarning("SQL", $"GetStoredCharacterId('{username}') failed: {ex.Message}");
+                return null;
+            }
+        }
+
         public string? GetStoredName2(string username)
         {
             try
@@ -2105,6 +2138,25 @@ namespace UsurperRemake.Systems
         /// Used to detect when another process (game server) has modified the data.
         /// Returns 0 if the key doesn't exist.
         /// </summary>
+        /// <summary>v1.1.13: the number of entries in a world_state JSON array (0 when absent or not an array).</summary>
+        public int GetWorldStateArrayLength(string key)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT CASE WHEN json_valid(value) AND json_type(value) = 'array' THEN json_array_length(value) ELSE 0 END FROM world_state WHERE key = @key;";
+                cmd.Parameters.AddWithValue("@key", key);
+                var result = cmd.ExecuteScalar();
+                return result != null && result != DBNull.Value ? Convert.ToInt32(result) : 0;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogWarning("SQL", $"GetWorldStateArrayLength('{key}') failed: {ex.Message}");
+                return 0;
+            }
+        }
+
         public long GetWorldStateVersion(string key)
         {
             try
@@ -8055,19 +8107,32 @@ namespace UsurperRemake.Systems
             catch { /* best-effort */ }
         }
 
-        /// <summary>v1.1.13: world purges queued by a web delete made while the MUD was down, oldest first.</summary>
-        public List<(long Id, string Username, string? Name2, string? DisplayName)> GetPendingPurges()
+        /// <summary>v1.1.13: a world purge queued by a web delete, with what the delete knew of the character then.</summary>
+        public sealed record PendingPurge(long Id, string Username, string? Name2, string? DisplayName,
+                                          DateTime? DeletedAt, string? PlayerId, bool? Untimed);
+
+        /// <summary>
+        /// v1.1.13: world purges queued by a web delete made while the MUD was down, oldest first. DeletedAt is
+        /// the delete time as a local time (deleted_at is SQLite UTC text; memory times are local).
+        /// </summary>
+        public List<PendingPurge> GetPendingPurges()
         {
-            var list = new List<(long, string, string?, string?)>();
+            var list = new List<PendingPurge>();
             try
             {
                 using var connection = OpenConnection();
                 using var cmd = connection.CreateCommand();
-                cmd.CommandText = "SELECT id, username, name2, display_name FROM pending_purges ORDER BY id LIMIT 20;";
+                cmd.CommandText = "SELECT id, username, name2, display_name, deleted_at, player_id, untimed FROM pending_purges ORDER BY id LIMIT 20;";
                 using var reader = cmd.ExecuteReader();
                 while (reader.Read())
-                    list.Add((reader.GetInt64(0), reader.GetString(1),
-                              reader.IsDBNull(2) ? null : reader.GetString(2), reader.IsDBNull(3) ? null : reader.GetString(3)));
+                {
+                    string? Text(int i) => reader.IsDBNull(i) ? null : Convert.ToString(reader.GetValue(i));
+                    DateTime? at = DateTime.TryParseExact(Text(4), "yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture,
+                        System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal, out var utc)
+                        ? utc.ToLocalTime() : null;
+                    bool? untimed = reader.IsDBNull(6) ? null : Convert.ToInt64(reader.GetValue(6)) != 0;
+                    list.Add(new PendingPurge(reader.GetInt64(0), reader.GetString(1), Text(2), Text(3), at, Text(5), untimed));
+                }
             }
             catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"GetPendingPurges failed: {ex.Message}"); }
             return list;

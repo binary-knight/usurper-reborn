@@ -28,6 +28,7 @@ namespace UsurperRemake.Systems
             [JsonPropertyName("character_key")] public string CharacterKey { get; set; } = "";
             [JsonPropertyName("deleted_at")] public string DeletedAt { get; set; } = "";   // round-trip local time, as memory times are
             [JsonPropertyName("untimed")] public bool Untimed { get; set; }                 // no other player used the name at the delete
+            [JsonPropertyName("character_ids")] public List<string> CharacterIds { get; set; } = new();   // v1.1.13: registry marriages to end
         }
 
         public sealed class VacateThronePayload
@@ -61,13 +62,15 @@ namespace UsurperRemake.Systems
 
         // --- appending ---
 
-        public static long AppendForgetCharacter(SqlSaveBackend sql, IEnumerable<string> aliases, string? characterKey, DateTime deletedAt, bool untimed) =>
+        public static long AppendForgetCharacter(SqlSaveBackend sql, IEnumerable<string> aliases, string? characterKey, DateTime deletedAt, bool untimed,
+            IEnumerable<string>? characterIds = null) =>
             sql.AppendWorldEdit(ForgetCharacter, JsonSerializer.Serialize(new ForgetCharacterPayload
             {
                 Aliases = aliases.Where(a => !string.IsNullOrWhiteSpace(a)).ToList(),
                 CharacterKey = characterKey ?? "",
                 DeletedAt = deletedAt.ToString("o", CultureInfo.InvariantCulture),
-                Untimed = untimed
+                Untimed = untimed,
+                CharacterIds = characterIds?.Where(i => !string.IsNullOrWhiteSpace(i)).ToList() ?? new()
             }), ProcessLabel);
 
         public static long AppendVacateThrone(SqlSaveBackend sql, string king, IEnumerable<string> aliases, string? characterKey) =>
@@ -113,13 +116,17 @@ namespace UsurperRemake.Systems
             if (p == null || p.Aliases.Count == 0) return 0;
             var cutOff = ParseDeletedAt(p.DeletedAt);
             if (cutOff == null) return 0;
-            bool later = sql.LaterCharacterUsesName(p.Aliases, edit.CreatedAt, p.CharacterKey);
+            // v1.1.13: a later character is one after the delete itself; a queued purge logs its edit later
+            bool later = sql.LaterCharacterUsesName(p.Aliases, EarlierSqlTime(edit.CreatedAt, cutOff.Value), p.CharacterKey);
+            bool untimed = p.Untimed && !later;
             int n = 0;
             foreach (var a in p.Aliases)
             {
-                n += PermadeathHelper.ForgetNpcGrudgesAgainst(a, cutOff, p.Untimed && !later);
-                if (!later) n += PermadeathHelper.ClearNpcSpousesOf(a, endedMarriages);
+                n += PermadeathHelper.ForgetNpcGrudgesAgainst(a, cutOff, untimed);
+                if (untimed) n += PermadeathHelper.ClearNpcSpousesOf(a, endedMarriages);   // v1.1.13: a spouse name carries no time
             }
+            // v1.1.13: the registry pairs by ID, so a marriage is ended even where the NPC's SpouseName is already empty
+            n += PermadeathHelper.EndRegistryMarriagesOf(p.CharacterIds, endedMarriages);
             return n;
         }
 
@@ -130,6 +137,13 @@ namespace UsurperRemake.Systems
             if (sql.LaterCharacterUsesName(p.Aliases.Append(p.King), edit.CreatedAt, p.CharacterKey)) return 0;
             string? shown = p.Aliases.FirstOrDefault(a => !string.Equals(a, p.King, StringComparison.OrdinalIgnoreCase));
             return global::CastleLocation.VacateDeletedKingLocally(p.King, shown) ? 1 : 0;
+        }
+
+        /// <summary>v1.1.13: the earlier of the edit's created_at (SQL UTC text) and the delete time, as SQL UTC text.</summary>
+        internal static string EarlierSqlTime(string createdAt, DateTime deletedAtLocal)
+        {
+            string deleted = deletedAtLocal.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+            return string.IsNullOrEmpty(createdAt) || string.CompareOrdinal(deleted, createdAt) < 0 ? deleted : createdAt;
         }
 
         /// <summary>The delete time as a local time (memory times are DateTime.Now).</summary>

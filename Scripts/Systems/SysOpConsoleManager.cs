@@ -702,6 +702,7 @@ namespace UsurperRemake.Systems
             // leave a living character purged, review). The character's Name2 is read from the save first.
             // v1.1.12: read from the row itself, so a banned character's Name2 is found too
             string? deletedName2 = sqlBackend.GetStoredName2(target.Username);
+            string? deletedId = sqlBackend.GetStoredCharacterId(target.Username);   // v1.1.13: read before the save is emptied
             if (!sqlBackend.DeleteGameData(target.Username))
             {
                 terminal.SetColor("red");
@@ -710,7 +711,7 @@ namespace UsurperRemake.Systems
                 return;
             }
             await PermadeathHelper.PurgeDeletedCharacterAsync(sqlBackend, target.Username,
-                deletedName2 ?? target.DisplayName);
+                deletedName2 ?? target.DisplayName, shownName: target.DisplayName, characterId: deletedId);
             terminal.SetColor("green");
             terminal.WriteLine($" {target.DisplayName} has been permanently deleted.");
             DebugLogger.Instance.LogWarning("SYSOP", $"Deleted player '{target.DisplayName}'");

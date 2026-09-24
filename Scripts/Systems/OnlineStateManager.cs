@@ -155,15 +155,19 @@ namespace UsurperRemake.Systems
         /// v1.1.13: the ordinary save of a process that is not the owner (a door session). The whole roster is
         /// written only under the version this session loaded, after the world edits are applied to it. On a
         /// conflict the stored roster is loaded, with this session's own changes laid over it: each NPC whose
-        /// data differs from the roster as this session loaded it replaces the stored copy of that NPC (an NPC
-        /// the stored roster no longer has is not brought back). The edits are applied again and the write
+        /// data differs from the roster as this session loaded it replaces the stored copy of that NPC, and an
+        /// NPC this session created is appended (v1.1.13); an NPC it loaded that the stored roster no longer
+        /// has is not brought back. The changes are found before any world edit is applied (v1.1.13). The edits are applied again and the write
         /// retried under the new version. Another process's changes to the other NPCs are kept; to an NPC both
         /// changed, this session's copy wins, as every door write did before. Returns true once written.
         /// </summary>
         internal async Task<bool> SaveSharedNPCsVersionedAsync(SqlSaveBackend sql, List<NPCData> npcData,
             Func<List<NPCData>, Task>? reloadRoster = null, Func<Task>? beforeWrite = null)
         {
-            reloadRoster ??= list => GameEngine.Instance.RestoreNPCs(list);
+            long generation = RosterGeneration;
+            // v1.1.13: this session's own changes are found before any shared clean-up edit is applied, so an
+            // NPC only an edit touched is never taken for one this session changed
+            var mineKeys = SessionChangedKeys(npcData);
             var edits = sql.GetWorldEditsToApply(WorldEditLog.ReapplyHours);
             if (edits.Count > 0 && WorldEditLog.Apply(sql, edits) > 0) npcData = SerializeCurrentNPCs();   // applied, never marked here
             long version = _npcsVersion ?? (sql.GetWorldStateVersion(KEY_NPCS) == 0 ? 0 : -1);
@@ -174,8 +178,8 @@ namespace UsurperRemake.Systems
                     if (beforeWrite != null) await beforeWrite();
                     if (await sql.SaveWorldStateIfVersion(KEY_NPCS, JsonSerializer.Serialize(npcData, jsonOptions), version))
                     {
-                        _npcsVersion = version + 1;
-                        _npcBaseline = HashRoster(npcData);
+                        NoteRosterWritten(npcData, version + 1);
+                        NoteLiveRosterWritten(generation, version + 1);
                         DebugLogger.Instance.LogDebug("ONLINE", $"Saved {npcData.Count} NPCs to shared state (v{version + 1})");
                         return true;
                     }
@@ -185,15 +189,11 @@ namespace UsurperRemake.Systems
                 var stored = string.IsNullOrEmpty(storedJson) ? null : JsonSerializer.Deserialize<List<NPCData>>(storedJson, jsonOptions);
                 if (stored == null || stored.Count == 0) { version = 0; continue; }
 
-                var baseline = _npcBaseline ?? new Dictionary<string, string>();
-                var current = HashRoster(npcData);
-                var mine = npcData.Where(d => _npcBaseline != null
-                                              && (!baseline.TryGetValue(NpcKey(d), out var h) || h != current[NpcKey(d)]))
-                                  .GroupBy(NpcKey).ToDictionary(g => g.Key, g => g.First());
-                int kept = 0;
-                for (int i = 0; i < stored.Count; i++)
-                    if (mine.TryGetValue(NpcKey(stored[i]), out var own)) { stored[i] = own; kept++; }
-                await reloadRoster(stored);
+                var mine = npcData.Where(d => mineKeys.Contains(NpcKey(d))).GroupBy(NpcKey).ToDictionary(g => g.Key, g => g.First());
+                int kept = OverlaySessionChanges(stored, mine);
+                if (reloadRoster != null) await reloadRoster(stored);
+                else await GameEngine.Instance.RestoreNPCs(stored, version);
+                generation = RosterGeneration;
                 WorldEditLog.Apply(sql, edits);
                 npcData = SerializeCurrentNPCs();
                 // the NPCs laid over stay this session's own changes if this write conflicts too
@@ -205,6 +205,97 @@ namespace UsurperRemake.Systems
             _npcsVersion = version;
             DebugLogger.Instance.LogWarning("ONLINE", "Shared NPC save gave up: the npcs record kept changing. The reloaded roster is kept; the next save tries again.");
             return false;
+        }
+
+        /// <summary>v1.1.13: the keys of the NPCs this session changed or created since its roster was loaded or written.</summary>
+        internal HashSet<string> SessionChangedKeys(List<NPCData> roster)
+        {
+            var keys = new HashSet<string>();
+            if (_npcBaseline == null) return keys;
+            foreach (var (key, hash) in HashRoster(roster))
+                if (!_npcBaseline.TryGetValue(key, out var h) || h != hash) keys.Add(key);
+            return keys;
+        }
+
+        /// <summary>
+        /// v1.1.13: lay this session's changed NPCs over a stored roster. A stored NPC is replaced by this
+        /// session's copy. An NPC this session created (not in the roster it loaded) is appended. An NPC it
+        /// loaded that the stored roster no longer has was removed by another writer and stays removed.
+        /// Returns how many were kept.
+        /// </summary>
+        internal int OverlaySessionChanges(List<NPCData> stored, Dictionary<string, NPCData> mine)
+        {
+            int kept = 0;
+            var storedKeys = new HashSet<string>();
+            for (int i = 0; i < stored.Count; i++)
+            {
+                storedKeys.Add(NpcKey(stored[i]));
+                if (mine.TryGetValue(NpcKey(stored[i]), out var own)) { stored[i] = own; kept++; }
+            }
+            foreach (var (key, own) in mine)
+                if (!storedKeys.Contains(key) && _npcBaseline != null && !_npcBaseline.ContainsKey(key)) { stored.Add(own); kept++; }
+            return kept;
+        }
+
+        /// <summary>v1.1.13: the stored roster now holds this session's roster at this version.</summary>
+        internal void NoteRosterWritten(List<NPCData> written, long version)
+        {
+            _npcsVersion = version;
+            _npcBaseline = HashRoster(written);
+        }
+
+        /// <summary>v1.1.13: after a purge reloaded the stored roster (and laid this session's changes over it) without writing.</summary>
+        internal void NoteRosterReloaded(List<NPCData> stored, long version, IEnumerable<string> mineKeys)
+        {
+            _npcsVersion = version;
+            _npcBaseline = HashRoster(stored);
+            foreach (var key in mineKeys) _npcBaseline.Remove(key);
+        }
+
+        // v1.1.13: the live NPC roster is process-wide. RosterLock is held by every rebuild of it (RestoreNPCs,
+        // the world sim's reload) and by a purge from its clean-up to its serialize, so a purge never writes a
+        // half-rebuilt roster. The version is the stored npcs version the live roster was restored from or last
+        // written as (null: unknown), and the generation counts the rebuilds.
+        internal static readonly object RosterLock = new();
+        private static long _rosterGeneration;
+        private static long? _liveRosterVersion;
+
+        internal static long RosterGeneration { get { lock (RosterLock) return _rosterGeneration; } }
+        internal static long? LiveRosterVersion { get { lock (RosterLock) return _liveRosterVersion; } }
+
+        /// <summary>v1.1.13: a rebuild replaced the live roster with the stored one of this version (null: not a stored roster).</summary>
+        internal static void NoteRosterRestored(long? storedVersion)
+        {
+            lock (RosterLock)
+            {
+                _rosterGeneration++;
+                _liveRosterVersion = storedVersion;
+            }
+        }
+
+        /// <summary>v1.1.13: the live roster serialized at this generation is stored at this version (ignored if rebuilt since).</summary>
+        internal static void NoteLiveRosterWritten(long generation, long version)
+        {
+            lock (RosterLock)
+                if (_rosterGeneration == generation) _liveRosterVersion = version;
+        }
+
+        /// <summary>v1.1.13: the live roster and the generation it was serialized at, taken under the roster lock.</summary>
+        internal static (List<NPCData> Data, long Generation) SnapshotLiveRoster()
+        {
+            lock (RosterLock) return (SerializeCurrentNPCs(), _rosterGeneration);
+        }
+
+        /// <summary>
+        /// v1.1.13: no rebuild is under way and the live roster is at least half the size of the stored one it
+        /// would be written over (as NPCSpawnSystem.IsCountPlausible judges against its high-water mark; the
+        /// stored size is used here since that mark has a floor of 25 NPCs). Call under RosterLock.
+        /// </summary>
+        private static bool LiveRosterIsWhole(int storedCount)
+        {
+            var spawner = NPCSpawnSystem.Instance;
+            if (spawner == null || spawner.IsRebuilding) return false;
+            return (spawner.ActiveNPCs?.Count ?? 0) * 2 >= storedCount;
         }
 
         /// <summary>
@@ -454,37 +545,99 @@ namespace UsurperRemake.Systems
 
         /// <summary>
         /// v1.1.13: apply cleanUp to the live NPC roster and write it to world_state at once, under the
-        /// record's version, never unconditionally. From the clean-up to the serialize nothing is awaited,
-        /// so a login's RestoreNPCs(LoadSharedNPCs()) cannot put the old roster back in between. If another
-        /// writer got in first, the stored roster is loaded into the game, the clean-up re-applied to it
-        /// and the write retried (as RemoveSharedQuestsAsync does). The marriages record then loses every
+        /// version this process's roster was loaded at or last written as, never unconditionally and never
+        /// under a newer version read now. The clean-up and the serialize hold RosterLock, which every rebuild
+        /// holds too, and run only on a whole roster (waiting up to rosterWaitMs; after that the world edit
+        /// log carries the clean-up). If another writer got in first, the stored roster is loaded into the
+        /// game with a door session's own changes laid over it, the clean-up re-applied to it and the write
+        /// retried (as RemoveSharedQuestsAsync does). The marriages record then loses every
         /// marriage of endedMarriages (the NPC ids the clean-up divorced) the same way. The record is edited,
         /// not replaced by this process's registry, since only the world sim's process loads the registry.
         /// Returns what the first clean-up changed. beforeWrite is a test hook; onWritten runs once the stored
         /// roster holds the clean-up (v1.1.13: the owner marks its world edit applied there).
         /// </summary>
         public static async Task<int> PersistNpcWorldNow(SqlSaveBackend sql, Func<int> cleanUp, ISet<string> endedMarriages,
-            Func<List<NPCData>, Task>? reloadRoster = null, Func<Task>? beforeWrite = null, Action? onWritten = null)
+            Func<Task>? beforeWrite = null, Action? onWritten = null, int rosterWaitMs = 10000)
         {
-            long version = sql.GetWorldStateVersion(KEY_NPCS);   // read before the roster is serialized, so any later write is a conflict
-            int changed = cleanUp();
-            if (changed == 0) return 0;
-            string json = JsonSerializer.Serialize(SerializeCurrentNPCs(), PersistJsonOptions);
+            // v1.1.13: a door session's own unsaved NPC changes are laid over a reloaded roster, as its save does
+            var session = WorldEditLog.IsOwnerProcess(sql) ? null : Instance;
+            HashSet<string> mineKeys = new();
+            List<NPCData> pre = new();
+            int changed;
+            List<NPCData> data;
+            long generation;
+            long version;
+            // v1.1.13: the clean-up and the serialize run under the roster lock that every rebuild holds, and
+            // only on a whole roster, so a login's rebuild on another task is never written half done
+            int storedCount = sql.GetWorldStateArrayLength(KEY_NPCS);
+            var waitUntil = DateTime.UtcNow.AddMilliseconds(rosterWaitMs);
+            while (true)
+            {
+                int left = Math.Max(0, (int)(waitUntil - DateTime.UtcNow).TotalMilliseconds);
+                if (!Monitor.TryEnter(RosterLock, left))
+                {
+                    DebugLogger.Instance.LogWarning("ONLINE", "PersistNpcWorldNow: the NPC roster stayed locked by a rebuild; not written now, the world edit log carries the clean-up.");
+                    return 0;
+                }
+                try
+                {
+                    if (LiveRosterIsWhole(storedCount))
+                    {
+                        pre = SerializeCurrentNPCs();
+                        mineKeys = session?.SessionChangedKeys(pre) ?? mineKeys;   // before the clean-up (it is not a session change)
+                        changed = cleanUp();
+                        if (changed == 0) return 0;
+                        data = SerializeCurrentNPCs();
+                        generation = _rosterGeneration;
+                        // v1.1.13: written only over the version this roster was loaded at or last written as
+                        version = _liveRosterVersion ?? -1;
+                        break;
+                    }
+                }
+                finally { Monitor.Exit(RosterLock); }
+                if (DateTime.UtcNow >= waitUntil)
+                {
+                    DebugLogger.Instance.LogWarning("ONLINE", "PersistNpcWorldNow: the NPC roster is being rebuilt or is partial; not written now, the world edit log carries the clean-up.");
+                    return 0;
+                }
+                await Task.Delay(50);
+            }
+            if (version < 0 && sql.GetWorldStateVersion(KEY_NPCS) == 0) version = 0;
+            var mine = pre.Where(d => mineKeys.Contains(NpcKey(d))).GroupBy(NpcKey).ToDictionary(g => g.Key, g => g.First());
             try
             {
-                reloadRoster ??= list => GameEngine.Instance.RestoreNPCs(list);
                 bool saved = false;
                 for (int attempt = 0; attempt < 5 && !saved; attempt++)
                 {
-                    if (beforeWrite != null) await beforeWrite();
-                    if (await sql.SaveWorldStateIfVersion(KEY_NPCS, json, version)) { saved = true; break; }
+                    if (version >= 0)
+                    {
+                        if (beforeWrite != null) await beforeWrite();
+                        if (await sql.SaveWorldStateIfVersion(KEY_NPCS, JsonSerializer.Serialize(data, PersistJsonOptions), version))
+                        {
+                            saved = true;
+                            NoteLiveRosterWritten(generation, version + 1);
+                            session?.NoteRosterWritten(data, version + 1);
+                            break;
+                        }
+                    }
+                    // another writer got in first: its roster, this session's own changes over it, the clean-up again
                     version = sql.GetWorldStateVersion(KEY_NPCS);
                     var storedJson = await sql.LoadWorldState(KEY_NPCS);
                     var stored = string.IsNullOrEmpty(storedJson) ? null : JsonSerializer.Deserialize<List<NPCData>>(storedJson, PersistJsonOptions);
                     if (stored == null || stored.Count == 0) break;
-                    await reloadRoster(stored);
-                    if (cleanUp() == 0) { saved = true; break; }   // the stored roster is already clean
-                    json = JsonSerializer.Serialize(SerializeCurrentNPCs(), PersistJsonOptions);
+                    var loaded = JsonSerializer.Deserialize<List<NPCData>>(storedJson!, PersistJsonOptions)!;
+                    if (session != null) session.OverlaySessionChanges(stored, mine);
+                    await GameEngine.Instance.RestoreNPCs(stored, version);
+                    session?.NoteRosterReloaded(loaded, version, mine.Keys);
+                    int again;
+                    lock (RosterLock)
+                    {
+                        again = cleanUp();
+                        data = SerializeCurrentNPCs();
+                        generation = _rosterGeneration;
+                        version = _liveRosterVersion ?? -1;   // a login may have restored another version meanwhile
+                    }
+                    if (again == 0 && mine.Count == 0) { saved = true; break; }   // the stored roster is already clean
                 }
                 if (!saved)
                     DebugLogger.Instance.LogWarning("ONLINE", "PersistNpcWorldNow gave up: the npcs record kept changing.");
@@ -654,16 +807,23 @@ namespace UsurperRemake.Systems
 
                 // v1.1.13: written only over the stored court this process's court was loaded from. A court never
                 // loaded here may write only where none is stored yet.
-                long? loadedAt = RoyalCourtVersion;
-                if (loadedAt == null && sql.GetWorldStateVersion("royal_court") == 0) loadedAt = 0;
-                if (loadedAt != null && await SaveRoyalCourtIfVersionAsync(loadedAt.Value, throneVacated))
+                for (int attempt = 0; attempt < 5; attempt++)
                 {
-                    DebugLogger.Instance.LogDebug("ONLINE", $"Royal court saved to world_state: {king?.Name ?? "(vacant)"}");
-                    return;
+                    long? loadedAt = RoyalCourtVersion;
+                    if (loadedAt == null && sql.GetWorldStateVersion("royal_court") == 0) loadedAt = 0;
+                    if (loadedAt != null && await SaveRoyalCourtIfVersionAsync(loadedAt.Value, throneVacated))
+                    {
+                        DebugLogger.Instance.LogDebug("ONLINE", $"Royal court saved to world_state: {king?.Name ?? "(vacant)"}");
+                        return;
+                    }
+                    // v1.1.13: another writer changed the court; this stale copy is dropped and the stored court
+                    // loaded. This process's unsaved treasury change is carried onto it and written again, so a
+                    // payment into or out of the treasury is neither lost nor made twice.
+                    DebugLogger.Instance.LogInfo("ONLINE", "Royal court save skipped: the stored court changed since it was loaded. Reloading it.");
+                    await LoadRoyalCourtFromWorldState();
+                    king = global::CastleLocation.GetCurrentKing();
+                    if (UnsavedTreasuryDelta(king) == 0) return;
                 }
-                // v1.1.13: another writer changed the court; this stale copy is dropped and the stored court loaded
-                DebugLogger.Instance.LogInfo("ONLINE", "Royal court save skipped: the stored court changed since it was loaded. Reloading it.");
-                await LoadRoyalCourtFromWorldState();
             }
             catch (Exception ex)
             {
@@ -682,7 +842,9 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>v1.1.11: the stored form of the court of this king (the body of SaveRoyalCourtToWorldState).</summary>
-        private string RoyalCourtJson(King king)
+        private string RoyalCourtJson(King king) => RoyalCourtJson(king, out _);
+
+        private string RoyalCourtJson(King king, out long treasury)   // v1.1.13: the treasury as written
         {
             var data = new RoyalCourtSaveData
             {
@@ -797,6 +959,7 @@ namespace UsurperRemake.Systems
                     ? king.LastProclamationDate.ToString("o") : ""
             };
 
+            treasury = data.Treasury;
             return JsonSerializer.Serialize(data, jsonOptions);
         }
 
@@ -807,7 +970,92 @@ namespace UsurperRemake.Systems
 
         internal static long? RoyalCourtVersion { get { lock (RoyalCourtVersionLock) return _royalCourtVersion; } }
 
-        internal static void NoteRoyalCourtVersion(long? version) { lock (RoyalCourtVersionLock) _royalCourtVersion = version; }
+        // v1.1.13: the king and treasury of the stored court at that version (null: unknown). The in-memory
+        // treasury minus it is this process's treasury change not yet stored, carried over a reload.
+        private static string? _courtBaselineKing;
+        private static long? _courtBaselineTreasury;
+
+        internal static void NoteRoyalCourtVersion(long? version, string? king = null, long? treasury = null)
+        {
+            lock (RoyalCourtVersionLock)
+            {
+                _royalCourtVersion = version;
+                _courtBaselineKing = king;
+                _courtBaselineTreasury = string.IsNullOrEmpty(king) ? null : treasury;
+            }
+        }
+
+        /// <summary>v1.1.13: the in-memory king and its unsaved treasury change, taken before a load resets the baseline.</summary>
+        internal static (string? King, long Delta) UnsavedTreasury()
+        {
+            lock (RoyalCourtVersionLock)
+            {
+                var king = global::CastleLocation.GetCurrentKing();
+                return (king?.Name, UnsavedTreasuryDelta(king));
+            }
+        }
+
+        /// <summary>v1.1.13: this process's change to the king's treasury that the stored court does not have yet.</summary>
+        internal static long UnsavedTreasuryDelta(King? king)
+        {
+            lock (RoyalCourtVersionLock)
+            {
+                if (king == null || _courtBaselineTreasury == null || !string.Equals(_courtBaselineKing, king.Name, StringComparison.Ordinal)) return 0;
+                return king.Treasury - _courtBaselineTreasury.Value;
+            }
+        }
+
+        /// <summary>
+        /// v1.1.13: a loaded court's treasury for the in-memory king: the stored treasury plus this process's
+        /// unsaved change to the same king's treasury, so a reload never drops a payment or an income this
+        /// process made. Notes the loaded version and treasury as the new baseline.
+        /// </summary>
+        internal static long TreasuryAfterLoad((string? King, long Delta) unsaved, RoyalCourtSaveData stored, long version)
+        {
+            lock (RoyalCourtVersionLock)
+            {
+                long carry = string.Equals(unsaved.King, stored.KingName, StringComparison.Ordinal) ? unsaved.Delta : 0;
+                NoteRoyalCourtVersion(version, stored.KingName, stored.Treasury);
+                if (carry != 0)
+                    DebugLogger.Instance.LogInfo("ONLINE", $"Royal court reloaded (v{version}); this process's unsaved treasury change of {carry:N0} is kept.");
+                return stored.Treasury + carry;
+            }
+        }
+
+        /// <summary>
+        /// v1.1.13: move gold into (delta above 0) or out of (below 0) the stored treasury as one versioned step:
+        /// the stored court is loaded (with this process's unsaved treasury change), the move applied, and the
+        /// court written under the version loaded, retried on a conflict. True once the write holds the move;
+        /// the caller changes the player's gold only then. False, with nothing moved, when the king is no longer
+        /// expectedKing, a withdrawal exceeds the treasury, or the court kept changing. beforeWrite is a test hook.
+        /// Without a SQL backend the in-memory court is the only one.
+        /// </summary>
+        internal async Task<bool> TryMoveTreasuryAsync(string expectedKing, long delta, Func<Task>? beforeWrite = null)
+        {
+            if (backend is not SqlSaveBackend sql)
+            {
+                var local = global::CastleLocation.GetCurrentKing();
+                if (local == null || local.Name != expectedKing || local.Treasury + delta < 0) return false;
+                local.Treasury += delta;
+                return true;
+            }
+            for (int attempt = 0; attempt < 5; attempt++)
+            {
+                await LoadRoyalCourtFromWorldState();
+                var king = global::CastleLocation.GetCurrentKing();
+                long? version = RoyalCourtVersion;
+                if (version == null && sql.GetWorldStateVersion("royal_court") == 0) version = 0;   // no court stored yet
+                if (king == null || king.Name != expectedKing || version == null) return false;
+                if (king.Treasury + delta < 0) return false;
+                king.Treasury += delta;
+                if (beforeWrite != null) await beforeWrite();
+                if (await SaveRoyalCourtIfVersionAsync(version.Value, throneVacated: false)) return true;
+                king.Treasury -= delta;   // not stored; the next reload replaces the court anyway
+            }
+            DebugLogger.Instance.LogWarning("ONLINE", "Treasury move gave up: the royal court kept changing. Nothing was moved.");
+            await LoadRoyalCourtFromWorldState();
+            return false;
+        }
 
         /// <summary>v1.1.11: the stored court and the version it was read at (the version read first, so a later write is a conflict).</summary>
         internal async Task<(RoyalCourtSaveData? Court, long Version)> ReadRoyalCourtWithVersionAsync()
@@ -826,9 +1074,10 @@ namespace UsurperRemake.Systems
             {
                 if (backend is not SqlSaveBackend sql) return false;   // v1.1.13: no unversioned fallback
                 var king = global::CastleLocation.GetCurrentKing();
-                string json = king == null ? EmptyRoyalCourtJson(throneVacated) : RoyalCourtJson(king);
+                long treasury = 0;
+                string json = king == null ? EmptyRoyalCourtJson(throneVacated) : RoyalCourtJson(king, out treasury);
                 if (!await sql.SaveWorldStateIfVersion("royal_court", json, version)) return false;
-                NoteRoyalCourtVersion(version + 1);   // v1.1.13: the in-memory court is now the stored one
+                NoteRoyalCourtVersion(version + 1, king?.Name, treasury);   // v1.1.13: the in-memory court is now the stored one
                 return true;
             }
             catch (Exception ex)
@@ -914,12 +1163,14 @@ namespace UsurperRemake.Systems
                 if (string.IsNullOrEmpty(json)) return;
 
                 var royalCourt = JsonSerializer.Deserialize<RoyalCourtSaveData>(json, jsonOptions);
+                var unsaved = UnsavedTreasury();   // v1.1.13: before the version is noted afresh
                 if (royalCourt != null) global::CastleLocation.RoyalCourtLoadedFromShared = true;   // v1.1.11
                 if (royalCourt != null) NoteRoyalCourtVersion(version);   // v1.1.13: the court the next save is checked against
                 if (royalCourt == null || global::CastleLocation.ApplySharedThroneVacancy(royalCourt)) return;   // v1.1.11
                 if (string.IsNullOrEmpty(royalCourt.KingName)) return;
 
                 var king = global::CastleLocation.GetCurrentKing();
+                long treasury = TreasuryAfterLoad(unsaved, royalCourt, version);   // v1.1.13: with this process's unsaved change
 
                 // Check if king identity is different from what NPCs say
                 if (king == null || king.Name != royalCourt.KingName)
@@ -938,7 +1189,7 @@ namespace UsurperRemake.Systems
 
                 if (king != null)
                 {
-                    king.Treasury = royalCourt.Treasury;
+                    king.Treasury = treasury;
                     king.TaxRate = royalCourt.TaxRate;
                     king.TotalReign = royalCourt.TotalReign;
                     king.KingTaxPercent = royalCourt.KingTaxPercent > 0 ? royalCourt.KingTaxPercent : 5;

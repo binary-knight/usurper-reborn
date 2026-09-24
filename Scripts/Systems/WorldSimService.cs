@@ -243,13 +243,18 @@ namespace UsurperRemake.Systems
         {
             try
             {
+                long npcVersion = sqlBackend.GetWorldStateVersion(OnlineStateManager.KEY_NPCS);   // v1.1.13: read before the value
                 var npcJson = await sqlBackend.LoadWorldState(OnlineStateManager.KEY_NPCS);
                 if (!string.IsNullOrEmpty(npcJson))
                 {
                     var npcData = JsonSerializer.Deserialize<List<NPCData>>(npcJson, jsonOptions);
                     if (npcData != null && npcData.Count > 0)
                     {
-                        RestoreNPCsFromData(npcData);
+                        lock (OnlineStateManager.RosterLock)   // v1.1.13: the live roster is the stored one of this version
+                        {
+                            RestoreNPCsFromData(npcData);
+                            OnlineStateManager.NoteRosterRestored(npcVersion);
+                        }
                         DebugLogger.Instance.LogInfo("WORLDSIM", $"Loaded {npcData.Count} NPCs from database");
 
                         // One-time class distribution rebalance (v0.52.1)
@@ -479,7 +484,7 @@ namespace UsurperRemake.Systems
                 // Save our NPC state (either fresh from reload or accumulated simulation changes)
                 // Dirty-check: hash the serialized JSON and skip the DB write if nothing changed.
                 // The NPC blob is ~18 MB, so avoiding unnecessary writes saves significant I/O.
-                var npcData = OnlineStateManager.SerializeCurrentNPCs();
+                var (npcData, rosterGeneration) = OnlineStateManager.SnapshotLiveRoster();   // v1.1.13: with the rebuild it belongs to
                 var json = JsonSerializer.Serialize(npcData, jsonOptions);
 
                 // Use a fast hash to detect changes (SHA256 of the JSON string)
@@ -517,6 +522,7 @@ namespace UsurperRemake.Systems
                         // cycle's reload check see "nothing new" and skip the
                         // merge that write was owed.
                         lastNpcVersion = lastNpcVersion + 1;
+                        OnlineStateManager.NoteLiveRosterWritten(rosterGeneration, lastNpcVersion);   // v1.1.13: the live roster is stored at this version
                         DebugLogger.Instance.LogInfo("WORLDSIM", $"State saved (v{lastNpcVersion}): {aliveCount} alive NPCs at {DateTime.UtcNow:HH:mm:ss}");
                         // v1.1.13: the roster edits are applied once this versioned write holds them
                         MarkEditsApplied(editsInPass, WorldEditLog.ForgetCharacter);
@@ -650,6 +656,7 @@ namespace UsurperRemake.Systems
                 if (string.IsNullOrEmpty(json)) return;
 
                 var royalCourt = JsonSerializer.Deserialize<RoyalCourtSaveData>(json, jsonOptions);
+                var unsaved = OnlineStateManager.UnsavedTreasury();   // v1.1.13: the income and payments not yet stored
                 if (royalCourt != null) CastleLocation.RoyalCourtLoadedFromShared = true;   // v1.1.11
                 if (royalCourt != null) OnlineStateManager.NoteRoyalCourtVersion(version);   // v1.1.13: the process-wide court
                 if (royalCourt == null) return;
@@ -682,7 +689,8 @@ namespace UsurperRemake.Systems
                 if (king != null)
                 {
                     // Restore financial/political state from world_state (authoritative)
-                    king.Treasury = royalCourt.Treasury;
+                    // v1.1.13: plus this process's unsaved treasury change to the same king, so it is not lost
+                    king.Treasury = OnlineStateManager.TreasuryAfterLoad(unsaved, royalCourt, version);
                     king.TaxRate = royalCourt.TaxRate;
                     king.TotalReign = royalCourt.TotalReign;
                     king.KingTaxPercent = royalCourt.KingTaxPercent > 0 ? royalCourt.KingTaxPercent : 5;
@@ -1013,7 +1021,7 @@ namespace UsurperRemake.Systems
                     // (a re-read could adopt a concurrent player write's
                     // version and skip the reload it was owed).
                     lastRoyalCourtVersion = lastRoyalCourtVersion + 1;
-                    OnlineStateManager.NoteRoyalCourtVersion(lastRoyalCourtVersion);   // v1.1.13: sessions share this court
+                    OnlineStateManager.NoteRoyalCourtVersion(lastRoyalCourtVersion, data.KingName, data.Treasury);   // v1.1.13: sessions share this court
                     _courtChangedByEdit = false;
                     return true;
                 }
@@ -1605,6 +1613,9 @@ namespace UsurperRemake.Systems
             // the tick thread in the same process as live player sessions, so a
             // session mid-login can otherwise read this roster while it is half
             // rebuilt and wrongly retire a living partner.
+            // v1.1.13: the rebuild holds the roster lock, as GameEngine.RestoreNPCs does
+            lock (OnlineStateManager.RosterLock)
+            {
             NPCSpawnSystem.Instance.IsRebuilding = true;
             var memoryLoadTime = DateTime.Now;   // v1.1.13: one load time for every restored memory
             try
@@ -2152,6 +2163,8 @@ namespace UsurperRemake.Systems
             finally
             {
                 NPCSpawnSystem.Instance.IsRebuilding = false;
+                OnlineStateManager.NoteRosterRestored(null);
+            }
             }
         }
 

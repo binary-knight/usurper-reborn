@@ -410,7 +410,12 @@ namespace UsurperRemake.Systems
         /// a restore does not bring back the world state cleared here.
         /// </summary>
         /// <param name="deferred">v1.1.13: a purge queued by a web delete and run later, after the rows are gone.</param>
-        public static async Task PurgeDeletedCharacterAsync(SqlSaveBackend? backend, string? username, string? displayName, global::Character? player = null, bool deferred = false)
+        /// <param name="shownName">v1.1.13: the display name (a married name) read before the row went, when no player is given.</param>
+        /// <param name="characterId">v1.1.13: the character's ID, read before the row went, when no player is given.</param>
+        /// <param name="deletedAt">v1.1.13: when the character was deleted (a queued purge runs later); default now.</param>
+        /// <param name="untimedAtDelete">v1.1.13: a queued delete's finding that no other player used the name then.</param>
+        public static async Task PurgeDeletedCharacterAsync(SqlSaveBackend? backend, string? username, string? displayName, global::Character? player = null, bool deferred = false,
+            string? shownName = null, string? characterId = null, DateTime? deletedAt = null, bool? untimedAtDelete = null)
         {
             string name = !string.IsNullOrWhiteSpace(displayName) ? displayName! : (username ?? "");
             if (string.IsNullOrWhiteSpace(name)) return;
@@ -420,7 +425,8 @@ namespace UsurperRemake.Systems
                 backend.PurgePlayerWorldState(username!, name);
 
             // v1.1.11: every name the character was known by; a royal-debt bounty names the married display name
-            string? shown = player?.DisplayName ?? (string.IsNullOrWhiteSpace(username) ? null : backend?.GetStoredDisplayName(username!));
+            string? shown = player?.DisplayName ?? (!string.IsNullOrWhiteSpace(shownName) ? shownName
+                          : (string.IsNullOrWhiteSpace(username) ? null : backend?.GetStoredDisplayName(username!)));
             var aliases = CharacterAliases(name, player?.Name2, shown);
             // quests record only the character's Name2 (Occupier / OfferedTo); the married display name is for
             // bounties only, since another character's Name2 may equal it (review)
@@ -506,12 +512,19 @@ namespace UsurperRemake.Systems
                 // persisted at once under the record's version. Enemies and KnownCharacters carry no time, so
                 // they are cleared only while no other player row uses the name; a deferred purge runs after
                 // the account's rows are gone, so any row with the name is a later character.
-                bool untimedToo = backend == null || !questNames.Any(a => backend.IsNameUsedByAnotherPlayer(a, deferred ? "" : (username ?? "")));
-                var deletedAt = DateTime.Now;
+                // v1.1.13: a queued purge also needs no other player to have used the name at the delete
+                bool untimedToo = untimedAtDelete != false
+                                  && (backend == null || !questNames.Any(a => backend.IsNameUsedByAnotherPlayer(a, deferred ? "" : (username ?? ""))));
+                var cutOff = deletedAt ?? DateTime.Now;   // v1.1.13: a queued purge cuts off at the delete, not at its run
+                string? id = !string.IsNullOrWhiteSpace(player?.ID) ? player!.ID
+                           : (!string.IsNullOrWhiteSpace(characterId) ? characterId
+                           : (backend != null && !string.IsNullOrWhiteSpace(username) ? backend.GetStoredCharacterId(username!) : null));
+                var ids = CharacterIdsToUnmarry(id, questNames, untimedToo);
                 // v1.1.13: logged first, so the owner re-applies it over any stale or old-binary write
-                long editId = backend != null ? WorldEditLog.AppendForgetCharacter(backend, questNames, username, deletedAt, untimedToo) : 0;
-                int forgotten = await ForgetCharacterInNpcWorldAsync(backend, questNames, deletedAt, untimedToo,
-                    onWritten: () => { if (editId > 0 && WorldEditLog.IsOwnerProcess(backend)) backend!.MarkWorldEditsApplied(new[] { editId }, WorldEditLog.ProcessLabel); });
+                long editId = backend != null ? WorldEditLog.AppendForgetCharacter(backend, questNames, username, cutOff, untimedToo, ids) : 0;
+                int forgotten = await ForgetCharacterInNpcWorldAsync(backend, questNames, cutOff, untimedToo,
+                    onWritten: () => { if (editId > 0 && WorldEditLog.IsOwnerProcess(backend)) backend!.MarkWorldEditsApplied(new[] { editId }, WorldEditLog.ProcessLabel); },
+                    characterIds: ids);
                 if (forgotten > 0)
                     DebugLogger.Instance.LogInfo("DELETE", $"Cleared {forgotten} NPC grudge(s), enemy entries and marriage(s) of deleted '{name}'.");
             }
@@ -631,22 +644,66 @@ namespace UsurperRemake.Systems
         /// <summary>
         /// v1.1.13: the NPC half of the purge: grudges, Enemies and KnownCharacters, and marriages naming the
         /// character, on the live roster and registry, then written at once (OnlineStateManager.PersistNpcWorldNow).
-        /// Nothing is awaited between the clean-up and the serialize, so a login's RestoreNPCs cannot put the
-        /// old roster back in between. A retry after a reload re-applies it with the same cut-off, the delete
+        /// The clean-up and the serialize hold the roster lock a login's RestoreNPCs holds, so neither can
+        /// interleave with it. Spouses carry no time, so they are cleared only with untimedToo (v1.1.13);
+        /// registry marriages of characterIds are ended whatever the NPC's SpouseName says. A retry after a reload re-applies it with the same cut-off, the delete
         /// time: a reload keeps each memory's recorded time (v1.1.13).
         /// </summary>
         internal static async Task<int> ForgetCharacterInNpcWorldAsync(SqlSaveBackend? backend, IReadOnlyList<string> names,
-            DateTime deletedAt, bool untimedToo, Func<List<NPCData>, Task>? reloadRoster = null, Func<Task>? beforeWrite = null, Action? onWritten = null)
+            DateTime deletedAt, bool untimedToo, Func<Task>? beforeWrite = null, Action? onWritten = null,
+            IReadOnlyCollection<string>? characterIds = null, int rosterWaitMs = 10000)
         {
             var endedMarriages = new HashSet<string>();
             int CleanUp()
             {
                 int n = 0;
-                foreach (var a in names) n += ForgetNpcGrudgesAgainst(a, deletedAt, untimedToo) + ClearNpcSpousesOf(a, endedMarriages);
+                foreach (var a in names)
+                {
+                    n += ForgetNpcGrudgesAgainst(a, deletedAt, untimedToo);
+                    // v1.1.13: a spouse name carries no time, so a later character of the name keeps its marriage
+                    if (untimedToo) n += ClearNpcSpousesOf(a, endedMarriages);
+                }
+                n += EndRegistryMarriagesOf(characterIds, endedMarriages);
                 return n;
             }
             if (backend == null) return CleanUp();
-            return await OnlineStateManager.PersistNpcWorldNow(backend, CleanUp, endedMarriages, reloadRoster, beforeWrite, onWritten);
+            return await OnlineStateManager.PersistNpcWorldNow(backend, CleanUp, endedMarriages, beforeWrite, onWritten, rosterWaitMs);
+        }
+
+        /// <summary>
+        /// v1.1.13: the character IDs whose registry marriages the delete ends. An ID is the character's own, so
+        /// a later character of the name has another; an old save's ID that is only the name counts only with
+        /// untimedToo.
+        /// </summary>
+        internal static List<string> CharacterIdsToUnmarry(string? id, IReadOnlyList<string> names, bool untimedToo)
+        {
+            var ids = new List<string>();
+            if (string.IsNullOrWhiteSpace(id)) return ids;
+            if (!untimedToo && names.Any(n => string.Equals(n, id, StringComparison.OrdinalIgnoreCase))) return ids;
+            ids.Add(id!);
+            return ids;
+        }
+
+        /// <summary>
+        /// v1.1.13: end every registry marriage of these character IDs, whatever the NPC's SpouseName says (a
+        /// reloaded clean roster has it empty while a process's registry still pairs them). The NPC side's ID
+        /// and the character's go into endedIds, so the stored marriages record loses the pair too.
+        /// </summary>
+        internal static int EndRegistryMarriagesOf(IEnumerable<string>? characterIds, ISet<string>? endedIds)
+        {
+            if (characterIds == null) return 0;
+            int ended = 0;
+            foreach (var id in characterIds)
+            {
+                if (string.IsNullOrWhiteSpace(id)) continue;
+                var partner = NPCMarriageRegistry.Instance.GetSpouseId(id);
+                if (string.IsNullOrEmpty(partner)) continue;
+                NPCMarriageRegistry.Instance.EndMarriage(id);
+                endedIds?.Add(id);
+                endedIds?.Add(partner!);
+                ended++;
+            }
+            return ended;
         }
     }
 }

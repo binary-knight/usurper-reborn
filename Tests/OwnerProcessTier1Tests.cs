@@ -34,6 +34,7 @@ public class OwnerProcessTier1Tests : IDisposable
         _db = new SqlSaveBackend(_path);
         _rosterBefore = NPCSpawnSystem.Instance.ActiveNPCs.ToList();
         NPCSpawnSystem.Instance.ActiveNPCs.Clear();
+        OnlineStateManager.NoteRosterRestored(null);   // v1.1.13: no stored roster held yet
     }
 
     public void Dispose()
@@ -71,8 +72,12 @@ public class OwnerProcessTier1Tests : IDisposable
 
     private static NPC? Find(string name) => NPCSpawnSystem.Instance.ActiveNPCs.FirstOrDefault(n => n.Name2 == name);
 
-    private async Task SeedStoredRoster() =>
+    /// <summary>v1.1.13: the live roster is stored, and this process holds it at that version (as a load does).</summary>
+    private async Task SeedStoredRoster()
+    {
         await _db.SaveWorldState(OnlineStateManager.KEY_NPCS, JsonSerializer.Serialize(OnlineStateManager.SerializeCurrentNPCs(), Json));
+        OnlineStateManager.NoteRosterRestored(_db.GetWorldStateVersion(OnlineStateManager.KEY_NPCS));
+    }
 
     private async Task<List<NPCData>> StoredRoster() =>
         JsonSerializer.Deserialize<List<NPCData>>((await _db.LoadWorldState(OnlineStateManager.KEY_NPCS))!, Json)!;
