@@ -327,6 +327,25 @@ public class TeamCornerPickerTests
     }
 
     [Fact]
+    public async Task Examine_ListsATeammateWhoSharesTheViewersDisplayName()
+    {
+        // v1.1.12: the viewer was left out by display name, which also hid a teammate of that name
+        await TeamCornerRig.Online(async (db, path) =>
+        {
+            await db.WriteGameData("bsmith", new SaveGameData
+            {
+                Version = GameConfig.SaveVersion,
+                Player = new PlayerData { Name1 = "bsmith", Name2 = "Bob Smith", Team = "Smith Band", Level = 14, Strength = 61, BaseStrength = 61, HP = 90, MaxHP = 90 }
+            });
+            TeamCornerRig.Exec(path, "UPDATE players SET display_name = 'Bob Smith' WHERE username = 'bsmith';");
+            var hero = new Character { Name1 = "bob", Name2 = "Bob", FamilySurname = "Smith", Team = "Smith Band", Class = CharacterClass.Warrior, Level = 20, HP = 300, MaxHP = 300 };
+            hero.DisplayName.Should().Be("Bob Smith");
+            string shown = await new TeamCornerRig(hero, new[] { "2", "" }).Run("ExamineMember");
+            shown.Should().Contain("STR: 61", "the other Bob Smith is listed second and can be examined");
+        });
+    }
+
+    [Fact]
     public async Task Examine_AnNpc_StillShowsTheNpcCard()
     {
         var npc = TeamCornerRig.Npc("tc_exam_2", "Card Npc", "Card Band");

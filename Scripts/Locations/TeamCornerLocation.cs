@@ -782,8 +782,13 @@ public class TeamCornerLocation : BaseLocation
                 IsOnline = true,
             }, IsViewer: true));
         if (DoorMode.IsOnlineMode && SaveSystem.Instance.Backend is SqlSaveBackend backend)
-            foreach (var pm in await backend.GetPlayerTeamMembers(team, excludeDisplayName: currentPlayer.DisplayName))
-                list.Add(new TeamMemberEntry(null, pm));
+        {
+            // v1.1.12: the viewer is left out by save key; a teammate may share the viewer's display name
+            string myKey = GameEngine.InheritanceKey(currentPlayer);
+            foreach (var pm in await backend.GetPlayerTeamMembers(team))
+                if (!string.Equals(pm.Username, myKey, StringComparison.OrdinalIgnoreCase))
+                    list.Add(new TeamMemberEntry(null, pm));
+        }
         foreach (var npc in NPCSpawnSystem.Instance.ActiveNPCs.Where(n => n.Team == team).OrderByDescending(n => n.Level))
             list.Add(new TeamMemberEntry(npc, null));
         return list;
@@ -2452,7 +2457,8 @@ public class TeamCornerLocation : BaseLocation
             // is the SQL one), under the mailbox's daily send cap.
             var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
             var members = backend != null
-                ? await backend.GetPlayerTeamMembers(currentPlayer.Team, excludeDisplayName: currentPlayer.DisplayName)
+                ? (await backend.GetPlayerTeamMembers(currentPlayer.Team))   // v1.1.12: the sender left out by save key
+                    .Where(m => !string.Equals(m.Username, GameEngine.InheritanceKey(currentPlayer), StringComparison.OrdinalIgnoreCase)).ToList()
                 : new List<PlayerSummary>();
 
             terminal.WriteLine("");
