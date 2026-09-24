@@ -507,8 +507,8 @@ public class CharacterRecreationTests : IDisposable
         }
 
         var purge = CodeOnly(Source("Systems", "PermadeathHelper.cs"));
-        purge.Should().Contain("aliases.Sum(a => QuestSystem.RemoveBountiesOnPlayer(a))");
-        purge.Should().Contain("RemoveSharedQuestsAsync(q => QuestLeftByCharacter(q, questNames, aliases))");
+        purge.Should().Contain("aliases.Sum(a => QuestSystem.RemoveBountiesOnPlayer(a, claimKeys))");
+        purge.Should().Contain("bool left = QuestLeftByCharacter(q, questNames, aliases);");
         purge.Should().Contain("QuestSystem.RemovePlayerQuests(questNames.ToArray())");
     }
 
@@ -596,6 +596,11 @@ public class CharacterRecreationTests : IDisposable
                 InDatabase(onLiving).Should().BeTrue("the living Bob Smith's bounty is theirs");
                 InDatabase(onBob).Should().BeFalse();
                 (await osm.LoadSharedQuests())!.Select(q => q.Id).Should().Equal(new[] { "L1" });
+
+                // v1.1.11: the removed bounties are claimed, so another process's cached copy never pays
+                _db.TryClaimBounty(QuestSystem.BountyClaimKey(onBob), "a stale process").Should().BeFalse();
+                _db.TryClaimBounty("L2", "a stale process").Should().BeFalse();
+                _db.TryClaimBounty("L1", "a stale process").Should().BeTrue("the living Bob Smith's bounty is still open");
             });
         }
         finally

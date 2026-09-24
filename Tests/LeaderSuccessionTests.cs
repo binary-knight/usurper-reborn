@@ -259,7 +259,30 @@ public class LeaderSuccessionTests : IDisposable
         await PermadeathHelper.PurgeDeletedCharacterAsync(_db, "leader", "Leader");
         Leader("Black Band").Should().Be("bran");
 
-        CodeOnly(Source("Systems", "PermadeathHelper.cs")).Should().Contain("GuildSystem.Instance?.PassLeadershipOf(username!)");
+        CodeOnly(Source("Systems", "PermadeathHelper.cs")).Should().Contain("guilds?.PassLeadershipOf(username!)");
+    }
+
+    [Fact]
+    public async Task TheDeletePurge_InADoorProcessWithNoGuildSystem_StillPassesOnTheGuild()
+    {
+        // v1.1.11: only the MUD server makes a GuildSystem; a --online --stdio door process has none
+        _ = new GuildSystem(_path, register: false);   // creates the guild tables
+        Player("gm", null, level: 70);
+        Player("heir", null, level: 30);
+        Guild("oak hall", "gm");
+        GuildMember("gm", "oak hall", "2026-01-01 00:00:00", "Leader");
+        GuildMember("heir", "oak hall", "2026-01-02 00:00:00");
+
+        var instance = typeof(GuildSystem).GetProperty("Instance")!;
+        var before = instance.GetValue(null);
+        instance.SetValue(null, null);
+        try
+        {
+            await PermadeathHelper.PurgeDeletedCharacterAsync(_db, "gm", "Gm");
+        }
+        finally { instance.SetValue(null, before); }
+        GuildLeader("oak hall").Should().Be("heir");
+        Scalar("SELECT rank FROM guild_members WHERE username = 'heir'").Should().Be("Leader");
     }
 
     [Fact]

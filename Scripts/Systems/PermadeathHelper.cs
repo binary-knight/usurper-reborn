@@ -434,10 +434,20 @@ namespace UsurperRemake.Systems
                 // Claimed quests (Occupier / OfferedTo = display name) and the King's WANTED bounty on
                 // the character. Pushed even when nothing was removed, since world_state may still hold
                 // a stale copy that a same-name character would merge back on load.
-                int removed = QuestSystem.RemovePlayerQuests(questNames.ToArray()) + aliases.Sum(a => QuestSystem.RemoveBountiesOnPlayer(a));
+                // v1.1.11: every removed bounty is also claimed, so another process's cached copy of it can
+                // never be paid, even against a later character of the same name
+                var claimKeys = new HashSet<string>();
+                int removed = QuestSystem.RemovePlayerQuests(questNames.ToArray()) + aliases.Sum(a => QuestSystem.RemoveBountiesOnPlayer(a, claimKeys));
                 // the shared record is edited in place, not replaced by this process's list (review)
                 if (UsurperRemake.BBS.DoorMode.IsOnlineMode && OnlineStateManager.IsActive)
-                    removed += await OnlineStateManager.Instance!.RemoveSharedQuestsAsync(q => QuestLeftByCharacter(q, questNames, aliases));
+                    removed += await OnlineStateManager.Instance!.RemoveSharedQuestsAsync(q =>
+                    {
+                        bool left = QuestLeftByCharacter(q, questNames, aliases);
+                        if (left && aliases.Any(a => QuestSystem.IsBountyOnPlayer(q.Initiator, q.TitleKey, q.TargetNPCName, q.IsPlayerBounty, a)))
+                            claimKeys.Add(QuestSystem.BountyClaimKey(q));
+                        return left;
+                    });
+                foreach (var key in claimKeys) backend?.TryClaimBounty(key, "(deleted character)");
                 if (removed > 0)
                     DebugLogger.Instance.LogInfo("DELETE", $"Removed {removed} quest(s) and bounties for deleted '{name}'.");
             }
@@ -457,7 +467,9 @@ namespace UsurperRemake.Systems
                 if (!string.IsNullOrWhiteSpace(username))
                 {
                     backend?.PassTeamLeadershipOfDeleted(username!);
-                    GuildSystem.Instance?.PassLeadershipOf(username!);
+                    // v1.1.11: a door process has no GuildSystem of its own (only the MUD server makes one)
+                    var guilds = GuildSystem.Instance ?? (backend != null ? new GuildSystem(backend.DatabasePath, register: false) : null);
+                    guilds?.PassLeadershipOf(username!);
                 }
             }
             catch (Exception lex) { DebugLogger.Instance.LogWarning("DELETE", $"Leadership succession failed for '{name}': {lex.Message}"); }

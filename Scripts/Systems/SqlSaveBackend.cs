@@ -63,6 +63,9 @@ namespace UsurperRemake.Systems
         // already gone and any in-flight saves died with the old process.
         private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> RageEventErasedUsernames = new();
 
+        /// <summary>v1.1.11: the database file, for a system that opens its own connection (guild succession).</summary>
+        public string DatabasePath => databasePath;
+
         public SqlSaveBackend(string databasePath)
         {
             this.databasePath = databasePath;

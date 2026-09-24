@@ -1292,10 +1292,18 @@ public partial class QuestSystem
     /// v1.1.11: remove the King's WANTED bounties posted on a player (PostBountyOnPlayer), so a deleted
     /// character's bounty does not hang over a new character given the same name.
     /// </summary>
-    public static int RemoveBountiesOnPlayer(string? playerName)
+    public static int RemoveBountiesOnPlayer(string? playerName) => RemoveBountiesOnPlayer(playerName, null);
+
+    /// <summary>v1.1.11: claimKeys, when given, receives the claim key of every bounty removed.</summary>
+    public static int RemoveBountiesOnPlayer(string? playerName, ICollection<string>? claimKeys)
     {
         if (string.IsNullOrWhiteSpace(playerName)) return 0;
-        return questDatabase.RemoveAll(q => IsBountyOnPlayer(q.Initiator, q.TitleKey, q.TargetNPCName, q.IsPlayerBounty, playerName));
+        return questDatabase.RemoveAll(q =>
+        {
+            if (!IsBountyOnPlayer(q.Initiator, q.TitleKey, q.TargetNPCName, q.IsPlayerBounty, playerName)) return false;
+            claimKeys?.Add(BountyClaimKey(q));
+            return true;
+        });
     }
 
     /// <summary>
