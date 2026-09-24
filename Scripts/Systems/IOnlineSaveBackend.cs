@@ -25,6 +25,9 @@ namespace UsurperRemake.Systems
         /// </summary>
         Task<string?> LoadWorldState(string key);
 
+        /// <summary>v1.1.13: a player king's save, found by the name on the throne; null when no player matches.</summary>
+        Task<SaveGameData?> ReadKingSave(string kingName);
+
         /// <summary>
         /// Atomically update a world state value using a transform function.
         /// Reads current value, applies transform, writes back - all in one transaction.

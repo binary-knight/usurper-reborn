@@ -11048,7 +11048,7 @@ public class DungeonLocation : BaseLocation
                 continue;
             }
 
-            var (selectedItem, wasEquipped, sourceSlot) = equipmentItems[itemIdx - 1];
+            var (selectedItem, wasEquipped, sourceSlot, sourceItem) = equipmentItems[itemIdx - 1];
 
             // Block unidentified items
             if (!selectedItem.IsIdentified)
@@ -11070,29 +11070,26 @@ public class DungeonLocation : BaseLocation
 
             EquipmentSlot? targetSlot = selectedSlot.Value;
 
+            // Remove from player. v1.1.13: the listed instance, and nothing is equipped if nothing came off
+            if (!TakeFromPlayerForEquip(selectedItem, wasEquipped, sourceSlot, sourceItem))
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine(Loc.Get("team.equip_item_gone", selectedItem.Name));
+                await Task.Delay(2000);
+                continue;
+            }
+
             // Track displaced items
             var targetInventoryBefore = target.Inventory.Count;
 
-            // Equip first, then remove from player on success (prevents item loss if equip fails)
             var result = target.EquipItem(selectedItem, targetSlot, out string message);
             target.RecalculateStats();
 
             if (result)
             {
-                // Remove from player AFTER successful equip
-                if (wasEquipped && sourceSlot.HasValue)
-                {
-                    currentPlayer.UnequipSlot(sourceSlot.Value);
-                    currentPlayer.RecalculateStats();
-                }
-                else
-                {
-                    var invItem = currentPlayer.Inventory.FirstOrDefault(i => i.Name == selectedItem.Name);
-                    if (invItem != null)
-                        currentPlayer.Inventory.Remove(invItem);
-                }
-
-                // Move displaced items to player inventory
+                // v1.1.13: the give is saved first (player, then NPC) with the displaced items still in the target's
+                // bag; then they come back to the player, saved NPC side first. A companion is one player save.
+                await SaveGearGivenToNpc(target);
                 if (target.Inventory.Count > targetInventoryBefore)
                 {
                     var displacedItems = target.Inventory.Skip(targetInventoryBefore).ToList();
@@ -11101,6 +11098,7 @@ public class DungeonLocation : BaseLocation
                         target.Inventory.Remove(displaced);
                         currentPlayer.Inventory.Add(displaced);
                     }
+                    await SaveGearTakenFromNpc(target);
                 }
 
                 terminal.WriteLine("");
@@ -11111,23 +11109,11 @@ public class DungeonLocation : BaseLocation
                     terminal.SetColor("yellow");
                     terminal.WriteLine($"  {message}");
                 }
-
-                // Sync equipment and save — prevents item loss on disconnect
-                if (target.IsCompanion)
-                    CompanionSystem.Instance?.SyncCompanionEquipment(target);
-                else
-                    CombatEngine.SyncNPCTeammateToActiveNPCs(target);
-                SaveSystem.Instance.ResetAutoSaveThrottle();
-                await SaveSystem.Instance.AutoSave(currentPlayer);
-                if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
-                {
-                    try { await OnlineStateManager.Instance.SaveAllSharedState(); }
-                    catch (Exception ex) { DebugLogger.Instance.LogError("DUNGEON", $"[ManagePartyMemberEquipment] SaveAllSharedState failed after equip: {ex.Message}"); }
-                }
             }
             else
             {
-                // Failed - item was never removed from player, nothing to return
+                // Failed - return item to player (v1.1.13: the pack item itself when it came from the pack)
+                currentPlayer.Inventory.Add(sourceItem ?? currentPlayer.ConvertEquipmentToLegacyItem(selectedItem));
                 terminal.SetColor("red");
                 terminal.WriteLine($"  {Loc.Get("dungeon.equip_failed", message)}");
             }
@@ -11191,25 +11177,20 @@ public class DungeonLocation : BaseLocation
 
         var (selectedSlot, selectedItem) = equippedSlots[idx - 1];
 
-        // Unequip and give to player
-        target.UnequipSlot(selectedSlot);
+        // Unequip and give to player. v1.1.13: only what came off (a cursed item stays on, and was copied)
+        var unequipped = target.UnequipSlot(selectedSlot);
+        if (unequipped == null)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine(Loc.Get("team.unequip_failed"));
+            await Task.Delay(1500);
+            return;
+        }
         target.RecalculateStats();
 
-        var legacyItem = currentPlayer.ConvertEquipmentToLegacyItem(selectedItem);
+        var legacyItem = currentPlayer.ConvertEquipmentToLegacyItem(unequipped);
         currentPlayer.Inventory.Add(legacyItem);
-
-        // Sync equipment and save — prevents item loss on disconnect
-        if (target.IsCompanion)
-            CompanionSystem.Instance?.SyncCompanionEquipment(target);
-        else
-            CombatEngine.SyncNPCTeammateToActiveNPCs(target);
-        SaveSystem.Instance.ResetAutoSaveThrottle();
-        await SaveSystem.Instance.AutoSave(currentPlayer);
-        if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
-        {
-            try { await OnlineStateManager.Instance.SaveAllSharedState(); }
-            catch (Exception ex) { DebugLogger.Instance.LogError("DUNGEON", $"[ManagePartyMemberEquipment] SaveAllSharedState failed after unequip: {ex.Message}"); }
-        }
+        await SaveGearTakenFromNpc(target);   // v1.1.13: NPC side first, then the player (a companion: one player save)
 
         terminal.WriteLine("");
         terminal.SetColor("bright_green");

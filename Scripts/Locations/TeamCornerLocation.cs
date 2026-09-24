@@ -3200,7 +3200,7 @@ public class TeamCornerLocation : BaseLocation
                 continue;
             }
 
-            var (selectedItem, wasEquipped, sourceSlot) = equipmentItems[itemIdx - 1];
+            var (selectedItem, wasEquipped, sourceSlot, sourceItem) = equipmentItems[itemIdx - 1];
 
             // Block unidentified items
             if (!selectedItem.IsIdentified)
@@ -3225,7 +3225,7 @@ public class TeamCornerLocation : BaseLocation
 
             // Remove from player. v1.1.12: if nothing came off the player, nothing is equipped (the item
             // was equipped anyway, a copy)
-            if (!TakeFromPlayerForEquip(selectedItem, wasEquipped, sourceSlot))
+            if (!TakeFromPlayerForEquip(selectedItem, wasEquipped, sourceSlot, sourceItem))   // v1.1.13: the listed instance
             {
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("team.equip_item_gone", selectedItem.Name));
@@ -3275,8 +3275,8 @@ public class TeamCornerLocation : BaseLocation
             }
             else
             {
-                // Failed - return item to player
-                var legacyItem = ConvertEquipmentToItem(selectedItem);
+                // Failed - return item to player (v1.1.13: the pack item itself when it came from the pack)
+                var legacyItem = sourceItem ?? ConvertEquipmentToItem(selectedItem);
                 currentPlayer.Inventory.Add(legacyItem);
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("team.equip_failed", message));
@@ -3284,25 +3284,6 @@ public class TeamCornerLocation : BaseLocation
 
             await Task.Delay(2000);
         }
-    }
-
-    /// <summary>
-    /// v1.1.12: takes the item being given from the player: off the slot it is worn in, or out of the pack
-    /// (matched on name and power first, then on name). False when nothing was removed, and then nothing
-    /// may be equipped.
-    /// </summary>
-    internal bool TakeFromPlayerForEquip(Equipment selectedItem, bool wasEquipped, EquipmentSlot? sourceSlot)
-    {
-        if (wasEquipped && sourceSlot.HasValue)
-        {
-            if (currentPlayer.UnequipSlot(sourceSlot.Value) == null) return false;
-            currentPlayer.RecalculateStats();
-            return true;
-        }
-        var invItem = currentPlayer.Inventory.FirstOrDefault(i =>
-            i.Name == selectedItem.Name && i.Attack == selectedItem.WeaponPower && i.Armor == selectedItem.ArmorClass)
-            ?? currentPlayer.Inventory.FirstOrDefault(i => i.Name == selectedItem.Name);
-        return invItem != null && currentPlayer.Inventory.Remove(invItem);
     }
 
     /// <summary>

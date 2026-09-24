@@ -184,7 +184,33 @@ public class DeleteFollowUpTests : IDisposable
         WithCompleteRoster(() => _db.PurgePlayerWorldState("bob", "Alice"));
         Count("SELECT COUNT(*) FROM messages WHERE to_player = 'Bob';").Should().Be(1, "another character's name2 is Bob");
         Count("SELECT COUNT(*) FROM messages WHERE to_player = 'Alice';").Should().Be(0);
-        Count("SELECT COUNT(*) FROM messages WHERE from_player = 'bob';").Should().Be(0);
+        // v1.1.13: "bob" is also the other Bob's name, so that sent mail is kept (it may be the living Bob's)
+        Count("SELECT COUNT(*) FROM messages WHERE from_player = 'bob';").Should().Be(1);
+    }
+
+    [Fact]
+    public async Task MailFromANameAnotherCharacterGoesBy_IsKept()
+    {
+        // v1.1.13: account "bob" plays "Alice"; another account's "Bob" sent team mail as "Bob"
+        Player("bob", "Alice");
+        Player("robin", "Bob");
+        Exec("INSERT INTO players (username, display_name, player_data) VALUES ('sam', 'Sam', '{\"player\":{\"name2\":\"Bobby\"}}');");
+        await _db.SendMessage("Bob", "Sam", "team", "from the living Bob");
+        await _db.SendMessage("Bobby", "Robin", "team", "from the living Bobby");
+        WithCompleteRoster(() => _db.PurgePlayerWorldState("bob", "Alice"));
+        Count("SELECT COUNT(*) FROM messages WHERE from_player = 'Bob';").Should().Be(1, "another character's display name is Bob");
+        WithCompleteRoster(() => _db.PurgePlayerWorldState("bobby", "Carol"));
+        Count("SELECT COUNT(*) FROM messages WHERE from_player = 'Bobby';").Should().Be(1, "another character's name2 is Bobby");
+    }
+
+    [Fact]
+    public async Task MailFromTheKey_IsPurged_WhenNoOtherCharacterGoesByThatName()
+    {
+        Player("bob", "Alice");
+        Player("robin", "Robin");
+        await _db.SendMessage("bob", "Robin", "mail", "sent by the deleted key");
+        WithCompleteRoster(() => _db.PurgePlayerWorldState("bob", "Alice"));
+        Count("SELECT COUNT(*) FROM messages WHERE LOWER(from_player) = 'bob';").Should().Be(0);
     }
 
     [Fact]

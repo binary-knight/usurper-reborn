@@ -4116,7 +4116,7 @@ public class InnLocation : BaseLocation
                 continue;
             }
 
-            var (selectedItem, wasEquipped, sourceSlot) = equipmentItems[itemIdx - 1];
+            var (selectedItem, wasEquipped, sourceSlot, sourceItem) = equipmentItems[itemIdx - 1];
 
             // Block unidentified items
             if (!selectedItem.IsIdentified)
@@ -4139,34 +4139,27 @@ public class InnLocation : BaseLocation
             // Use the slot the player already picked (no need to ask which hand)
             EquipmentSlot? targetSlot = selectedSlot.Value;
 
+            // Remove from player. v1.1.13: the listed instance, and nothing is equipped if nothing came off
+            if (!TakeFromPlayerForEquip(selectedItem, wasEquipped, sourceSlot, sourceItem))
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine(Loc.Get("team.equip_item_gone", selectedItem.Name));
+                await Task.Delay(2000);
+                continue;
+            }
+
             // Track items in target's inventory BEFORE equipping, so we can move displaced items to player
             var targetInventoryBefore = target.Inventory.Count;
 
-            // Equip to target FIRST - EquipItem adds displaced items to target's inventory
+            // Equip to target - EquipItem adds displaced items to target's inventory
             var result = target.EquipItem(selectedItem, targetSlot, out string message);
             target.RecalculateStats();
 
             if (result)
             {
-                // Equip succeeded — NOW remove the source item from player
-                if (wasEquipped && sourceSlot.HasValue)
-                {
-                    currentPlayer.UnequipSlot(sourceSlot.Value);
-                    currentPlayer.RecalculateStats();
-                }
-                else
-                {
-                    // Remove from inventory by reference (not name — avoids wrong-item removal with duplicates)
-                    // Find the matching Item by name, value, attack — use best match
-                    var invItem = currentPlayer.Inventory.FirstOrDefault(i =>
-                        i.Name == selectedItem.Name && i.Attack == selectedItem.WeaponPower && i.Armor == selectedItem.ArmorClass);
-                    if (invItem == null)
-                        invItem = currentPlayer.Inventory.FirstOrDefault(i => i.Name == selectedItem.Name);
-                    if (invItem != null)
-                        currentPlayer.Inventory.Remove(invItem);
-                }
-
-                // Move any items that were added to target's inventory (displaced equipment) to player's inventory
+                // v1.1.13: saved at once; a companion's gear is in the player's save, so each save is one atomic
+                // write (the helpers copy the wrapper back to the Companion first)
+                await SaveGearGivenToNpc(target);
                 if (target.Inventory.Count > targetInventoryBefore)
                 {
                     var displacedItems = target.Inventory.Skip(targetInventoryBefore).ToList();
@@ -4175,15 +4168,8 @@ public class InnLocation : BaseLocation
                         target.Inventory.Remove(displaced);
                         currentPlayer.Inventory.Add(displaced);
                     }
+                    await SaveGearTakenFromNpc(target);
                 }
-
-                // v0.57.7 (Hesperos report): `target` is a WRAPPER Character built fresh by
-                // CompanionSystem.GetCompanionsAsCharacters() — edits to wrapper.EquippedItems
-                // don't mutate the underlying Companion unless we explicitly sync. Without this
-                // call Lyris reverted to her EquipStartingGear set on next wrapper regeneration.
-                // Safe no-op for non-companion targets (spouse/lover/child/team NPC).
-                if (target.IsCompanion)
-                    CompanionSystem.Instance?.SyncCompanionEquipment(target);
 
                 terminal.WriteLine("");
                 terminal.SetColor("bright_green");
@@ -4196,7 +4182,8 @@ public class InnLocation : BaseLocation
             }
             else
             {
-                // Failed - item was never removed from player, just show error
+                // Failed - return item to player (v1.1.13: the pack item itself when it came from the pack)
+                currentPlayer.Inventory.Add(sourceItem ?? CompanionConvertEquipmentToItem(selectedItem));
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("inn.failed_equip", message));
             }
@@ -4287,6 +4274,7 @@ public class InnLocation : BaseLocation
                 CompanionSystem.Instance?.SyncCompanionEquipment(target);
             var legacyItem = CompanionConvertEquipmentToItem(unequipped);
             currentPlayer.Inventory.Add(legacyItem);
+            await SaveGearTakenFromNpc(target);   // v1.1.13: saved at once (a companion: one player save)
 
             terminal.WriteLine("");
             terminal.SetColor("bright_green");
@@ -4349,6 +4337,7 @@ public class InnLocation : BaseLocation
         // v0.57.7 — sync wrapper take-all back to Companion (Hesperos report)
         if (itemsTaken > 0 && target.IsCompanion)
             CompanionSystem.Instance?.SyncCompanionEquipment(target);
+        if (itemsTaken > 0) await SaveGearTakenFromNpc(target);   // v1.1.13: saved at once (a companion: one player save)
 
         terminal.WriteLine("");
         if (itemsTaken > 0)

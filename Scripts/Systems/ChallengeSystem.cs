@@ -167,7 +167,7 @@ public class ChallengeSystem
             {
                 if (SqlBackend != null)
                 {
-                    var kingSave = SqlBackend.ReadGameData(king.Name.ToLowerInvariant()).GetAwaiter().GetResult();
+                    var kingSave = SqlBackend.ReadKingSave(king.Name).GetAwaiter().GetResult();   // v1.1.13: by save key
                     if (kingSave?.Player != null)
                         kingLevel = kingSave.Player.Level;
                 }
@@ -457,7 +457,7 @@ public class ChallengeSystem
             {
                 if (SqlBackend != null)
                 {
-                    var kingSaveData = SqlBackend.ReadGameData(king.Name.ToLowerInvariant()).GetAwaiter().GetResult();
+                    var kingSaveData = SqlBackend.ReadKingSave(king.Name).GetAwaiter().GetResult();   // v1.1.13: by save key
                     if (kingSaveData?.Player != null)
                     {
                         pStr = kingSaveData.Player.Strength;

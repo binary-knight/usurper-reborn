@@ -10522,6 +10522,7 @@ public abstract class BaseLocation
     /// player, so a crash between loses the item rather than copying it.</summary>
     protected internal async Task SaveGearTakenFromNpc(Character? npc)
     {
+        SyncCompanionGear(npc);
         if (npc != null) CombatEngine.SyncNPCTeammateToActiveNPCs(npc);
         await SaveSharedStateForGear();
         await SavePlayerForGear();
@@ -10531,9 +10532,38 @@ public abstract class BaseLocation
     /// state, for the same reason.</summary>
     protected internal async Task SaveGearGivenToNpc(Character? npc)
     {
+        SyncCompanionGear(npc);
         await SavePlayerForGear();
         if (npc != null) CombatEngine.SyncNPCTeammateToActiveNPCs(npc);
         await SaveSharedStateForGear();
+    }
+
+    // v1.1.13: a companion's gear is in the player's own save, so it is copied back before the player save,
+    // which then holds both sides at once
+    private static void SyncCompanionGear(Character? target)
+    {
+        if (target != null && target.IsCompanion)
+            UsurperRemake.Systems.CompanionSystem.Instance?.SyncCompanionEquipment(target);
+    }
+
+    /// <summary>
+    /// v1.1.12: takes the item being given from the player: off the slot it is worn in, or out of the pack.
+    /// v1.1.13: a pack item is removed as the very instance listed (source); name matching is only for callers
+    /// without one. False when nothing was removed, and then nothing may be equipped.
+    /// </summary>
+    protected internal bool TakeFromPlayerForEquip(Equipment selectedItem, bool wasEquipped, EquipmentSlot? sourceSlot, Item? source = null)
+    {
+        if (wasEquipped && sourceSlot.HasValue)
+        {
+            if (currentPlayer.UnequipSlot(sourceSlot.Value) == null) return false;
+            currentPlayer.RecalculateStats();
+            return true;
+        }
+        if (source != null) return currentPlayer.Inventory.Remove(source);
+        var invItem = currentPlayer.Inventory.FirstOrDefault(i =>
+            i.Name == selectedItem.Name && i.Attack == selectedItem.WeaponPower && i.Armor == selectedItem.ArmorClass)
+            ?? currentPlayer.Inventory.FirstOrDefault(i => i.Name == selectedItem.Name);
+        return invItem != null && currentPlayer.Inventory.Remove(invItem);
     }
 
     private async Task SaveSharedStateForGear()
@@ -10607,14 +10637,14 @@ public abstract class BaseLocation
             var candidates = GetItemsForSlot(slot)
                 .Where(x => !x.isEquipped && x.item.IsIdentified && !x.item.IsCursed)
                 .Where(x => x.item.CanEquip(target, out _))
-                .Select(x => (x.item, fromBag: (Item?)null))
+                .Select(x => (x.item, fromBag: (Item?)null, fromPack: x.source))
                 .ToList();
             // v1.1.12: gear displaced earlier in this pass is still in the target's bag; it competes for this slot too
             foreach (var bagItem in displacedAll)
             {
                 var eq = ConvertInventoryItemToEquipment(bagItem);
                 if (eq != null && ItemMatchesSlot(eq, slot) && eq.IsIdentified && !eq.IsCursed && eq.CanEquip(target, out _))
-                    candidates.Add((eq, bagItem));
+                    candidates.Add((eq, bagItem, null));
             }
 
             if (candidates.Count == 0)
@@ -10641,12 +10671,13 @@ public abstract class BaseLocation
                 continue;
             }
 
-            // Remove from player inventory (find by name match); v1.1.12: or take it back out of the target's bag
+            // Remove from player inventory; v1.1.12: or take it back out of the target's bag.
+            // v1.1.13: the very pack item scored, not the first of its name (a weaker twin stayed behind as the copy)
             var fromBag = bestCandidate.fromBag;
-            var invItem = fromBag ?? currentPlayer.Inventory.FirstOrDefault(i => i.Name == bestCandidate.item.Name);
+            var invItem = fromBag ?? bestCandidate.fromPack;
             if (invItem == null) continue;
             if (fromBag != null) { target.Inventory.Remove(fromBag); displacedAll.Remove(fromBag); }
-            else currentPlayer.Inventory.Remove(invItem);
+            else if (!currentPlayer.Inventory.Remove(invItem)) continue;
 
             // Track items before equipping so displaced items go to player
             var targetInventoryBefore = target.Inventory.Count;
@@ -10846,10 +10877,11 @@ public abstract class BaseLocation
     /// Show items from player inventory/equipment that match a specific slot, with full stats.
     /// Used by slot-based equip flow. Returns list of matching items.
     /// </summary>
-    protected List<(Equipment item, bool isEquipped, EquipmentSlot? fromSlot)> GetItemsForSlot(
+    // v1.1.13: a pack entry carries its source Item, so the move takes that instance and not a same-named one
+    protected List<(Equipment item, bool isEquipped, EquipmentSlot? fromSlot, Item? source)> GetItemsForSlot(
         EquipmentSlot targetSlot)
     {
-        var items = new List<(Equipment item, bool isEquipped, EquipmentSlot? fromSlot)>();
+        var items = new List<(Equipment item, bool isEquipped, EquipmentSlot? fromSlot, Item? source)>();
 
         // Add matching items from player's inventory
         foreach (var invItem in currentPlayer.Inventory)
@@ -10858,7 +10890,7 @@ public abstract class BaseLocation
             if (equipment == null) continue;
 
             if (ItemMatchesSlot(equipment, targetSlot))
-                items.Add((equipment, false, null));
+                items.Add((equipment, false, null, invItem));
         }
 
         // Add matching items from player's equipped items
@@ -10869,7 +10901,7 @@ public abstract class BaseLocation
             if (equipped == null) continue;
 
             if (ItemMatchesSlot(equipped, targetSlot))
-                items.Add((equipped, true, slot));
+                items.Add((equipped, true, slot, null));
         }
 
         return items;
@@ -10908,12 +10940,12 @@ public abstract class BaseLocation
     /// Returns the displayed items for selection. Handles unidentified items.
     /// </summary>
     protected void DisplayEquipmentItemList(
-        List<(Equipment item, bool isEquipped, EquipmentSlot? fromSlot)> items,
+        List<(Equipment item, bool isEquipped, EquipmentSlot? fromSlot, Item? source)> items,
         Character target)
     {
         for (int i = 0; i < items.Count; i++)
         {
-            var (item, isEquipped, fromSlot) = items[i];
+            var (item, isEquipped, fromSlot, _) = items[i];
             terminal.SetColor("bright_yellow");
             terminal.Write($"  {i + 1}. ");
 
