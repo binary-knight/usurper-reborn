@@ -213,7 +213,7 @@ namespace UsurperRemake.Systems
 
             StoryProgressionSystem.Instance.SetStoryFlag("first_seal_hint", true);
 
-            await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+            await terminal.PressAnyKey();
         }
 
         /// <summary>
@@ -241,7 +241,7 @@ namespace UsurperRemake.Systems
 
             StoryProgressionSystem.Instance.SetStoryFlag($"{godName.ToLower()}_stirring_warning", true);
 
-            await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+            await terminal.PressAnyKey();
         }
 
         /// <summary>
@@ -343,7 +343,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine($"  * {Loc.Get("opening.bonus_key")}", "bright_magenta");
             }
 
-            await terminal.GetInputAsync(Loc.Get("opening.press_enter_new_cycle"));
+            await terminal.PressAnyKey(Loc.Get("opening.press_enter_new_cycle"));
 
             // Reset story with cycle bonuses
             story.StartNewCycle(endingAchieved);

@@ -449,7 +449,7 @@ namespace UsurperRemake.Systems
 
             terminal.WriteLine("");
 
-            await terminal.GetInputAsync($"  {Loc.Get("old_god.press_enter_face")}");
+            await terminal.PressAnyKey(Loc.Get("old_god.press_enter_face"));
         }
 
         /// <summary>
@@ -1188,7 +1188,7 @@ namespace UsurperRemake.Systems
             // Queue Stranger encounter after first Old God
             QueueStrangerOldGodEncounter(StrangerContextEvent.OldGodSaved);
 
-            await terminal.GetInputAsync($"  {Loc.Get("ui.press_enter")}");
+            await terminal.PressAnyKey();
 
             // Moment of silence — let the gravity of salvation settle
             await UsurperRemake.UI.UIHelper.MomentOfSilence(terminal, 4000);
@@ -1223,7 +1223,7 @@ namespace UsurperRemake.Systems
             }
 
             terminal.WriteLine("");
-            await terminal.GetInputAsync($"  {Loc.Get("ui.press_enter")}");
+            await terminal.PressAnyKey();
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("old_god.defeated_fades", boss.Name), "white");
             terminal.WriteLine("");
@@ -1277,7 +1277,7 @@ namespace UsurperRemake.Systems
             // Queue Stranger encounter after first Old God
             QueueStrangerOldGodEncounter(StrangerContextEvent.OldGodDefeated);
 
-            await terminal.GetInputAsync($"  {Loc.Get("ui.press_enter")}");
+            await terminal.PressAnyKey();
 
             // Moment of silence — the weight of a god's fall
             await UsurperRemake.UI.UIHelper.MomentOfSilence(terminal, 4000);
@@ -1306,7 +1306,7 @@ namespace UsurperRemake.Systems
                     terminal.WriteLine("  Her form dissolves into shadow, slipping through your fingers.");
                     terminal.WriteLine("  She has escaped — for now.");
                     terminal.WriteLine("");
-                    await terminal.GetInputAsync($"  {Loc.Get("ui.press_enter")}");
+                    await terminal.PressAnyKey();
                     betrayalResult = false; // treat as escape
                 }
 
@@ -1362,7 +1362,7 @@ namespace UsurperRemake.Systems
                 await Task.Delay(1500);
             }
 
-            await terminal.GetInputAsync($"\n  {Loc.Get("ui.press_enter")}");
+            await terminal.PressAnyKey();
 
             // Partial heal — Noctura wants a "fair" fight
             long healAmount = (player.MaxHP - player.HP) / 2;
@@ -1436,7 +1436,7 @@ namespace UsurperRemake.Systems
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine($"  Gold found: {goldReward:N0}");
 
-                await terminal.GetInputAsync($"\n  {Loc.Get("ui.press_enter")}");
+                await terminal.PressAnyKey();
                 return true;
             }
             else
@@ -1455,7 +1455,7 @@ namespace UsurperRemake.Systems
 
                 player.HP = Math.Max(1, player.HP);
 
-                await terminal.GetInputAsync($"\n  {Loc.Get("ui.press_enter")}");
+                await terminal.PressAnyKey();
                 return false;
             }
         }
@@ -1508,7 +1508,7 @@ namespace UsurperRemake.Systems
             player.HP = player.MaxHP / 4;
             player.Experience = Math.Max(0, player.Experience - (boss.Level * 100));
 
-            await terminal.GetInputAsync($"  {Loc.Get("ui.press_enter")}");
+            await terminal.PressAnyKey();
 
             return new BossEncounterResult
             {

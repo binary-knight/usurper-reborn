@@ -213,7 +213,7 @@ namespace UsurperRemake.Data
                 OceanPhilosophySystem.Instance.CollectFragment(WaveFragment.TheCycle);
             }
 
-            await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+            await terminal.PressAnyKey();
         }
 
         private async Task DisplayFailure(Riddle riddle, Character player, TerminalEmulator terminal)
@@ -232,7 +232,7 @@ namespace UsurperRemake.Data
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("riddle.answer_was", riddle.LocAnswer()), "gray");
 
-            await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+            await terminal.PressAnyKey();
         }
 
         private async Task ApplyFleeConsequence(Riddle riddle, Character player, TerminalEmulator terminal)
