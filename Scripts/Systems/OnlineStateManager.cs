@@ -1033,10 +1033,20 @@ namespace UsurperRemake.Systems
         /// court is the stored one. The caller applies the player's side only on true. Without SQL the
         /// in-memory court is the only one and change is applied to it the same way. beforeWrite is a test hook.
         /// </summary>
-        internal static async Task<bool> ApplyCourtChangeAsync(SqlSaveBackend? sql, Func<RoyalCourtSaveData, bool> change, Func<Task>? beforeWrite = null)
+        internal static async Task<bool> ApplyCourtChangeAsync(SqlSaveBackend? sql, Func<RoyalCourtSaveData, bool> requested, Func<Task>? beforeWrite = null)
         {
             var gate = CourtGateFor(sql);
             await gate.WaitAsync();
+            // v1.1.14: sales tax an earlier court change gave up on is taken here and added to this change's copy;
+            // it leaves the pending total only once this write lands, and goes back to it otherwise (exactly once)
+            long carried = Interlocked.Exchange(ref _pendingSalesTax, 0);
+            bool carriedStored = false;
+            bool change(RoyalCourtSaveData court)
+            {
+                if (!requested(court)) return false;
+                if (carried > 0) court.Treasury = court.Treasury > long.MaxValue - carried ? long.MaxValue : court.Treasury + carried;
+                return true;
+            }
             try
             {
                 if (sql == null)
@@ -1050,6 +1060,7 @@ namespace UsurperRemake.Systems
                     }
                     if (!change(local)) return false;
                     lock (RoyalCourtVersionLock) ApplyCourtToKing(local, exact: true);
+                    carriedStored = true;
                     return true;
                 }
                 for (int attempt = 0; attempt < 5; attempt++)
@@ -1086,6 +1097,7 @@ namespace UsurperRemake.Systems
                                 _royalCourtVersion = version + 1;
                             }
                         }
+                        carriedStored = true;
                         return true;
                     }
                 }
@@ -1100,8 +1112,18 @@ namespace UsurperRemake.Systems
                 DebugLogger.Instance.LogError("ONLINE", $"Court change failed: {ex.Message}");
                 return false;
             }
-            finally { gate.Release(); }
+            finally
+            {
+                if (!carriedStored && carried > 0) Interlocked.Add(ref _pendingSalesTax, carried);
+                gate.Release();
+            }
         }
+
+        // v1.1.14: the king's sales tax whose court change gave up (the buyer had already paid); the next court
+        // change that lands in this process adds it to the treasury (ApplyCourtChangeAsync)
+        private static long _pendingSalesTax;
+        internal static long PendingSalesTax { get => Interlocked.Read(ref _pendingSalesTax); set => Interlocked.Exchange(ref _pendingSalesTax, value); }
+        internal static void CarrySalesTax(long amount) { if (amount > 0) Interlocked.Add(ref _pendingSalesTax, amount); }
 
         /// <summary>v1.1.13: a court change against this session's shared court (see the static form).</summary>
         internal Task<bool> TryApplyCourtChangeAsync(Func<RoyalCourtSaveData, bool> change, Func<Task>? beforeWrite = null) =>
