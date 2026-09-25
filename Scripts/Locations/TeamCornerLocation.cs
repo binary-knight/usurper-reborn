@@ -2120,8 +2120,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine(full ? Loc.Get("team.team_full", MaxTeamSize) : Loc.Get("team.recruit_unavailable_now", recruit.DisplayName));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
 
