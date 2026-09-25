@@ -2650,6 +2650,7 @@
   "castle.no_guards_pay": "No tienes guardias a quienes pagar.",
   "castle.bonus_per_guard": "Monto de bonificación por guardia: ",
   "castle.insufficient_treasury_bonus": "¡Fondos insuficientes en el tesoro!",
+  "castle.bonus_invalid": "La bonificación debe estar entre 1 y {0} de oro por guardia.",
   "castle.bonus_paid": "¡Se pagaron {0} oro de bonificación a cada guardia!",
   "castle.loyalty_increased": "¡La lealtad de los guardias ha aumentado!",
   "castle.history_empty": "Los libros de historia están vacíos. ¡Tu reinado podría ser el primero!",

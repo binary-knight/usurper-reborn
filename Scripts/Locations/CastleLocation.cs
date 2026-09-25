@@ -2744,10 +2744,15 @@ public class CastleLocation : BaseLocation
         terminal.SetColor("white");
         string input = await terminal.ReadLineAsync();
 
-        if (long.TryParse(input, out long bonus) && bonus > 0)
+        if (long.TryParse(input, out long bonus))
         {
-            long totalCost = bonus * currentKing.Guards.Count;
-            if (totalCost > currentKing.Treasury)
+            if (bonus <= 0 || bonus > MaxGuardBonus)
+            {
+                // v1.1.13: a bonus outside 1..MaxGuardBonus is refused before any cost is worked out
+                terminal.SetColor("red");
+                terminal.WriteLine(Loc.Get("castle.bonus_invalid", MaxGuardBonus.ToString("N0")));
+            }
+            else if (GuardBonusCost(bonus, currentKing.Guards.Count, currentKing.Treasury) == null)
             {
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("castle.insufficient_treasury_bonus"));
@@ -2774,15 +2779,32 @@ public class CastleLocation : BaseLocation
     internal static Task<bool> PayGuardBonusAsync(OnlineStateManager? osm, long bonus, Func<Task>? beforeWrite = null)
     {
         string? expected = currentKing?.Name;
+        if (bonus <= 0 || bonus > MaxGuardBonus) return Task.FromResult(false);   // v1.1.13: refused before any court read
         return CourtChangeAsync(osm, court =>
         {
-            long totalCost = bonus * court.Guards.Count;
-            if (court.KingName != expected || court.Guards.Count == 0 || totalCost > court.Treasury) return false;
-            court.Treasury -= totalCost;
+            if (court.KingName != expected) return false;
+            long? totalCost = GuardBonusCost(bonus, court.Guards.Count, court.Treasury);
+            if (totalCost == null) return false;
+            court.Treasury -= totalCost.Value;
+            int loyaltyGain = (int)Math.Min(100, bonus / 100);   // v1.1.13: bounded before the cast
             foreach (var guard in court.Guards)
-                guard.Loyalty = Math.Min(100, guard.Loyalty + (int)(bonus / 100));
+                guard.Loyalty = Math.Min(100, guard.Loyalty + loyaltyGain);
             return true;
         }, beforeWrite);
+    }
+
+    /// <summary>v1.1.13: the most a guard bonus may be, per guard.</summary>
+    internal const long MaxGuardBonus = 1_000_000;
+
+    /// <summary>
+    /// v1.1.13: a bonus's total for this many guards, or null when it is refused: no guards, a bonus outside
+    /// 1..MaxGuardBonus, or more than the treasury holds. Bounded before the multiply, so it never overflows.
+    /// </summary>
+    internal static long? GuardBonusCost(long bonus, int guards, long treasury)
+    {
+        if (guards <= 0 || bonus <= 0 || bonus > MaxGuardBonus || treasury <= 0) return null;
+        if (bonus > treasury / guards) return null;
+        return checked(bonus * guards);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -7714,7 +7736,7 @@ public class CastleLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("castle.donate_chivalry", chivalryGain));
 
                 // Increase Crown standing (+1 per 50 gold donated)
-                int crownStandingGain = (int)(amount / 50);
+                int crownStandingGain = (int)Math.Min(int.MaxValue, amount / 50);   // v1.1.13: bounded before the cast
                 if (crownStandingGain > 0)
                 {
                     UsurperRemake.Systems.FactionSystem.Instance.ModifyReputation(UsurperRemake.Systems.Faction.TheCrown, crownStandingGain);

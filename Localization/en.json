@@ -2650,6 +2650,7 @@
   "castle.no_guards_pay": "You have no guards to pay.",
   "castle.bonus_per_guard": "Bonus amount per guard: ",
   "castle.insufficient_treasury_bonus": "Insufficient funds in treasury!",
+  "castle.bonus_invalid": "The bonus must be between 1 and {0} gold per guard.",
   "castle.bonus_paid": "Paid {0} gold bonus to each guard!",
   "castle.loyalty_increased": "Guard loyalty has increased!",
   "castle.history_empty": "The history books are empty. Your reign may be the first!",

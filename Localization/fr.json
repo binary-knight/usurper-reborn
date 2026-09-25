@@ -2650,6 +2650,7 @@
   "castle.no_guards_pay": "Vous n’avez aucun garde à payer.",
   "castle.bonus_per_guard": "Montant de la prime par garde : ",
   "castle.insufficient_treasury_bonus": "Fonds insuffisants!",
+  "castle.bonus_invalid": "La prime doit être comprise entre 1 et {0} pièces d'or par garde.",
   "castle.bonus_paid": "{0} or de prime versés à chaque garde!",
   "castle.loyalty_increased": "La loyauté des gardes a augmenté!",
   "castle.history_empty": "Les livres d’histoire sont vides. Votre règne pourrait être le premier!",

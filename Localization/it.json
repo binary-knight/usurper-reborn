@@ -2650,6 +2650,7 @@
   "castle.no_guards_pay": "Non avete guardie a cui pagare un bonus.",
   "castle.bonus_per_guard": "Importo bonus per guardia: ",
   "castle.insufficient_treasury_bonus": "Fondi insufficienti nel tesoro!",
+  "castle.bonus_invalid": "Il bonus deve essere tra 1 e {0} monete d'oro per guardia.",
   "castle.bonus_paid": "Pagato un bonus di {0} oro a ogni guardia!",
   "castle.loyalty_increased": "La lealtà delle guardie è aumentata!",
   "castle.history_empty": "I libri di storia sono vuoti. Il vostro regno potrebbe essere il primo!",

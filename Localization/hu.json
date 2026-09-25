@@ -2650,6 +2650,7 @@
   "castle.no_guards_pay": "Nincsenek őreid, akiket fizethetnél.",
   "castle.bonus_per_guard": "Bónusz összege őrönként: ",
   "castle.insufficient_treasury_bonus": "Nincs elég arany a kincstárban!",
+  "castle.bonus_invalid": "A bónusz őrönként 1 és {0} arany között lehet.",
   "castle.bonus_paid": "{0} arany bónuszt fizettél minden őrnek!",
   "castle.loyalty_increased": "Az őrök hűsége növekedett!",
   "castle.history_empty": "A történelemkönyvek üresek. Lehet, hogy a te uralkodásod lesz az első!",
