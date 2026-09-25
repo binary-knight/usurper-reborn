@@ -708,12 +708,13 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Save quest data to shared state.
+        /// Save quest data to shared state. v1.1.14: with SQL, a versioned write (SaveSharedQuestsVersionedAsync).
         /// </summary>
         public async Task SaveSharedQuests(List<QuestData> quests)
         {
             try
             {
+                if (backend is SqlSaveBackend sql) { await SaveSharedQuestsVersionedAsync(sql, quests); return; }
                 var json = JsonSerializer.Serialize(quests, jsonOptions);
                 await backend.SaveWorldState(KEY_QUESTS, json);
             }
@@ -721,6 +722,58 @@ namespace UsurperRemake.Systems
             {
                 DebugLogger.Instance.LogError("ONLINE", $"Failed to save quests: {ex.Message}");
             }
+        }
+
+        // v1.1.14: this session's quest list as it last wrote it (JSON by quest key; null: never written), and the
+        // keys of every quest a stored list it read has held (a quest it holds that no stored list had is its own)
+        private Dictionary<string, string>? _questBaseline;
+        private readonly HashSet<string> _questSeen = new();
+
+        private static string QuestKey(QuestData q) => !string.IsNullOrEmpty(q.Id) ? q.Id : "title:" + q.Title + "|" + q.Initiator;
+
+        /// <summary>
+        /// v1.1.14: the shared quests are written only under the version read just before the value. This
+        /// session's changes since its last write (a quest added, changed or dropped) are laid over the stored
+        /// list, so every other process's quests are kept; on a conflict the stored list is read again, the
+        /// changes laid over it again and the write retried (5 attempts). A quest another process removed is not
+        /// brought back unless this session changed it. RemoveSharedQuestsAsync, the other writer, is versioned
+        /// the same way. beforeWrite is a test hook. True once written.
+        /// </summary>
+        internal async Task<bool> SaveSharedQuestsVersionedAsync(SqlSaveBackend sql, List<QuestData> quests, Func<Task>? beforeWrite = null)
+        {
+            var own = new Dictionary<string, string>();
+            foreach (var q in quests) own[QuestKey(q)] = JsonSerializer.Serialize(q, jsonOptions);
+            var changed = own.Where(kv => _questBaseline == null || !_questBaseline.TryGetValue(kv.Key, out var was) || was != kv.Value)
+                             .Select(kv => kv.Key).ToHashSet();
+            var dropped = _questBaseline == null ? new HashSet<string>() : _questBaseline.Keys.Where(k => !own.ContainsKey(k)).ToHashSet();
+            var byKey = quests.GroupBy(QuestKey).ToDictionary(g => g.Key, g => g.Last());
+            for (int attempt = 0; attempt < 5; attempt++)
+            {
+                long version = sql.GetWorldStateVersion(KEY_QUESTS);   // read before the value, so any later write is a conflict
+                var storedJson = await sql.LoadWorldState(KEY_QUESTS);
+                var stored = string.IsNullOrEmpty(storedJson) ? new List<QuestData>() : JsonSerializer.Deserialize<List<QuestData>>(storedJson, jsonOptions) ?? new List<QuestData>();
+                var storedKeys = stored.Select(QuestKey).ToHashSet();
+                var merged = new List<QuestData>();
+                foreach (var q in stored)
+                {
+                    string key = QuestKey(q);
+                    if (dropped.Contains(key)) continue;
+                    merged.Add(changed.Contains(key) ? byKey[key] : q);
+                }
+                foreach (var key in changed)
+                    if (!storedKeys.Contains(key) && !_questSeen.Contains(key)) merged.Add(byKey[key]);   // made by this session
+                _questSeen.UnionWith(storedKeys);
+                if (beforeWrite != null) await beforeWrite();
+                if (await sql.SaveWorldStateIfVersion(KEY_QUESTS, JsonSerializer.Serialize(merged, jsonOptions), version))
+                {
+                    _questBaseline = own;
+                    _questSeen.UnionWith(merged.Select(QuestKey));
+                    return true;
+                }
+                DebugLogger.Instance.LogInfo("ONLINE", $"Quest record changed by another process since it was read (was v{version}): reading it again and retrying.");
+            }
+            DebugLogger.Instance.LogWarning("ONLINE", "Shared quest save gave up: the quest record kept changing. The next save tries again.");
+            return false;
         }
 
         /// <summary>

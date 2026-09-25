@@ -158,6 +158,40 @@ public partial class OwnerProcessConflictTests
         IndexSql().Should().NotBeNull();
     }
 
+    // ─── M5: the shared quests are written under the version read, merged and retried ───
+
+    private static QuestData Quest(string id, string title) => new QuestData { Id = id, Title = title, Initiator = "Board" };
+
+    private async Task<List<string>> StoredQuestTitles() =>
+        JsonSerializer.Deserialize<List<QuestData>>((await _db.LoadWorldState(OnlineStateManager.KEY_QUESTS))!, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!.Select(q => q.Title).OrderBy(t => t).ToList();
+
+    [Fact]
+    public async Task TwoProcessesSavingQuests_KeepEachOthersQuests_ThroughAConflict()
+    {
+        var osmA = NewOsm(new SqlSaveBackend(_path));
+        var osmB = NewOsm(new SqlSaveBackend(_path));
+
+        await osmA.SaveSharedQuests(new List<QuestData> { Quest("q1", "Rats") });
+        await osmB.SaveSharedQuests(new List<QuestData> { Quest("q2", "Wolves") });
+        (await StoredQuestTitles()).Should().Equal("Rats", "Wolves");
+
+        // A changes its quest while B adds one between A's read and A's write: A reads again and retries
+        int writes = 0;
+        (await osmA.SaveSharedQuestsVersionedAsync(_db, new List<QuestData> { Quest("q1", "Rats II") }, async () =>
+        {
+            if (writes++ == 0) await osmB.SaveSharedQuests(new List<QuestData> { Quest("q2", "Wolves"), Quest("q3", "Bandits") });
+        })).Should().BeTrue();
+        writes.Should().Be(2);
+        (await StoredQuestTitles()).Should().Equal("Bandits", "Rats II", "Wolves");
+
+        // a quest another process removed stays removed; one this process dropped goes
+        await osmB.RemoveSharedQuestsAsync(q => q.Id == "q1");
+        await osmA.SaveSharedQuests(new List<QuestData> { Quest("q1", "Rats II"), Quest("q4", "Ghosts") });
+        (await StoredQuestTitles()).Should().Equal("Bandits", "Ghosts", "Wolves");
+        await osmA.SaveSharedQuests(new List<QuestData> { Quest("q1", "Rats II") });
+        (await StoredQuestTitles()).Should().Equal("Bandits", "Wolves");
+    }
+
     private static string RepoRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
