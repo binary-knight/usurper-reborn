@@ -280,7 +280,7 @@ namespace UsurperRemake.Systems
             }
 
             // In online mode, push NPC changes to shared world_state
-            // Skip this — the WorldSimService already saves NPC state every 5 minutes
+            // Skip this: the WorldSimService already saves NPC state every 5 minutes
             // with dirty-checking. Player sessions don't need to duplicate this work.
             // The world sim is the authority for NPC state in online mode.
 

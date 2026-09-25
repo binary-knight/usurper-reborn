@@ -32,7 +32,7 @@ public partial class OwnerProcessConflictTests
                 // every write of the tax meets another process's write first: it gives up
                 long b = 1000;
                 (await CityControlSystem.AddSalesTaxAsync(50, osmA, () => OtherCourtWrite("Kim", b += 10))).Should().BeFalse();
-                OnlineStateManager.PendingSalesTax.Should().Be(50, "the buyer paid; the share waits for the next court change");
+                dbA.GetPendingSalesTax().Should().Be(50, "the buyer paid; the share is stored, waiting for the next court change");
                 (await StoredCourt()).Treasury.Should().Be(b);
 
                 // the next court change meets one conflict and is retried: the carried share is added once
@@ -45,6 +45,7 @@ public partial class OwnerProcessConflictTests
                 writes.Should().Be(2);
                 (await StoredCourt()).Treasury.Should().Be(b + 100 + 50, "the deposit and the carried tax, each once");
                 OnlineStateManager.PendingSalesTax.Should().Be(0);
+                dbA.GetPendingSalesTax().Should().Be(0, "taken in the same write");
 
                 // and the change after it adds nothing more
                 (await CastleLocation.MoveTreasuryGoldAsync(osmA, player, -100)).Should().BeTrue();
@@ -55,6 +56,45 @@ public partial class OwnerProcessConflictTests
                 OnlineStateManager.CarrySalesTax(30);
                 (await CastleLocation.MoveTreasuryGoldAsync(osmA, player, 1_000_000)).Should().BeFalse();
                 OnlineStateManager.PendingSalesTax.Should().Be(30);
+            }
+            finally { OnlineStateManager.PendingSalesTax = 0; }
+        });
+    }
+
+    [Fact]
+    public async Task SalesTaxThatGivesUp_SurvivesARestart_AndIsCreditedOnce()
+    {
+        await WithKing("Kim", 1000, async _ =>
+        {
+            OnlineStateManager.PendingSalesTax = 0;
+            try
+            {
+                var dbA = new SqlSaveBackend(_path);
+                await dbA.SaveWorldState("royal_court", Court("Kim", 1000));
+                var osmA = NewOsm(dbA);
+                await osmA.LoadRoyalCourtFromWorldState();
+                long b = 1000;
+                (await CityControlSystem.AddSalesTaxAsync(50, osmA, () => OtherCourtWrite("Kim", b += 10))).Should().BeFalse();
+
+                // the process stops: its memory is gone; a new one opens the same database
+                OnlineStateManager.PendingSalesTax = 0;
+                SqliteConnection.ClearAllPools();
+                var dbB = new SqlSaveBackend(_path);
+                var osmB = NewOsm(dbB);
+                await osmB.LoadRoyalCourtFromWorldState();
+                var player = new Character { Name2 = "Pat", Gold = 500 };
+                (await CastleLocation.MoveTreasuryGoldAsync(osmB, player, -100)).Should().BeTrue();
+                (await StoredCourt()).Treasury.Should().Be(b + 100 + 50, "the tax from before the restart is credited");
+                (await CastleLocation.MoveTreasuryGoldAsync(osmB, player, -100)).Should().BeTrue();
+                (await StoredCourt()).Treasury.Should().Be(b + 200 + 50, "and only once");
+                dbB.GetPendingSalesTax().Should().Be(0);
+
+                // a court write that meets a smaller pending amount (another process took it) lands nothing
+                dbB.AddPendingSalesTax(20).Should().BeTrue();
+                long v = dbB.GetWorldStateVersion("royal_court");
+                (await dbB.SaveWorldStateIfVersion("royal_court", Court("Kim", 1), v, 30)).Should().BeFalse();
+                (await StoredCourt()).Treasury.Should().Be(b + 250);
+                dbB.GetPendingSalesTax().Should().Be(20);
             }
             finally { OnlineStateManager.PendingSalesTax = 0; }
         });
@@ -230,6 +270,17 @@ public partial class OwnerProcessConflictTests
         Teams().Should().Be("Wolves|Wolves (2)|Wolves (3)");
         Scalar1("SELECT COUNT(*) FROM messages").Should().Be("1", "members are told once");
         _db.GetWorldStateVersion(OnlineStateManager.KEY_NPCS).Should().Be(npcsVersion + 1);
+    }
+
+    // ─── v1.1.14 follow-up: the save builder's moved comment carries no dash ───
+
+    [Fact]
+    public void TheMovedAutoSaveComment_HasNoDash()
+    {
+        var lines = File.ReadAllLines(Path.Combine(RepoRoot(), "Scripts", "Systems", "SaveSystem.cs"))
+            .Where(l => l.Contains("the WorldSimService already saves NPC state every 5 minutes")).ToList();
+        lines.Should().ContainSingle();
+        lines[0].Should().NotContain("—").And.NotContain("–");
     }
 
     private static string RepoRoot()
