@@ -65,3 +65,46 @@ public partial class OwnerProcessConflictTests
         }));
     }
 }
+
+/// <summary>v1.1.13: a granted pardon frees a player with or without a court prison record, online and offline.</summary>
+public partial class OwnerProcessConflictTests
+{
+    [Fact]
+    public async Task APardon_FreesAnArrestWithARecord_AndOneWithout_WritingOnlyWhenThereIsARecord()
+    {
+        await WithKing("Aldric", 1000, async _ => await AsTheWorldSim(async () =>
+        {
+            await _db.SaveWorldState("royal_court", NpcCourtHolding("Aldric", "Pat", withRecord: true));
+            await NewOsm(_db).LoadRoyalCourtFromWorldState();
+
+            var pat = Prisoner("Pat");
+            (await PrisonLocation.PardonAsync(CastleLocation.TreasuryOsm(), pat, "Pat")).Should().BeTrue();
+            pat.DaysInPrison.Should().Be(0);
+            (await StoredCourt()).Prisoners.Should().NotContain(p => p.CharacterName == "Pat");
+
+            // a street arrest: prison days, no court record
+            var quin = Prisoner("Quin");
+            long before = _db.GetWorldStateVersion("royal_court");
+            (await PrisonLocation.PardonAsync(CastleLocation.TreasuryOsm(), quin, "Quin")).Should().BeTrue("an arrest without a record is pardonable");
+            quin.DaysInPrison.Should().Be(0);
+            _db.GetWorldStateVersion("royal_court").Should().Be(before, "nothing is written when there is nothing to change");
+        }));
+    }
+
+    [Fact]
+    public async Task APardon_FreesAnArrestWithARecord_AndOneWithout_Offline()
+    {
+        await WithKing("Aldric", 1000, async king =>
+        {
+            king.Prisoners["Pat"] = new PrisonRecord { CharacterName = "Pat", Sentence = 7, Crime = "Theft" };
+            var pat = Prisoner("Pat");
+            (await PrisonLocation.PardonAsync(null, pat, "Pat")).Should().BeTrue();
+            pat.DaysInPrison.Should().Be(0);
+            CastleLocation.GetCurrentKing()!.Prisoners.Should().NotContainKey("Pat");
+
+            var quin = Prisoner("Quin");
+            (await PrisonLocation.PardonAsync(null, quin, "Quin")).Should().BeTrue();
+            quin.DaysInPrison.Should().Be(0);
+        });
+    }
+}

@@ -508,6 +508,24 @@ public partial class PrisonLocation : BaseLocation
         return true;
     }
 
+    /// <summary>
+    /// v1.1.13: a granted pardon. A prison record the stored court holds is removed in one guarded court change
+    /// and the player is freed once it is written; with no record there (an arrest that made none) nothing is
+    /// written and the player is freed. False when a record is there and its removal was not written.
+    /// </summary>
+    internal static async Task<bool> PardonAsync(UsurperRemake.Systems.OnlineStateManager? osm, Character player, string playerName)
+    {
+        bool hadRecord = false;
+        bool removed = await CastleLocation.CourtChangeAsync(osm, court =>
+        {
+            hadRecord = court.Prisoners.Any(p => p.CharacterName == playerName);
+            return court.Prisoners.RemoveAll(p => p.CharacterName == playerName) > 0;
+        });
+        if (!removed && hadRecord) return false;
+        player.DaysInPrison = 0;
+        return true;
+    }
+
     /// <summary>v1.1.13: bail set on the prisoner's stored record, as one guarded court change (false: no record there).</summary>
     internal static Task<bool> SetBailAsync(UsurperRemake.Systems.OnlineStateManager? osm, string playerName, long bail) =>
         CastleLocation.CourtChangeAsync(osm, court =>
@@ -610,11 +628,11 @@ public partial class PrisonLocation : BaseLocation
                 await terminal.WriteColorLineAsync("  The king considers your plea for mercy...", TerminalEmulator.ColorWhite);
                 await Task.Delay(2000);
 
-                // v1.1.13: the release is one guarded court change; the player walks free once it is written
+                // v1.1.13: a court prison record is removed in one guarded court change; an arrest without one
+                // (a street arrest) is pardoned with no court write
                 if (Random.Shared.Next(100) < pardonChance
-                    && await CastleLocation.CourtChangeAsync(CastleLocation.TreasuryOsm(), court => court.Prisoners.RemoveAll(p => p.CharacterName == playerName) > 0))
+                    && await PardonAsync(CastleLocation.TreasuryOsm(), player, playerName))
                 {
-                    player.DaysInPrison = 0;
 
                     await terminal.WriteColorLineAsync("  \"Very well. I shall show mercy this once.\"", TerminalEmulator.ColorGreen);
                     await terminal.WriteColorLineAsync("  The king pardons you! You are free!", TerminalEmulator.ColorGreen);
