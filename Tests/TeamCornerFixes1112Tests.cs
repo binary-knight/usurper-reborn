@@ -670,6 +670,46 @@ public class TeamCornerFixes1112Tests : IDisposable
         });
     }
 
+    [Fact]
+    public async Task AnNpcsGear_IsTakenByOneProcessOnly_ThroughTheRecoveryClaim()
+    {
+        // v1.1.14: two processes (two backends on one database) holding a copy of the NPC wearing the same blade
+        await TeamCornerRig.Online(async (db, path) =>
+        {
+            var other = new SqlSaveBackend(path);
+            string ev = SqlSaveBackend.GearRecoveryEvent("MainHand", "Claimed Blade");
+            other.TryClaimGearRecovery("tc_claim_1", ev, "door_b").Should().BeTrue("the first claim lands");
+            db.TryClaimGearRecovery("tc_claim_1", ev, "mud").Should().BeFalse("the second process is refused");
+            db.TryClaimGearRecovery("tc_claim_2", ev, "mud").Should().BeTrue("another NPC's blade is its own event");
+
+            var blade = new Equipment { Name = "Claimed Blade", Slot = EquipmentSlot.MainHand, WeaponPower = 12, Value = 100 };
+            var helm = new Equipment { Name = "Claimed Helm", Slot = EquipmentSlot.Head, ArmorClass = 4, Value = 100 };
+            var npc = TeamCornerRig.Npc("tc_claim_1", "Claim Npc", "Claim Band");
+            npc.EquippedItems[EquipmentSlot.MainHand] = EquipmentDatabase.RegisterDynamic(blade);
+            npc.EquippedItems[EquipmentSlot.Head] = EquipmentDatabase.RegisterDynamic(helm);
+            NPCSpawnSystem.Instance.ActiveNPCs.Add(npc);
+            try
+            {
+                var hero = TeamCornerRig.Hero(team: "Claim Band");
+                var rig = new TeamCornerRig(hero, Array.Empty<string>());
+                var taken = rig.Loc.MoveEquipmentToPlayer(npc, new System.Collections.Generic.List<string>());
+                taken.Select(t => t.Name).Should().Equal(new[] { "Claimed Helm" }, "the blade another process claimed stays on this copy");
+                hero.Inventory.Should().NotContain(i => i.Name == "Claimed Blade");
+                npc.EquippedItems[EquipmentSlot.MainHand].Should().BeGreaterThan(0);
+                other.TryClaimGearRecovery("tc_claim_1", SqlSaveBackend.GearRecoveryEvent("Head", "Claimed Helm"), "door_b")
+                    .Should().BeFalse("this process claimed the helm it took");
+
+                // a claim holds for GearClaimMinutes; after that the same piece can be taken again
+                TeamCornerRig.Exec(path, $"UPDATE recovery_claims SET claimed_at = datetime('now', '-{SqlSaveBackend.GearClaimMinutes + 1} minutes');");
+                db.TryClaimGearRecovery("tc_claim_1", ev, "mud").Should().BeTrue();
+                // and gear given back is released at once
+                other.ReleaseGearClaims("tc_claim_1", new[] { ev });
+                other.TryClaimGearRecovery("tc_claim_1", ev, "door_b").Should().BeTrue();
+            }
+            finally { NPCSpawnSystem.Instance.ActiveNPCs.RemoveAll(n => n.ID == "tc_claim_1"); }
+        });
+    }
+
     // ---------- 8. equipping ----------
 
     [Fact]

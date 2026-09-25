@@ -1012,6 +1012,16 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex) { DebugLogger.Instance.LogWarning("SQL", $"bounty_claims not ensured: {ex.Message}"); }
 
+            // v1.1.14: one-time claims on an NPC's gear, so two processes cannot both take the same piece
+            try
+            {
+                using var migCmd = connection.CreateCommand();
+                migCmd.CommandText = "CREATE TABLE IF NOT EXISTS recovery_claims (npc_id TEXT NOT NULL, recovery_event TEXT NOT NULL, claimed_by TEXT, " +
+                                     "claimed_at TEXT DEFAULT (datetime('now')), PRIMARY KEY (npc_id, recovery_event));";
+                migCmd.ExecuteNonQuery();
+            }
+            catch (Exception ex) { DebugLogger.Instance.LogWarning("SQL", $"recovery_claims not ensured: {ex.Message}"); }
+
             // v1.1.13: the world edits log, also on a database made by an older release
             try
             {
@@ -2466,6 +2476,71 @@ namespace UsurperRemake.Systems
                 DebugLogger.Instance.LogWarning("SQL", $"LaterCharacterUsesName failed: {ex.Message}");
                 return true;
             }
+        }
+
+        /// <summary>v1.1.14: how long a gear claim holds; after it a piece of the same name in the same slot can be taken again.</summary>
+        public const int GearClaimMinutes = 10;
+
+        /// <summary>v1.1.14: the recovery event of one piece of gear: its slot and its name (an ID can differ between processes).</summary>
+        public static string GearRecoveryEvent(string slot, string itemName) => $"gear:{slot}:{itemName}";
+
+        /// <summary>
+        /// v1.1.14: a one-time claim on taking one piece of an NPC's gear (as bounty_claims is for a bounty): an
+        /// INSERT OR IGNORE of (NPC ID, recovery event), in one transaction with the removal of a claim older than
+        /// GearClaimMinutes. Only the process whose row lands moves the gear; another process holding a stale copy
+        /// of the NPC still wearing it is refused. A read or write error refuses. Released when gear is given back.
+        /// </summary>
+        public bool TryClaimGearRecovery(string npcId, string recoveryEvent, string claimedBy)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var tx = connection.BeginTransaction();
+                using (var expire = connection.CreateCommand())
+                {
+                    expire.Transaction = tx;
+                    expire.CommandText = "DELETE FROM recovery_claims WHERE npc_id = @n AND recovery_event = @e AND claimed_at < datetime('now', @w);";
+                    expire.Parameters.AddWithValue("@n", npcId);
+                    expire.Parameters.AddWithValue("@e", recoveryEvent);
+                    expire.Parameters.AddWithValue("@w", $"-{GearClaimMinutes} minutes");
+                    expire.ExecuteNonQuery();
+                }
+                int landed;
+                using (var claim = connection.CreateCommand())
+                {
+                    claim.Transaction = tx;
+                    claim.CommandText = "INSERT OR IGNORE INTO recovery_claims (npc_id, recovery_event, claimed_by) VALUES (@n, @e, @b);";
+                    claim.Parameters.AddWithValue("@n", npcId);
+                    claim.Parameters.AddWithValue("@e", recoveryEvent);
+                    claim.Parameters.AddWithValue("@b", claimedBy ?? "");
+                    landed = claim.ExecuteNonQuery();
+                }
+                tx.Commit();
+                return landed == 1;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogWarning("SQL", $"Gear claim for NPC '{npcId}' ({recoveryEvent}) failed: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>v1.1.14: gear given to an NPC may be taken again: the claims on what it now wears are removed.</summary>
+        public void ReleaseGearClaims(string npcId, IEnumerable<string> recoveryEvents)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                foreach (var e in recoveryEvents)
+                {
+                    using var cmd = connection.CreateCommand();
+                    cmd.CommandText = "DELETE FROM recovery_claims WHERE npc_id = @n AND recovery_event = @e;";
+                    cmd.Parameters.AddWithValue("@n", npcId);
+                    cmd.Parameters.AddWithValue("@e", e);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+            catch (Exception ex) { DebugLogger.Instance.LogWarning("SQL", $"Gear claims of NPC '{npcId}' not released: {ex.Message}"); }
         }
 
         /// <summary>v1.1.13: the owner id in the world sim lock, or null when none is held.</summary>
