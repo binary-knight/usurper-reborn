@@ -1631,10 +1631,19 @@ public class WorldSimulator
                     IsRealOrphan = true
                 };
 
-                king.Orphans.Add(orphan);
+                // v1.1.13: the arrival is one guarded court change (the stored court's cap and duplicates decide)
+                var record = OnlineStateManager.OrphanData(orphan);
+                bool admitted = CastleLocation.CourtChangeAsync(court =>
+                {
+                    if (court.Orphans.Count >= GameConfig.MaxRoyalOrphans
+                        || court.Orphans.Any(o => o.Name == record.Name && o.IsRealOrphan)) return false;
+                    court.Orphans.Add(record);
+                    return true;
+                }).GetAwaiter().GetResult();
 
-                NewsSystem.Instance?.Newsy(
-                    $"🏠 Young {child.Name}, child of the late {child.Mother} and {child.Father}, has been taken into the Royal Orphanage.");
+                if (admitted)
+                    NewsSystem.Instance?.Newsy(
+                        $"🏠 Young {child.Name}, child of the late {child.Mother} and {child.Father}, has been taken into the Royal Orphanage.");
             }
             else if (king == null)
             {
@@ -1774,8 +1783,34 @@ public class WorldSimulator
             return;
         }
 
-        // Remove from orphanage
-        king.Orphans.Remove(orphan);
+        // 30% chance: become a royal guard (if slots available); 70% (or guard slots full): a citizen NPC
+        bool wantsGuard = random.Next(100) < 30;
+
+        // v1.1.13: the orphan leaves the stored court (and joins its guard) in one guarded court change; the
+        // child record and the NPC follow only once it is written, so a court reload cannot graduate it twice
+        bool becameGuard = false;
+        string name = orphan.Name;
+        var sex = orphan.Sex;
+        if (!CastleLocation.CourtChangeAsync(court =>
+            {
+                becameGuard = false;
+                if (court.Orphans.RemoveAll(o => o.Name == name && o.IsRealOrphan) == 0) return false;
+                if (wantsGuard && court.Guards.Count < King.MaxNPCGuards)
+                {
+                    court.Guards.Add(new RoyalGuardSaveData
+                    {
+                        Name = name,
+                        AI = (int)CharacterAI.Computer,
+                        Sex = (int)sex,
+                        DailySalary = GameConfig.BaseGuardSalary,
+                        Loyalty = 85, // High loyalty: raised by the crown
+                        IsActive = true
+                    });
+                    becameGuard = true;
+                }
+                return true;
+            }).GetAwaiter().GetResult())
+            return;
 
         // Mark underlying Child as Deleted
         var child = FamilySystem.Instance?.AllChildren
@@ -1784,36 +1819,18 @@ public class WorldSimulator
         if (child != null)
             child.Deleted = true;
 
-        int roll = random.Next(100);
-
-        if (roll < 30 && king.Guards.Count < King.MaxNPCGuards)
-        {
-            // 30% chance: become a royal guard (if slots available)
-            OrphanBecomesRoyalGuard(orphan, king);
-        }
+        if (becameGuard)
+            OrphanBecomesRoyalGuard(orphan);
         else
-        {
-            // 70% chance (or guard slots full): released as citizen NPC
             OrphanBecomesNPC(orphan);
-        }
     }
 
     /// <summary>
     /// Orphan graduates to become a Royal Guard with high loyalty (raised by the crown).
+    /// v1.1.13: the guard itself joined the stored court in the graduation's court change.
     /// </summary>
-    private void OrphanBecomesRoyalGuard(RoyalOrphan orphan, King king)
+    private void OrphanBecomesRoyalGuard(RoyalOrphan orphan)
     {
-        var guard = new RoyalGuard
-        {
-            Name = orphan.Name,
-            AI = CharacterAI.Computer,
-            Sex = orphan.Sex,
-            DailySalary = GameConfig.BaseGuardSalary,
-            RecruitmentDate = DateTime.Now,
-            Loyalty = 85 // High loyalty — raised by the crown
-        };
-        king.Guards.Add(guard);
-
         // Also create the NPC entity so the guard has real combat stats
         OrphanBecomesNPC(orphan);
 
@@ -2134,16 +2151,18 @@ public class WorldSimulator
 
     /// <summary>
     /// Pick up orphaned children who were flagged while no king existed.
-    /// Called when a new king is crowned or when the orphanage is first accessed.
+    /// Called when a new king is crowned. v1.1.13: returns them for the new king's construction; it no
+    /// longer changes a court.
     /// </summary>
-    public static void PickUpOrphanedChildren(King king)
+    public static List<RoyalOrphan> OrphanedChildrenToPickUp(List<RoyalOrphan> existing)
     {
+        var picked = new List<RoyalOrphan>();
         var familySystem = FamilySystem.Instance;
-        if (familySystem == null || king == null) return;
+        if (familySystem == null || existing == null) return picked;
 
         var orphanedChildren = familySystem.AllChildren
             .Where(c => !c.Deleted && c.Location == GameConfig.ChildLocationOrphanage &&
-                        !king.Orphans.Any(o => o.Name == c.Name && o.IsRealOrphan))
+                        !existing.Any(o => o.Name == c.Name && o.IsRealOrphan))
             .ToList();
 
         // v0.63.0 slice 4 (audit npc-N4): per-instance NPC list is in scope here
@@ -2153,13 +2172,13 @@ public class WorldSimulator
 
         foreach (var child in orphanedChildren)
         {
-            if (king.Orphans.Count >= GameConfig.MaxRoyalOrphans) break;
+            if (existing.Count + picked.Count >= GameConfig.MaxRoyalOrphans) break;
 
             var inheritedRace = inst != null
                 ? inst.DetermineOrphanRace(child)
                 : CharacterRace.Human;
 
-            king.Orphans.Add(new RoyalOrphan
+            picked.Add(new RoyalOrphan
             {
                 Name = child.Name,
                 Age = child.Age,
@@ -2183,6 +2202,7 @@ public class WorldSimulator
             DebugLogger.Instance.LogInfo("ORPHANAGE",
                 $"Picked up {orphanedChildren.Count} orphaned children for new king");
         }
+        return picked;
     }
 
     /// <summary>
@@ -5762,18 +5782,25 @@ public class WorldSimulator
                 // NPC applies and is accepted!
                 long salary = GameConfig.BaseGuardSalary + (npc.Level * GameConfig.GuardSalaryPerGuardLevel);
 
-                var guard = new RoyalGuard
-                {
-                    Name = npc.Name,
-                    AI = CharacterAI.Computer,
-                    Sex = npc.Sex,
-                    DailySalary = salary,
-                    RecruitmentDate = DateTime.Now,
-                    Loyalty = 80 + random.Next(21), // 80-100 loyalty
-                    IsActive = true
-                };
-
-                king.Guards.Add(guard);
+                // v1.1.13: the guard joins the stored court as one guarded court change
+                int loyalty = 80 + random.Next(21); // 80-100 loyalty
+                string guardName = npc.Name;
+                var guardSex = npc.Sex;
+                if (!CastleLocation.CourtChangeAsync(court =>
+                    {
+                        if (court.Guards.Count >= GameConfig.MaxRoyalGuards || court.Guards.Any(g => g.Name == guardName)) return false;
+                        court.Guards.Add(new RoyalGuardSaveData
+                        {
+                            Name = guardName,
+                            AI = (int)CharacterAI.Computer,
+                            Sex = (int)guardSex,
+                            DailySalary = salary,
+                            Loyalty = loyalty,
+                            IsActive = true
+                        });
+                        return true;
+                    }).GetAwaiter().GetResult())
+                    return;
 
                 // News announcement
                 NewsSystem.Instance?.Newsy(true, $"{npc.Name} has joined the Royal Guard!");
@@ -5789,9 +5816,12 @@ public class WorldSimulator
             if (npc.Gold > 500 && npc.Chivalry > 50)
             {
                 long donation = Math.Min(npc.Gold / 10, 200 + npc.Level * 10);
-                npc.SpendGold(donation);
-                king.Treasury += donation;
-                npc.Chivalry += (int)Math.Min(5, donation / 50);
+                // v1.1.13: into the stored treasury as one guarded court change; the NPC pays once it is written
+                if (CastleLocation.CourtChangeAsync(court => { court.Treasury += donation; return true; }).GetAwaiter().GetResult())
+                {
+                    npc.SpendGold(donation);
+                    npc.Chivalry += (int)Math.Min(5, donation / 50);
+                }
             }
         }
 
@@ -6381,26 +6411,14 @@ public class WorldSimulator
     {
         try
         {
-            var king = CastleLocation.GetCurrentKing();
-            if (king == null || !king.IsActive) return;
+            var current = CastleLocation.GetCurrentKing();
+            if (current == null || !current.IsActive) return;
 
-            // NPC guard recruitment (10% chance per tick if there are openings)
-            if (king.Guards.Count < King.MaxNPCGuards && (float)Random.Shared.NextDouble() < 0.10f)
-            {
-                ProcessNPCGuardRecruitment(king);
-            }
-
-            // Court intrigue processing (5% chance per tick)
-            if ((float)Random.Shared.NextDouble() < 0.05f)
-            {
-                ProcessCourtIntrigue(king);
-            }
-
-            // Plot progression (all active plots advance)
-            foreach (var plot in king.ActivePlots.ToList())
-            {
-                AdvancePlot(king, plot);
-            }
+            // v1.1.13: the tick's court politics run on a copy of the stored court and are written as one
+            // guarded court change (only when something changed); the in-memory court is then the written one
+            string expected = current.Name;
+            OnlineStateManager.ApplyKingChangeAsync(OnlineStateManager.CourtStoreFor(CastleLocation.TreasuryOsm()),
+                working => working.Name == expected && CourtPoliticsTick(working)).GetAwaiter().GetResult();
         }
         catch (Exception ex)
             {
@@ -6409,9 +6427,37 @@ public class WorldSimulator
     }
 
     /// <summary>
+    /// v1.1.13: one tick of court politics on the court's working copy (see ProcessRoyalCourtPolitics). The
+    /// copy is named working here and in the methods it calls, as ApplyKingChangeAsync names it.
+    /// </summary>
+    private bool CourtPoliticsTick(King working)
+    {
+        {
+            // NPC guard recruitment (10% chance per tick if there are openings)
+            if (working.Guards.Count < King.MaxNPCGuards && (float)Random.Shared.NextDouble() < 0.10f)
+            {
+                ProcessNPCGuardRecruitment(working);
+            }
+
+            // Court intrigue processing (5% chance per tick)
+            if ((float)Random.Shared.NextDouble() < 0.05f)
+            {
+                ProcessCourtIntrigue(working);
+            }
+
+            // Plot progression (all active plots advance)
+            foreach (var plot in working.ActivePlots.ToList())
+            {
+                AdvancePlot(working, plot);
+            }
+        }
+        return true;
+    }
+
+    /// <summary>
     /// NPCs may apply to become royal guards if positions are available
     /// </summary>
-    private void ProcessNPCGuardRecruitment(King king)
+    private void ProcessNPCGuardRecruitment(King working)
     {
         // Find NPCs who might want to become guards:
         // - Not already a guard
@@ -6427,7 +6473,7 @@ public class WorldSimulator
                    string.IsNullOrEmpty(n.Team) &&
                    !n.King &&
                    !n.IsStoryNPC &&
-                   !king.Guards.Any(g => g.Name == n.Name) &&
+                   !working.Guards.Any(g => g.Name == n.Name) &&
                    (n.Brain?.Personality?.Trustworthiness > 0.5f ||
                     n.Brain?.Personality?.Loyalty > 0.6f))
             .OrderByDescending(n => n.Level)
@@ -6440,7 +6486,7 @@ public class WorldSimulator
         var applicant = candidates[Random.Shared.Next(0, candidates.Count)];
 
         // Check if treasury can afford the recruitment cost
-        if (king.Treasury < GameConfig.GuardRecruitmentCost)
+        if (working.Treasury < GameConfig.GuardRecruitmentCost)
         {
             // GD.Print($"[WorldSim] {applicant.Name} wanted to join guards but treasury is low");
             return;
@@ -6457,8 +6503,8 @@ public class WorldSimulator
             Loyalty = 70 + Random.Shared.Next(0, 31)  // New recruits have 70-100 loyalty
         };
 
-        king.Guards.Add(guard);
-        king.Treasury -= GameConfig.GuardRecruitmentCost;
+        working.Guards.Add(guard);
+        working.Treasury -= GameConfig.GuardRecruitmentCost;
 
         NewsSystem.Instance?.Newsy(false, $"{applicant.Name} has joined the Royal Guard!");
         // GD.Print($"[WorldSim] {applicant.Name} recruited as Royal Guard");
@@ -6467,20 +6513,20 @@ public class WorldSimulator
     /// <summary>
     /// Process court intrigue - unhappy court members may start plots
     /// </summary>
-    private void ProcessCourtIntrigue(King king)
+    private void ProcessCourtIntrigue(King working)
     {
         // Initialize court if empty
-        if (king.CourtMembers.Count == 0)
+        if (working.CourtMembers.Count == 0)
         {
-            InitializeCourtMembers(king);
+            InitializeCourtMembers(working);
         }
 
         // Check for new plots starting
-        var unhappyMembers = king.CourtMembers
+        var unhappyMembers = working.CourtMembers
             .Where(c => c.LoyaltyToKing < 40 && !c.IsPlotting)
             .ToList();
 
-        if (unhappyMembers.Count >= 2 && king.ActivePlots.Count < 3)
+        if (unhappyMembers.Count >= 2 && working.ActivePlots.Count < 3)
         {
             // Start a new plot
             var conspirators = unhappyMembers.Take(Random.Shared.Next(2, (Math.Min(4, unhappyMembers.Count)) + 1)).ToList();
@@ -6497,12 +6543,12 @@ public class WorldSimulator
             {
                 PlotType = plotType,
                 Conspirators = conspirators.Select(c => c.Name).ToList(),
-                Target = king.Name,
+                Target = working.Name,
                 Progress = 10 + Random.Shared.Next(0, 21),
                 StartDate = DateTime.Now
             };
 
-            king.ActivePlots.Add(plot);
+            working.ActivePlots.Add(plot);
             foreach (var conspirator in conspirators)
             {
                 conspirator.IsPlotting = true;
@@ -6515,7 +6561,7 @@ public class WorldSimulator
     /// <summary>
     /// Initialize court members for a new king
     /// </summary>
-    private void InitializeCourtMembers(King king)
+    private void InitializeCourtMembers(King working)
     {
         // Create default court positions
         var roles = new[] { "Royal Advisor", "Court Steward", "Marshal", "Spymaster", "Treasurer" };
@@ -6532,7 +6578,7 @@ public class WorldSimulator
                 LoyaltyToKing = 50 + Random.Shared.Next(0, 41),
                 JoinedCourt = DateTime.Now
             };
-            king.CourtMembers.Add(member);
+            working.CourtMembers.Add(member);
         }
     }
 
@@ -6551,7 +6597,7 @@ public class WorldSimulator
     /// <summary>
     /// Advance a plot toward completion
     /// </summary>
-    private void AdvancePlot(King king, CourtIntrigue plot)
+    private void AdvancePlot(King working, CourtIntrigue plot)
     {
         if (plot.IsDiscovered) return;
 
@@ -6568,11 +6614,11 @@ public class WorldSimulator
             // Conspirators go to prison
             foreach (var conspirator in plot.Conspirators)
             {
-                var member = king.CourtMembers.FirstOrDefault(m => m.Name == conspirator);
+                var member = working.CourtMembers.FirstOrDefault(m => m.Name == conspirator);
                 if (member != null)
                 {
                     member.IsPlotting = false;
-                    king.CourtMembers.Remove(member);
+                    working.CourtMembers.Remove(member);
                 }
             }
 
@@ -6580,56 +6626,56 @@ public class WorldSimulator
             // which need "An" not "A". Lowercased so the helper still finds the vowel.
             string plotTypeLc = plot.PlotType.ToLower();
             NewsSystem.Instance?.Newsy(true,
-                $"{GameConfig.GetIndefiniteArticle(plotTypeLc)} {plotTypeLc} plot against {king.GetTitle()} {king.Name} was discovered!");
+                $"{GameConfig.GetIndefiniteArticle(plotTypeLc)} {plotTypeLc} plot against {working.GetTitle()} {working.Name} was discovered!");
 
-            king.ActivePlots.Remove(plot);
+            working.ActivePlots.Remove(plot);
             return;
         }
 
         // Plot triggers at 100%
         if (plot.Progress >= 100)
         {
-            ExecutePlot(king, plot);
+            ExecutePlot(working, plot);
         }
     }
 
     /// <summary>
     /// Execute a completed plot
     /// </summary>
-    private void ExecutePlot(King king, CourtIntrigue plot)
+    private void ExecutePlot(King working, CourtIntrigue plot)
     {
         switch (plot.PlotType)
         {
             case "Assassination":
                 // King "survives" but is weakened
-                king.Treasury /= 2;
+                working.Treasury /= 2;
                 NewsSystem.Instance?.Newsy(true,
-                    $"ASSASSINATION ATTEMPT! {king.GetTitle()} {king.Name} narrowly survived an assassination plot!");
+                    $"ASSASSINATION ATTEMPT! {working.GetTitle()} {working.Name} narrowly survived an assassination plot!");
                 break;
 
             case "Coup":
                 // Treasury stolen, guards desert
-                king.Treasury = Math.Max(0, king.Treasury - 10000);
-                var deserters = king.Guards.Where(g => g.Loyalty < 50).ToList();
+                working.Treasury = Math.Max(0, working.Treasury - 10000);
+                var deserters = working.Guards.Where(g => g.Loyalty < 50).ToList();
                 foreach (var guard in deserters)
                 {
-                    king.Guards.Remove(guard);
+                    working.Guards.Remove(guard);
                 }
                 NewsSystem.Instance?.Newsy(true,
-                    $"COUP ATTEMPT! {deserters.Count} guards joined the conspiracy against {king.GetTitle()} {king.Name}!");
+                    $"COUP ATTEMPT! {deserters.Count} guards joined the conspiracy against {working.GetTitle()} {working.Name}!");
                 break;
 
             case "Scandal":
                 // King's reputation damaged - harder to collect taxes
-                king.TaxRate = Math.Max(0, king.TaxRate - 10);
+                working.TaxRate = Math.Max(0, working.TaxRate - 10);
                 NewsSystem.Instance?.Newsy(true,
-                    $"SCANDAL! Shocking revelations about {king.GetTitle()} {king.Name} rock the kingdom!");
+                    $"SCANDAL! Shocking revelations about {working.GetTitle()} {working.Name} rock the kingdom!");
                 break;
 
             case "Sabotage":
                 // Treasury damaged
-                king.Treasury = Math.Max(0, king.Treasury - 5000);
-                king.MagicBudget = Math.Max(0, king.MagicBudget - 2000);
+                working.Treasury = Math.Max(0, working.Treasury - 5000);
+                working.MagicBudget = Math.Max(0, working.MagicBudget - 2000);
                 NewsSystem.Instance?.Newsy(true,
                     $"SABOTAGE! The royal treasury has been plundered!");
                 break;
@@ -6638,14 +6684,14 @@ public class WorldSimulator
         // Clear conspirators' plotting status
         foreach (var conspirator in plot.Conspirators)
         {
-            var member = king.CourtMembers.FirstOrDefault(m => m.Name == conspirator);
+            var member = working.CourtMembers.FirstOrDefault(m => m.Name == conspirator);
             if (member != null)
             {
                 member.IsPlotting = false;
             }
         }
 
-        king.ActivePlots.Remove(plot);
+        working.ActivePlots.Remove(plot);
     }
 
     /// <summary>

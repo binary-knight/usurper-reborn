@@ -1,0 +1,10 @@
+[h1]Usurper Reborn 1.1.13[/h1]
+
+[list]
+[*]Main Street is laid out in districts: Merchant Row, Guild Row, Home & Hearth, Castle Grounds, Status, the Notice Board and, online, the Online hub. Every screen shows only the keys it uses, and the street names what a new level opens.
+[*]Combat: the XP lines add up, auto-combat heals at the HP share you choose, floors 4 to 6 are gentler, monster stuns cannot chain, and the status line shows effects, damage per turn and Last Stand.
+[*]The chest's Search for Traps works, invalid choices ask again, typed keys are kept during online pauses, and /train takes you to the Level Master.
+[*]Equip Best picks gear for a companion's role.
+[*]New NPCs no longer get Roman numerals in their names, and NPC memories fade as intended.
+[*]The royal court: treasury and court changes are saved in one step, a new king is saved at once, and several treasury bugs are fixed, including one that could create gold.
+[/list]

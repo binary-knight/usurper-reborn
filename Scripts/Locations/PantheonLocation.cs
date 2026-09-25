@@ -1186,7 +1186,14 @@ public class PantheonLocation : BaseLocation
         // Auto-abdicate if player is the king
         if (currentPlayer.King)
         {
-            CastleLocation.AbdicatePlayerThrone(currentPlayer, "abdicated the throne to start anew");
+            // v1.1.13: the abdication is written first; nothing is renounced when it fails
+            if (!await CastleLocation.AbdicatePlayerThroneAsync(currentPlayer, "abdicated the throne to start anew"))
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine(Loc.Get("castle.court_change_failed"));
+                await Task.Delay(1500);
+                return false;
+            }
             terminal.SetColor("bright_yellow");
             terminal.WriteLine(Loc.Get("pantheon.renounce_abdicate"));
             terminal.WriteLine("");

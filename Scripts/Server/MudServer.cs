@@ -122,6 +122,9 @@ public class MudServer
     /// <summary>Shared SQL backend for admin command queue access.</summary>
     private SqlSaveBackend? _sqlBackend;
 
+    /// <summary>v1.1.13: the in-process world sim, so queued purges wait for its roster.</summary>
+    private WorldSimService? _worldSimService;
+
     public MudServer(int port, string databasePath)
     {
         _port = port;
@@ -236,12 +239,20 @@ public class MudServer
 
         // Start the world simulator as an in-process background task
         // This replaces the separate usurper-world.service process
+        // v1.1.13: the MUD takes the world sim lock, so door processes on this database start no world sim of
+        // their own and know the owner. The MUD owns the shared records either way; its heartbeat takes a
+        // lock another process still holds.
+        string worldSimOwnerId = $"mud_{Environment.ProcessId}_{DateTime.UtcNow.Ticks}";
+        if (!sqlBackend.TryAcquireWorldSimLock(worldSimOwnerId))
+            Console.Error.WriteLine("[MUD] The world sim lock was held by another process; the MUD takes it over");
         var worldSimService = new WorldSimService(
             sqlBackend,
             simIntervalSeconds: UsurperRemake.BBS.DoorMode.SimIntervalSeconds,
             npcXpMultiplier: UsurperRemake.BBS.DoorMode.NpcXpMultiplier,
-            saveIntervalMinutes: UsurperRemake.BBS.DoorMode.SaveIntervalMinutes
+            saveIntervalMinutes: UsurperRemake.BBS.DoorMode.SaveIntervalMinutes,
+            heartbeatOwnerId: worldSimOwnerId
         );
+        _worldSimService = worldSimService;
         var worldSimTask = Task.Run(() => worldSimService.RunAsync(_cts.Token));
         Console.Error.WriteLine("[MUD] World simulator started as background task");
 
@@ -1774,6 +1785,11 @@ public class MudServer
 
             try
             {
+                _sqlBackend.TouchMudHeartbeat();   // v1.1.13: the web delete waits for this poller only while it beats
+                // v1.1.13: queued web-delete purges, once the world sim has loaded the roster they clear
+                if (_worldSimService?.InitializationComplete.Task.IsCompletedSuccessfully == true)
+                    await DrainPendingPurgesAsync(_sqlBackend);
+
                 var commands = _sqlBackend.GetPendingAdminCommands();
                 foreach (var cmd in commands)
                 {
@@ -1837,9 +1853,56 @@ public class MudServer
     }
 
     /// <summary>
+    /// v1.1.13: the web delete, in the admin consoles' order: the character's Name2 is read from the row,
+    /// the row deleted (archived for /restore), and the world purge run only once the delete succeeded.
+    /// </summary>
+    internal static async Task<(bool Deleted, string Result)> DeletePlayerAsync(SqlSaveBackend db, string username)
+    {
+        string? name2 = db.GetStoredName2(username);
+        string? displayName = db.GetStoredDisplayName(username);
+        string? characterId = db.GetStoredCharacterId(username);   // v1.1.13: read before the save is emptied
+        if (!db.DeleteGameData(username))
+            return (false, $"Deleting '{username}' failed; nothing was changed");
+        await PermadeathHelper.PurgeDeletedCharacterAsync(db, username, name2 ?? displayName ?? username,
+            shownName: displayName, characterId: characterId);
+        return (true, $"Deleted {username}");
+    }
+
+    /// <summary>
+    /// v1.1.13: run the world purges a web delete queued while the MUD was down (its rows are already
+    /// gone). Called once the world is loaded, so the live roster the purge clears is the stored one.
+    /// </summary>
+    internal static async Task<int> DrainPendingPurgesAsync(SqlSaveBackend db)
+    {
+        int ran = 0;
+        foreach (var p in db.GetPendingPurges())
+        {
+            try
+            {
+                string name = !string.IsNullOrWhiteSpace(p.Name2) ? p.Name2! : (!string.IsNullOrWhiteSpace(p.DisplayName) ? p.DisplayName! : p.Username);
+                // v1.1.13: every name, the ID, the delete time and the untimed finding the web delete recorded
+                await PermadeathHelper.PurgeDeletedCharacterAsync(db, p.Username, name, deferred: true,
+                    shownName: p.DisplayName, characterId: p.PlayerId, deletedAt: p.DeletedAt, untimedAtDelete: p.Untimed);
+                ran++;
+            }
+            catch (Exception ex) { Console.Error.WriteLine($"[MUD] Queued purge for '{p.Username}' failed: {ex.Message}"); }
+            db.RemovePendingPurge(p.Id);
+        }
+        return ran;
+    }
+
+    /// <summary>
     /// Execute a single admin command from the web dashboard.
     /// </summary>
     private async Task ExecuteAdminCommand(AdminCommand cmd)
+    {
+        if (_sqlBackend == null) return;
+        // v1.1.13: claimed first; a command the web server withdrew (or another poll claimed) is not run
+        if (!_sqlBackend.TryClaimAdminCommand(cmd.Id)) return;
+        await RunClaimedAdminCommand(cmd);
+    }
+
+    private async Task RunClaimedAdminCommand(AdminCommand cmd)
     {
         if (_sqlBackend == null) return;
 
@@ -1981,6 +2044,25 @@ public class MudServer
                     else
                     {
                         _sqlBackend.MarkAdminCommandFailed(cmd.Id, $"Player '{target}' is not online or has no terminal");
+                    }
+                    break;
+
+                case "delete_player":
+                    if (target == null) { _sqlBackend.MarkAdminCommandFailed(cmd.Id, "No target"); return; }
+                    if (session != null)
+                    {
+                        // v1.1.13: as permadeath does, so the disconnect save cannot write the row back
+                        SqlSaveBackend.MarkUsernameErased(target);
+                        session.SuppressDisconnectSave = true;
+                        session.SuppressDisconnectSaveKey = target;
+                        await KickPlayer(target, "Account deleted");
+                    }
+                    var (deleted, deleteResult) = await DeletePlayerAsync(_sqlBackend, target);
+                    if (deleted) _sqlBackend.MarkAdminCommandExecuted(cmd.Id, deleteResult);
+                    else
+                    {
+                        if (session != null) SqlSaveBackend.ClearErasedMark(target);
+                        _sqlBackend.MarkAdminCommandFailed(cmd.Id, deleteResult);
                     }
                     break;
 

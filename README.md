@@ -2,7 +2,7 @@
 
 ## A Persistent Online Text RPG with a Living World
 
-**v1.1.12 "Regalia"** | **FREE AND OPEN SOURCE** | **GPL v2**
+**v1.1.13 "Regalia"** | **FREE AND OPEN SOURCE** | **GPL v2**
 
 130+ autonomous NPCs wake up, go to work, visit taverns, fall in love, get married, have children, age, and eventually die of old age, all while you're offline. Log back in, read the news feed, and discover that the blacksmith married the barmaid, the king was assassinated, or a new generation just came of age. The world doesn't wait for you.
 
@@ -13,6 +13,16 @@
 - Steam: https://store.steampowered.com/app/4336570/Usurper_Reborn/
 
 **Download standalone:** [Latest Release](https://github.com/binary-knight/usurper-reborn/releases) | **Report bugs:** [Discord](https://discord.gg/EZhwgDT6Ta) or [GitHub Issues](https://github.com/binary-knight/usurper-reborn/issues) or press `!` in-game
+
+## Screenshots
+
+| Main Street | Combat |
+|---|---|
+| ![Main Street, the town hub with its districts](DOCS/images/screenshot-main-street.png) | ![A dungeon fight, with the combat status panel](DOCS/images/screenshot-combat.png) |
+
+| A dungeon room and its map | Character status |
+|---|---|
+| ![A Catacombs room with its exits, features and the explored map](DOCS/images/screenshot-dungeon.png) | ![The character status sheet](DOCS/images/screenshot-status.png) |
 
 ---
 
@@ -282,6 +292,7 @@ The game ships small patches frequently. Each version has a dedicated release no
 - **v1.1.1:** a bug pass. Five review agents each took a domain of the codebase and about seventy findings were verified and fixed: NPCs losing their innate power on load, the world simulator editing the wrong player's relationships, a restored character unable to save, one player's autosave starving everyone else's, the Black Market re-rolling on relog, a closed connection spinning the server, bank and gambling exploits, buffs consumed a fight early, and raw placeholders in the text. See `DOCS/release-notes/RELEASE_NOTES_1.1.1.md`.
 - **v1.1.2:** seven of the eight open design items, each designed twice (Codex and Claude), reconciled against the code, and reviewed before implementation: grouped followers get their own cooldowns and a real death; haggling finally has a way in and its attempts persist; the bank vault is one persisted reserve per world, atomic online; relationships cool with neglect measured in days you were present; NPCs left to die while you held a heal remember it; ability and spell numbers are moddable from `GameData/`; the two intimacy lines that really dropped a name are fixed. Docker stack refreshed and verified. See `DOCS/release-notes/RELEASE_NOTES_1.1.2.md`.
 - **v1.1.3:** party survivability. Wounded allies shield up, brace (half damage on ordinary hits, specials, and life drain), and drink their own potion first; NPC allies who die in your party roll the 2 percent team permadeath rate they were always meant to; three stances per ally (Aggressive, Balanced, Cautious) set from the dungeon party menu or the Inn and saved with the character; monsters no longer prefer a wounded target and an ally's brace no longer pulls hits unless it is Aggressive; a shared potion belt (off by default, two loans per fight, never the player's last three), give-a-number, and the one-personal-potion rule; a fight summary per ally, a warning before a voluntary fight with an ally below 30 percent, and a floor guard that offers Cautious to an ally eleven levels behind. Planned by a council of Codex, a Claude design agent, and the supervisor session in `DOCS/PARTY_SURVIVABILITY_PLAN.md`; the downed state is the next release.
+- **v1.1.13:** Main Street is laid out in districts with a Notice Board and an Online hub, and names what a new level opens. Combat XP lines add up, auto-combat heals at a chosen HP share, floors 4 to 6 are gentler, monster stuns cannot chain, and the status line shows effects. Chest trap searching works and invalid choices ask again. New NPC names have no Roman numerals, NPC memories fade as intended, and every royal court change is saved in one step. See `DOCS/release-notes/RELEASE_NOTES_1.1.13.md`.
 - **v1.1.12:** Awakening grows in seven shown stages with a lasting gift at each, more of what you live through counts, and [P] Progress opens the Ocean Journal; chapter 1 is The Drowning. The Team Corner picks from lists, its rankings load at once with real numbers, and its passwords, dissolving, wars, vault, gear moves and team size are fixed. NPC teammates no longer attack their sleeping player, plus playtest fixes to reward labels, cursed items, rests, lives and gear comparisons. See `DOCS/release-notes/RELEASE_NOTES_1.1.12.md`.
 - **v1.1.11:** Team HQ upgrades reach every hit, potion and XP award and follow the team you are in; rankings count real members and leadership passes on when a leader leaves. WANTED targets count wherever they are beaten, and Crown bounties on players pay the duel winner. A same-name character starts clean, and deleting a character ends its reign and clears its mail and auctions. An Old God kill pays once, wilderness gold finds pay on the dungeon scale, and Potion Mastery works on every healing potion. See `DOCS/release-notes/RELEASE_NOTES_1.1.11.md`.
 - **v1.1.10:** Mael'Keth is tuned for a level-30s party, the five floors before every Old God have tougher monsters, a god's power surge lasts three rounds, its intro shows its fight HP, and dialogue answers apply. Companions are protected from special attacks like normal hits and tanks shield before they taunt. Items waiting for pack room reach alts, cannot be lost, and arrive on /boss; bequests from teams reach their leader, with an admin screen to set the leader of older teams. The Inn lists every patron, PvP control can no longer chain, and Team HQ upgrades cost what the menu shows. See `DOCS/release-notes/RELEASE_NOTES_1.1.10.md`.
@@ -343,7 +354,7 @@ Join Discord for discussions, feedback, and updates: **https://discord.gg/EZhwgD
 
 *"You are not a wave fighting the ocean. You ARE the ocean, dreaming of being a wave."*
 
-## Known Issues (v1.1.12)
+## Known Issues (v1.1.13)
 
 - Save files from the earliest alpha versions may not be fully compatible.
 - BBS FOSSIL mode not natively supported (use `--stdio` flag for FOSSIL-based BBSes via host pipe).
@@ -357,4 +368,4 @@ Join Discord for discussions, feedback, and updates: **https://discord.gg/EZhwgD
 
 ---
 
-**Status:** v1.1.12 "Regalia". The world is running. [Watch it live.](https://usurper-reborn.net)
+**Status:** v1.1.13 "Regalia". The world is running. [Watch it live.](https://usurper-reborn.net)

@@ -837,6 +837,9 @@ public class FeatureInteractionSystem
 
     #endregion
 
+    // v1.1.13: the risk prompt's answers: every language's yes (as GameConfig.IsAffirmative) and no
+    private static readonly string[] RiskAnswers = { "Y", "S", "O", "I", "YES", "SI", "S\u00CC", "OUI", "IGEN", "N", "NO", "NON", "NEM" };
+
     #region Moral Choice
 
     private async Task HandleMoralChoice(RoomFeature feature, Character player, int level,
@@ -868,10 +871,10 @@ public class FeatureInteractionSystem
         terminal.WriteLine($"[3] {Loc.Get("feature.walk_away")}");
         terminal.WriteLine("");
 
-        var input = await terminal.GetInput("> ");
+        var input = await terminal.GetValidChoice("> ", new[] { "1", "2", "3" }, "3"); // v1.1.13: a typo asks again
         terminal.WriteLine("");
 
-        switch (input.Trim())
+        switch (input)
         {
             case "1":
                 await ApplyMoralChoice(player, choice.Option1, terminal, outcome, level);
@@ -1230,9 +1233,10 @@ public class FeatureInteractionSystem
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("feature.take_risk"));
 
-        var input = await terminal.GetInput("> ");
+        // v1.1.13: yes or no; anything else asks again (it read as no)
+        var input = await terminal.GetValidChoice("> ", RiskAnswers, "N", Loc.Get("feature.risk_answers"));
 
-        if (input.Trim().ToUpper().StartsWith("Y"))
+        if (GameConfig.IsAffirmative(input))
         {
             int roll = random.Next(100);
             terminal.WriteLine("");

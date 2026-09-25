@@ -2711,7 +2711,8 @@ public partial class GameEngine
                 var sharedNpcs = await OnlineStateManager.Instance.LoadSharedNPCs();
                 if (sharedNpcs != null && sharedNpcs.Count > 0)
                 {
-                    await RestoreNPCs(sharedNpcs);
+                    await RestoreNPCs(sharedNpcs, OnlineStateManager.Instance.NpcsVersion);   // v1.1.13: the version it was loaded at
+                    OnlineStateManager.Instance.NoteNpcBaseline();   // v1.1.13: what this session's save compares against
                     DebugLogger.Instance.LogInfo("ONLINE", $"NPCs overridden from world_state: {sharedNpcs.Count} NPCs loaded");
                 }
 
@@ -4706,7 +4707,8 @@ public partial class GameEngine
             var sharedNpcs = await OnlineStateManager.Instance.LoadSharedNPCs();
             if (sharedNpcs != null && sharedNpcs.Count > 0)
             {
-                await RestoreNPCs(sharedNpcs);
+                await RestoreNPCs(sharedNpcs, OnlineStateManager.Instance.NpcsVersion);   // v1.1.13: the version it was loaded at
+                OnlineStateManager.Instance.NoteNpcBaseline();   // v1.1.13: what this session's save compares against
                 DebugLogger.Instance.LogInfo("ONLINE", $"NPCs overridden from world_state: {sharedNpcs.Count} NPCs loaded");
             }
 
@@ -5566,6 +5568,7 @@ public partial class GameEngine
             ColorTheme = playerData.ColorTheme,
             AutoLevelUp = playerData.AutoLevelUp,
             AutoEquipDisabled = playerData.AutoEquipDisabled,
+            AutoCombatHealPercent = GameConfig.ClampAutoCombatHealPercent(playerData.AutoCombatHealPercent), // v1.1.13: in range
             DateFormatPreference = playerData.DateFormatPreference,
             AutoRedistributeXP = playerData.AutoRedistributeXP,
             Specialization = (ClassSpecialization)playerData.Specialization,
@@ -6499,20 +6502,41 @@ public partial class GameEngine
         return Math.Min(randomAge, cap);
     }
 
-    private async Task RestoreNPCs(List<NPCData> npcData)
+    /// <summary>
+    /// v1.1.13: storedVersion is the world_state npcs version npcData was loaded at (null: not the stored
+    /// roster). The rebuild holds OnlineStateManager.RosterLock, so a purge's clean-up and serialize on
+    /// another task never see it half done. The rebuild has no await inside.
+    /// </summary>
+    internal Task RestoreNPCs(List<NPCData> npcData, long? storedVersion = null)   // v1.1.13: internal for the purge's reload
     {
         if (npcData == null || npcData.Count == 0)
         {
             // Expected in online mode — player saves don't store NPCs (world sim manages them via world_state)
             DebugLogger.Instance.LogDebug("NPC", "No NPC data in player save (normal for online mode)");
-            return;
+            return Task.CompletedTask;
         }
+        try
+        {
+            lock (OnlineStateManager.RosterLock)
+            {
+                bool whole = false;
+                try { RestoreNPCsLocked(npcData); whole = true; }
+                finally { OnlineStateManager.NoteRosterRestored(whole ? storedVersion : null); }   // v1.1.13: a failed rebuild is no stored roster
+            }
+            return Task.CompletedTask;
+        }
+        catch (Exception ex) { return Task.FromException(ex); }
+    }
+
+    private void RestoreNPCsLocked(List<NPCData> npcData)
+    {
 
         // v1.0.2: mark the roster as in-flight for the whole teardown-and-rebuild.
         // The singleton is process-wide, so another session mid-login can otherwise
         // observe a partially filled roster and wrongly conclude an NPC is gone.
         // Anything that DELETES state on a missed lookup must wait this out.
         NPCSpawnSystem.Instance.IsRebuilding = true;
+        var memoryLoadTime = DateTime.Now;   // v1.1.13: one load time for every restored memory
         try
         {
 
@@ -6757,11 +6781,11 @@ public partial class GameEngine
                                 Type = memType,
                                 Description = memData.Description,
                                 InvolvedCharacter = memData.InvolvedCharacter,
-                                Timestamp = memData.Timestamp,
+                                Timestamp = MemorySystem.RestoredTimestamp(memData.Timestamp, data.MemoryTimesKept, memoryLoadTime),   // v1.1.13
                                 Importance = memData.Importance,
                                 EmotionalImpact = memData.EmotionalImpact
                             };
-                            npc.Brain.Memory?.RecordEvent(memory);
+                            npc.Brain.Memory?.RecordEvent(memory, keepTimestamp: true);   // v1.1.13: the saved time
                         }
                     }
                     // GD.Print($"[GameEngine] Restored {data.Memories.Count} memories for {npc.Name}");
@@ -7071,8 +7095,6 @@ public partial class GameEngine
         {
             UsurperRemake.Systems.DebugLogger.Instance.LogWarning("NPC", "worldSimulator is null - cannot process dead NPCs!");
         }
-
-        await Task.CompletedTask;
 
         }
         finally

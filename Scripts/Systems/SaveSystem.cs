@@ -775,6 +775,7 @@ namespace UsurperRemake.Systems
                 ColorTheme = player.ColorTheme,
                 AutoLevelUp = player.AutoLevelUp,
                 AutoEquipDisabled = player.AutoEquipDisabled,
+                AutoCombatHealPercent = player.AutoCombatHealPercent, // v1.1.13: auto-combat potion threshold
                 DateFormatPreference = player.DateFormatPreference,
                 AutoRedistributeXP = player.AutoRedistributeXP,
                 Specialization = (int)player.Specialization,
@@ -1338,6 +1339,7 @@ namespace UsurperRemake.Systems
                     // AI state
                     PersonalityProfile = SerializePersonality(npc.Brain?.Personality),
                     Memories = SerializeMemories(npc.Brain?.Memory),
+                    MemoryTimesKept = true,   // v1.1.13
                     CurrentGoals = SerializeGoals(npc.Brain?.Goals),
                     EmotionalState = SerializeEmotionalState(npc.Brain?.Emotions),
 
@@ -2649,15 +2651,11 @@ namespace UsurperRemake.Systems
                         king.Treasury = data.RoyalCourt.Treasury;
                         king.TaxRate = data.RoyalCourt.TaxRate;
                         king.TotalReign = data.RoyalCourt.TotalReign;
-                        king.KingTaxPercent = data.RoyalCourt.KingTaxPercent > 0 ? data.RoyalCourt.KingTaxPercent : 5;
-                        king.CityTaxPercent = data.RoyalCourt.CityTaxPercent > 0 ? data.RoyalCourt.CityTaxPercent : 2;
+                        king.KingTaxPercent = data.RoyalCourt.KingTaxPercent ?? 5;   // v1.1.13: the default only when absent; a stored 0 stays 0
+                        king.CityTaxPercent = data.RoyalCourt.CityTaxPercent ?? 2;
 
                         // Restore coronation date and tax alignment
-                        if (!string.IsNullOrEmpty(data.RoyalCourt.CoronationDate))
-                        {
-                            if (DateTime.TryParse(data.RoyalCourt.CoronationDate, null, System.Globalization.DateTimeStyles.RoundtripKind, out var coronation))
-                                king.CoronationDate = coronation;
-                        }
+                        king.CoronationDate = OnlineStateManager.CourtDate(data.RoyalCourt.CoronationDate) ?? king.CoronationDate;
                         king.TaxAlignment = (GameConfig.TaxAlignment)data.RoyalCourt.TaxAlignment;
 
                         // Restore king AI and Sex (SetCurrentKing hardcodes AI=Computer)
@@ -2700,22 +2698,8 @@ namespace UsurperRemake.Systems
                             IsDesignated = h.IsDesignated
                         }).ToList() ?? new List<RoyalHeir>();
 
-                        // Restore spouse
-                        if (data.RoyalCourt.Spouse != null)
-                        {
-                            king.Spouse = new RoyalSpouse
-                            {
-                                Name = data.RoyalCourt.Spouse.Name,
-                                Sex = (CharacterSex)data.RoyalCourt.Spouse.Sex,
-                                OriginalFaction = (CourtFaction)data.RoyalCourt.Spouse.OriginalFaction,
-                                Dowry = data.RoyalCourt.Spouse.Dowry,
-                                Happiness = data.RoyalCourt.Spouse.Happiness
-                            };
-                        }
-                        else
-                        {
-                            king.Spouse = null; // Ensure old spouse doesn't carry over
-                        }
+                        // Restore spouse (none: the old spouse doesn't carry over)
+                        king.Spouse = OnlineStateManager.SpouseFromCourt(data.RoyalCourt.Spouse, null);
 
                         // Restore active plots
                         king.ActivePlots = data.RoyalCourt.ActivePlots?.Select(p => new CourtIntrigue
@@ -2811,11 +2795,7 @@ namespace UsurperRemake.Systems
                             king.LastProclamation = data.RoyalCourt.LastProclamation;
                         }
 
-                        if (!string.IsNullOrEmpty(data.RoyalCourt.LastProclamationDate) &&
-                            DateTime.TryParse(data.RoyalCourt.LastProclamationDate, out var procDate))
-                        {
-                            king.LastProclamationDate = procDate;
-                        }
+                        king.LastProclamationDate = OnlineStateManager.CourtDate(data.RoyalCourt.LastProclamationDate, roundtrip: false) ?? king.LastProclamationDate;
 
                     }
                 }

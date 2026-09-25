@@ -4553,11 +4553,13 @@ public class DungeonLocation : BaseLocation
         // Action-based commands
         switch (choice)
         {
+            // v1.1.13: an action that cannot be done here says why, instead of doing nothing
             case "F":
                 if (room.HasMonsters && !room.IsCleared)
                 {
                     await FightRoomMonsters(room);
                 }
+                else await ExplainNoAction("dungeon.no_action_fight");
                 return false;
 
             case "T":
@@ -4565,6 +4567,7 @@ public class DungeonLocation : BaseLocation
                 {
                     await CollectTreasure(room);
                 }
+                else await ExplainNoAction(room.HasTreasure && !room.TreasureLooted ? "dungeon.no_action_guarded" : "dungeon.no_action_treasure");
                 return false;
 
             case "V":
@@ -4573,6 +4576,7 @@ public class DungeonLocation : BaseLocation
                     await HandleRoomEvent(room);
                     RequestRedisplay();
                 }
+                else await ExplainNoAction("dungeon.no_action_event");
                 return false;
 
             case "X":
@@ -4581,6 +4585,7 @@ public class DungeonLocation : BaseLocation
                     await ExamineFeatures(room);
                     RequestRedisplay();
                 }
+                else await ExplainNoAction("dungeon.no_action_examine");
                 return false;
 
             case "D":
@@ -4588,6 +4593,7 @@ public class DungeonLocation : BaseLocation
                 {
                     await DescendStairs();
                 }
+                else await ExplainNoAction(room.HasStairsDown ? "dungeon.no_action_guarded" : "dungeon.no_action_stairs");
                 return false;
 
             case "R":
@@ -4596,6 +4602,7 @@ public class DungeonLocation : BaseLocation
                     await RestInRoom();
                     RequestRedisplay();
                 }
+                else await ExplainNoAction(hasCampedThisFloor ? "dungeon.rest_once_per_floor" : "dungeon.no_action_rest");
                 return false;
 
             case "M":
@@ -5016,6 +5023,47 @@ public class DungeonLocation : BaseLocation
     /// Check if player evades a trap based on agility
     /// Returns true if trap is evaded, false if it hits
     /// </summary>
+    /// <summary>
+    /// v1.1.13: the chance a chest search finds what is wrong with it. The same shape as TryEvadeTrap
+    /// (a stat base, harder on deeper floors, the trap classes' bonuses, 5-85%), with a careful eye
+    /// (Dexterity and Wisdom) in place of quick feet.
+    /// </summary>
+    internal static int ChestTrapSearchChance(Character player, int floor)
+    {
+        int chance = (int)Math.Min(75, (player.Dexterity + player.Wisdom) / 6);
+        chance -= floor / 5;
+        if (player.Class == CharacterClass.Assassin)
+            chance += 15 + (int)(player.Dexterity / 8);
+        else if (player.Class == CharacterClass.Ranger)
+            chance += 10 + (int)(player.Dexterity / 12);
+        else if (player.Class == CharacterClass.Jester || player.Class == CharacterClass.Bard)
+            chance += 5;
+        return Math.Clamp(chance, 5, 85);
+    }
+
+    /// <summary>
+    /// v1.1.13: [S] Search for Traps on a chest. A found trap is disarmed and the chest is safe to open
+    /// (its treasure is still inside); a found mimic is revealed; a clean chest or a missed search reads
+    /// the same. Returns the chest's roll after the search (0-6 treasure, 7-8 trap, 9 mimic).
+    /// </summary>
+    private int SearchChestForTraps(Character player, int chestRoll)
+    {
+        terminal.WriteLine(Loc.Get("dungeon.chest_search_start"), "cyan");
+        bool found = dungeonRandom.Next(100) < ChestTrapSearchChance(player, currentDungeonLevel);
+        if (found && chestRoll is 7 or 8)
+        {
+            terminal.WriteLine(Loc.Get("dungeon.chest_search_disarmed"), "green");
+            return 0;
+        }
+        if (found && chestRoll == 9)
+        {
+            terminal.WriteLine(Loc.Get("dungeon.chest_search_mimic"), "bright_red");
+            return chestRoll;
+        }
+        terminal.WriteLine(Loc.Get("dungeon.chest_search_nothing"), "gray");
+        return chestRoll;
+    }
+
     private bool TryEvadeTrap(Character player, int trapDifficulty = 50)
     {
         // Base evasion chance: Agility / 3, capped at 75%
@@ -5871,7 +5919,48 @@ public class DungeonLocation : BaseLocation
     /// </summary>
     private async Task HandleRoomEvent(DungeonRoom room)
     {
-        room.EventCompleted = true;
+        // v1.1.13: the chest and the shrine are spent by the player's choice (SpendRoomEvent), not before
+        // the prompt, so a typo does not use them up. The other events are spent up front as before.
+        bool spentByChoice = room.EventType is DungeonEventType.TreasureChest or DungeonEventType.Shrine;
+        if (spentByChoice) _roomEventAwaitingChoice = room;
+        else room.EventCompleted = true;
+        try
+        {
+            await RunRoomEvent(room);
+        }
+        catch (LocationExitException)
+        {
+            SpendRoomEvent();
+            throw;
+        }
+        catch
+        {
+            _roomEventAwaitingChoice = null; // a lost connection at the prompt leaves the event for later
+            throw;
+        }
+        SpendRoomEvent();
+    }
+
+    // v1.1.13: the room whose event is spent when the player makes a valid choice
+    private DungeonRoom? _roomEventAwaitingChoice;
+
+    /// <summary>v1.1.13: marks the room event now being played as spent; no-op outside a room event.</summary>
+    private void SpendRoomEvent()
+    {
+        if (_roomEventAwaitingChoice == null) return;
+        _roomEventAwaitingChoice.EventCompleted = true;
+        _roomEventAwaitingChoice = null;
+    }
+
+    /// <summary>v1.1.13: why a room action cannot be done here, in place of a silent no-op.</summary>
+    private async Task ExplainNoAction(string key)
+    {
+        terminal.WriteLine($"  {Loc.Get(key)}", "gray");
+        await Task.Delay(800);
+    }
+
+    private async Task RunRoomEvent(DungeonRoom room)
+    {
 
         // Broadcast room event type to followers
         string? eventDesc = room.EventType switch
@@ -6016,9 +6105,9 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine(Loc.Get("ui.cancel"));
         terminal.WriteLine("");
 
-        var input = await terminal.GetInput(Loc.Get("ui.choice"));
-
-        if (int.TryParse(input, out int idx) && idx >= 1 && idx <= unexamined.Count)
+        // v1.1.13: an invalid number (a stale one after the list renumbered) asks again instead of leaving
+        int idx = await terminal.GetValidNumber(Loc.Get("ui.choice"), unexamined.Count);
+        if (idx >= 1)
         {
             await InteractWithFeature(unexamined[idx - 1]);
         }
@@ -8279,21 +8368,35 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine(Loc.Get("dungeon.treasure_chest_discover"), "cyan");
         terminal.WriteLine("");
 
-        EmitChoices("treasure_chest", "Treasure Chest",
-            ("O", "Open", "treasure"),
-            ("S", "Search for Traps", "info"),
-            ("L", "Leave It", "info"));
-        var choice = await terminal.GetInput(Loc.Get("dungeon.treasure_chest_choice"));
-
         var currentPlayer = GetCurrentPlayer();
 
-        if (choice.ToUpper() == "O")
+        // 70% good, 20% trap, 10% mimic. v1.1.13: rolled before the prompt, so a search finds what is there.
+        var chestRoll = dungeonRandom.Next(10);
+        bool searched = false;
+        string choice;
+        while (true)
+        {
+            if (searched)
+                EmitChoices("treasure_chest", "Treasure Chest", ("O", "Open", "treasure"), ("L", "Leave It", "info"));
+            else
+                EmitChoices("treasure_chest", "Treasure Chest",
+                    ("O", "Open", "treasure"),
+                    ("S", "Search for Traps", "info"),
+                    ("L", "Leave It", "info"));
+            choice = await terminal.GetValidChoice(
+                Loc.Get(searched ? "dungeon.treasure_chest_choice_searched" : "dungeon.treasure_chest_choice"),
+                searched ? new[] { "O", "L" } : new[] { "O", "S", "L" }, "L");
+            if (choice != "S") break;
+            // v1.1.13: Search for Traps, once per chest; costs nothing
+            searched = true;
+            chestRoll = SearchChestForTraps(currentPlayer, chestRoll);
+        }
+        SpendRoomEvent();
+
+        if (choice == "O")
         {
             // Track chest opened for achievements
             currentPlayer.Statistics.RecordChestOpened();
-
-            // 70% good, 20% trap, 10% mimic
-            var chestRoll = dungeonRandom.Next(10);
 
             if (chestRoll < 7)
             {
@@ -8476,7 +8579,7 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine(Loc.Get("dungeon.strangers_demand_gold"), "white");
         terminal.WriteLine("");
 
-        var choice = await terminal.GetInput(Loc.Get("dungeon.strangers_choice"));
+        var choice = await terminal.GetValidChoice(Loc.Get("dungeon.strangers_choice"), new[] { "F", "P", "E" }, "E"); // v1.1.13: a typo asks again
 
         if (choice.ToUpper() == "F")
         {
@@ -8585,7 +8688,7 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine(Loc.Get("dungeon.damsel_harassed"), "gray");
         terminal.WriteLine("");
 
-        var choice = await terminal.GetInput(Loc.Get("dungeon.damsel_choice"));
+        var choice = await terminal.GetValidChoice(Loc.Get("dungeon.damsel_choice"), new[] { "H", "I", "J" }, "I"); // v1.1.13: a typo asks again
 
         var currentPlayer = GetCurrentPlayer();
 
@@ -8769,7 +8872,8 @@ public class DungeonLocation : BaseLocation
             ("P", "Pray", "info"),
             ("D", "Desecrate", "danger"),
             ("L", "Leave", "info"));
-        var choice = await terminal.GetInput(Loc.Get("dungeon.shrine_choice"));
+        var choice = await terminal.GetValidChoice(Loc.Get("dungeon.shrine_choice"), new[] { "P", "D", "L" }, "L"); // v1.1.13: a typo asks again
+        SpendRoomEvent();
 
         if (choice.ToUpper() == "P")
         {
@@ -11048,7 +11152,7 @@ public class DungeonLocation : BaseLocation
                 continue;
             }
 
-            var (selectedItem, wasEquipped, sourceSlot) = equipmentItems[itemIdx - 1];
+            var (selectedItem, wasEquipped, sourceSlot, sourceItem) = equipmentItems[itemIdx - 1];
 
             // Block unidentified items
             if (!selectedItem.IsIdentified)
@@ -11070,29 +11174,26 @@ public class DungeonLocation : BaseLocation
 
             EquipmentSlot? targetSlot = selectedSlot.Value;
 
+            // Remove from player. v1.1.13: the listed instance, and nothing is equipped if nothing came off
+            if (!TakeFromPlayerForEquip(selectedItem, wasEquipped, sourceSlot, sourceItem))
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine(Loc.Get("team.equip_item_gone", selectedItem.Name));
+                await Task.Delay(2000);
+                continue;
+            }
+
             // Track displaced items
             var targetInventoryBefore = target.Inventory.Count;
 
-            // Equip first, then remove from player on success (prevents item loss if equip fails)
             var result = target.EquipItem(selectedItem, targetSlot, out string message);
             target.RecalculateStats();
 
             if (result)
             {
-                // Remove from player AFTER successful equip
-                if (wasEquipped && sourceSlot.HasValue)
-                {
-                    currentPlayer.UnequipSlot(sourceSlot.Value);
-                    currentPlayer.RecalculateStats();
-                }
-                else
-                {
-                    var invItem = currentPlayer.Inventory.FirstOrDefault(i => i.Name == selectedItem.Name);
-                    if (invItem != null)
-                        currentPlayer.Inventory.Remove(invItem);
-                }
-
-                // Move displaced items to player inventory
+                // v1.1.13: the give is saved first (player, then NPC) with the displaced items still in the target's
+                // bag; then they come back to the player, saved NPC side first. A companion is one player save.
+                await SaveGearGivenToNpc(target);
                 if (target.Inventory.Count > targetInventoryBefore)
                 {
                     var displacedItems = target.Inventory.Skip(targetInventoryBefore).ToList();
@@ -11101,6 +11202,7 @@ public class DungeonLocation : BaseLocation
                         target.Inventory.Remove(displaced);
                         currentPlayer.Inventory.Add(displaced);
                     }
+                    await SaveGearTakenFromNpc(target);
                 }
 
                 terminal.WriteLine("");
@@ -11111,23 +11213,11 @@ public class DungeonLocation : BaseLocation
                     terminal.SetColor("yellow");
                     terminal.WriteLine($"  {message}");
                 }
-
-                // Sync equipment and save — prevents item loss on disconnect
-                if (target.IsCompanion)
-                    CompanionSystem.Instance?.SyncCompanionEquipment(target);
-                else
-                    CombatEngine.SyncNPCTeammateToActiveNPCs(target);
-                SaveSystem.Instance.ResetAutoSaveThrottle();
-                await SaveSystem.Instance.AutoSave(currentPlayer);
-                if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
-                {
-                    try { await OnlineStateManager.Instance.SaveAllSharedState(); }
-                    catch (Exception ex) { DebugLogger.Instance.LogError("DUNGEON", $"[ManagePartyMemberEquipment] SaveAllSharedState failed after equip: {ex.Message}"); }
-                }
             }
             else
             {
-                // Failed - item was never removed from player, nothing to return
+                // Failed - return item to player (v1.1.13: the pack item itself when it came from the pack)
+                currentPlayer.Inventory.Add(sourceItem ?? currentPlayer.ConvertEquipmentToLegacyItem(selectedItem));
                 terminal.SetColor("red");
                 terminal.WriteLine($"  {Loc.Get("dungeon.equip_failed", message)}");
             }
@@ -11191,25 +11281,20 @@ public class DungeonLocation : BaseLocation
 
         var (selectedSlot, selectedItem) = equippedSlots[idx - 1];
 
-        // Unequip and give to player
-        target.UnequipSlot(selectedSlot);
+        // Unequip and give to player. v1.1.13: only what came off (a cursed item stays on, and was copied)
+        var unequipped = target.UnequipSlot(selectedSlot);
+        if (unequipped == null)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine(Loc.Get("team.unequip_failed"));
+            await Task.Delay(1500);
+            return;
+        }
         target.RecalculateStats();
 
-        var legacyItem = currentPlayer.ConvertEquipmentToLegacyItem(selectedItem);
+        var legacyItem = currentPlayer.ConvertEquipmentToLegacyItem(unequipped);
         currentPlayer.Inventory.Add(legacyItem);
-
-        // Sync equipment and save — prevents item loss on disconnect
-        if (target.IsCompanion)
-            CompanionSystem.Instance?.SyncCompanionEquipment(target);
-        else
-            CombatEngine.SyncNPCTeammateToActiveNPCs(target);
-        SaveSystem.Instance.ResetAutoSaveThrottle();
-        await SaveSystem.Instance.AutoSave(currentPlayer);
-        if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
-        {
-            try { await OnlineStateManager.Instance.SaveAllSharedState(); }
-            catch (Exception ex) { DebugLogger.Instance.LogError("DUNGEON", $"[ManagePartyMemberEquipment] SaveAllSharedState failed after unequip: {ex.Message}"); }
-        }
+        await SaveGearTakenFromNpc(target);   // v1.1.13: NPC side first, then the player (a companion: one player save)
 
         terminal.WriteLine("");
         terminal.SetColor("bright_green");

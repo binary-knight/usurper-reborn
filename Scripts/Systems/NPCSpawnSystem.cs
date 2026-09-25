@@ -1586,14 +1586,35 @@ namespace UsurperRemake.Systems
             return (CharacterClass)random.Next(baseClassCount);
         }
 
-        public static string ToRomanNumeral(int number)
+        // v1.1.13: legacy uniqueness suffixes; new names never carry one
+        private static readonly HashSet<string> RomanNumeralTokens = new(StringComparer.Ordinal)
         {
-            return number switch
-            {
-                2 => "II", 3 => "III", 4 => "IV", 5 => "V",
-                6 => "VI", 7 => "VII", 8 => "VIII", 9 => "IX", 10 => "X",
-                _ => number.ToString()
-            };
+            "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"
+        };
+
+        internal static bool IsRomanNumeralToken(string token) => RomanNumeralTokens.Contains(token);
+
+        private static string[]? _allSurnames;
+        /// <summary>
+        /// v1.1.13: every surname a generated name can carry, immigrant and family pools.
+        /// Read-only union; FamilySystem.GeneratedSurnames keeps its order for its hash.
+        /// </summary>
+        internal static string[] AllSurnames => _allSurnames ??=
+            ImmigrantSurnames.Concat(FamilySystem.GeneratedSurnames)
+                .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+
+        /// <summary>
+        /// v1.1.13: drop trailing Roman numeral tokens ("Ansel II VI" becomes "Ansel").
+        /// A name made only of numerals comes back unchanged, never empty.
+        /// </summary>
+        public static string StripRomanNumeralSuffix(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return name;
+            var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries).ToList();
+            while (parts.Count > 1 && IsRomanNumeralToken(parts[^1]))
+                parts.RemoveAt(parts.Count - 1);
+            if (parts.Count == 1 && IsRomanNumeralToken(parts[0])) return name.Trim();
+            return string.Join(" ", parts);
         }
 
         /// <summary>
@@ -1608,51 +1629,106 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Return a display name no NPC has ever carried, and reserve it. If the
-        /// candidate is taken, append a Roman-numeral suffix (II through X), then a
-        /// short unique fragment. Used by immigrant generation and child / orphan
-        /// graduation (v0.63.0 -- previously only immigrants did this, graduating
-        /// children could silently shadow living NPCs by name).
+        /// Return a display name no NPC has ever carried, and reserve it. Used by
+        /// immigrant generation and child / orphan graduation (v0.63.0).
         /// v1.0.4: checks NPCNameRegistry as well as the live roster, so a permadead
         /// NPC's name stays retired after the corpse is pruned. Pass
         /// <paramref name="alreadyReserved"/> when the candidate was reserved for
         /// this very character at birth (children, royal orphans): the registry hit
         /// is its own, so only the live roster is checked for the exact candidate.
+        /// v1.1.13: never appends a numeral. Trailing numerals are stripped; a taken
+        /// one-word name gets a surname, a taken surnamed name keeps its first name
+        /// with another surname, then other first names are tried. With
+        /// <paramref name="keepSurname"/> (children) the family surname stays and the
+        /// first name changes, from the <paramref name="sex"/> pool when given.
         /// </summary>
-        public string DisambiguateNPCName(string candidate, bool alreadyReserved = false)
+        public string DisambiguateNPCName(string candidate, bool alreadyReserved = false, bool keepSurname = false, CharacterSex? sex = null)
         {
-            if (string.IsNullOrEmpty(candidate)) return candidate;
+            if (string.IsNullOrWhiteSpace(candidate)) return candidate;
 
-            bool inRoster = spawnedNPCs.Any(n => n.Name2.Equals(candidate, StringComparison.OrdinalIgnoreCase));
-            if (!inRoster && (alreadyReserved || !NPCNameRegistry.IsTaken(candidate)))
+            // v1.1.13: the exact reserved candidate keeps its old behaviour, numeral or not
+            if (alreadyReserved
+                && !spawnedNPCs.Any(n => n.Name2.Equals(candidate, StringComparison.OrdinalIgnoreCase)))
             {
                 NPCNameRegistry.Reserve(candidate);
                 return candidate;
             }
-            for (int suffix = 2; suffix <= 10; suffix++)
+
+            // v1.1.13: no numeral or fragment suffix; strip a legacy one, then try surnames
+            string stripped = StripRomanNumeralSuffix(candidate);
+            if (!IsNameInUse(stripped))
             {
-                string suffixed = $"{candidate} {ToRomanNumeral(suffix)}";
-                if (!IsNameInUse(suffixed))
+                NPCNameRegistry.Reserve(stripped);
+                return stripped;
+            }
+            foreach (var option in AlternativeNames(stripped, keepSurname, sex))
+            {
+                if (!IsNameInUse(option))
                 {
-                    NPCNameRegistry.Reserve(suffixed);
-                    return suffixed;
+                    NPCNameRegistry.Reserve(option);
+                    return option;
                 }
             }
-            // Bail at X+1; appending a guid fragment is uglier but unique.
-            while (true)
+            // v1.1.13: unreachable in practice, a child alone has 6,400 names per surname
+            return stripped;
+        }
+
+        /// <summary>
+        /// v1.1.13: replacement names for a taken name, nearest first. Pools are shuffled
+        /// so namesakes do not all land on the same surname.
+        /// </summary>
+        private IEnumerable<string> AlternativeNames(string name, bool keepSurname, CharacterSex? sex)
+        {
+            var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            // A name made only of numerals has no given name worth keeping
+            bool keepGiven = !parts.All(IsRomanNumeralToken);
+            string? currentSurname = parts.Length > 1 ? parts[^1] : null;
+            // Everything but the surname: "Sir Borin Hammerhand" keeps "Sir Borin"
+            string given = parts.Length > 1 ? string.Join(" ", parts[..^1]) : parts[0];
+            bool NotCurrent(string s) => currentSurname == null || !s.Equals(currentSurname, StringComparison.OrdinalIgnoreCase);
+
+            var surnames = AllSurnames.OrderBy(_ => random.Next()).ToArray();
+            // Other first names come from the sex pool, else the given name's own pool, else both
+            string[] firstPool = sex == CharacterSex.Female ? ImmigrantFemaleNames
+                : sex == CharacterSex.Male ? ImmigrantMaleNames
+                : ImmigrantFemaleNames.Contains(parts[0], StringComparer.OrdinalIgnoreCase) ? ImmigrantFemaleNames
+                : ImmigrantMaleNames.Contains(parts[0], StringComparer.OrdinalIgnoreCase) ? ImmigrantMaleNames
+                : ImmigrantMaleNames.Concat(ImmigrantFemaleNames).ToArray();
+            var firstNames = firstPool.Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(_ => random.Next()).ToArray();
+
+            if (keepGiven && keepSurname && currentSurname != null)
             {
-                string tagged = $"{candidate} {Guid.NewGuid().ToString("N").Substring(0, 4)}";
-                if (!IsNameInUse(tagged))
-                {
-                    NPCNameRegistry.Reserve(tagged);
-                    return tagged;
-                }
+                // v1.1.13: a child keeps the family surname and gets another first name
+                foreach (var first in firstNames)
+                    if (!first.Equals(given, StringComparison.OrdinalIgnoreCase))
+                        yield return $"{first} {currentSurname}";
+                // v1.1.13: every first name taken with this surname: two first names, surname last
+                foreach (var first in firstNames)
+                    foreach (var second in firstNames)
+                        if (!first.Equals(second, StringComparison.OrdinalIgnoreCase))
+                            yield return $"{first} {second} {currentSurname}";
+                yield break;
             }
+
+            // Same given name, another surname
+            if (keepGiven)
+                foreach (var surname in surnames.Where(NotCurrent))
+                    yield return $"{given} {surname}";
+            // Pool exhausted for this given name: other first names
+            foreach (var first in firstNames)
+                foreach (var surname in surnames)
+                    yield return $"{first} {surname}";
+            // Then two surnames
+            foreach (var first in firstNames)
+                foreach (var a in surnames)
+                    foreach (var b in surnames)
+                        if (!a.Equals(b, StringComparison.OrdinalIgnoreCase))
+                            yield return $"{first} {a} {b}";
         }
 
         /// <summary>
         /// v1.0.4: roll immigrant names until one has never been used, then reserve it.
-        /// Only falls back to a suffix if forty rolls all collide (pools exhausted).
+        /// If forty rolls all collide, DisambiguateNPCName picks another combination.
         /// </summary>
         private string PickUnusedImmigrantName(CharacterSex sex)
         {

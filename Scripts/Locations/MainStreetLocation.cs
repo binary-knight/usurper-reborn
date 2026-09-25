@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 /// Main Street location - central hub of the game
 /// Based on Pascal main_menu procedure from GAMEC.PAS
 /// </summary>
-public class MainStreetLocation : BaseLocation
+public partial class MainStreetLocation : BaseLocation
 {
     public MainStreetLocation() : base(
         GameLocation.MainStreet,
@@ -69,6 +69,15 @@ public class MainStreetLocation : BaseLocation
         return 1;
     }
 
+    private void ShowTierUnlockAnnouncement()
+    {
+        string? notice = TakeDistrictsNotice(currentPlayer); // v1.1.13: once, for a character that knew the old menu
+        if (notice != null) terminal.WriteLine(notice, "bright_cyan");
+        foreach (string line in TakeTierUnlockAnnouncement(currentPlayer))
+            terminal.WriteLine(line, "bright_green");
+        terminal.SetColor("white");
+    }
+
     protected override string[]? GetAmbientMessages() => new[]
     {
         Loc.Get("main_street.ambient_merchant"),
@@ -103,6 +112,7 @@ public class MainStreetLocation : BaseLocation
 
         if (IsBBSSession)
         {
+            ShowTierUnlockAnnouncement(); // v1.1.13: above the BBS screen
             DisplayLocationBBS();
             return;
         }
@@ -170,6 +180,9 @@ public class MainStreetLocation : BaseLocation
 
         // Show NPCs in location
         ShowNPCsInLocation();
+
+        // v1.1.13: one line naming places a tier rise just opened
+        ShowTierUnlockAnnouncement();
 
         // Main Street menu (Pascal-style layout)
         ShowMainStreetMenu();
@@ -437,135 +450,10 @@ public class MainStreetLocation : BaseLocation
             AchievementSystem.TryUnlock(currentPlayer, "first_steps");
         }
 
-        // Menu rows — progressive disclosure based on player level
-        int tier = GetMenuTier();
-
-        // Tier 1 (always): Core combat loop
-        terminal.SetColor("darkgray");
-        terminal.Write(" ["); terminal.SetColor("bright_yellow"); terminal.Write("D"); terminal.SetColor("darkgray"); terminal.Write("]");
-        terminal.SetColor("white"); terminal.Write(Loc.Get("main_street.menu_dungeons_suffix"));
-        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("W"); terminal.SetColor("darkgray"); terminal.Write("]");
-        terminal.SetColor("white"); terminal.Write(Loc.Get("main_street.menu_weapon_suffix"));
-        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("A"); terminal.SetColor("darkgray"); terminal.Write("]");
-        terminal.SetColor("white"); terminal.Write(Loc.Get("main_street.menu_armor_suffix"));
-        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("M"); terminal.SetColor("darkgray"); terminal.Write("]");
-        terminal.SetColor("white"); terminal.Write(Loc.Get("main_street.menu_magic_suffix"));
-        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("U"); terminal.SetColor("darkgray"); terminal.Write("]");
-        terminal.SetColor("cyan"); terminal.WriteLine(Loc.Get("menu.action.music_shop"));
-
-        terminal.SetColor("darkgray");
-        terminal.Write(" ["); terminal.SetColor("bright_yellow"); terminal.Write("I"); terminal.SetColor("darkgray"); terminal.Write("]");
-        terminal.SetColor("white"); terminal.Write(Loc.Get("main_street.menu_inn_suffix"));
-        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("1"); terminal.SetColor("darkgray"); terminal.Write("]");
-        terminal.SetColor("white"); terminal.Write(Loc.Get("main_street.menu_healer"));
-        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("2"); terminal.SetColor("darkgray"); terminal.Write("]");
-        terminal.SetColor("white"); terminal.Write(Loc.Get("main_street.menu_quest_hall"));
-        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("V"); terminal.SetColor("darkgray"); terminal.Write("]");
-        terminal.SetColor("white"); terminal.WriteLine(Loc.Get("main_street.menu_master"));
-
-        // Tier 2 (Level 3+): Town services
-        if (tier >= 2)
-        {
-            terminal.SetColor("darkgray");
-            terminal.Write(" ["); terminal.SetColor("bright_yellow"); terminal.Write("B"); terminal.SetColor("darkgray"); terminal.Write("]");
-            terminal.SetColor("white"); terminal.Write(Loc.Get("main_street.menu_bank_suffix"));
-            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("T"); terminal.SetColor("darkgray"); terminal.Write("]");
-            terminal.SetColor("white"); terminal.Write(Loc.Get("main_street.menu_temple_suffix"));
-            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("K"); terminal.SetColor("darkgray"); terminal.Write("]");
-            terminal.SetColor("white"); terminal.Write(Loc.Get("main_street.menu_castle"));
-            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("H"); terminal.SetColor("darkgray"); terminal.Write("]");
-            terminal.SetColor("white"); terminal.WriteLine(Loc.Get("main_street.menu_home_suffix"));
-
-            terminal.SetColor("darkgray");
-            terminal.Write(" ["); terminal.SetColor("bright_yellow"); terminal.Write("N"); terminal.SetColor("darkgray"); terminal.Write("]");
-            terminal.SetColor("white"); terminal.Write(Loc.Get("main_street.menu_news_suffix"));
-            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("F"); terminal.SetColor("darkgray"); terminal.Write("]");
-            terminal.SetColor("white"); terminal.Write(Loc.Get("main_street.menu_fame_suffix"));
-            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("E"); terminal.SetColor("darkgray"); terminal.Write("]");
-            terminal.SetColor("bright_green"); terminal.Write(Loc.Get("main_street.menu_explore_suffix"));
-            // v1.1.12: the $ key worked but was never drawn.
-            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("$"); terminal.SetColor("darkgray"); terminal.Write("]");
-            terminal.SetColor("white"); terminal.WriteLine(Loc.Get("main_street.menu_events_suffix"));
-        }
-
-        // Tier 3 (Level 5+): Full menu
-        if (tier >= 3)
-        {
-            terminal.SetColor("darkgray");
-            terminal.Write(" ["); terminal.SetColor("bright_yellow"); terminal.Write("Y"); terminal.SetColor("darkgray"); terminal.Write("]");
-            terminal.SetColor("gray"); terminal.Write(Loc.Get("main_street.menu_dark_alley"));
-            // v0.62.x Phase 6: The Sanctum -- yin/yang Light mirror of Dark Alley. Iconic [+] symbol.
-            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("+"); terminal.SetColor("darkgray"); terminal.Write("]");
-            terminal.SetColor("bright_yellow"); terminal.Write(Loc.Get("main_street.menu_sanctum"));
-            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("X"); terminal.SetColor("darkgray"); terminal.Write("]");
-            terminal.SetColor("magenta"); terminal.Write(Loc.Get("main_street.menu_love_st"));
-            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("O"); terminal.SetColor("darkgray"); terminal.Write("]");
-            terminal.SetColor("white"); terminal.Write(Loc.Get("main_street.menu_church_suffix"));
-            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("J"); terminal.SetColor("darkgray"); terminal.Write("]");
-            terminal.SetColor("white"); terminal.WriteLine(Loc.Get("main_street.menu_auction"));
-
-            terminal.SetColor("darkgray");
-            terminal.Write(" ["); terminal.SetColor("bright_yellow"); terminal.Write("C"); terminal.SetColor("darkgray"); terminal.Write("]");
-            terminal.SetColor("white"); terminal.Write(Loc.Get("main_street.menu_challenges_suffix"));
-            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("L"); terminal.SetColor("darkgray"); terminal.Write("]");
-            terminal.SetColor("white"); terminal.Write(Loc.Get("main_street.menu_lodging_suffix"));
-            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("="); terminal.SetColor("darkgray"); terminal.Write("]");
-            terminal.SetColor("white"); terminal.Write(Loc.Get("main_street.menu_stats"));
-            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("P"); terminal.SetColor("darkgray"); terminal.Write("]");
-            terminal.SetColor("white"); terminal.WriteLine(Loc.Get("main_street.menu_progress_suffix"));
-
-            terminal.SetColor("darkgray");
-            terminal.Write(" ["); terminal.SetColor("bright_yellow"); terminal.Write("Z"); terminal.SetColor("darkgray"); terminal.Write("]");
-            terminal.SetColor("white"); terminal.Write(Loc.Get("main_street.menu_team_corner"));
-            if (UsurperRemake.Systems.SettlementSystem.Instance?.State.IsEstablished == true)
-            {
-                terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write(">"); terminal.SetColor("darkgray"); terminal.Write("]");
-                terminal.SetColor("bright_green"); terminal.Write(Loc.Get("main_street.menu_outskirts"));
-            }
-            terminal.WriteLine("");
-        }
-
-        // Always: Quit + Settings
-        terminal.SetColor("darkgray");
-        if (tier < 3) terminal.Write(" "); // indent if not continuing a row
-        terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("Q"); terminal.SetColor("darkgray"); terminal.Write("]");
-        terminal.SetColor("gray"); terminal.Write(Loc.Get("main_street.menu_quit_suffix"));
-        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("~"); terminal.SetColor("darkgray"); terminal.Write("]");
-        terminal.SetColor("gray"); terminal.WriteLine(Loc.Get("main_street.menu_settings"));
-
-        // Compact mode number-key hint (offline only — online mode has its own number row)
-        if (GameConfig.CompactMode && !DoorMode.IsOnlineMode)
-        {
-            terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("main_street.numpad_hint"));
-        }
-
-        // Online multiplayer row (only in online mode)
-        if (DoorMode.IsOnlineMode && OnlineChatSystem.IsActive)
-        {
-            int onlineCount = OnlineStateManager.Instance?.CachedOnlinePlayerCount ?? 0;
-            if (IsScreenReader)
-            {
-                terminal.WriteLine(Loc.Get("main_street.online_label"), "bright_green");
-            }
-            else
-            {
-                terminal.SetColor("bright_green");
-                terminal.Write(Loc.Get("main_street.online_separator"));
-            }
-            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("3"); terminal.SetColor("darkgray"); terminal.Write("]");
-            terminal.SetColor("white"); terminal.Write(Loc.Get("main_street.who_count", onlineCount));
-            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("4"); terminal.SetColor("darkgray"); terminal.Write("]");
-            terminal.SetColor("white"); terminal.Write(Loc.Get("main_street.menu_chat_short"));
-            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("5"); terminal.SetColor("darkgray"); terminal.Write("]");
-            terminal.SetColor("white"); terminal.Write(Loc.Get("main_street.menu_news_short"));
-            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("6"); terminal.SetColor("darkgray"); terminal.Write("]");
-            terminal.SetColor("white"); terminal.Write(Loc.Get("main_street.menu_arena_short"));
-            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("7"); terminal.SetColor("darkgray"); terminal.Write("]");
-            terminal.SetColor("white"); terminal.Write(Loc.Get("main_street.menu_boss_short"));
-            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("R"); terminal.SetColor("darkgray"); terminal.Write("]");
-            terminal.SetColor("white"); terminal.WriteLine(Loc.Get("menu.action.guilds"));
-        }
+        // v1.1.13: the district menu (one per line for a screen reader)
+        var streetLines = MainStreetLines(CurrentStreetView(), OnlinePlayerCount());
+        if (IsScreenReader) WriteStreetMenuPlain(streetLines);
+        else WriteStreetMenuCompact(streetLines);
 
         // Blank line
         terminal.WriteLine("");
@@ -629,25 +517,6 @@ public class MainStreetLocation : BaseLocation
             terminal.SetColor("gray");
             terminal.Write($"({pct}%)");
         }
-        terminal.WriteLine("");
-
-        // Line 15: Quick commands (compact)
-        terminal.SetColor("darkgray");
-        terminal.Write(" ["); terminal.SetColor("bright_yellow"); terminal.Write("S"); terminal.SetColor("darkgray"); terminal.Write("]");
-        terminal.SetColor("white"); terminal.Write(Loc.Get("main_street.menu_status_suffix"));
-        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("*"); terminal.SetColor("darkgray"); terminal.Write("]");
-        terminal.SetColor("white"); terminal.Write(Loc.Get("main_street.menu_inv"));
-        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("?"); terminal.SetColor("darkgray"); terminal.Write("]");
-        terminal.SetColor("white"); terminal.Write(Loc.Get("main_street.menu_help_short"));
-        if (liveNPCs.Count > 0)
-        {
-            terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("0"); terminal.SetColor("darkgray"); terminal.Write("]");
-            terminal.SetColor("white"); terminal.Write(Loc.Get("main_street.talk_count", liveNPCs.Count));
-        }
-        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("~"); terminal.SetColor("darkgray"); terminal.Write("]");
-        terminal.SetColor("white"); terminal.Write(Loc.Get("main_street.menu_prefs"));
-        terminal.SetColor("darkgray"); terminal.Write("["); terminal.SetColor("bright_yellow"); terminal.Write("!"); terminal.SetColor("darkgray"); terminal.Write("]");
-        terminal.SetColor("white"); terminal.Write(Loc.Get("main_street.menu_bug"));
         terminal.WriteLine("");
 
         // Line 16: Bottom border
@@ -782,241 +651,12 @@ public class MainStreetLocation : BaseLocation
     }
 
     /// <summary>
-    /// Show the classic Main Street menu layout (v0.4 style)
-    /// Progressive disclosure: Tier 1 (Lv1-2) core loop, Tier 2 (Lv3-4) town services, Tier 3 (Lv5+) full menu.
-    /// All keys still work at all levels — only the display is gated.
+    /// v1.1.13: the visual Main Street menu: direct places, districts and hubs, then Settings, Help, Quit.
+    /// Only unlocked places and districts are drawn, and only drawn keys work.
     /// </summary>
     private void ShowClassicMenu()
     {
-        int tier = GetMenuTier();
-        terminal.WriteLine("");
-
-        // Helper: write a colored menu key+label, padded to fixed column width
-        // Format: [K] Label padded to `col` total chars (4 for "[X] " + label)
-        void MI(string key, string label, string color, int col)
-        {
-            terminal.SetColor("darkgray"); terminal.Write("[");
-            terminal.SetColor("bright_yellow"); terminal.Write(key);
-            terminal.SetColor("darkgray"); terminal.Write("]");
-            terminal.SetColor(color); terminal.Write(label.PadRight(col - 3));
-        }
-        // Last item in a row (no padding)
-        void ML(string key, string label, string color)
-        {
-            terminal.SetColor("darkgray"); terminal.Write("[");
-            terminal.SetColor("bright_yellow"); terminal.Write(key);
-            terminal.SetColor("darkgray"); terminal.Write("]");
-            terminal.SetColor(color); terminal.WriteLine(label);
-        }
-
-        // Fixed column width: 16 chars per item keeps columns aligned across rows
-        // 5 items × 16 = 80 chars (full terminal width)
-        const int C = 16;
-
-        // Row 1 - Primary locations (D/I always, T/O tier 2+)
-        terminal.Write(" ");
-        if (tier >= 2)
-        {
-            MI("D", Loc.Get("menu.action.dungeon"), "white", C);
-            MI("I", Loc.Get("menu.action.inn"), "white", C);
-            MI("T", Loc.Get("menu.action.temple"), "white", C);
-            ML("O", Loc.Get("menu.action.old_church"), "white");
-        }
-        else
-        {
-            MI("D", Loc.Get("menu.action.dungeon"), "white", C);
-            ML("I", Loc.Get("menu.action.inn"), "white");
-        }
-
-        // Row 2 - Shops (W/A/M/U always, J tier 3+)
-        terminal.Write(" ");
-        if (tier >= 3)
-        {
-            MI("W", Loc.Get("menu.action.weapon_shop"), "white", C);
-            MI("A", Loc.Get("menu.action.armor_shop"), "white", C);
-            MI("M", Loc.Get("menu.action.magic_shop"), "white", C);
-            MI("U", Loc.Get("menu.action.music_shop"), "cyan", C);
-            ML("J", Loc.Get("menu.action.auction_house"), "white");
-        }
-        else
-        {
-            MI("W", Loc.Get("menu.action.weapon_shop"), "white", C);
-            MI("A", Loc.Get("menu.action.armor_shop"), "white", C);
-            MI("M", Loc.Get("menu.action.magic_shop"), "white", C);
-            ML("U", Loc.Get("menu.action.music_shop"), "cyan");
-        }
-
-        // Row 3 - Services (B tier 2+, 1/2/V always)
-        terminal.Write(" ");
-        if (tier >= 2)
-        {
-            MI("B", Loc.Get("menu.action.bank"), "white", C);
-            MI("1", Loc.Get("menu.action.healer"), "white", C);
-            MI("2", Loc.Get("menu.action.quest_hall"), "white", C);
-            ML("V", Loc.Get("menu.action.level_master"), "white");
-        }
-        else
-        {
-            MI("1", Loc.Get("menu.action.healer"), "white", C);
-            MI("2", Loc.Get("menu.action.quest_hall"), "white", C);
-            ML("V", Loc.Get("menu.action.level_master"), "white");
-        }
-
-        // Row 4 - Important locations (K/H tier 2+, C/L/Z tier 3+)
-        if (tier >= 2)
-        {
-            terminal.Write(" ");
-            if (tier >= 3)
-            {
-                MI("K", Loc.Get("menu.action.castle"), "white", C);
-                MI("H", Loc.Get("menu.action.home"), "white", C);
-                MI("C", Loc.Get("menu.action.challenges"), "white", C);
-                MI("L", Loc.Get("menu.action.lodging_short"), "white", C);
-                ML("Z", Loc.Get("menu.action.team_corner"), "white");
-            }
-            else
-            {
-                MI("K", Loc.Get("menu.action.castle"), "white", C);
-                ML("H", Loc.Get("menu.action.home"), "white");
-            }
-        }
-
-        terminal.WriteLine("");
-
-        // Row 5 - Information (S always, N/F/E tier 2+)
-        terminal.Write(" ");
-        if (tier >= 2)
-        {
-            MI("S", Loc.Get("menu.action.status"), "white", C);
-            MI("N", Loc.Get("menu.action.news"), "white", C);
-            MI("F", Loc.Get("menu.action.fame"), "white", C);
-            MI("E", Loc.Get("menu.action.explore"), "bright_green", C);
-            ML("$", Loc.Get("menu.action.world_events"), "white"); // v1.1.12
-        }
-        else
-        {
-            ML("S", Loc.Get("menu.action.status"), "white");
-        }
-
-        // Row 6 - Stats & Progress (tier 3+)
-        if (tier >= 3)
-        {
-            terminal.Write(" ");
-            if (UsurperRemake.Systems.SettlementSystem.Instance?.State.IsEstablished == true)
-            {
-                MI("=", Loc.Get("menu.action.stats_record"), "white", C);
-                MI("P", Loc.Get("menu.action.progress"), "white", C);
-                ML(">", Loc.Get("menu.action.settlement"), "bright_green");
-            }
-            else
-            {
-                MI("=", Loc.Get("menu.action.stats_record"), "white", C);
-                ML("P", Loc.Get("menu.action.progress"), "white");
-            }
-        }
-
-        // Row 7 - Shady areas + Quit (Y/X tier 3+, Q/~ always)
-        terminal.Write(" ");
-        if (tier >= 3)
-        {
-            MI("Y", Loc.Get("menu.action.dark_alley"), "gray", C);
-            MI("+", Loc.Get("menu.action.sanctum"), "bright_yellow", C);
-            MI("X", Loc.Get("menu.action.love_street"), "magenta", C);
-            MI("Q", Loc.Get("menu.action.quit_game"), "gray", C);
-            ML("~", Loc.Get("menu.action.settings"), "gray");
-        }
-        else
-        {
-            MI("Q", Loc.Get("menu.action.quit_game"), "gray", C);
-            ML("~", Loc.Get("menu.action.settings"), "gray");
-        }
-
-        // Online multiplayer section (only shown in online mode)
-        if (DoorMode.IsOnlineMode && OnlineChatSystem.IsActive)
-        {
-            terminal.WriteLine("");
-            if (IsScreenReader)
-            {
-                terminal.WriteLine(Loc.Get("main_street.online_label"), "bright_white");
-            }
-            else
-            {
-                terminal.SetColor("bright_green");
-                terminal.Write(" ═══ ");
-                terminal.SetColor("bright_white");
-                terminal.Write(Loc.Get("main_street.online_header"));
-                terminal.SetColor("bright_green");
-                terminal.WriteLine(" ═══");
-            }
-
-            // Show online player count
-            int onlineCount = OnlineStateManager.Instance?.CachedOnlinePlayerCount ?? 0;
-
-            terminal.SetColor("darkgray");
-            terminal.Write(" [");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("3");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.Write(Loc.Get("main_street.whos_online_label"));
-            terminal.SetColor("bright_green");
-            terminal.Write($"({onlineCount}");
-            terminal.SetColor("white");
-            terminal.WriteLine(Loc.Get("main_street.player_count", onlineCount != 1 ? Loc.Get("main_street.player_plural") : ""));
-
-            terminal.SetColor("darkgray");
-            terminal.Write(" [");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("4");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.Write(Loc.Get("main_street.menu_chat_padded"));
-
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("5");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.Write(Loc.Get("main_street.menu_news_padded"));
-
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("6");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.Write(Loc.Get("main_street.menu_arena_padded"));
-
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("7");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.Write(Loc.Get("main_street.world_boss"));
-
-            terminal.SetColor("darkgray");
-            terminal.Write("  [");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("R");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.WriteLine(Loc.Get("menu.action.guilds"));
-        }
-
-        terminal.WriteLine("");
-        if (!IsScreenReader)
-        {
-            terminal.SetColor("bright_cyan");
-            terminal.WriteLine("╚═════════════════════════════════════════════════════════════════════════════╝");
-        }
+        WriteStreetMenuGrid(MainStreetLines(CurrentStreetView(), OnlinePlayerCount()));
         terminal.SetColor("white");
         terminal.WriteLine("");
     }
@@ -1026,371 +666,35 @@ public class MainStreetLocation : BaseLocation
     /// </summary>
     private void ShowScreenReaderMenu()
     {
-        int tier = GetMenuTier();
-        terminal.WriteLine("");
-        terminal.WriteLine(Loc.Get("main_street.menu_title"));
-        terminal.WriteLine("");
-
-        terminal.WriteLine(Loc.Get("main_street.section_locations"));
-        terminal.WriteLine($"  D - {Loc.Get("menu.action.dungeon")}");
-        terminal.WriteLine($"  I - {Loc.Get("menu.action.inn")}");
-        if (tier >= 2)
-        {
-            terminal.WriteLine($"  T - {Loc.Get("menu.action.temple")}");
-            terminal.WriteLine($"  K - {Loc.Get("menu.action.castle")}");
-            terminal.WriteLine($"  H - {Loc.Get("menu.action.home")}");
-        }
-        if (tier >= 3)
-        {
-            terminal.WriteLine($"  O - {Loc.Get("menu.action.church")}");
-            terminal.WriteLine($"  L - {Loc.Get("menu.action.lodging")}");
-        }
-        terminal.WriteLine("");
-
-        terminal.WriteLine(Loc.Get("main_street.section_shops"));
-        terminal.WriteLine($"  W - {Loc.Get("menu.action.weapon_shop")}");
-        terminal.WriteLine($"  A - {Loc.Get("menu.action.armor_shop")}");
-        terminal.WriteLine($"  M - {Loc.Get("menu.action.magic_shop")}");
-        terminal.WriteLine($"  U - {Loc.Get("menu.action.music_shop")}");
-        if (tier >= 3) terminal.WriteLine($"  J - {Loc.Get("menu.action.auction_house")}");
-        if (tier >= 2) terminal.WriteLine($"  B - {Loc.Get("menu.action.bank")}");
-        terminal.WriteLine($"  1 - {Loc.Get("menu.action.healer")}");
-        terminal.WriteLine("");
-
-        terminal.WriteLine(Loc.Get("main_street.section_services"));
-        terminal.WriteLine($"  V - {Loc.Get("menu.action.level_master")}");
-        terminal.WriteLine($"  2 - {Loc.Get("menu.action.quest_hall")}");
-        if (tier >= 3) terminal.WriteLine($"  C - {Loc.Get("menu.action.challenges")}");
-        if (tier >= 3) terminal.WriteLine($"  Z - {Loc.Get("menu.action.team_corner")}");
-        terminal.WriteLine("");
-
-        if (tier >= 2)
-        {
-            terminal.WriteLine(Loc.Get("main_street.section_info"));
-            terminal.WriteLine($"  S - {Loc.Get("menu.action.status")}");
-            terminal.WriteLine($"  N - {Loc.Get("menu.action.news")}");
-            terminal.WriteLine($"  F - {Loc.Get("menu.action.fame")}");
-            terminal.WriteLine($"  $ - {Loc.Get("menu.action.world_events")}"); // v1.1.12
-            if (tier >= 3)
-            {
-                terminal.WriteLine($"  = - {Loc.Get("menu.action.stats_record")}");
-                terminal.WriteLine($"  P - {Loc.Get("menu.action.progress")}");
-            }
-            terminal.WriteLine("");
-        }
-        else
-        {
-            terminal.WriteLine($"  S - {Loc.Get("menu.action.status")}");
-            terminal.WriteLine("");
-        }
-
-        if (tier >= 2)
-        {
-            terminal.WriteLine(Loc.Get("main_street.section_exploration_label"));
-            terminal.WriteLine($"  E - {Loc.Get("menu.action.wilderness")}");
-            if (UsurperRemake.Systems.SettlementSystem.Instance?.State.IsEstablished == true)
-                terminal.WriteLine($"  > - {Loc.Get("menu.action.settlement")}");
-            terminal.WriteLine("");
-        }
-
-        terminal.WriteLine(Loc.Get("main_street.section_other"));
-        if (tier >= 3)
-        {
-            terminal.WriteLine($"  Y - {Loc.Get("menu.action.dark_alley")}");
-            terminal.WriteLine($"  + - {Loc.Get("menu.action.sanctum")}");
-            terminal.WriteLine($"  X - {Loc.Get("menu.action.love_street")}");
-        }
-        terminal.WriteLine($"  Q - {Loc.Get("menu.action.quit")}");
-        terminal.WriteLine($"  ? - {Loc.Get("menu.action.help")}");
-        terminal.WriteLine($"  ! - {Loc.Get("menu.action.report_bug")}");
-        terminal.WriteLine("");
-
-        if (DoorMode.IsOnlineMode && OnlineChatSystem.IsActive)
-        {
-            terminal.WriteLine(Loc.Get("main_street.online_label"));
-            terminal.WriteLine($"  3 - {Loc.Get("main_street.whos_online")}");
-            terminal.WriteLine($"  4 - {Loc.Get("main_street.chat")}");
-            terminal.WriteLine($"  5 - {Loc.Get("main_street.news_feed")}");
-            terminal.WriteLine($"  6 - {Loc.Get("main_street.arena_pvp")}");
-            terminal.WriteLine($"  7 - {Loc.Get("main_street.world_boss")}");
-            terminal.WriteLine($"  R - {Loc.Get("menu.action.guilds")}");
-            terminal.WriteLine($"  /say message - {Loc.Get("main_street.broadcast_chat")}");
-            terminal.WriteLine($"  /tell player message - {Loc.Get("main_street.private_message")}");
-            terminal.WriteLine($"  /who - {Loc.Get("main_street.see_online")}");
-            terminal.WriteLine($"  /news - {Loc.Get("main_street.recent_news")}");
-            terminal.WriteLine("");
-        }
+        WriteStreetMenuPlain(MainStreetLines(CurrentStreetView(), OnlinePlayerCount()));
     }
-    
+
     protected override async Task<bool> ProcessChoice(string choice)
     {
-        // Handle global quick commands first
-        var (handled, shouldExit) = await TryProcessGlobalCommand(choice);
-        if (handled) return shouldExit;
-
         if (string.IsNullOrWhiteSpace(choice))
             return false;
 
         var upperChoice = choice.ToUpper().Trim();
 
-        // Compact mode: map number keys to common locations for touch-friendly input
-        // Only in offline mode — online mode already uses 3-7 for online features
-        if (GameConfig.CompactMode && !DoorMode.IsOnlineMode)
+        // v1.1.13: ? is Main Street's own help (where each place is); /help still lists the quick commands
+        if (upperChoice == "?")
         {
-            upperChoice = upperChoice switch
-            {
-                "3" => "W",  // Weapon Shop
-                "4" => "A",  // Armor Shop
-                "5" => "T",  // Temple
-                "6" => "K",  // Castle
-                "7" => "H",  // Home
-                "8" => "V",  // Level Master
-                "0" => "Q",  // Quit
-                _ => upperChoice
-            };
+            await ShowHelp();
+            return false;
         }
 
-        // Handle Main Street specific commands
+        // Global quick commands: slash commands, * inventory, 0/TALK, ~/PREFS, % status, ! bug report
+        var (handled, shouldExit) = await TryProcessGlobalCommand(choice);
+        if (handled) return shouldExit;
+
+        // v1.1.13: a key works only when this screen draws it (locked places and old keys do nothing)
+        var line = MainStreetLines(CurrentStreetView(), OnlinePlayerCount()).FirstOrDefault(l => l.Key == upperChoice);
+        if (line?.Entry != null) return await VisitPlace(line.Entry.Place);
+        if (line?.District != null) return await EnterDistrict(line.District);
+        if (line?.Key == "Q") return await QuitGame();
+
         switch (upperChoice)
         {
-            case "S":
-                await ShowStatus();
-                return false;
-                
-            case "D":
-                await NavigateToLocation(GameLocation.Dungeons);
-                return true;
-                
-            case "B":
-                await NavigateToLocation(GameLocation.Bank);
-                return true;
-                
-            case "I":
-                await NavigateToLocation(GameLocation.TheInn);
-                return true;
-                
-            case "C":
-                await NavigateToLocation(GameLocation.AnchorRoad); // Challenges
-                return true;
-
-            case "L":
-                await NavigateToLocation(GameLocation.Dormitory); // Lodging
-                return true;
-
-            case "A":
-                await NavigateToLocation(GameLocation.ArmorShop);
-                return true;
-                
-            case "W":
-                await NavigateToLocation(GameLocation.WeaponShop);
-                return true;
-                
-            case "H":
-                await NavigateToLocation(GameLocation.Home);
-                return true;
-                
-            case "F":
-                await ShowFame();
-                return false;
-                
-            case "1":
-                await NavigateToLocation(GameLocation.Healer);
-                return true;
-
-            case "2":
-                await NavigateToLocation(GameLocation.QuestHall);
-                return true;
-
-            case "Q":
-                return await QuitGame();
-                
-            case "G":
-                await ShowGoodDeeds();
-                return false;
-                
-            case "E":
-                await NavigateToLocation(GameLocation.Wilderness);
-                return true;
-                
-            case "V":
-                await NavigateToLocation(GameLocation.Master);
-                return true;
-                
-            case "M":
-                await NavigateToLocation(GameLocation.MagicShop);
-                return true;
-                
-            case "N":
-                var newsLocation = new NewsLocation();
-                await newsLocation.EnterLocation(currentPlayer, terminal);
-                return false; // Stay in main street after returning from news
-
-            case "$":
-                await ShowWorldEvents();
-                return false;
-                
-            case "Z":
-                if (currentPlayer.Level >= GameConfig.MenuTier3Level)
-                    await NavigateToTeamCorner();
-                else
-                    terminal.WriteLine(Loc.Get("main_street.team_corner_level_req"), "yellow");
-                return currentPlayer.Level >= GameConfig.MenuTier3Level;
-
-            // List Citizens removed - merged into Fame (F) which now shows locations
-            // case "L":
-            //     await ListCharacters();
-            //     return false;
-                
-            case "T":
-                terminal.WriteLine(Loc.Get("main_street.nav_temple"), "cyan");
-                await Task.Delay(1500);
-                throw new LocationExitException(GameLocation.Temple);
-                
-            case "X":
-                terminal.WriteLine(Loc.Get("main_street.nav_love_street"), "magenta");
-                await Task.Delay(1500);
-                throw new LocationExitException(GameLocation.LoveCorner);
-                
-            case "J":
-                if (DoorMode.IsOnlineMode)
-                {
-                    await ShowAuctionMenu();
-                    return false;
-                }
-                else
-                {
-                    await NavigateToLocation(GameLocation.AuctionHouse);
-                    return true;
-                }
-                
-
-            case "*":
-                await ShowInventory();
-                return false;
-
-            case "=":
-                await ShowStatistics();
-                return false;
-
-            case "U":
-                await NavigateToLocation(GameLocation.MusicShop);
-                return true;
-
-            // Achievements removed - available via Trophy Room at Home
-            // case "!":
-            //     await ShowAchievements();
-            //     return false;
-
-            case "9":
-                return false;
-            
-            // Quick navigation
-            case "K":
-                await NavigateToLocation(GameLocation.Castle);
-                return true;
-                
-            case "P":
-                await ShowStoryProgress();
-                return false;
-                
-            case "O":
-                await NavigateToLocation(GameLocation.Church);
-                return true;
-
-            // Assault removed - players can challenge NPCs via Talk feature
-            // case "U":
-            //     await AttackSomeone();
-            //     return false;
-
-            case "Y":
-                terminal.WriteLine(Loc.Get("main_street.nav_dark_alley"), "gray");
-                await Task.Delay(1500);
-                throw new LocationExitException(GameLocation.DarkAlley);
-
-            case "+":
-                // v0.62.x Phase 6: The Sanctum -- Light activity hub (yin/yang mirror of Dark Alley).
-                // Evil players are wards-barred at the door inside AlignmentSystem.CanAccessLocation.
-                terminal.WriteLine(Loc.Get("main_street.nav_sanctum"), "bright_yellow");
-                await Task.Delay(1500);
-                throw new LocationExitException(GameLocation.Sanctum);
-
-            case ">":
-                if (UsurperRemake.Systems.SettlementSystem.Instance?.State.IsEstablished == true)
-                {
-                    terminal.WriteLine(Loc.Get("main_street.nav_settlement"), "gray");
-                    await Task.Delay(1500);
-                    throw new LocationExitException(GameLocation.Settlement);
-                }
-                return false;
-
-            case "?":
-                await ShowHelp();
-                return false;
-
-            case "!":
-                await BugReportSystem.ReportBug(terminal, currentPlayer);
-                return false;
-
-            case "R":
-                if (DoorMode.IsOnlineMode && GuildSystem.Instance != null)
-                {
-                    await ShowGuildBoard();
-                }
-                else
-                {
-                    terminal.WriteLine($"  {Loc.Get("guild.online_only")}", "gray");
-                }
-                return false;
-
-            case "3":
-                if (DoorMode.IsOnlineMode && OnlineChatSystem.IsActive)
-                {
-                    await OnlineChatSystem.Instance!.ShowWhosOnline(terminal);
-                }
-                else
-                {
-                    await ListCharacters();
-                }
-                return false;
-
-            case "4":
-                if (DoorMode.IsOnlineMode && OnlineChatSystem.IsActive)
-                {
-                    terminal.SetColor("bright_cyan");
-                    terminal.Write(Loc.Get("main_street.say_prompt"));
-                    terminal.SetColor("white");
-                    var chatMsg = await terminal.GetInput("");
-                    if (!string.IsNullOrWhiteSpace(chatMsg))
-                    {
-                        await OnlineChatSystem.Instance!.Say(chatMsg);
-                        terminal.SetColor("cyan");
-                        terminal.WriteLine(Loc.Get("main_street.say_you", chatMsg));
-                        await Task.Delay(1000);
-                    }
-                }
-                return false;
-
-            case "5":
-                if (DoorMode.IsOnlineMode && OnlineChatSystem.IsActive)
-                {
-                    await OnlineChatSystem.Instance!.ShowNews(terminal);
-                }
-                return false;
-
-            case "6":
-                if (DoorMode.IsOnlineMode)
-                {
-                    throw new LocationExitException(GameLocation.Arena);
-                }
-                return false;
-
-            case "7":
-                if (DoorMode.IsOnlineMode)
-                {
-                    await ShowWorldBossMenu();
-                }
-                return false;
-
             // v0.60.6 security removal: bare-word "SETTINGS" / "CONFIG" aliases
             // removed per security report. Both opened ShowSettingsMenu, which
             // exposes ALL-PLAYERS save management: Load Different Save, Delete
@@ -1414,19 +718,6 @@ public class MainStreetLocation : BaseLocation
             case "CHEATER":
             case "DEVMENU":
                 terminal.WriteLine("  The dev menu has been removed. Use the admin console.", "gray");
-                return false;
-
-            // Talk to NPCs
-            case "0":
-            case "TALK":
-                await TalkToNPC();
-                return false;
-
-            // Quick preferences (accessible from any location)
-            case "~":
-            case "PREFS":
-            case "PREFERENCES":
-                await ShowPreferencesMenu();
                 return false;
 
             default:
@@ -2532,7 +1823,7 @@ public class MainStreetLocation : BaseLocation
     }
 
     /// <summary>
-    /// Show help screen with game commands and tips
+    /// v1.1.13: Main Street's help: every unlocked place under the keys that reach it, then tips.
     /// </summary>
     private async Task ShowHelp()
     {
@@ -2540,38 +1831,12 @@ public class MainStreetLocation : BaseLocation
         WriteBoxHeader(Loc.Get("main_street.help"), "bright_cyan");
         terminal.WriteLine("");
 
-        terminal.SetColor("bright_yellow");
-        terminal.WriteLine(Loc.Get("help.section_locations"));
         terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("help.dungeons"));
-        terminal.WriteLine(Loc.Get("help.inn"));
-        terminal.WriteLine(Loc.Get("help.weapon_shop"));
-        terminal.WriteLine(Loc.Get("help.armor_shop"));
-        terminal.WriteLine(Loc.Get("help.magic_shop"));
-        terminal.WriteLine(Loc.Get("help.healer"));
-        terminal.WriteLine(Loc.Get("help.bank"));
-        terminal.WriteLine(Loc.Get("help.temple"));
-        terminal.WriteLine(Loc.Get("help.castle"));
-        terminal.WriteLine(Loc.Get("help.home"));
-        terminal.WriteLine(Loc.Get("help.level_master"));
-        terminal.WriteLine(Loc.Get("help.auction"));
-        terminal.WriteLine(Loc.Get("help.dark_alley"));
+        terminal.WriteLine(Loc.Get("main_street.help_intro"));
         terminal.WriteLine("");
-
-        terminal.SetColor("bright_yellow");
-        terminal.WriteLine(Loc.Get("help.section_information"));
-        terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("help.status"));
-        terminal.WriteLine(Loc.Get("help.news"));
-        terminal.WriteLine(Loc.Get("help.fame"));
-        terminal.WriteLine(Loc.Get("help.world_events"));
+        foreach (string line in HelpMapLines(CurrentStreetView(), OnlinePlayerCount()))
+            terminal.WriteLine($"  {line}");
         terminal.WriteLine("");
-
-        terminal.SetColor("bright_yellow");
-        terminal.WriteLine(Loc.Get("help.section_actions"));
-        terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("help.good_deeds"));
-        terminal.WriteLine(Loc.Get("help.wilderness"));
         terminal.WriteLine(Loc.Get("help.talk_npcs"));
         terminal.WriteLine("");
 
@@ -2584,8 +1849,10 @@ public class MainStreetLocation : BaseLocation
         terminal.WriteLine(Loc.Get("help.tip_npcs"));
         terminal.WriteLine(Loc.Get("help.tip_alignment"));
         terminal.WriteLine("");
-
         terminal.SetColor("cyan");
+        terminal.WriteLine(Loc.Get("main_street.help_quick_commands"));
+        terminal.WriteLine("");
+
         await terminal.PressAnyKey(Loc.Get("main_street.press_return"));
     }
 

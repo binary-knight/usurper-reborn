@@ -1071,7 +1071,8 @@ namespace UsurperRemake.Systems
                     if (choice.ToUpper() == "G")
                     {
                         long cost = king.TaxRate * 5;
-                        king.Treasury -= cost;
+                        if (!await CastleLocation.CourtChangeAsync(court => { court.Treasury -= cost; return true; }))   // v1.1.13: one guarded court change
+                            { terminal.SetColor("red"); terminal.WriteLine($"\n  {Loc.Get("castle.court_change_failed")}"); break; }
                         terminal.SetColor("bright_green");
                         terminal.WriteLine($"\n  {Loc.Get("petition.royal.tax_grant_result", cost)}");
                         AlignmentSystem.Instance.ChangeAlignment(player, 5, isGood: true, "petition.royal.tax_grant"); // v0.57.12: paired movement
@@ -1085,7 +1086,8 @@ namespace UsurperRemake.Systems
                     else if (choice.ToUpper() == "H")
                     {
                         long cost = king.TaxRate * 2;
-                        king.Treasury -= cost;
+                        if (!await CastleLocation.CourtChangeAsync(court => { court.Treasury -= cost; return true; }))   // v1.1.13: one guarded court change
+                            { terminal.SetColor("red"); terminal.WriteLine($"\n  {Loc.Get("castle.court_change_failed")}"); break; }
                         terminal.SetColor("cyan");
                         terminal.WriteLine($"\n  {Loc.Get("petition.royal.tax_halve_result", cost)}");
                         AlignmentSystem.Instance.ChangeAlignment(player, 2, isGood: true, "petition.royal.tax_halve"); // v0.57.12: paired movement
@@ -1123,7 +1125,8 @@ namespace UsurperRemake.Systems
                     else if (choice.ToUpper() == "C")
                     {
                         long comp = 200 + petitioner.Level * 20;
-                        king.Treasury -= comp;
+                        if (!await CastleLocation.CourtChangeAsync(court => { court.Treasury -= comp; return true; }))   // v1.1.13: one guarded court change
+                            { terminal.SetColor("red"); terminal.WriteLine($"\n  {Loc.Get("castle.court_change_failed")}"); break; }
                         player.Gold -= Math.Min(comp / 2, player.Gold);
                         terminal.SetColor("yellow");
                         terminal.WriteLine($"\n  {Loc.Get("petition.royal.justice_compensate_result", comp)}");
@@ -1148,7 +1151,8 @@ namespace UsurperRemake.Systems
                 case "monster":
                     if (choice.ToUpper() == "S")
                     {
-                        king.Treasury -= 500;
+                        if (!await CastleLocation.CourtChangeAsync(court => { court.Treasury -= 500; return true; }))   // v1.1.13: one guarded court change
+                            { terminal.SetColor("red"); terminal.WriteLine($"\n  {Loc.Get("castle.court_change_failed")}"); break; }
                         terminal.SetColor("bright_green");
                         terminal.WriteLine($"\n  {Loc.Get("petition.royal.monster_send_result")}");
                         AlignmentSystem.Instance.ChangeAlignment(player, 5, isGood: true, "petition.royal.monster_send"); // v0.57.12: paired movement

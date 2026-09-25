@@ -446,6 +446,7 @@ namespace UsurperRemake.Systems
         public ColorThemeType ColorTheme { get; set; } = ColorThemeType.Default;  // Player-selected color theme
         public bool AutoLevelUp { get; set; } = true;  // Auto-level on XP threshold (default on)
         public bool AutoEquipDisabled { get; set; }  // Shop purchases go to inventory
+        public int AutoCombatHealPercent { get; set; } = 50;  // v1.1.13: auto-combat potion threshold, HP %; old saves read 50
         public int DateFormatPreference { get; set; }  // 0=MM/DD, 1=DD/MM, 2=YYYY-MM-DD
         public bool AutoRedistributeXP { get; set; } = true; // Auto-redistribute XP when teammates die
         public int Specialization { get; set; }  // v0.65.4: player class specialization (ClassSpecialization as int; 0 = None)
@@ -918,6 +919,7 @@ namespace UsurperRemake.Systems
         // AI state
         public PersonalityData? PersonalityProfile { get; set; }
         public List<MemoryData> Memories { get; set; } = new();
+        public bool MemoryTimesKept { get; set; }   // v1.1.13: the memory times are the real ones (restore keeps them)
         public List<GoalData> CurrentGoals { get; set; } = new();
         public EmotionalStateData? EmotionalState { get; set; }
 
@@ -1859,8 +1861,9 @@ namespace UsurperRemake.Systems
         public long Treasury { get; set; }
         public long TaxRate { get; set; }
         public long TotalReign { get; set; }
-        public int KingTaxPercent { get; set; } = 5;
-        public int CityTaxPercent { get; set; } = 2;
+        /// <summary>v1.1.13: null only when absent from the stored record (an older save): the loaders then use 5 and 2. A stored 0 is 0.</summary>
+        public int? KingTaxPercent { get; set; }
+        public int? CityTaxPercent { get; set; }
         public string DesignatedHeir { get; set; } = "";
         public int KingAI { get; set; } = 1; // CharacterAI: 0=Human, 1=Computer
         public int KingSex { get; set; } = 0; // CharacterSex

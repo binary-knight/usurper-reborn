@@ -467,6 +467,11 @@ public partial class CombatEngine
     // at the end of this round before it can cost a turn (Codex round 7).
     private readonly HashSet<Character> _pvpTurnTakenThisRound = new();
 
+    /// <summary>v1.1.13: auto-combat drinks a potion at or below the player's HP threshold.</summary>
+    internal static bool ShouldAutoCombatHeal(Character p) =>
+        p.Healing > 0 && p.MaxHP > 0
+        && p.HP * 100 <= p.MaxHP * (long)GameConfig.ClampAutoCombatHealPercent(p.AutoCombatHealPercent);
+
     private static bool IsHeld(Character c) => c.ActiveStatuses.Keys.Any(s => s.PreventsAction() && s != StatusEffect.Charmed);
 
     /// <summary>
@@ -474,6 +479,7 @@ public partial class CombatEngine
     /// one holds, GameConfig.StunImmunityRoundsAfterRecovery rounds of immunity after it ends,
     /// diminishing returns (full, half, quarter, then immune until StunDRWindowRounds pass without
     /// one), and a cap of GameConfig.MaxStunDurationNormal rounds. True when it landed.
+    /// v1.1.13: also a monster's stun or web on the player, per fight.
     /// </summary>
     internal bool TryApplyPvPControl(Character target, StatusEffect status, int requestedDuration)
     {
@@ -848,6 +854,9 @@ public partial class CombatEngine
         // v0.65.6 Death's Door: once-per-combat burst rescue resets at combat start.
         player.DeathsDoorUsedThisCombat = false;
         player.DeathsDoorFiredThisRound = false;
+        // v1.1.13: the player's hold state (the duel control rules) is per fight
+        _pvpControl.Clear();
+        _pvpTurnTakenThisRound.Clear();
 
         // v0.60.3: GMCP Char.Combat.Start with the enemy list so MUD client scripts
         // can flip into combat-mode triggers (status panes, sound effects, hotbar
@@ -1310,6 +1319,7 @@ public partial class CombatEngine
         {
             roundNumber++;
             result.CurrentRound = roundNumber;
+            _pvpTurnTakenThisRound.Clear(); // v1.1.13: the player has not had this round's turn yet
 
             // v0.61.2 Last-Stand cap: snapshot the player's HP at the top of the
             // round so TakeIncomingDamage can decide whether they qualify for
@@ -1457,6 +1467,7 @@ public partial class CombatEngine
 
             // Process status effects for player and display messages (skip if dead from boss mechanics)
             var statusMessages = player.IsAlive ? player.ProcessStatusEffects() : new List<(string message, string color)>();
+            TickPvPControl(player); // v1.1.13: a hold that ended starts the player's immunity
             if (statusMessages.Count > 0)
             {
                 terminal.SetColor(ColorRole.Notice);
@@ -1635,8 +1646,8 @@ public partial class CombatEngine
                         playerAction = action;
                         if (enableAuto) autoCombat = true;
                     }
-                    // Smart auto-combat: use potion if HP below 50% (preemptive to survive burst)
-                    else if (player.HP < player.MaxHP * 0.5 && player.Healing > 0)
+                    // Smart auto-combat: use potion at or below the player's threshold (v1.1.13: a preference, default 50%)
+                    else if (ShouldAutoCombatHeal(player))
                     {
                         terminal.SetColor("bright_green");
                         terminal.WriteLine(Loc.Get("combat.auto_healing_potion"));
@@ -1724,6 +1735,8 @@ public partial class CombatEngine
                 break;
 
             // === ALL MONSTERS' TURNS ===
+            // v1.1.13: a hold put on the player from here must be at least 2 to cost a turn
+            _pvpTurnTakenThisRound.Add(player);
             var livingMonsters = monsters.Where(m => m.IsAlive).ToList();
 
             // Reset per-round hit counters for multi-hit damage reduction
@@ -5843,9 +5856,15 @@ public partial class CombatEngine
             }
             else if (random.Next(100) < abilityResult.StatusChance)
             {
-                player.ApplyStatus(abilityResult.InflictStatus, abilityResult.StatusDuration);
-                terminal.WriteLine(Loc.Get("combat.afflicted_with", abilityResult.InflictStatus), "yellow");
-                result.CombatLog.Add($"Player afflicted with {abilityResult.InflictStatus}");
+                // v1.1.13: a stun or web on the player follows the duel control rules (no re-hold, immunity after)
+                if (!abilityResult.InflictStatus.PreventsAction())
+                    player.ApplyStatus(abilityResult.InflictStatus, abilityResult.StatusDuration);
+                if (!abilityResult.InflictStatus.PreventsAction()
+                    || TryApplyPvPControl(player, abilityResult.InflictStatus, abilityResult.StatusDuration))
+                {
+                    terminal.WriteLine(Loc.Get("combat.afflicted_with", abilityResult.InflictStatus), "yellow");
+                    result.CombatLog.Add($"Player afflicted with {abilityResult.InflictStatus}");
+                }
             }
             else
             {
@@ -6259,9 +6278,10 @@ public partial class CombatEngine
                     }
                     else
                     {
-                        player.ApplyStatus(StatusEffect.Stunned, 2); // +1 for ProcessStatusEffects off-by-one
                         terminal.WriteLine(Loc.Get("combat.monster_uses_ability", monster.Name, abilityName), "bright_yellow");
-                        terminal.WriteLine(Loc.Get("combat.you_are_stunned"), "yellow");
+                        // v1.1.13: the duel control rules (no re-hold, immunity after); +1 for the off-by-one
+                        if (TryApplyPvPControl(player, StatusEffect.Stunned, 2))
+                            terminal.WriteLine(Loc.Get("combat.you_are_stunned"), "yellow");
                     }
                 }
                 else
@@ -6508,9 +6528,10 @@ public partial class CombatEngine
                     }
                     else
                     {
-                        player.ApplyStatus(StatusEffect.Stunned, 2); // +1 for ProcessStatusEffects off-by-one
                         terminal.WriteLine($"  {Loc.Get("combat.manwe_time_freeze")}", "bright_cyan");
-                        terminal.WriteLine($"  {Loc.Get("combat.manwe_time_trapped")}", "yellow");
+                        // v1.1.13: the duel control rules (no re-hold, immunity after); +1 for the off-by-one
+                        if (TryApplyPvPControl(player, StatusEffect.Stunned, 2))
+                            terminal.WriteLine($"  {Loc.Get("combat.manwe_time_trapped")}", "yellow");
                     }
                 }
                 else
@@ -11171,6 +11192,59 @@ public partial class CombatEngine
     }
 
     /// <summary>
+    /// v1.1.13: the XP multipliers that have no line of their own on the victory screen, tallied as they
+    /// are applied, so one line can show their combined effect and where it came from.
+    /// </summary>
+    internal sealed class XPModifierTally
+    {
+        public double Multiplier { get; private set; } = 1.0;
+        /// <summary>The part of Multiplier applied to the player's own share, after the party split.</summary>
+        public double PostShareMultiplier { get; private set; } = 1.0;
+        public List<string> Sources { get; } = new();
+
+        public long Note(long before, long after, string source)
+        {
+            if (before > 0 && after != before)
+            {
+                Multiplier *= (double)after / before;
+                if (!Sources.Contains(source)) Sources.Add(source);
+            }
+            return after;
+        }
+
+        public void NoteTeamHQ(Character player, long before, long after)
+        {
+            if (before <= 0 || after == before) return;
+            double m = (double)after / before;
+            Multiplier *= m;
+            PostShareMultiplier *= m;
+            if (TeamHQBonus.XPMultiplier(player) > 1.0 && !Sources.Contains("team_hq")) Sources.Add("team_hq");
+            if (AwakeningBonus.XPMultiplier(player) != 1.0 && !Sources.Contains("awakening")) Sources.Add("awakening");
+        }
+    }
+
+    /// <summary>
+    /// v1.1.13: one line for the multipliers with no line of their own (only when their combined effect is not
+    /// 1.0), then the player's share. The share line's pot includes what applies after the split, so the
+    /// percentage of it is what the player got.
+    /// </summary>
+    internal static void ShowXPModifiersAndShare(TerminalEmulator terminal, XPModifierTally mods, int sharePercent, long pot, bool showShare)
+    {
+        if (Math.Abs(mods.Multiplier - 1.0) >= 0.005 && mods.Sources.Count > 0)
+        {
+            string names = string.Join(", ", mods.Sources.Select(k => Loc.Get("combat.xp_mod." + k)));
+            terminal.SetColor("gray");
+            terminal.WriteLine($"  {Loc.Get("combat.xp_other_modifiers", mods.Multiplier.ToString("0.##"), names)}");
+        }
+        if (showShare)
+        {
+            long shownPot = (long)Math.Round(pot * mods.PostShareMultiplier);
+            terminal.SetColor("cyan");
+            terminal.WriteLine($"  {Loc.Get("combat.xp_share", sharePercent.ToString(), shownPot.ToString())}");
+        }
+    }
+
+    /// <summary>
     /// v1.1.12: prints the world event's own share of a reward, only when it is positive.
     /// </summary>
     internal static void ShowWorldEventBonus(TerminalEmulator terminal, long worldEventXP, long worldEventGold)
@@ -11817,8 +11891,8 @@ public partial class CombatEngine
         terminal.SetColor("yellow");
         terminal.WriteLine($"{player.CurrentCombatStamina,4}/{player.MaxCombatStamina,-4}");
 
-        // Status effects line for player
-        if (player.ActiveStatuses.Count > 0)
+        // Status effects line for player (v1.1.13: turns, damage per turn, turns lost, and the rescues)
+        if (BuildPlayerStatusEntries(player).Count > 0)
         {
             terminal.SetColor("bright_cyan");
             terminal.Write($"║ ");
@@ -12038,13 +12112,12 @@ public partial class CombatEngine
             terminal.SetColor("bright_magenta");
             terminal.Write($"{player.DamageAbsorptionPool}");
         }
-        // Inline status effects
-        if (player.ActiveStatuses.Count > 0 || player.IsRaging)
+        // Inline status effects (v1.1.13: the detailed entries, as the other HUDs show them)
+        var detailed = BuildPlayerStatusEntries(player);
+        if (detailed.Count > 0 || player.IsRaging)
         {
-            var statuses = new List<string>();
-            foreach (var kv in player.ActiveStatuses)
-                statuses.Add(kv.Value >= 999 ? kv.Key.ToString() : kv.Value > 0 ? $"{kv.Key}({kv.Value})" : kv.Key.ToString());
-            if (player.IsRaging && !statuses.Any(s => s.StartsWith("Raging")))
+            var statuses = detailed.Select(e => e.text).ToList();
+            if (player.IsRaging && !player.HasStatus(StatusEffect.Raging))
                 statuses.Add("Raging");
             terminal.SetColor("gray");
             terminal.Write("  ");
@@ -12189,7 +12262,7 @@ public partial class CombatEngine
         }
 
         // Status effects
-        if (player.ActiveStatuses.Count > 0)
+        if (BuildPlayerStatusEntries(player).Count > 0) // v1.1.13: the detailed status line
         {
             terminal.SetColor("gray");
             terminal.Write($"  {Loc.Get("combat.sr_status_effects")}");
@@ -12320,17 +12393,55 @@ public partial class CombatEngine
     private void DisplayPlayerStatusEffects(Character player)
     {
         bool first = true;
-        foreach (var kvp in player.ActiveStatuses)
+        foreach (var (text, color) in BuildPlayerStatusEntries(player))
         {
-            if (!first) terminal.Write(" ");
+            if (!first) terminal.Write("  ");
             first = false;
-
-            string color = kvp.Key.GetDisplayColor();
-            string shortName = kvp.Key.GetShortName();
-
             terminal.SetColor(color);
-            terminal.Write($"{shortName}({kvp.Value})");
+            terminal.Write(text);
         }
+    }
+
+    /// <summary>
+    /// v1.1.13: the player's status line. Each effect with its turns left; a damage-over-time effect with
+    /// its damage per turn (Character.StatusDamagePerTurn); a hold with the turns it will actually cost
+    /// (the round-start tick runs before the turn, so a hold of N shown here costs N-1); then whether
+    /// Last Stand and Death's Door can still save the player this fight. Read at the top of the round.
+    /// </summary>
+    internal static List<(string text, string color)> BuildPlayerStatusEntries(Character p)
+    {
+        var entries = new List<(string text, string color)>();
+        foreach (var kvp in p.ActiveStatuses)
+        {
+            string name = kvp.Key.GetShortName();
+            string color = kvp.Key.GetDisplayColor();
+            int turns = kvp.Value;
+            if (kvp.Key.PreventsAction())
+                entries.Add((Loc.Get("combat.status_hold", name, Math.Max(0, turns - 1)), color));
+            else if (Character.StatusDamagePerTurn(kvp.Key, p.Level) is (int min, int max))
+                entries.Add((Loc.Get("combat.status_dot", name, turns, min == max ? min.ToString() : $"{min}-{max}"), color));
+            else if (turns >= 999)
+                entries.Add((name, color));
+            else
+                entries.Add((Loc.Get("combat.status_turns", name, turns), color));
+        }
+        // the rescues belong to the fight's owner in PvE; a grouped follower's screen leaves them out
+        if (!p.IsGroupedPlayer && !DifficultySystem.IsPermadeath())
+        {
+            entries.Add(p.RoundStartHP > p.MaxHP / 2
+                ? (Loc.Get("combat.rescue_last_stand_ready"), "bright_green")
+                : (Loc.Get("combat.rescue_last_stand_low"), "gray"));
+            if (!p.IsExhibitionCombat && !p.IsArrestCombat)
+            {
+                if (p.DeathsDoorUsedThisCombat)
+                    entries.Add((Loc.Get("combat.rescue_deaths_door_spent"), "gray"));
+                else if (p.RoundStartHP > p.MaxHP / 4)
+                    entries.Add((Loc.Get("combat.rescue_deaths_door_ready"), "bright_green"));
+                else
+                    entries.Add((Loc.Get("combat.rescue_deaths_door_low"), "gray"));
+            }
+        }
+        return entries;
     }
 
     /// <summary>
@@ -20568,18 +20679,19 @@ public partial class CombatEngine
         // v1.1.12: the event's share alone; later multipliers are not the event's.
         long worldEventXP = WorldEventSystem.Instance.GetWorldEventXPBonus(totalExp);
         long worldEventGold = WorldEventSystem.Instance.GetWorldEventGoldBonus(totalGold);
+        var xpMods = new XPModifierTally(); // v1.1.13: the XP multipliers with no line of their own
 
         // Blood Moon multipliers (v0.52.0)
         if (result.Player.IsBloodMoon)
         {
-            adjustedExp = (long)(adjustedExp * GameConfig.BloodMoonXPMultiplier);
+            adjustedExp = xpMods.Note(adjustedExp, (long)(adjustedExp * GameConfig.BloodMoonXPMultiplier), "blood_moon");
             adjustedGold = (long)(adjustedGold * GameConfig.BloodMoonGoldMultiplier);
         }
 
         // Apply difficulty modifiers (per-character difficulty + server-wide SysOp multiplier)
         float xpMult = DifficultySystem.GetExperienceMultiplier(DifficultySystem.CurrentDifficulty) * GameConfig.XPMultiplier;
         float goldMult = DifficultySystem.GetGoldMultiplier(DifficultySystem.CurrentDifficulty) * GameConfig.GoldMultiplier;
-        adjustedExp = (long)(adjustedExp * xpMult);
+        adjustedExp = xpMods.Note(adjustedExp, (long)(adjustedExp * xpMult), "difficulty");
         adjustedGold = (long)(adjustedGold * goldMult);
 
         // NG+ cycle gold modifier (v0.52.0)
@@ -20618,7 +20730,7 @@ public partial class CombatEngine
         float childXPMult = FamilySystem.Instance?.GetChildXPMultiplier(result.Player) ?? 1.0f;
         if (childXPMult > 1.0f)
         {
-            adjustedExp = (long)(adjustedExp * childXPMult);
+            adjustedExp = xpMods.Note(adjustedExp, (long)(adjustedExp * childXPMult), "family");
         }
 
         // Team bonus - 15% extra XP and gold for cooperative play.
@@ -20653,30 +20765,31 @@ public partial class CombatEngine
         {
             adjustedExp = (long)(adjustedExp * teamXPMult);
         }
+        long postTeamBalanceExp = adjustedExp; // v1.1.13: the loss is this step's alone, not the later multipliers'
 
         // Study/Library XP bonus (Home upgrade)
         if (result.Player.HasStudy)
         {
-            adjustedExp += (long)(adjustedExp * GameConfig.StudyXPBonus);
+            adjustedExp = xpMods.Note(adjustedExp, adjustedExp + (long)(adjustedExp * GameConfig.StudyXPBonus), "home");
         }
 
         // Divine boon XP/gold bonus (multi-monster path)
         var mmVictoryBoons = result.Player.CachedBoonEffects;
         if (mmVictoryBoons != null)
         {
-            if (mmVictoryBoons.XPPercent > 0) adjustedExp += (long)(adjustedExp * mmVictoryBoons.XPPercent);
+            if (mmVictoryBoons.XPPercent > 0) adjustedExp = xpMods.Note(adjustedExp, adjustedExp + (long)(adjustedExp * mmVictoryBoons.XPPercent), "boon");
             if (mmVictoryBoons.GoldPercent > 0) adjustedGold += (long)(adjustedGold * mmVictoryBoons.GoldPercent);
         }
 
         // Settlement Tavern XP bonus (multi-monster path)
         if (result.Player.HasSettlementBuff && result.Player.SettlementBuffType == (int)UsurperRemake.Systems.SettlementBuffType.XPBonus)
         {
-            adjustedExp += (long)(adjustedExp * result.Player.SettlementBuffValue);
+            adjustedExp = xpMods.Note(adjustedExp, adjustedExp + (long)(adjustedExp * result.Player.SettlementBuffValue), "settlement");
         }
         // Settlement Library XP bonus (multi-monster path)
         if (result.Player.HasSettlementBuff && result.Player.SettlementBuffType == (int)UsurperRemake.Systems.SettlementBuffType.LibraryXP)
         {
-            adjustedExp += (long)(adjustedExp * result.Player.SettlementBuffValue);
+            adjustedExp = xpMods.Note(adjustedExp, adjustedExp + (long)(adjustedExp * result.Player.SettlementBuffValue), "settlement");
         }
         // Settlement Thieves' Den gold bonus (multi-monster path)
         if (result.Player.HasSettlementBuff && result.Player.SettlementBuffType == (int)UsurperRemake.Systems.SettlementBuffType.GoldBonus)
@@ -20687,7 +20800,7 @@ public partial class CombatEngine
         // NG+ cycle XP multiplier
         if (result.Player.CycleExpMultiplier > 1.0f)
         {
-            adjustedExp = (long)(adjustedExp * result.Player.CycleExpMultiplier);
+            adjustedExp = xpMods.Note(adjustedExp, (long)(adjustedExp * result.Player.CycleExpMultiplier), "ng_plus");
         }
 
         // Cyclebreaker Cycle Memory: +5% XP per NG+ cycle (max +25%) — multi-monster path
@@ -20696,7 +20809,7 @@ public partial class CombatEngine
             int cycleMM = StoryProgressionSystem.Instance?.CurrentCycle ?? 1;
             float cycleXPBonusMM = Math.Min(GameConfig.CyclebreakerCycleXPBonusCap, (cycleMM - 1) * GameConfig.CyclebreakerCycleXPBonus);
             if (cycleXPBonusMM > 0)
-                adjustedExp += (long)(adjustedExp * cycleXPBonusMM);
+                adjustedExp = xpMods.Note(adjustedExp, adjustedExp + (long)(adjustedExp * cycleXPBonusMM), "ng_plus");
         }
 
         // Guild XP bonus (v0.52.0) — multi-monster path
@@ -20704,13 +20817,13 @@ public partial class CombatEngine
         {
             double guildMultMM = GuildSystem.Instance.GetGuildXPMultiplier(result.Player.Name1 ?? "");
             if (guildMultMM > 1.0)
-                adjustedExp = (long)(adjustedExp * guildMultMM);
+                adjustedExp = xpMods.Note(adjustedExp, (long)(adjustedExp * guildMultMM), "guild");
         }
 
         // Fatigue XP penalty — Exhausted tier only (single-player only)
         if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && result.Player.Fatigue >= GameConfig.FatigueExhaustedThreshold)
         {
-            adjustedExp -= (long)(adjustedExp * GameConfig.FatigueExhaustedXPPenalty);
+            adjustedExp = xpMods.Note(adjustedExp, adjustedExp - (long)(adjustedExp * GameConfig.FatigueExhaustedXPPenalty), "fatigue");
         }
 
         // v0.64.1 early-game XP multiplier (multi-monster path). See
@@ -20718,7 +20831,7 @@ public partial class CombatEngine
         double earlyGameMultMM = GameConfig.GetEarlyGameXPMultiplier((int)result.Player.Level);
         if (earlyGameMultMM > 1.0)
         {
-            adjustedExp = (long)(adjustedExp * earlyGameMultMM);
+            adjustedExp = xpMods.Note(adjustedExp, (long)(adjustedExp * earlyGameMultMM), "early_game");
         }
 
         // Session XP diminishing returns removed in v0.54.7.
@@ -20731,7 +20844,9 @@ public partial class CombatEngine
         long totalXPPotMM = adjustedExp;
         long playerXPmm = (long)(totalXPPotMM * xpSharesMM[0] / 100.0);
         // v1.1.11: Team HQ Training on the player's own share, after the split, so it stays out of the teammates' pot.
+        long preplayerXPmm = playerXPmm; // v1.1.13: for the XP line
         playerXPmm = TeamHQBonus.ApplyXP(result.Player, playerXPmm);
+        xpMods.NoteTeamHQ(result.Player, preplayerXPmm, playerXPmm);
 
         // Apply rewards (player's percentage share)
         result.Player.Experience += playerXPmm;
@@ -20786,7 +20901,7 @@ public partial class CombatEngine
         // Show team balance XP penalty if applicable
         if (teamXPMult < 1.0f)
         {
-            long xpLost = preTeamBalanceExp - totalXPPotMM;
+            long xpLost = preTeamBalanceExp - postTeamBalanceExp;
             terminal.SetColor("yellow");
             terminal.WriteLine($"  {Loc.Get("combat.team_penalty", xpLost.ToString(), ((int)(teamXPMult * 100)).ToString())}");
         }
@@ -20798,12 +20913,9 @@ public partial class CombatEngine
             terminal.WriteLine($"  {Loc.Get("combat.team_bonus", teamXPBonus.ToString(), teamGoldBonus.ToString())}");
         }
 
-        // Show XP distribution percentage if teammates present
-        if (result.Teammates != null && result.Teammates.Count > 0 && xpSharesMM[0] < 100)
-        {
-            terminal.SetColor("cyan");
-            terminal.WriteLine($"  {Loc.Get("combat.xp_share", xpSharesMM[0].ToString(), totalXPPotMM.ToString())}");
-        }
+        // v1.1.13: the other multipliers in one line, then the share of the pot as it counts for the player
+        ShowXPModifiersAndShare(terminal, xpMods, xpSharesMM[0], totalXPPotMM,
+            result.Teammates != null && result.Teammates.Count > 0 && xpSharesMM[0] < 100);
 
         terminal.WriteLine(Loc.Get("combat.gold_label", $"{adjustedGold:N0}"));
         PrintPartyFightSummary(result); // v1.1.3 (council ruling 5)
@@ -21198,18 +21310,19 @@ public partial class CombatEngine
         // v1.1.12: the event's share alone; later multipliers are not the event's.
         long worldEventXP = WorldEventSystem.Instance.GetWorldEventXPBonus(totalExp);
         long worldEventGold = WorldEventSystem.Instance.GetWorldEventGoldBonus(totalGold);
+        var xpMods = new XPModifierTally(); // v1.1.13: the XP multipliers with no line of their own
 
         // Blood Moon multipliers (v0.52.0)
         if (result.Player.IsBloodMoon)
         {
-            adjustedExp = (long)(adjustedExp * GameConfig.BloodMoonXPMultiplier);
+            adjustedExp = xpMods.Note(adjustedExp, (long)(adjustedExp * GameConfig.BloodMoonXPMultiplier), "blood_moon");
             adjustedGold = (long)(adjustedGold * GameConfig.BloodMoonGoldMultiplier);
         }
 
         // Apply difficulty modifiers (per-character difficulty + server-wide SysOp multiplier)
         float xpMult = DifficultySystem.GetExperienceMultiplier(DifficultySystem.CurrentDifficulty) * GameConfig.XPMultiplier;
         float goldMult = DifficultySystem.GetGoldMultiplier(DifficultySystem.CurrentDifficulty) * GameConfig.GoldMultiplier;
-        adjustedExp = (long)(adjustedExp * xpMult);
+        adjustedExp = xpMods.Note(adjustedExp, (long)(adjustedExp * xpMult), "difficulty");
         adjustedGold = (long)(adjustedGold * goldMult);
 
         // NG+ cycle gold modifier (v0.52.0)
@@ -21226,17 +21339,17 @@ public partial class CombatEngine
         {
             var spouseNpcFled = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == RomanceTracker.Instance.PrimarySpouse.NPCId);
             if (spouseNpcFled != null && spouseNpcFled.IsAlive)
-                adjustedExp += adjustedExp / 10; // 10% bonus
+                adjustedExp = xpMods.Note(adjustedExp, adjustedExp + adjustedExp / 10, "spouse"); // 10% bonus
         }
         int divineXPBonusFled = DivineBlessingSystem.Instance.GetXPBonus(result.Player);
         if (divineXPBonusFled > 0)
-            adjustedExp += (long)(adjustedExp * divineXPBonusFled / 100f);
+            adjustedExp = xpMods.Note(adjustedExp, adjustedExp + (long)(adjustedExp * divineXPBonusFled / 100f), "divine");
 
         // Apply child XP bonus
         float childXPMult = FamilySystem.Instance?.GetChildXPMultiplier(result.Player) ?? 1.0f;
         if (childXPMult > 1.0f)
         {
-            adjustedExp = (long)(adjustedExp * childXPMult);
+            adjustedExp = xpMods.Note(adjustedExp, (long)(adjustedExp * childXPMult), "family");
         }
 
         // Team balance XP penalty - reduced XP when carried by high-level teammates
@@ -21246,30 +21359,31 @@ public partial class CombatEngine
         {
             adjustedExp = (long)(adjustedExp * teamXPMult);
         }
+        long postTeamBalanceExp = adjustedExp; // v1.1.13: the loss is this step's alone, not the later multipliers'
 
         // Study/Library XP bonus (Home upgrade)
         if (result.Player.HasStudy)
         {
-            adjustedExp += (long)(adjustedExp * GameConfig.StudyXPBonus);
+            adjustedExp = xpMods.Note(adjustedExp, adjustedExp + (long)(adjustedExp * GameConfig.StudyXPBonus), "home");
         }
 
         // Divine boon XP/gold bonus (berserker/special multi-monster path)
         var berserkBoons = result.Player.CachedBoonEffects;
         if (berserkBoons != null)
         {
-            if (berserkBoons.XPPercent > 0) adjustedExp += (long)(adjustedExp * berserkBoons.XPPercent);
+            if (berserkBoons.XPPercent > 0) adjustedExp = xpMods.Note(adjustedExp, adjustedExp + (long)(adjustedExp * berserkBoons.XPPercent), "boon");
             if (berserkBoons.GoldPercent > 0) adjustedGold += (long)(adjustedGold * berserkBoons.GoldPercent);
         }
 
         // Settlement Tavern XP bonus (berserker/special multi-monster path)
         if (result.Player.HasSettlementBuff && result.Player.SettlementBuffType == (int)UsurperRemake.Systems.SettlementBuffType.XPBonus)
         {
-            adjustedExp += (long)(adjustedExp * result.Player.SettlementBuffValue);
+            adjustedExp = xpMods.Note(adjustedExp, adjustedExp + (long)(adjustedExp * result.Player.SettlementBuffValue), "settlement");
         }
         // Settlement Library XP bonus (berserker/special multi-monster path)
         if (result.Player.HasSettlementBuff && result.Player.SettlementBuffType == (int)UsurperRemake.Systems.SettlementBuffType.LibraryXP)
         {
-            adjustedExp += (long)(adjustedExp * result.Player.SettlementBuffValue);
+            adjustedExp = xpMods.Note(adjustedExp, adjustedExp + (long)(adjustedExp * result.Player.SettlementBuffValue), "settlement");
         }
         // Settlement Thieves' Den gold bonus (berserker/special multi-monster path)
         if (result.Player.HasSettlementBuff && result.Player.SettlementBuffType == (int)UsurperRemake.Systems.SettlementBuffType.GoldBonus)
@@ -21280,7 +21394,7 @@ public partial class CombatEngine
         // NG+ cycle XP multiplier
         if (result.Player.CycleExpMultiplier > 1.0f)
         {
-            adjustedExp = (long)(adjustedExp * result.Player.CycleExpMultiplier);
+            adjustedExp = xpMods.Note(adjustedExp, (long)(adjustedExp * result.Player.CycleExpMultiplier), "ng_plus");
         }
 
         // Guild XP bonus (v0.52.0) — berserker/special multi-monster path
@@ -21288,14 +21402,14 @@ public partial class CombatEngine
         {
             double guildMultPV = GuildSystem.Instance.GetGuildXPMultiplier(result.Player.Name1 ?? "");
             if (guildMultPV > 1.0)
-                adjustedExp = (long)(adjustedExp * guildMultPV);
+                adjustedExp = xpMods.Note(adjustedExp, (long)(adjustedExp * guildMultPV), "guild");
         }
 
         // v0.64.1 early-game XP multiplier (berserker / special path).
         double earlyGameMultPV = GameConfig.GetEarlyGameXPMultiplier((int)result.Player.Level);
         if (earlyGameMultPV > 1.0)
         {
-            adjustedExp = (long)(adjustedExp * earlyGameMultPV);
+            adjustedExp = xpMods.Note(adjustedExp, (long)(adjustedExp * earlyGameMultPV), "early_game");
         }
 
         // v1.0.4: resolve this combat's split from the stored preference and the party present.
@@ -21306,7 +21420,9 @@ public partial class CombatEngine
         long totalXPPotPV = adjustedExp;
         long playerXPpv = (long)(totalXPPotPV * xpSharesPV[0] / 100.0);
         // v1.1.11: Team HQ Training on the player's own share, after the split, so it stays out of the teammates' pot.
+        long preplayerXPpv = playerXPpv; // v1.1.13: for the XP line
         playerXPpv = TeamHQBonus.ApplyXP(result.Player, playerXPpv);
+        xpMods.NoteTeamHQ(result.Player, preplayerXPpv, playerXPpv);
 
         result.Player.Experience += playerXPpv;
         result.Player.Gold += adjustedGold;
@@ -21329,10 +21445,13 @@ public partial class CombatEngine
         // Show team balance XP penalty if applicable
         if (teamXPMult < 1.0f)
         {
-            long xpLost = preTeamBalanceExp - adjustedExp;
+            long xpLost = preTeamBalanceExp - postTeamBalanceExp;
             terminal.SetColor("yellow");
             terminal.WriteLine($"  {Loc.Get("combat.team_penalty", xpLost.ToString(), ((int)(teamXPMult * 100)).ToString())}");
         }
+        // v1.1.13: the other multipliers in one line, then the share of the pot as it counts for the player
+        ShowXPModifiersAndShare(terminal, xpMods, xpSharesPV[0], totalXPPotPV,
+            result.Teammates != null && result.Teammates.Count > 0 && xpSharesPV[0] < 100);
         terminal.WriteLine(Loc.Get("combat.gold_gained", $"{adjustedGold:N0}"));
 
         // Show bonus from world events if any

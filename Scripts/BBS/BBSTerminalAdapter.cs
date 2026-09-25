@@ -298,8 +298,20 @@ namespace UsurperRemake.BBS
 
         #region Input Methods
 
+        // v1.1.13: a line typed at a pause, handed to the next prompt (as TerminalEmulator.PressAnyKey does)
+        private string? _pendingLine;
+
         public async Task<string> GetInput(string prompt = "> ")
         {
+            if (_pendingLine != null)
+            {
+                string typed = _pendingLine;
+                _pendingLine = null;
+                if (!string.IsNullOrEmpty(prompt)) Write(prompt, "bright_white");
+                WriteLine(typed);
+                return typed;
+            }
+
             if (!string.IsNullOrEmpty(prompt))
             {
                 Write(prompt, "bright_white");
@@ -427,7 +439,10 @@ namespace UsurperRemake.BBS
         {
             SetColor("gray");
             WriteLine(message);
-            await GetInput("");
+            string? kept = _pendingLine;
+            _pendingLine = null;
+            string line = await GetInput("");
+            _pendingLine = !string.IsNullOrWhiteSpace(line) ? line.Trim() : kept; // v1.1.13: keep a typed command
         }
 
         public async Task WaitForKey(string message = "Press Enter to continue...")

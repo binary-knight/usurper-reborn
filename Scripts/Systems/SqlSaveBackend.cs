@@ -754,6 +754,23 @@ namespace UsurperRemake.Systems
                     CREATE INDEX IF NOT EXISTS idx_snoop_target ON snoop_buffer(target_username, id);
                     CREATE INDEX IF NOT EXISTS idx_admin_cmd_status ON admin_commands(status, id);
 
+                    -- v1.1.13: a web delete made while the MUD was down queues its world purge here;
+                    -- the MUD runs it once its world is loaded. mud_heartbeat is the admin poller's beat.
+                    CREATE TABLE IF NOT EXISTS pending_purges (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        username TEXT NOT NULL,
+                        name2 TEXT,
+                        display_name TEXT,
+                        deleted_at TEXT DEFAULT (datetime('now')),
+                        created_by TEXT DEFAULT 'admin-web',
+                        player_id TEXT,
+                        untimed INTEGER
+                    );
+                    CREATE TABLE IF NOT EXISTS mud_heartbeat (
+                        id INTEGER PRIMARY KEY CHECK (id = 1),
+                        beat_at TEXT NOT NULL
+                    );
+
                     -- v0.60.4: bot detection snapshot. Single-row table (id=1) holding
                     -- the latest BotDetectionSystem.Snapshot() output as JSON. Updated
                     -- periodically by the game process; read by the admin dashboard.
@@ -852,6 +869,11 @@ namespace UsurperRemake.Systems
                         claimed_by TEXT,
                         claimed_at TEXT DEFAULT (datetime('now'))
                     );
+
+                    -- v1.1.13: idempotent edits of the shared world records (a deleted character's grudges,
+                    -- marriages, throne) that the owner process re-applies after stale writes. See WorldEditLog.
+                    CREATE TABLE IF NOT EXISTS world_edits (id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL, payload TEXT NOT NULL, created_at TEXT DEFAULT (datetime('now')), created_by TEXT, applied_at TEXT, applied_by TEXT);
+                    CREATE INDEX IF NOT EXISTS idx_world_edits_created ON world_edits(created_at);
                 ";
                 cmd.ExecuteNonQuery();
             }
@@ -903,6 +925,18 @@ namespace UsurperRemake.Systems
                 migCmd.ExecuteNonQuery();
             }
             catch { /* Column already exists - expected */ }
+
+            // v1.1.13: a queued purge's character ID, and whether another player used the name at the delete
+            foreach (var column in new[] { "player_id TEXT", "untimed INTEGER" })
+            {
+                try
+                {
+                    using var migCmd = connection.CreateCommand();
+                    migCmd.CommandText = $"ALTER TABLE pending_purges ADD COLUMN {column};";
+                    migCmd.ExecuteNonQuery();
+                }
+                catch { /* Column already exists - expected */ }
+            }
 
             // v1.1.12: who paid a team war's wager, so a war left active by a lost session can be refunded
             try
@@ -968,6 +1002,15 @@ namespace UsurperRemake.Systems
                 migCmd.ExecuteNonQuery();
             }
             catch (Exception ex) { DebugLogger.Instance.LogWarning("SQL", $"bounty_claims not ensured: {ex.Message}"); }
+
+            // v1.1.13: the world edits log, also on a database made by an older release
+            try
+            {
+                using var migCmd = connection.CreateCommand();
+                migCmd.CommandText = "CREATE TABLE IF NOT EXISTS world_edits (id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL, payload TEXT NOT NULL, created_at TEXT DEFAULT (datetime('now')), created_by TEXT, applied_at TEXT, applied_by TEXT); CREATE INDEX IF NOT EXISTS idx_world_edits_created ON world_edits(created_at);";
+                migCmd.ExecuteNonQuery();
+            }
+            catch (Exception ex) { DebugLogger.Instance.LogWarning("SQL", $"world_edits not ensured: {ex.Message}"); }
 
             MigrateWorldBossTables(connection); // v1.1.4
 
@@ -1075,6 +1118,25 @@ namespace UsurperRemake.Systems
         /// v1.1.12: the save's Name2 for one key, banned accounts included (ReadGameData skips them), for the
         /// admin deletes: a married display name is not the name children and quests record. Null if none.
         /// </summary>
+        /// <summary>v1.1.13: the character ID in the account's save (null when none), read before the row is emptied.</summary>
+        public string? GetStoredCharacterId(string username)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT CASE WHEN json_valid(player_data) THEN json_extract(player_data, '$.player.id') END FROM players " +
+                                  "WHERE LOWER(username) = LOWER(@u) ORDER BY LENGTH(player_data) DESC LIMIT 1;";
+                cmd.Parameters.AddWithValue("@u", username);
+                return cmd.ExecuteScalar() is string s && !string.IsNullOrWhiteSpace(s) ? s : null;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogWarning("SQL", $"GetStoredCharacterId('{username}') failed: {ex.Message}");
+                return null;
+            }
+        }
+
         public string? GetStoredName2(string username)
         {
             try
@@ -1235,7 +1297,11 @@ namespace UsurperRemake.Systems
                 // attacker/defender, etc. Clear all of them.
                 // v1.1.12: mail to the key is kept when another character goes by that name (account "bob" playing
                 // "Alice" beside a character "Bob"), as the alias clause below does
-                ExecPurge(connection, tx, "messages",          "LOWER(from_player) = LOWER(@u) OR (LOWER(to_player) = LOWER(@u) " +
+                // v1.1.13: the same for mail from the key, which may be another character's sent mail
+                ExecPurge(connection, tx, "messages",          "(LOWER(from_player) = LOWER(@u) " +
+                    "AND NOT EXISTS (SELECT 1 FROM players p WHERE LOWER(p.username) != LOWER(@u) AND (LOWER(p.display_name) = LOWER(messages.from_player) " +
+                    "OR LOWER(CASE WHEN json_valid(p.player_data) THEN json_extract(p.player_data, '$.player.name2') END) = LOWER(messages.from_player)))) " +
+                    "OR (LOWER(to_player) = LOWER(@u) " +
                     "AND NOT EXISTS (SELECT 1 FROM players p WHERE LOWER(p.username) != LOWER(@u) AND (LOWER(p.display_name) = LOWER(messages.to_player) " +
                     "OR LOWER(CASE WHEN json_valid(p.player_data) THEN json_extract(p.player_data, '$.player.name2') END) = LOWER(messages.to_player))))", username);
                 ExecPurge(connection, tx, "trade_offers",      "LOWER(from_player) = LOWER(@u) OR LOWER(to_player) = LOWER(@u)", username);
@@ -2072,6 +2138,25 @@ namespace UsurperRemake.Systems
         /// Used to detect when another process (game server) has modified the data.
         /// Returns 0 if the key doesn't exist.
         /// </summary>
+        /// <summary>v1.1.13: the number of entries in a world_state JSON array (0 when absent or not an array).</summary>
+        public int GetWorldStateArrayLength(string key)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT CASE WHEN json_valid(value) AND json_type(value) = 'array' THEN json_array_length(value) ELSE 0 END FROM world_state WHERE key = @key;";
+                cmd.Parameters.AddWithValue("@key", key);
+                var result = cmd.ExecuteScalar();
+                return result != null && result != DBNull.Value ? Convert.ToInt32(result) : 0;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogWarning("SQL", $"GetWorldStateArrayLength('{key}') failed: {ex.Message}");
+                return 0;
+            }
+        }
+
         public long GetWorldStateVersion(string key)
         {
             try
@@ -2164,6 +2249,150 @@ namespace UsurperRemake.Systems
                 DebugLogger.Instance.LogError("SQL", $"Atomic update failed for '{key}': {ex.Message}");
                 return false;
             }
+        }
+
+        // --- v1.1.13: World edits ---
+        // Idempotent edits of the shared world records, appended by the process that makes them and
+        // re-applied by the owner process (WorldEditLog). Times are SQLite datetime('now'), UTC.
+
+        /// <summary>v1.1.13: append an edit; returns its id, or 0 when the write failed.</summary>
+        public long AppendWorldEdit(string kind, string payloadJson, string createdBy)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "INSERT INTO world_edits (kind, payload, created_by) VALUES (@k, @p, @b); SELECT last_insert_rowid();";
+                cmd.Parameters.AddWithValue("@k", kind);
+                cmd.Parameters.AddWithValue("@p", payloadJson);
+                cmd.Parameters.AddWithValue("@b", createdBy ?? "");
+                return Convert.ToInt64(cmd.ExecuteScalar());
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"AppendWorldEdit('{kind}') failed: {ex.Message}");
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// v1.1.13: the edits the owner applies: every edit not yet applied, whatever its age, and every
+        /// edit made in the last reapplyHours (applied or not), oldest first.
+        /// </summary>
+        public List<WorldEdit> GetWorldEditsToApply(int reapplyHours = 24) =>
+            QueryWorldEdits("applied_at IS NULL OR created_at >= datetime('now', @h)", $"-{reapplyHours} hours");
+
+        /// <summary>v1.1.13: edits never applied that are older than hours (for the warning line).</summary>
+        public List<WorldEdit> GetUnappliedWorldEditsOlderThan(int hours) =>
+            QueryWorldEdits("applied_at IS NULL AND created_at < datetime('now', @h)", $"-{hours} hours");
+
+        private List<WorldEdit> QueryWorldEdits(string where, string span)
+        {
+            var list = new List<WorldEdit>();
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = $"SELECT id, kind, payload, created_at, created_by, applied_at, applied_by FROM world_edits WHERE {where} ORDER BY id;";
+                cmd.Parameters.AddWithValue("@h", span);
+                using var r = cmd.ExecuteReader();
+                while (r.Read())
+                    list.Add(new WorldEdit
+                    {
+                        Id = r.GetInt64(0), Kind = r.GetString(1), Payload = r.GetString(2),
+                        CreatedAt = r.IsDBNull(3) ? "" : r.GetString(3), CreatedBy = r.IsDBNull(4) ? "" : r.GetString(4),
+                        AppliedAt = r.IsDBNull(5) ? null : r.GetString(5), AppliedBy = r.IsDBNull(6) ? null : r.GetString(6)
+                    });
+            }
+            catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"World edits read failed: {ex.Message}"); }
+            return list;
+        }
+
+        /// <summary>v1.1.13: mark edits applied; an edit already marked keeps its first mark. Returns the rows marked.</summary>
+        public int MarkWorldEditsApplied(IEnumerable<long> ids, string appliedBy)
+        {
+            int marked = 0;
+            try
+            {
+                using var connection = OpenConnection();
+                foreach (var id in ids)
+                {
+                    using var cmd = connection.CreateCommand();
+                    cmd.CommandText = "UPDATE world_edits SET applied_at = datetime('now'), applied_by = @b WHERE id = @id AND applied_at IS NULL;";
+                    cmd.Parameters.AddWithValue("@id", id);
+                    cmd.Parameters.AddWithValue("@b", appliedBy ?? "");
+                    marked += cmd.ExecuteNonQuery();
+                }
+            }
+            catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"MarkWorldEditsApplied failed: {ex.Message}"); }
+            return marked;
+        }
+
+        /// <summary>v1.1.13: delete edits applied more than days ago. An edit never applied is never deleted here.</summary>
+        public int PruneAppliedWorldEdits(int days = 7)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "DELETE FROM world_edits WHERE applied_at IS NOT NULL AND applied_at < datetime('now', @d);";
+                cmd.Parameters.AddWithValue("@d", $"-{days} days");
+                return cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"PruneAppliedWorldEdits failed: {ex.Message}");
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// v1.1.13: a character that came after the edit uses one of the names: a player row with a save
+        /// under the name (display name or Name2) created after the edit, saved after it, or on the deleted
+        /// character's own account (a same-account recreation keeps the account's created_at).
+        /// A failed read counts as a later character, so nothing untimed is re-applied on a doubt.
+        /// </summary>
+        public bool LaterCharacterUsesName(IEnumerable<string> names, string editCreatedAt, string? characterKey)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                foreach (var name in names)
+                {
+                    if (string.IsNullOrWhiteSpace(name)) continue;
+                    using var cmd = connection.CreateCommand();
+                    cmd.CommandText = "SELECT EXISTS (SELECT 1 FROM players WHERE player_data IS NOT NULL AND length(player_data) > 4 " +
+                        "AND (LOWER(display_name) = LOWER(@n) OR " +
+                        "LOWER(CASE WHEN json_valid(player_data) THEN json_extract(player_data, '$.player.name2') END) = LOWER(@n)) " +
+                        "AND (created_at > @t OR last_login > @t OR LOWER(username) = LOWER(@k)));";
+                    cmd.Parameters.AddWithValue("@n", name);
+                    cmd.Parameters.AddWithValue("@t", editCreatedAt ?? "");
+                    cmd.Parameters.AddWithValue("@k", characterKey ?? "");
+                    if (Convert.ToInt64(cmd.ExecuteScalar()) != 0) return true;
+                }
+                return false;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogWarning("SQL", $"LaterCharacterUsesName failed: {ex.Message}");
+                return true;
+            }
+        }
+
+        /// <summary>v1.1.13: the owner id in the world sim lock, or null when none is held.</summary>
+        public string? WorldSimLockOwner()
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT value FROM world_state WHERE key = @key;";
+                cmd.Parameters.AddWithValue("@key", WORLDSIM_LOCK_KEY);
+                if (cmd.ExecuteScalar() is not string json || string.IsNullOrEmpty(json)) return null;
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                return doc.RootElement.TryGetProperty("owner", out var o) ? o.GetString() : null;
+            }
+            catch { return null; }
         }
 
         // --- World Sim Lock ---
@@ -6292,6 +6521,35 @@ namespace UsurperRemake.Systems
         catch { return null; }
     }
 
+    /// <summary>
+    /// v1.1.13: the save key of a player king. The throne keeps the display name (with any married surname),
+    /// so that is matched first, then the character name (crowned before a marriage), then a username.
+    /// Null when no player goes by the name.
+    /// </summary>
+    public string? ResolveKingSaveKey(string kingName)
+    {
+        if (string.IsNullOrWhiteSpace(kingName)) return null;
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            const string name2 = "LOWER(CASE WHEN json_valid(player_data) THEN json_extract(player_data, '$.player.name2') END)";
+            cmd.CommandText = "SELECT username FROM players WHERE username NOT LIKE 'emergency_%' AND LENGTH(player_data) > 2 " +
+                $"AND (LOWER(display_name) = LOWER(@name) OR {name2} = LOWER(@name) OR LOWER(username) = LOWER(@name)) " +
+                $"ORDER BY (LOWER(display_name) = LOWER(@name)) DESC, ({name2} = LOWER(@name)) DESC LIMIT 1;";
+            cmd.Parameters.AddWithValue("@name", kingName);
+            return cmd.ExecuteScalar()?.ToString();
+        }
+        catch { return null; }
+    }
+
+    /// <summary>v1.1.13: the player king's save, read by its resolved key; null when no player matches.</summary>
+    public async Task<SaveGameData?> ReadKingSave(string kingName)
+    {
+        var key = ResolveKingSaveKey(kingName);
+        return key == null ? null : await ReadGameData(key);
+    }
+
     public async Task<List<PlayerMessage>> GetMailInbox(string username, int limit = 20, int offset = 0)
     {
         var messages = new List<PlayerMessage>();
@@ -7744,6 +8002,27 @@ namespace UsurperRemake.Systems
             return commands;
         }
 
+        /// <summary>
+        /// v1.1.13: claim a pending admin command before running it. Only one of the game server and the
+        /// web server's withdrawal wins: true when this call moved the row from pending to executing.
+        /// </summary>
+        public bool TryClaimAdminCommand(int id)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "UPDATE admin_commands SET status = 'executing' WHERE id = @id AND status = 'pending';";
+                cmd.Parameters.AddWithValue("@id", id);
+                return cmd.ExecuteNonQuery() == 1;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"TryClaimAdminCommand failed: {ex.Message}");
+                return false;
+            }
+        }
+
         /// <summary>Mark an admin command as successfully executed.</summary>
         public void MarkAdminCommandExecuted(int id, string result)
         {
@@ -7812,6 +8091,101 @@ namespace UsurperRemake.Systems
                 cmd.ExecuteNonQuery();
             }
             catch { /* Best-effort cleanup */ }
+        }
+
+        /// <summary>v1.1.13: the MUD's admin poller is alive; the web delete checks this before queueing.</summary>
+        public void TouchMudHeartbeat()
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "INSERT INTO mud_heartbeat (id, beat_at) VALUES (1, datetime('now')) " +
+                                  "ON CONFLICT(id) DO UPDATE SET beat_at = datetime('now');";
+                cmd.ExecuteNonQuery();
+            }
+            catch { /* best-effort */ }
+        }
+
+        /// <summary>v1.1.13: a world purge queued by a web delete, with what the delete knew of the character then.</summary>
+        public sealed record PendingPurge(long Id, string Username, string? Name2, string? DisplayName,
+                                          DateTime? DeletedAt, string? PlayerId, bool? Untimed);
+
+        /// <summary>
+        /// v1.1.13: world purges queued by a web delete made while the MUD was down, oldest first. DeletedAt is
+        /// the delete time as a local time (deleted_at is SQLite UTC text; memory times are local).
+        /// </summary>
+        public List<PendingPurge> GetPendingPurges()
+        {
+            var list = new List<PendingPurge>();
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT id, username, name2, display_name, deleted_at, player_id, untimed FROM pending_purges ORDER BY id LIMIT 20;";
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    string? Text(int i) => reader.IsDBNull(i) ? null : Convert.ToString(reader.GetValue(i));
+                    DateTime? at = DateTime.TryParseExact(Text(4), "yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture,
+                        System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal, out var utc)
+                        ? utc.ToLocalTime() : null;
+                    bool? untimed = reader.IsDBNull(6) ? null : Convert.ToInt64(reader.GetValue(6)) != 0;
+                    list.Add(new PendingPurge(reader.GetInt64(0), reader.GetString(1), Text(2), Text(3), at, Text(5), untimed));
+                }
+            }
+            catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"GetPendingPurges failed: {ex.Message}"); }
+            return list;
+        }
+
+        /// <summary>
+        /// v1.1.13: a character was made on this key, or under one of these names, after deletedAt (local time): a
+        /// player row with a save whose created_at or last_login (every save sets it) is at or after the delete.
+        /// A queued purge then leaves that character's rows alone. A failed read counts as made again.
+        /// </summary>
+        public bool WasRecreatedSince(string username, IEnumerable<string> names, DateTime deletedAt)
+        {
+            try
+            {
+                string at = deletedAt.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture);
+                var lowered = names.Where(n => !string.IsNullOrWhiteSpace(n)).Select(n => n.ToLowerInvariant()).Distinct().ToList();
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                var named = new List<string>();
+                for (int i = 0; i < lowered.Count; i++)
+                {
+                    named.Add($"@n{i}");
+                    cmd.Parameters.AddWithValue($"@n{i}", lowered[i]);
+                }
+                string nameClause = named.Count == 0 ? "" :
+                    $" OR LOWER(display_name) IN ({string.Join(",", named)}) " +
+                    $"OR LOWER(CASE WHEN json_valid(player_data) THEN json_extract(player_data, '$.player.name2') END) IN ({string.Join(",", named)})";
+                cmd.CommandText = "SELECT EXISTS (SELECT 1 FROM players WHERE (LOWER(username) = LOWER(@u)" + nameClause + ") " +
+                                  "AND player_data IS NOT NULL AND player_data != '{}' AND length(player_data) > 4 " +
+                                  "AND (created_at >= @t OR last_login >= @t));";
+                cmd.Parameters.AddWithValue("@u", username);
+                cmd.Parameters.AddWithValue("@t", at);
+                return Convert.ToInt64(cmd.ExecuteScalar()) != 0;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogWarning("SQL", $"WasRecreatedSince('{username}') failed: {ex.Message}");
+                return true;
+            }
+        }
+
+        /// <summary>v1.1.13: a queued purge that has run.</summary>
+        public void RemovePendingPurge(long id)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "DELETE FROM pending_purges WHERE id = @id;";
+                cmd.Parameters.AddWithValue("@id", id);
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"RemovePendingPurge failed: {ex.Message}"); }
         }
 
         /// <summary>Expire admin commands older than 60 seconds that are still pending.</summary>
@@ -8073,6 +8447,18 @@ namespace UsurperRemake.Systems
     }
 
     /// <summary>Represents a pending admin command from the web dashboard.</summary>
+    /// <summary>v1.1.13: a row of world_edits. Times are SQLite UTC text.</summary>
+    public class WorldEdit
+    {
+        public long Id { get; set; }
+        public string Kind { get; set; } = "";
+        public string Payload { get; set; } = "";
+        public string CreatedAt { get; set; } = "";
+        public string CreatedBy { get; set; } = "";
+        public string? AppliedAt { get; set; }
+        public string? AppliedBy { get; set; }
+    }
+
     public class AdminCommand
     {
         public int Id { get; set; }

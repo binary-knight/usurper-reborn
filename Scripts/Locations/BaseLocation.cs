@@ -565,22 +565,39 @@ public abstract class BaseLocation
             }
             else
             {
-                // Player refused - severe loyalty penalty
-                playerGuard.Loyalty = Math.Max(0, playerGuard.Loyalty - 25);
+                // Player refused - severe loyalty penalty (v1.1.13: one guarded court change on the stored guard;
+                // the dismissal at low loyalty is in the same write)
+                string guardName = playerGuard.Name;
+                int loyaltyNow = playerGuard.Loyalty;
+                bool stripped = false;
+                bool penalised = await CastleLocation.CourtChangeAsync(court =>
+                {
+                    stripped = false;
+                    var stored = court.Guards.FirstOrDefault(g => g.Name == guardName);
+                    if (stored == null) return false;
+                    stored.Loyalty = Math.Max(0, stored.Loyalty - 25);
+                    loyaltyNow = stored.Loyalty;
+                    if (stored.Loyalty <= 20)
+                    {
+                        court.Guards.Remove(stored);
+                        stripped = true;
+                    }
+                    return true;
+                });
 
                 terminal.SetColor("red");
                 terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("base.guard_turn_away"));
                 terminal.WriteLine(Loc.Get("base.guard_crown_remembers"));
-                terminal.WriteLine(Loc.Get("base.guard_loyalty_dropped", playerGuard.Loyalty));
+                if (penalised)
+                    terminal.WriteLine(Loc.Get("base.guard_loyalty_dropped", loyaltyNow));
 
-                if (playerGuard.Loyalty <= 20)
+                if (stripped)
                 {
                     terminal.SetColor("bright_red");
                     terminal.WriteLine("");
                     terminal.WriteLine(Loc.Get("base.guard_stripped"));
-                    king.Guards.Remove(playerGuard);
-                    NewsSystem.Instance?.Newsy(true, Loc.Get("base.news_guard_dismissed", playerGuard.Name));
+                    NewsSystem.Instance?.Newsy(true, Loc.Get("base.news_guard_dismissed", guardName));
                 }
 
                 await terminal.PressAnyKey();
@@ -712,6 +729,12 @@ public abstract class BaseLocation
                     terminal.SetColor("yellow");
                     if (currentPlayer.TrainingPoints > 0)
                         terminal.WriteLine($"  {Loc.Get("base.training_points_hint")}");
+                    // v1.1.13: level 10 is a milestone worth a line of its own
+                    if (ReachedLevelTenWithPoints(fromLevel, currentPlayer.Level, currentPlayer.TrainingPoints))
+                    {
+                        terminal.SetColor("bright_yellow");
+                        terminal.WriteLine($"  {Loc.Get("base.level_ten_milestone", currentPlayer.TrainingPoints)}");
+                    }
                     terminal.SetColor("white");
                     terminal.WriteLine("");
 
@@ -2731,6 +2754,32 @@ public abstract class BaseLocation
         }
     }
 
+    /// <summary>v1.1.13: /train goes where the town map allows a direct walk to the Level Master (Main Street).</summary>
+    internal static bool CanTravelToLevelMaster(GameLocation from) =>
+        from != GameLocation.Master && LocationManager.Instance.CanNavigateTo(from, GameLocation.Master);
+
+    /// <summary>v1.1.13: /train. Moves to the Level Master the way a menu exit does, or says how to get there.</summary>
+    protected async Task GoToLevelMaster()
+    {
+        if (LocationId == GameLocation.Master)
+        {
+            terminal.WriteLine($"  {Loc.Get("base.train_already_here")}", "yellow");
+            await Task.Delay(800);
+            return;
+        }
+        if (CanTravelToLevelMaster(LocationId))
+        {
+            await NavigateToLocation(GameLocation.Master); // throws LocationExitException, like a menu exit
+            return;
+        }
+        terminal.WriteLine($"  {Loc.Get("base.train_how")}", "yellow");
+        await Task.Delay(1500);
+    }
+
+    /// <summary>v1.1.13: true when a level-up took the player to level 10 (or past it) with points to spend.</summary>
+    internal static bool ReachedLevelTenWithPoints(int fromLevel, int toLevel, int trainingPoints) =>
+        fromLevel <= 10 && toLevel >= 10 && trainingPoints > 0;
+
     /// <summary>
     /// Process slash commands like /stats, /quests, /time, etc.
     /// </summary>
@@ -2782,6 +2831,12 @@ public abstract class BaseLocation
             case "todo":
                 // v0.64.2: The Adventurer's Journal -- "what should I do now?"
                 await ShowJournal();
+                return (true, false);
+
+            case "train":
+            case "training":
+                // v1.1.13: to the Level Master, or how to get there
+                await GoToLevelMaster();
                 return (true, false);
 
             case "path":
@@ -3067,6 +3122,7 @@ public abstract class BaseLocation
         WriteCmdAlias("/quests", "/q", Loc.Get("base.help_quests"));
         WriteCmdAlias("/journal", "/next", Loc.Get("journal.help")); // v0.64.2
         WriteCmdAlias("/path", "/roadmap", Loc.Get("base.help_path")); // v1.0.5: was only reachable by knowing the command
+        WriteCmd("/train", Loc.Get("base.help_train")); // v1.1.13: /train
         if (UsurperRemake.BBS.DoorMode.IsMudServerMode)
             WriteCmd("look", Loc.Get("base.help_look")); // v0.64.2: prompt hint removed; documented here instead
         WriteCmdAlias("/gold", "/g", Loc.Get("base.help_gold"));
@@ -3183,6 +3239,7 @@ public abstract class BaseLocation
         terminal.WriteLine($"/inventory or * {Loc.Get("base.help_inventory")}");
         terminal.WriteLine($"/quests or /q {Loc.Get("base.help_quests")}");
         terminal.WriteLine($"/journal or /next {Loc.Get("journal.help")}");
+        terminal.WriteLine($"/train {Loc.Get("base.help_train")}"); // v1.1.13: /train
         if (UsurperRemake.BBS.DoorMode.IsMudServerMode)
             terminal.WriteLine($"look {Loc.Get("base.help_look")}");
         terminal.WriteLine($"/gold or /g {Loc.Get("base.help_gold")}");
@@ -4170,6 +4227,7 @@ public abstract class BaseLocation
                 if (UsurperRemake.BBS.DoorMode.IsMudServerMode)
                     terminal.WriteLine($"  {Loc.Get("prefs.auto_look")}: {(currentPlayer.AutoLook ? Loc.Get("prefs.enabled") : Loc.Get("prefs.disabled"))}");
                 terminal.WriteLine($"  {Loc.Get("prefs.auto_equip")}: {(currentPlayer.AutoEquipDisabled ? Loc.Get("prefs.disabled") : Loc.Get("prefs.enabled"))}");
+                terminal.WriteLine($"  {Loc.Get("prefs.auto_combat_heal")}: {currentPlayer.AutoCombatHealPercent}%"); // v1.1.13: heal threshold
                 terminal.WriteLine("");
 
                 string srDateFormat = currentPlayer.DateFormatPreference switch { 1 => "DD/MM/YYYY", 2 => "YYYY-MM-DD", _ => "MM/DD/YYYY" };
@@ -4182,6 +4240,7 @@ public abstract class BaseLocation
                     terminal.WriteLine($"  5. {Loc.Get("prefs.difficulty")} ({DifficultySystem.GetLocalizedName(currentPlayer.Difficulty)})");
                 terminal.WriteLine($"  8. {Loc.Get("prefs.toggle", Loc.Get("prefs.auto_level"))}");
                 terminal.WriteLine($"  A. {Loc.Get("prefs.toggle", Loc.Get("prefs.auto_equip"))}");
+                terminal.WriteLine($"  H. {Loc.Get("prefs.auto_combat_heal")} ({currentPlayer.AutoCombatHealPercent}%)"); // v1.1.13: heal threshold
                 terminal.WriteLine(Loc.Get("base.prefs_display"));
                 terminal.WriteLine($"  6. {Loc.Get("prefs.color_theme")}");
                 terminal.WriteLine($"  9. {Loc.Get("prefs.toggle", Loc.Get("prefs.compact_mode"))}");
@@ -4246,6 +4305,7 @@ public abstract class BaseLocation
                     WriteMenuOption("5", $"{Loc.Get("prefs.difficulty")}: {DifficultySystem.GetLocalizedName(currentPlayer.Difficulty)}");
                 WriteMenuOption("8", $"{Loc.Get("prefs.auto_level")}: {onOff(currentPlayer.AutoLevelUp)}");
                 WriteMenuOption("A", $"{Loc.Get("prefs.auto_equip")}: {onOff(!currentPlayer.AutoEquipDisabled)}");
+                WriteMenuOption("H", $"{Loc.Get("prefs.auto_combat_heal")}: {currentPlayer.AutoCombatHealPercent}%"); // v1.1.13: heal threshold
                 terminal.WriteLine("");
 
                 // -- DISPLAY --
@@ -4414,6 +4474,14 @@ public abstract class BaseLocation
                     }
                     await GameEngine.Instance.SaveCurrentGame();
                     await Task.Delay(1000);
+                    break;
+
+                case "H":
+                    // v1.1.13: auto-combat potion threshold, 20-70% in steps of 10
+                    currentPlayer.AutoCombatHealPercent = GameConfig.NextAutoCombatHealPercent(currentPlayer.AutoCombatHealPercent);
+                    terminal.WriteLine(Loc.Get("base.pref_auto_combat_heal_set", currentPlayer.AutoCombatHealPercent), "green");
+                    await GameEngine.Instance.SaveCurrentGame();
+                    await Task.Delay(800);
                     break;
 
                 case "A":
@@ -10522,6 +10590,7 @@ public abstract class BaseLocation
     /// player, so a crash between loses the item rather than copying it.</summary>
     protected internal async Task SaveGearTakenFromNpc(Character? npc)
     {
+        SyncCompanionGear(npc);
         if (npc != null) CombatEngine.SyncNPCTeammateToActiveNPCs(npc);
         await SaveSharedStateForGear();
         await SavePlayerForGear();
@@ -10531,9 +10600,38 @@ public abstract class BaseLocation
     /// state, for the same reason.</summary>
     protected internal async Task SaveGearGivenToNpc(Character? npc)
     {
+        SyncCompanionGear(npc);
         await SavePlayerForGear();
         if (npc != null) CombatEngine.SyncNPCTeammateToActiveNPCs(npc);
         await SaveSharedStateForGear();
+    }
+
+    // v1.1.13: a companion's gear is in the player's own save, so it is copied back before the player save,
+    // which then holds both sides at once
+    private static void SyncCompanionGear(Character? target)
+    {
+        if (target != null && target.IsCompanion)
+            UsurperRemake.Systems.CompanionSystem.Instance?.SyncCompanionEquipment(target);
+    }
+
+    /// <summary>
+    /// v1.1.12: takes the item being given from the player: off the slot it is worn in, or out of the pack.
+    /// v1.1.13: a pack item is removed as the very instance listed (source); name matching is only for callers
+    /// without one. False when nothing was removed, and then nothing may be equipped.
+    /// </summary>
+    protected internal bool TakeFromPlayerForEquip(Equipment selectedItem, bool wasEquipped, EquipmentSlot? sourceSlot, Item? source = null)
+    {
+        if (wasEquipped && sourceSlot.HasValue)
+        {
+            if (currentPlayer.UnequipSlot(sourceSlot.Value) == null) return false;
+            currentPlayer.RecalculateStats();
+            return true;
+        }
+        if (source != null) return currentPlayer.Inventory.Remove(source);
+        var invItem = currentPlayer.Inventory.FirstOrDefault(i =>
+            i.Name == selectedItem.Name && i.Attack == selectedItem.WeaponPower && i.Armor == selectedItem.ArmorClass)
+            ?? currentPlayer.Inventory.FirstOrDefault(i => i.Name == selectedItem.Name);
+        return invItem != null && currentPlayer.Inventory.Remove(invItem);
     }
 
     private async Task SaveSharedStateForGear()
@@ -10607,14 +10705,14 @@ public abstract class BaseLocation
             var candidates = GetItemsForSlot(slot)
                 .Where(x => !x.isEquipped && x.item.IsIdentified && !x.item.IsCursed)
                 .Where(x => x.item.CanEquip(target, out _))
-                .Select(x => (x.item, fromBag: (Item?)null))
+                .Select(x => (x.item, fromBag: (Item?)null, fromPack: x.source))
                 .ToList();
             // v1.1.12: gear displaced earlier in this pass is still in the target's bag; it competes for this slot too
             foreach (var bagItem in displacedAll)
             {
                 var eq = ConvertInventoryItemToEquipment(bagItem);
                 if (eq != null && ItemMatchesSlot(eq, slot) && eq.IsIdentified && !eq.IsCursed && eq.CanEquip(target, out _))
-                    candidates.Add((eq, bagItem));
+                    candidates.Add((eq, bagItem, null));
             }
 
             if (candidates.Count == 0)
@@ -10624,7 +10722,7 @@ public abstract class BaseLocation
                 continue;
             }
 
-            // Score each candidate by primary stat value (class-aware — see ScoreEquipment)
+            // Score each candidate by primary stat value (v1.1.13: role-aware, see ScoreEquipment)
             var bestCandidate = candidates
                 .OrderByDescending(x => ScoreEquipment(x.item, slot, target))
                 .First();
@@ -10641,12 +10739,13 @@ public abstract class BaseLocation
                 continue;
             }
 
-            // Remove from player inventory (find by name match); v1.1.12: or take it back out of the target's bag
+            // Remove from player inventory; v1.1.12: or take it back out of the target's bag.
+            // v1.1.13: the very pack item scored, not the first of its name (a weaker twin stayed behind as the copy)
             var fromBag = bestCandidate.fromBag;
-            var invItem = fromBag ?? currentPlayer.Inventory.FirstOrDefault(i => i.Name == bestCandidate.item.Name);
+            var invItem = fromBag ?? bestCandidate.fromPack;
             if (invItem == null) continue;
             if (fromBag != null) { target.Inventory.Remove(fromBag); displacedAll.Remove(fromBag); }
-            else currentPlayer.Inventory.Remove(invItem);
+            else if (!currentPlayer.Inventory.Remove(invItem)) continue;
 
             // Track items before equipping so displaced items go to player
             var targetInventoryBefore = target.Inventory.Count;
@@ -10733,17 +10832,32 @@ public abstract class BaseLocation
             score = item.ArmorClass * 10;
         }
 
-        // Add stat bonuses (weighted equally)
-        score += (item.StrengthBonus + item.DexterityBonus + item.AgilityBonus +
-                  item.ConstitutionBonus + item.IntelligenceBonus + item.WisdomBonus +
-                  item.CharismaBonus) * 3;
-        score += item.MaxHPBonus * 2;
-        score += item.MaxManaBonus * 2;
-        score += item.DefenceBonus * 3;
-        score += item.MagicResistance * 2;
-        score += item.CriticalChanceBonus * 2;
-        score += item.LifeSteal * 2;
-        score += item.StaminaBonus * 2;
+        // v1.1.13: stats the target's role uses count triple; the others keep the old weights.
+        // With no target every stat counts once, as before.
+        var role = target != null ? GetGearRole(target) : GearRole.None;
+        int useful = score;   // weapon and armour power always count
+        int other = 0;
+        void Add(int value, int weight, params GearRole[] roles)
+        {
+            if (role == GearRole.None) useful += value * weight;
+            else if (Array.IndexOf(roles, role) >= 0) useful += value * weight * 3;
+            else other += value * weight;
+        }
+        Add(item.StrengthBonus, 3, GearRole.Tank, GearRole.Damage);
+        Add(item.DexterityBonus, 3, GearRole.Damage);
+        Add(item.AgilityBonus, 3, GearRole.Damage);
+        Add(item.ConstitutionBonus, 3, GearRole.Tank);
+        Add(item.IntelligenceBonus, 3, GearRole.Caster);
+        Add(item.WisdomBonus, 3, GearRole.Caster, GearRole.Healer);
+        Add(item.CharismaBonus, 3);
+        Add(item.MaxHPBonus, 2, GearRole.Tank);
+        Add(item.MaxManaBonus, 2, GearRole.Caster, GearRole.Healer);
+        Add(item.DefenceBonus, 3, GearRole.Tank);
+        Add(item.MagicResistance, 2, GearRole.Tank, GearRole.Damage, GearRole.Caster, GearRole.Healer);
+        Add(item.CriticalChanceBonus, 2, GearRole.Damage);
+        Add(item.LifeSteal, 2, GearRole.Damage);
+        Add(item.StaminaBonus, 2, GearRole.Tank);
+        score = useful + other;
 
         // v0.57.2 — class-aware weapon preference. Without this, auto-equip just picks the highest
         // raw-stat weapon and ignores class fantasy: Warriors got 1H weapons in off-hand instead of
@@ -10754,7 +10868,32 @@ public abstract class BaseLocation
             score = ApplyClassWeaponPreference(score, item, slot, target);
         }
 
+        // v1.1.13: an item with something the role uses always outranks one with nothing it uses
+        if (target != null && useful > 0) score += UsefulGearFloor;
+
         return score;
+    }
+
+    // v1.1.13: role for Equip Best scoring
+    protected enum GearRole { None, Tank, Healer, Caster, Damage }
+
+    private const int UsefulGearFloor = 1_000_000;
+
+    /// <summary>v1.1.13: a tank or healer specialization wins; otherwise the class decides.</summary>
+    protected static GearRole GetGearRole(Character target)
+    {
+        if (target.Specialization != ClassSpecialization.None)
+        {
+            if (SpecializationData.IsTankSpec(target.Specialization)) return GearRole.Tank;
+            if (SpecializationData.IsHealerSpec(target.Specialization)) return GearRole.Healer;
+        }
+        return target.Class switch
+        {
+            CharacterClass.Warrior or CharacterClass.Paladin or CharacterClass.Tidesworn => GearRole.Tank,
+            CharacterClass.Cleric or CharacterClass.Wavecaller => GearRole.Healer,
+            CharacterClass.Magician or CharacterClass.Sage or CharacterClass.Cyclebreaker or CharacterClass.MysticShaman => GearRole.Caster,
+            _ => GearRole.Damage,
+        };
     }
 
     /// <summary>
@@ -10846,10 +10985,11 @@ public abstract class BaseLocation
     /// Show items from player inventory/equipment that match a specific slot, with full stats.
     /// Used by slot-based equip flow. Returns list of matching items.
     /// </summary>
-    protected List<(Equipment item, bool isEquipped, EquipmentSlot? fromSlot)> GetItemsForSlot(
+    // v1.1.13: a pack entry carries its source Item, so the move takes that instance and not a same-named one
+    protected List<(Equipment item, bool isEquipped, EquipmentSlot? fromSlot, Item? source)> GetItemsForSlot(
         EquipmentSlot targetSlot)
     {
-        var items = new List<(Equipment item, bool isEquipped, EquipmentSlot? fromSlot)>();
+        var items = new List<(Equipment item, bool isEquipped, EquipmentSlot? fromSlot, Item? source)>();
 
         // Add matching items from player's inventory
         foreach (var invItem in currentPlayer.Inventory)
@@ -10858,7 +10998,7 @@ public abstract class BaseLocation
             if (equipment == null) continue;
 
             if (ItemMatchesSlot(equipment, targetSlot))
-                items.Add((equipment, false, null));
+                items.Add((equipment, false, null, invItem));
         }
 
         // Add matching items from player's equipped items
@@ -10869,7 +11009,7 @@ public abstract class BaseLocation
             if (equipped == null) continue;
 
             if (ItemMatchesSlot(equipped, targetSlot))
-                items.Add((equipped, true, slot));
+                items.Add((equipped, true, slot, null));
         }
 
         return items;
@@ -10908,12 +11048,12 @@ public abstract class BaseLocation
     /// Returns the displayed items for selection. Handles unidentified items.
     /// </summary>
     protected void DisplayEquipmentItemList(
-        List<(Equipment item, bool isEquipped, EquipmentSlot? fromSlot)> items,
+        List<(Equipment item, bool isEquipped, EquipmentSlot? fromSlot, Item? source)> items,
         Character target)
     {
         for (int i = 0; i < items.Count; i++)
         {
-            var (item, isEquipped, fromSlot) = items[i];
+            var (item, isEquipped, fromSlot, _) = items[i];
             terminal.SetColor("bright_yellow");
             terminal.Write($"  {i + 1}. ");
 

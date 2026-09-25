@@ -184,7 +184,33 @@ public class DeleteFollowUpTests : IDisposable
         WithCompleteRoster(() => _db.PurgePlayerWorldState("bob", "Alice"));
         Count("SELECT COUNT(*) FROM messages WHERE to_player = 'Bob';").Should().Be(1, "another character's name2 is Bob");
         Count("SELECT COUNT(*) FROM messages WHERE to_player = 'Alice';").Should().Be(0);
-        Count("SELECT COUNT(*) FROM messages WHERE from_player = 'bob';").Should().Be(0);
+        // v1.1.13: "bob" is also the other Bob's name, so that sent mail is kept (it may be the living Bob's)
+        Count("SELECT COUNT(*) FROM messages WHERE from_player = 'bob';").Should().Be(1);
+    }
+
+    [Fact]
+    public async Task MailFromANameAnotherCharacterGoesBy_IsKept()
+    {
+        // v1.1.13: account "bob" plays "Alice"; another account's "Bob" sent team mail as "Bob"
+        Player("bob", "Alice");
+        Player("robin", "Bob");
+        Exec("INSERT INTO players (username, display_name, player_data) VALUES ('sam', 'Sam', '{\"player\":{\"name2\":\"Bobby\"}}');");
+        await _db.SendMessage("Bob", "Sam", "team", "from the living Bob");
+        await _db.SendMessage("Bobby", "Robin", "team", "from the living Bobby");
+        WithCompleteRoster(() => _db.PurgePlayerWorldState("bob", "Alice"));
+        Count("SELECT COUNT(*) FROM messages WHERE from_player = 'Bob';").Should().Be(1, "another character's display name is Bob");
+        WithCompleteRoster(() => _db.PurgePlayerWorldState("bobby", "Carol"));
+        Count("SELECT COUNT(*) FROM messages WHERE from_player = 'Bobby';").Should().Be(1, "another character's name2 is Bobby");
+    }
+
+    [Fact]
+    public async Task MailFromTheKey_IsPurged_WhenNoOtherCharacterGoesByThatName()
+    {
+        Player("bob", "Alice");
+        Player("robin", "Robin");
+        await _db.SendMessage("bob", "Robin", "mail", "sent by the deleted key");
+        WithCompleteRoster(() => _db.PurgePlayerWorldState("bob", "Alice"));
+        Count("SELECT COUNT(*) FROM messages WHERE LOWER(from_player) = 'bob';").Should().Be(0);
     }
 
     [Fact]
@@ -335,15 +361,14 @@ public class DeleteFollowUpTests : IDisposable
             {
                 // a fresh database with no court: absent changes nothing
                 var sim = new WorldSimService(_db);
-                var simVersion = typeof(WorldSimService).GetField("lastRoyalCourtVersion", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
                 sim.LoadRoyalCourtFromWorldState();
                 CastleLocation.GetCurrentKing().Should().BeSameAs(bob);
 
                 // control: the sim's court save does write its king when it holds the current version
                 await _db.SaveWorldState("royal_court", CourtJson(new RoyalCourtSaveData { KingName = "Bob", KingAI = (int)CharacterAI.Human }));
-                simVersion.SetValue(sim, _db.GetWorldStateVersion("royal_court"));
+                OnlineStateManager.NoteRoyalCourtVersion(_db.GetWorldStateVersion("royal_court"));   // v1.1.13: the process-wide court version
                 await _db.SaveWorldState("royal_court", CourtJson(new RoyalCourtSaveData { KingName = "Nobody", KingAI = 1 }));
-                simVersion.SetValue(sim, _db.GetWorldStateVersion("royal_court"));
+                OnlineStateManager.NoteRoyalCourtVersion(_db.GetWorldStateVersion("royal_court"));   // v1.1.13: the process-wide court version
                 await sim.SaveRoyalCourtToWorldState();
                 (await _db.LoadWorldState("royal_court")).Should().Contain("\"Bob\"", "the save path is live");
 
@@ -358,7 +383,7 @@ public class DeleteFollowUpTests : IDisposable
                 (CastleLocation.GetCurrentKing()?.Name).Should().NotBe("Bob", "the world sim's copy of the deleted king is cleared");
                 bob.IsActive.Should().BeFalse();
 
-                simVersion.SetValue(sim, _db.GetWorldStateVersion("royal_court"));   // the sim holds the vacancy's version
+                OnlineStateManager.NoteRoyalCourtVersion(_db.GetWorldStateVersion("royal_court"));   // v1.1.13: the process-wide court version   // the sim holds the vacancy's version
                 await sim.SaveRoyalCourtToWorldState();
                 var stored = System.Text.Json.JsonSerializer.Deserialize<RoyalCourtSaveData>((await _db.LoadWorldState("royal_court"))!,
                     new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
@@ -370,7 +395,7 @@ public class DeleteFollowUpTests : IDisposable
         string osm = Source("Systems", "OnlineStateManager.cs");
         osm.Should().Contain("global::CastleLocation.ApplySharedThroneVacancy(royalCourt)", "the login loader honours it too");
         osm.Should().Contain("ThroneVacant = throneVacated");
-        osm.Should().Contain("if (KeepsStoredVacancy(await ReadRoyalCourtFromWorldState(), throneVacated)) return;");
+        osm.Should().Contain("if (king == null && KeepsStoredVacancy(await ReadRoyalCourtFromWorldState(), throneVacated)) return;");   // v1.1.13
         OnlineStateManager.KeepsStoredVacancy(new RoyalCourtSaveData { ThroneVacant = true }, throneVacated: false)
             .Should().BeTrue("a later session's plain empty save does not hide the vacancy from the world sim");
         OnlineStateManager.KeepsStoredVacancy(new RoyalCourtSaveData { ThroneVacant = true }, throneVacated: true).Should().BeFalse();
