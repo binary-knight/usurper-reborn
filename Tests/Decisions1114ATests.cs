@@ -283,6 +283,37 @@ public partial class OwnerProcessConflictTests
         lines[0].Should().NotContain("\u2014").And.NotContain("\u2013");
     }
 
+    // ─── M5 follow-up: expired quests leave the shared record ───
+
+    [Fact]
+    public async Task ExpiredQuests_LeaveTheSharedRecord_AndAProcessStillHoldingOneDoesNotPutItBack()
+    {
+        var now = DateTime.Now;
+        QuestData Q(string id, string occupier, double daysOld, int occupied = 0, int limit = 10) => new QuestData
+        {
+            Id = id, Title = id, Initiator = "Board", Occupier = occupier, StartTime = now.AddDays(-daysOld), OccupiedDays = occupied, DaysToComplete = limit
+        };
+        var holder = NewOsm(new SqlSaveBackend(_path));
+        var held = new List<QuestData>
+        {
+            Q("stale_board", "", 8), Q("fresh_board", "", 2),
+            Q("failed_claim", "Holder", 3, occupied: 11), Q("running_claim", "Holder", 3, occupied: 2),
+            Q("old_claim", "Holder", 19, occupied: 2), Q("young_claim", "Holder", 17, occupied: 2),
+            new QuestData { Id = "undated", Title = "undated", Initiator = "Board" },
+        };
+        // an older writer's record, unpruned
+        await _db.SaveWorldState(OnlineStateManager.KEY_QUESTS, JsonSerializer.Serialize(held, Json));
+
+        var other = NewOsm(new SqlSaveBackend(_path));
+        await other.SaveSharedQuests(new List<QuestData> { Q("new_quest", "", 0) });
+        (await StoredQuestTitles()).Should().Equal("fresh_board", "new_quest", "running_claim", "undated", "young_claim");
+
+        // the process still holding the expired quests (one of them changed) writes: they stay out
+        held[2].OccupiedDays = 12;
+        (await holder.SaveSharedQuestsVersionedAsync(_db, held)).Should().BeTrue();
+        (await StoredQuestTitles()).Should().Equal("fresh_board", "new_quest", "running_claim", "undated", "young_claim");
+    }
+
     private static string RepoRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);

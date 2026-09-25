@@ -741,12 +741,30 @@ namespace UsurperRemake.Systems
         private static string QuestKey(QuestData q) => !string.IsNullOrEmpty(q.Id) ? q.Id : "title:" + q.Title + "|" + q.Initiator;
 
         /// <summary>
+        /// v1.1.14: a quest in the shared record that every process drops by its own rules by now, so the record
+        /// drops it too (it is never read back into a quest list). An unclaimed quest older than 7 days
+        /// (QuestSystem's cleanup of stale board quests); a claimed quest past its time limit (the daily failure
+        /// check, OccupiedDays over DaysToComplete); and a claimed quest older than 7 days plus its time limit
+        /// plus one day since it was made, which is past the limit counted from the latest day the board still
+        /// offers it for a claim. Every part reads fields that never go back, so a copy another process still
+        /// holds meets the rule too. A quest with no start time is kept. Times are local, as quest dates are.
+        /// </summary>
+        internal static bool IsExpiredSharedQuest(QuestData q, DateTime now)
+        {
+            bool dated = q.StartTime != default;
+            if (string.IsNullOrEmpty(q.Occupier)) return dated && q.StartTime < now.AddDays(-7);
+            if (q.DaysToComplete > 0 && q.OccupiedDays > q.DaysToComplete) return true;
+            return dated && q.DaysToComplete > 0 && q.StartTime < now.AddDays(-(7 + q.DaysToComplete + 1));
+        }
+
+        /// <summary>
         /// v1.1.14: the shared quests are written only under the version read just before the value. This
         /// session's changes since its last write (a quest added, changed or dropped) are laid over the stored
         /// list, so every other process's quests are kept; on a conflict the stored list is read again, the
-        /// changes laid over it again and the write retried (5 attempts). A quest another process removed is not
-        /// brought back unless this session changed it. RemoveSharedQuestsAsync, the other writer, is versioned
-        /// the same way. beforeWrite is a test hook. True once written.
+        /// changes laid over it again and the write retried (5 attempts). A quest another process removed is never
+        /// brought back, changed or not. RemoveSharedQuestsAsync, the other writer, is versioned the same way.
+        /// v1.1.14: every write also drops the expired quests (IsExpiredSharedQuest), stored or this session's,
+        /// so a quest no process holds any more leaves the record. beforeWrite is a test hook. True once written.
         /// </summary>
         internal async Task<bool> SaveSharedQuestsVersionedAsync(SqlSaveBackend sql, List<QuestData> quests, Func<Task>? beforeWrite = null)
         {
@@ -772,6 +790,9 @@ namespace UsurperRemake.Systems
                 foreach (var key in changed)
                     if (!storedKeys.Contains(key) && !_questSeen.Contains(key)) merged.Add(byKey[key]);   // made by this session
                 _questSeen.UnionWith(storedKeys);
+                var now = DateTime.Now;
+                int pruned = merged.RemoveAll(q => IsExpiredSharedQuest(q, now));   // v1.1.14
+                if (pruned > 0) DebugLogger.Instance.LogDebug("ONLINE", $"Dropped {pruned} expired quest(s) from the shared quest record.");
                 if (beforeWrite != null) await beforeWrite();
                 if (await sql.SaveWorldStateIfVersion(KEY_QUESTS, JsonSerializer.Serialize(merged, jsonOptions), version))
                 {
