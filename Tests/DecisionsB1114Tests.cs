@@ -163,4 +163,58 @@ public class DecisionsB1114Tests
         hero.HasStatus(StatusEffect.Stunned).Should().BeTrue();
         Special(Cube(2)).Should().BeFalse("a held player gets the second cube's normal attack instead");
     }
+    // ---- B2: a goblin's Critical Strike, once per fight per goblin ----
+
+    private static Monster Goblin(string name, string family = "Goblinoid") => new Monster
+    {
+        Name = name, FamilyName = family, Level = 40, HP = 100_000, MaxHP = 100_000,
+        Strength = 200, WeapPow = 200, IsActive = true,
+        SpecialAbilities = new List<string> { "CriticalStrike" },
+    };
+
+    private static int Crits(CombatResult result) => result.CombatLog.Count(l => l.Contains("uses CriticalStrike"));
+
+    [Fact]
+    public async Task Goblin_CriticalStrike_OncePerFight_OnACompanion()
+    {
+        var engine = LowEngine();
+        var tank = Tank();
+        var result = new CombatResult { CurrentRound = 2 };
+        var champion = Goblin("Goblin Champion");
+        for (int i = 0; i < 4; i++)
+            await CubeHitsCompanion(engine, champion, tank, result);
+        Crits(result).Should().Be(1, "the second and later turns are normal attacks");
+
+        var warlord = Goblin("Goblin Warlord");
+        await CubeHitsCompanion(engine, warlord, tank, result);
+        Crits(result).Should().Be(2, "each goblin has its own once-per-fight strike");
+    }
+
+    [Fact]
+    public void Goblin_CriticalStrike_OncePerFight_OnThePlayer()
+    {
+        var engine = LowEngine();
+        var hero = new Character { Name1 = "Hero", Name2 = "Hero", Class = CharacterClass.Warrior, Level = 40, HP = 10_000_000, MaxHP = 10_000_000 };
+        var result = new CombatResult { Player = hero };
+        var m = typeof(CombatEngine).GetMethod("TryMonsterSpecialAbility", NF)!;
+        bool Special(Monster mon) => ((Task<bool>)m.Invoke(engine, new object?[] { mon, hero, result, null })!).GetAwaiter().GetResult();
+
+        var goblin = Goblin("Goblin King");
+        Special(goblin).Should().BeTrue("the first Critical Strike lands");
+        Special(goblin).Should().BeFalse("the goblin makes a normal attack after that");
+        Special(Goblin("Goblin Champion")).Should().BeTrue("another goblin still has its own");
+    }
+
+    [Fact]
+    public void CriticalStrike_OnANonGoblin_IsUnchanged()
+    {
+        var engine = LowEngine();
+        var hero = new Character { Name1 = "Hero", Name2 = "Hero", Class = CharacterClass.Warrior, Level = 40, HP = 10_000_000, MaxHP = 10_000_000 };
+        var result = new CombatResult { Player = hero };
+        var m = typeof(CombatEngine).GetMethod("TryMonsterSpecialAbility", NF)!;
+        var champion = Goblin("Arena Champion", family: "");
+        for (int i = 0; i < 3; i++)
+            ((Task<bool>)m.Invoke(engine, new object?[] { champion, hero, result, null })!).GetAwaiter().GetResult()
+                .Should().BeTrue("the decision covers the goblin family only");
+    }
 }
