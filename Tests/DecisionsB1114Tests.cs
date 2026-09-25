@@ -217,4 +217,45 @@ public class DecisionsB1114Tests
             ((Task<bool>)m.Invoke(engine, new object?[] { champion, hero, result, null })!).GetAwaiter().GetResult()
                 .Should().BeTrue("the decision covers the goblin family only");
     }
+
+    // ---- B3: no freeze on an area hit ----
+    // v1.1.14: at cd43e9f no area hit freezes. Monster Frost Breath (Ice Troll) resolves on the one
+    // target of that monster's turn; Ice Storm's frost slows; Sage Freeze, Alchemist Frost Bomb and
+    // the Leviathan's Frost Bolt and Deep Freeze are single-target. These guards keep it that way.
+
+    [Fact]
+    public void NoWorldBossAreaAbility_Freezes()
+    {
+        foreach (var boss in UsurperRemake.Data.WorldBossDatabase.GetAllBosses())
+            foreach (var ab in boss.Phase1Abilities.Concat(boss.Phase2Abilities).Concat(boss.Phase3Abilities))
+                if (ab.IsAoE)
+                    ab.AppliedStatus.Should().NotBe(StatusEffect.Frozen, $"{boss.Name}'s {ab.Name} hits an area");
+    }
+
+    [Fact]
+    public void NoAreaSpell_Freezes()
+    {
+        string src = File.ReadAllText(Path.Combine(RepoRoot(), "Scripts", "Systems", "SpellSystem.cs"));
+        int checkedSpells = 0;
+        foreach (CharacterClass cls in Enum.GetValues(typeof(CharacterClass)))
+            for (int level = 1; level <= 25; level++)
+            {
+                var info = SpellSystem.GetSpellInfo(cls, level);
+                if (info == null || !info.IsMultiTarget) continue;
+                var m = Regex.Match(src, @"case " + level + @": // " + Regex.Escape(info.Name) + @"\b(.*?)break;", RegexOptions.Singleline);
+                m.Success.Should().BeTrue($"{info.Name} has an effect block");
+                m.Groups[1].Value.Should().NotContain("\"freeze\"", $"{info.Name} hits every enemy");
+                checkedSpells++;
+            }
+        checkedSpells.Should().BeGreaterThan(5);
+    }
+
+    [Fact]
+    public void FrostBreath_StillFreezes_ItsOneTarget()
+    {
+        var troll = new Monster { Name = "Ice Troll", Level = 30, HP = 1000, MaxHP = 1000, Strength = 50 };
+        var r = MonsterAbilities.ExecuteAbility(MonsterAbilities.AbilityType.FrostBreath, troll, Tank());
+        r.InflictStatus.Should().Be(StatusEffect.Frozen);
+        r.StatusChance.Should().Be(50);
+    }
 }
