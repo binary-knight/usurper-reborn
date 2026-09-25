@@ -1207,12 +1207,33 @@ public class TeamCornerLocation : BaseLocation
     private async Task<bool> RefuseJoinIfFull(string teamName)
     {
         if (await TeamSlotsUsed(teamName) < MaxTeamSize) return false;
+        await ShowJoinTeamFull(teamName);
+        return true;
+    }
+
+    /// <summary>
+    /// v1.1.14: the last check of a join, after the password. Online, the slot count and the membership
+    /// write are one transaction (SqlSaveBackend.TryClaimTeamSlot), so of two players joining at once only
+    /// one takes the last slot; before, both passed the check and the saves that followed made six.
+    /// Offline no other player can join. True when the player may join.
+    /// </summary>
+    private async Task<bool> ClaimJoinSlot(string teamName)
+    {
+        if (!(DoorMode.IsOnlineMode && SaveSystem.Instance.Backend is SqlSaveBackend backend))
+            return !await RefuseJoinIfFull(teamName);
+        int npcSlots = CountTeamSlots(NPCSpawnSystem.Instance.ActiveNPCs, teamName, 0);
+        if (await backend.TryClaimTeamSlot(teamName, GameEngine.InheritanceKey(currentPlayer), npcSlots, MaxTeamSize)) return true;
+        await ShowJoinTeamFull(teamName);
+        return false;
+    }
+
+    private async Task ShowJoinTeamFull(string teamName)
+    {
         terminal.WriteLine("");
         terminal.SetColor("red");
         terminal.WriteLine(Loc.Get("team.join_team_full", teamName, MaxTeamSize));
         terminal.WriteLine("");
         await Task.Delay(2000);
-        return true;
     }
 
     /// <summary>
@@ -1276,7 +1297,7 @@ public class TeamCornerLocation : BaseLocation
                 var (exists, pwCorrect) = await backend.VerifyPlayerTeam(teamName, password);
                 if (exists && pwCorrect)
                 {
-                    if (await RefuseJoinIfFull(teamName)) return;
+                    if (!await ClaimJoinSlot(teamName)) return;   // v1.1.14: the check and the write, together
                     currentPlayer.Team = teamName;
                     currentPlayer.TeamPW = password;
                     currentPlayer.CTurf = false;
@@ -1333,7 +1354,7 @@ public class TeamCornerLocation : BaseLocation
 
         if (npcPassword == teamMember.TeamPW)
         {
-            if (await RefuseJoinIfFull(teamName)) return;
+            if (!await ClaimJoinSlot(teamName)) return;   // v1.1.14: online, the check and the write together
             currentPlayer.Team = teamName;
             currentPlayer.TeamPW = npcPassword;
             currentPlayer.CTurf = teamMember.CTurf;

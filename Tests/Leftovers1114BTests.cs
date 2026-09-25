@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
 using UsurperRemake;
@@ -180,5 +182,89 @@ public class RandomRoomEventChoice1114Tests
         var room = Room();
         await HandleRoomEvent(Dungeon(new ScriptRandom(roll), "L", "", "", ""), room);
         room.EventCompleted.Should().BeTrue("leaving is a valid choice");
+    }
+}
+
+/// <summary>v1.1.14 (T1): two players joining a team with one free slot at once cannot take it to six.</summary>
+[Collection("SharedGameSingletons")]
+public class TeamJoinSlotClaim1114Tests
+{
+    private static long Members(string path, string team) => Convert.ToInt64(TeamCornerRig.Scalar(path,
+        $"SELECT COUNT(*) FROM players WHERE json_extract(player_data, '$.player.team') = '{team}';"));
+
+    [Fact]
+    public async Task TwoBackends_ClaimingTheLastSlotAtOnce_OnlyOneGetsIt()
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"usurper-t1-{Guid.NewGuid():N}.db");
+        var one = new SqlSaveBackend(path);
+        var two = new SqlSaveBackend(path);   // a second backend on the same database, as a second process has
+        try
+        {
+            foreach (var k in new[] { "memba", "membb", "membc", "membd" }) TeamCornerRig.PlayerRow(path, k, "Full House");
+            TeamCornerRig.PlayerRow(path, "joinx", "");
+            TeamCornerRig.PlayerRow(path, "joiny", "");
+            for (int round = 0; round < 20; round++)
+            {
+                TeamCornerRig.Exec(path, "UPDATE players SET player_data = json_set(player_data, '$.player.team', '') WHERE username IN ('joinx', 'joiny');");
+                using var start = new ManualResetEventSlim(false);
+                var a = Task.Run(async () => { start.Wait(); return await one.TryClaimTeamSlot("Full House", "joinx", 0, 5); });
+                var b = Task.Run(async () => { start.Wait(); return await two.TryClaimTeamSlot("Full House", "joiny", 0, 5); });
+                start.Set();
+                var won = await Task.WhenAll(a, b);
+                won.Count(w => w).Should().Be(1, $"one free slot, round {round}");
+                Members(path, "Full House").Should().Be(5, $"never six, round {round}");
+            }
+            // NPC slots count too: four players and one NPC leave no slot
+            TeamCornerRig.Exec(path, "UPDATE players SET player_data = json_set(player_data, '$.player.team', '') WHERE username IN ('joinx', 'joiny');");
+            (await one.TryClaimTeamSlot("Full House", "joinx", 1, 5)).Should().BeFalse();
+            Members(path, "Full House").Should().Be(4);
+        }
+        finally
+        {
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            try { File.Delete(path); } catch { }
+        }
+    }
+
+    [Fact]
+    public async Task ASecondJoin_BeforeTheFirstJoinersSaveLands_IsRefused()
+    {
+        // the first join's full save has not landed (in a test it never does); the claim wrote the team already
+        var npc = TeamCornerRig.Npc("tc_t1_npc", "Crowd Npc", "Crowded");
+        NPCSpawnSystem.Instance.ActiveNPCs.Add(npc);
+        var saved = UsurperRemake.Server.SessionContext.Current;
+        try
+        {
+            await TeamCornerRig.Online(async (db, path) =>
+            {
+                (await db.CreatePlayerTeam("Crowded", SqlSaveBackend.HashTeamPassword("pw"), "crowda")).Should().BeTrue();
+                foreach (var k in new[] { "crowda", "crowdb", "crowdc" }) TeamCornerRig.PlayerRow(path, k, "Crowded");
+                TeamCornerRig.PlayerRow(path, "firstj", "");
+                TeamCornerRig.PlayerRow(path, "secondj", "");
+
+                async Task<(Character hero, string shown)> Join(string key)
+                {
+                    UsurperRemake.Server.SessionContext.Current = new UsurperRemake.Server.SessionContext
+                        { InputStream = Stream.Null, OutputStream = Stream.Null, Username = key, CharacterKey = key };
+                    var hero = TeamCornerRig.Hero(name: char.ToUpper(key[0]) + key.Substring(1));
+                    string shown = await new TeamCornerRig(hero, new[] { "crowded", "pw", "" }).Run("JoinTeam");
+                    return (hero, shown);
+                }
+
+                var (first, firstShown) = await Join("firstj");
+                first.Team.Should().Be("Crowded");
+                firstShown.Should().Contain(Loc.Get("team.joined_team", "Crowded"));
+                var (second, secondShown) = await Join("secondj");
+                secondShown.Should().Contain(Loc.Get("team.join_team_full", "Crowded", 5));
+                second.Team.Should().BeEmpty();
+                Members(path, "Crowded").Should().Be(4, "three players and the first joiner, with the NPC five");
+                WorldSimulator.UnregisterPlayerTeam("Crowded");
+            });
+        }
+        finally
+        {
+            UsurperRemake.Server.SessionContext.Current = saved;
+            NPCSpawnSystem.Instance.ActiveNPCs.Remove(npc);
+        }
     }
 }
