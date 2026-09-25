@@ -127,12 +127,15 @@ public class ClassicMainStreetNotices1114Tests
     }
 
     [Fact]
-    public void Tip_ForAVeteran_TheNoticeCarriesTheFirstDraw()
+    public void Tip_ForAVeteran_FollowsTheNotice_StillTenTimes()
     {
         var vet = new Character { Name1 = "Vet", Name2 = "Vet", Level = 7, MKills = 40, HP = 100, MaxHP = 100, AI = CharacterAI.Human };
         vet.HintsShown.UnionWith(new[] { "menu_tier_1", "menu_tier_2", "menu_tier_3" });
-        Draws(vet, 11, "visual", out string text).Should().Be(9, "the first draw shows the notice, which names Settings");
-        Regex.Matches(text, Regex.Escape(Loc.Get("main_street.districts_notice"))).Count.Should().Be(1);
+        Draws(vet, 1, "visual", out string first).Should().Be(0, "the first draw shows the notice, which names Settings, and no tip");
+        first.Should().Contain(Loc.Get("main_street.districts_notice"));
+        vet.ClassicTipDraws.Should().Be(0);
+        Draws(vet, 11, "visual", out string text).Should().Be(10, "then the tip on the next ten draws");
+        text.Should().NotContain(Loc.Get("main_street.districts_notice"));
         vet.ClassicTipDraws.Should().Be(10);
     }
 

@@ -457,14 +457,14 @@ public partial class MainStreetLocation
 
     /// <summary>
     /// v1.1.14: the "switch back to the classic layout" tip, on a character's first ten district Main Street
-    /// draws (counted and saved per character; classic draws do not count). On a draw that shows the one-time
-    /// reorganisation notice the notice, which names the same setting, stands in for the tip and the draw counts.
+    /// draws that show it (counted and saved per character; classic draws do not count). The draw that shows the
+    /// one-time reorganisation notice, which names the same setting, shows no tip and is not counted.
     /// </summary>
     internal static string? TakeClassicLayoutTip(Character player, bool noticeShown)
     {
-        if (player == null || player.ClassicMainStreet || player.ClassicTipDraws >= ClassicTipDrawLimit) return null;
+        if (player == null || player.ClassicMainStreet || noticeShown || player.ClassicTipDraws >= ClassicTipDrawLimit) return null;
         player.ClassicTipDraws++;
-        return noticeShown ? null : Loc.Get("main_street.classic_tip");
+        return Loc.Get("main_street.classic_tip");
     }
 
     /// <summary>v1.1.13: the help screen: every unlocked place under the key path that reaches it.</summary>
