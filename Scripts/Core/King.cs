@@ -390,6 +390,8 @@ public class King
         if (string.IsNullOrWhiteSpace(name))
             name = "Unknown Ruler";
 
+        // Pick up any orphaned children that were flagged while no king existed
+        var orphans = inheritedOrphans ?? new List<RoyalOrphan>();
         var king = new King
         {
             Name = name,
@@ -402,11 +404,8 @@ public class King
             CityTaxPercent = 2,
             CoronationDate = DateTime.Now,
             TotalReign = 0,
-            Orphans = inheritedOrphans ?? new List<RoyalOrphan>()
+            Orphans = orphans.Concat(WorldSimulator.OrphanedChildrenToPickUp(orphans)).ToList()
         };
-
-        // Pick up any orphaned children that were flagged while no king existed
-        WorldSimulator.PickUpOrphanedChildren(king);
 
         return king;
     }

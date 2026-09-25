@@ -1631,10 +1631,19 @@ public class WorldSimulator
                     IsRealOrphan = true
                 };
 
-                king.Orphans.Add(orphan);
+                // v1.1.13: the arrival is one guarded court change (the stored court's cap and duplicates decide)
+                var record = OnlineStateManager.OrphanData(orphan);
+                bool admitted = CastleLocation.CourtChangeAsync(court =>
+                {
+                    if (court.Orphans.Count >= GameConfig.MaxRoyalOrphans
+                        || court.Orphans.Any(o => o.Name == record.Name && o.IsRealOrphan)) return false;
+                    court.Orphans.Add(record);
+                    return true;
+                }).GetAwaiter().GetResult();
 
-                NewsSystem.Instance?.Newsy(
-                    $"🏠 Young {child.Name}, child of the late {child.Mother} and {child.Father}, has been taken into the Royal Orphanage.");
+                if (admitted)
+                    NewsSystem.Instance?.Newsy(
+                        $"🏠 Young {child.Name}, child of the late {child.Mother} and {child.Father}, has been taken into the Royal Orphanage.");
             }
             else if (king == null)
             {
@@ -1774,8 +1783,34 @@ public class WorldSimulator
             return;
         }
 
-        // Remove from orphanage
-        king.Orphans.Remove(orphan);
+        // 30% chance: become a royal guard (if slots available); 70% (or guard slots full): a citizen NPC
+        bool wantsGuard = random.Next(100) < 30;
+
+        // v1.1.13: the orphan leaves the stored court (and joins its guard) in one guarded court change; the
+        // child record and the NPC follow only once it is written, so a court reload cannot graduate it twice
+        bool becameGuard = false;
+        string name = orphan.Name;
+        var sex = orphan.Sex;
+        if (!CastleLocation.CourtChangeAsync(court =>
+            {
+                becameGuard = false;
+                if (court.Orphans.RemoveAll(o => o.Name == name && o.IsRealOrphan) == 0) return false;
+                if (wantsGuard && court.Guards.Count < King.MaxNPCGuards)
+                {
+                    court.Guards.Add(new RoyalGuardSaveData
+                    {
+                        Name = name,
+                        AI = (int)CharacterAI.Computer,
+                        Sex = (int)sex,
+                        DailySalary = GameConfig.BaseGuardSalary,
+                        Loyalty = 85, // High loyalty — raised by the crown
+                        IsActive = true
+                    });
+                    becameGuard = true;
+                }
+                return true;
+            }).GetAwaiter().GetResult())
+            return;
 
         // Mark underlying Child as Deleted
         var child = FamilySystem.Instance?.AllChildren
@@ -1784,36 +1819,18 @@ public class WorldSimulator
         if (child != null)
             child.Deleted = true;
 
-        int roll = random.Next(100);
-
-        if (roll < 30 && king.Guards.Count < King.MaxNPCGuards)
-        {
-            // 30% chance: become a royal guard (if slots available)
-            OrphanBecomesRoyalGuard(orphan, king);
-        }
+        if (becameGuard)
+            OrphanBecomesRoyalGuard(orphan);
         else
-        {
-            // 70% chance (or guard slots full): released as citizen NPC
             OrphanBecomesNPC(orphan);
-        }
     }
 
     /// <summary>
     /// Orphan graduates to become a Royal Guard with high loyalty (raised by the crown).
+    /// v1.1.13: the guard itself joined the stored court in the graduation's court change.
     /// </summary>
-    private void OrphanBecomesRoyalGuard(RoyalOrphan orphan, King king)
+    private void OrphanBecomesRoyalGuard(RoyalOrphan orphan)
     {
-        var guard = new RoyalGuard
-        {
-            Name = orphan.Name,
-            AI = CharacterAI.Computer,
-            Sex = orphan.Sex,
-            DailySalary = GameConfig.BaseGuardSalary,
-            RecruitmentDate = DateTime.Now,
-            Loyalty = 85 // High loyalty — raised by the crown
-        };
-        king.Guards.Add(guard);
-
         // Also create the NPC entity so the guard has real combat stats
         OrphanBecomesNPC(orphan);
 
@@ -2134,16 +2151,18 @@ public class WorldSimulator
 
     /// <summary>
     /// Pick up orphaned children who were flagged while no king existed.
-    /// Called when a new king is crowned or when the orphanage is first accessed.
+    /// Called when a new king is crowned. v1.1.13: returns them for the new king's construction; it no
+    /// longer changes a court.
     /// </summary>
-    public static void PickUpOrphanedChildren(King king)
+    public static List<RoyalOrphan> OrphanedChildrenToPickUp(List<RoyalOrphan> existing)
     {
+        var picked = new List<RoyalOrphan>();
         var familySystem = FamilySystem.Instance;
-        if (familySystem == null || king == null) return;
+        if (familySystem == null || existing == null) return picked;
 
         var orphanedChildren = familySystem.AllChildren
             .Where(c => !c.Deleted && c.Location == GameConfig.ChildLocationOrphanage &&
-                        !king.Orphans.Any(o => o.Name == c.Name && o.IsRealOrphan))
+                        !existing.Any(o => o.Name == c.Name && o.IsRealOrphan))
             .ToList();
 
         // v0.63.0 slice 4 (audit npc-N4): per-instance NPC list is in scope here
@@ -2153,13 +2172,13 @@ public class WorldSimulator
 
         foreach (var child in orphanedChildren)
         {
-            if (king.Orphans.Count >= GameConfig.MaxRoyalOrphans) break;
+            if (existing.Count + picked.Count >= GameConfig.MaxRoyalOrphans) break;
 
             var inheritedRace = inst != null
                 ? inst.DetermineOrphanRace(child)
                 : CharacterRace.Human;
 
-            king.Orphans.Add(new RoyalOrphan
+            picked.Add(new RoyalOrphan
             {
                 Name = child.Name,
                 Age = child.Age,
@@ -2183,6 +2202,7 @@ public class WorldSimulator
             DebugLogger.Instance.LogInfo("ORPHANAGE",
                 $"Picked up {orphanedChildren.Count} orphaned children for new king");
         }
+        return picked;
     }
 
     /// <summary>
