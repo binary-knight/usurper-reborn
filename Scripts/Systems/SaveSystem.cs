@@ -776,6 +776,7 @@ namespace UsurperRemake.Systems
                 AutoLevelUp = player.AutoLevelUp,
                 AutoEquipDisabled = player.AutoEquipDisabled,
                 AutoCombatHealPercent = player.AutoCombatHealPercent, // v1.1.13: auto-combat potion threshold
+                ClassicMainStreet = player.ClassicMainStreet, // v1.1.14: Main Street layout preference
                 DateFormatPreference = player.DateFormatPreference,
                 AutoRedistributeXP = player.AutoRedistributeXP,
                 Specialization = (int)player.Specialization,
