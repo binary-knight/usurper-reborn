@@ -443,8 +443,9 @@ public class LeftoversFollowup1114ATests : IDisposable
                 if (file.Contains("node_modules") || file.Contains(Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar)
                     || file.Contains(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar)) continue;
                 var lines = File.ReadAllLines(file);
+                // a comment line that names the table is not a reader
                 for (int i = 0; i < lines.Length; i++)
-                    if (lines[i].Contains("bounty_claims"))
+                    if (lines[i].Contains("bounty_claims") && !lines[i].TrimStart().StartsWith("//"))
                         uses.Add($"{Path.GetRelativePath(dir.FullName, file)}: {lines[i].Trim()}");
             }
         }
