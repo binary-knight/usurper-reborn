@@ -380,4 +380,49 @@ public class Leftovers1114BTests : IDisposable
         UsurperRemake.Server.MudServer.DeletePurgeArgs("{\"reason\":\"x\"}").Should().BeNull();
         UsurperRemake.Server.MudServer.DeletePurgeArgs("not json").Should().BeNull();
     }
+
+    // ─── C5 follow-up: the court politics news is localized ───
+
+    [Fact]
+    public void CourtPoliticsNews_IsWrittenInTheNewsLanguage()
+    {
+        string before = GameConfig.Language;
+        try
+        {
+            foreach (var lang in new[] { "en", "es", "fr", "hu", "it" })
+            {
+                GameConfig.Language = lang;
+                var queen = King.CreateNewKing("Loc Monarch", CharacterAI.Computer, CharacterSex.Female);
+                queen.Treasury = 50_000;
+                string title = Loc.Get("castle.queen");
+                foreach (var (type, key) in new[] { ("Scandal", "worldsim.court.scandal"), ("Assassination", "worldsim.court.assassination_attempt"), ("Sabotage", "worldsim.court.sabotage") })
+                {
+                    var news = new List<(bool Important, string Text)>();
+                    typeof(WorldSimulator).GetMethod("ExecutePlot", Priv)!.Invoke(new WorldSimulator(),
+                        new object[] { queen, new CourtIntrigue { PlotType = type, Progress = 100 }, news });
+                    news.Should().ContainSingle().Which.Text.Should().Be(Loc.Get(key, title, "Loc Monarch"), $"{type} in {lang}");
+                }
+                var coup = new List<(bool Important, string Text)>();
+                typeof(WorldSimulator).GetMethod("ExecutePlot", Priv)!.Invoke(new WorldSimulator(),
+                    new object[] { queen, new CourtIntrigue { PlotType = "Coup", Progress = 100 }, coup });
+                coup.Single().Text.Should().Be(Loc.Get("worldsim.court.coup_attempt", 0, title, "Loc Monarch"));
+                if (lang != "en") coup.Single().Text.Should().NotContain("COUP ATTEMPT", $"the {lang} line is not the English one");
+            }
+        }
+        finally { GameConfig.Language = before; }
+    }
+
+    [Fact]
+    public void CourtPoliticsNews_HasNoEnglishLiterals()
+    {
+        var sim = Source("Systems", "WorldSimulator.cs").Replace("\r\n", "\n");
+        foreach (var method in new[] { "private void ProcessNPCGuardRecruitment(", "private void AdvancePlot(", "private void ExecutePlot(" })
+        {
+            int start = sim.IndexOf(method, StringComparison.Ordinal);
+            int end = sim.IndexOf("\n    }\n", start, StringComparison.Ordinal);
+            var body = sim.Substring(start, end - start);
+            System.Text.RegularExpressions.Regex.Matches(body, @"news\.Add\(\((true|false),\s*\$?""").Count.Should().Be(0, $"{method} posts only Loc.Get text");
+            body.Should().Contain("news.Add((");
+        }
+    }
 }
