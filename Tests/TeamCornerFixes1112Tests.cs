@@ -637,6 +637,39 @@ public class TeamCornerFixes1112Tests : IDisposable
         });
     }
 
+    [Fact]
+    public async Task AVaultDeposit_SavesThePlayerAndCreditsTheVault_InOneTransaction()
+    {
+        // v1.1.14: the player's save failing takes the vault credit back with it
+        await TeamCornerRig.Online(async (db, path) =>
+        {
+            var hero = TeamCornerRig.Hero(name: "Vault Hero", team: "Savers", gold: 1000);
+            string key = UsurperRemake.BBS.DoorMode.GetPlayerName().ToLowerInvariant();   // the save key AutoSave uses here
+            TeamCornerRig.Exec(path, $"INSERT INTO players (username, display_name, player_data) VALUES ('{key}', 'Vault Hero', '{{}}');");
+            TeamCornerRig.Exec(path, "CREATE TRIGGER no_save_i BEFORE INSERT ON players BEGIN SELECT RAISE(ABORT, 'test'); END;" +
+                                     "CREATE TRIGGER no_save_u BEFORE UPDATE ON players BEGIN SELECT RAISE(ABORT, 'test'); END;");
+            await new TeamCornerRig(hero, new[] { "600" }).Run("DepositToVault", db, "Savers");
+            (await db.GetTeamVaultGold("Savers")).Should().Be(0, "the credit is rolled back with the save that failed");
+            hero.Gold.Should().Be(1000);
+            TeamCornerRig.Scalar(path, $"SELECT player_data FROM players WHERE username = '{key}'").Should().Be("{}");
+
+            // a save that writes no row (no row for the key, and the insert refused) is no save either
+            TeamCornerRig.Exec(path, $"DELETE FROM players WHERE username = '{key}';");
+            await new TeamCornerRig(hero, new[] { "600" }).Run("DepositToVault", db, "Savers");
+            (await db.GetTeamVaultGold("Savers")).Should().Be(0);
+            hero.Gold.Should().Be(1000);
+
+            // and the credit failing (the vault is full) writes no save without the gold
+            TeamCornerRig.Exec(path, "DROP TRIGGER no_save_i; DROP TRIGGER no_save_u;");
+            var data = new SaveGameData { Version = GameConfig.SaveVersion, Player = new PlayerData { Name1 = "vh", Name2 = "Vault Hero", Gold = 400 } };
+            (await db.WriteGameDataWithVaultDeposit("vh", data, "Savers", GameConfig.TeamVaultBaseCapacity + 1)).Should().BeFalse();
+            Convert.ToInt64(TeamCornerRig.Scalar(path, "SELECT COUNT(*) FROM players WHERE username = 'vh'")).Should().Be(0);
+            (await db.WriteGameDataWithVaultDeposit("vh", data, "Savers", 600)).Should().BeTrue();
+            (await db.GetTeamVaultGold("Savers")).Should().Be(600);
+            Convert.ToInt64(TeamCornerRig.Scalar(path, "SELECT json_extract(player_data, '$.player.gold') FROM players WHERE username = 'vh'")).Should().Be(400);
+        });
+    }
+
     // ---------- 8. equipping ----------
 
     [Fact]

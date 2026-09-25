@@ -4064,14 +4064,14 @@ public class TeamCornerLocation : BaseLocation
         if (amount <= 0) return;
 
         // v1.1.12: the vault row was credited at once but the gold left the player only in memory, so a
-        // crash before the next autosave kept both. Now the gold is taken and saved first, then the vault
-        // is credited (capacity checked in the SQL); if the credit fails the gold comes back.
+        // crash before the next autosave kept both. v1.1.14: the save without the gold and the vault credit
+        // (capacity checked in the SQL) are one transaction, so a crash between them cannot lose the gold;
+        // if it does not land, nothing was written and the gold comes back in memory.
         currentPlayer.Gold -= amount;
-        bool deposited = await ForcePlayerSave() && await backend.DepositToTeamVault(teamName, amount);
+        bool deposited = await SaveSystem.Instance.SaveWithTeamVaultDeposit(currentPlayer, teamName, amount);
         if (!deposited)
         {
             currentPlayer.Gold += amount;
-            await ForcePlayerSave();
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.vault_full"));
             await Task.Delay(1500);

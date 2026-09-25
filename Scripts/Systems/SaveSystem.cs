@@ -269,6 +269,30 @@ namespace UsurperRemake.Systems
                     return true; // Pretend success, save will happen soon
             }
 
+            var (playerName, saveData) = await BuildAutoSaveData(player);
+
+            var success = await backend.WriteAutoSave(playerName, saveData);
+
+            // Sync stats to Steam if available (blocked if dev menu was used)
+            if (success && player is Player playerChar && playerChar.Statistics != null && !player.DevMenuUsed)
+            {
+                SteamIntegration.SyncPlayerStats(playerChar.Statistics);
+            }
+
+            // In online mode, push NPC changes to shared world_state
+            // Skip this — the WorldSimService already saves NPC state every 5 minutes
+            // with dirty-checking. Player sessions don't need to duplicate this work.
+            // The world sim is the authority for NPC state in online mode.
+
+            if (success)
+                _lastAutoSaveByKey[throttleKey] = DateTime.UtcNow;
+
+            return success;
+        }
+
+        /// <summary>v1.1.14: the save AutoSave writes, and the key it writes it under (the session's character key online).</summary>
+        private async Task<(string Key, SaveGameData Data)> BuildAutoSaveData(Character player)
+        {
             // In online mode, use the session's character key (handles alt characters correctly)
             var playerName = UsurperRemake.BBS.DoorMode.IsOnlineMode
                 ? (UsurperRemake.BBS.DoorMode.GetPlayerName()?.ToLowerInvariant() ?? player.Name2 ?? player.Name1)
@@ -292,23 +316,19 @@ namespace UsurperRemake.Systems
                 Settings = SerializeDailySettings(),
                 StorySystems = SerializeStorySystems()
             };
+            return (playerName, saveData);
+        }
 
-            var success = await backend.WriteAutoSave(playerName, saveData);
-
-            // Sync stats to Steam if available (blocked if dev menu was used)
-            if (success && player is Player playerChar && playerChar.Statistics != null && !player.DevMenuUsed)
-            {
-                SteamIntegration.SyncPlayerStats(playerChar.Statistics);
-            }
-
-            // In online mode, push NPC changes to shared world_state
-            // Skip this — the WorldSimService already saves NPC state every 5 minutes
-            // with dirty-checking. Player sessions don't need to duplicate this work.
-            // The world sim is the authority for NPC state in online mode.
-
-            if (success)
-                _lastAutoSaveByKey[throttleKey] = DateTime.UtcNow;
-
+        /// <summary>
+        /// v1.1.14: the player's save (as AutoSave writes it, now) and a team vault credit as one SQL transaction
+        /// (SqlSaveBackend.WriteGameDataWithVaultDeposit). False, with nothing written, without an SQL backend.
+        /// </summary>
+        public async Task<bool> SaveWithTeamVaultDeposit(Character player, string teamName, long amount)
+        {
+            if (player == null || backend is not SqlSaveBackend sql) return false;
+            var (playerName, saveData) = await BuildAutoSaveData(player);
+            bool success = await sql.WriteGameDataWithVaultDeposit(playerName, saveData, teamName, amount);
+            if (success) _lastAutoSaveByKey[AutoSaveThrottleKey(player)] = DateTime.UtcNow;
             return success;
         }
 

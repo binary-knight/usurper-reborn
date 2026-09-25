@@ -1089,7 +1089,18 @@ namespace UsurperRemake.Systems
         // ISaveBackend Implementation (Core save/load)
         // =====================================================================
 
-        public async Task<bool> WriteGameData(string playerName, SaveGameData data)
+        public Task<bool> WriteGameData(string playerName, SaveGameData data) => WriteGameDataCore(playerName, data, null, 0);
+
+        /// <summary>
+        /// v1.1.14: the player's save and a team vault credit in one SQL transaction: both land or neither does,
+        /// so a crash between them can neither lose the gold (taken from the save, never credited) nor duplicate
+        /// it. The credit is checked against the vault's capacity in the statement (as DepositToTeamVault); false,
+        /// with nothing written, when it does not fit or the save fails.
+        /// </summary>
+        public Task<bool> WriteGameDataWithVaultDeposit(string playerName, SaveGameData data, string teamName, long amount) =>
+            WriteGameDataCore(playerName, data, teamName, amount);
+
+        private async Task<bool> WriteGameDataCore(string playerName, SaveGameData data, string? vaultTeam, long vaultAmount)
         {
             try
             {
@@ -1123,7 +1134,21 @@ namespace UsurperRemake.Systems
                 var normalizedUsername = playerName.ToLower();
 
                 using var connection = OpenConnection();
+                // v1.1.14: a vault credit and the save commit together (no transaction for a plain save)
+                using var tx = vaultTeam != null ? connection.BeginTransaction() : null;
+                if (vaultTeam != null)
+                {
+                    using var vault = connection.CreateCommand();
+                    vault.Transaction = tx;
+                    vault.CommandText = VaultDepositSql;
+                    vault.Parameters.AddWithValue("@team", vaultTeam);
+                    vault.Parameters.AddWithValue("@amount", vaultAmount);
+                    vault.Parameters.AddWithValue("@base", GameConfig.TeamVaultBaseCapacity);
+                    vault.Parameters.AddWithValue("@per", GameConfig.TeamVaultCapacityPerLevel);
+                    if (await vault.ExecuteNonQueryAsync() != 1) { tx!.Rollback(); return false; }
+                }
                 using var cmd = connection.CreateCommand();
+                cmd.Transaction = tx;
                 // Persist account-level preferences so they apply before character load
                 int screenReaderFlag = data.Player?.ScreenReaderMode == true ? 1 : 0;
                 string language = data.Player?.Language ?? "en";
@@ -1160,9 +1185,12 @@ namespace UsurperRemake.Systems
                             language = @language
                         WHERE LOWER(username) = LOWER(@username);
                     ";
-                    await cmd.ExecuteNonQueryAsync();
+                    int saved = await cmd.ExecuteNonQueryAsync();
+                    // v1.1.14: with a vault credit, a save that wrote no row is no save: nothing is committed
+                    if (tx != null && saved == 0) { tx.Rollback(); return false; }
                     DebugLogger.Instance.LogWarning("SQL", $"Display name '{displayName}' conflicts with another player — saved data without updating display_name for '{playerName}'");
                 }
+                tx?.Commit();
                 DebugLogger.Instance.LogDebug("SQL", $"Saved game data for '{playerName}'");
                 return true;
             }
@@ -7827,20 +7855,22 @@ namespace UsurperRemake.Systems
         catch { return 0; }
     }
 
+    // v1.1.12: the capacity is enforced here, from the vault level in the same statement, so two
+    // deposits at once cannot overfill it; no row changed when it would not fit
+    private const string VaultDepositSql = @"WITH cap AS (SELECT @base + @per * COALESCE((SELECT level FROM team_upgrades
+                                    WHERE team_name = @team AND upgrade_type = 'vault'), 0) AS c)
+                                INSERT INTO team_vault (team_name, gold)
+                                SELECT @team, @amount WHERE @amount > 0 AND @amount <= (SELECT c FROM cap)
+                                ON CONFLICT(team_name) DO UPDATE SET gold = gold + @amount
+                                WHERE team_vault.gold + @amount <= (SELECT c FROM cap);";
+
     public async Task<bool> DepositToTeamVault(string teamName, long amount)
     {
         try
         {
             using var connection = OpenConnection();
             using var cmd = connection.CreateCommand();
-            // v1.1.12: the capacity is enforced here, from the vault level in the same statement, so two
-            // deposits at once cannot overfill it; false when it would not fit
-            cmd.CommandText = @"WITH cap AS (SELECT @base + @per * COALESCE((SELECT level FROM team_upgrades
-                                    WHERE team_name = @team AND upgrade_type = 'vault'), 0) AS c)
-                                INSERT INTO team_vault (team_name, gold)
-                                SELECT @team, @amount WHERE @amount > 0 AND @amount <= (SELECT c FROM cap)
-                                ON CONFLICT(team_name) DO UPDATE SET gold = gold + @amount
-                                WHERE team_vault.gold + @amount <= (SELECT c FROM cap);";
+            cmd.CommandText = VaultDepositSql;
             cmd.Parameters.AddWithValue("@team", teamName);
             cmd.Parameters.AddWithValue("@amount", amount);
             cmd.Parameters.AddWithValue("@base", GameConfig.TeamVaultBaseCapacity);
