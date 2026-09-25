@@ -3787,6 +3787,8 @@ namespace UsurperRemake.Systems
                 if (ipRows > 0)
                     DebugLogger.Instance.LogInfo("BAN", $"Unban '{username}' also lifted {ipRows} associated IP ban(s).");
                 DebugLogger.Instance.LogInfo("SQL", $"Player '{username}' unbanned by admin");
+                // v1.1.14: a guild left with no leader (all its members were banned) passes to the unbanned member
+                (GuildSystem.Instance ?? new GuildSystem(databasePath, register: false)).FillLeaderlessGuildOf(username);
             }
             catch (Exception ex)
             {

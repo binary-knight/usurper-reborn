@@ -165,3 +165,94 @@ public partial class OwnerProcessConflictTests
         return dir!.FullName;
     }
 }
+
+/// <summary>v1.1.14 T6: a guild left with no leader passes to a member once one can lead.</summary>
+[Collection("SharedGameSingletons")]
+public class LeaderlessGuildTests : IDisposable
+{
+    private readonly string _path = Path.Combine(Path.GetTempPath(), $"usurper-lg-{Guid.NewGuid():N}.db");
+    private readonly SqlSaveBackend _db;
+
+    public LeaderlessGuildTests() { _db = new SqlSaveBackend(_path); }
+
+    public void Dispose()
+    {
+        SqliteConnection.ClearAllPools();
+        try { File.Delete(_path); } catch { }
+    }
+
+    private void Exec(string sql)
+    {
+        using var conn = new SqliteConnection($"Data Source={_path}");
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = sql;
+        cmd.ExecuteNonQuery();
+    }
+
+    private string? Scalar(string sql)
+    {
+        using var conn = new SqliteConnection($"Data Source={_path}");
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = sql;
+        return cmd.ExecuteScalar()?.ToString();
+    }
+
+    private void Player(string key, int level, bool banned = false) =>
+        Exec($"INSERT INTO players (username, display_name, player_data, is_banned) VALUES ('{key}', '{key}', " +
+             $"'{{\"player\":{{\"level\":{level}}}}}', {(banned ? 1 : 0)});");
+
+    /// <summary>A guild whose leader was deleted while every other member is banned: the succession found no one.</summary>
+    private GuildSystem LeaderlessGuild()
+    {
+        var guilds = new GuildSystem(_path, register: false);
+        Player("boss", 90);
+        Player("exiled", 50, banned: true);
+        Player("outcast", 70, banned: true);
+        Exec("INSERT INTO guilds (name, display_name, leader_username) VALUES ('ironhand', 'Ironhand', 'boss');");
+        Exec("INSERT INTO guild_members (username, guild_name, rank, joined_at) VALUES ('exiled', 'ironhand', 'Member', '2026-01-01 00:00:00');");
+        Exec("INSERT INTO guild_members (username, guild_name, rank, joined_at) VALUES ('outcast', 'ironhand', 'Member', '2026-01-02 00:00:00');");
+        guilds.PassLeadershipOf("boss").Should().Be(0, "every remaining member is banned");
+        Scalar("SELECT leader_username FROM guilds WHERE name = 'ironhand'").Should().Be("boss");
+        return guilds;
+    }
+
+    [Fact]
+    public async Task AnUnbannedMember_TakesOverAGuildWithNoLeader()
+    {
+        LeaderlessGuild();
+        await _db.UnbanPlayer("exiled");
+        Scalar("SELECT leader_username FROM guilds WHERE name = 'ironhand'").Should().Be("exiled", "the unbanned member can lead; the other is still banned");
+        Scalar("SELECT rank FROM guild_members WHERE username = 'exiled'").Should().Be("Leader");
+
+        // a second unban does not move the leadership again
+        await _db.UnbanPlayer("outcast");
+        Scalar("SELECT leader_username FROM guilds WHERE name = 'ironhand'").Should().Be("exiled");
+    }
+
+    [Fact]
+    public void ANonBannedJoiner_TakesOverAGuildWithNoLeader()
+    {
+        var guilds = LeaderlessGuild();
+        Player("recruit", 10);
+        guilds.AddMember("recruit", "ironhand").Should().BeNull();
+        Scalar("SELECT leader_username FROM guilds WHERE name = 'ironhand'").Should().Be("recruit");
+        Scalar("SELECT rank FROM guild_members WHERE username = 'recruit'").Should().Be("Leader");
+    }
+
+    [Fact]
+    public void AWebUnban_IsPickedUpByTheSweep_AndAGuildWithALeaderIsLeftAlone()
+    {
+        var guilds = LeaderlessGuild();
+        Exec("UPDATE players SET is_banned = 0 WHERE username = 'outcast';");   // the web's unban writes the row directly
+        Player("chief", 20);
+        Exec("INSERT INTO guilds (name, display_name, leader_username) VALUES ('stonehall', 'Stonehall', 'chief');");
+        Exec("INSERT INTO guild_members (username, guild_name, rank) VALUES ('chief', 'stonehall', 'Leader');");
+
+        guilds.FillLeaderlessGuilds().Should().Be(1);
+        Scalar("SELECT leader_username FROM guilds WHERE name = 'ironhand'").Should().Be("outcast");
+        Scalar("SELECT leader_username FROM guilds WHERE name = 'stonehall'").Should().Be("chief");
+        guilds.FillLeaderlessGuilds().Should().Be(0, "nothing left to fill");
+    }
+}
