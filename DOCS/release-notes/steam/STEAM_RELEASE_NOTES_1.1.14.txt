@@ -1,0 +1,11 @@
+[h1]Usurper Reborn 1.1.14[/h1]
+
+[list]
+[*]The classic Main Street layout is back as a setting: Settings [~], key S. Districts stay the default, and the district menu mentions the setting on your first 10 visits.
+[*]Every online pause keeps a command typed ahead for the next prompt.
+[*]Combat: Engulf is not used on a target that is already held, a goblin uses its Critical Strike once per fight, and a monster's stun on a teammate follows the hold rules.
+[*]The alt character slot opens at level 25.
+[*]Teams never go past five members by any route, and a new team does not inherit an old team's wars.
+[*]The royal court: petitions cannot overspend the treasury, a dead monarch's throne stays empty, and sales tax is credited once, even across a restart.
+[*]No two items share a name in any language.
+[/list]
