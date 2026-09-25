@@ -508,6 +508,16 @@ public partial class PrisonLocation : BaseLocation
         return true;
     }
 
+    /// <summary>v1.1.13: bail set on the prisoner's stored record, as one guarded court change (false: no record there).</summary>
+    internal static Task<bool> SetBailAsync(UsurperRemake.Systems.OnlineStateManager? osm, string playerName, long bail) =>
+        CastleLocation.CourtChangeAsync(osm, court =>
+        {
+            var stored = court.Prisoners.FirstOrDefault(p => p.CharacterName == playerName);
+            if (stored == null) return false;
+            stored.BailAmount = bail;
+            return true;
+        });
+
     /// <summary>
     /// Handle petition to the king for release or bail setting
     /// </summary>
@@ -549,9 +559,10 @@ public partial class PrisonLocation : BaseLocation
                 if (king.AI == CharacterAI.Computer)
                 {
                     long bailAmount = 1000 + player.Level * 500;
-                    if (king.Prisoners.TryGetValue(playerName, out var rec) && rec != null)
+                    // v1.1.13: the bail is set on the stored record in one guarded court change, so paying it at once
+                    // meets the same amount
+                    if (await SetBailAsync(CastleLocation.TreasuryOsm(), playerName, bailAmount))
                     {
-                        rec.BailAmount = bailAmount;
                         await terminal.WriteColorLineAsync($"  The king considers your petition...", TerminalEmulator.ColorWhite);
                         await Task.Delay(1500);
                         await terminal.WriteColorLineAsync($"  Bail has been set at {bailAmount:N0} gold.", TerminalEmulator.ColorGreen);
