@@ -278,4 +278,47 @@ public class Leftovers1114BTests : IDisposable
         program.Split("pauseWithoutLock: true").Length.Should().Be(3, "the door's embedded sim and the standalone sim");
         Source("Server", "MudServer.cs").Should().NotContain("pauseWithoutLock");
     }
+
+    // ─── M3 follow-up: every process gives an Id-less record the same Id ───
+
+    private static List<NPCData> RoundTrip(List<NPCData> data) =>
+        JsonSerializer.Deserialize<List<NPCData>>(JsonSerializer.Serialize(data, Json), Json)!;
+
+    [Fact]
+    public async Task TwoProcessesRestoringTheSameIdlessRecord_GiveItTheSameId()
+    {
+        Npc("npc_m3b_a", "M3b Ada");
+        Npc("npc_m3b_b", "M3b Bo");
+        var stored = RoundTrip(OnlineStateManager.SerializeCurrentNPCs());
+        stored.Single(d => d.Name == "M3b Ada").Id = null!;
+        stored.Single(d => d.Name == "M3b Bo").Id = "";
+
+        async Task<(string Ada, string Bo)> Restore(Func<List<NPCData>, Task> restore)
+        {
+            NPCSpawnSystem.Instance.ActiveNPCs.Clear();
+            await restore(RoundTrip(stored));
+            return (Find("M3b Ada")!.Id, Find("M3b Bo")!.Id);
+        }
+
+        // a door process's loader, the world sim's loader in another process, and a later restore
+        var door = await Restore(d => GameEngine.Instance.RestoreNPCs(d));
+        var sim = new WorldSimService(_db);
+        var worldSim = await Restore(d =>
+        {
+            typeof(WorldSimService).GetMethod("RestoreNPCsFromData", Priv)!.Invoke(sim, new object[] { d });
+            return Task.CompletedTask;
+        });
+        var again = await Restore(d => GameEngine.Instance.RestoreNPCs(d));
+
+        worldSim.Should().Be(door, "both processes derive the Id from the same record");
+        again.Should().Be(door);
+        door.Ada.Should().NotBe(door.Bo);
+        door.Ada.Should().Be(NPC.LegacyIdFor("M3b Ada", "npc_m3b_a"));
+        Guid.Parse(door.Ada).ToString("D")[14].Should().Be('5', "a name-based (version 5) UUID");
+
+        // a record that has an Id keeps it
+        NPC.LegacyIdFor("M3b Ada", "npc_m3b_a").Should().NotBe(NPC.LegacyIdFor("M3b Ada", "npc_other"));
+        stored.Single(d => d.Name == "M3b Ada").Id = "kept_id";
+        (await Restore(d => GameEngine.Instance.RestoreNPCs(d))).Ada.Should().Be("kept_id");
+    }
 }
