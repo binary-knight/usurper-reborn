@@ -40,6 +40,7 @@ namespace UsurperRemake.Systems
 
         // Heartbeat support for embedded worldsim (database-level leader election)
         private string? _heartbeatOwnerId;
+        private bool _heldWorldSimLock = true;   // v1.1.14: the last heartbeat's outcome, to log a change once
 
         /// <summary>
         /// Signals when initialization (systems + world state load) is complete.
@@ -135,7 +136,13 @@ namespace UsurperRemake.Systems
                         // Update heartbeat (embedded mode leader election)
                         if (_heartbeatOwnerId != null)
                         {
-                            sqlBackend.UpdateWorldSimHeartbeat(_heartbeatOwnerId);
+                            // v1.1.14: the beat lands only while this sim holds the lock (or it is free or stale)
+                            bool held = sqlBackend.UpdateWorldSimHeartbeat(_heartbeatOwnerId);
+                            if (held != _heldWorldSimLock)
+                                DebugLogger.Instance.LogWarning("WORLDSIM", held
+                                    ? "This world sim holds the world sim lock again."
+                                    : "Another process holds the world sim lock; this world sim no longer claims it.");
+                            _heldWorldSimLock = held;
                         }
 
                         // Check for 7 PM ET world daily reset

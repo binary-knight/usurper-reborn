@@ -293,4 +293,56 @@ public class Leftovers1114ATests : IDisposable
         await SimSave(sim);
         Find("M2 Target")!.Gold.Should().Be(99, "a version this process did not write is reloaded");
     }
+
+    // ─── M1: the world sim heartbeat is a compare-and-swap ───
+
+    [Fact]
+    public void TheHeartbeat_KeepsOnlyALockThatIsFreeStaleOrOurs()
+    {
+        _db.UpdateWorldSimHeartbeat("sim_a").Should().BeTrue("a free lock is taken");
+        _db.WorldSimLockOwner().Should().Be("sim_a");
+        WorldEditLog.NoteLockOwnerId("sim_a");
+        WorldEditLog.IsOwnerProcess(_db).Should().BeTrue();
+
+        // a second world sim on the same database beats: it does not take a held, fresh lock
+        _db.UpdateWorldSimHeartbeat("sim_b").Should().BeFalse();
+        _db.WorldSimLockOwner().Should().Be("sim_a");
+        WorldEditLog.IsOwnerProcess(_db).Should().BeTrue("the owner does not flip with the other sim's beat");
+        _db.UpdateWorldSimHeartbeat("sim_a").Should().BeTrue();
+        _db.UpdateWorldSimHeartbeat("sim_b").Should().BeFalse();
+        _db.WorldSimLockOwner().Should().Be("sim_a");
+
+        // a stale lock (its holder stopped beating) is taken
+        var stale = JsonSerializer.Serialize(new { owner = "sim_a", heartbeat = DateTime.UtcNow.AddMinutes(-5).ToString("o"), pid = 1, acquired = DateTime.UtcNow.AddMinutes(-60).ToString("o") });
+        Exec($"UPDATE world_state SET value = '{stale}' WHERE key = 'worldsim_lock';");
+        _db.UpdateWorldSimHeartbeat("sim_b").Should().BeTrue();
+        _db.WorldSimLockOwner().Should().Be("sim_b");
+        WorldEditLog.IsOwnerProcess(_db).Should().BeFalse("sim_a lost it");
+        _db.UpdateWorldSimHeartbeat("sim_a").Should().BeFalse("and cannot beat it back while sim_b beats");
+
+        // the MUD (or the standalone world sim) takes a fresh lock over at its start; the loser stops claiming it
+        _db.TakeOverWorldSimLock("mud_1");
+        _db.WorldSimLockOwner().Should().Be("mud_1");
+        _db.UpdateWorldSimHeartbeat("sim_b").Should().BeFalse();
+        _db.UpdateWorldSimHeartbeat("mud_1").Should().BeTrue();
+        _db.WorldSimLockOwner().Should().Be("mud_1");
+    }
+
+    [Fact]
+    public void TheMudAndTheStandaloneSim_TakeOverAHeldLock_AtTheirStart()
+    {
+        var mud = Source("Server", "MudServer.cs");
+        int acquire = mud.IndexOf("if (!sqlBackend.TryAcquireWorldSimLock(worldSimOwnerId))", StringComparison.Ordinal);
+        acquire.Should().BeGreaterThan(0);
+        mud.Substring(acquire, 300).Should().Contain("sqlBackend.TakeOverWorldSimLock(worldSimOwnerId);");
+
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "Console"))) dir = dir.Parent;
+        var program = File.ReadAllText(Path.Combine(dir!.FullName, "Console", "Bootstrap", "Program.cs"));
+        int standalone = program.IndexOf("if (!sqlBackend.TryAcquireWorldSimLock(ownerId))", StringComparison.Ordinal);
+        standalone.Should().BeGreaterThan(0);
+        program.Substring(standalone, 300).Should().Contain("sqlBackend.TakeOverWorldSimLock(ownerId);");
+        // a door's embedded world sim never takes a held lock over
+        program.Should().NotContain("TakeOverWorldSimLock(worldSimOwnerId)");
+    }
 }

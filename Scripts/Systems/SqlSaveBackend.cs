@@ -2503,8 +2503,19 @@ namespace UsurperRemake.Systems
         /// <summary>
         /// Update the world sim heartbeat. Called after each simulation tick.
         /// Other processes check this to determine if the lock is stale.
+        /// v1.1.14: a compare-and-swap, the same test as TryAcquireWorldSimLock in one transaction: the beat is
+        /// written only when the lock is free, stale, or already this owner's. It overwrote the lock
+        /// unconditionally, so two world sims beating on one database passed it back and forth and
+        /// IsOwnerProcess flipped between them. Returns false when another process holds the lock.
         /// </summary>
-        public void UpdateWorldSimHeartbeat(string ownerId)
+        public bool UpdateWorldSimHeartbeat(string ownerId) => TryAcquireWorldSimLock(ownerId);
+
+        /// <summary>
+        /// v1.1.14: the lock taken whoever holds it, for the processes that own the shared records by design
+        /// (the MUD server and the standalone world sim) at their start. A door's embedded world sim that held
+        /// it then fails its next heartbeat and stops claiming it.
+        /// </summary>
+        public void TakeOverWorldSimLock(string ownerId)
         {
             try
             {
@@ -2519,8 +2530,12 @@ namespace UsurperRemake.Systems
                 using var connection = OpenConnection();
                 using var cmd = connection.CreateCommand();
                 cmd.CommandText = @"
-                    UPDATE world_state SET value = @value, updated_at = datetime('now')
-                    WHERE key = @key;
+                    INSERT INTO world_state (key, value, version, updated_at)
+                    VALUES (@key, @value, 1, datetime('now'))
+                    ON CONFLICT(key) DO UPDATE SET
+                        value = @value,
+                        version = version + 1,
+                        updated_at = datetime('now');
                 ";
                 cmd.Parameters.AddWithValue("@key", WORLDSIM_LOCK_KEY);
                 cmd.Parameters.AddWithValue("@value", lockJson);
@@ -2528,7 +2543,7 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex)
             {
-                DebugLogger.Instance.LogError("SQL", $"Failed to update worldsim heartbeat: {ex.Message}");
+                DebugLogger.Instance.LogError("SQL", $"Failed to take over the worldsim lock: {ex.Message}");
             }
         }
 
