@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
+using System.Threading.Tasks;
 using FluentAssertions;
 using Xunit;
 
@@ -67,4 +68,68 @@ public class Leftovers1114BTests
     [InlineData("Wren", "")]
     public void MarriageSurname_NeverOffersARomanNumeral(string name, string expected) =>
         MarriageSurnameHelper.ExtractSurname(name).Should().Be(expected);
+}
+
+/// <summary>v1.1.14 (T5): a new team does not inherit the wars and sieges of a removed team of its name.</summary>
+[Collection("SharedGameSingletons")]
+public class TeamRecordsSinceCreation1114Tests : IDisposable
+{
+    private readonly string _path = Path.Combine(Path.GetTempPath(), $"usurper-t5-{Guid.NewGuid():N}.db");
+    private readonly UsurperRemake.Systems.SqlSaveBackend _db;
+
+    public TeamRecordsSinceCreation1114Tests() { _db = new UsurperRemake.Systems.SqlSaveBackend(_path); }
+
+    public void Dispose()
+    {
+        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+        try { File.Delete(_path); } catch { }
+    }
+
+    private void Exec(string sql) => TeamCornerRig.Exec(_path, sql);
+
+    private void War(string challenger, string defender, string startedAt) =>
+        Exec($"INSERT INTO team_wars (challenger_team, defender_team, status, challenger_wins, defender_wins, gold_wagered, started_at) " +
+             $"VALUES ('{challenger}', '{defender}', 'challenger_won', 2, 1, 0, {startedAt});");
+
+    private Task<UsurperRemake.Systems.TeamWarInfo?> Recent(string mine, string enemy) =>
+        TeamCornerLocation.RecentWarAgainst(_db, mine, enemy, DateTime.UtcNow.AddHours(-24));
+
+    [Fact]
+    public async Task ANewTeam_DoesNotInherit_TheWarsAndSiegeOfARemovedTeamOfItsName()
+    {
+        Exec("INSERT INTO player_teams (team_name, password_hash, created_by, created_at) VALUES ('Owls', 'x', 'owner', datetime('now', '-2 days'));");
+        Exec("INSERT INTO player_teams (team_name, password_hash, created_by, created_at) VALUES ('Ravens', 'x', 'first', datetime('now', '-2 days'));");
+        War("Ravens", "Owls", "datetime('now', '-10 minutes')");
+        Exec("INSERT INTO castle_sieges (team_name, total_guards, result, started_at) VALUES ('Ravens', 5, 'failed', datetime('now', '-10 minutes'));");
+
+        // the old team holds its records
+        (await _db.GetTeamWarHistory("Ravens")).Should().HaveCount(1);
+        _db.CanTeamSiege("Ravens").Should().BeFalse();
+        (await Recent("Owls", "Ravens")).Should().NotBeNull();
+
+        // the team is removed (DeleteEmptyTeam leaves team_wars and castle_sieges) and a new one takes the name
+        Exec("DELETE FROM player_teams WHERE team_name = 'Ravens';");
+        (await _db.CreatePlayerTeam("Ravens", "hash", "second")).Should().BeTrue();
+
+        (await _db.GetTeamWarHistory("Ravens")).Should().BeEmpty("the new team fought no war");
+        _db.CanTeamSiege("Ravens").Should().BeTrue("the new team laid no siege");
+        (await Recent("Ravens", "Owls")).Should().BeNull();
+        (await Recent("Owls", "Ravens")).Should().BeNull("the old team's war does not hold the cooldown against the new team either");
+        (await _db.GetTeamWarHistory("Owls")).Should().ContainSingle("the other team keeps its history")
+            .Which.ChallengerTeam.Should().Be("Ravens");
+
+        // a war the new team fights counts as before
+        War("Ravens", "Owls", "datetime('now')");
+        (await _db.GetTeamWarHistory("Ravens")).Should().HaveCount(1);
+        (await Recent("Owls", "Ravens")).Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task AnNpcTeam_WithNoPlayerTeamRow_KeepsEveryRecord()
+    {
+        War("Wolves", "Bears", "datetime('now', '-3 days')");
+        Exec("INSERT INTO castle_sieges (team_name, total_guards, result, started_at) VALUES ('Wolves', 5, 'failed', datetime('now', '-1 hours'));");
+        (await _db.GetTeamWarHistory("Wolves")).Should().HaveCount(1);
+        _db.CanTeamSiege("Wolves").Should().BeFalse();
+    }
 }

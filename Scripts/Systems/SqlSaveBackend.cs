@@ -7363,10 +7363,12 @@ namespace UsurperRemake.Systems
         {
             using var connection = OpenConnection();
             using var cmd = connection.CreateCommand();
+            // v1.1.14: only the wars of this team, not of a removed team of the same name (TeamCreatedAtSql)
             cmd.CommandText = @"SELECT id, challenger_team, defender_team, status, challenger_wins, defender_wins,
                                        gold_wagered, started_at, finished_at
                                 FROM team_wars
                                 WHERE (challenger_team = @team OR defender_team = @team)
+                                AND started_at >= " + TeamCreatedAtSql + @"
                                 ORDER BY started_at DESC LIMIT @limit;";
             cmd.Parameters.AddWithValue("@team", teamName);
             cmd.Parameters.AddWithValue("@limit", limit);
@@ -7589,6 +7591,14 @@ namespace UsurperRemake.Systems
         catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to complete siege: {ex.Message}"); }
     }
 
+    /// <summary>
+    /// v1.1.14: team_wars and castle_sieges are keyed by name, and a team removed by DeleteEmptyTeam leaves
+    /// them behind. A row counts for a player team only from the team's created_at, so a new team of that
+    /// name does not inherit the old one's wars, siege cooldown or war cooldowns. The rows stay, so the
+    /// other team's history keeps them. No player_teams row (an NPC team) keeps every row.
+    /// </summary>
+    private const string TeamCreatedAtSql = "COALESCE((SELECT created_at FROM player_teams WHERE team_name = @team), '')";
+
     public bool CanTeamSiege(string teamName)
     {
         try
@@ -7597,7 +7607,8 @@ namespace UsurperRemake.Systems
             using var cmd = connection.CreateCommand();
             // 24h cooldown between sieges
             cmd.CommandText = @"SELECT COUNT(*) FROM castle_sieges
-                                WHERE team_name = @team AND started_at > datetime('now', '-24 hours');";
+                                WHERE team_name = @team AND started_at > datetime('now', '-24 hours')
+                                AND started_at >= " + TeamCreatedAtSql + ";";   // v1.1.14
             cmd.Parameters.AddWithValue("@team", teamName);
             return Convert.ToInt32(cmd.ExecuteScalar()) == 0;
         }

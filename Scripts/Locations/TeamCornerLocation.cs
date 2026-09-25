@@ -3549,6 +3549,22 @@ public class TeamCornerLocation : BaseLocation
         }
     }
 
+    /// <summary>
+    /// v1.1.14: the latest war between the two teams since the cutoff that holds the per-opponent cooldown
+    /// (moved from ChallengeTeamWar). A war counts only if it is in both teams' history, so a war fought by a
+    /// removed team of either name does not hold the cooldown for the team now using that name.
+    /// </summary>
+    internal static async Task<TeamWarInfo?> RecentWarAgainst(SqlSaveBackend backend, string myTeam, string enemyTeam, DateTime cutoff)
+    {
+        var recentHistory = await backend.GetTeamWarHistory(myTeam, limit: 20);
+        var enemyWarIds = (await backend.GetTeamWarHistory(enemyTeam, limit: 100)).Select(w => w.Id).ToHashSet();
+        return recentHistory.FirstOrDefault(w =>
+            w.StartedAt > cutoff && w.Status != "abandoned" &&   // v1.1.12: a war that never ran does not count
+            enemyWarIds.Contains(w.Id) &&
+            ((w.ChallengerTeam == myTeam && w.DefenderTeam == enemyTeam) ||
+             (w.DefenderTeam == myTeam && w.ChallengerTeam == enemyTeam)));
+    }
+
     private async Task ChallengeTeamWar(SqlSaveBackend backend)
     {
         string myTeam = currentPlayer.Team;
@@ -3613,12 +3629,8 @@ public class TeamCornerLocation : BaseLocation
         // the same defender. Reads from the team_wars history rather than tracking
         // separate state — any war (won or lost, by any challenger from our team)
         // counts toward the cooldown.
-        var recentHistory = await backend.GetTeamWarHistory(myTeam, limit: 20);
         var cooldownCutoff = DateTime.UtcNow.AddHours(-GameConfig.TeamWarOpponentCooldownHours);
-        var recentVsThisOpponent = recentHistory.FirstOrDefault(w =>
-            w.StartedAt > cooldownCutoff && w.Status != "abandoned" &&   // v1.1.12: a war that never ran does not count
-            ((w.ChallengerTeam == myTeam && w.DefenderTeam == enemyTeam.TeamName) ||
-             (w.DefenderTeam == myTeam && w.ChallengerTeam == enemyTeam.TeamName)));
+        var recentVsThisOpponent = await RecentWarAgainst(backend, myTeam, enemyTeam.TeamName, cooldownCutoff);
         if (recentVsThisOpponent != null)
         {
             var hoursLeft = Math.Max(1, (int)Math.Ceiling((recentVsThisOpponent.StartedAt - cooldownCutoff).TotalHours));
