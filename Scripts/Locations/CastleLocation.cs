@@ -8135,11 +8135,16 @@ public class CastleLocation : BaseLocation
 
     private void LoadKingData()
     {
-        // If player is king but no king data exists, create it
+        // If player is king but no king data exists, create it. v1.1.13: as a versioned write of a fresh court,
+        // only while no court is stored (offline it is set in memory); a stored court is loaded instead
         if (currentKing == null && playerIsKing)
         {
-            currentKing = King.CreateNewKing(currentPlayer.DisplayName, CharacterAI.Human, currentPlayer.Sex);
-            return;
+            var template = King.CreateNewKing(currentPlayer.DisplayName, CharacterAI.Human, currentPlayer.Sex);
+            if (CrownAsync(null, stored => stored == null ? NewReignCourt(template, null) : null).GetAwaiter().GetResult())
+                return;
+            // the stored court, loaded by the refusal, decides (the player's own flag is synced on entry)
+            playerIsKing = IsDeletedCharactersReign(currentKing, currentPlayer.Name2, currentPlayer.DisplayName);
+            if (playerIsKing) return;
         }
 
         // If no king exists at all, trigger NPC succession
@@ -8418,6 +8423,19 @@ public class CastleLocation : BaseLocation
     /// </summary>
     public static void SetKing(King king) => currentKing = king;
 
+    /// <summary>v1.1.13: npc's King flag set and every other NPC's cleared (SetCurrentKing's v0.60.3 rule).</summary>
+    private static void MarkReigningNPC(NPC npc)
+    {
+        if (NPCSpawnSystem.Instance?.ActiveNPCs != null)
+        {
+            foreach (var other in NPCSpawnSystem.Instance.ActiveNPCs.Where(n => n.King && n != npc))
+            {
+                other.King = false;
+            }
+        }
+        npc.King = true;
+    }
+
     /// <summary>
     /// Set an NPC as the current king (for save restoration)
     /// </summary>
@@ -8436,14 +8454,7 @@ public class CastleLocation : BaseLocation
         // challenger against herself ("Thalia Ravenswood is challenging Queen
         // Thalia Ravenswood for the throne!"). Also clear King=true on any other
         // NPC by name so a stale flag from a previous reign doesn't linger.
-        if (NPCSpawnSystem.Instance?.ActiveNPCs != null)
-        {
-            foreach (var other in NPCSpawnSystem.Instance.ActiveNPCs.Where(n => n.King && n != npc))
-            {
-                other.King = false;
-            }
-        }
-        npc.King = true;
+        MarkReigningNPC(npc);
 
         currentKing = new King
         {
@@ -8456,16 +8467,26 @@ public class CastleLocation : BaseLocation
     }
 
     /// <summary>
-    /// Called when the current king dies. Vacates the throne and posts news.
-    /// Static so it can be called from WorldSimulator without a CastleLocation instance.
-    /// </summary>
-    /// <summary>
     /// Automatically abdicate the throne for a player who is ascending to godhood or rerolling.
-    /// Static so it can be called from EndingsSystem and PantheonLocation.
+    /// Static so it can be called from EndingsSystem and PantheonLocation. v1.1.13: the ended reign and the NPC
+    /// successor (or a marked vacancy) are one versioned write of the stored court; the player's flags, the
+    /// marriage clean-up, the successor's gift and the news follow only once it lands. False: the reign still stands
+    /// (the court kept changing); true with nothing changed when the stored court no longer holds it.
     /// </summary>
-    public static void AbdicatePlayerThrone(Character player, string reason)
+    internal static async Task<bool> AbdicatePlayerThroneAsync(Character player, string reason)
     {
-        if (player == null || !player.King) return;
+        if (player == null || !player.King) return true;
+
+        var inMemory = GetCurrentKing();
+        string reign = IsDeletedCharactersReign(inMemory, player.Name2, player.DisplayName) ? inMemory!.Name : player.DisplayName;
+        var successor = PlayerReignSuccessor();
+        string? spouseName = null;
+        if (!await EndReignAsync(reign, reason, successor, stored => spouseName = stored.Spouse?.Name))
+        {
+            // v1.1.13: a court that no longer holds this reign (loaded by the refusal) leaves nothing to end here;
+            // the player's flags are left to the usual deposed-king sync
+            return !IsDeletedCharactersReign(GetCurrentKing(), player.Name2, player.DisplayName);
+        }
 
         // Clear player state
         player.King = false;
@@ -8473,9 +8494,25 @@ public class CastleLocation : BaseLocation
             player.NobleTitle = null;
         player.RoyalMercenaries?.Clear();
         player.RecalculateStats();
+        ClearRoyalMarriage(reign, spouseName);
 
-        EndPlayerReign(player.DisplayName, reason);
+        NewsSystem.Instance?.Newsy(true, $"{player.DisplayName} has {reason}! The kingdom is in chaos!");
+        if (successor != null)
+        {
+            MarkReigningNPC(successor);
+            PayForCoronation(successor);
+            NewsSystem.Instance?.Newsy(true, $"{successor.DisplayName} has claimed the throne!");
+        }
+        return true;
     }
+
+    /// <summary>v1.1.13: the NPC to succeed a player's ended reign (EndPlayerReign's rules; null: none).</summary>
+    private static NPC? PlayerReignSuccessor() =>
+        NPCSpawnSystem.Instance?.ActiveNPCs?
+            .Where(npc => npc.IsAlive && !npc.IsDead && !npc.IsPermaDead && !npc.IsAgedDeath
+                          && npc.DaysInPrison <= 0 && npc.Level >= GameConfig.MinLevelKing)
+            .OrderByDescending(npc => npc.Level * 10 + (int)(npc.Charisma / 2))
+            .FirstOrDefault();
 
     /// <summary>
     /// v1.1.11: a deleted character who holds the throne abdicates through the same path, so the normal
@@ -8598,7 +8635,7 @@ public class CastleLocation : BaseLocation
         return true;
     }
 
-    // v1.1.11: the throne side of AbdicatePlayerThrone, shared with AbdicateDeletedKing.
+    // v1.1.11: the throne side of a deleted character's reign (AbdicateDeletedKing, its async form and the re-apply).
     private static void EndPlayerReign(string kingDisplayName, string reason, bool persist = true)
     {
         var king = GetCurrentKing();
@@ -8627,25 +8664,15 @@ public class CastleLocation : BaseLocation
         NewsSystem.Instance?.Newsy(true, $"{kingDisplayName} has {reason}! The kingdom is in chaos!");
 
         // Trigger NPC succession (uses only static fields + singletons)
-        var npcs = NPCSpawnSystem.Instance?.ActiveNPCs;
-        if (npcs != null && npcs.Count > 0)
+        // v1.1.1: same candidate rules and the same setter as every other NPC coronation.
+        // This path built its own King with DisplayName and never set npc.King, so the
+        // world sim could not match the ruler on death and a second NPC could keep a stale
+        // King flag from an earlier reign.
+        var newMonarch = PlayerReignSuccessor();
+        if (newMonarch != null)
         {
-            // v1.1.1: same candidate rules and the same setter as every other NPC coronation.
-            // This path built its own King with DisplayName and never set npc.King, so the
-            // world sim could not match the ruler on death and a second NPC could keep a stale
-            // King flag from an earlier reign.
-            var candidates = npcs
-                .Where(npc => npc.IsAlive && !npc.IsDead && !npc.IsPermaDead && !npc.IsAgedDeath
-                              && npc.DaysInPrison <= 0 && npc.Level >= GameConfig.MinLevelKing)
-                .OrderByDescending(npc => npc.Level * 10 + (int)(npc.Charisma / 2))
-                .ToList();
-
-            if (candidates.Count > 0)
-            {
-                var newMonarch = candidates.First();
-                SetCurrentKing(newMonarch);
-                NewsSystem.Instance?.Newsy(true, $"{newMonarch.DisplayName} has claimed the throne!");
-            }
+            SetCurrentKing(newMonarch);
+            NewsSystem.Instance?.Newsy(true, $"{newMonarch.DisplayName} has claimed the throne!");
         }
 
         // Persist to world_state in online mode (v1.1.11: the delete path awaits its own write)
@@ -8666,6 +8693,10 @@ public class CastleLocation : BaseLocation
         }
     }
 
+    /// <summary>
+    /// Called when the current king dies. Vacates the throne and posts news.
+    /// Static so it can be called from WorldSimulator without a CastleLocation instance.
+    /// </summary>
     public static void VacateThrone(string reason)
     {
         var king = GetCurrentKing();

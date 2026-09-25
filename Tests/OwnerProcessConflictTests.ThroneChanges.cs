@@ -204,4 +204,109 @@ public partial class OwnerProcessConflictTests
         rebellion.IndexOf("ImprisonPlayer(prisonerName, 0)", StringComparison.Ordinal).Should().BeGreaterThan(write);
         rebellion.Should().NotContain("PersistRoyalCourtToWorldState").And.NotContain("currentKing = null");
     }
+
+    [Fact]
+    public async Task APlayersAbdicationForAscension_AfterTheStoredThroneChangedHands_WritesNothing_AndChangesNothing()
+    {
+        await WithKing("Kim", 1000, async _ => await AsTheWorldSim(async () =>
+        {
+            await _db.SaveWorldState("royal_court", Court("Kim", 1000));
+            new WorldSimService(_db).LoadRoyalCourtFromWorldState();
+            var seren = Npc("npc_ap_seren", "Seren");
+            seren.Level = 40; seren.Gold = 40_000;
+            var kim = PlayerKing("Kim");
+
+            // another process crowned Cedric first
+            await OtherCourtWrite("Cedric", 3000);
+            long cedricAt = _db.GetWorldStateVersion("royal_court");
+            (await CastleLocation.AbdicatePlayerThroneAsync(kim, "ascended")).Should().BeTrue("the reign had already ended elsewhere");
+
+            _db.GetWorldStateVersion("royal_court").Should().Be(cedricAt, "nothing was written over Cedric's court");
+            (await StoredCourt()).KingName.Should().Be("Cedric");
+            CastleLocation.GetCurrentKing()!.Name.Should().Be("Cedric", "the refusal loads the stored court");
+            kim.King.Should().BeTrue("the player's side follows only a written abdication");
+            kim.NobleTitle.Should().Be("King");
+            seren.Gold.Should().Be(40_000);
+            seren.King.Should().BeFalse();
+            CastleLocation.GetMonarchHistory().Should().NotContain(m => m.EndReason == "ascended");
+        }));
+    }
+
+    [Fact]
+    public async Task APlayersAbdicationForAscension_OfTheStoredReign_LandsWithItsSuccessor()
+    {
+        await WithKing("Kim", 1000, async _ => await AsTheWorldSim(async () =>
+        {
+            await _db.SaveWorldState("royal_court", Court("Kim", 1000));
+            new WorldSimService(_db).LoadRoyalCourtFromWorldState();
+            var seren = Npc("npc_ap_seren2", "Seren");
+            seren.Level = 40; seren.Gold = 40_000;
+            var kim = PlayerKing("Kim");
+            long before = _db.GetWorldStateVersion("royal_court");
+
+            (await CastleLocation.AbdicatePlayerThroneAsync(kim, "ascended")).Should().BeTrue();
+
+            _db.GetWorldStateVersion("royal_court").Should().Be(before + 1, "one versioned write");
+            var stored = await StoredCourt();
+            stored.KingName.Should().Be("Seren");
+            stored.MonarchHistory.Select(m => (m.Name, m.EndReason)).Should().Contain(("Kim", "ascended"));
+            CastleLocation.GetCurrentKing()!.Name.Should().Be("Seren");
+            kim.King.Should().BeFalse();
+            kim.NobleTitle.Should().BeNull();
+            seren.King.Should().BeTrue();
+            seren.Gold.Should().Be(20_000, "the successor's gift follows the written coronation");
+        }));
+    }
+
+    [Fact]
+    public async Task TheCastlesFallbackCourt_IsWrittenOnlyWhenNoCourtIsStored()
+    {
+        await WithKing("Kim", 1000, async _ => await AsTheWorldSim(async () =>
+        {
+            var kim = PlayerKing("Kim");
+            var load = typeof(CastleLocation).GetMethod("LoadKingData", Inst)!;
+            var isKing = typeof(CastleLocation).GetField("playerIsKing", Inst)!;
+
+            // a vacancy is stored: nothing is written and the castle does not show the player as king
+            var vacancy = StoredVersionless(new RoyalCourtSaveData { KingName = "", ThroneVacant = true, KingAI = 1 });
+            await _db.SaveWorldState("royal_court", vacancy);
+            await NewOsm(_db).LoadRoyalCourtFromWorldState();
+            CastleLocation.GetCurrentKing().Should().BeNull();
+            long vacantAt = _db.GetWorldStateVersion("royal_court");
+            var castle = Castle(kim, Array.Empty<string>());
+            load.Invoke(castle, null);
+            _db.GetWorldStateVersion("royal_court").Should().Be(vacantAt, "a stored court is never replaced by the fallback");
+            (await StoredCourt()).ThroneVacant.Should().BeTrue();
+            CastleLocation.GetCurrentKing().Should().BeNull();
+            ((bool)isKing.GetValue(castle)!).Should().BeFalse();
+
+            // the stored court is the player's own: it is loaded, not replaced
+            await _db.SaveWorldState("royal_court", Court("Kim", 1000));
+            long kimAt = _db.GetWorldStateVersion("royal_court");
+            CastleLocation.SetKing(null!);
+            castle = Castle(kim, Array.Empty<string>());
+            load.Invoke(castle, null);
+            _db.GetWorldStateVersion("royal_court").Should().Be(kimAt);
+            CastleLocation.GetCurrentKing()!.Treasury.Should().Be(1000, "the stored court is the one held");
+            ((bool)isKing.GetValue(castle)!).Should().BeTrue();
+        }));
+    }
+
+    [Fact]
+    public async Task TheCastlesFallbackCourt_WithNoCourtStored_IsWrittenAtOnce()
+    {
+        await WithKing("Kim", 1000, async _ => await AsTheWorldSim(async () =>
+        {
+            _db.GetWorldStateVersion("royal_court").Should().Be(0);
+            var kim = PlayerKing("Kim");
+            CastleLocation.SetKing(null!);
+            var castle = Castle(kim, Array.Empty<string>());
+            typeof(CastleLocation).GetMethod("LoadKingData", Inst)!.Invoke(castle, null);
+
+            _db.GetWorldStateVersion("royal_court").Should().Be(1, "the fresh court is one versioned write");
+            (await StoredCourt()).KingName.Should().Be("Kim");
+            CastleLocation.GetCurrentKing()!.Name.Should().Be("Kim");
+            OnlineStateManager.RoyalCourtVersion.Should().Be(1);
+        }));
+    }
 }

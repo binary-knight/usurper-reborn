@@ -439,6 +439,86 @@ public partial class OwnerProcessConflictTests : IDisposable
         offenders.Should().BeEmpty("every change to a court goes through a guarded court change (ApplyCourtChangeAsync, ApplyKingChangeAsync or CrownAsync)");
     }
 
+    // v1.1.13: the members that may put a whole King in the holder outside CrownAsync and EndReignAsync, each named
+    private static readonly Dictionary<(string File, string Member), string> WholeKingLoaders = new()
+    {
+        // CrownAsync's own step: the written court becomes the in-memory king
+        [("Systems/OnlineStateManager.cs", "ApplyCrownedCourt")] = "installs the court CrownAsync just wrote",
+        // the court loader: the stored court names a king this process does not hold yet
+        [("Systems/OnlineStateManager.cs", "ApplyCourtToKing")] = "installs a loaded stored court",
+        // the roster loaders: the saved roster's king flag, before any court is loaded over it
+        [("Core/GameEngine.cs", "RestoreNPCsLocked")] = "restores the king from a loaded roster",
+        [("Systems/WorldSimService.cs", "RestoreNPCsFromData")] = "restores the king from the stored roster",
+        // first boot: a new world's first monarch, before any court can be stored
+        [("Systems/WorldInitializerSystem.cs", "SimulateKingshipEstablishment")] = "creates a new world's first monarch",
+        // a deleted king's reign: its own versioned read-decide-write loop (AbdicateDeletedKingAsync), and the
+        // world edit's unpersisted re-apply that the owner's versioned court save then carries
+        [("Locations/CastleLocation.cs", "EndPlayerReign")] = "the delete paths' guarded write and re-apply",
+    };
+
+    /// <summary>
+    /// v1.1.13: every whole-king replacement in this code (a King assigned to the holder, or a SetKing or
+    /// SetCurrentKing call) outside a named loader, with the member it is in. A local of that
+    /// name is not the holder; a null assignment clears the holder (a vacancy) and is not a new King; the two
+    /// setters' own bodies are the holder's write. loaders false: the named loaders are reported too.
+    /// </summary>
+    internal static List<string> WholeKingReplacements(string file, string code, bool loaders = true)
+    {
+        var member = new System.Text.RegularExpressions.Regex(
+            @"^\s*(?:(?:public|private|internal|protected|static|async|override|virtual|sealed|unsafe)\s+)+[\w<>\[\],.?\s]*?\b(\w+)\s*\(");
+        var replace = new System.Text.RegularExpressions.Regex(
+            @"(?<!\b(?:var|King\??)\s+)\bcurrentKing\s*=(?![=>])(?!\s*null\b)|(?<!void\s+)\bSet(?:Current)?King\s*\(");
+        var lines = code.Split('\n');
+        var found = new List<string>();
+        string current = "";
+        for (int i = 0; i < lines.Length; i++)
+        {
+            var m = member.Match(lines[i]);
+            if (m.Success) current = m.Groups[1].Value;
+            if (!replace.IsMatch(lines[i])) continue;
+            if (file == "Locations/CastleLocation.cs" && (current == "SetKing" || current == "SetCurrentKing")) continue;
+            if (loaders && WholeKingLoaders.ContainsKey((file, current))) continue;
+            found.Add($"{file}:{i + 1} ({current}) {lines[i].Trim()}");
+        }
+        return found;
+    }
+
+    [Fact]
+    public void NoWholeKingIsReplaced_OutsideCrownAsyncEndReignAsyncAndTheLoaders()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "Scripts"))) dir = dir.Parent;
+        var root = Path.Combine(dir!.FullName, "Scripts");
+
+        // the check finds each form it looks for, and leaves out the setters, a vacancy and the named loaders
+        WholeKingReplacements("Locations/CastleLocation.cs", string.Join("\n", new[]
+        {
+            "    private void LoadKingData()", "    {", "        currentKing = King.CreateNewKing(n, ai, sex);",
+            "        SetCurrentKing(npc);", "        global::CastleLocation.SetKing(king);", "    }",
+        })).Should().HaveCount(3);
+        WholeKingReplacements("Locations/CastleLocation.cs", string.Join("\n", new[]
+        {
+            "    private static King currentKing = null;", "        var currentKing = CastleLocation.GetCurrentKing();",
+            "    public static void SetKing(King king) => currentKing = king;",
+            "    public static void SetCurrentKing(NPC npc)", "    {", "        currentKing = new King { Name = npc.Name };", "    }",
+            "    internal static bool ApplySharedThroneVacancy(RoyalCourtSaveData court)", "    {", "        currentKing = null;", "    }",
+        })).Should().BeEmpty();
+        WholeKingReplacements("Systems/OnlineStateManager.cs", string.Join("\n", new[]
+        {
+            "        private static void ApplyCrownedCourt(RoyalCourtSaveData court)", "        {", "            global::CastleLocation.SetKing(king);", "        }",
+        })).Should().BeEmpty();
+
+        var offenders = new List<string>();
+        foreach (var path in Directory.GetFiles(root, "*.cs", SearchOption.AllDirectories))
+            offenders.AddRange(WholeKingReplacements(Path.GetRelativePath(root, path).Replace('\\', '/'), CodeOnly(File.ReadAllText(path))));
+        offenders.Should().BeEmpty("a change of monarch goes through CrownAsync or EndReignAsync; only the named loaders install a king");
+
+        // and each named loader is still one (no stale entry)
+        foreach (var (file, name) in WholeKingLoaders.Keys)
+            WholeKingReplacements(file, CodeOnly(File.ReadAllText(Path.Combine(root, file))), loaders: false)
+                .Should().Contain(f => f.Contains($"({name})"), $"{file} {name} is named as a loader");
+    }
+
     [Fact]
     public void TheCarriedTreasuryDelta_IsGone()
     {

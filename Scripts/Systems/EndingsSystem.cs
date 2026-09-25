@@ -1423,7 +1423,14 @@ namespace UsurperRemake.Systems
             // Auto-abdicate if player is the king
             if (player.King)
             {
-                CastleLocation.AbdicatePlayerThrone(player, "abdicated the throne to ascend to godhood");
+                // v1.1.13: the abdication is written first; there is no ascension when it fails
+                if (!await CastleLocation.AbdicatePlayerThroneAsync(player, "abdicated the throne to ascend to godhood"))
+                {
+                    terminal.SetColor("red");
+                    terminal.WriteLine($"  {Loc.Get("castle.court_change_failed")}");
+                    await Task.Delay(1500);
+                    return false;
+                }
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine($"  {Loc.Get("ending.immortal_abdicated")}", "bright_yellow");
                 terminal.WriteLine("");
