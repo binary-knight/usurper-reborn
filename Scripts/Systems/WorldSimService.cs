@@ -40,6 +40,7 @@ namespace UsurperRemake.Systems
 
         // Heartbeat support for embedded worldsim (database-level leader election)
         private string? _heartbeatOwnerId;
+        private bool _heldWorldSimLock = true;   // v1.1.14: the last heartbeat's outcome, to log a change once
 
         /// <summary>
         /// Signals when initialization (systems + world state load) is complete.
@@ -135,7 +136,13 @@ namespace UsurperRemake.Systems
                         // Update heartbeat (embedded mode leader election)
                         if (_heartbeatOwnerId != null)
                         {
-                            sqlBackend.UpdateWorldSimHeartbeat(_heartbeatOwnerId);
+                            // v1.1.14: the beat lands only while this sim holds the lock (or it is free or stale)
+                            bool held = sqlBackend.UpdateWorldSimHeartbeat(_heartbeatOwnerId);
+                            if (held != _heldWorldSimLock)
+                                DebugLogger.Instance.LogWarning("WORLDSIM", held
+                                    ? "This world sim holds the world sim lock again."
+                                    : "Another process holds the world sim lock; this world sim no longer claims it.");
+                            _heldWorldSimLock = held;
                         }
 
                         // Check for 7 PM ET world daily reset
@@ -308,6 +315,15 @@ namespace UsurperRemake.Systems
                 // Both game server and world sim write to the same world_state key.
                 // The version auto-increments on each write, so if it changed, a player saved.
                 long currentNpcVersion = sqlBackend.GetWorldStateVersion(OnlineStateManager.KEY_NPCS);
+                // v1.1.14: a newer version this process's live roster was itself written as (a purge's write,
+                // PersistNpcWorldNow) or restored from holds nothing the live roster lacks. It is adopted, not
+                // reloaded: a reload would drop the sim's changes made since that write. A later write by
+                // another process fails the versioned write below and is reloaded on the next pass.
+                if (currentNpcVersion > lastNpcVersion && lastNpcVersion > 0 && OnlineStateManager.LiveRosterVersion == currentNpcVersion)
+                {
+                    DebugLogger.Instance.LogInfo("WORLDSIM", $"NPC data v{currentNpcVersion} was written from this process's live roster; adopted without a reload.");
+                    lastNpcVersion = currentNpcVersion;
+                }
                 if (currentNpcVersion > lastNpcVersion && lastNpcVersion > 0)
                 {
                     DebugLogger.Instance.LogInfo("WORLDSIM", $"NPC data modified by game server (v{lastNpcVersion} → v{currentNpcVersion}). Reloading to pick up player changes...");
@@ -496,6 +512,7 @@ namespace UsurperRemake.Systems
                 }
 
                 var aliveCount = NPCSpawnSystem.Instance.ActiveNPCs.Count(n => n.IsAlive && !n.IsDead);
+                bool npcsHoldEdits = false;   // v1.1.14: this pass's npcs write landed with the re-applied edits
 
                 if (jsonHash != _lastNpcJsonHash)
                 {
@@ -524,8 +541,7 @@ namespace UsurperRemake.Systems
                         lastNpcVersion = lastNpcVersion + 1;
                         OnlineStateManager.NoteLiveRosterWritten(rosterGeneration, lastNpcVersion);   // v1.1.13: the live roster is stored at this version
                         DebugLogger.Instance.LogInfo("WORLDSIM", $"State saved (v{lastNpcVersion}): {aliveCount} alive NPCs at {DateTime.UtcNow:HH:mm:ss}");
-                        // v1.1.13: the roster edits are applied once this versioned write holds them
-                        MarkEditsApplied(editsInPass, WorldEditLog.ForgetCharacter);
+                        npcsHoldEdits = true;
                     }
                     else
                     {
@@ -562,7 +578,12 @@ namespace UsurperRemake.Systems
                 await SaveChildrenState();
 
                 // Save NPC marriage registry (survives world sim restart)
-                await SaveMarriageRegistryState();
+                bool registrySaved = await SaveMarriageRegistryState();
+                // v1.1.14: a forget_character edit is applied once both records hold it: the npcs write above and
+                // the marriages record (its registry marriages ended). Marked after the npcs write alone, a crash
+                // before this save and a restart past the re-apply window loaded the marriage back.
+                if (npcsHoldEdits && registrySaved)
+                    MarkEditsApplied(editsInPass, WorldEditLog.ForgetCharacter);
 
                 // Save world events (plagues, festivals, wars, etc.)
                 await SaveWorldEventsState();
@@ -894,7 +915,7 @@ namespace UsurperRemake.Systems
         /// Save NPCMarriageRegistry to world_state.
         /// Persists NPC-NPC marriages and affair states so they survive world sim restarts.
         /// </summary>
-        private async Task SaveMarriageRegistryState()
+        private async Task<bool> SaveMarriageRegistryState()   // v1.1.14: true once the record is written
         {
             try
             {
@@ -910,11 +931,12 @@ namespace UsurperRemake.Systems
                 };
 
                 var json = JsonSerializer.Serialize(data, jsonOptions);
-                await sqlBackend.SaveWorldState(OnlineStateManager.KEY_MARRIAGES, json);
+                return await sqlBackend.TrySaveWorldState(OnlineStateManager.KEY_MARRIAGES, json);
             }
             catch (Exception ex)
             {
                 DebugLogger.Instance.LogError("WORLDSIM", $"Failed to save marriage registry: {ex.Message}");
+                return false;
             }
         }
 
@@ -1296,7 +1318,9 @@ namespace UsurperRemake.Systems
               {
                 var npc = new NPC
                 {
-                    Id = data.Id,
+                    // v1.1.14: a record saved with no Id gets one here, once, so the roster overlay tracks the NPC by it
+                    // (not by name, where a tombstone of an earlier NPC of that name would drop it)
+                    Id = string.IsNullOrEmpty(data.Id) ? Guid.NewGuid().ToString() : data.Id,
                     ID = !string.IsNullOrEmpty(data.CharacterID) ? data.CharacterID : $"npc_{data.Name.ToLower().Replace(" ", "_")}",
                     Name1 = data.Name,
                     Name2 = data.Name,

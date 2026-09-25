@@ -581,4 +581,62 @@ public class NPCDefeatQuestTests
             winner.Gold.Should().Be(500);
         });
     }
+
+    // v1.1.14: a player bounty posted before 1.1.11 lacks the IsPlayerBounty mark; the duel paid only marked ones
+    [Fact]
+    public void AnUnmarkedPreMarkPlayerBounty_IsPaidInADuel_OnlyWhenNoNpcCarriesTheName()
+    {
+        var spawner = NPCSpawnSystem.Instance;
+        var highWater = typeof(NPCSpawnSystem).GetField("_rosterHighWaterMark", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        object? highWaterBefore = highWater.GetValue(spawner);
+        var fillers = new System.Collections.Generic.List<NPC>();
+        for (int i = 0; i < 60; i++) fillers.Add(new NPC { ID = $"npc_c12_filler_{i}", Name1 = $"C12 Filler {i}", Name2 = $"C12 Filler {i}", Level = 5 });
+        Quest Unmarked(string name) => new Quest
+        {
+            Title = "WANTED: " + name, Initiator = "The Crown", QuestTarget = QuestTarget.DefeatNPC, TargetNPCName = name,
+            TitleKey = "", BountyGold = 3500, IsPlayerBounty = false, Date = DateTime.Now, DaysToComplete = 30
+        };
+        var bounty = Unmarked("Premark Rogue");
+        var npcNamed = Unmarked("Premark Twin");
+        var twin = new NPC { ID = "npc_c12_twin", Name1 = "Premark Twin", Name2 = "Premark Twin", Level = 20 };
+        QuestSystem.AddQuestToDatabase(bounty);
+        QuestSystem.AddQuestToDatabase(npcNamed);
+        try
+        {
+            var rogue = new Character { Name1 = "premark_rogue", Name2 = "Premark Rogue", Level = 30, IsLoadedPlayer = true };
+            var winner = new Character { Name1 = "sheriff_c12", Name2 = "Sheriff C12", Level = 30, Gold = 0 };
+
+            // a roster far below its high-water mark is not complete, so an NPC of that name cannot be ruled out: not paid
+            highWater.SetValue(spawner, 1_000_000);
+            spawner.IsRosterTrustworthy.Should().BeFalse();
+            QuestSystem.CollectBountiesOnPlayer(winner, rogue).Should().BeEmpty();
+            bounty.Deleted.Should().BeFalse();
+            winner.Gold.Should().Be(0);
+
+            highWater.SetValue(spawner, 0);
+            foreach (var f in fillers) spawner.ActiveNPCs.Add(f);
+            spawner.ActiveNPCs.Add(twin);
+            spawner.IsRosterTrustworthy.Should().BeTrue();
+
+            // a complete roster with no NPC of that name: the bounty is the player's, and paid once
+            QuestSystem.CollectBountiesOnPlayer(winner, rogue).Should().ContainSingle().Which.Should().BeSameAs(bounty);
+            winner.Gold.Should().BeGreaterThanOrEqualTo(3500);
+            bounty.Deleted.Should().BeTrue();
+
+            // an NPC carries the name: the unmarked bounty is that NPC's, never paid for beating a player of that name
+            var namesake = new Character { Name1 = "premark_twin", Name2 = "Premark Twin", Level = 30, IsLoadedPlayer = true };
+            var other = new Character { Name1 = "sheriff_c12b", Name2 = "Sheriff C12b", Level = 30, Gold = 0 };
+            QuestSystem.CollectBountiesOnPlayer(other, namesake).Should().BeEmpty();
+            npcNamed.Deleted.Should().BeFalse();
+            other.Gold.Should().Be(0);
+        }
+        finally
+        {
+            foreach (var f in fillers) spawner.ActiveNPCs.Remove(f);
+            spawner.ActiveNPCs.Remove(twin);
+            highWater.SetValue(spawner, highWaterBefore);
+            bounty.Deleted = true;
+            npcNamed.Deleted = true;
+        }
+    }
 }

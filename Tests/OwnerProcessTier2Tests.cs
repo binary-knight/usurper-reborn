@@ -425,7 +425,7 @@ public class OwnerProcessTier2Tests : IDisposable
         await _db.SaveWorldState(OnlineStateManager.KEY_NPCS, stale);
 
         var sim = OwnerSim("owner_t", clean);
-        _db.UpdateWorldSimHeartbeat("someone_else");   // the lock has moved on
+        _db.TakeOverWorldSimLock("someone_else");   // the lock has moved on (v1.1.14: a heartbeat no longer takes a held lock)
         sim.ReapplyWorldEdits().Should().BeEmpty();
         await SimSave(sim);
 

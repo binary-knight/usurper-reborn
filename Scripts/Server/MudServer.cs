@@ -240,11 +240,15 @@ public class MudServer
         // Start the world simulator as an in-process background task
         // This replaces the separate usurper-world.service process
         // v1.1.13: the MUD takes the world sim lock, so door processes on this database start no world sim of
-        // their own and know the owner. The MUD owns the shared records either way; its heartbeat takes a
-        // lock another process still holds.
+        // their own and know the owner. The MUD owns the shared records either way.
+        // v1.1.14: a lock another process still holds is taken over here, once; the heartbeat after that only
+        // keeps a lock the MUD holds (a compare-and-swap), so a door's world sim that lost it stops claiming it.
         string worldSimOwnerId = $"mud_{Environment.ProcessId}_{DateTime.UtcNow.Ticks}";
         if (!sqlBackend.TryAcquireWorldSimLock(worldSimOwnerId))
+        {
+            sqlBackend.TakeOverWorldSimLock(worldSimOwnerId);
             Console.Error.WriteLine("[MUD] The world sim lock was held by another process; the MUD takes it over");
+        }
         var worldSimService = new WorldSimService(
             sqlBackend,
             simIntervalSeconds: UsurperRemake.BBS.DoorMode.SimIntervalSeconds,
@@ -1787,8 +1791,12 @@ public class MudServer
             {
                 _sqlBackend.TouchMudHeartbeat();   // v1.1.13: the web delete waits for this poller only while it beats
                 // v1.1.13: queued web-delete purges, once the world sim has loaded the roster they clear
+                // v1.1.14: first, commands a stopped game server left 'executing' (a delete may queue its purge)
                 if (_worldSimService?.InitializationComplete.Task.IsCompletedSuccessfully == true)
+                {
+                    await RecoverStuckAdminCommandsAsync(_sqlBackend, id => AdminCommandsRunningHere.ContainsKey(id), RunClaimedAdminCommand);
                     await DrainPendingPurgesAsync(_sqlBackend);
+                }
 
                 var commands = _sqlBackend.GetPendingAdminCommands();
                 foreach (var cmd in commands)
@@ -1899,7 +1907,63 @@ public class MudServer
         if (_sqlBackend == null) return;
         // v1.1.13: claimed first; a command the web server withdrew (or another poll claimed) is not run
         if (!_sqlBackend.TryClaimAdminCommand(cmd.Id)) return;
-        await RunClaimedAdminCommand(cmd);
+        AdminCommandsRunningHere[cmd.Id] = 0;   // v1.1.14: never taken for a stuck one while it runs
+        try { await RunClaimedAdminCommand(cmd); }
+        finally { AdminCommandsRunningHere.TryRemove(cmd.Id, out _); }
+    }
+
+    // v1.1.14: the admin commands this process claimed and is running (static: one game server per process)
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<int, byte> AdminCommandsRunningHere = new();
+
+    /// <summary>v1.1.14: an admin command 'executing' longer than this, and not running here, was left by a stopped game server.</summary>
+    internal const int StuckAdminCommandSeconds = 60;
+
+    /// <summary>
+    /// v1.1.14: recover the admin commands a game server claimed and then stopped (a crash or a restart) before
+    /// it marked them, so the web server and the admin page see a final status. Each is taken over first
+    /// (TryClaimStuckAdminCommand), so it is recovered once. A delete_player whose account still holds its save
+    /// did not empty it and is run now by rerunDelete, which marks it; one whose delete landed (the save emptied,
+    /// its archive row at or after the command) is marked executed and its world purge queued in pending_purges,
+    /// with the archived Name2, ID and delete time, for the drain that follows (a deferred purge leaves a
+    /// character made again since alone); one with neither is marked failed. Any other command is marked failed, not run again
+    /// (a kick, a broadcast or a shutdown is not safe to repeat late). Returns the commands recovered.
+    /// </summary>
+    internal static async Task<int> RecoverStuckAdminCommandsAsync(SqlSaveBackend db, Func<int, bool> runningHere,
+        Func<AdminCommand, Task> rerunDelete, int olderThanSeconds = StuckAdminCommandSeconds)
+    {
+        int recovered = 0;
+        foreach (var cmd in db.GetStuckAdminCommands(olderThanSeconds))
+        {
+            if (runningHere(cmd.Id) || !db.TryClaimStuckAdminCommand(cmd.Id, olderThanSeconds)) continue;
+            recovered++;
+            try
+            {
+                string? user = cmd.TargetUsername;
+                if (cmd.Command != "delete_player" || string.IsNullOrWhiteSpace(user))
+                {
+                    db.MarkAdminCommandFailed(cmd.Id, "Interrupted by a game server restart; not run again");
+                    continue;
+                }
+                // the save first: DeleteGameData archives, then empties the save, in two statements, so a stop
+                // between them leaves an archive row beside a save the delete never emptied
+                var archived = db.GetArchivedDeleteForCommand(user!, cmd.Id);
+                if (db.HasCharacterSave(user!))
+                    await rerunDelete(cmd);
+                else if (archived is { } a)
+                {
+                    db.QueuePendingPurge(user!, a.Name2, a.DisplayName, a.DeletedAt, a.PlayerId, "mud-recovery");
+                    db.MarkAdminCommandExecuted(cmd.Id, $"Deleted {user} (world purge queued again after a game server restart)");
+                }
+                else
+                    db.MarkAdminCommandFailed(cmd.Id, "Interrupted by a game server restart; no save or archive of the character was found");
+                Console.Error.WriteLine($"[MUD] Recovered admin command {cmd.Id} ({cmd.Command} {user}) left executing by a stopped game server");
+            }
+            catch (Exception ex)
+            {
+                db.MarkAdminCommandFailed(cmd.Id, $"Recovery after a game server restart failed: {ex.Message}");
+            }
+        }
+        return recovered;
     }
 
     private async Task RunClaimedAdminCommand(AdminCommand cmd)
