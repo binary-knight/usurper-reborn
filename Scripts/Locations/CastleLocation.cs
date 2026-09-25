@@ -6364,34 +6364,19 @@ public class CastleLocation : BaseLocation
         terminal.WriteLine(Loc.Get("castle.defeated_king", currentKing.GetTitle(), currentKing.Name));
         terminal.WriteLine(Loc.Get("castle.throne_is_yours"));
 
-        // Record old monarch
-        monarchHistory.Add(new MonarchRecord
-        {
-            Name = currentKing.Name,
-            Title = currentKing.GetTitle(),
-            DaysReigned = (int)currentKing.TotalReign,
-            CoronationDate = currentKing.CoronationDate,
-            EndReason = $"Defeated by {currentPlayer.DisplayName}"
-        });
-        while (monarchHistory.Count > MaxMonarchHistory)
-            monarchHistory.RemoveAt(0);
-
-        // Crown new monarch — inherit the previous king's treasury and orphans
-        long inheritedTreasury = currentKing.Treasury;
-        var inheritedOrphans = currentKing?.Orphans?.ToList();
-        var inheritedPrisoners = currentKing?.Prisoners?.ToDictionary(p => p.Key, p => p.Value);
+        // Crown new monarch — inherit the previous king's treasury, orphans and prisoners, and record the old
+        // monarch. v1.1.13: from the stored court, as one versioned write; the rest follows only once it lands
+        var oldKing = currentKing;
         string oldKingName = currentKing.Name;
         bool oldKingWasHuman = currentKing.AI == CharacterAI.Human;
-        ClearRoyalMarriage(currentKing); // Clear old king's royal spouse before replacing
+        if (!await CrownPlayerAsync(oldKingName, $"Defeated by {currentPlayer.DisplayName}"))
+        {
+            await ShowCourtChangeFailed();
+            return false;
+        }
+        ClearRoyalMarriage(oldKing); // Clear old king's royal spouse before replacing
         currentPlayer.King = true;
         currentPlayer.NobleTitle = currentPlayer.Sex == CharacterSex.Female ? "Queen" : "King";
-        currentKing = King.CreateNewKing(currentPlayer.DisplayName, CharacterAI.Human, currentPlayer.Sex, inheritedOrphans);
-        currentKing.Treasury = inheritedTreasury;
-        if (inheritedPrisoners != null && inheritedPrisoners.Count > 0)
-        {
-            foreach (var p in inheritedPrisoners)
-                currentKing.Prisoners[p.Key] = p.Value;
-        }
         playerIsKing = true;
 
         currentPlayer.PKills++;
@@ -6401,12 +6386,9 @@ public class CastleLocation : BaseLocation
 
         NewsSystem.Instance.Newsy(true, $"{currentPlayer.DisplayName} has seized the throne! Long live the new {currentKing.GetTitle()}!");
 
-        // Notify the dethroned player
+        // Notify the dethroned player (v1.1.13: the new court is already written)
         if (oldKingWasHuman)
             NotifyDethronedPlayer(oldKingName, currentPlayer.DisplayName, "defeated you in combat");
-
-        // Persist to world_state so world sim and other players see the new king immediately
-        PersistRoyalCourtToWorldState();
 
         await Task.Delay(4000);
         return false; // Stay in castle as new king
@@ -7963,6 +7945,70 @@ public class CastleLocation : BaseLocation
         return CourtChangeAsync(TreasuryOsm(), court => court.KingName == expected && change(court));
     }
 
+    /// <summary>
+    /// v1.1.13: a change of monarch as one versioned write against the stored court (OnlineStateManager.CrownAsync):
+    /// the stored court must still name expectedKing (null: none), crown builds the new court from it, and the
+    /// in-memory court is the written copy once it lands. The caller applies the rest only on true.
+    /// </summary>
+    internal static Task<bool> CrownAsync(string? expectedKing, Func<RoyalCourtSaveData?, RoyalCourtSaveData?> crown, bool reloadOnRefusal = true) =>
+        OnlineStateManager.CrownAsync(OnlineStateManager.CourtStoreFor(TreasuryOsm()),
+            stored => OnlineStateManager.ReigningName(stored) == expectedKing ? crown(stored) : null, reloadOnRefusal);
+
+    /// <summary>
+    /// v1.1.13: an empty throne claimed as one versioned write: the stored court must name no monarch, or the one
+    /// whose reign ended here (endedKing: a death leaves its king stored until the next court save).
+    /// </summary>
+    internal static Task<bool> CrownEmptyThroneAsync(string? endedKing, Func<RoyalCourtSaveData?, RoyalCourtSaveData?> crown, bool reloadOnRefusal = true) =>
+        OnlineStateManager.CrownAsync(OnlineStateManager.CourtStoreFor(TreasuryOsm()), stored =>
+        {
+            var reigning = OnlineStateManager.ReigningName(stored);
+            return reigning == null || (endedKing != null && reigning == endedKing) ? crown(stored) : null;
+        }, reloadOnRefusal);
+
+    /// <summary>
+    /// v1.1.13: a new reign's court record: the new King's court, the stored reign's orphans inherited, and the
+    /// stored monarch history (this process's when none is stored) with added appended.
+    /// </summary>
+    internal static RoyalCourtSaveData NewReignCourt(King newKing, RoyalCourtSaveData? stored, MonarchRecordSaveData? added = null)
+    {
+        var history = (stored?.MonarchHistory?.Count > 0 ? stored.MonarchHistory : MonarchHistorySaveData()).ToList();
+        if (added != null) history.Add(added);
+        while (history.Count > MaxMonarchHistory) history.RemoveAt(0);
+        var court = OnlineStateManager.CourtData(newKing, history);
+        var inherited = stored?.Orphans ?? new List<RoyalOrphanSaveData>();
+        court.Orphans = inherited.Concat(court.Orphans.Where(o => inherited.All(i => i.Name != o.Name))).ToList();
+        return court;
+    }
+
+    /// <summary>
+    /// v1.1.13: the player crowned in place of expectedKing, as one versioned write built from the stored court:
+    /// its treasury, orphans and prisoners inherited and its reign recorded as ended with endReason. False when
+    /// the stored throne changed hands first (the in-memory court is then the stored one).
+    /// </summary>
+    private Task<bool> CrownPlayerAsync(string expectedKing, string endReason)
+    {
+        var template = King.CreateNewKing(currentPlayer.DisplayName, CharacterAI.Human, currentPlayer.Sex);
+        return CrownAsync(expectedKing, stored =>
+        {
+            if (stored == null) return null;
+            var old = OnlineStateManager.KingFromCourt(stored);
+            var court = NewReignCourt(template, stored, MonarchEntry(old.Name, old.GetTitle(), old.TotalReign, old.CoronationDate, endReason));
+            court.Treasury = stored.Treasury;
+            court.Prisoners = stored.Prisoners.ToList();
+            return court;
+        });
+    }
+
+    /// <summary>v1.1.13: an ended or begun reign as the stored history holds it.</summary>
+    internal static MonarchRecordSaveData MonarchEntry(string name, string title, long daysReigned, DateTime coronation, string endReason) => new()
+    {
+        Name = name,
+        Title = title,
+        DaysReigned = (int)daysReigned,
+        CoronationDate = coronation.ToString("o"),
+        EndReason = endReason
+    };
+
     /// <summary>v1.1.13: a prison record as the stored court holds it.</summary>
     internal static PrisonRecordSaveData PrisonerRecord(string name, int sentence, string crime, long bail = 0) => new()
     {
@@ -9475,34 +9521,19 @@ public class CastleLocation : BaseLocation
         terminal.WriteLine("");
         await Task.Delay(1500);
 
-        // Record old monarch in history
+        // Crown new monarch — inherit the previous king's treasury, orphans, and prisoners, and record the old
+        // monarch in history. v1.1.13: from the stored court, as one versioned write; the rest follows it
         string oldKingName = currentKing.Name;
-        monarchHistory.Add(new MonarchRecord
-        {
-            Name = currentKing.Name,
-            Title = currentKing.GetTitle(),
-            DaysReigned = (int)currentKing.TotalReign,
-            CoronationDate = currentKing.CoronationDate,
-            EndReason = $"Overthrown by {siegeTeam} siege"
-        });
-        while (monarchHistory.Count > MaxMonarchHistory)
-            monarchHistory.RemoveAt(0);
-
-        // Crown new monarch — inherit the previous king's treasury, orphans, and prisoners
-        long inheritedTreasury = currentKing.Treasury;
-        var inheritedOrphans = currentKing?.Orphans?.ToList();
-        var inheritedPrisoners = currentKing?.Prisoners?.ToDictionary(p => p.Key, p => p.Value);
+        var oldKing = currentKing;
         bool oldKingWasHuman = currentKing.AI == CharacterAI.Human;
-        ClearRoyalMarriage(currentKing); // Clear old king's royal spouse before replacing
+        if (!await CrownPlayerAsync(oldKingName, $"Overthrown by {siegeTeam} siege"))
+        {
+            await ShowCourtChangeFailed();
+            return;
+        }
+        ClearRoyalMarriage(oldKing); // Clear old king's royal spouse before replacing
         currentPlayer.King = true;
         currentPlayer.NobleTitle = currentPlayer.Sex == CharacterSex.Female ? "Queen" : "King";
-        currentKing = King.CreateNewKing(currentPlayer.DisplayName, CharacterAI.Human, currentPlayer.Sex, inheritedOrphans);
-        currentKing.Treasury = inheritedTreasury;
-        if (inheritedPrisoners != null && inheritedPrisoners.Count > 0)
-        {
-            foreach (var p in inheritedPrisoners)
-                currentKing.Prisoners[p.Key] = p.Value;
-        }
         playerIsKing = true;
         currentPlayer.PKills++;
         UsurperRemake.Systems.ArchetypeTracker.Instance.RecordBecameKing();
@@ -9522,10 +9553,6 @@ public class CastleLocation : BaseLocation
         // Notify the dethroned player
         if (oldKingWasHuman)
             NotifyDethronedPlayer(oldKingName, currentPlayer.DisplayName, $"was overthrown by {siegeTeam}'s siege");
-
-        // Persist royal court changes
-        if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
-            PersistRoyalCourtToWorldState();
 
         await terminal.PressAnyKey();
     }

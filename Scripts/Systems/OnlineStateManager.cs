@@ -1125,6 +1125,109 @@ namespace UsurperRemake.Systems
                 return true;
             }, beforeWrite);
 
+        /// <summary>
+        /// v1.1.13: a change of monarch as one versioned write. The stored court is read with its version (null:
+        /// none stored) and crown builds the new court from it, or returns null to refuse (the throne changed
+        /// hands first; see ReigningName). The new court is written under the version read and retried on a
+        /// conflict; once written the in-memory court is the written copy with the new king. On a refusal the
+        /// in-memory court becomes the stored one (unless reloadOnRefusal is false). The caller applies the
+        /// coronation's other effects (NPC and player flags, news) only on true. beforeWrite is a test hook.
+        /// </summary>
+        internal static async Task<bool> CrownAsync(SqlSaveBackend? sql,
+            Func<RoyalCourtSaveData?, RoyalCourtSaveData?> crown, bool reloadOnRefusal = true, Func<Task>? beforeWrite = null)
+        {
+            var gate = CourtGateFor(sql);
+            await gate.WaitAsync();
+            try
+            {
+                if (sql == null)
+                {
+                    RoyalCourtSaveData? local;
+                    lock (RoyalCourtVersionLock)
+                    {
+                        var king = global::CastleLocation.GetCurrentKing();
+                        local = king == null ? null : CourtData(king);
+                        if (local != null && !king!.IsActive) local.ThroneVacant = true;   // a reign ended here
+                    }
+                    var crownedLocal = crown(local);
+                    if (crownedLocal == null || string.IsNullOrEmpty(crownedLocal.KingName)) return false;
+                    crownedLocal.ThroneVacant = false;
+                    lock (RoyalCourtVersionLock) ApplyCrownedCourt(crownedLocal);
+                    return true;
+                }
+                for (int attempt = 0; attempt < 5; attempt++)
+                {
+                    long version = sql.GetWorldStateVersion("royal_court");   // read before the value, so a later write is a conflict
+                    var json = await sql.LoadWorldState("royal_court");
+                    RoyalCourtSaveData? stored;
+                    if (string.IsNullOrEmpty(json))
+                    {
+                        // no court stored yet: this process's court is the first one
+                        lock (RoyalCourtVersionLock)
+                        {
+                            var king = global::CastleLocation.GetCurrentKing();
+                            stored = version == 0 && king != null && king.IsActive ? CourtData(king) : null;
+                        }
+                    }
+                    else stored = JsonSerializer.Deserialize<RoyalCourtSaveData>(json, CourtJsonOptions);
+                    var crowned = crown(stored);
+                    if (crowned == null || string.IsNullOrEmpty(crowned.KingName))
+                    {
+                        if (reloadOnRefusal && !string.IsNullOrEmpty(json))
+                            ApplyLoadedCourt(JsonSerializer.Deserialize<RoyalCourtSaveData>(json, CourtJsonOptions), version);
+                        return false;
+                    }
+                    crowned.ThroneVacant = false;
+                    if (beforeWrite != null) await beforeWrite();
+                    if (await sql.SaveWorldStateIfVersion("royal_court", JsonSerializer.Serialize(crowned, CourtJsonOptions), version))
+                    {
+                        lock (RoyalCourtVersionLock)
+                        {
+                            if (_royalCourtVersion == null || _royalCourtVersion <= version)
+                            {
+                                ApplyCrownedCourt(crowned);
+                                global::CastleLocation.RoyalCourtLoadedFromShared = true;
+                                _royalCourtVersion = version + 1;
+                            }
+                        }
+                        return true;
+                    }
+                }
+                DebugLogger.Instance.LogWarning("ONLINE", "Coronation gave up: the royal court kept changing. Nothing was changed.");
+                if (reloadOnRefusal)
+                {
+                    long v = sql.GetWorldStateVersion("royal_court");
+                    var latest = await sql.LoadWorldState("royal_court");
+                    if (!string.IsNullOrEmpty(latest)) ApplyLoadedCourt(JsonSerializer.Deserialize<RoyalCourtSaveData>(latest, CourtJsonOptions), v);
+                }
+                return false;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("ONLINE", $"Coronation failed: {ex.Message}");
+                return false;
+            }
+            finally { gate.Release(); }
+        }
+
+        /// <summary>v1.1.13: the monarch a court record names as reigning (null: none, or a vacancy).</summary>
+        internal static string? ReigningName(RoyalCourtSaveData? court) =>
+            court == null || court.ThroneVacant || string.IsNullOrEmpty(court.KingName) ? null : court.KingName;
+
+        /// <summary>v1.1.13: a crowned court becomes the in-memory court, as a new King. Call under RoyalCourtVersionLock.</summary>
+        private static void ApplyCrownedCourt(RoyalCourtSaveData court)
+        {
+            var king = new King
+            {
+                Name = court.KingName,
+                AI = (CharacterAI)court.KingAI,
+                Sex = (CharacterSex)court.KingSex,
+                IsActive = true
+            };
+            ApplyCourtTo(king, court, exact: true, history: true);
+            global::CastleLocation.SetKing(king);
+        }
+
         /// <summary>v1.1.13: the world sim's shared court when no session's is at hand (set by the running world sim).</summary>
         internal static SqlSaveBackend? SimCourtStore;
 

@@ -518,9 +518,32 @@ public class ChallengeSystem
 
     /// <summary>
     /// Crown a new King after successful challenge
+    /// v1.1.13: the new court is one versioned write before anything else the coronation does, so a court
+    /// change later in the same tick (court politics) reads the new king; internal for tests
     /// </summary>
-    private void CrownNewKing(NPC newKing, King oldKing)
+    internal void CrownNewKing(NPC newKing, King oldKing)
     {
+        // Create new king data — inherit orphans from previous reign (v1.1.13: from the stored court)
+        var template = King.CreateNewKing(newKing.Name, CharacterAI.Computer, newKing.Sex);
+        var oldKingNPC = NPCSpawnSystem.Instance?.ActiveNPCs?
+            .FirstOrDefault(n => n.Name == oldKing.Name);
+        bool crowned = CastleLocation.CrownAsync(oldKing.Name, stored =>
+        {
+            if (stored == null) return null;
+            var court = CastleLocation.NewReignCourt(template, stored);
+            court.Treasury = stored.Treasury / 2; // Inherits half the treasury
+            court.TaxRate = stored.TaxRate;
+            court.CityTaxPercent = stored.CityTaxPercent;
+            // the deposed monarch's cell is in the same write
+            if (oldKingNPC != null) court.Prisoners.Add(CastleLocation.PrisonerRecord(oldKing.Name, 14, "Deposed monarch"));
+            return court;
+        }).GetAwaiter().GetResult();
+        if (!crowned)
+        {
+            DebugLogger.Instance.LogInfo("CHALLENGE", $"{newKing.Name}'s coronation was not written: the stored court no longer names {oldKing.Name}.");
+            return;
+        }
+
         // RULE: New King cannot be on a team
         if (!string.IsNullOrEmpty(newKing.Team))
         {
@@ -530,24 +553,12 @@ public class ChallengeSystem
         // Mark as King
         newKing.King = true;
 
-        // Create new king data — inherit orphans from previous reign
-        var inheritedOrphans = oldKing?.Orphans?.ToList();
-        var kingData = King.CreateNewKing(newKing.Name, CharacterAI.Computer, newKing.Sex, inheritedOrphans);
-        kingData.Treasury = oldKing.Treasury / 2; // Inherits half the treasury
-        kingData.TaxRate = oldKing.TaxRate;
-        kingData.CityTaxPercent = oldKing.CityTaxPercent;
-
-        // Set as current king
-        CastleLocation.SetKing(kingData);
-
         // Find and unmark old king NPC if they exist
-        var oldKingNPC = NPCSpawnSystem.Instance?.ActiveNPCs?
-            .FirstOrDefault(n => n.Name == oldKing.Name);
         if (oldKingNPC != null)
         {
             oldKingNPC.King = false;
-            // Old king goes to prison or flees
-            ImprisonChallenger(oldKingNPC, 14, "Deposed monarch");
+            // Old king goes to prison or flees (v1.1.13: the court's record was written with the crown)
+            ImprisonChallenger(oldKingNPC, 14, "Deposed monarch", courtRecord: false);
         }
 
         // If the old king was the player, clear their King flag too
@@ -560,6 +571,7 @@ public class ChallengeSystem
             player.RecalculateStats(); // Remove Royal Authority HP bonus
         }
 
+        var kingData = CastleLocation.GetCurrentKing() ?? template;
         NewsSystem.Instance?.Newsy(true,
             $"ALL HAIL {kingData.GetTitle()} {newKing.Name}! A new monarch sits upon the throne!");
 
@@ -596,14 +608,17 @@ public class ChallengeSystem
                     n.Level >= GameConfig.MinLevelKing && !n.IsStoryNPC);
             if (heir != null)
             {
+                // v1.1.13: the new court is one versioned write; the rest follows only once it lands
+                var heirKingData = King.CreateNewKing(heir.Name, CharacterAI.Computer, heir.Sex, previousOrphans);
+                long heirTreasury = random.Next(5000, 20000);
+                if (!CrownEmptyThrone(heirKingData, heirTreasury, GameConfig.DefaultTaxRateNew))
+                {
+                    _lastDesignatedHeir = null;
+                    return;
+                }
                 if (!string.IsNullOrEmpty(heir.Team))
                     CityControlSystem.Instance.ForceLeaveTeam(heir);
-
                 heir.King = true;
-                var heirKingData = King.CreateNewKing(heir.Name, CharacterAI.Computer, heir.Sex, previousOrphans);
-                heirKingData.Treasury = random.Next(5000, 20000);
-                heirKingData.TaxRate = GameConfig.DefaultTaxRateNew;
-                CastleLocation.SetKing(heirKingData);
 
                 NewsSystem.Instance?.Newsy(true,
                     $"The designated heir {heir.Name} has claimed the throne! ALL HAIL {heirKingData.GetTitle()} {heir.Name}!");
@@ -650,6 +665,11 @@ public class ChallengeSystem
 
         var newKing = candidates[0];
 
+        // v1.1.13: the new court is one versioned write; the rest follows only once it lands
+        var kingData = King.CreateNewKing(newKing.Name, CharacterAI.Computer, newKing.Sex, previousOrphans);
+        if (!CrownEmptyThrone(kingData, random.Next(5000, 20000), random.Next(10, 30)))
+            return;
+
         // Must leave team to become King
         if (!string.IsNullOrEmpty(newKing.Team))
         {
@@ -658,17 +678,24 @@ public class ChallengeSystem
 
         newKing.King = true;
 
-        var kingData = King.CreateNewKing(newKing.Name, CharacterAI.Computer, newKing.Sex, previousOrphans);
-        kingData.Treasury = random.Next(5000, 20000);
-        kingData.TaxRate = random.Next(10, 30);
-
-        CastleLocation.SetKing(kingData);
-
         NewsSystem.Instance?.Newsy(true,
             $"{newKing.Name} has claimed the empty throne! ALL HAIL {kingData.GetTitle()} {newKing.Name}!");
 
         // GD.Print($"[Challenge] {newKing.Name} claimed empty throne");
     }
+
+    /// <summary>
+    /// v1.1.13: an empty throne's new court as one versioned write. It is written only while the stored throne
+    /// is empty too; otherwise nothing changes here (a reign this process ended but has yet to write stays ended).
+    /// </summary>
+    private static bool CrownEmptyThrone(King kingData, long treasury, long taxRate) =>
+        CastleLocation.CrownEmptyThroneAsync(null, stored =>
+        {
+            var court = CastleLocation.NewReignCourt(kingData, stored);
+            court.Treasury = treasury;
+            court.TaxRate = taxRate;
+            return court;
+        }, reloadOnRefusal: false).GetAwaiter().GetResult();
 
     /// <summary>
     /// Process a city control challenge between teams
@@ -779,7 +806,7 @@ public class ChallengeSystem
         }
     }
 
-    private void ImprisonChallenger(NPC? npc, int days, string crime)
+    private void ImprisonChallenger(NPC? npc, int days, string crime, bool courtRecord = true)
     {
         if (npc == null) return;
 
@@ -805,9 +832,18 @@ public class ChallengeSystem
             }
         }
 
-        // Also add to King's prison record if there's a King
-        var king = CastleLocation.GetCurrentKing();
-        king?.ImprisonCharacter(npc.Name, days, crime);
+        // Also add to King's prison record if there's a King (v1.1.13: one guarded court change, so a later
+        // court change this tick does not drop it)
+        if (courtRecord && CastleLocation.GetCurrentKing() != null)
+        {
+            string name = npc.Name;
+            CastleLocation.CourtChangeAsync(court =>
+            {
+                court.Prisoners.RemoveAll(p => p.CharacterName == name);
+                court.Prisoners.Add(CastleLocation.PrisonerRecord(name, days, crime));
+                return true;
+            }).GetAwaiter().GetResult();
+        }
 
         NewsSystem.Instance?.Newsy(true, $"{npc.Name} was thrown in prison for {days} days!");
     }

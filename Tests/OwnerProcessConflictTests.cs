@@ -363,10 +363,7 @@ public partial class OwnerProcessConflictTests : IDisposable
         var allowed = new (string File, string Member)[]
         {
             ("OnlineStateManager.cs", "ApplyCourtTo("),                 // the loaders' and the change's copy into a King
-            ("CastleLocation.cs", "ChallengeThrone("),                  // coronations: a new King, written whole
-            ("CastleLocation.cs", "CrownNPC("),
-            ("CastleLocation.cs", "CastleSiegeMenu("),
-            ("ChallengeSystem.cs", ""),                                 // a new king's court (kingData)
+            ("CastleLocation.cs", "CrownNPC("),                         // a coronation: a new King, written whole
             ("WorldInitializerSystem.cs", ""),                          // a new world
             ("SaveSystem.cs", ""),                                      // the single-player save's own court
             ("King.cs", "CreateNewKing("),
