@@ -425,4 +425,32 @@ public class Leftovers1114BTests : IDisposable
             body.Should().Contain("news.Add((");
         }
     }
+
+    // ─── N4 follow-up: bounty_claims holds claims on any quest; nothing reads it as a list of bounties ───
+
+    [Fact]
+    public void BountyClaims_IsOnlyCreatedAndClaimed_NeverReadAsBounties()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "Scripts"))) dir = dir.Parent;
+        var uses = new List<string>();
+        foreach (var folder in new[] { "Scripts", "Console", "web", "scripts-server", "tools", "docker" })
+        {
+            var root = Path.Combine(dir!.FullName, folder);
+            if (!Directory.Exists(root)) continue;
+            foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
+            {
+                if (file.Contains("node_modules") || file.Contains(Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar)
+                    || file.Contains(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar)) continue;
+                var lines = File.ReadAllLines(file);
+                for (int i = 0; i < lines.Length; i++)
+                    if (lines[i].Contains("bounty_claims"))
+                        uses.Add($"{Path.GetRelativePath(dir.FullName, file)}: {lines[i].Trim()}");
+            }
+        }
+        // the table (fresh schema and migration), its migration warning, and the claim; no report, panel or clean-up
+        uses.Should().OnlyContain(u => u.Contains("CREATE TABLE IF NOT EXISTS bounty_claims") || u.Contains("bounty_claims not ensured")
+                                       || u.Contains("INSERT OR IGNORE INTO bounty_claims (quest_id, claimed_by)"), string.Join("\n", uses));
+        uses.Should().Contain(u => u.Contains("INSERT OR IGNORE INTO bounty_claims"));
+    }
 }
