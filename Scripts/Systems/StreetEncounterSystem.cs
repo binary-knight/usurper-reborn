@@ -2912,6 +2912,10 @@ public class StreetEncounterSystem
         await terminal.PressAnyKey();
     }
 
+    /// <summary>
+    /// v1.1.13: nothing calls this (StreetEncounterSystemReachabilityTests proves it from the compiled IL). Its
+    /// court outcomes are guarded court changes all the same, with the player's side after the write.
+    /// </summary>
     private async Task ExecuteThroneChallenge(NPC challenger, Character player,
         TerminalEmulator terminal, EncounterResult result)
     {
@@ -2959,16 +2963,14 @@ public class StreetEncounterSystem
                 {
                     terminal.SetColor("red");
                     terminal.WriteLine(Loc.Get("street_encounter.throne.defeated_claims", challenger.Name2));
-                    player.King = false;
-                    player.RoyalMercenaries?.Clear(); // Dismiss bodyguards on dethronement
-                    player.RecalculateStats(); // Remove Royal Authority HP bonus
-                    // NPC becomes king
-                    if (king != null)
+                    // NPC becomes king (v1.1.13: one versioned throne write; the player's side follows it)
+                    if (king != null && await CastleLocation.EndReignAsync(king.Name, $"Defeated by {challenger.Name2}", challenger))
                     {
-                        king.Name = challenger.Name2;
-                        king.AI = CharacterAI.Civilian;
+                        player.King = false;
+                        player.RoyalMercenaries?.Clear(); // Dismiss bodyguards on dethronement
+                        player.RecalculateStats(); // Remove Royal Authority HP bonus
+                        NewsSystem.Instance?.Newsy($"{challenger.Name2} defeated King {player.Name2} and seized the throne!");
                     }
-                    NewsSystem.Instance?.Newsy($"{challenger.Name2} defeated King {player.Name2} and seized the throne!");
                 }
                 break;
 
@@ -3010,17 +3012,14 @@ public class StreetEncounterSystem
                     terminal.SetColor("white");
                     terminal.WriteLine(Loc.Get("street_encounter.throne.considers_seat", challenger.Name2));
 
-                    if (king != null)
-                    {
-                        king.CourtMembers.Add(new CourtMember
+                    // v1.1.13: the advisory seat is one guarded court change; the news follows it
+                    string advisor = challenger.Name2;
+                    if (king != null && await CastleLocation.CourtChangeAsync(court =>
                         {
-                            Name = challenger.Name2,
-                            Role = "Advisor",
-                            LoyaltyToKing = 40
-                        });
-                    }
-
-                    NewsSystem.Instance?.Newsy($"King {player.Name2} negotiated with would-be usurper {challenger.Name2}, offering them a court position.");
+                            court.CourtMembers.Add(new CourtMemberSaveData { Name = advisor, Role = "Advisor", LoyaltyToKing = 40 });
+                            return true;
+                        }))
+                        NewsSystem.Instance?.Newsy($"King {player.Name2} negotiated with would-be usurper {challenger.Name2}, offering them a court position.");
                 }
                 else
                 {
@@ -3038,11 +3037,14 @@ public class StreetEncounterSystem
                     terminal.SetColor("red");
                     terminal.WriteLine(Loc.Get("street_encounter.throne.seize_treason"));
 
+                    // Guards lose loyalty (tyrannical act); v1.1.13: one guarded court change, the arrest after it
+                    await CastleLocation.CourtChangeAsync(court =>
+                    {
+                        foreach (var guard in court.Guards)
+                            guard.Loyalty = Math.Max(0, guard.Loyalty - 10);
+                        return true;
+                    });
                     NPCSpawnSystem.Instance?.ImprisonNPC(challenger, 14);
-
-                    // Guards lose loyalty (tyrannical act)
-                    foreach (var guard in king.Guards)
-                        guard.Loyalty = Math.Max(0, guard.Loyalty - 10);
 
                     terminal.SetColor("yellow");
                     terminal.WriteLine(Loc.Get("street_encounter.throne.dragged_away", challenger.Name2));
