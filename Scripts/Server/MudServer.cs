@@ -2147,6 +2147,16 @@ public class MudServer
                     }
                     break;
 
+                case "guild_succession":
+                    // v1.1.14: queued by the web unban: a guild left with no leader passes to the unbanned member
+                    if (target == null) { _sqlBackend.MarkAdminCommandFailed(cmd.Id, "No target"); return; }
+                    {
+                        var guilds = UsurperRemake.Systems.GuildSystem.Instance ?? new UsurperRemake.Systems.GuildSystem(_sqlBackend.DatabasePath, register: false);
+                        string? leader = guilds.FillLeaderlessGuildOf(target);
+                        _sqlBackend.MarkAdminCommandExecuted(cmd.Id, leader != null ? $"Guild leadership passed to {leader}" : "No guild needed a leader");
+                    }
+                    break;
+
                 case "delete_player":
                     if (target == null) { _sqlBackend.MarkAdminCommandFailed(cmd.Id, "No target"); return; }
                     if (session != null)

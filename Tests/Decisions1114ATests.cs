@@ -398,6 +398,33 @@ public class LeaderlessGuildTests : IDisposable
     }
 
     [Fact]
+    public async Task AWebUnban_QueuesAGuildSuccession_ThatTheGameServerRunsAtOnce()
+    {
+        LeaderlessGuild();
+        // the web unban's statements, as ssh-proxy.js has them
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "Scripts"))) dir = dir.Parent;
+        var js = File.ReadAllText(Path.Combine(dir!.FullName, "web", "ssh-proxy.js"));
+        int start = js.IndexOf("// POST /api/admin/players/:username/unban", StringComparison.Ordinal);
+        var route = js.Substring(start, js.IndexOf("return true;", start, StringComparison.Ordinal) - start);
+        route.Should().Contain(".run('guild_succession', playerUsername, null, 'admin-web');");
+        Exec("UPDATE players SET is_banned = 0 WHERE username = 'outcast';");
+        Exec("INSERT INTO admin_commands (command, target_username, args, created_by) VALUES ('guild_succession', 'outcast', NULL, 'admin-web');");
+
+        var t = typeof(UsurperRemake.Server.MudServer);
+        var server = (UsurperRemake.Server.MudServer)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(t);
+        const System.Reflection.BindingFlags F = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        t.GetField("_sqlBackend", F)!.SetValue(server, _db);
+        t.GetField("<ActiveSessions>k__BackingField", F)!.SetValue(server,
+            new System.Collections.Concurrent.ConcurrentDictionary<string, UsurperRemake.Server.PlayerSession>());
+        var cmd = _db.GetPendingAdminCommands().Single();
+        await (Task)t.GetMethod("ExecuteAdminCommand", F)!.Invoke(server, new object[] { cmd })!;
+
+        Scalar($"SELECT status FROM admin_commands WHERE id = {cmd.Id}").Should().Be("executed");
+        Scalar("SELECT leader_username FROM guilds WHERE name = 'ironhand'").Should().Be("outcast", "passed when the command ran, not at the next maintenance");
+    }
+
+    [Fact]
     public void AWebUnban_IsPickedUpByTheSweep_AndAGuildWithALeaderIsLeftAlone()
     {
         var guilds = LeaderlessGuild();

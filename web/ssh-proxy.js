@@ -3105,6 +3105,13 @@ async function handleAdminRequest(req, res) {
           .run('admin-web', 'unban_player', playerUsername, lifted.changes > 0 ? `(also lifted ${lifted.changes} IP ban${lifted.changes === 1 ? '' : 's'})` : '');
       } catch (e) { /* non-critical */ }
 
+      // v1.1.14: the game server passes a guild left with no leader to the unbanned member at once; if it does
+      // not run the command, its maintenance pass does the same later
+      try {
+        dbWrite.prepare("INSERT INTO admin_commands (command, target_username, args, created_by) VALUES (?, ?, ?, ?)")
+          .run('guild_succession', playerUsername, null, 'admin-web');
+      } catch (e) { /* non-critical */ }
+
       sendJson(res, 200, { success: true });
     } catch (e) {
       sendJson(res, 500, { error: e.message });
