@@ -4826,10 +4826,13 @@ public class CastleLocation : BaseLocation
         if (int.TryParse(input, out int idx) && idx > 0 && idx <= currentKing.CourtMembers.Count)
         {
             var member = currentKing.CourtMembers[idx - 1];
-            // v1.1.13: the dismissal and the faction's loyalty hit are one guarded court change
+            // v1.1.13: the dismissal and the faction's loyalty hit are one guarded court change, on the selected
+            // entry only (a namesake stays)
             if (!await CourtChangeAsync(court =>
                 {
-                    if (court.CourtMembers.RemoveAll(c => c.Name == member.Name) == 0) return false;
+                    int at = SelectedCourtier(court.CourtMembers, idx - 1, member);
+                    if (at < 0) return false;
+                    court.CourtMembers.RemoveAt(at);
                     // Faction loyalty hit
                     foreach (var cm in court.CourtMembers.Where(c => c.Faction == (int)member.Faction))
                         cm.LoyaltyToKing = Math.Max(0, cm.LoyaltyToKing - GameConfig.DismissLoyaltyCost);
@@ -5016,6 +5019,19 @@ public class CastleLocation : BaseLocation
         terminal.WriteLine("");
     }
 
+    /// <summary>
+    /// v1.1.13: where the courtier selected at index is in a court record. Court members have no stored id, so
+    /// an entry is known by its place and its name, role and faction together: the entry at index when it still
+    /// matches all three, else the only entry that does. -1 when none does, or more than one does elsewhere.
+    /// </summary>
+    internal static int SelectedCourtier(List<CourtMemberSaveData> members, int index, CourtMember selected)
+    {
+        bool same(CourtMemberSaveData c) => c.Name == selected.Name && c.Role == selected.Role && c.Faction == (int)selected.Faction;
+        if (index >= 0 && index < members.Count && same(members[index])) return index;
+        var matches = Enumerable.Range(0, members.Count).Where(i => same(members[i])).ToList();
+        return matches.Count == 1 ? matches[0] : -1;
+    }
+
     private async Task CourtAction_Promote()
     {
         terminal.SetColor("yellow");
@@ -5044,8 +5060,9 @@ public class CastleLocation : BaseLocation
             // v1.1.13: the cost and the promotion are one guarded court change
             if (!await CourtChangeAsync(court =>
                 {
-                    var m = court.CourtMembers.FirstOrDefault(c => c.Name == member.Name);
-                    if (m == null || court.Treasury < GameConfig.PromoteCost) return false;
+                    int at = SelectedCourtier(court.CourtMembers, idx - 1, member);   // v1.1.13: the selected entry, not a namesake
+                    if (at < 0 || court.Treasury < GameConfig.PromoteCost) return false;
+                    var m = court.CourtMembers[at];
                     court.Treasury -= GameConfig.PromoteCost;
                     m.LoyaltyToKing = Math.Min(100, m.LoyaltyToKing + GameConfig.PromoteLoyaltyGain);
                     m.Influence = Math.Min(100, m.Influence + 5);
