@@ -1421,8 +1421,8 @@ namespace UsurperRemake.Systems
             king.Treasury = royalCourt.Treasury;
             king.TaxRate = royalCourt.TaxRate;
             king.TotalReign = royalCourt.TotalReign;
-            king.KingTaxPercent = royalCourt.KingTaxPercent > 0 ? royalCourt.KingTaxPercent : 5;
-            king.CityTaxPercent = royalCourt.CityTaxPercent > 0 ? royalCourt.CityTaxPercent : 2;
+            king.KingTaxPercent = royalCourt.KingTaxPercent ?? 5;   // v1.1.13: the default only when absent; a stored 0 stays 0
+            king.CityTaxPercent = royalCourt.CityTaxPercent ?? 2;
             king.DesignatedHeir = royalCourt.DesignatedHeir;
 
             // Restore coronation date and tax alignment

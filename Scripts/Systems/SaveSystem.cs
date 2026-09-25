@@ -2651,8 +2651,8 @@ namespace UsurperRemake.Systems
                         king.Treasury = data.RoyalCourt.Treasury;
                         king.TaxRate = data.RoyalCourt.TaxRate;
                         king.TotalReign = data.RoyalCourt.TotalReign;
-                        king.KingTaxPercent = data.RoyalCourt.KingTaxPercent > 0 ? data.RoyalCourt.KingTaxPercent : 5;
-                        king.CityTaxPercent = data.RoyalCourt.CityTaxPercent > 0 ? data.RoyalCourt.CityTaxPercent : 2;
+                        king.KingTaxPercent = data.RoyalCourt.KingTaxPercent ?? 5;   // v1.1.13: the default only when absent; a stored 0 stays 0
+                        king.CityTaxPercent = data.RoyalCourt.CityTaxPercent ?? 2;
 
                         // Restore coronation date and tax alignment
                         if (!string.IsNullOrEmpty(data.RoyalCourt.CoronationDate))

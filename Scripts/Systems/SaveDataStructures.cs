@@ -1861,8 +1861,9 @@ namespace UsurperRemake.Systems
         public long Treasury { get; set; }
         public long TaxRate { get; set; }
         public long TotalReign { get; set; }
-        public int KingTaxPercent { get; set; } = 5;
-        public int CityTaxPercent { get; set; } = 2;
+        /// <summary>v1.1.13: null only when absent from the stored record (an older save): the loaders then use 5 and 2. A stored 0 is 0.</summary>
+        public int? KingTaxPercent { get; set; }
+        public int? CityTaxPercent { get; set; }
         public string DesignatedHeir { get; set; } = "";
         public int KingAI { get; set; } = 1; // CharacterAI: 0=Human, 1=Computer
         public int KingSex { get; set; } = 0; // CharacterSex
