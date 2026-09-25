@@ -3011,17 +3011,11 @@ public class CastleLocation : BaseLocation
             return;
         }
 
-        // v1.1.13: the spell's cost leaves the stored magic budget in one guarded court change
-        if (!await CourtChangeAsync(court => { if (court.MagicBudget < 2000) return false; court.MagicBudget -= 2000; return true; }))
+        // v1.1.13: the spell's cost and the guards' loyalty are one guarded court change
+        if (!await CastProtectionAsync(TreasuryOsm()))
         {
             await ShowCourtChangeFailed();
             return;
-        }
-
-        // Boost all guards
-        foreach (var guard in currentKing.Guards)
-        {
-            guard.Loyalty = Math.Min(100, guard.Loyalty + 10);
         }
 
         terminal.SetColor("bright_cyan");
@@ -3033,6 +3027,24 @@ public class CastleLocation : BaseLocation
         terminal.WriteLine(Loc.Get("castle.guard_loyalty_up"));
 
         await Task.Delay(2500);
+    }
+
+    /// <summary>
+    /// v1.1.13: Protection on the stored court: the 2,000 magic budget leaves and every guard's loyalty rises
+    /// by 10 in the same guarded court change, so a later court change never keeps the cost without the benefit.
+    /// </summary>
+    internal static Task<bool> CastProtectionAsync(OnlineStateManager? osm, Func<Task>? beforeWrite = null)
+    {
+        string? expected = currentKing?.Name;
+        return CourtChangeAsync(osm, court =>
+        {
+            if (court.KingName != expected || court.MagicBudget < 2000) return false;
+            court.MagicBudget -= 2000;
+            // Boost all guards
+            foreach (var guard in court.Guards)
+                guard.Loyalty = Math.Min(100, guard.Loyalty + 10);
+            return true;
+        }, beforeWrite);
     }
 
     private async Task CastScry()
