@@ -123,6 +123,41 @@ public partial class OwnerProcessConflictTests
             File.ReadAllText(Path.Combine(RepoRoot(), "Localization", lang + ".json")).Should().Contain("\"castle.bounty_roster_busy\"");
     }
 
+    // ─── O1: the unique display-name index, made only when no display name is shared ───
+
+    private string? IndexSql() => Scalar1($"SELECT sql FROM sqlite_master WHERE type = 'index' AND name = '{SqlSaveBackend.DisplayNameUniqueIndex}';");
+
+    private string? Scalar1(string sql)
+    {
+        using var conn = new SqliteConnection($"Data Source={_path}");
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = sql;
+        return cmd.ExecuteScalar()?.ToString();
+    }
+
+    [Fact]
+    public void TheDisplayNameIndex_IsMade_OnlyWhenNoDisplayNameIsShared()
+    {
+        // a new database gets the live index, as defined live
+        IndexSql().Should().Be("CREATE UNIQUE INDEX idx_players_display_name_unique ON players(LOWER(display_name))");
+        Action second = () => Exec("INSERT INTO players (username, display_name, player_data) VALUES ('a1', 'Ann', '{}'), ('a2', 'ANN', '{}');");
+        second.Should().Throw<SqliteException>("a second player named Ann, in any case, is refused");
+
+        // an older database whose players share a name: the index is not made, and the start goes on
+        Exec($"DROP INDEX {SqlSaveBackend.DisplayNameUniqueIndex};");
+        Exec("INSERT INTO players (username, display_name, player_data) VALUES ('b1', 'Bob', '{}'), ('b2', 'bob', '{}');");
+        SqliteConnection.ClearAllPools();
+        _ = new SqlSaveBackend(_path);
+        IndexSql().Should().BeNull("two players share 'bob'");
+
+        // once they no longer do, the next start makes it
+        Exec("UPDATE players SET display_name = 'Bobby' WHERE username = 'b2';");
+        SqliteConnection.ClearAllPools();
+        _ = new SqlSaveBackend(_path);
+        IndexSql().Should().NotBeNull();
+    }
+
     private static string RepoRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);

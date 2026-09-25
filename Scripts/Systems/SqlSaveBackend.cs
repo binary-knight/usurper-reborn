@@ -1014,7 +1014,57 @@ namespace UsurperRemake.Systems
 
             MigrateWorldBossTables(connection); // v1.1.4
 
+            EnsureDisplayNameUniqueIndex(connection);   // v1.1.14
+
             DebugLogger.Instance.LogInfo("SQL", $"Database initialized at {databasePath}");
+        }
+
+        /// <summary>v1.1.14: the unique display-name index, as the live server has it.</summary>
+        internal const string DisplayNameUniqueIndex = "idx_players_display_name_unique";
+
+        /// <summary>
+        /// v1.1.14: no two players may share a display name, ignoring case (WriteGameData keeps the stored name
+        /// when a save would break this). The index is made only when no two rows share one now: counted first,
+        /// and when some do it is not made and the names are logged, for an admin to settle; the next start
+        /// checks again. A duplicate written between the count and the CREATE fails the CREATE, which is caught
+        /// and logged the same way. True when the index exists afterwards.
+        /// </summary>
+        internal static bool EnsureDisplayNameUniqueIndex(SqliteConnection connection)
+        {
+            try
+            {
+                using (var has = connection.CreateCommand())
+                {
+                    has.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = @n;";
+                    has.Parameters.AddWithValue("@n", DisplayNameUniqueIndex);
+                    if (Convert.ToInt64(has.ExecuteScalar()) > 0) return true;
+                }
+                var shared = new List<string>();
+                using (var dup = connection.CreateCommand())
+                {
+                    dup.CommandText = "SELECT LOWER(display_name), COUNT(*) FROM players GROUP BY LOWER(display_name) HAVING COUNT(*) > 1 ORDER BY 1;";
+                    using var r = dup.ExecuteReader();
+                    while (r.Read()) shared.Add($"'{(r.IsDBNull(0) ? "" : r.GetString(0))}' x{r.GetInt64(1)}");
+                }
+                if (shared.Count > 0)
+                {
+                    DebugLogger.Instance.LogWarning("SQL", $"{DisplayNameUniqueIndex} not made: {shared.Count} display name(s) are shared by more than one player " +
+                        $"({string.Join(", ", shared.Take(20))}{(shared.Count > 20 ? ", ..." : "")}). Rename them and restart to add it.");
+                    return false;
+                }
+                using (var make = connection.CreateCommand())
+                {
+                    make.CommandText = $"CREATE UNIQUE INDEX IF NOT EXISTS {DisplayNameUniqueIndex} ON players(LOWER(display_name));";
+                    make.ExecuteNonQuery();
+                }
+                DebugLogger.Instance.LogInfo("SQL", $"{DisplayNameUniqueIndex} made: no display name is shared.");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogWarning("SQL", $"{DisplayNameUniqueIndex} not made: {ex.Message}. The next start tries again.");
+                return false;
+            }
         }
 
         private SqliteConnection OpenConnection()
