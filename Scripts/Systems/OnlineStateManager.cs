@@ -104,8 +104,11 @@ namespace UsurperRemake.Systems
         /// <summary>
         /// Save NPC data to shared world state.
         /// Called after NPC changes that should be visible to all players.
+        /// v1.1.14: generation is the live roster's rebuild count when npcData was serialized (SnapshotLiveRoster);
+        /// with it, the owner's write notes the live roster as stored at the version it wrote, so the world sim of
+        /// this process adopts that version instead of reloading over its own unsaved changes.
         /// </summary>
-        public async Task SaveSharedNPCs(List<NPCData> npcData)
+        public async Task SaveSharedNPCs(List<NPCData> npcData, long? generation = null)
         {
             try
             {
@@ -116,7 +119,13 @@ namespace UsurperRemake.Systems
                     return;
                 }
                 var json = JsonSerializer.Serialize(npcData, jsonOptions);
-                await backend.SaveWorldState(KEY_NPCS, json);
+                if (backend is SqlSaveBackend owner)
+                {
+                    long? written = await owner.SaveWorldStateReturningVersion(KEY_NPCS, json);
+                    if (written != null && generation != null) NoteLiveRosterWritten(generation.Value, written.Value);
+                }
+                else
+                    await backend.SaveWorldState(KEY_NPCS, json);
                 DebugLogger.Instance.LogDebug("ONLINE", $"Saved {npcData.Count} NPCs to shared state");
             }
             catch (Exception ex)
@@ -708,12 +717,13 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Save quest data to shared state.
+        /// Save quest data to shared state. v1.1.14: with SQL, a versioned write (SaveSharedQuestsVersionedAsync).
         /// </summary>
         public async Task SaveSharedQuests(List<QuestData> quests)
         {
             try
             {
+                if (backend is SqlSaveBackend sql) { await SaveSharedQuestsVersionedAsync(sql, quests); return; }
                 var json = JsonSerializer.Serialize(quests, jsonOptions);
                 await backend.SaveWorldState(KEY_QUESTS, json);
             }
@@ -721,6 +731,79 @@ namespace UsurperRemake.Systems
             {
                 DebugLogger.Instance.LogError("ONLINE", $"Failed to save quests: {ex.Message}");
             }
+        }
+
+        // v1.1.14: this session's quest list as it last wrote it (JSON by quest key; null: never written), and the
+        // keys of every quest a stored list it read has held (a quest it holds that no stored list had is its own)
+        private Dictionary<string, string>? _questBaseline;
+        private readonly HashSet<string> _questSeen = new();
+
+        private static string QuestKey(QuestData q) => !string.IsNullOrEmpty(q.Id) ? q.Id : "title:" + q.Title + "|" + q.Initiator;
+
+        /// <summary>
+        /// v1.1.14: a quest in the shared record that every process drops by its own rules by now, so the record
+        /// drops it too (it is never read back into a quest list). An unclaimed quest older than 7 days
+        /// (QuestSystem's cleanup of stale board quests); a claimed quest past its time limit (the daily failure
+        /// check, OccupiedDays over DaysToComplete); and a claimed quest older than 7 days plus its time limit
+        /// plus one day since it was made, which is past the limit counted from the latest day the board still
+        /// offers it for a claim. Every part reads fields that never go back, so a copy another process still
+        /// holds meets the rule too. A quest with no start time is kept. Times are local, as quest dates are.
+        /// </summary>
+        internal static bool IsExpiredSharedQuest(QuestData q, DateTime now)
+        {
+            bool dated = q.StartTime != default;
+            if (string.IsNullOrEmpty(q.Occupier)) return dated && q.StartTime < now.AddDays(-7);
+            if (q.DaysToComplete > 0 && q.OccupiedDays > q.DaysToComplete) return true;
+            return dated && q.DaysToComplete > 0 && q.StartTime < now.AddDays(-(7 + q.DaysToComplete + 1));
+        }
+
+        /// <summary>
+        /// v1.1.14: the shared quests are written only under the version read just before the value. This
+        /// session's changes since its last write (a quest added, changed or dropped) are laid over the stored
+        /// list, so every other process's quests are kept; on a conflict the stored list is read again, the
+        /// changes laid over it again and the write retried (5 attempts). A quest another process removed is never
+        /// brought back, changed or not. RemoveSharedQuestsAsync, the other writer, is versioned the same way.
+        /// v1.1.14: every write also drops the expired quests (IsExpiredSharedQuest), stored or this session's,
+        /// so a quest no process holds any more leaves the record. beforeWrite is a test hook. True once written.
+        /// </summary>
+        internal async Task<bool> SaveSharedQuestsVersionedAsync(SqlSaveBackend sql, List<QuestData> quests, Func<Task>? beforeWrite = null)
+        {
+            var own = new Dictionary<string, string>();
+            foreach (var q in quests) own[QuestKey(q)] = JsonSerializer.Serialize(q, jsonOptions);
+            var changed = own.Where(kv => _questBaseline == null || !_questBaseline.TryGetValue(kv.Key, out var was) || was != kv.Value)
+                             .Select(kv => kv.Key).ToHashSet();
+            var dropped = _questBaseline == null ? new HashSet<string>() : _questBaseline.Keys.Where(k => !own.ContainsKey(k)).ToHashSet();
+            var byKey = quests.GroupBy(QuestKey).ToDictionary(g => g.Key, g => g.Last());
+            for (int attempt = 0; attempt < 5; attempt++)
+            {
+                long version = sql.GetWorldStateVersion(KEY_QUESTS);   // read before the value, so any later write is a conflict
+                var storedJson = await sql.LoadWorldState(KEY_QUESTS);
+                var stored = string.IsNullOrEmpty(storedJson) ? new List<QuestData>() : JsonSerializer.Deserialize<List<QuestData>>(storedJson, jsonOptions) ?? new List<QuestData>();
+                var storedKeys = stored.Select(QuestKey).ToHashSet();
+                var merged = new List<QuestData>();
+                foreach (var q in stored)
+                {
+                    string key = QuestKey(q);
+                    if (dropped.Contains(key)) continue;
+                    merged.Add(changed.Contains(key) ? byKey[key] : q);
+                }
+                foreach (var key in changed)
+                    if (!storedKeys.Contains(key) && !_questSeen.Contains(key)) merged.Add(byKey[key]);   // made by this session
+                _questSeen.UnionWith(storedKeys);
+                var now = DateTime.Now;
+                int pruned = merged.RemoveAll(q => IsExpiredSharedQuest(q, now));   // v1.1.14
+                if (pruned > 0) DebugLogger.Instance.LogDebug("ONLINE", $"Dropped {pruned} expired quest(s) from the shared quest record.");
+                if (beforeWrite != null) await beforeWrite();
+                if (await sql.SaveWorldStateIfVersion(KEY_QUESTS, JsonSerializer.Serialize(merged, jsonOptions), version))
+                {
+                    _questBaseline = own;
+                    _questSeen.UnionWith(merged.Select(QuestKey));
+                    return true;
+                }
+                DebugLogger.Instance.LogInfo("ONLINE", $"Quest record changed by another process since it was read (was v{version}): reading it again and retrying.");
+            }
+            DebugLogger.Instance.LogWarning("ONLINE", "Shared quest save gave up: the quest record kept changing. The next save tries again.");
+            return false;
         }
 
         /// <summary>
@@ -788,9 +871,9 @@ namespace UsurperRemake.Systems
             try
             {
                 // NPCs
-                var npcData = SerializeCurrentNPCs();
+                var (npcData, generation) = SnapshotLiveRoster();   // v1.1.14: with the rebuild it belongs to
                 if (npcData.Count > 0)
-                    await SaveSharedNPCs(npcData);
+                    await SaveSharedNPCs(npcData, generation);
 
                 // World events
                 var events = SerializeCurrentWorldEvents();
@@ -1033,10 +1116,24 @@ namespace UsurperRemake.Systems
         /// court is the stored one. The caller applies the player's side only on true. Without SQL the
         /// in-memory court is the only one and change is applied to it the same way. beforeWrite is a test hook.
         /// </summary>
-        internal static async Task<bool> ApplyCourtChangeAsync(SqlSaveBackend? sql, Func<RoyalCourtSaveData, bool> change, Func<Task>? beforeWrite = null)
+        internal static async Task<bool> ApplyCourtChangeAsync(SqlSaveBackend? sql, Func<RoyalCourtSaveData, bool> requested, Func<Task>? beforeWrite = null)
         {
             var gate = CourtGateFor(sql);
             await gate.WaitAsync();
+            // v1.1.14: sales tax an earlier court change gave up on is taken here and added to this change's copy;
+            // it leaves the pending total only once this write lands, and goes back to it otherwise (exactly once).
+            // With SQL the tax pending is stored (pending_sales_tax, kept across a restart): each attempt reads it,
+            // adds it, and the court write takes it out in the same transaction (SaveWorldStateIfVersion)
+            long carried = Interlocked.Exchange(ref _pendingSalesTax, 0);
+            bool carriedStored = false;
+            long storedPending = 0;
+            bool change(RoyalCourtSaveData court)
+            {
+                if (!requested(court)) return false;
+                long add = carried + storedPending;
+                if (add > 0) court.Treasury = court.Treasury > long.MaxValue - add ? long.MaxValue : court.Treasury + add;
+                return true;
+            }
             try
             {
                 if (sql == null)
@@ -1050,10 +1147,12 @@ namespace UsurperRemake.Systems
                     }
                     if (!change(local)) return false;
                     lock (RoyalCourtVersionLock) ApplyCourtToKing(local, exact: true);
+                    carriedStored = true;
                     return true;
                 }
                 for (int attempt = 0; attempt < 5; attempt++)
                 {
+                    storedPending = sql.GetPendingSalesTax();   // v1.1.14: what this write will take, if it lands
                     long version = sql.GetWorldStateVersion("royal_court");   // read before the value, so a later write is a conflict
                     var json = await sql.LoadWorldState("royal_court");
                     RoyalCourtSaveData? court;
@@ -1075,7 +1174,7 @@ namespace UsurperRemake.Systems
                         return false;
                     }
                     if (beforeWrite != null) await beforeWrite();
-                    if (await sql.SaveWorldStateIfVersion("royal_court", JsonSerializer.Serialize(court, CourtJsonOptions), version))
+                    if (await sql.SaveWorldStateIfVersion("royal_court", JsonSerializer.Serialize(court, CourtJsonOptions), version, storedPending))
                     {
                         lock (RoyalCourtVersionLock)
                         {
@@ -1086,6 +1185,7 @@ namespace UsurperRemake.Systems
                                 _royalCourtVersion = version + 1;
                             }
                         }
+                        carriedStored = true;
                         return true;
                     }
                 }
@@ -1100,8 +1200,18 @@ namespace UsurperRemake.Systems
                 DebugLogger.Instance.LogError("ONLINE", $"Court change failed: {ex.Message}");
                 return false;
             }
-            finally { gate.Release(); }
+            finally
+            {
+                if (!carriedStored && carried > 0) Interlocked.Add(ref _pendingSalesTax, carried);
+                gate.Release();
+            }
         }
+
+        // v1.1.14: the king's sales tax whose court change gave up (the buyer had already paid); the next court
+        // change that lands in this process adds it to the treasury (ApplyCourtChangeAsync)
+        private static long _pendingSalesTax;
+        internal static long PendingSalesTax { get => Interlocked.Read(ref _pendingSalesTax); set => Interlocked.Exchange(ref _pendingSalesTax, value); }
+        internal static void CarrySalesTax(long amount) { if (amount > 0) Interlocked.Add(ref _pendingSalesTax, amount); }
 
         /// <summary>v1.1.13: a court change against this session's shared court (see the static form).</summary>
         internal Task<bool> TryApplyCourtChangeAsync(Func<RoyalCourtSaveData, bool> change, Func<Task>? beforeWrite = null) =>

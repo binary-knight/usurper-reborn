@@ -283,18 +283,21 @@ public static class EnhancedNPCBehaviors
         
         foreach (var candidate in availableNPCs)
         {
-            if (random.Next(3) == 0) // 33% recruitment chance
-            {
-                candidate.Team = gangName;
-                
-                // Copy team settings from existing member
-                var existingMember = npcs.FirstOrDefault(n => n.Team == gangName);
-                if (existingMember != null)
+            // v1.1.14: up to three recruits into a gang of three could make six; each one now takes a free
+            // slot under the membership gate (TeamCornerLocation.TryNpcJoin)
+            var existingMember = npcs.FirstOrDefault(n => n.Team == gangName);
+            if (random.Next(3) == 0 && TeamCornerLocation.TryNpcJoin(npcs, gangName, () =>
                 {
-                    candidate.TeamPassword = existingMember.TeamPassword;
-                    candidate.ControlsTurf = existingMember.ControlsTurf;
-                }
-                
+                    candidate.Team = gangName;
+                    // Copy team settings from existing member
+                    if (existingMember != null)
+                    {
+                        candidate.TeamPassword = existingMember.TeamPassword;
+                        candidate.ControlsTurf = existingMember.ControlsTurf;
+                    }
+                })) // 33% recruitment chance
+            {
+
                 // Generate news
                 NewsSystem.Instance.Newsy($"{GameConfig.NewsColorPlayer}{candidate.Name2}{GameConfig.NewsColorDefault} has been recruited to {GameConfig.TeamColor}{gangName}{GameConfig.NewsColorDefault}", true, GameConfig.NewsCategory.General);
             }

@@ -403,6 +403,7 @@ public class GuildSystem
             cmd.ExecuteNonQuery();
 
             membershipCache[username] = guildName.ToLowerInvariant();
+            FillLeaderlessGuild(guildName);   // v1.1.14: a guild with no leader passes to a joiner who can lead
             return null;
         }
         catch (Exception ex)
@@ -410,6 +411,80 @@ public class GuildSystem
             DebugLogger.Instance?.LogError("GUILD", $"Failed to add member: {ex.Message}");
             return "Failed to add member.";
         }
+    }
+
+    /// <summary>
+    /// v1.1.14: a guild left with no leader (its stored leader is no member any more, as when a succession found
+    /// only banned or emergency members) passes to a member who can lead as soon as there is one: when a player
+    /// joins it, when a member is unbanned, and at the world sim's maintenance (a web unban). The succession is
+    /// PassLeadership's. Returns the new leader, or null when none was needed or none can lead yet.
+    /// </summary>
+    public string? FillLeaderlessGuild(string guildName)
+    {
+        string? leader = null;
+        bool leaderIsMember = false;
+        try
+        {
+            using var conn = new SqliteConnection(connectionString);
+            conn.Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"SELECT g.leader_username, EXISTS (SELECT 1 FROM guild_members gm
+                                    WHERE gm.username = g.leader_username COLLATE NOCASE AND gm.guild_name = g.name COLLATE NOCASE)
+                                FROM guilds g WHERE g.name = @guild COLLATE NOCASE";
+            cmd.Parameters.AddWithValue("@guild", guildName);
+            using var reader = cmd.ExecuteReader();
+            if (!reader.Read()) return null;
+            leader = reader.IsDBNull(0) ? null : reader.GetString(0);
+            leaderIsMember = reader.GetInt64(1) != 0;
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance?.LogError("GUILD", $"Failed to read the leader of guild '{guildName}': {ex.Message}");
+            return null;
+        }
+        if (!NeedsGuildSuccession(leader, leaderIsMember)) return null;
+        return PassLeadership(guildName, leader!);
+    }
+
+    /// <summary>v1.1.14: FillLeaderlessGuild for the guild this account is in (after an unban). Null when none.</summary>
+    public string? FillLeaderlessGuildOf(string username)
+    {
+        string? guild = null;
+        try
+        {
+            using var conn = new SqliteConnection(connectionString);
+            conn.Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT guild_name FROM guild_members WHERE username = @user COLLATE NOCASE";
+            cmd.Parameters.AddWithValue("@user", username);
+            guild = cmd.ExecuteScalar() as string;
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance?.LogError("GUILD", $"Failed to read the guild of '{username}': {ex.Message}");
+        }
+        return string.IsNullOrEmpty(guild) ? null : FillLeaderlessGuild(guild);
+    }
+
+    /// <summary>v1.1.14: FillLeaderlessGuild for every guild with no leader among its members. Returns how many passed.</summary>
+    public int FillLeaderlessGuilds()
+    {
+        var names = new List<string>();
+        try
+        {
+            using var conn = new SqliteConnection(connectionString);
+            conn.Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"SELECT g.name FROM guilds g WHERE NOT EXISTS (SELECT 1 FROM guild_members gm
+                                    WHERE gm.username = g.leader_username COLLATE NOCASE AND gm.guild_name = g.name COLLATE NOCASE)";
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read()) names.Add(reader.GetString(0));
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance?.LogError("GUILD", $"Failed to list the guilds with no leader: {ex.Message}");
+        }
+        return names.Count(n => FillLeaderlessGuild(n) != null);
     }
 
     /// <summary>v1.1.11: a guild whose leader_username names no member any more needs a successor.</summary>

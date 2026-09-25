@@ -10,7 +10,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "1.1.13";
+    public const string Version = "1.1.14";
     public const string VersionName = "Regalia"; // 1.1 line: the gear and reward loop
 
     // v0.57.12: Alignment scale cap. Character.Chivalry and Character.Darkness setters clamp to [0, AlignmentCap]
@@ -1819,8 +1819,9 @@ public static partial class GameConfig
     public const int GodSmitePlayerCooldownMinutes = 30;       // Anti-grief: can't smite same player within 30min
     public const float GodPoisonRelationshipChance = 0.33f;  // 33% chance to poison relationship
     public const float GodBelieverKillXPPercent = 0.05f;  // 5% of believer's combat XP goes to their god
-    // Alt Character System — immortals can create a second mortal character
+    // Alt Character System: immortals and level-25 mains can create a second mortal character (v1.1.14: level added)
     public const string AltCharacterSuffix = "__alt";    // Appended to account username for alt save key
+    public const int AltSlotUnlockLevel = 25;            // v1.1.14: a main at this level opens the alt slot (immortality still does)
     // Divine Boon System — gods configure boons for their followers
     public const int GodBoonBudgetPerLevel = 10;         // Budget points per god level (Level 1 = 10, Level 9 = 90)
     public const int GodBoonConcentrationMax = 20;       // Max concentration bonus (at 0 believers)

@@ -3301,7 +3301,7 @@ public class HomeLocation : BaseLocation
         terminal.WriteLine(Loc.Get("home.hw_bond_deepened"));
         terminal.WriteLine();
 
-        await terminal.GetInput(Loc.Get("ui.press_enter"));
+        await terminal.PressAnyKey();
     }
 
     private async Task DiscussCuckolding(NPC spouse, Spouse spouseData)
@@ -3534,7 +3534,7 @@ public class HomeLocation : BaseLocation
         terminal.WriteLine(Loc.Get("home.cuck_new_chapter"));
         terminal.WriteLine();
 
-        await terminal.GetInput(Loc.Get("ui.press_enter"));
+        await terminal.PressAnyKey();
     }
 
     private async Task DiscussStagVixen(NPC spouse, Spouse spouseData)
@@ -4471,8 +4471,7 @@ public class HomeLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("home.resurrect_already_recovered", toResurrect.DisplayName));
                 terminal.WriteLine("");
                 terminal.SetColor("darkgray");
-                terminal.WriteLine(Loc.Get("ui.press_enter"));
-                await terminal.ReadKeyAsync();
+                await terminal.PressAnyKey();
                 return;
             }
 
@@ -4499,8 +4498,7 @@ public class HomeLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     #endregion
@@ -4966,8 +4964,8 @@ public class HomeLocation : BaseLocation
             return;
         }
 
-        // Unequip and add to player inventory
-        var unequipped = target.UnequipSlot(selectedSlot);
+        // Unequip and add to player inventory. v1.1.14: only once this process's claim on the piece lands
+        var unequipped = ClaimGearRecovery(target, selectedSlot, selectedItem.Name) ? target.UnequipSlot(selectedSlot) : null;
         if (unequipped != null)
         {
             target.RecalculateStats();
@@ -5027,6 +5025,7 @@ public class HomeLocation : BaseLocation
                     cursedItems.Add(item.Name);
                     continue;
                 }
+                if (!ClaimGearRecovery(target, slot, item.Name)) continue;   // v1.1.14: another process took it first
 
                 var unequipped = target.UnequipSlot(slot);
                 if (unequipped != null)

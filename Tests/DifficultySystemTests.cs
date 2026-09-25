@@ -6,7 +6,11 @@ namespace UsurperReborn.Tests;
 /// <summary>
 /// Unit tests for DifficultySystem
 /// Tests all difficulty multipliers and modifiers
+/// v1.1.14: in the shared collection. These tests set the static DifficultySystem.CurrentDifficulty
+/// (Nightmare among others), which combat reads (Last Stand, permadeath, damage); run in parallel they
+/// could change the difficulty in the middle of another test's fight.
 /// </summary>
+[Collection("SharedGameSingletons")]
 public class DifficultySystemTests
 {
     #region Display Name Tests

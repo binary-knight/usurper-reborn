@@ -947,6 +947,15 @@ namespace UsurperRemake.Systems
             }
             catch { /* Column already exists - expected */ }
 
+            // v1.1.14: a fought war's result, stored before its completion flip, for the stale sweep to settle by
+            try
+            {
+                using var migCmd = connection.CreateCommand();
+                migCmd.CommandText = "ALTER TABLE team_wars ADD COLUMN final_result TEXT;";
+                migCmd.ExecuteNonQuery();
+            }
+            catch { /* Column already exists - expected */ }
+
             // v0.60.5: add created_ip column for per-IP registration rate limiting
             try
             {
@@ -1003,6 +1012,25 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex) { DebugLogger.Instance.LogWarning("SQL", $"bounty_claims not ensured: {ex.Message}"); }
 
+            // v1.1.14: the king's sales tax not yet in the stored treasury, kept across a restart
+            try
+            {
+                using var migCmd = connection.CreateCommand();
+                migCmd.CommandText = "CREATE TABLE IF NOT EXISTS pending_sales_tax (id INTEGER PRIMARY KEY CHECK (id = 1), amount INTEGER NOT NULL DEFAULT 0);";
+                migCmd.ExecuteNonQuery();
+            }
+            catch (Exception ex) { DebugLogger.Instance.LogWarning("SQL", $"pending_sales_tax not ensured: {ex.Message}"); }
+
+            // v1.1.14: one-time claims on an NPC's gear, so two processes cannot both take the same piece
+            try
+            {
+                using var migCmd = connection.CreateCommand();
+                migCmd.CommandText = "CREATE TABLE IF NOT EXISTS recovery_claims (npc_id TEXT NOT NULL, recovery_event TEXT NOT NULL, claimed_by TEXT, " +
+                                     "claimed_at TEXT DEFAULT (datetime('now')), PRIMARY KEY (npc_id, recovery_event));";
+                migCmd.ExecuteNonQuery();
+            }
+            catch (Exception ex) { DebugLogger.Instance.LogWarning("SQL", $"recovery_claims not ensured: {ex.Message}"); }
+
             // v1.1.13: the world edits log, also on a database made by an older release
             try
             {
@@ -1014,7 +1042,177 @@ namespace UsurperRemake.Systems
 
             MigrateWorldBossTables(connection); // v1.1.4
 
+            EnsureDisplayNameUniqueIndex(connection);   // v1.1.14
+            RenameCaseVariantTeams();                    // v1.1.14
+
             DebugLogger.Instance.LogInfo("SQL", $"Database initialized at {databasePath}");
+        }
+
+        /// <summary>
+        /// v1.1.14: teams whose names differ only in case (made before 1.1.12 refused them, ulower) stay two
+        /// teams; the newer of each pair (created_at, then row order) is renamed "name (2)", or the next free
+        /// number, unique ignoring case as ulower folds it. In one transaction per start: the team row, its
+        /// upgrades, vault, wars and sieges, each member's save ($.player.team, matched exactly), the NPC
+        /// members in the stored roster (written at the next version, so a process holding an older one reloads
+        /// it), and one mail to each player member in their language. Idempotent: a second run finds no pair and
+        /// changes nothing. Returns the number of teams renamed.
+        /// </summary>
+        internal int RenameCaseVariantTeams()
+        {
+            var renames = new List<(string Old, string New, string Kept)>();
+            try
+            {
+                using var connection = OpenConnection();
+                using var tx = connection.BeginTransaction(deferred: false);
+                var teams = new List<string>();
+                using (var q = connection.CreateCommand())
+                {
+                    q.Transaction = tx;
+                    q.CommandText = "SELECT team_name FROM player_teams ORDER BY created_at, rowid;";
+                    using var r = q.ExecuteReader();
+                    while (r.Read()) teams.Add(r.GetString(0));
+                }
+                var taken = new HashSet<string>(teams.Select(t => t.ToLowerInvariant()));
+                foreach (var group in teams.GroupBy(t => t.ToLowerInvariant()).Where(g => g.Count() > 1))
+                {
+                    string kept = group.First();
+                    foreach (var newer in group.Skip(1))
+                    {
+                        int n = 2;
+                        string name;
+                        do name = $"{kept} ({n++})"; while (taken.Contains(name.ToLowerInvariant()));
+                        taken.Add(name.ToLowerInvariant());
+                        renames.Add((newer, name, kept));
+                    }
+                }
+                if (renames.Count == 0) return 0;
+
+                void Exec(string sql, string oldName, string newName)
+                {
+                    using var cmd = connection.CreateCommand();
+                    cmd.Transaction = tx;
+                    cmd.CommandText = sql;
+                    cmd.Parameters.AddWithValue("@old", oldName);
+                    cmd.Parameters.AddWithValue("@new", newName);
+                    cmd.ExecuteNonQuery();
+                }
+                foreach (var (oldName, newName, kept) in renames)
+                {
+                    Exec("UPDATE player_teams SET team_name = @new WHERE team_name = @old;", oldName, newName);
+                    Exec("UPDATE team_upgrades SET team_name = @new WHERE team_name = @old;", oldName, newName);
+                    Exec("UPDATE team_vault SET team_name = @new WHERE team_name = @old;", oldName, newName);
+                    Exec("UPDATE team_wars SET challenger_team = @new WHERE challenger_team = @old;", oldName, newName);
+                    Exec("UPDATE team_wars SET defender_team = @new WHERE defender_team = @old;", oldName, newName);
+                    Exec("UPDATE castle_sieges SET team_name = @new WHERE team_name = @old;", oldName, newName);
+
+                    var members = new List<(string User, string Lang)>();
+                    using (var m = connection.CreateCommand())
+                    {
+                        m.Transaction = tx;
+                        m.CommandText = "SELECT username, COALESCE(language, 'en') FROM players WHERE json_valid(player_data) AND json_extract(player_data, '$.player.team') = @old;";
+                        m.Parameters.AddWithValue("@old", oldName);
+                        using var r = m.ExecuteReader();
+                        while (r.Read()) members.Add((r.GetString(0), r.GetString(1)));
+                    }
+                    Exec("UPDATE players SET player_data = json_set(player_data, '$.player.team', @new) " +
+                         "WHERE json_valid(player_data) AND json_extract(player_data, '$.player.team') = @old;", oldName, newName);
+                    foreach (var (user, lang) in members)
+                    {
+                        using var mail = connection.CreateCommand();
+                        mail.Transaction = tx;
+                        mail.CommandText = "INSERT INTO messages (from_player, to_player, message_type, message) VALUES ('System', @to, 'team_renamed', @msg);";
+                        mail.Parameters.AddWithValue("@to", user);
+                        mail.Parameters.AddWithValue("@msg", Loc.GetIn(lang, "team.renamed_case_notice", oldName, kept, newName));
+                        mail.ExecuteNonQuery();
+                    }
+                }
+
+                // the NPC members, in the stored roster
+                string? npcsJson = null;
+                using (var n = connection.CreateCommand())
+                {
+                    n.Transaction = tx;
+                    n.CommandText = "SELECT value FROM world_state WHERE key = 'npcs';";
+                    npcsJson = n.ExecuteScalar() as string;
+                }
+                if (!string.IsNullOrEmpty(npcsJson) && System.Text.Json.Nodes.JsonNode.Parse(npcsJson) is System.Text.Json.Nodes.JsonArray roster)
+                {
+                    int moved = 0;
+                    foreach (var npc in roster)
+                    {
+                        if (npc is not System.Text.Json.Nodes.JsonObject o || o["team"] is not System.Text.Json.Nodes.JsonValue v || !v.TryGetValue<string>(out var team)) continue;
+                        var hit = renames.FirstOrDefault(x => x.Old == team);
+                        if (hit.Old == null) continue;
+                        o["team"] = hit.New;
+                        moved++;
+                    }
+                    if (moved > 0)
+                    {
+                        using var w = connection.CreateCommand();
+                        w.Transaction = tx;
+                        w.CommandText = "UPDATE world_state SET value = @v, version = version + 1, updated_at = datetime('now'), updated_by = 'team_rename' WHERE key = 'npcs';";
+                        w.Parameters.AddWithValue("@v", roster.ToJsonString());
+                        w.ExecuteNonQuery();
+                    }
+                }
+                tx.Commit();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Renaming teams whose names differ only in case failed; nothing was changed, the next start tries again: {ex.Message}");
+                return 0;
+            }
+            foreach (var (oldName, newName, kept) in renames)
+                DebugLogger.Instance.LogInfo("TEAM", $"Team '{oldName}' renamed '{newName}': its name differed from team '{kept}' only in case.");
+            return renames.Count;
+        }
+
+        /// <summary>v1.1.14: the unique display-name index, as the live server has it.</summary>
+        internal const string DisplayNameUniqueIndex = "idx_players_display_name_unique";
+
+        /// <summary>
+        /// v1.1.14: no two players may share a display name, ignoring case (WriteGameData keeps the stored name
+        /// when a save would break this). The index is made only when no two rows share one now: counted first,
+        /// and when some do it is not made and the names are logged, for an admin to settle; the next start
+        /// checks again. A duplicate written between the count and the CREATE fails the CREATE, which is caught
+        /// and logged the same way. True when the index exists afterwards.
+        /// </summary>
+        internal static bool EnsureDisplayNameUniqueIndex(SqliteConnection connection)
+        {
+            try
+            {
+                using (var has = connection.CreateCommand())
+                {
+                    has.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = @n;";
+                    has.Parameters.AddWithValue("@n", DisplayNameUniqueIndex);
+                    if (Convert.ToInt64(has.ExecuteScalar()) > 0) return true;
+                }
+                var shared = new List<string>();
+                using (var dup = connection.CreateCommand())
+                {
+                    dup.CommandText = "SELECT LOWER(display_name), COUNT(*) FROM players GROUP BY LOWER(display_name) HAVING COUNT(*) > 1 ORDER BY 1;";
+                    using var r = dup.ExecuteReader();
+                    while (r.Read()) shared.Add($"'{(r.IsDBNull(0) ? "" : r.GetString(0))}' x{r.GetInt64(1)}");
+                }
+                if (shared.Count > 0)
+                {
+                    DebugLogger.Instance.LogWarning("SQL", $"{DisplayNameUniqueIndex} not made: {shared.Count} display name(s) are shared by more than one player " +
+                        $"({string.Join(", ", shared.Take(20))}{(shared.Count > 20 ? ", ..." : "")}). Rename them and restart to add it.");
+                    return false;
+                }
+                using (var make = connection.CreateCommand())
+                {
+                    make.CommandText = $"CREATE UNIQUE INDEX IF NOT EXISTS {DisplayNameUniqueIndex} ON players(LOWER(display_name));";
+                    make.ExecuteNonQuery();
+                }
+                DebugLogger.Instance.LogInfo("SQL", $"{DisplayNameUniqueIndex} made: no display name is shared.");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogWarning("SQL", $"{DisplayNameUniqueIndex} not made: {ex.Message}. The next start tries again.");
+                return false;
+            }
         }
 
         private SqliteConnection OpenConnection()
@@ -1030,7 +1228,18 @@ namespace UsurperRemake.Systems
         // ISaveBackend Implementation (Core save/load)
         // =====================================================================
 
-        public async Task<bool> WriteGameData(string playerName, SaveGameData data)
+        public Task<bool> WriteGameData(string playerName, SaveGameData data) => WriteGameDataCore(playerName, data, null, 0);
+
+        /// <summary>
+        /// v1.1.14: the player's save and a team vault credit in one SQL transaction: both land or neither does,
+        /// so a crash between them can neither lose the gold (taken from the save, never credited) nor duplicate
+        /// it. The credit is checked against the vault's capacity in the statement (as DepositToTeamVault); false,
+        /// with nothing written, when it does not fit or the save fails.
+        /// </summary>
+        public Task<bool> WriteGameDataWithVaultDeposit(string playerName, SaveGameData data, string teamName, long amount) =>
+            WriteGameDataCore(playerName, data, teamName, amount);
+
+        private async Task<bool> WriteGameDataCore(string playerName, SaveGameData data, string? vaultTeam, long vaultAmount)
         {
             try
             {
@@ -1064,7 +1273,21 @@ namespace UsurperRemake.Systems
                 var normalizedUsername = playerName.ToLower();
 
                 using var connection = OpenConnection();
+                // v1.1.14: a vault credit and the save commit together (no transaction for a plain save)
+                using var tx = vaultTeam != null ? connection.BeginTransaction() : null;
+                if (vaultTeam != null)
+                {
+                    using var vault = connection.CreateCommand();
+                    vault.Transaction = tx;
+                    vault.CommandText = VaultDepositSql;
+                    vault.Parameters.AddWithValue("@team", vaultTeam);
+                    vault.Parameters.AddWithValue("@amount", vaultAmount);
+                    vault.Parameters.AddWithValue("@base", GameConfig.TeamVaultBaseCapacity);
+                    vault.Parameters.AddWithValue("@per", GameConfig.TeamVaultCapacityPerLevel);
+                    if (await vault.ExecuteNonQueryAsync() != 1) { tx!.Rollback(); return false; }
+                }
                 using var cmd = connection.CreateCommand();
+                cmd.Transaction = tx;
                 // Persist account-level preferences so they apply before character load
                 int screenReaderFlag = data.Player?.ScreenReaderMode == true ? 1 : 0;
                 string language = data.Player?.Language ?? "en";
@@ -1101,9 +1324,12 @@ namespace UsurperRemake.Systems
                             language = @language
                         WHERE LOWER(username) = LOWER(@username);
                     ";
-                    await cmd.ExecuteNonQueryAsync();
+                    int saved = await cmd.ExecuteNonQueryAsync();
+                    // v1.1.14: with a vault credit, a save that wrote no row is no save: nothing is committed
+                    if (tx != null && saved == 0) { tx.Rollback(); return false; }
                     DebugLogger.Instance.LogWarning("SQL", $"Display name '{displayName}' conflicts with another player — saved data without updating display_name for '{playerName}'");
                 }
+                tx?.Commit();
                 DebugLogger.Instance.LogDebug("SQL", $"Saved game data for '{playerName}'");
                 return true;
             }
@@ -1291,7 +1517,8 @@ namespace UsurperRemake.Systems
                 ExecPurge(connection, tx, "guild_members",     "LOWER(username) = LOWER(@u)", username);
                 ExecPurge(connection, tx, "online_players",    "LOWER(username) = LOWER(@u)", username);
                 ExecPurge(connection, tx, "sleeping_players",  "LOWER(username) = LOWER(@u)", username);
-                ExecPurge(connection, tx, "wizard_flags",      "LOWER(username) = LOWER(@u)", username);
+                // v1.1.14: wizard_flags (frozen, muted) are the account's, keyed by its login name; they are kept
+                // through a delete, so deleting and recreating a character no longer sheds them
 
                 // Multi-column tables: the username can appear as sender/recipient,
                 // attacker/defender, etc. Clear all of them.
@@ -2036,12 +2263,30 @@ namespace UsurperRemake.Systems
         /// SaveAllSharedState). expectedVersion 0 = "key should not exist
         /// yet" (first-ever write).
         /// </summary>
-        public async Task<bool> SaveWorldStateIfVersion(string key, string jsonValue, long expectedVersion)
+        public async Task<bool> SaveWorldStateIfVersion(string key, string jsonValue, long expectedVersion) =>
+            await SaveWorldStateIfVersion(key, jsonValue, expectedVersion, 0);
+
+        /// <summary>
+        /// v1.1.14: the same versioned write, also taking takePendingSalesTax out of the stored pending sales tax
+        /// (pending_sales_tax) in the same transaction: the write lands only if that much is still pending, so a
+        /// court write that adds the pending tax to the treasury clears it at once, and two processes cannot both
+        /// credit it. False (nothing written) on a conflict of either.
+        /// </summary>
+        public async Task<bool> SaveWorldStateIfVersion(string key, string jsonValue, long expectedVersion, long takePendingSalesTax)
         {
             try
             {
                 using var connection = OpenConnection();
                 using var transaction = connection.BeginTransaction();
+
+                if (takePendingSalesTax > 0)
+                {
+                    using var take = connection.CreateCommand();
+                    take.Transaction = transaction;
+                    take.CommandText = "UPDATE pending_sales_tax SET amount = amount - @t WHERE id = 1 AND amount >= @t;";
+                    take.Parameters.AddWithValue("@t", takePendingSalesTax);
+                    if (await take.ExecuteNonQueryAsync() != 1) { transaction.Rollback(); return false; }
+                }
 
                 long currentVersion = -1; // -1 = row absent
                 using (var readCmd = connection.CreateCommand())
@@ -2091,7 +2336,49 @@ namespace UsurperRemake.Systems
             }
         }
 
-        public async Task SaveWorldState(string key, string jsonValue)
+        /// <summary>v1.1.14: add the king's share of a sale to the stored pending sales tax. False if it could not be stored.</summary>
+        public bool AddPendingSalesTax(long amount)
+        {
+            if (amount <= 0) return true;
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "INSERT INTO pending_sales_tax (id, amount) VALUES (1, @a) ON CONFLICT(id) DO UPDATE SET amount = amount + @a;";
+                cmd.Parameters.AddWithValue("@a", amount);
+                return cmd.ExecuteNonQuery() == 1;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"AddPendingSalesTax failed: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>v1.1.14: the stored pending sales tax (0 when none or unreadable).</summary>
+        public long GetPendingSalesTax()
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT amount FROM pending_sales_tax WHERE id = 1;";
+                var r = cmd.ExecuteScalar();
+                return r == null || r is DBNull ? 0 : Math.Max(0, Convert.ToInt64(r));
+            }
+            catch { return 0; }
+        }
+
+        public async Task SaveWorldState(string key, string jsonValue) => await TrySaveWorldState(key, jsonValue);
+
+        /// <summary>v1.1.14: SaveWorldState that says whether the write landed (false: it failed and was logged).</summary>
+        public async Task<bool> TrySaveWorldState(string key, string jsonValue) => await SaveWorldStateReturningVersion(key, jsonValue) != null;
+
+        /// <summary>
+        /// v1.1.14: SaveWorldState that returns the version the row now has, read in the same statement (RETURNING),
+        /// so a writer learns the version of its own write, never a later writer's. Null when the write failed.
+        /// </summary>
+        public async Task<long?> SaveWorldStateReturningVersion(string key, string jsonValue)
         {
             try
             {
@@ -2103,15 +2390,17 @@ namespace UsurperRemake.Systems
                     ON CONFLICT(key) DO UPDATE SET
                         value = @value,
                         version = version + 1,
-                        updated_at = datetime('now');
+                        updated_at = datetime('now')
+                    RETURNING version;
                 ";
                 cmd.Parameters.AddWithValue("@key", key);
                 cmd.Parameters.AddWithValue("@value", jsonValue);
-                await cmd.ExecuteNonQueryAsync();
+                return Convert.ToInt64(await cmd.ExecuteScalarAsync());
             }
             catch (Exception ex)
             {
                 DebugLogger.Instance.LogError("SQL", $"Failed to save world state '{key}': {ex.Message}");
+                return null;
             }
         }
 
@@ -2276,11 +2565,12 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// v1.1.13: the edits the owner applies: every edit not yet applied, whatever its age, and every
-        /// edit made in the last reapplyHours (applied or not), oldest first.
+        /// v1.1.13: the edits the owner applies: every edit not yet applied, whatever its age, and (v1.1.14) every
+        /// applied edit the prune has not deleted: applied within reapplyHours (WorldEditLog.ReapplyHours, the
+        /// prune's 7 days), oldest first. The clock is SQLite's datetime('now') (UTC) against applied_at.
         /// </summary>
-        public List<WorldEdit> GetWorldEditsToApply(int reapplyHours = 24) =>
-            QueryWorldEdits("applied_at IS NULL OR created_at >= datetime('now', @h)", $"-{reapplyHours} hours");
+        public List<WorldEdit> GetWorldEditsToApply(int reapplyHours = WorldEditLog.ReapplyHours) =>
+            QueryWorldEdits("applied_at IS NULL OR applied_at >= datetime('now', @h)", $"-{reapplyHours} hours");
 
         /// <summary>v1.1.13: edits never applied that are older than hours (for the warning line).</summary>
         public List<WorldEdit> GetUnappliedWorldEditsOlderThan(int hours) =>
@@ -2377,6 +2667,71 @@ namespace UsurperRemake.Systems
                 DebugLogger.Instance.LogWarning("SQL", $"LaterCharacterUsesName failed: {ex.Message}");
                 return true;
             }
+        }
+
+        /// <summary>v1.1.14: how long a gear claim holds; after it a piece of the same name in the same slot can be taken again.</summary>
+        public const int GearClaimMinutes = 10;
+
+        /// <summary>v1.1.14: the recovery event of one piece of gear: its slot and its name (an ID can differ between processes).</summary>
+        public static string GearRecoveryEvent(string slot, string itemName) => $"gear:{slot}:{itemName}";
+
+        /// <summary>
+        /// v1.1.14: a one-time claim on taking one piece of an NPC's gear (as bounty_claims is for a bounty): an
+        /// INSERT OR IGNORE of (NPC ID, recovery event), in one transaction with the removal of a claim older than
+        /// GearClaimMinutes. Only the process whose row lands moves the gear; another process holding a stale copy
+        /// of the NPC still wearing it is refused. A read or write error refuses. Released when gear is given back.
+        /// </summary>
+        public bool TryClaimGearRecovery(string npcId, string recoveryEvent, string claimedBy)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var tx = connection.BeginTransaction();
+                using (var expire = connection.CreateCommand())
+                {
+                    expire.Transaction = tx;
+                    expire.CommandText = "DELETE FROM recovery_claims WHERE npc_id = @n AND recovery_event = @e AND claimed_at < datetime('now', @w);";
+                    expire.Parameters.AddWithValue("@n", npcId);
+                    expire.Parameters.AddWithValue("@e", recoveryEvent);
+                    expire.Parameters.AddWithValue("@w", $"-{GearClaimMinutes} minutes");
+                    expire.ExecuteNonQuery();
+                }
+                int landed;
+                using (var claim = connection.CreateCommand())
+                {
+                    claim.Transaction = tx;
+                    claim.CommandText = "INSERT OR IGNORE INTO recovery_claims (npc_id, recovery_event, claimed_by) VALUES (@n, @e, @b);";
+                    claim.Parameters.AddWithValue("@n", npcId);
+                    claim.Parameters.AddWithValue("@e", recoveryEvent);
+                    claim.Parameters.AddWithValue("@b", claimedBy ?? "");
+                    landed = claim.ExecuteNonQuery();
+                }
+                tx.Commit();
+                return landed == 1;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogWarning("SQL", $"Gear claim for NPC '{npcId}' ({recoveryEvent}) failed: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>v1.1.14: gear given to an NPC may be taken again: the claims on what it now wears are removed.</summary>
+        public void ReleaseGearClaims(string npcId, IEnumerable<string> recoveryEvents)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                foreach (var e in recoveryEvents)
+                {
+                    using var cmd = connection.CreateCommand();
+                    cmd.CommandText = "DELETE FROM recovery_claims WHERE npc_id = @n AND recovery_event = @e;";
+                    cmd.Parameters.AddWithValue("@n", npcId);
+                    cmd.Parameters.AddWithValue("@e", e);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+            catch (Exception ex) { DebugLogger.Instance.LogWarning("SQL", $"Gear claims of NPC '{npcId}' not released: {ex.Message}"); }
         }
 
         /// <summary>v1.1.13: the owner id in the world sim lock, or null when none is held.</summary>
@@ -2498,8 +2853,19 @@ namespace UsurperRemake.Systems
         /// <summary>
         /// Update the world sim heartbeat. Called after each simulation tick.
         /// Other processes check this to determine if the lock is stale.
+        /// v1.1.14: a compare-and-swap, the same test as TryAcquireWorldSimLock in one transaction: the beat is
+        /// written only when the lock is free, stale, or already this owner's. It overwrote the lock
+        /// unconditionally, so two world sims beating on one database passed it back and forth and
+        /// IsOwnerProcess flipped between them. Returns false when another process holds the lock.
         /// </summary>
-        public void UpdateWorldSimHeartbeat(string ownerId)
+        public bool UpdateWorldSimHeartbeat(string ownerId) => TryAcquireWorldSimLock(ownerId);
+
+        /// <summary>
+        /// v1.1.14: the lock taken whoever holds it, for the processes that own the shared records by design
+        /// (the MUD server and the standalone world sim) at their start. A door's embedded world sim that held
+        /// it then fails its next heartbeat and stops claiming it.
+        /// </summary>
+        public void TakeOverWorldSimLock(string ownerId)
         {
             try
             {
@@ -2514,8 +2880,12 @@ namespace UsurperRemake.Systems
                 using var connection = OpenConnection();
                 using var cmd = connection.CreateCommand();
                 cmd.CommandText = @"
-                    UPDATE world_state SET value = @value, updated_at = datetime('now')
-                    WHERE key = @key;
+                    INSERT INTO world_state (key, value, version, updated_at)
+                    VALUES (@key, @value, 1, datetime('now'))
+                    ON CONFLICT(key) DO UPDATE SET
+                        value = @value,
+                        version = version + 1,
+                        updated_at = datetime('now');
                 ";
                 cmd.Parameters.AddWithValue("@key", WORLDSIM_LOCK_KEY);
                 cmd.Parameters.AddWithValue("@value", lockJson);
@@ -2523,7 +2893,7 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex)
             {
-                DebugLogger.Instance.LogError("SQL", $"Failed to update worldsim heartbeat: {ex.Message}");
+                DebugLogger.Instance.LogError("SQL", $"Failed to take over the worldsim lock: {ex.Message}");
             }
         }
 
@@ -3726,6 +4096,8 @@ namespace UsurperRemake.Systems
                 if (ipRows > 0)
                     DebugLogger.Instance.LogInfo("BAN", $"Unban '{username}' also lifted {ipRows} associated IP ban(s).");
                 DebugLogger.Instance.LogInfo("SQL", $"Player '{username}' unbanned by admin");
+                // v1.1.14: a guild left with no leader (all its members were banned) passes to the unbanned member
+                (GuildSystem.Instance ?? new GuildSystem(databasePath, register: false)).FillLeaderlessGuildOf(username);
             }
             catch (Exception ex)
             {
@@ -6278,6 +6650,87 @@ namespace UsurperRemake.Systems
         }
     }
 
+    /// <summary>
+    /// v1.1.14: a join's last slot check and its membership write, in one BEGIN IMMEDIATE transaction.
+    /// Membership lives in the saves, and a join used to check the count and then write the whole save
+    /// later, so two joins at once could both pass and take a team to six. The count of player members
+    /// (as UpdatePlayerTeamMemberCount counts them, the joiner left out) plus the NPC slots the caller
+    /// counted must leave a free slot; then the team goes into the joiner's save by json_set before the
+    /// write lock is released, so the next join counts it. True when the slot was taken. A joiner with no
+    /// save row yet is counted by no one, as before; the check still runs and nothing is written.
+    /// </summary>
+    /// <summary>
+    /// v1.1.14: the team's player members in the saves, counted as TryClaimTeamSlot counts them; for an NPC
+    /// joining a team on its own (TeamCornerLocation.TryNpcJoin), which runs on the world sim's thread.
+    /// On a failed read, MaxTeamMembers, so the NPC does not join.
+    /// </summary>
+    public int CountPlayerTeamMembers(string teamName)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"
+                SELECT COUNT(*) FROM players
+                WHERE (CASE WHEN json_valid(player_data) THEN json_extract(player_data, '$.player.team') END) = @team
+                AND player_data != '{}' AND LENGTH(player_data) > 2
+                AND is_banned = 0 AND username NOT LIKE 'emergency_%';";
+            cmd.Parameters.AddWithValue("@team", teamName);
+            return Convert.ToInt32(cmd.ExecuteScalar() ?? 0L);
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to count the player members of '{teamName}': {ex.Message}");
+            return GameConfig.MaxTeamMembers;
+        }
+    }
+
+    public async Task<bool> TryClaimTeamSlot(string teamName, string joinerKey, int npcSlotsUsed, int maxSlots)
+    {
+        try
+        {
+            return await Task.Run(() =>
+            {
+                using var connection = OpenConnection();
+                using var tx = connection.BeginTransaction(deferred: false);   // BEGIN IMMEDIATE: joins queue here
+                long players;
+                using (var count = connection.CreateCommand())
+                {
+                    count.Transaction = tx;
+                    count.CommandText = @"
+                        SELECT COUNT(*) FROM players
+                        WHERE (CASE WHEN json_valid(player_data) THEN json_extract(player_data, '$.player.team') END) = @team
+                        AND player_data != '{}' AND LENGTH(player_data) > 2
+                        AND is_banned = 0 AND username NOT LIKE 'emergency_%'
+                        AND LOWER(username) != LOWER(@joiner);";
+                    count.Parameters.AddWithValue("@team", teamName);
+                    count.Parameters.AddWithValue("@joiner", joinerKey);
+                    players = Convert.ToInt64(count.ExecuteScalar() ?? 0L);
+                }
+                if (players + npcSlotsUsed >= maxSlots) { tx.Rollback(); return false; }
+                using (var write = connection.CreateCommand())
+                {
+                    write.Transaction = tx;
+                    write.CommandText = @"
+                        UPDATE players SET player_data = json_set(player_data, '$.player.team', @team)
+                        WHERE LOWER(username) = LOWER(@joiner) AND json_valid(player_data)
+                        AND player_data != '{}' AND LENGTH(player_data) > 2;";
+                    write.Parameters.AddWithValue("@team", teamName);
+                    write.Parameters.AddWithValue("@joiner", joinerKey);
+                    if (write.ExecuteNonQuery() == 0)
+                        DebugLogger.Instance.LogWarning("SQL", $"Team join for '{joinerKey}' has no save row to write into; the slot check ran");
+                }
+                tx.Commit();
+                return true;
+            });
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to claim a slot in team '{teamName}': {ex.Message}");
+            return false;
+        }
+    }
+
     public async Task UpdatePlayerTeamMemberCount(string teamName)
     {
         try
@@ -7264,9 +7717,13 @@ namespace UsurperRemake.Systems
     /// v1.1.12: a war still 'active' after GameConfig.TeamWarStaleMinutes was left by a lost session and
     /// would block both teams for ever. It is marked 'abandoned'; if no round was recorded, the wager goes
     /// back to its payer by a queued transfer, in the same transaction and only by the process that flipped
-    /// the row. A war with rounds recorded is not refunded, so leaving a losing war does not pay. It is not
-    /// settled by score either, since a challenger could leave while ahead; this holds too for a fought war
-    /// whose own completion failed (TeamCornerLocation pays nothing then). Returns the number expired.
+    /// the row. A war with rounds recorded is not refunded, so leaving a losing war does not pay, and it is
+    /// not settled by its running score, since a challenger could leave while ahead.
+    /// v1.1.14: a war whose whole result was stored (RecordTeamWarResult, written after the last round and
+    /// before the completion flip) but whose flip failed is settled by that result instead: flipped to it,
+    /// and a challenger's win pays the spoils by a queued transfer, in the same transaction and only by the
+    /// process whose flip landed, so it pays once. A loss needs nothing: the wager was taken at the start.
+    /// Returns the number expired.
     /// </summary>
     public int ExpireStaleTeamWars(int? staleMinutes = null)
     {
@@ -7275,24 +7732,40 @@ namespace UsurperRemake.Systems
         {
             using var connection = OpenConnection();
             using var tx = connection.BeginTransaction();
-            var stale = new List<(int Id, long Wager, int Wins, string Key, string Team)>();
+            var stale = new List<(int Id, long Wager, int Wins, string Key, string Team, string Result)>();
             using (var q = connection.CreateCommand())
             {
                 q.Transaction = tx;
-                q.CommandText = @"SELECT id, gold_wagered, challenger_wins + defender_wins, COALESCE(challenger_key, ''), challenger_team
+                q.CommandText = @"SELECT id, gold_wagered, challenger_wins + defender_wins, COALESCE(challenger_key, ''), challenger_team, COALESCE(final_result, '')
                                   FROM team_wars WHERE status = 'active' AND started_at < datetime('now', '-' || @mins || ' minutes');";
                 q.Parameters.AddWithValue("@mins", staleMinutes ?? GameConfig.TeamWarStaleMinutes);
                 using var r = q.ExecuteReader();
-                while (r.Read()) stale.Add((r.GetInt32(0), r.GetInt64(1), r.GetInt32(2), r.GetString(3), r.GetString(4)));
+                while (r.Read()) stale.Add((r.GetInt32(0), r.GetInt64(1), r.GetInt32(2), r.GetString(3), r.GetString(4), r.GetString(5)));
             }
             foreach (var war in stale)
             {
+                // v1.1.14: a stored result settles the war by it; otherwise it is abandoned as before
+                bool settled = war.Result == "challenger_won" || war.Result == "defender_won";
                 using var flip = connection.CreateCommand();
                 flip.Transaction = tx;
-                flip.CommandText = "UPDATE team_wars SET status = 'abandoned', finished_at = datetime('now') WHERE id = @id AND status = 'active';";
+                flip.CommandText = "UPDATE team_wars SET status = @status, finished_at = datetime('now') WHERE id = @id AND status = 'active';";
                 flip.Parameters.AddWithValue("@id", war.Id);
+                flip.Parameters.AddWithValue("@status", settled ? war.Result : "abandoned");
                 if (flip.ExecuteNonQuery() != 1) continue;
                 expired++;
+                if (settled)
+                {
+                    if (war.Result != "challenger_won" || war.Wager <= 0 || string.IsNullOrEmpty(war.Key)) continue;
+                    using var spoils = connection.CreateCommand();
+                    spoils.Transaction = tx;
+                    spoils.CommandText = @"INSERT INTO pending_gold_transfers (recipient_username, sender_display, amount, note)
+                                           VALUES (@user, @sender, @amount, 'Team war winnings');";
+                    spoils.Parameters.AddWithValue("@user", war.Key);
+                    spoils.Parameters.AddWithValue("@sender", war.Team);
+                    spoils.Parameters.AddWithValue("@amount", TeamWarSpoils(war.Wager));
+                    spoils.ExecuteNonQuery();
+                    continue;
+                }
                 if (war.Wins != 0 || war.Wager <= 0 || string.IsNullOrEmpty(war.Key)) continue;
                 using var refund = connection.CreateCommand();
                 refund.Transaction = tx;
@@ -7307,6 +7780,30 @@ namespace UsurperRemake.Systems
         }
         catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to expire stale team wars: {ex.Message}"); }
         return expired;
+    }
+
+    /// <summary>v1.1.14: what a won war pays its challenger (TeamCornerLocation and the stale sweep alike).</summary>
+    public static long TeamWarSpoils(long wager) => (long)(wager * GameConfig.TeamWarRewardMultiplier);
+
+    /// <summary>
+    /// v1.1.14: a fought war's whole score and result, stored while it is still active, before its completion
+    /// flip (CompleteTeamWar). If that flip fails, the stale sweep settles the war by this result. True when stored.
+    /// </summary>
+    public async Task<bool> RecordTeamWarResult(int warId, int challengerWins, int defenderWins, string result)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"UPDATE team_wars SET challenger_wins = @c, defender_wins = @d, final_result = @r
+                                WHERE id = @id AND status = 'active';";
+            cmd.Parameters.AddWithValue("@id", warId);
+            cmd.Parameters.AddWithValue("@c", challengerWins);
+            cmd.Parameters.AddWithValue("@d", defenderWins);
+            cmd.Parameters.AddWithValue("@r", result);
+            return await cmd.ExecuteNonQueryAsync() == 1;
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to record team war result: {ex.Message}"); return false; }
     }
 
     public async Task UpdateTeamWarScore(int warId, bool challengerWon)
@@ -7363,10 +7860,12 @@ namespace UsurperRemake.Systems
         {
             using var connection = OpenConnection();
             using var cmd = connection.CreateCommand();
+            // v1.1.14: only the wars of this team, not of a removed team of the same name (TeamCreatedAtSql)
             cmd.CommandText = @"SELECT id, challenger_team, defender_team, status, challenger_wins, defender_wins,
                                        gold_wagered, started_at, finished_at
                                 FROM team_wars
                                 WHERE (challenger_team = @team OR defender_team = @team)
+                                AND started_at >= " + TeamCreatedAtSql + @"
                                 ORDER BY started_at DESC LIMIT @limit;";
             cmd.Parameters.AddWithValue("@team", teamName);
             cmd.Parameters.AddWithValue("@limit", limit);
@@ -7589,6 +8088,14 @@ namespace UsurperRemake.Systems
         catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to complete siege: {ex.Message}"); }
     }
 
+    /// <summary>
+    /// v1.1.14: team_wars and castle_sieges are keyed by name, and a team removed by DeleteEmptyTeam leaves
+    /// them behind. A row counts for a player team only from the team's created_at, so a new team of that
+    /// name does not inherit the old one's wars, siege cooldown or war cooldowns. The rows stay, so the
+    /// other team's history keeps them. No player_teams row (an NPC team) keeps every row.
+    /// </summary>
+    private const string TeamCreatedAtSql = "COALESCE((SELECT created_at FROM player_teams WHERE team_name = @team), '')";
+
     public bool CanTeamSiege(string teamName)
     {
         try
@@ -7597,7 +8104,8 @@ namespace UsurperRemake.Systems
             using var cmd = connection.CreateCommand();
             // 24h cooldown between sieges
             cmd.CommandText = @"SELECT COUNT(*) FROM castle_sieges
-                                WHERE team_name = @team AND started_at > datetime('now', '-24 hours');";
+                                WHERE team_name = @team AND started_at > datetime('now', '-24 hours')
+                                AND started_at >= " + TeamCreatedAtSql + ";";   // v1.1.14
             cmd.Parameters.AddWithValue("@team", teamName);
             return Convert.ToInt32(cmd.ExecuteScalar()) == 0;
         }
@@ -7720,20 +8228,22 @@ namespace UsurperRemake.Systems
         catch { return 0; }
     }
 
+    // v1.1.12: the capacity is enforced here, from the vault level in the same statement, so two
+    // deposits at once cannot overfill it; no row changed when it would not fit
+    private const string VaultDepositSql = @"WITH cap AS (SELECT @base + @per * COALESCE((SELECT level FROM team_upgrades
+                                    WHERE team_name = @team AND upgrade_type = 'vault'), 0) AS c)
+                                INSERT INTO team_vault (team_name, gold)
+                                SELECT @team, @amount WHERE @amount > 0 AND @amount <= (SELECT c FROM cap)
+                                ON CONFLICT(team_name) DO UPDATE SET gold = gold + @amount
+                                WHERE team_vault.gold + @amount <= (SELECT c FROM cap);";
+
     public async Task<bool> DepositToTeamVault(string teamName, long amount)
     {
         try
         {
             using var connection = OpenConnection();
             using var cmd = connection.CreateCommand();
-            // v1.1.12: the capacity is enforced here, from the vault level in the same statement, so two
-            // deposits at once cannot overfill it; false when it would not fit
-            cmd.CommandText = @"WITH cap AS (SELECT @base + @per * COALESCE((SELECT level FROM team_upgrades
-                                    WHERE team_name = @team AND upgrade_type = 'vault'), 0) AS c)
-                                INSERT INTO team_vault (team_name, gold)
-                                SELECT @team, @amount WHERE @amount > 0 AND @amount <= (SELECT c FROM cap)
-                                ON CONFLICT(team_name) DO UPDATE SET gold = gold + @amount
-                                WHERE team_vault.gold + @amount <= (SELECT c FROM cap);";
+            cmd.CommandText = VaultDepositSql;
             cmd.Parameters.AddWithValue("@team", teamName);
             cmd.Parameters.AddWithValue("@amount", amount);
             cmd.Parameters.AddWithValue("@base", GameConfig.TeamVaultBaseCapacity);
@@ -8188,6 +8698,130 @@ namespace UsurperRemake.Systems
             catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"RemovePendingPurge failed: {ex.Message}"); }
         }
 
+        // v1.1.14: an admin command stays 'executing' while it runs; executed_at is empty then, and is stamped
+        // when a restarted game server takes the stuck command over (TryClaimStuckAdminCommand)
+        private const string StuckExecuting =
+            "status = 'executing' AND ((executed_at IS NULL AND created_at < datetime('now', @age)) OR executed_at < datetime('now', @age))";
+
+        /// <summary>
+        /// v1.1.14: commands left 'executing' longer than olderThanSeconds: claimed by a game server that stopped
+        /// before it marked them executed or failed (the web server then waits on them in vain).
+        /// </summary>
+        public List<AdminCommand> GetStuckAdminCommands(int olderThanSeconds)
+        {
+            var commands = new List<AdminCommand>();
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT id, command, target_username, args, created_at FROM admin_commands WHERE " + StuckExecuting + " ORDER BY id LIMIT 20;";
+                cmd.Parameters.AddWithValue("@age", $"-{olderThanSeconds} seconds");
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                    commands.Add(new AdminCommand
+                    {
+                        Id = reader.GetInt32(0),
+                        Command = reader.GetString(1),
+                        TargetUsername = reader.IsDBNull(2) ? null : reader.GetString(2),
+                        Args = reader.IsDBNull(3) ? null : reader.GetString(3),
+                        CreatedAt = reader.IsDBNull(4) ? null : Convert.ToString(reader.GetValue(4))   // v1.1.14
+                    });
+            }
+            catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"GetStuckAdminCommands failed: {ex.Message}"); }
+            return commands;
+        }
+
+        /// <summary>
+        /// v1.1.14: take over a stuck command (see GetStuckAdminCommands) before recovering it: true when this
+        /// call stamped it, so two recoveries never both run it. A recovery that stops too is taken over again
+        /// once the stamp is older than olderThanSeconds.
+        /// </summary>
+        public bool TryClaimStuckAdminCommand(int id, int olderThanSeconds)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "UPDATE admin_commands SET executed_at = datetime('now') WHERE id = @id AND " + StuckExecuting + ";";
+                cmd.Parameters.AddWithValue("@id", id);
+                cmd.Parameters.AddWithValue("@age", $"-{olderThanSeconds} seconds");
+                return cmd.ExecuteNonQuery() == 1;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"TryClaimStuckAdminCommand failed: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// v1.1.14: the archive row a delete of this account wrote at or after the admin command was queued (the
+        /// delete landed), with the Name2 and character ID from the archived save; null when there is none.
+        /// </summary>
+        public (string? Name2, string? DisplayName, string? PlayerId, string DeletedAt)? GetArchivedDeleteForCommand(string username, int commandId)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT CASE WHEN json_valid(player_data) THEN json_extract(player_data, '$.player.name2') END,
+                           display_name,
+                           CASE WHEN json_valid(player_data) THEN json_extract(player_data, '$.player.id') END,
+                           deleted_at
+                      FROM deleted_characters
+                     WHERE LOWER(username) = LOWER(@u)
+                       AND deleted_at >= (SELECT created_at FROM admin_commands WHERE id = @id)
+                     ORDER BY id DESC LIMIT 1;";
+                cmd.Parameters.AddWithValue("@u", username);
+                cmd.Parameters.AddWithValue("@id", commandId);
+                using var reader = cmd.ExecuteReader();
+                if (!reader.Read()) return null;
+                string? Text(int i) => reader.IsDBNull(i) ? null : Convert.ToString(reader.GetValue(i));
+                return (Text(0), Text(1), Text(2), Text(3) ?? "");
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"GetArchivedDeleteForCommand failed: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>v1.1.14: the account still holds a character save (its delete has not run).</summary>
+        public bool HasCharacterSave(string username)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT EXISTS (SELECT 1 FROM players WHERE LOWER(username) = LOWER(@u) " +
+                                  "AND player_data IS NOT NULL AND player_data != '{}' AND length(player_data) > 4);";
+                cmd.Parameters.AddWithValue("@u", username);
+                return Convert.ToInt64(cmd.ExecuteScalar()) != 0;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"HasCharacterSave failed: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>v1.1.14: queue a world purge, as the web delete does when the game server is down.</summary>
+        public void QueuePendingPurge(string username, string? name2, string? displayName, string deletedAt, string? playerId, string createdBy)
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "INSERT INTO pending_purges (username, name2, display_name, deleted_at, created_by, player_id) " +
+                              "VALUES (@u, @n, @d, @at, @by, @pid);";
+            cmd.Parameters.AddWithValue("@u", username);
+            cmd.Parameters.AddWithValue("@n", (object?)name2 ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@d", (object?)displayName ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@at", deletedAt);
+            cmd.Parameters.AddWithValue("@by", createdBy);
+            cmd.Parameters.AddWithValue("@pid", (object?)playerId ?? DBNull.Value);
+            cmd.ExecuteNonQuery();
+        }
+
         /// <summary>Expire admin commands older than 60 seconds that are still pending.</summary>
         public void ExpireStaleAdminCommands()
         {
@@ -8465,5 +9099,6 @@ namespace UsurperRemake.Systems
         public string Command { get; set; } = "";
         public string? TargetUsername { get; set; }
         public string? Args { get; set; }
+        public string? CreatedAt { get; set; }   // v1.1.14: SQLite UTC text; filled by GetStuckAdminCommands
     }
 }

@@ -549,7 +549,8 @@ public class WorldSimulator
         {
             CastleLocation.VacateThrone(npc.IsAgedDeath
                 ? "The ruler has died of old age."
-                : "The ruler has fallen in battle.");
+                : "The ruler has fallen in battle.",
+                npc.IsAgedDeath ? "Died of old age" : "Fell in battle");   // v1.1.14: recorded in the monarch history
         }
     }
 
@@ -3658,13 +3659,15 @@ public class WorldSimulator
             {
                 // Check compatibility with team leader
                 var compatibility = npc.Brain?.Personality?.GetCompatibility(teamLeader.Brain?.Personality) ?? 0.5f;
-                if (compatibility > 0.3f)
+                // v1.1.14: the group above counts only the members alive here; the whole team counts, the dead
+                // included, checked and joined under the membership gate (TeamCornerLocation.TryNpcJoin)
+                if (compatibility > 0.3f && TeamCornerLocation.TryNpcJoin(npcs, teamLeader.Team, () =>
+                    {
+                        npc.Team = teamLeader.Team;
+                        npc.TeamPW = teamLeader.TeamPW;
+                        npc.CTurf = teamLeader.CTurf;
+                    }))
                 {
-                    // Join the team!
-                    npc.Team = teamLeader.Team;
-                    npc.TeamPW = teamLeader.TeamPW;
-                    npc.CTurf = teamLeader.CTurf;
-
                     NewsSystem.Instance.Newsy(true, $"{npc.Name} joined the team '{npc.Team}'!");
                     if (UsurperRemake.BBS.DoorMode.IsOnlineMode) _npcTeamActionCooldown[npc.Id] = _currentTick;
                     return;
@@ -3773,11 +3776,15 @@ public class WorldSimulator
             recruitChance += 0.2f;
         }
 
-        if (random.NextDouble() < recruitChance)
+        // v1.1.14: the size check above counts only the living; the dead hold their slots, checked and
+        // joined under the membership gate (TeamCornerLocation.TryNpcJoin)
+        if (random.NextDouble() < recruitChance && TeamCornerLocation.TryNpcJoin(npcs, npc.Team, () =>
+            {
+                candidate.Team = npc.Team;
+                candidate.TeamPW = npc.TeamPW;
+                candidate.CTurf = npc.CTurf;
+            }))
         {
-            candidate.Team = npc.Team;
-            candidate.TeamPW = npc.TeamPW;
-            candidate.CTurf = npc.CTurf;
 
             if (random.NextDouble() < 0.3) // 30% chance to announce
             {
@@ -6416,9 +6423,20 @@ public class WorldSimulator
 
             // v1.1.13: the tick's court politics run on a copy of the stored court and are written as one
             // guarded court change (only when something changed); the in-memory court is then the written one
+            // v1.1.14: the delegate is retried on a conflict (up to 5 times) and may give up, so it only collects
+            // the news, afresh on each run; the news of the run that was written is posted once, after the write
             string expected = current.Name;
-            OnlineStateManager.ApplyKingChangeAsync(OnlineStateManager.CourtStoreFor(CastleLocation.TreasuryOsm()),
-                working => working.Name == expected && CourtPoliticsTick(working)).GetAwaiter().GetResult();
+            var news = new List<(bool Important, string Text)>();
+            bool written = OnlineStateManager.ApplyKingChangeAsync(OnlineStateManager.CourtStoreFor(CastleLocation.TreasuryOsm()),
+                working =>
+                {
+                    if (working.Name != expected) return false;
+                    news = CourtPoliticsTick(working);
+                    return true;
+                }, CourtPoliticsBeforeWrite).GetAwaiter().GetResult();
+            if (written)
+                foreach (var (important, text) in news)
+                    NewsSystem.Instance?.Newsy(important, text);
         }
         catch (Exception ex)
             {
@@ -6426,17 +6444,22 @@ public class WorldSimulator
             }
     }
 
+    /// <summary>v1.1.14: tests only: runs before the court politics write (the ApplyCourtChangeAsync hook).</summary>
+    internal static Func<System.Threading.Tasks.Task>? CourtPoliticsBeforeWrite;
+
     /// <summary>
     /// v1.1.13: one tick of court politics on the court's working copy (see ProcessRoyalCourtPolitics). The
     /// copy is named working here and in the methods it calls, as ApplyKingChangeAsync names it.
+    /// v1.1.14: returns the tick's news, posted by the caller only once the court is written.
     /// </summary>
-    private bool CourtPoliticsTick(King working)
+    private List<(bool Important, string Text)> CourtPoliticsTick(King working)
     {
+        var news = new List<(bool Important, string Text)>();
         {
             // NPC guard recruitment (10% chance per tick if there are openings)
             if (working.Guards.Count < King.MaxNPCGuards && (float)Random.Shared.NextDouble() < 0.10f)
             {
-                ProcessNPCGuardRecruitment(working);
+                ProcessNPCGuardRecruitment(working, news);
             }
 
             // Court intrigue processing (5% chance per tick)
@@ -6448,16 +6471,16 @@ public class WorldSimulator
             // Plot progression (all active plots advance)
             foreach (var plot in working.ActivePlots.ToList())
             {
-                AdvancePlot(working, plot);
+                AdvancePlot(working, plot, news);
             }
         }
-        return true;
+        return news;
     }
 
     /// <summary>
     /// NPCs may apply to become royal guards if positions are available
     /// </summary>
-    private void ProcessNPCGuardRecruitment(King working)
+    private void ProcessNPCGuardRecruitment(King working, List<(bool Important, string Text)> news)
     {
         // Find NPCs who might want to become guards:
         // - Not already a guard
@@ -6506,7 +6529,7 @@ public class WorldSimulator
         working.Guards.Add(guard);
         working.Treasury -= GameConfig.GuardRecruitmentCost;
 
-        NewsSystem.Instance?.Newsy(false, $"{applicant.Name} has joined the Royal Guard!");
+        news.Add((false, Loc.Get("worldsim.court.guard_joined", applicant.Name)));   // v1.1.14: posted after the write
         // GD.Print($"[WorldSim] {applicant.Name} recruited as Royal Guard");
     }
 
@@ -6597,7 +6620,7 @@ public class WorldSimulator
     /// <summary>
     /// Advance a plot toward completion
     /// </summary>
-    private void AdvancePlot(King working, CourtIntrigue plot)
+    private void AdvancePlot(King working, CourtIntrigue plot, List<(bool Important, string Text)> news)
     {
         if (plot.IsDiscovered) return;
 
@@ -6622,11 +6645,17 @@ public class WorldSimulator
                 }
             }
 
-            // v0.62.1 (article fix): plot types include "Assassination" / "Espionage"
-            // which need "An" not "A". Lowercased so the helper still finds the vowel.
-            string plotTypeLc = plot.PlotType.ToLower();
-            NewsSystem.Instance?.Newsy(true,
-                $"{GameConfig.GetIndefiniteArticle(plotTypeLc)} {plotTypeLc} plot against {working.GetTitle()} {working.Name} was discovered!");
+            // v1.1.14: one line per plot type in every language (the English article is in the text), and a
+            // plain one for a plot type stored by an older release
+            string plotKey = plot.PlotType switch
+            {
+                "Assassination" => "worldsim.court.plot_discovered.assassination",
+                "Coup" => "worldsim.court.plot_discovered.coup",
+                "Scandal" => "worldsim.court.plot_discovered.scandal",
+                "Sabotage" => "worldsim.court.plot_discovered.sabotage",
+                _ => "worldsim.court.plot_discovered"
+            };
+            news.Add((true, Loc.Get(plotKey, CourtTitle(working), working.Name)));
 
             working.ActivePlots.Remove(plot);
             return;
@@ -6635,22 +6664,24 @@ public class WorldSimulator
         // Plot triggers at 100%
         if (plot.Progress >= 100)
         {
-            ExecutePlot(working, plot);
+            ExecutePlot(working, plot, news);
         }
     }
 
     /// <summary>
     /// Execute a completed plot
     /// </summary>
-    private void ExecutePlot(King working, CourtIntrigue plot)
+    /// <summary>v1.1.14: the monarch's title in the news language (castle.king / castle.queen).</summary>
+    private static string CourtTitle(King working) => Loc.Get(working.Sex == CharacterSex.Male ? "castle.king" : "castle.queen");
+
+    private void ExecutePlot(King working, CourtIntrigue plot, List<(bool Important, string Text)> news)
     {
         switch (plot.PlotType)
         {
             case "Assassination":
                 // King "survives" but is weakened
                 working.Treasury /= 2;
-                NewsSystem.Instance?.Newsy(true,
-                    $"ASSASSINATION ATTEMPT! {working.GetTitle()} {working.Name} narrowly survived an assassination plot!");
+                news.Add((true, Loc.Get("worldsim.court.assassination_attempt", CourtTitle(working), working.Name)));
                 break;
 
             case "Coup":
@@ -6661,23 +6692,20 @@ public class WorldSimulator
                 {
                     working.Guards.Remove(guard);
                 }
-                NewsSystem.Instance?.Newsy(true,
-                    $"COUP ATTEMPT! {deserters.Count} guards joined the conspiracy against {working.GetTitle()} {working.Name}!");
+                news.Add((true, Loc.Get("worldsim.court.coup_attempt", deserters.Count, CourtTitle(working), working.Name)));
                 break;
 
             case "Scandal":
                 // King's reputation damaged - harder to collect taxes
                 working.TaxRate = Math.Max(0, working.TaxRate - 10);
-                NewsSystem.Instance?.Newsy(true,
-                    $"SCANDAL! Shocking revelations about {working.GetTitle()} {working.Name} rock the kingdom!");
+                news.Add((true, Loc.Get("worldsim.court.scandal", CourtTitle(working), working.Name)));
                 break;
 
             case "Sabotage":
                 // Treasury damaged
                 working.Treasury = Math.Max(0, working.Treasury - 5000);
                 working.MagicBudget = Math.Max(0, working.MagicBudget - 2000);
-                NewsSystem.Instance?.Newsy(true,
-                    $"SABOTAGE! The royal treasury has been plundered!");
+                news.Add((true, Loc.Get("worldsim.court.sabotage")));
                 break;
         }
 

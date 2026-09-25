@@ -110,13 +110,15 @@ public static class MarriageSurnameHelper
         catch { /* presence refresh is cosmetic */ }
     }
 
-    /// <summary>Last whitespace-delimited token of a name, or "" if it's single-token.</summary>
+    /// <summary>Last whitespace-delimited token of a name, or "" if it's single-token.
+    /// v1.1.14: legacy numerals are stripped first, and a Roman numeral is never offered as a surname.</summary>
     public static string ExtractSurname(string fullName)
     {
         if (string.IsNullOrWhiteSpace(fullName)) return "";
-        fullName = fullName.Trim();
+        fullName = NPCSpawnSystem.StripRomanNumeralSuffix(fullName.Trim());
         int sp = fullName.LastIndexOf(' ');
-        return (sp > 0 && sp < fullName.Length - 1) ? fullName.Substring(sp + 1) : "";
+        string surname = (sp > 0 && sp < fullName.Length - 1) ? fullName.Substring(sp + 1) : "";
+        return NPCSpawnSystem.IsRomanNumeralToken(surname) ? "" : surname;
     }
 
     /// <summary>Letters / space / hyphen / apostrophe only; collapse, cap length.</summary>

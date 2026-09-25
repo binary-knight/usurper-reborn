@@ -180,7 +180,7 @@ public partial class QuestSystem
             var factionSystem = FactionSystem.Instance;
             if (factionSystem != null)
             {
-                factionSystem.FactionStanding[questFaction.Value] += 50;
+                factionSystem.AddStanding(questFaction.Value, 50);   // v1.1.14: saturating
                 factionSystem.CompletedFactionQuests.Add(quest.Id);
                 terminal.WriteLine(Loc.Get("quest.standing_improved", quest.GetDisplayInitiator()), "bright_cyan");
             }
@@ -1584,8 +1584,10 @@ public partial class QuestSystem
         List<Quest> claimed;
         lock (_bountyPayoutLock)
         {
-            claimed = questDatabase.Where(q => !q.Deleted && q.IsPlayerBounty && q.Initiator == KING_BOUNTY_INITIATOR &&
-                !string.IsNullOrEmpty(q.TargetNPCName) && names.Any(n => q.TargetNPCName.Equals(n, StringComparison.OrdinalIgnoreCase))).ToList();
+            // v1.1.14: a bounty from before the IsPlayerBounty mark is the player's too, by the same test the
+            // delete purge uses (IsBountyOnPlayer: no TitleKey, a complete roster, no NPC of that name)
+            claimed = questDatabase.Where(q => !q.Deleted &&
+                names.Any(n => IsBountyOnPlayer(q.Initiator, q.TitleKey, q.TargetNPCName, q.IsPlayerBounty, n))).ToList();
             // v1.1.11: another process may hold the same bounty; only the one whose DB claim lands pays it.
             // A bounty claimed elsewhere is marked Deleted here too, unpaid.
             var found = claimed;

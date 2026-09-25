@@ -71,8 +71,13 @@ public partial class MainStreetLocation : BaseLocation
 
     private void ShowTierUnlockAnnouncement()
     {
-        string? notice = TakeDistrictsNotice(currentPlayer); // v1.1.13: once, for a character that knew the old menu
-        if (notice != null) terminal.WriteLine(notice, "bright_cyan");
+        if (!UseClassicLayout) // v1.1.14: the districts notice and the switch-to-classic tip are for the districts only
+        {
+            string? notice = TakeDistrictsNotice(currentPlayer); // v1.1.13: once, for a character that knew the old menu
+            if (notice != null) terminal.WriteLine(notice, "bright_cyan");
+            string? tip = TakeClassicLayoutTip(currentPlayer, notice != null);
+            if (tip != null) terminal.WriteLine(tip, "cyan");
+        }
         foreach (string line in TakeTierUnlockAnnouncement(currentPlayer))
             terminal.WriteLine(line, "bright_green");
         terminal.SetColor("white");
@@ -192,6 +197,7 @@ public partial class MainStreetLocation : BaseLocation
 
         // Status line
         ShowStatusLine();
+        if (UseClassicLayout) base.ShowQuickCommandBar(); // v1.1.14: the classic screen kept the quick command bar
 
         // Electron emit was hoisted to the top of this method (Phase 2 — see comment there).
 
@@ -451,9 +457,16 @@ public partial class MainStreetLocation : BaseLocation
         }
 
         // v1.1.13: the district menu (one per line for a screen reader)
-        var streetLines = MainStreetLines(CurrentStreetView(), OnlinePlayerCount());
-        if (IsScreenReader) WriteStreetMenuPlain(streetLines);
-        else WriteStreetMenuCompact(streetLines);
+        if (UseClassicLayout)
+        {
+            WriteClassicLayoutBBSMenu(); // v1.1.14: the classic rows
+        }
+        else
+        {
+            var streetLines = MainStreetLines(CurrentStreetView(), OnlinePlayerCount());
+            if (IsScreenReader) WriteStreetMenuPlain(streetLines);
+            else WriteStreetMenuCompact(streetLines);
+        }
 
         // Blank line
         terminal.WriteLine("");
@@ -518,6 +531,8 @@ public partial class MainStreetLocation : BaseLocation
             terminal.Write($"({pct}%)");
         }
         terminal.WriteLine("");
+
+        if (UseClassicLayout) WriteClassicLayoutBBSQuickCommands(liveNPCs.Count); // v1.1.14: classic line 15
 
         // Line 16: Bottom border
         if (!IsScreenReader)
@@ -640,6 +655,12 @@ public partial class MainStreetLocation : BaseLocation
     /// </summary>
     private void ShowMainStreetMenu()
     {
+        if (UseClassicLayout) // v1.1.14: the classic layout, by preference
+        {
+            if (currentPlayer.ScreenReaderMode) ShowClassicLayoutScreenReaderMenu();
+            else ShowClassicLayoutMenu();
+            return;
+        }
         if (currentPlayer.ScreenReaderMode)
         {
             ShowScreenReaderMenu();
@@ -671,6 +692,8 @@ public partial class MainStreetLocation : BaseLocation
 
     protected override async Task<bool> ProcessChoice(string choice)
     {
+        if (UseClassicLayout) return await ProcessClassicChoice(choice); // v1.1.14: the classic keys, by preference
+
         if (string.IsNullOrWhiteSpace(choice))
             return false;
 
@@ -1818,8 +1841,7 @@ public partial class MainStreetLocation : BaseLocation
     {
         terminal.WriteLine(Loc.Get("main_street.mail_checking"), "cyan");
         await MailSystem.ReadPlayerMail(currentPlayer.Name2, terminal);
-        terminal.WriteLine(Loc.Get("main_street.mail_return"), "gray");
-        await terminal.GetInput("");
+        await terminal.PressAnyKey(Loc.Get("main_street.mail_return"));
     }
 
     /// <summary>

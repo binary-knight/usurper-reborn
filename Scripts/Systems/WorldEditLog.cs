@@ -10,8 +10,8 @@ namespace UsurperRemake.Systems
     /// <summary>
     /// v1.1.13: the world edits log (table world_edits). A process that deletes a character appends an
     /// idempotent edit, applies it and writes it under the records' versions. The owner process (the MUD
-    /// server, else the world sim lock holder) re-applies every unapplied edit and every edit of the last
-    /// 24 hours after it loads or reloads the shared records and before it saves them, and marks an edit
+    /// server, else the world sim lock holder) re-applies every edit still in the log (v1.1.14: until the prune
+    /// deletes it, PruneAppliedDays after it was applied) after it loads or reloads the shared records and before it saves them, and marks an edit
     /// applied only after its own versioned write succeeds. So a stale or old-binary write that brings a
     /// deleted character's grudge, marriage or throne back is undone at the owner's next save.
     /// </summary>
@@ -19,8 +19,13 @@ namespace UsurperRemake.Systems
     {
         public const string ForgetCharacter = "forget_character";
         public const string VacateThrone = "vacate_throne";
-        public const int ReapplyHours = 24;
         public const int PruneAppliedDays = 7;
+        // v1.1.14: an edit is re-applied until the prune deletes it (was 24 h), so an old binary's write after a
+        // day is still undone. The clock: SQLite's datetime('now') (UTC) against the edit's applied_at, also
+        // written by datetime('now'); the set is the prune's complement (SqlSaveBackend.GetWorldEditsToApply)
+        public const int ReapplyHours = PruneAppliedDays * 24;
+        // v1.1.14: an edit no owner has applied after this long is still reported (ReportUnapplied)
+        public const int UnappliedWarningHours = 24;
 
         public sealed class ForgetCharacterPayload
         {
@@ -122,7 +127,9 @@ namespace UsurperRemake.Systems
             int n = 0;
             foreach (var a in p.Aliases)
             {
-                n += PermadeathHelper.ForgetNpcGrudgesAgainst(a, cutOff, untimed);
+                // v1.1.14: no later character uses the name, so every grudge against it is the deleted
+                // character's: forgotten with no time cut-off (an old binary's re-stamped memory time included)
+                n += PermadeathHelper.ForgetNpcGrudgesAgainst(a, untimed ? null : cutOff, untimed);
                 if (untimed) n += PermadeathHelper.ClearNpcSpousesOf(a, endedMarriages);   // v1.1.13: a spouse name carries no time
             }
             // v1.1.13: the registry pairs by ID, so a marriage is ended even where the NPC's SpouseName is already empty
@@ -160,10 +167,10 @@ namespace UsurperRemake.Systems
         /// </summary>
         public static int ReportUnapplied(SqlSaveBackend sql)
         {
-            var stale = sql.GetUnappliedWorldEditsOlderThan(ReapplyHours);
+            var stale = sql.GetUnappliedWorldEditsOlderThan(UnappliedWarningHours);
             if (stale.Count > 0)
                 DebugLogger.Instance.LogWarning("WORLD_EDITS",
-                    $"{stale.Count} world edit(s) not applied after {ReapplyHours} h: " +
+                    $"{stale.Count} world edit(s) not applied after {UnappliedWarningHours} h: " +
                     string.Join(", ", stale.Select(e => $"#{e.Id} {e.Kind} by {e.CreatedBy} at {e.CreatedAt}")));
             return stale.Count;
         }

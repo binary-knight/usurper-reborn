@@ -359,7 +359,7 @@ public class CharacterCreationSystem
         terminal.SetColor("gray");
         terminal.WriteLine($"  {Loc.Get("creation.qs_defaults_hint")}");
         terminal.WriteLine("");
-        await terminal.GetInputAsync(Loc.Get("creation.qs_begin"));
+        await terminal.PressAnyKey(Loc.Get("creation.qs_begin"));
         return true;
     }
 
@@ -2543,7 +2543,7 @@ public class CharacterCreationSystem
                 // No re-rolls remaining - must accept
                 terminal.WriteLine(Loc.Get("character_creation.no_rerolls"), "bright_red");
                 terminal.WriteLine("");
-                await terminal.GetInputAsync(Loc.Get("character_creation.press_enter_accept"));
+                await terminal.PressAnyKey(Loc.Get("character_creation.press_enter_accept"));
                 break;
             }
         }
@@ -2874,7 +2874,7 @@ public class CharacterCreationSystem
         terminal.WriteLine($"{Loc.Get("ui.healing_potions")}: {character.Healing}", "white");
         terminal.WriteLine("");
         
-        await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+        await terminal.PressAnyKey();
     }
     
     /// <summary>
@@ -2887,7 +2887,7 @@ public class CharacterCreationSystem
         terminal.WriteLine($"--- {Loc.Get("character_creation.race_info_header")} ---", "bright_green");
         terminal.WriteLine("");
         terminal.WriteLine(GameConfig.RaceHelpText, "white");
-        await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+        await terminal.PressAnyKey();
     }
     
     /// <summary>
@@ -2900,7 +2900,7 @@ public class CharacterCreationSystem
         terminal.WriteLine($"--- {Loc.Get("character_creation.class_info_header")} ---", "bright_green");
         terminal.WriteLine("");
         terminal.WriteLine(GameConfig.ClassHelpText, "white");
-        await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+        await terminal.PressAnyKey();
     }
     
     /// <summary>

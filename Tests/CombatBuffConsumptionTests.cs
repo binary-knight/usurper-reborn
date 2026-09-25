@@ -63,7 +63,10 @@ public class CombatBuffConsumptionTests
     {
         var output = new MemoryStream();
         var term = new TerminalEmulator(new ScriptedStream(script, throwWhenDrained), output);
-        return (new CombatEngine(term), output);
+        var engine = new CombatEngine(term);
+        // v1.1.14: seeded, so every run of a fight makes the same rolls and meets the same prompts
+        engine.SeedRandomForTests(1114);
+        return (engine, output);
     }
 
     private static Character MakeBuffedPlayer(long hp = 500)
@@ -147,7 +150,12 @@ public class CombatBuffConsumptionTests
         // resurrection at the veil, then enough blank lines to clear any further "press any key".
         var (engine, output) = MakeEngine(string.Concat(Enumerable.Repeat("A\n", 6)) + "\n\n\n1\n" + string.Concat(Enumerable.Repeat("\n", 8)));
         var player = MakeBuffedPlayer(hp: 5);
-        var (result, error, transcript) = await Run(() => engine.PlayerVsMonsters(player, new List<Monster> { LethalMonster() }), output);
+        // v1.1.14: combat reads the static difficulty (Last Stand, permadeath); pinned for this fight
+        var difficulty = DifficultySystem.CurrentDifficulty;
+        DifficultySystem.CurrentDifficulty = DifficultyMode.Normal;
+        CombatResult? result; Exception? error; string transcript;
+        try { (result, error, transcript) = await Run(() => engine.PlayerVsMonsters(player, new List<Monster> { LethalMonster() }), output); }
+        finally { DifficultySystem.CurrentDifficulty = difficulty; }
         error.Should().BeNull("transcript: {0}", transcript);
         // The first lethal blow can trigger Last Stand / Death's Door, which rewrites the outcome
         // to PlayerEscaped with the fight over; either way the fight ended in defeat, not victory.

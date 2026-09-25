@@ -1023,8 +1023,7 @@ public class CastleLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -1063,8 +1062,7 @@ public class CastleLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     private async Task ManagePrisonCells()
@@ -2240,8 +2238,7 @@ public class CastleLocation : BaseLocation
             terminal.WriteLine("");
 
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
         }
     }
 
@@ -2375,8 +2372,7 @@ public class CastleLocation : BaseLocation
 
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
         }
     }
 
@@ -2853,8 +2849,7 @@ public class CastleLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -3310,8 +3305,7 @@ public class CastleLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     private async Task WithdrawFromTreasury()
@@ -3614,6 +3608,9 @@ public class CastleLocation : BaseLocation
         }
     }
 
+    /// <summary>v1.1.14: a royal decree waits while the NPC roster is not loaded or is being rebuilt (not trustworthy).</summary>
+    internal static bool DecreeMustWaitForRoster() => NPCSpawnSystem.Instance?.IsRosterTrustworthy != true;
+
     private async Task PlaceBounty()
     {
         terminal.WriteLine("");
@@ -3645,6 +3642,13 @@ public class CastleLocation : BaseLocation
             {
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("castle.insufficient_treasury"));
+            }
+            else if (DecreeMustWaitForRoster())
+            {
+                // v1.1.14: refused before any gold leaves the treasury; a decree posted now could not tell a
+                // player from an NPC briefly missing from the roster
+                terminal.SetColor("yellow");
+                terminal.WriteLine(Loc.Get("castle.bounty_roster_busy"));
             }
             else if (!await CourtChangeAsync(court => { if (court.Treasury < amount) return false; court.Treasury -= amount; return true; }))   // v1.1.13
             {
@@ -5914,8 +5918,7 @@ public class CastleLocation : BaseLocation
         terminal.WriteLine(Loc.Get("castle.visit_quest_hall"));
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -6648,8 +6651,7 @@ public class CastleLocation : BaseLocation
             terminal.WriteLine(Loc.Get("castle.throne_room_empty"));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -6672,8 +6674,7 @@ public class CastleLocation : BaseLocation
             terminal.WriteLine(Loc.Get("castle.increase_chivalry_fame"));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -6990,8 +6991,7 @@ public class CastleLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     /// <summary>
@@ -7172,8 +7172,7 @@ public class CastleLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     /// <summary>
@@ -7269,8 +7268,7 @@ public class CastleLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     /// <summary>
@@ -7412,8 +7410,7 @@ public class CastleLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     /// <summary>
@@ -7512,8 +7509,7 @@ public class CastleLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     /// <summary>
@@ -7623,8 +7619,7 @@ public class CastleLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     /// <summary>
@@ -7710,8 +7705,7 @@ public class CastleLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     private async Task DonateToRoyalPurse()
@@ -7796,8 +7790,7 @@ public class CastleLocation : BaseLocation
             terminal.WriteLine(Loc.Get("castle.guard_no_accept"));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -7809,8 +7802,7 @@ public class CastleLocation : BaseLocation
             terminal.WriteLine(Loc.Get("castle.guard_no_positions"));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -7821,8 +7813,7 @@ public class CastleLocation : BaseLocation
             terminal.WriteLine(Loc.Get("castle.guard_already_serving"));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -7838,8 +7829,7 @@ public class CastleLocation : BaseLocation
             terminal.WriteLine(Loc.Get("castle.guard_min_level", minLevel));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -7854,8 +7844,7 @@ public class CastleLocation : BaseLocation
             terminal.WriteLine(Loc.Get("castle.guard_seek_redemption"));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -7932,8 +7921,7 @@ public class CastleLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -8696,34 +8684,23 @@ public class CastleLocation : BaseLocation
     /// <summary>
     /// Called when the current king dies. Vacates the throne and posts news.
     /// Static so it can be called from WorldSimulator without a CastleLocation instance.
+    /// v1.1.14: the ended reign and a marked vacancy are one versioned write (EndReignAsync), so a fresh load
+    /// finds the throne empty; the news follows only once it lands. An empty throne is claimed later as usual.
     /// </summary>
-    public static void VacateThrone(string reason)
+    public static void VacateThrone(string reason, string endReason = "Died")
     {
         var king = GetCurrentKing();
         if (king == null || !king.IsActive) return;
 
         string kingName = king.Name;
-        king.IsActive = false;
+        if (!EndReignAsync(kingName, endReason, null).GetAwaiter().GetResult())
+        {
+            DebugLogger.Instance.LogWarning("CASTLE", $"The reign of {kingName} was not ended: the stored court no longer holds it, or kept changing.");
+            return;
+        }
 
         // Post news
         NewsSystem.Instance?.Newsy(true, $"{kingName} is no longer ruler! The throne stands vacant. {reason}");
-
-        // Persist to world_state in online mode
-        if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
-        {
-            var osm = OnlineStateManager.Instance;
-            if (osm != null)
-            {
-                _ = Task.Run(async () =>
-                {
-                    try { await osm.SaveRoyalCourtToWorldState(); }
-                    catch (Exception ex)
-                    {
-                        DebugLogger.Instance.LogError("CASTLE", $"Failed to persist throne vacancy: {ex.Message}");
-                    }
-                });
-            }
-        }
     }
 
     #region The Crown Faction Recruitment
@@ -8981,7 +8958,7 @@ public class CastleLocation : BaseLocation
             terminal.WriteLine(Loc.Get("castle.crown_divided_loyalties"));
             terminal.WriteLine(Loc.Get("castle.crown_renounce_return"));
             terminal.WriteLine("");
-            await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -9038,7 +9015,7 @@ public class CastleLocation : BaseLocation
             {
                 terminal.WriteLine(Loc.Get("castle.crown_prove_worth"));
             }
-            await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -9073,7 +9050,7 @@ public class CastleLocation : BaseLocation
             terminal.WriteLine(Loc.Get("castle.crown_gates_open"));
         }
 
-        await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+        await terminal.PressAnyKey();
     }
 
     /// <summary>

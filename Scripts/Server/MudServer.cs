@@ -240,11 +240,15 @@ public class MudServer
         // Start the world simulator as an in-process background task
         // This replaces the separate usurper-world.service process
         // v1.1.13: the MUD takes the world sim lock, so door processes on this database start no world sim of
-        // their own and know the owner. The MUD owns the shared records either way; its heartbeat takes a
-        // lock another process still holds.
+        // their own and know the owner. The MUD owns the shared records either way.
+        // v1.1.14: a lock another process still holds is taken over here, once; the heartbeat after that only
+        // keeps a lock the MUD holds (a compare-and-swap), so a door's world sim that lost it stops claiming it.
         string worldSimOwnerId = $"mud_{Environment.ProcessId}_{DateTime.UtcNow.Ticks}";
         if (!sqlBackend.TryAcquireWorldSimLock(worldSimOwnerId))
+        {
+            sqlBackend.TakeOverWorldSimLock(worldSimOwnerId);
             Console.Error.WriteLine("[MUD] The world sim lock was held by another process; the MUD takes it over");
+        }
         var worldSimService = new WorldSimService(
             sqlBackend,
             simIntervalSeconds: UsurperRemake.BBS.DoorMode.SimIntervalSeconds,
@@ -1787,8 +1791,12 @@ public class MudServer
             {
                 _sqlBackend.TouchMudHeartbeat();   // v1.1.13: the web delete waits for this poller only while it beats
                 // v1.1.13: queued web-delete purges, once the world sim has loaded the roster they clear
+                // v1.1.14: first, commands a stopped game server left 'executing' (a delete may queue its purge)
                 if (_worldSimService?.InitializationComplete.Task.IsCompletedSuccessfully == true)
+                {
+                    await RecoverStuckAdminCommandsAsync(_sqlBackend, id => AdminCommandsRunningHere.ContainsKey(id), RunClaimedAdminCommand);
                     await DrainPendingPurgesAsync(_sqlBackend);
+                }
 
                 var commands = _sqlBackend.GetPendingAdminCommands();
                 foreach (var cmd in commands)
@@ -1899,7 +1907,99 @@ public class MudServer
         if (_sqlBackend == null) return;
         // v1.1.13: claimed first; a command the web server withdrew (or another poll claimed) is not run
         if (!_sqlBackend.TryClaimAdminCommand(cmd.Id)) return;
-        await RunClaimedAdminCommand(cmd);
+        AdminCommandsRunningHere[cmd.Id] = 0;   // v1.1.14: never taken for a stuck one while it runs
+        try { await RunClaimedAdminCommand(cmd); }
+        finally { AdminCommandsRunningHere.TryRemove(cmd.Id, out _); }
+    }
+
+    // v1.1.14: the admin commands this process claimed and is running (static: one game server per process)
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<int, byte> AdminCommandsRunningHere = new();
+
+    /// <summary>v1.1.14: an admin command 'executing' longer than this, and not running here, was left by a stopped game server.</summary>
+    internal const int StuckAdminCommandSeconds = 60;
+
+    /// <summary>
+    /// v1.1.14: recover the admin commands a game server claimed and then stopped (a crash or a restart) before
+    /// it marked them, so the web server and the admin page see a final status. Each is taken over first
+    /// (TryClaimStuckAdminCommand), so it is recovered once. A delete_player whose account still holds its save
+    /// did not empty it and is run now by rerunDelete, which marks it; one whose delete landed (the save emptied,
+    /// its archive row at or after the command) is marked executed and its world purge queued in pending_purges,
+    /// with the archived Name2, ID and delete time, for the drain that follows (a deferred purge leaves a
+    /// character made again since alone); one with neither has its purge queued from the command's own record of
+    /// the character (v1.1.14: the args the web delete writes) and is marked executed, or, with no such record,
+    /// is marked failed with StuckDeleteUnrecoverable, which the admin page shows. Any other command is marked failed, not run again
+    /// (a kick, a broadcast or a shutdown is not safe to repeat late). Returns the commands recovered.
+    /// </summary>
+    internal static async Task<int> RecoverStuckAdminCommandsAsync(SqlSaveBackend db, Func<int, bool> runningHere,
+        Func<AdminCommand, Task> rerunDelete, int olderThanSeconds = StuckAdminCommandSeconds)
+    {
+        int recovered = 0;
+        foreach (var cmd in db.GetStuckAdminCommands(olderThanSeconds))
+        {
+            if (runningHere(cmd.Id) || !db.TryClaimStuckAdminCommand(cmd.Id, olderThanSeconds)) continue;
+            recovered++;
+            try
+            {
+                string? user = cmd.TargetUsername;
+                if (cmd.Command != "delete_player" || string.IsNullOrWhiteSpace(user))
+                {
+                    db.MarkAdminCommandFailed(cmd.Id, "Interrupted by a game server restart; not run again");
+                    continue;
+                }
+                // the save first: DeleteGameData archives, then empties the save, in two statements, so a stop
+                // between them leaves an archive row beside a save the delete never emptied
+                var archived = db.GetArchivedDeleteForCommand(user!, cmd.Id);
+                if (db.HasCharacterSave(user!))
+                    await rerunDelete(cmd);
+                else if (archived is { } a)
+                {
+                    db.QueuePendingPurge(user!, a.Name2, a.DisplayName, a.DeletedAt, a.PlayerId, "mud-recovery");
+                    db.MarkAdminCommandExecuted(cmd.Id, $"Deleted {user} (world purge queued again after a game server restart)");
+                }
+                // v1.1.14: no archive (expired after 7 days, or never written): the command's own record of the
+                // character, written by the web delete when it queued the command, names the purge instead
+                else if (DeletePurgeArgs(cmd.Args) is { } p && !string.IsNullOrWhiteSpace(cmd.CreatedAt))
+                {
+                    db.QueuePendingPurge(user!, p.Name2, p.DisplayName, cmd.CreatedAt!, p.PlayerId, "mud-recovery");
+                    db.MarkAdminCommandExecuted(cmd.Id, $"Deleted {user} (world purge queued after a game server restart, from the delete request's record)");
+                }
+                else
+                    db.MarkAdminCommandFailed(cmd.Id, StuckDeleteUnrecoverable);
+                Console.Error.WriteLine($"[MUD] Recovered admin command {cmd.Id} ({cmd.Command} {user}) left executing by a stopped game server");
+            }
+            catch (Exception ex)
+            {
+                db.MarkAdminCommandFailed(cmd.Id, $"Recovery after a game server restart failed: {ex.Message}");
+            }
+        }
+        return recovered;
+    }
+
+    /// <summary>v1.1.14: the admin page's result for a stuck delete whose world purge cannot be queued.</summary>
+    internal const string StuckDeleteUnrecoverable =
+        "Interrupted by a game server restart after the character's save was emptied. No delete archive (kept 7 days) " +
+        "and no record of the character's name were found, so the world purge (NPC grudges, marriages, the throne) " +
+        "was not queued. Delete the account again from this panel to run the purge by its display name.";
+
+    /// <summary>
+    /// v1.1.14: the character a delete_player command names in its args (the web delete writes name2, display_name
+    /// and player_id when it queues the command). Null without a Name2: then the save held no character when the
+    /// delete was asked for, and nothing names the purge.
+    /// </summary>
+    internal static (string Name2, string? DisplayName, string? PlayerId)? DeletePurgeArgs(string? args)
+    {
+        if (string.IsNullOrWhiteSpace(args)) return null;
+        try
+        {
+            using var doc = JsonDocument.Parse(args);
+            var root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object) return null;
+            string? Text(string name) => root.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
+            string? name2 = Text("name2");
+            if (string.IsNullOrWhiteSpace(name2)) return null;
+            return (name2!, Text("display_name"), Text("player_id"));
+        }
+        catch (JsonException) { return null; }
     }
 
     private async Task RunClaimedAdminCommand(AdminCommand cmd)
@@ -2044,6 +2144,16 @@ public class MudServer
                     else
                     {
                         _sqlBackend.MarkAdminCommandFailed(cmd.Id, $"Player '{target}' is not online or has no terminal");
+                    }
+                    break;
+
+                case "guild_succession":
+                    // v1.1.14: queued by the web unban: a guild left with no leader passes to the unbanned member
+                    if (target == null) { _sqlBackend.MarkAdminCommandFailed(cmd.Id, "No target"); return; }
+                    {
+                        var guilds = UsurperRemake.Systems.GuildSystem.Instance ?? new UsurperRemake.Systems.GuildSystem(_sqlBackend.DatabasePath, register: false);
+                        string? leader = guilds.FillLeaderlessGuildOf(target);
+                        _sqlBackend.MarkAdminCommandExecuted(cmd.Id, leader != null ? $"Guild leadership passed to {leader}" : "No guild needed a leader");
                     }
                     break;
 

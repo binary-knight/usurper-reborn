@@ -3105,6 +3105,13 @@ async function handleAdminRequest(req, res) {
           .run('admin-web', 'unban_player', playerUsername, lifted.changes > 0 ? `(also lifted ${lifted.changes} IP ban${lifted.changes === 1 ? '' : 's'})` : '');
       } catch (e) { /* non-critical */ }
 
+      // v1.1.14: the game server passes a guild left with no leader to the unbanned member at once; if it does
+      // not run the command, its maintenance pass does the same later
+      try {
+        dbWrite.prepare("INSERT INTO admin_commands (command, target_username, args, created_by) VALUES (?, ?, ?, ?)")
+          .run('guild_succession', playerUsername, null, 'admin-web');
+      } catch (e) { /* non-critical */ }
+
       sendJson(res, 200, { success: true });
     } catch (e) {
       sendJson(res, 500, { error: e.message });
@@ -3220,8 +3227,16 @@ async function handleAdminRequest(req, res) {
         beat = db.prepare("SELECT 1 AS ok FROM mud_heartbeat WHERE id = 1 AND beat_at >= datetime('now', '-15 seconds')").get();
       } catch (e) { /* table not created yet: an older game server */ }
       if (beat) {
+        // v1.1.14: the character's names and ID go with the command, so a game server that stops mid-delete can
+        // still queue its world purge after a restart (the delete archive expires after 7 days)
+        let purgeArgs = null;
+        try {
+          const named = db.prepare("SELECT display_name, CASE WHEN json_valid(player_data) THEN json_extract(player_data, '$.player.name2') END AS name2, CASE WHEN json_valid(player_data) THEN json_extract(player_data, '$.player.id') END AS player_id FROM players WHERE LOWER(username) = LOWER(?)")
+            .get(playerUsername);
+          if (named) purgeArgs = JSON.stringify({ name2: named.name2 || null, display_name: named.display_name || null, player_id: named.player_id || null });
+        } catch (e) { /* the purge is then named from the delete archive only */ }
         const queued = dbWrite.prepare("INSERT INTO admin_commands (command, target_username, args, created_by) VALUES (?, ?, ?, ?)")
-          .run('delete_player', playerUsername, null, 'admin-web');
+          .run('delete_player', playerUsername, purgeArgs, 'admin-web');
         const readStatus = () => db.prepare("SELECT status, result FROM admin_commands WHERE id = ?").get(queued.lastInsertRowid);
         let row = null;
         const running = r => r && (r.status === 'pending' || r.status === 'executing');
@@ -3272,7 +3287,8 @@ async function handleAdminRequest(req, res) {
       }
 
       // Delete from all related tables
-      const tables = ['players', 'wizard_flags', 'sleeping_players', 'online_players', 'pvp_log'];
+      // v1.1.14: wizard_flags (frozen, muted) are kept by account name through a delete and recreate
+      const tables = ['players', 'sleeping_players', 'online_players', 'pvp_log'];
       for (const table of tables) {
         try {
           dbWrite.prepare(`DELETE FROM ${table} WHERE LOWER(username) = LOWER(?)`).run(playerUsername);

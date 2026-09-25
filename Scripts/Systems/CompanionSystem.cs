@@ -1313,7 +1313,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine($"  \"{companion.DialogueHints[0]}\"", "dark_cyan");
             }
 
-            await terminal.GetInputAsync(Loc.Get("companion.press_enter_welcome"));
+            await terminal.PressAnyKey(Loc.Get("companion.press_enter_welcome"));
         }
 
         private async Task DisplayDeathScene(Companion companion, DeathType type, string circumstance, TerminalEmulator terminal)
@@ -1396,7 +1396,7 @@ namespace UsurperRemake.Systems
             terminal.SetColor("white");
             terminal.WriteLine("");
 
-            await terminal.GetInputAsync(Loc.Get("companion.press_enter_ready"));
+            await terminal.PressAnyKey(Loc.Get("companion.press_enter_ready"));
         }
 
         /// <summary>

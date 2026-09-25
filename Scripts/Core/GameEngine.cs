@@ -371,6 +371,13 @@ public partial class GameEngine
     }
 
     /// <summary>
+    /// v1.1.14: the alt slot opens when the main is immortal, has earned the slot (it persists
+    /// through renouncing), or has reached GameConfig.AltSlotUnlockLevel. Immortal only before.
+    /// </summary>
+    internal static bool AltSlotUnlocked(bool mainIsImmortal, bool hasEarnedAltSlot, int mainLevel) =>
+        mainIsImmortal || hasEarnedAltSlot || mainLevel >= GameConfig.AltSlotUnlockLevel;
+
+    /// <summary>
     /// BBS Door mode - automatically loads or creates character based on drop file
     /// </summary>
     private async Task RunBBSDoorMode()
@@ -427,6 +434,7 @@ public partial class GameEngine
         // Peek at main save to check immortal/alt slot status
         bool mainIsImmortal = false;
         bool hasAltSlot = false;
+        int mainLevel = mainSave?.Level ?? 0;
         if (mainSave != null)
         {
             try
@@ -434,6 +442,7 @@ public partial class GameEngine
                 var mainData = await SaveSystem.Instance.LoadSaveByFileName(accountName);
                 mainIsImmortal = mainData?.Player?.IsImmortal == true;
                 hasAltSlot = mainData?.Player?.HasEarnedAltSlot == true;
+                if (mainData?.Player != null) mainLevel = mainData.Player.Level;
             }
             catch (Exception ex) { DebugLogger.Instance.LogError("ENGINE", $"[ShowCharacterSlots] Failed to peek alt slot data: {ex.Message}"); }
         }
@@ -460,7 +469,8 @@ public partial class GameEngine
             terminal.WriteLine("");
 
         // Show alt creation option if eligible (has alt slot but no alt character yet)
-        bool canCreateAlt = (mainIsImmortal || hasAltSlot) && altSave == null && UsurperRemake.BBS.DoorMode.IsOnlineMode;
+        // v1.1.14: a level-25 main opens the slot too; still one alt per account.
+        bool canCreateAlt = AltSlotUnlocked(mainIsImmortal, hasAltSlot, mainLevel) && altSave == null && UsurperRemake.BBS.DoorMode.IsOnlineMode;
 
         // Compact BBS menu (fits 24-line terminals) vs full menu for MUD/local
         bool compactMenu = UsurperRemake.BBS.DoorMode.IsInDoorMode;
@@ -648,7 +658,7 @@ public partial class GameEngine
                 }
                 else
                 {
-                    terminal.WriteLine(Loc.Get("engine.immortal_required"), "red");
+                    terminal.WriteLine(Loc.Get("engine.alt_level_required", GameConfig.AltSlotUnlockLevel), "red");
                     await Task.Delay(2000);
                     await RunBBSDoorMode();
                     return;
@@ -1866,7 +1876,7 @@ public partial class GameEngine
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("engine.admin_requires_online"));
-            await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+            await terminal.PressAnyKey();
             return;
         }
         var adminConsole = new OnlineAdminConsole(terminal, sqlBackend);
@@ -1884,7 +1894,7 @@ public partial class GameEngine
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("engine.password_requires_online"));
-            await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -1898,7 +1908,7 @@ public partial class GameEngine
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("engine.no_username"));
-            await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -1920,7 +1930,7 @@ public partial class GameEngine
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("engine.password_min_length"));
-            await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -1929,14 +1939,14 @@ public partial class GameEngine
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("engine.passwords_no_match"));
-            await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+            await terminal.PressAnyKey();
             return;
         }
 
         var (success, message) = await sqlBackend.ChangePassword(username, currentPassword, newPassword);
         terminal.SetColor(success ? "bright_green" : "red");
         terminal.WriteLine(message);
-        await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+        await terminal.PressAnyKey();
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -3715,7 +3725,7 @@ public partial class GameEngine
         if (questsToRemove.Count == 0)
             return;
 
-        terminal.WriteLine("");
+        bool shown = false;
         foreach (var quest in questsToRemove)
         {
             string targetDisplay = !string.IsNullOrEmpty(quest.TargetNPCName)
@@ -3723,20 +3733,10 @@ public partial class GameEngine
                 : quest.Objectives.FirstOrDefault(o =>
                     !string.IsNullOrEmpty(o.TargetName))?.TargetName ?? "Unknown";
 
-            // Give the reward
-            var rewardAmount = quest.CalculateReward(player.Level);
-            if (rewardAmount <= 0) rewardAmount = player.Level * 100;
+            // v1.1.14: paid only under the quest's claim, as the bounty payouts are
+            if (SettleDeadNpcQuest(player, quest, out long rewardAmount) != true) continue;
 
-            player.Gold += rewardAmount;
-            player.Statistics?.RecordQuestGoldReward(rewardAmount);
-            player.RoyQuests++;
-            player.Fame += 5;
-
-            // Clean up the quest
-            quest.Deleted = true;
-            quest.Occupier = "";
-            player.ActiveQuests.Remove(quest);
-
+            if (!shown) { terminal.WriteLine(""); shown = true; }
             terminal.WriteLine($"  Quest Update: {targetDisplay} has perished.", "yellow");
             terminal.WriteLine($"  \"{quest.GetDisplayTitle()}\" auto-completed. Reward: {rewardAmount:N0} gold.", "bright_green");
             terminal.WriteLine("");
@@ -3744,7 +3744,41 @@ public partial class GameEngine
             DebugLogger.Instance.LogInfo("QUEST", $"Auto-completed quest '{quest.Title}' for {player.DisplayName} — target NPC '{targetDisplay}' is permadead. Reward: {rewardAmount:N0}g");
         }
 
-        await terminal.PressAnyKey();
+        if (shown) await terminal.PressAnyKey();
+    }
+
+    /// <summary>
+    /// v1.1.14: a quest whose target NPC is permadead, settled at login. The reward is paid only when this
+    /// process's claim on the quest lands (QuestSystem.ClaimAcrossProcesses, the key the bounty payouts use),
+    /// so a crash before the save, or the quest paid in another process first, never pays it twice.
+    /// True: paid and removed. False: claimed elsewhere, removed unpaid. Null: the claim could not be
+    /// written (a busy database); the quest is left for the next login.
+    /// </summary>
+    internal static bool? SettleDeadNpcQuest(Character player, Quest quest, out long reward)
+    {
+        reward = 0;
+        bool? claim = QuestSystem.ClaimAcrossProcesses(quest, player.Name2);
+        if (claim == null)
+        {
+            DebugLogger.Instance.LogWarning("QUEST", $"Dead-target quest '{quest.Title}' for {player.DisplayName}: the claim could not be written; left for the next login.");
+            return null;
+        }
+        if (claim == true)
+        {
+            reward = quest.CalculateReward(player.Level);
+            if (reward <= 0) reward = player.Level * 100;
+            player.Gold += reward;
+            player.Statistics?.RecordQuestGoldReward(reward);
+            player.RoyQuests++;
+            player.Fame += 5;
+        }
+        else
+            DebugLogger.Instance.LogInfo("QUEST", $"Dead-target quest '{quest.Title}' for {player.DisplayName} was settled elsewhere; removed unpaid.");
+
+        quest.Deleted = true;
+        quest.Occupier = "";
+        player.ActiveQuests.Remove(quest);
+        return claim;
     }
 
     /// <summary>
@@ -5569,6 +5603,8 @@ public partial class GameEngine
             AutoLevelUp = playerData.AutoLevelUp,
             AutoEquipDisabled = playerData.AutoEquipDisabled,
             AutoCombatHealPercent = GameConfig.ClampAutoCombatHealPercent(playerData.AutoCombatHealPercent), // v1.1.13: in range
+            ClassicMainStreet = playerData.ClassicMainStreet, // v1.1.14: Main Street layout preference
+            ClassicTipDraws = Math.Max(0, playerData.ClassicTipDraws), // v1.1.14: switch-to-classic tip count
             DateFormatPreference = playerData.DateFormatPreference,
             AutoRedistributeXP = playerData.AutoRedistributeXP,
             Specialization = (ClassSpecialization)playerData.Specialization,
@@ -6558,7 +6594,9 @@ public partial class GameEngine
             // Create NPC from save data
             var npc = new NPC
             {
-                Id = data.Id,
+                // v1.1.14: a record saved with no Id gets one here, derived from its name and character ID, so every
+                // process restoring the same record gives it the same Id and the roster overlay tracks the NPC by it
+                Id = string.IsNullOrEmpty(data.Id) ? NPC.LegacyIdFor(data.Name, data.CharacterID) : data.Id,
                 ID = !string.IsNullOrEmpty(data.CharacterID) ? data.CharacterID : $"npc_{data.Name.ToLower().Replace(" ", "_")}",  // Restore Character.ID (or generate if missing)
                 Name1 = data.Name,
                 Name2 = data.Name,

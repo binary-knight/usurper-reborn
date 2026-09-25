@@ -136,19 +136,33 @@ public class CityControlSystem
     /// Called when any shop makes a sale
     /// </summary>
     /// <summary>v1.1.13: the king's sales tax into the stored treasury (the shared court when online).</summary>
-    internal static async System.Threading.Tasks.Task<bool> AddSalesTaxAsync(long kingShare)
+    internal static System.Threading.Tasks.Task<bool> AddSalesTaxAsync(long kingShare) =>
+        AddSalesTaxAsync(kingShare, CastleLocation.TreasuryOsm(), null);
+
+    /// <summary>
+    /// v1.1.14: as above; a write that gives up carries the share into the next court change that lands. With the
+    /// shared SQL store the share is first stored as pending (pending_sales_tax), so it survives a restart, and a
+    /// court change then takes the whole pending amount into the treasury in its own write. Without SQL it is
+    /// added in the court change and carried in the process if that fails. beforeWrite is a test hook.
+    /// </summary>
+    internal static async System.Threading.Tasks.Task<bool> AddSalesTaxAsync(long kingShare, OnlineStateManager? osm, Func<System.Threading.Tasks.Task>? beforeWrite)
     {
+        bool ok = false;
+        var sql = OnlineStateManager.CourtStoreFor(osm);
+        bool stored = sql != null && sql.AddPendingSalesTax(kingShare);
         try
         {
-            bool ok = await CastleLocation.CourtChangeAsync(CastleLocation.TreasuryOsm(), court => { court.Treasury += kingShare; return true; });
-            if (!ok) UsurperRemake.Systems.DebugLogger.Instance.LogWarning("TAX", $"Sales tax of {kingShare:N0} not added: the royal court kept changing or has no king.");
-            return ok;
+            ok = stored
+                ? await CastleLocation.CourtChangeAsync(osm, court => true, beforeWrite)   // takes the stored pending tax
+                : await CastleLocation.CourtChangeAsync(osm, court => { court.Treasury += kingShare; return true; }, beforeWrite);
+            if (!ok) UsurperRemake.Systems.DebugLogger.Instance.LogWarning("TAX", $"Sales tax of {kingShare:N0} not added now: carried into the next court change.");
         }
         catch (Exception ex)
         {
             UsurperRemake.Systems.DebugLogger.Instance.LogError("TAX", $"Sales tax failed: {ex.Message}");
-            return false;
         }
+        if (!ok && !stored) OnlineStateManager.CarrySalesTax(kingShare);
+        return ok;
     }
 
     public void ProcessSaleTax(long saleAmount)

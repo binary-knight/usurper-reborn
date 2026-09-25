@@ -77,6 +77,7 @@ public class OldGodDialogueTests
         var output = new MemoryStream();
         var term = new TerminalEmulator(new ScriptedStream(string.Concat(Enumerable.Repeat("A\n", 10)) + string.Concat(Enumerable.Repeat("P\n", 6))), output);
         var engine = new CombatEngine(term);
+        engine.SeedRandomForTests(1114);   // v1.1.14: the same rolls every run
         var hero = Hero();
         hero.TempAttackBonus = 777;          // leftovers the reset must clear before the hook runs
         hero.HasBloodlust = true;

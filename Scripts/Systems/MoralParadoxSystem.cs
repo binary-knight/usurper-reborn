@@ -806,7 +806,7 @@ namespace UsurperRemake.Systems
             }
 
             terminal.WriteLine("");
-            await terminal.GetInputAsync($"  {Loc.Get("ui.press_enter")}");
+            await terminal.PressAnyKey();
         }
 
         /// <summary>
@@ -911,7 +911,7 @@ namespace UsurperRemake.Systems
             }
 
             terminal.WriteLine("");
-            await terminal.GetInputAsync($"  {Loc.Get("ui.press_enter")}");
+            await terminal.PressAnyKey();
         }
 
         /// <summary>

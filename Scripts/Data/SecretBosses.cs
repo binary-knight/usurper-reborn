@@ -447,7 +447,7 @@ namespace UsurperRemake.Data
             terminal.WriteLine("");
             terminal.WriteLine($"\"{boss.LocBattleCry()}\"", "bright_red");
             terminal.WriteLine("");
-            await terminal.GetInputAsync(Loc.Get("secretboss.press_begin"));
+            await terminal.PressAnyKey(Loc.Get("secretboss.press_begin"));
 
             // The actual combat would integrate with CombatEngine
             // For now, simulate the encounter
@@ -530,7 +530,7 @@ namespace UsurperRemake.Data
                 StoryProgressionSystem.Instance.SetStoryFlag("true_ending_available", true);
             }
 
-            await terminal.GetInputAsync("\nPress Enter to continue...");
+            await terminal.PressAnyKey();
         }
 
         private async Task DisplayIntro(SecretBossData boss, TerminalEmulator terminal)
@@ -559,7 +559,7 @@ namespace UsurperRemake.Data
             terminal.WriteLine($"  \"{boss.Title}\"", "red");
             terminal.WriteLine("");
 
-            await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+            await terminal.PressAnyKey();
         }
 
         private async Task DisplayDialogue(string[] dialogue, string name, TerminalEmulator terminal)
@@ -582,7 +582,7 @@ namespace UsurperRemake.Data
             }
 
             terminal.WriteLine("");
-            await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+            await terminal.PressAnyKey();
         }
 
         private async Task<bool> HandleBossChoice(SecretBossData boss, TerminalEmulator terminal)

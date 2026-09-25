@@ -3006,8 +3006,7 @@ public class InnLocation : BaseLocation
                 }
 
                 terminal.SetColor("gray");
-                terminal.WriteLine(Loc.Get("ui.press_enter"));
-                await terminal.ReadKeyAsync();
+                await terminal.PressAnyKey();
                 terminal.ClearScreen();
             }
 

@@ -177,6 +177,7 @@ public class Monster
     public bool HasHardenedArmor { get; set; } = false;
     public bool HasEnraged { get; set; } = false;
     public bool HasUsedBackstab { get; set; } = false;
+    public bool HasUsedCriticalStrike { get; set; } = false;   // v1.1.14: a goblin's Critical Strike is once per fight
 
     // Conversion/Charm effects
     public bool Fled { get; set; } = false;           // Monster has fled from combat

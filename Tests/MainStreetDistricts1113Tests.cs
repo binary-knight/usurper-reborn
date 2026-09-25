@@ -317,7 +317,7 @@ public class MainStreetDistricts1113Tests
 
         var lowButPlayed = new Character { Name1 = "Low", Name2 = "Low", Level = 1, MKills = 2 };
         MainStreetLocation.TakeDistrictsNotice(lowButPlayed).Should().NotBeNull();
-        Loc.Get("main_street.districts_notice").Should().Be("Main Street has been reorganised into districts. Press ? for help.");
+        Loc.Get("main_street.districts_notice").Should().Be("Main Street has been reorganised into districts. Press ? for help, or choose the classic layout in Settings (~)."); // v1.1.14: names the classic setting
     }
 
     // ---------- the three renderers ----------

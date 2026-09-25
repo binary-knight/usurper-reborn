@@ -395,8 +395,7 @@ public class AnchorRoadLocation : BaseLocation
             terminal.WriteLine(Loc.Get("anchor_road.come_back_tomorrow"));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -428,8 +427,7 @@ public class AnchorRoadLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("anchor_road.no_bounties"));
                 terminal.WriteLine("");
                 terminal.SetColor("darkgray");
-                terminal.WriteLine(Loc.Get("ui.press_enter"));
-                await terminal.ReadKeyAsync();
+                await terminal.PressAnyKey();
                 return;
             }
         }
@@ -517,8 +515,7 @@ public class AnchorRoadLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     /// <summary>
@@ -537,8 +534,7 @@ public class AnchorRoadLocation : BaseLocation
             terminal.WriteLine(Loc.Get("anchor_road.visit_team_corner"));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -548,8 +544,7 @@ public class AnchorRoadLocation : BaseLocation
             terminal.WriteLine(Loc.Get("anchor_road.no_team_fights"));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -593,8 +588,7 @@ public class AnchorRoadLocation : BaseLocation
             terminal.WriteLine(Loc.Get("anchor_road.no_rival_teams"));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -698,8 +692,7 @@ public class AnchorRoadLocation : BaseLocation
 
                 terminal.WriteLine("");
                 terminal.SetColor("darkgray");
-                terminal.WriteLine(Loc.Get("ui.press_enter"));
-                await terminal.ReadKeyAsync();
+                await terminal.PressAnyKey();
                 return;
             }
 
@@ -814,8 +807,7 @@ public class AnchorRoadLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     /// <summary>
@@ -841,8 +833,7 @@ public class AnchorRoadLocation : BaseLocation
             terminal.WriteLine(Loc.Get("anchor_road.gauntlet_min_level", GameConfig.GauntletMinLevel));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -852,8 +843,7 @@ public class AnchorRoadLocation : BaseLocation
             terminal.WriteLine(Loc.Get("anchor_road.no_fights_left"));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -866,8 +856,7 @@ public class AnchorRoadLocation : BaseLocation
             terminal.WriteLine(Loc.Get("anchor_road.gauntlet_daily_cap_reached", GameConfig.MaxGauntletRunsPerDay));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -913,8 +902,7 @@ public class AnchorRoadLocation : BaseLocation
             terminal.WriteLine(Loc.Get("anchor_road.need_gold", $"{entryFee:N0}", $"{currentPlayer.Gold:N0}"));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -929,8 +917,7 @@ public class AnchorRoadLocation : BaseLocation
             terminal.WriteLine(Loc.Get("anchor_road.come_back_later"));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -1193,8 +1180,7 @@ public class AnchorRoadLocation : BaseLocation
                     terminal.WriteLine($"{Loc.Get("combat.bar_hp")}: {currentPlayer.HP}/{currentPlayer.MaxHP}  {Loc.Get("ui.mana_label")}: {currentPlayer.Mana}/{currentPlayer.MaxMana}");
                     terminal.WriteLine("");
                     terminal.SetColor("darkgray");
-                    terminal.WriteLine(Loc.Get("anchor_road.next_wave"));
-                    await terminal.ReadKeyAsync();
+                    await terminal.PressAnyKey(Loc.Get("anchor_road.next_wave"));
                 }
             }
             else
@@ -1273,8 +1259,7 @@ public class AnchorRoadLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     // ====================================================================================
@@ -1581,8 +1566,7 @@ public class AnchorRoadLocation : BaseLocation
             terminal.WriteLine(Loc.Get("anchor_road.no_team_claim"));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -1592,8 +1576,7 @@ public class AnchorRoadLocation : BaseLocation
             terminal.WriteLine(Loc.Get("anchor_road.already_controls"));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -1646,8 +1629,7 @@ public class AnchorRoadLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     /// <summary>
@@ -1702,8 +1684,7 @@ public class AnchorRoadLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     /// <summary>
@@ -1805,8 +1786,7 @@ public class AnchorRoadLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     private async Task ViewPrisoners()
@@ -1847,8 +1827,7 @@ public class AnchorRoadLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     /// <summary>
@@ -2040,8 +2019,7 @@ public class AnchorRoadLocation : BaseLocation
             terminal.WriteLine($"  {Loc.Get("merc.contract_cap_reached", GameConfig.MaxMercContractsPerDay)}");
             terminal.WriteLine("");
             terminal.SetColor("gray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -2134,8 +2112,7 @@ public class AnchorRoadLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("gray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     #endregion

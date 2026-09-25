@@ -512,8 +512,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine(Loc.Get("team.be_first"));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -589,8 +588,7 @@ public class TeamCornerLocation : BaseLocation
             if (totalPages <= 1)
             {
                 terminal.SetColor("darkgray");
-                terminal.WriteLine(Loc.Get("ui.press_enter"));
-                await terminal.ReadKeyAsync();
+                await terminal.PressAnyKey();
                 return;
             }
             terminal.SetColor("darkgray");
@@ -665,8 +663,7 @@ public class TeamCornerLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     /// <summary>
@@ -710,8 +707,7 @@ public class TeamCornerLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     /// <summary>
@@ -907,8 +903,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine("");
         }
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     private async Task ShowTeamMembers(string teamName, bool detailed)
@@ -1192,8 +1187,7 @@ public class TeamCornerLocation : BaseLocation
                 Loc.Get("team.news_formed", currentPlayer.DisplayName, teamName), "team");
 
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     /// <summary>v1.1.12: an NPC team goes by this name, in any case.</summary>
@@ -1207,12 +1201,80 @@ public class TeamCornerLocation : BaseLocation
     private async Task<bool> RefuseJoinIfFull(string teamName)
     {
         if (await TeamSlotsUsed(teamName) < MaxTeamSize) return false;
+        await ShowJoinTeamFull(teamName);
+        return true;
+    }
+
+    /// <summary>
+    /// v1.1.14: the last check of a join, after the password. Online, the slot count and the membership
+    /// write are one transaction (SqlSaveBackend.TryClaimTeamSlot), so of two players joining at once only
+    /// one takes the last slot; before, both passed the check and the saves that followed made six.
+    /// Offline no other player can join. True when the player may join.
+    /// </summary>
+    private async Task<bool> ClaimJoinSlot(string teamName)
+    {
+        if (await TryTakeTeamSlot(currentPlayer, teamName)) return true;
+        await ShowJoinTeamFull(teamName);
+        return false;
+    }
+
+    /// <summary>
+    /// v1.1.14: every change that adds a member to a team counts the slots and makes the change under this
+    /// gate: a player's join (TryTakeTeamSlot), a hired NPC (RecruitNPCToTeam) and an NPC joining on its own
+    /// (TryNpcJoin). Before, a join and a hire in the same process could each count four and make six.
+    /// </summary>
+    internal static readonly System.Threading.SemaphoreSlim TeamMembershipGate = new(1, 1);
+
+    /// <summary>
+    /// v1.1.14: a player's last slot check before joining a team, for every join path (Team Corner and the
+    /// street gang). Online, the count and the membership write are one transaction
+    /// (SqlSaveBackend.TryClaimTeamSlot), so of two players joining at once only one takes the last slot.
+    /// Offline only the team's NPCs can hold slots. On success the team is registered as a player team
+    /// before the gate opens, so NPCs stop joining it on their own. True when the player may join.
+    /// </summary>
+    internal static async Task<bool> TryTakeTeamSlot(Character player, string teamName)
+    {
+        await TeamMembershipGate.WaitAsync();
+        try
+        {
+            int npcSlots = CountTeamSlots(NPCSpawnSystem.Instance.ActiveNPCs, teamName, 0);
+            bool taken = DoorMode.IsOnlineMode && SaveSystem.Instance.Backend is SqlSaveBackend backend
+                ? await backend.TryClaimTeamSlot(teamName, GameEngine.InheritanceKey(player), npcSlots, MaxTeamSize)
+                : npcSlots < MaxTeamSize;
+            if (taken) WorldSimulator.RegisterPlayerTeam(teamName);
+            return taken;
+        }
+        finally { TeamMembershipGate.Release(); }
+    }
+
+    /// <summary>
+    /// v1.1.14: an NPC joining a team on its own (world simulation, world creation). Only an NPC team with a
+    /// free slot: a team with a player member is left to its players; the dead hold their slots
+    /// (CountTeamSlots); online the player members are counted from the saves as well, for a world sim that
+    /// runs in its own process. Never waits: if a join or a hire holds the gate, the NPC tries another time.
+    /// join makes the change and runs under the gate. True when it ran.
+    /// </summary>
+    internal static bool TryNpcJoin(IEnumerable<NPC> npcs, string teamName, Action join)
+    {
+        if (string.IsNullOrEmpty(teamName) || !TeamMembershipGate.Wait(0)) return false;
+        try
+        {
+            if (WorldSimulator.IsPlayerTeam(teamName)) return false;
+            int players = SaveSystem.Instance.Backend is SqlSaveBackend backend ? backend.CountPlayerTeamMembers(teamName) : 0;
+            if (CountTeamSlots(npcs, teamName, players) >= MaxTeamSize) return false;
+            join();
+            return true;
+        }
+        finally { TeamMembershipGate.Release(); }
+    }
+
+    private async Task ShowJoinTeamFull(string teamName)
+    {
         terminal.WriteLine("");
         terminal.SetColor("red");
         terminal.WriteLine(Loc.Get("team.join_team_full", teamName, MaxTeamSize));
         terminal.WriteLine("");
         await Task.Delay(2000);
-        return true;
     }
 
     /// <summary>
@@ -1276,7 +1338,7 @@ public class TeamCornerLocation : BaseLocation
                 var (exists, pwCorrect) = await backend.VerifyPlayerTeam(teamName, password);
                 if (exists && pwCorrect)
                 {
-                    if (await RefuseJoinIfFull(teamName)) return;
+                    if (!await ClaimJoinSlot(teamName)) return;   // v1.1.14: the check and the write, together
                     currentPlayer.Team = teamName;
                     currentPlayer.TeamPW = password;
                     currentPlayer.CTurf = false;
@@ -1297,8 +1359,7 @@ public class TeamCornerLocation : BaseLocation
                             Loc.Get("team.news_joined", currentPlayer.DisplayName, teamName), "team");
 
                     terminal.SetColor("darkgray");
-                    terminal.WriteLine(Loc.Get("ui.press_enter"));
-                    await terminal.ReadKeyAsync();
+                    await terminal.PressAnyKey();
                     return;
                 }
                 else if (exists)
@@ -1333,7 +1394,7 @@ public class TeamCornerLocation : BaseLocation
 
         if (npcPassword == teamMember.TeamPW)
         {
-            if (await RefuseJoinIfFull(teamName)) return;
+            if (!await ClaimJoinSlot(teamName)) return;   // v1.1.14: online, the check and the write together
             currentPlayer.Team = teamName;
             currentPlayer.TeamPW = npcPassword;
             currentPlayer.CTurf = teamMember.CTurf;
@@ -1353,8 +1414,7 @@ public class TeamCornerLocation : BaseLocation
                     Loc.Get("team.news_joined", currentPlayer.DisplayName, teamName), "team");
 
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
         }
         else
         {
@@ -1442,8 +1502,7 @@ public class TeamCornerLocation : BaseLocation
                     Loc.Get("team.news_left", currentPlayer.DisplayName, oldTeam), "team");
 
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
         }
     }
 
@@ -1843,8 +1902,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine(Loc.Get("team.recruit_no_match", lookup));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -1868,8 +1926,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine(Loc.Get(key, chosen.DisplayName));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
         if (band == TeamSystem.RecruitmentBand.Refused)
@@ -1880,8 +1937,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine(Loc.Get($"team.recruit_refuse_hate_{idx + 1}", chosen.DisplayName));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -1959,8 +2015,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine(Loc.Get("team.team_full", MaxTeamSize));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -1976,8 +2031,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine(Loc.Get("team.recruit_unavailable_now", recruit.DisplayName));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
         if (!ReferenceEquals(liveRecruit, recruit))
@@ -2005,16 +2059,14 @@ public class TeamCornerLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("team.recruit_already_on_team", recruit.DisplayName));
                 terminal.WriteLine("");
                 terminal.SetColor("darkgray");
-                terminal.WriteLine(Loc.Get("ui.press_enter"));
-                await terminal.ReadKeyAsync();
+                await terminal.PressAnyKey();
                 return;
             }
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.recruit_unavailable_now", recruit.DisplayName));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
         if (liveBand == TeamSystem.RecruitmentBand.Refused)
@@ -2023,8 +2075,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine(Loc.Get("team.recruit_refuse_hate_1", recruit.DisplayName));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -2038,16 +2089,40 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine(Loc.Get("team.need_gold_recruit", $"{liveCost:N0}", $"{currentPlayer.Gold:N0}"));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
 
-        // Recruitment success
-        currentPlayer.Gold -= liveCost;
-        recruit.Team = currentPlayer.Team;
-        recruit.TeamPW = currentPlayer.TeamPW;
-        recruit.CTurf = currentPlayer.CTurf;
+        // v1.1.14: the last slot count and the hire under the membership gate (TeamMembershipGate), so a
+        // player's join or an NPC joining on its own cannot take the slot between the count and the hire.
+        // The count queries the saves and yields, so the NPC is looked up again after it.
+        bool full = false, gone = false;
+        await TeamMembershipGate.WaitAsync();
+        try
+        {
+            full = await TeamSlotsUsed(currentPlayer.Team) >= MaxTeamSize;
+            var live = full ? null : LiveTeamNpc(recruit);
+            gone = !full && (live == null || !string.IsNullOrEmpty(live.Team));
+            if (!full && !gone)
+            {
+                recruit = live!;
+                // Recruitment success
+                currentPlayer.Gold -= liveCost;
+                recruit.Team = currentPlayer.Team;
+                recruit.TeamPW = currentPlayer.TeamPW;
+                recruit.CTurf = currentPlayer.CTurf;
+            }
+        }
+        finally { TeamMembershipGate.Release(); }
+        if (full || gone)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine(full ? Loc.Get("team.team_full", MaxTeamSize) : Loc.Get("team.recruit_unavailable_now", recruit.DisplayName));
+            terminal.WriteLine("");
+            terminal.SetColor("darkgray");
+            await terminal.PressAnyKey();
+            return;
+        }
 
         terminal.WriteLine("");
         terminal.SetColor("bright_green");
@@ -2070,8 +2145,7 @@ public class TeamCornerLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     /// <summary>
@@ -2311,8 +2385,7 @@ public class TeamCornerLocation : BaseLocation
         terminal.WriteLine("");
 
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     /// <summary>
@@ -2616,8 +2689,7 @@ public class TeamCornerLocation : BaseLocation
         }
 
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     /// <summary>v1.1.12: the gear taken on a sack, saved at once: the NPC's side first, then the player's (a
@@ -2775,8 +2847,7 @@ public class TeamCornerLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     private static long ResurrectionCost(NPC npc) => npc.Level * 1000L;
@@ -2937,8 +3008,7 @@ public class TeamCornerLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     /// <summary>v1.1.12: whether a teammate is in the echo recruit list. An entry that is a team member's save key
@@ -3361,8 +3431,8 @@ public class TeamCornerLocation : BaseLocation
             return;
         }
 
-        // Unequip and add to player inventory
-        var unequipped = target.UnequipSlot(selectedSlot);
+        // Unequip and add to player inventory. v1.1.14: only once this process's claim on the piece lands
+        var unequipped = ClaimGearRecovery(target, selectedSlot, selectedItem.Name) ? target.UnequipSlot(selectedSlot) : null;
         if (unequipped != null)
         {
             target.RecalculateStats();
@@ -3432,6 +3502,7 @@ public class TeamCornerLocation : BaseLocation
                     cursedItems.Add(item.Name);
                     continue;
                 }
+                if (!ClaimGearRecovery(target, slot, item.Name)) continue;   // v1.1.14: another process took it first
 
                 int id = target.EquippedItems[slot];
                 var unequipped = target.UnequipSlot(slot);
@@ -3549,6 +3620,22 @@ public class TeamCornerLocation : BaseLocation
         }
     }
 
+    /// <summary>
+    /// v1.1.14: the latest war between the two teams since the cutoff that holds the per-opponent cooldown
+    /// (moved from ChallengeTeamWar). A war counts only if it is in both teams' history, so a war fought by a
+    /// removed team of either name does not hold the cooldown for the team now using that name.
+    /// </summary>
+    internal static async Task<TeamWarInfo?> RecentWarAgainst(SqlSaveBackend backend, string myTeam, string enemyTeam, DateTime cutoff)
+    {
+        var recentHistory = await backend.GetTeamWarHistory(myTeam, limit: 20);
+        var enemyWarIds = (await backend.GetTeamWarHistory(enemyTeam, limit: 100)).Select(w => w.Id).ToHashSet();
+        return recentHistory.FirstOrDefault(w =>
+            w.StartedAt > cutoff && w.Status != "abandoned" &&   // v1.1.12: a war that never ran does not count
+            enemyWarIds.Contains(w.Id) &&
+            ((w.ChallengerTeam == myTeam && w.DefenderTeam == enemyTeam) ||
+             (w.DefenderTeam == myTeam && w.ChallengerTeam == enemyTeam)));
+    }
+
     private async Task ChallengeTeamWar(SqlSaveBackend backend)
     {
         string myTeam = currentPlayer.Team;
@@ -3613,12 +3700,8 @@ public class TeamCornerLocation : BaseLocation
         // the same defender. Reads from the team_wars history rather than tracking
         // separate state — any war (won or lost, by any challenger from our team)
         // counts toward the cooldown.
-        var recentHistory = await backend.GetTeamWarHistory(myTeam, limit: 20);
         var cooldownCutoff = DateTime.UtcNow.AddHours(-GameConfig.TeamWarOpponentCooldownHours);
-        var recentVsThisOpponent = recentHistory.FirstOrDefault(w =>
-            w.StartedAt > cooldownCutoff && w.Status != "abandoned" &&   // v1.1.12: a war that never ran does not count
-            ((w.ChallengerTeam == myTeam && w.DefenderTeam == enemyTeam.TeamName) ||
-             (w.DefenderTeam == myTeam && w.ChallengerTeam == enemyTeam.TeamName)));
+        var recentVsThisOpponent = await RecentWarAgainst(backend, myTeam, enemyTeam.TeamName, cooldownCutoff);
         if (recentVsThisOpponent != null)
         {
             var hoursLeft = Math.Max(1, (int)Math.Ceiling((recentVsThisOpponent.StartedAt - cooldownCutoff).TotalHours));
@@ -3753,9 +3836,11 @@ public class TeamCornerLocation : BaseLocation
 
         bool weWon = myWins > enemyWins;
         string result = weWon ? "challenger_won" : "defender_won";
+        // v1.1.14: the whole score and result are stored before the flip; if the flip below fails, the stale
+        // cleanup (ExpireStaleTeamWars) settles the war by them, paying a win's spoils by transfer, once
+        await backend.RecordTeamWarResult(warId, myWins, enemyWins, result);
         // v1.1.12: paid or charged only if this guarded flip landed, as in the no-round path. Otherwise nothing
-        // changes hands here: the stale cleanup (ExpireStaleTeamWars) closes the war once, refunding the wager
-        // only if no round was recorded, so a won war can never pay twice.
+        // changes hands here: the stale cleanup closes the war once, so a won war can never pay twice.
         if (!await backend.CompleteTeamWar(warId, result))
         {
             string? status = await backend.GetTeamWarStatus(warId);
@@ -3774,7 +3859,7 @@ public class TeamCornerLocation : BaseLocation
         {
             // v0.57.17 — reduced from wager*2 (net +100% per win) to wager*1.5 (net +50%
             // per win) so even within the daily cap each win is less of a printer.
-            long reward = (long)(wager * GameConfig.TeamWarRewardMultiplier);
+            long reward = SqlSaveBackend.TeamWarSpoils(wager);
             currentPlayer.Gold += reward;
             WriteSectionHeader(Loc.Get("team_corner.your_team_wins"), "bright_green");
             terminal.SetColor("yellow");
@@ -4062,14 +4147,14 @@ public class TeamCornerLocation : BaseLocation
         if (amount <= 0) return;
 
         // v1.1.12: the vault row was credited at once but the gold left the player only in memory, so a
-        // crash before the next autosave kept both. Now the gold is taken and saved first, then the vault
-        // is credited (capacity checked in the SQL); if the credit fails the gold comes back.
+        // crash before the next autosave kept both. v1.1.14: the save without the gold and the vault credit
+        // (capacity checked in the SQL) are one transaction, so a crash between them cannot lose the gold;
+        // if it does not land, nothing was written and the gold comes back in memory.
         currentPlayer.Gold -= amount;
-        bool deposited = await ForcePlayerSave() && await backend.DepositToTeamVault(teamName, amount);
+        bool deposited = await SaveSystem.Instance.SaveWithTeamVaultDeposit(currentPlayer, teamName, amount);
         if (!deposited)
         {
             currentPlayer.Gold += amount;
-            await ForcePlayerSave();
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.vault_full"));
             await Task.Delay(1500);

@@ -314,7 +314,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("  ═══════════════════════════════════════", "dark_cyan");
             terminal.WriteLine("");
 
-            await terminal.GetInputAsync($"  {Loc.Get("ui.press_enter")}");
+            await terminal.PressAnyKey();
         }
 
         /// <summary>
@@ -352,7 +352,7 @@ namespace UsurperRemake.Systems
             StoryProgressionSystem.Instance.SetStoryFlag("all_seals_collected", true);
             StoryProgressionSystem.Instance.SetStoryFlag("true_ending_possible", true);
 
-            await terminal.GetInputAsync($"  {Loc.Get("ui.press_enter")}");
+            await terminal.PressAnyKey();
         }
 
         /// <summary>

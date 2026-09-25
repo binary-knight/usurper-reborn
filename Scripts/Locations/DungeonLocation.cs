@@ -301,8 +301,7 @@ public class DungeonLocation : BaseLocation
 
             term.WriteLine("");
             term.SetColor("darkgray");
-            term.Write(Loc.Get("dungeon.press_enter_continue"));
-            await term.ReadKeyAsync();
+            await term.PressAnyKey(Loc.Get("dungeon.press_enter_continue"));
         }
 
         // Refresh bounty board quests based on player level
@@ -1881,7 +1880,7 @@ public class DungeonLocation : BaseLocation
 
         term.WriteLine("");
         term.SetColor("gray");
-        await term.GetInputAsync(Loc.Get("dungeon.press_enter_continue"));
+        await term.PressAnyKey(Loc.Get("dungeon.press_enter_continue"));
     }
 
     /// <summary>
@@ -2579,18 +2578,19 @@ public class DungeonLocation : BaseLocation
         if (currentPlayer != null && currentPlayer.IsBloodMoon)
         {
             terminal.SetColor("red");
-            terminal.WriteLine($"  {Loc.Get("dungeon.blood_moon_atmosphere")}");
+            UsurperRemake.UI.UIHelper.WriteWrapped(terminal, Loc.Get("dungeon.blood_moon_atmosphere"), "  ");
             terminal.WriteLine("");
         }
 
         // Room description
+        // v1.1.14: wrap at word boundaries, not at the terminal's 80th column.
         terminal.SetColor("white");
-        terminal.WriteLine(room.Description);
+        UsurperRemake.UI.UIHelper.WriteWrapped(terminal, room.Description);
         terminal.WriteLine("");
 
         // Atmospheric text (builds tension)
         terminal.SetColor("gray");
-        terminal.WriteLine(room.AtmosphereText);
+        UsurperRemake.UI.UIHelper.WriteWrapped(terminal, room.AtmosphereText);
         terminal.WriteLine("");
 
         // Mystery breadcrumbs — early floors hint at something deeper (v0.49.6)
@@ -2608,7 +2608,7 @@ public class DungeonLocation : BaseLocation
                 Loc.Get("dungeon.breadcrumb_8"),
             };
             terminal.SetColor("dark_magenta");
-            terminal.WriteLine($"  {breadcrumbs[Random.Shared.Next(breadcrumbs.Length)]}");
+            UsurperRemake.UI.UIHelper.WriteWrapped(terminal, breadcrumbs[Random.Shared.Next(breadcrumbs.Length)], "  ");
             terminal.SetColor("white");
             terminal.WriteLine("");
         }
@@ -2656,9 +2656,14 @@ public class DungeonLocation : BaseLocation
 
         // Line 2: Theme
         terminal.SetColor(GetThemeColor(currentFloor.Theme));
-        terminal.Write($" {GetThemeShortName(currentFloor.Theme)}");
+        string themeName = GetThemeShortName(currentFloor.Theme);
+        terminal.Write($" {themeName}");
         terminal.SetColor("gray");
-        terminal.WriteLine($" | {room.Description}");
+        // v1.1.14: wrap the description at word boundaries after the theme prefix.
+        var descLines = UsurperRemake.UI.UIHelper.WordWrap(room.Description, UsurperRemake.UI.UIHelper.WrapWidth - 1, themeName.Length + 3);
+        terminal.WriteLine($" | {descLines[0]}");
+        foreach (var line in descLines.Skip(1))
+            terminal.WriteLine($" {line}");
 
         // Blood Moon atmosphere (v0.52.0)
         if (player != null && player.IsBloodMoon)
@@ -2939,7 +2944,7 @@ public class DungeonLocation : BaseLocation
         }
         else
         {
-            terminal.Write($"{Loc.Get("dungeon.bbs_danger")}: ");
+            terminal.Write(Loc.Get("dungeon.bbs_danger")); // v1.1.14: the label already ends in ": "
             for (int i = 0; i < room.DangerRating; i++) terminal.Write("*");
             for (int i = room.DangerRating; i < 3; i++) terminal.Write(".");
         }
@@ -4185,7 +4190,7 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine("");
 
         terminal.SetColor("gray");
-        await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+        await terminal.PressAnyKey();
     }
 
     private string GetChapterName(StoryChapter chapter)
@@ -5317,7 +5322,7 @@ public class DungeonLocation : BaseLocation
         {
             WriteBoxHeader(Loc.Get("dungeon.boss_encounter"), "red", 51);
             terminal.WriteLine("");
-            terminal.WriteLine(room.Description);
+            UsurperRemake.UI.UIHelper.WriteWrapped(terminal, room.Description); // v1.1.14
 
             // Check for Old God boss encounters on specific floors
             bool hadOldGodEncounter = await TryOldGodBossEncounter(player!, room);
@@ -6017,10 +6022,10 @@ public class DungeonLocation : BaseLocation
                 await SecretBossEncounter();
                 break;
             case DungeonEventType.Settlement:
-                await SettlementEncounter();
+                await SettlementEncounter(room);
                 break;
             default:
-                await RandomDungeonEvent();
+                await RandomDungeonEvent(room);   // v1.1.14: a chest or shrine it picks waits for the choice
                 break;
         }
     }
@@ -10662,7 +10667,7 @@ public class DungeonLocation : BaseLocation
 
             // Skip text rendering in Electron mode
             ElectronBridge.EmitPressAnyKey();
-            await terminal.GetInput("");
+            await terminal.GetInput(""); // v1.1.14: pause-exempt: Electron branch (shelved client); the overlay already got EmitPressAnyKey
             return;
         }
 
@@ -11281,8 +11286,9 @@ public class DungeonLocation : BaseLocation
 
         var (selectedSlot, selectedItem) = equippedSlots[idx - 1];
 
-        // Unequip and give to player. v1.1.13: only what came off (a cursed item stays on, and was copied)
-        var unequipped = target.UnequipSlot(selectedSlot);
+        // Unequip and give to player. v1.1.13: only what came off (a cursed item stays on, and was copied).
+        // v1.1.14: and only once this process's claim on the piece lands
+        var unequipped = ClaimGearRecovery(target, selectedSlot, selectedItem.Name) ? target.UnequipSlot(selectedSlot) : null;
         if (unequipped == null)
         {
             terminal.SetColor("red");
@@ -13143,7 +13149,7 @@ public class DungeonLocation : BaseLocation
 
                 // In Electron mode, skip text rendering — graphical overlay handles it
                 ElectronBridge.EmitPressAnyKey();
-                await terminal.GetInput("");
+                await terminal.GetInput(""); // v1.1.14: pause-exempt: Electron branch (shelved client); the overlay already got EmitPressAnyKey
                 return;
             }
         }
@@ -13342,8 +13348,7 @@ public class DungeonLocation : BaseLocation
             return;
         }
 
-        terminal.WriteLine($" {Loc.Get("dungeon.press_enter_continue")}");
-        await terminal.GetInput("");
+        await terminal.PressAnyKey(Loc.Get("dungeon.press_enter_continue"));
     }
 
     private async Task ShowDungeonMapScreenReader()
@@ -14772,11 +14777,11 @@ public class DungeonLocation : BaseLocation
     /// <summary>
     /// Settlement encounter — safe outpost with NPC, healing, trading, lore
     /// </summary>
-    private async Task SettlementEncounter()
+    private async Task SettlementEncounter(DungeonRoom? room = null)
     {
         var player = GetCurrentPlayer();
         var settlement = DungeonSettlementData.GetSettlement(currentDungeonLevel);
-        if (settlement == null) { await RandomDungeonEvent(); return; }
+        if (settlement == null) { await RandomDungeonEvent(room); return; }   // v1.1.14: the room, as in RunRoomEvent
 
         // Track first visit
         bool firstVisit = !player.VisitedSettlements.Contains(settlement.Id);
@@ -15489,10 +15494,17 @@ public class DungeonLocation : BaseLocation
     /// <summary>
     /// Random fallback dungeon event
     /// </summary>
-    private async Task RandomDungeonEvent()
+    private async Task RandomDungeonEvent(DungeonRoom? room = null)
     {
         // Pick a random existing event
         var eventType = dungeonRandom.Next(6);
+        // v1.1.14: a chest or shrine picked here is spent by the player's choice, as a chest or shrine room
+        // is (HandleRoomEvent), and not before the prompt; a lost connection there leaves it for later
+        if (room != null && eventType is 0 or 2)
+        {
+            room.EventCompleted = false;
+            _roomEventAwaitingChoice = room;
+        }
         switch (eventType)
         {
             case 0: await TreasureChestEncounter(); break;
@@ -16135,7 +16147,7 @@ public class DungeonLocation : BaseLocation
         await Task.Delay(1500);
 
         terminal.SetColor("gray");
-        await terminal.GetInputAsync(Loc.Get("dungeon.seal_press_enter"));
+        await terminal.PressAnyKey(Loc.Get("dungeon.seal_press_enter"));
 
         // Collect the seal using the SevenSealsSystem
         var sealSystem = SevenSealsSystem.Instance;
@@ -17920,10 +17932,13 @@ public class DungeonLocation : BaseLocation
         sb.AppendLine();
 
         // Description + atmosphere
+        // v1.1.14: word-wrapped, two-space indent on every line.
         if (!string.IsNullOrEmpty(room.Description))
-            sb.AppendLine($"\u001b[37m  {room.Description}\u001b[0m");
+            foreach (var line in UsurperRemake.UI.UIHelper.WordWrap(room.Description, UsurperRemake.UI.UIHelper.WrapWidth - 2))
+                sb.AppendLine($"\u001b[37m  {line}\u001b[0m");
         if (!string.IsNullOrEmpty(room.AtmosphereText))
-            sb.AppendLine($"\u001b[90m  {room.AtmosphereText}\u001b[0m");
+            foreach (var line in UsurperRemake.UI.UIHelper.WordWrap(room.AtmosphereText, UsurperRemake.UI.UIHelper.WrapWidth - 2))
+                sb.AppendLine($"\u001b[90m  {line}\u001b[0m");
         sb.AppendLine();
 
         // Room contents

@@ -281,17 +281,23 @@ public class OwnerProcessTier2Tests : IDisposable
     }
 
     [Fact]
-    public void TheOwnersSet_IsEveryUnappliedEdit_AndTheLastDaysApplied()
+    public void TheOwnersSet_IsEveryUnappliedEdit_AndEveryAppliedEditNotYetPruned()
     {
         long oldUnapplied = _db.AppendWorldEdit("forget_character", "{}", "t");
         long oldApplied = _db.AppendWorldEdit("forget_character", "{}", "t");
         long recentApplied = _db.AppendWorldEdit("forget_character", "{}", "t");
         long recent = _db.AppendWorldEdit("vacate_throne", "{}", "t");
-        _db.MarkWorldEditsApplied(new[] { oldApplied, recentApplied }, "owner").Should().Be(2);
+        long pruneDue = _db.AppendWorldEdit("forget_character", "{}", "t");
+        _db.MarkWorldEditsApplied(new[] { oldApplied, recentApplied, pruneDue }, "owner").Should().Be(3);
         Exec($"UPDATE world_edits SET created_at = datetime('now', '-3 days') WHERE id IN ({oldUnapplied}, {oldApplied});");
+        Exec($"UPDATE world_edits SET applied_at = datetime('now', '-2 days') WHERE id = {oldApplied};");
+        Exec($"UPDATE world_edits SET created_at = datetime('now', '-9 days'), applied_at = datetime('now', '-8 days') WHERE id = {pruneDue};");
 
-        _db.GetWorldEditsToApply().Select(e => e.Id).Should().Equal(oldUnapplied, recentApplied, recent);
+        // v1.1.14: re-applied until pruned (7 days after it was applied), not only for 24 hours
+        _db.GetWorldEditsToApply().Select(e => e.Id).Should().Equal(oldUnapplied, oldApplied, recentApplied, recent);
         _db.GetUnappliedWorldEditsOlderThan(24).Select(e => e.Id).Should().Equal(oldUnapplied);
+        _db.PruneAppliedWorldEdits(WorldEditLog.PruneAppliedDays).Should().Be(1, "the one edit left out of the set is the one the prune deletes");
+        _db.GetWorldEditsToApply().Select(e => e.Id).Should().Equal(oldUnapplied, oldApplied, recentApplied, recent);
 
         string first = Scalar($"SELECT applied_at FROM world_edits WHERE id = {oldApplied};")!;
         _db.MarkWorldEditsApplied(new[] { oldApplied }, "other").Should().Be(0, "an applied edit keeps its first mark");
@@ -425,7 +431,7 @@ public class OwnerProcessTier2Tests : IDisposable
         await _db.SaveWorldState(OnlineStateManager.KEY_NPCS, stale);
 
         var sim = OwnerSim("owner_t", clean);
-        _db.UpdateWorldSimHeartbeat("someone_else");   // the lock has moved on
+        _db.TakeOverWorldSimLock("someone_else");   // the lock has moved on (v1.1.14: a heartbeat no longer takes a held lock)
         sim.ReapplyWorldEdits().Should().BeEmpty();
         await SimSave(sim);
 
@@ -494,9 +500,12 @@ public class OwnerProcessTier2Tests : IDisposable
 
         var sim = Source("Systems", "WorldSimService.cs");
         int run = sim.IndexOf("public async Task RunAsync", StringComparison.Ordinal);
-        int loaded = sim.IndexOf("LoadUsedNamesState();", run, StringComparison.Ordinal);
-        sim.IndexOf("ReapplyWorldEdits();", run, StringComparison.Ordinal).Should().BeGreaterThan(loaded, "after every record is loaded")
-            .And.BeLessThan(sim.IndexOf("while (!cancellationToken.IsCancellationRequested)", run, StringComparison.Ordinal));
+        // v1.1.14: the loads and the re-apply moved to LoadSharedRecordsAsync, which RunAsync calls before its loop
+        sim.IndexOf("await LoadSharedRecordsAsync();", run, StringComparison.Ordinal)
+            .Should().BeLessThan(sim.IndexOf("while (!cancellationToken.IsCancellationRequested)", run, StringComparison.Ordinal));
+        int records = sim.IndexOf("private async Task LoadSharedRecordsAsync()", StringComparison.Ordinal);
+        int loaded = sim.IndexOf("LoadUsedNamesState();", records, StringComparison.Ordinal);
+        sim.IndexOf("ReapplyWorldEdits();", records, StringComparison.Ordinal).Should().BeGreaterThan(loaded, "after every record is loaded");
         int save = sim.IndexOf("private async Task SaveWorldState()", StringComparison.Ordinal);
         int reload = sim.IndexOf("await LoadWorldState();", save, StringComparison.Ordinal);
         int courtReload = sim.IndexOf("Royal court modified by player", save, StringComparison.Ordinal);
@@ -609,7 +618,7 @@ public class OwnerProcessTier2Tests : IDisposable
         int save = src.IndexOf("public async Task SaveSharedNPCs(", StringComparison.Ordinal);
         src.IndexOf("!WorldEditLog.IsOwnerProcess(sql)", save, StringComparison.Ordinal)
             .Should().BeLessThan(src.IndexOf("await backend.SaveWorldState(KEY_NPCS, json);", save, StringComparison.Ordinal));
-        Source("Systems", "SaveSystem.cs").Should().Contain("await OnlineStateManager.Instance.SaveSharedNPCs(sharedNpcData);");
+        Source("Systems", "SaveSystem.cs").Should().Contain("await OnlineStateManager.Instance.SaveSharedNPCs(sharedNpcData, generation);");   // v1.1.14: with its generation
         Source("Core", "GameEngine.cs").Split("OnlineStateManager.Instance.NoteNpcBaseline();").Length.Should().Be(3, "both online loads record the baseline");
     }
 

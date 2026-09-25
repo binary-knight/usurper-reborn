@@ -247,7 +247,7 @@ public class PantheonLocation : BaseLocation
         }
 
         terminal.WriteLine("");
-        await terminal.GetInputAsync(Loc.Get("pantheon.press_enter_return"));
+        await terminal.PressAnyKey(Loc.Get("pantheon.press_enter_return"));
     }
 
     #endregion
@@ -296,7 +296,7 @@ public class PantheonLocation : BaseLocation
         }
 
         terminal.WriteLine("");
-        await terminal.GetInputAsync(Loc.Get("pantheon.press_enter_return"));
+        await terminal.PressAnyKey(Loc.Get("pantheon.press_enter_return"));
     }
 
     #endregion
@@ -525,7 +525,7 @@ public class PantheonLocation : BaseLocation
         {
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("pantheon.no_deeds_left"), "gray");
-            await terminal.GetInputAsync(Loc.Get("pantheon.press_enter_return"));
+            await terminal.PressAnyKey(Loc.Get("pantheon.press_enter_return"));
             return;
         }
 
@@ -604,7 +604,7 @@ public class PantheonLocation : BaseLocation
         if (targets.Count == 0)
         {
             terminal.WriteLine(Loc.Get("pantheon.no_mortals_to_recruit"), "gray");
-            await terminal.GetInputAsync(Loc.Get("pantheon.press_enter_return"));
+            await terminal.PressAnyKey(Loc.Get("pantheon.press_enter_return"));
             return;
         }
 
@@ -683,7 +683,7 @@ public class PantheonLocation : BaseLocation
             }
         }
 
-        await terminal.GetInputAsync(Loc.Get("pantheon.press_enter_continue"));
+        await terminal.PressAnyKey(Loc.Get("pantheon.press_enter_continue"));
     }
 
     private async Task DeedBlessFollower()
@@ -693,7 +693,7 @@ public class PantheonLocation : BaseLocation
         if (believers.Count == 0)
         {
             terminal.WriteLine(Loc.Get("pantheon.no_believers_to_bless"), "gray");
-            await terminal.GetInputAsync(Loc.Get("pantheon.press_enter_return"));
+            await terminal.PressAnyKey(Loc.Get("pantheon.press_enter_return"));
             return;
         }
 
@@ -740,7 +740,7 @@ public class PantheonLocation : BaseLocation
         terminal.WriteLine(Loc.Get("pantheon.exp_gain", expGain));
         RecalculateGodLevel();
 
-        await terminal.GetInputAsync(Loc.Get("pantheon.press_enter_continue"));
+        await terminal.PressAnyKey(Loc.Get("pantheon.press_enter_continue"));
     }
 
     private async Task DeedSmiteMortal()
@@ -795,7 +795,7 @@ public class PantheonLocation : BaseLocation
         if (targets.Count == 0)
         {
             terminal.WriteLine(Loc.Get("pantheon.no_mortals_to_smite"), "gray");
-            await terminal.GetInputAsync(Loc.Get("pantheon.press_enter_return"));
+            await terminal.PressAnyKey(Loc.Get("pantheon.press_enter_return"));
             return;
         }
 
@@ -840,7 +840,7 @@ public class PantheonLocation : BaseLocation
         terminal.WriteLine(Loc.Get("pantheon.exp_gain", expGain));
         RecalculateGodLevel();
 
-        await terminal.GetInputAsync(Loc.Get("pantheon.press_enter_continue"));
+        await terminal.PressAnyKey(Loc.Get("pantheon.press_enter_continue"));
     }
 
     private async Task DeedPoisonRelationship()
@@ -853,7 +853,7 @@ public class PantheonLocation : BaseLocation
         if (npcs.Count < 2)
         {
             terminal.WriteLine(Loc.Get("pantheon.not_enough_mortals"), "gray");
-            await terminal.GetInputAsync(Loc.Get("pantheon.press_enter_return"));
+            await terminal.PressAnyKey(Loc.Get("pantheon.press_enter_return"));
             return;
         }
 
@@ -891,7 +891,7 @@ public class PantheonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("pantheon.poison_failure"));
         }
 
-        await terminal.GetInputAsync(Loc.Get("pantheon.press_enter_continue"));
+        await terminal.PressAnyKey(Loc.Get("pantheon.press_enter_continue"));
     }
 
     private async Task DeedFreePrisoner()
@@ -903,7 +903,7 @@ public class PantheonLocation : BaseLocation
         if (prisoners.Count == 0)
         {
             terminal.WriteLine(Loc.Get("pantheon.no_prisoners"), "gray");
-            await terminal.GetInputAsync(Loc.Get("pantheon.press_enter_return"));
+            await terminal.PressAnyKey(Loc.Get("pantheon.press_enter_return"));
             return;
         }
 
@@ -923,7 +923,7 @@ public class PantheonLocation : BaseLocation
         terminal.WriteLine(Loc.Get("pantheon.exp_gain", GameConfig.GodFreePrisonerExp));
         RecalculateGodLevel();
 
-        await terminal.GetInputAsync(Loc.Get("pantheon.press_enter_continue"));
+        await terminal.PressAnyKey(Loc.Get("pantheon.press_enter_continue"));
     }
 
     private async Task DeedProclamation()
@@ -962,7 +962,7 @@ public class PantheonLocation : BaseLocation
         terminal.WriteLine(Loc.Get("pantheon.exp_gain", GameConfig.GodProclamationExp));
         RecalculateGodLevel();
 
-        await terminal.GetInputAsync(Loc.Get("pantheon.press_enter_continue"));
+        await terminal.PressAnyKey(Loc.Get("pantheon.press_enter_continue"));
     }
 
     #endregion
@@ -1022,7 +1022,7 @@ public class PantheonLocation : BaseLocation
         }
 
         terminal.WriteLine("");
-        await terminal.GetInputAsync(Loc.Get("pantheon.press_enter_return"));
+        await terminal.PressAnyKey(Loc.Get("pantheon.press_enter_return"));
     }
 
     #endregion
@@ -1053,7 +1053,7 @@ public class PantheonLocation : BaseLocation
         }
 
         terminal.WriteLine("");
-        await terminal.GetInputAsync(Loc.Get("pantheon.press_enter_return"));
+        await terminal.PressAnyKey(Loc.Get("pantheon.press_enter_return"));
     }
 
     #endregion
@@ -1083,7 +1083,7 @@ public class PantheonLocation : BaseLocation
         terminal.SetColor("bright_cyan");
         terminal.WriteLine(Loc.Get("pantheon.comment_success"));
 
-        await terminal.GetInputAsync(Loc.Get("pantheon.press_enter_return"));
+        await terminal.PressAnyKey(Loc.Get("pantheon.press_enter_return"));
     }
 
     #endregion
@@ -1153,7 +1153,7 @@ public class PantheonLocation : BaseLocation
         }
 
         terminal.WriteLine("");
-        await terminal.GetInputAsync(Loc.Get("pantheon.press_enter_return"));
+        await terminal.PressAnyKey(Loc.Get("pantheon.press_enter_return"));
     }
 
     #endregion
@@ -1269,7 +1269,7 @@ public class PantheonLocation : BaseLocation
         terminal.WriteLine(Loc.Get("pantheon.renounce_new_life"));
         terminal.WriteLine("");
 
-        await terminal.GetInputAsync(Loc.Get("pantheon.renounce_begin_anew"));
+        await terminal.PressAnyKey(Loc.Get("pantheon.renounce_begin_anew"));
         return true;
     }
 

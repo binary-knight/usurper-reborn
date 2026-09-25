@@ -898,7 +898,7 @@ namespace UsurperRemake.Systems
                 OceanPhilosophySystem.Instance.CollectFragment(WaveFragment.TheForgetting);
             }
 
-            await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+            await terminal.PressAnyKey();
         }
 
         private async Task DisplayPuzzleFailure(PuzzleInstance puzzle, Character player, TerminalEmulator terminal)
