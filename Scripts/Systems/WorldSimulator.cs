@@ -6418,7 +6418,7 @@ public class WorldSimulator
             // guarded court change (only when something changed); the in-memory court is then the written one
             string expected = current.Name;
             OnlineStateManager.ApplyKingChangeAsync(OnlineStateManager.CourtStoreFor(CastleLocation.TreasuryOsm()),
-                king => king.Name == expected && CourtPoliticsTick(king)).GetAwaiter().GetResult();
+                working => working.Name == expected && CourtPoliticsTick(working)).GetAwaiter().GetResult();
         }
         catch (Exception ex)
             {
@@ -6426,26 +6426,29 @@ public class WorldSimulator
             }
     }
 
-    /// <summary>v1.1.13: one tick of court politics on the court's working copy (see ProcessRoyalCourtPolitics).</summary>
-    private bool CourtPoliticsTick(King king)
+    /// <summary>
+    /// v1.1.13: one tick of court politics on the court's working copy (see ProcessRoyalCourtPolitics). The
+    /// copy is named working here and in the methods it calls, as ApplyKingChangeAsync names it.
+    /// </summary>
+    private bool CourtPoliticsTick(King working)
     {
         {
             // NPC guard recruitment (10% chance per tick if there are openings)
-            if (king.Guards.Count < King.MaxNPCGuards && (float)Random.Shared.NextDouble() < 0.10f)
+            if (working.Guards.Count < King.MaxNPCGuards && (float)Random.Shared.NextDouble() < 0.10f)
             {
-                ProcessNPCGuardRecruitment(king);
+                ProcessNPCGuardRecruitment(working);
             }
 
             // Court intrigue processing (5% chance per tick)
             if ((float)Random.Shared.NextDouble() < 0.05f)
             {
-                ProcessCourtIntrigue(king);
+                ProcessCourtIntrigue(working);
             }
 
             // Plot progression (all active plots advance)
-            foreach (var plot in king.ActivePlots.ToList())
+            foreach (var plot in working.ActivePlots.ToList())
             {
-                AdvancePlot(king, plot);
+                AdvancePlot(working, plot);
             }
         }
         return true;
@@ -6454,7 +6457,7 @@ public class WorldSimulator
     /// <summary>
     /// NPCs may apply to become royal guards if positions are available
     /// </summary>
-    private void ProcessNPCGuardRecruitment(King king)
+    private void ProcessNPCGuardRecruitment(King working)
     {
         // Find NPCs who might want to become guards:
         // - Not already a guard
@@ -6470,7 +6473,7 @@ public class WorldSimulator
                    string.IsNullOrEmpty(n.Team) &&
                    !n.King &&
                    !n.IsStoryNPC &&
-                   !king.Guards.Any(g => g.Name == n.Name) &&
+                   !working.Guards.Any(g => g.Name == n.Name) &&
                    (n.Brain?.Personality?.Trustworthiness > 0.5f ||
                     n.Brain?.Personality?.Loyalty > 0.6f))
             .OrderByDescending(n => n.Level)
@@ -6483,7 +6486,7 @@ public class WorldSimulator
         var applicant = candidates[Random.Shared.Next(0, candidates.Count)];
 
         // Check if treasury can afford the recruitment cost
-        if (king.Treasury < GameConfig.GuardRecruitmentCost)
+        if (working.Treasury < GameConfig.GuardRecruitmentCost)
         {
             // GD.Print($"[WorldSim] {applicant.Name} wanted to join guards but treasury is low");
             return;
@@ -6500,8 +6503,8 @@ public class WorldSimulator
             Loyalty = 70 + Random.Shared.Next(0, 31)  // New recruits have 70-100 loyalty
         };
 
-        king.Guards.Add(guard);
-        king.Treasury -= GameConfig.GuardRecruitmentCost;
+        working.Guards.Add(guard);
+        working.Treasury -= GameConfig.GuardRecruitmentCost;
 
         NewsSystem.Instance?.Newsy(false, $"{applicant.Name} has joined the Royal Guard!");
         // GD.Print($"[WorldSim] {applicant.Name} recruited as Royal Guard");
@@ -6510,20 +6513,20 @@ public class WorldSimulator
     /// <summary>
     /// Process court intrigue - unhappy court members may start plots
     /// </summary>
-    private void ProcessCourtIntrigue(King king)
+    private void ProcessCourtIntrigue(King working)
     {
         // Initialize court if empty
-        if (king.CourtMembers.Count == 0)
+        if (working.CourtMembers.Count == 0)
         {
-            InitializeCourtMembers(king);
+            InitializeCourtMembers(working);
         }
 
         // Check for new plots starting
-        var unhappyMembers = king.CourtMembers
+        var unhappyMembers = working.CourtMembers
             .Where(c => c.LoyaltyToKing < 40 && !c.IsPlotting)
             .ToList();
 
-        if (unhappyMembers.Count >= 2 && king.ActivePlots.Count < 3)
+        if (unhappyMembers.Count >= 2 && working.ActivePlots.Count < 3)
         {
             // Start a new plot
             var conspirators = unhappyMembers.Take(Random.Shared.Next(2, (Math.Min(4, unhappyMembers.Count)) + 1)).ToList();
@@ -6540,12 +6543,12 @@ public class WorldSimulator
             {
                 PlotType = plotType,
                 Conspirators = conspirators.Select(c => c.Name).ToList(),
-                Target = king.Name,
+                Target = working.Name,
                 Progress = 10 + Random.Shared.Next(0, 21),
                 StartDate = DateTime.Now
             };
 
-            king.ActivePlots.Add(plot);
+            working.ActivePlots.Add(plot);
             foreach (var conspirator in conspirators)
             {
                 conspirator.IsPlotting = true;
@@ -6558,7 +6561,7 @@ public class WorldSimulator
     /// <summary>
     /// Initialize court members for a new king
     /// </summary>
-    private void InitializeCourtMembers(King king)
+    private void InitializeCourtMembers(King working)
     {
         // Create default court positions
         var roles = new[] { "Royal Advisor", "Court Steward", "Marshal", "Spymaster", "Treasurer" };
@@ -6575,7 +6578,7 @@ public class WorldSimulator
                 LoyaltyToKing = 50 + Random.Shared.Next(0, 41),
                 JoinedCourt = DateTime.Now
             };
-            king.CourtMembers.Add(member);
+            working.CourtMembers.Add(member);
         }
     }
 
@@ -6594,7 +6597,7 @@ public class WorldSimulator
     /// <summary>
     /// Advance a plot toward completion
     /// </summary>
-    private void AdvancePlot(King king, CourtIntrigue plot)
+    private void AdvancePlot(King working, CourtIntrigue plot)
     {
         if (plot.IsDiscovered) return;
 
@@ -6611,11 +6614,11 @@ public class WorldSimulator
             // Conspirators go to prison
             foreach (var conspirator in plot.Conspirators)
             {
-                var member = king.CourtMembers.FirstOrDefault(m => m.Name == conspirator);
+                var member = working.CourtMembers.FirstOrDefault(m => m.Name == conspirator);
                 if (member != null)
                 {
                     member.IsPlotting = false;
-                    king.CourtMembers.Remove(member);
+                    working.CourtMembers.Remove(member);
                 }
             }
 
@@ -6623,56 +6626,56 @@ public class WorldSimulator
             // which need "An" not "A". Lowercased so the helper still finds the vowel.
             string plotTypeLc = plot.PlotType.ToLower();
             NewsSystem.Instance?.Newsy(true,
-                $"{GameConfig.GetIndefiniteArticle(plotTypeLc)} {plotTypeLc} plot against {king.GetTitle()} {king.Name} was discovered!");
+                $"{GameConfig.GetIndefiniteArticle(plotTypeLc)} {plotTypeLc} plot against {working.GetTitle()} {working.Name} was discovered!");
 
-            king.ActivePlots.Remove(plot);
+            working.ActivePlots.Remove(plot);
             return;
         }
 
         // Plot triggers at 100%
         if (plot.Progress >= 100)
         {
-            ExecutePlot(king, plot);
+            ExecutePlot(working, plot);
         }
     }
 
     /// <summary>
     /// Execute a completed plot
     /// </summary>
-    private void ExecutePlot(King king, CourtIntrigue plot)
+    private void ExecutePlot(King working, CourtIntrigue plot)
     {
         switch (plot.PlotType)
         {
             case "Assassination":
                 // King "survives" but is weakened
-                king.Treasury /= 2;
+                working.Treasury /= 2;
                 NewsSystem.Instance?.Newsy(true,
-                    $"ASSASSINATION ATTEMPT! {king.GetTitle()} {king.Name} narrowly survived an assassination plot!");
+                    $"ASSASSINATION ATTEMPT! {working.GetTitle()} {working.Name} narrowly survived an assassination plot!");
                 break;
 
             case "Coup":
                 // Treasury stolen, guards desert
-                king.Treasury = Math.Max(0, king.Treasury - 10000);
-                var deserters = king.Guards.Where(g => g.Loyalty < 50).ToList();
+                working.Treasury = Math.Max(0, working.Treasury - 10000);
+                var deserters = working.Guards.Where(g => g.Loyalty < 50).ToList();
                 foreach (var guard in deserters)
                 {
-                    king.Guards.Remove(guard);
+                    working.Guards.Remove(guard);
                 }
                 NewsSystem.Instance?.Newsy(true,
-                    $"COUP ATTEMPT! {deserters.Count} guards joined the conspiracy against {king.GetTitle()} {king.Name}!");
+                    $"COUP ATTEMPT! {deserters.Count} guards joined the conspiracy against {working.GetTitle()} {working.Name}!");
                 break;
 
             case "Scandal":
                 // King's reputation damaged - harder to collect taxes
-                king.TaxRate = Math.Max(0, king.TaxRate - 10);
+                working.TaxRate = Math.Max(0, working.TaxRate - 10);
                 NewsSystem.Instance?.Newsy(true,
-                    $"SCANDAL! Shocking revelations about {king.GetTitle()} {king.Name} rock the kingdom!");
+                    $"SCANDAL! Shocking revelations about {working.GetTitle()} {working.Name} rock the kingdom!");
                 break;
 
             case "Sabotage":
                 // Treasury damaged
-                king.Treasury = Math.Max(0, king.Treasury - 5000);
-                king.MagicBudget = Math.Max(0, king.MagicBudget - 2000);
+                working.Treasury = Math.Max(0, working.Treasury - 5000);
+                working.MagicBudget = Math.Max(0, working.MagicBudget - 2000);
                 NewsSystem.Instance?.Newsy(true,
                     $"SABOTAGE! The royal treasury has been plundered!");
                 break;
@@ -6681,14 +6684,14 @@ public class WorldSimulator
         // Clear conspirators' plotting status
         foreach (var conspirator in plot.Conspirators)
         {
-            var member = king.CourtMembers.FirstOrDefault(m => m.Name == conspirator);
+            var member = working.CourtMembers.FirstOrDefault(m => m.Name == conspirator);
             if (member != null)
             {
                 member.IsPlotting = false;
             }
         }
 
-        king.ActivePlots.Remove(plot);
+        working.ActivePlots.Remove(plot);
     }
 
     /// <summary>

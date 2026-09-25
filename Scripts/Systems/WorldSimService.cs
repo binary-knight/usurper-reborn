@@ -1895,54 +1895,11 @@ namespace UsurperRemake.Systems
             var treasuryBefore = king.Treasury;
             // the recruitment date is not stored with the court; the in-memory guards carry it
             var recruited = king.Guards.GroupBy(g => g.Name).ToDictionary(g => g.Key, g => g.First().RecruitmentDate);
-            var news = new List<(bool, string)>();
+            var news = new List<(bool Important, string Text)>();
             var random = Random.Shared;
             bool done = await King.ProcessDailyActivitiesAsync(sqlBackend, court =>
             {
-                news.Clear();
-                // Process guard loyalty changes based on treasury health
-                long expenses = King.DailyExpensesOf(court);
-                var guardsToRemove = new List<RoyalGuardSaveData>();
-                foreach (var guard in court.Guards)
-                {
-                    if (court.Treasury < expenses)
-                        guard.Loyalty = Math.Max(0, guard.Loyalty - 5);
-                    else
-                        guard.Loyalty = Math.Min(100, guard.Loyalty + 1);
-
-                    if (recruited.TryGetValue(guard.Name, out var joined) && (DateTime.Now - joined).TotalDays > 30)
-                        guard.Loyalty = Math.Min(100, guard.Loyalty + 1);
-
-                    if (guard.Loyalty <= 10)
-                    {
-                        guardsToRemove.Add(guard);
-                        news.Add((true, $"Guard {guard.Name} has deserted the royal service!"));
-                    }
-                    else if (guard.Loyalty <= 25 && random.Next(100) < 10)
-                    {
-                        guardsToRemove.Add(guard);
-                        news.Add((true, $"Disgruntled guard {guard.Name} has abandoned their post!"));
-                    }
-                }
-                foreach (var deserter in guardsToRemove)
-                    court.Guards.Remove(deserter);
-
-                // Treasury crisis check
-                if (court.Treasury < King.DailyExpensesOf(court))
-                {
-                    foreach (var guard in court.Guards)
-                        guard.Loyalty = Math.Max(0, guard.Loyalty - 3);
-
-                    var escapedMonsters = court.MonsterGuards.Where(_ => random.Next(100) < 10).ToList();
-                    foreach (var monster in escapedMonsters)
-                    {
-                        news.Add((true, $"The unfed {monster.Name} has escaped from the castle moat!"));
-                        court.MonsterGuards.Remove(monster);
-                    }
-
-                    if (court.Guards.Count > 0 || court.MonsterGuards.Count > 0)
-                        news.Add((false, $"Royal treasury crisis! Guards and monsters go unpaid!"));
-                }
+                news = King.ApplyGuardUpkeep(court, recruited, random);   // v1.1.13: shared with single-player
                 return true;
             }, beforeWrite);
             if (!done) return false;

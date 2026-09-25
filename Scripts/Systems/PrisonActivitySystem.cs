@@ -298,13 +298,11 @@ public class PrisonActivitySystem
                 if (prisoner.DaysInPrison <= 0)
                 {
                     UsurperRemake.Systems.NPCSpawnSystem.Instance?.ReleaseNPC(prisoner);
-                    // Also remove from King's prisoner records to keep in sync
-                    var king = CastleLocation.GetCurrentKing();
-                    if (king?.Prisoners != null)
-                    {
-                        string prisonerName = prisoner.Name2 ?? prisoner.Name1;
-                        king.Prisoners.Remove(prisonerName);
-                    }
+                    // Also remove from King's prisoner records to keep in sync (v1.1.13: one guarded court change)
+                    string prisonerName = prisoner.Name2 ?? prisoner.Name1;
+                    if (CastleLocation.GetCurrentKing()?.Prisoners.ContainsKey(prisonerName) == true)
+                        CastleLocation.CourtChangeAsync(court => court.Prisoners.RemoveAll(p => p.CharacterName == prisonerName) > 0)
+                            .GetAwaiter().GetResult();
                     NewsSystem.Instance?.Newsy(true, $"{prisoner.Name} has been released from prison.");
                 }
             }

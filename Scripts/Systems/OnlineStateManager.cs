@@ -1426,11 +1426,7 @@ namespace UsurperRemake.Systems
             king.DesignatedHeir = royalCourt.DesignatedHeir;
 
             // Restore coronation date and tax alignment
-            if (!string.IsNullOrEmpty(royalCourt.CoronationDate))
-            {
-                if (DateTime.TryParse(royalCourt.CoronationDate, null, System.Globalization.DateTimeStyles.RoundtripKind, out var coronation))
-                    king.CoronationDate = coronation;
-            }
+            king.CoronationDate = CourtDate(royalCourt.CoronationDate) ?? king.CoronationDate;
             king.TaxAlignment = (GameConfig.TaxAlignment)royalCourt.TaxAlignment;
 
             // Restore monarch history
@@ -1477,23 +1473,8 @@ namespace UsurperRemake.Systems
                 }).ToList();
             }
 
-            if (royalCourt.Spouse != null)
-            {
-                var married = king.Spouse?.Name == royalCourt.Spouse.Name ? king.Spouse.MarriageDate : DateTime.Now;
-                king.Spouse = new RoyalSpouse
-                {
-                    Name = royalCourt.Spouse.Name,
-                    Sex = (CharacterSex)royalCourt.Spouse.Sex,
-                    OriginalFaction = (CourtFaction)royalCourt.Spouse.OriginalFaction,
-                    Dowry = royalCourt.Spouse.Dowry,
-                    Happiness = royalCourt.Spouse.Happiness,
-                    MarriageDate = married
-                };
-            }
-            else
-            {
-                king.Spouse = null; // Ensure old spouse doesn't carry over
-            }
+            // (none: the old spouse doesn't carry over)
+            king.Spouse = SpouseFromCourt(royalCourt.Spouse, king.Spouse?.Name == royalCourt.Spouse?.Name ? king.Spouse?.MarriageDate : null);
 
             if (royalCourt.ActivePlots != null)
             {
@@ -1590,12 +1571,26 @@ namespace UsurperRemake.Systems
             if (exact || !string.IsNullOrEmpty(royalCourt.LastProclamation))
                 king.LastProclamation = royalCourt.LastProclamation ?? "";
 
-            if (!string.IsNullOrEmpty(royalCourt.LastProclamationDate) &&
-                DateTime.TryParse(royalCourt.LastProclamationDate, out var procDate))
-                king.LastProclamationDate = procDate;
-            else if (exact)
-                king.LastProclamationDate = DateTime.MinValue;
+            king.LastProclamationDate = CourtDate(royalCourt.LastProclamationDate, roundtrip: false)
+                ?? (exact ? DateTime.MinValue : king.LastProclamationDate);
         }
+
+        /// <summary>v1.1.13: a date as a court record stores it (null: absent or unreadable).</summary>
+        internal static DateTime? CourtDate(string? stored, bool roundtrip = true) =>
+            !string.IsNullOrEmpty(stored) && (roundtrip
+                ? DateTime.TryParse(stored, null, System.Globalization.DateTimeStyles.RoundtripKind, out var d)
+                : DateTime.TryParse(stored, out d)) ? d : null;
+
+        /// <summary>v1.1.13: a court record's spouse as the King holds it (null: none); married: the kept marriage date, else now.</summary>
+        internal static RoyalSpouse? SpouseFromCourt(RoyalSpouseSaveData? stored, DateTime? married) => stored == null ? null : new RoyalSpouse
+        {
+            Name = stored.Name,
+            Sex = (CharacterSex)stored.Sex,
+            OriginalFaction = (CourtFaction)stored.OriginalFaction,
+            Dowry = stored.Dowry,
+            Happiness = stored.Happiness,
+            MarriageDate = married ?? DateTime.Now
+        };
 
         /// <summary>
         /// Load settlement state from world_state (authoritative source).

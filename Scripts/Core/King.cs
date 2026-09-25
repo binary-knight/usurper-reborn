@@ -204,6 +204,61 @@ public class King
         return true;
     }
 
+    /// <summary>
+    /// v1.1.13: the day's guard upkeep on a court record (the world sim's and single-player's day both use it):
+    /// loyalty by pay and service, desertions, and in a treasury crisis the loyalty loss and escaping monsters.
+    /// recruited holds the in-memory joining dates (the record has none). Returns the news, for after the write.
+    /// </summary>
+    internal static List<(bool Important, string Text)> ApplyGuardUpkeep(UsurperRemake.Systems.RoyalCourtSaveData court,
+        IReadOnlyDictionary<string, DateTime> recruited, Random random)
+    {
+        var news = new List<(bool Important, string Text)>();
+        // Process guard loyalty changes based on treasury health
+        long expenses = DailyExpensesOf(court);
+        var guardsToRemove = new List<UsurperRemake.Systems.RoyalGuardSaveData>();
+        foreach (var guard in court.Guards)
+        {
+            if (court.Treasury < expenses)
+                guard.Loyalty = Math.Max(0, guard.Loyalty - 5);
+            else
+                guard.Loyalty = Math.Min(100, guard.Loyalty + 1);
+
+            if (recruited.TryGetValue(guard.Name, out var joined) && (DateTime.Now - joined).TotalDays > 30)
+                guard.Loyalty = Math.Min(100, guard.Loyalty + 1);
+
+            if (guard.Loyalty <= 10)
+            {
+                guardsToRemove.Add(guard);
+                news.Add((true, $"Guard {guard.Name} has deserted the royal service!"));
+            }
+            else if (guard.Loyalty <= 25 && random.Next(100) < 10)
+            {
+                guardsToRemove.Add(guard);
+                news.Add((true, $"Disgruntled guard {guard.Name} has abandoned their post!"));
+            }
+        }
+        foreach (var deserter in guardsToRemove)
+            court.Guards.Remove(deserter);
+
+        // Treasury crisis check
+        if (court.Treasury < DailyExpensesOf(court))
+        {
+            foreach (var guard in court.Guards)
+                guard.Loyalty = Math.Max(0, guard.Loyalty - 3);
+
+            var escapedMonsters = court.MonsterGuards.Where(_ => random.Next(100) < 10).ToList();
+            foreach (var monster in escapedMonsters)
+            {
+                news.Add((true, $"The unfed {monster.Name} has escaped from the castle moat!"));
+                court.MonsterGuards.Remove(monster);
+            }
+
+            if (court.Guards.Count > 0 || court.MonsterGuards.Count > 0)
+                news.Add((false, $"Royal treasury crisis! Guards and monsters go unpaid!"));
+        }
+        return news;
+    }
+
     /// <summary>v1.1.13: the day's court activities applied to a court record; returns the prisoners released.</summary>
     internal static List<string> ApplyDailyActivities(UsurperRemake.Systems.RoyalCourtSaveData court)
     {
@@ -285,20 +340,6 @@ public class King
     }
 
     /// <summary>
-    /// Remove an NPC guard from the royal guard
-    /// </summary>
-    public bool RemoveGuard(string guardName)
-    {
-        var guard = Guards.Find(g => g.Name == guardName);
-        if (guard != null)
-        {
-            Guards.Remove(guard);
-            return true;
-        }
-        return false;
-    }
-
-    /// <summary>
     /// Add a monster guard - monsters cost more but are stronger. v1.1.13: on a court record, the monster
     /// joins and its cost leaves the treasury together.
     /// </summary>
@@ -339,48 +380,9 @@ public class King
     }
 
     /// <summary>
-    /// Remove a monster guard
-    /// </summary>
-    public bool RemoveMonsterGuard(string monsterName)
-    {
-        var monster = MonsterGuards.Find(m => m.Name == monsterName);
-        if (monster != null)
-        {
-            MonsterGuards.Remove(monster);
-            return true;
-        }
-        return false;
-    }
-
-    /// <summary>
     /// Get total guard count (NPC + Monster)
     /// </summary>
     public int TotalGuardCount => Guards.Count + MonsterGuards.Count;
-    
-    /// <summary>
-    /// Imprison a character
-    /// </summary>
-    public void ImprisonCharacter(string characterName, int sentence, string crime)
-    {
-        var prisonRecord = new PrisonRecord
-        {
-            CharacterName = characterName,
-            Crime = crime,
-            Sentence = sentence,
-            DaysServed = 0,
-            ImprisonmentDate = DateTime.Now
-        };
-        
-        Prisoners[characterName] = prisonRecord;
-    }
-    
-    /// <summary>
-    /// Release a character from prison (pardon or bail)
-    /// </summary>
-    public bool ReleaseCharacter(string characterName)
-    {
-        return Prisoners.Remove(characterName);
-    }
     
     /// <summary>
     /// Create a new king (abdication or succession)

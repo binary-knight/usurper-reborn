@@ -352,46 +352,91 @@ public partial class OwnerProcessConflictTests : IDisposable
         }));
     }
 
+    // v1.1.13: the court record's mutable members, and the fields of its entries (guards, monsters, courtiers,
+    // orphans, heirs, the spouse, prisoners, plots)
+    private const string CourtMembers = @"(?:Treasury|TaxRate|TotalReign|KingTaxPercent|CityTaxPercent|DesignatedHeir|MagicBudget|Spouse|Guards|MonsterGuards|Prisoners|Orphans|CourtMembers|Heirs|ActivePlots|EstablishmentStatus|LastProclamation|LastProclamationDate|CoronationDate|TaxAlignment)";
+    private const string CourtLists = @"(?:Guards|MonsterGuards|Prisoners|Orphans|CourtMembers|Heirs|ActivePlots|Spouse)";
+    private const string EntryFields = @"(?:Loyalty|LoyaltyToKing|Influence|IsPlotting|Happiness|ClaimStrength|IsDesignated|DaysServed|Sentence|BailAmount|Progress|IsDiscovered|DailySalary|HP)";
+    private const string Write = @"(?:[-+*/]?=(?![=>])|\+\+|--)";
+
+    /// <summary>
+    /// v1.1.13: every write to a court member or a court entry's field in this code, other than on a guarded
+    /// court change's copy. No allowlist: what is left out is left out by its form. The receiver court is a
+    /// court change's record and working ApplyKingChangeAsync's King copy (both helpers name them so); a
+    /// member assigned from a stored record (royalCourt. or data.RoyalCourt.) is a loader installing it; a King
+    /// declared in the same method by new King or King.CreateNewKing is being built; an entry is a court
+    /// entry when declared (foreach, var or out var) from a court list, and one from court. is the copy's.
+    /// </summary>
+    internal static List<string> InMemoryCourtWrites(string file, string code)
+    {
+        var rx = System.Text.RegularExpressions.RegexOptions.None;
+        var assign = new System.Text.RegularExpressions.Regex(@"(\b\w+(?:\(\))?)\s*\.\s*" + CourtMembers + @"\s*" + Write, rx);
+        var mutate = new System.Text.RegularExpressions.Regex(@"(\b\w+(?:\(\))?)\s*\.\s*" + CourtMembers + @"\s*(?:\[[^\]]*\]\s*=(?![=>])|\.\s*(?:Add|AddRange|Insert|Remove|RemoveAll|RemoveAt|Clear)\s*\()", rx);
+        var chain = new System.Text.RegularExpressions.Regex(@"(\b\w+(?:\(\))?)\s*\.\s*" + CourtLists + @"\b[^;=]*?\.\s*" + EntryFields + @"\s*" + Write, rx);
+        var entry = new System.Text.RegularExpressions.Regex(@"\b(\w+)\s*\.\s*" + EntryFields + @"\s*" + Write, rx);
+        var copies = new[] { "court", "working" };
+        var lines = code.Split('\n');
+        var found = new List<string>();
+        for (int i = 0; i < lines.Length; i++)
+        {
+            string line = lines[i];
+            foreach (var m in assign.Matches(line).Concat(mutate.Matches(line)).Concat(chain.Matches(line)))
+            {
+                string receiver = m.Groups[1].Value;
+                if (copies.Contains(receiver)) continue;
+                if (System.Text.RegularExpressions.Regex.IsMatch(line.Substring(m.Index + m.Length), @"\b(royalCourt|RoyalCourt)\.")) continue;
+                bool built = false;
+                for (int j = i; j >= Math.Max(0, i - 60) && !built; j--)
+                    built = System.Text.RegularExpressions.Regex.IsMatch(lines[j],
+                        @"\bvar\s+" + System.Text.RegularExpressions.Regex.Escape(receiver) + @"\s*=\s*(King\.CreateNewKing\(|new King\b)");
+                if (built) continue;
+                found.Add($"{file}:{i + 1} {line.Trim()}");
+            }
+            foreach (System.Text.RegularExpressions.Match m in entry.Matches(line))
+            {
+                string v = System.Text.RegularExpressions.Regex.Escape(m.Groups[1].Value);
+                string? from = null;
+                for (int j = i; j >= Math.Max(0, i - 80) && from == null; j--)
+                {
+                    var d = System.Text.RegularExpressions.Regex.Match(lines[j], @"(?:foreach\s*\(\s*var\s+" + v + @"\s+in\s+|var\s+" + v + @"\s*=\s*)(.*)");
+                    if (d.Success) { from = d.Groups[1].Value; break; }
+                    d = System.Text.RegularExpressions.Regex.Match(lines[j], @"([\w.()!?]*\." + CourtLists + @")\.TryGetValue\([^,]*,\s*out\s+var\s+" + v + @"\b");
+                    if (d.Success) from = d.Groups[1].Value;
+                }
+                if (from == null) continue;
+                var list = System.Text.RegularExpressions.Regex.Match(from, @"^\s*\(?([\w.()!?]*?)\." + CourtLists + @"\b");
+                if (!list.Success) continue;                                       // not a court entry
+                if (copies.Contains(list.Groups[1].Value.Split('.')[0].TrimEnd('!', '?'))) continue;
+                found.Add($"{file}:{i + 1} {line.Trim()}");
+            }
+        }
+        return found.Distinct().ToList();   // one entry per line
+    }
+
     [Fact]
-    public void NoTreasuryIsAssigned_OutsideTheOneCourtChange()
+    public void NoCourtMemberIsChanged_OutsideAGuardedCourtChange()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
         while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "Scripts"))) dir = dir.Parent;
         var root = Path.Combine(dir!.FullName, "Scripts");
-        // the receiver `court` is the court-change delegate's copy of the stored court (or its King form);
-        // the rest are the in-memory court's loaders and a new court's construction (a coronation, a new world)
-        var allowed = new (string File, string Member)[]
+
+        // the check finds each form it looks for
+        InMemoryCourtWrites("canary", string.Join("\n", new[]
         {
-            ("OnlineStateManager.cs", "ApplyCourtTo("),                 // the loaders' and the change's copy into a King
-            ("WorldInitializerSystem.cs", ""),                          // a new world
-            ("SaveSystem.cs", ""),                                      // the single-player save's own court
-            ("King.cs", "CreateNewKing("),
-            ("WorldSimulator.cs", "ExecutePlot("),                      // these two run only on ApplyKingChangeAsync's copy
-            ("WorldSimulator.cs", "ProcessNPCGuardRecruitment("),
-        };
-        var assign = new System.Text.RegularExpressions.Regex(@"(\b\w+(\(\))?\.)?\bTreasury\s*([-+*/]?=)(?!=)");
+            "king.Treasury -= 5;", "currentKing.Guards.Remove(g);", "CastleLocation.GetCurrentKing().Orphans.Add(o);",
+            "foreach (var guard in king.Guards)", "    guard.Loyalty = 0;", "if (king.Prisoners.TryGetValue(n, out var rec)) rec.BailAmount = 5;",
+            "king.Spouse.Happiness += 1;", "king.EstablishmentStatus[key] = false;",
+        })).Should().HaveCount(7);
+        InMemoryCourtWrites("canary", string.Join("\n", new[]
+        {
+            "court.Treasury -= 5;", "working.Guards.Add(g);", "foreach (var guard in court.Guards)", "    guard.Loyalty = 0;",
+            "king.Treasury = royalCourt.Treasury;", "var k = King.CreateNewKing(n, ai, sex);", "k.Treasury = 5;",
+        })).Should().BeEmpty();
+
         var offenders = new List<string>();
         foreach (var path in Directory.GetFiles(root, "*.cs", SearchOption.AllDirectories))
-        {
-            var lines = CodeOnly(File.ReadAllText(path)).Split('\n');
-            string member = "";
-            for (int i = 0; i < lines.Length; i++)
-            {
-                var m0 = System.Text.RegularExpressions.Regex.Match(lines[i], @"^\s{4,8}(public|private|internal|protected)[^=;]*?\b(\w+)\s*\(");
-                if (m0.Success) member = m0.Groups[2].Value + "(";
-                foreach (System.Text.RegularExpressions.Match m in assign.Matches(lines[i]))
-                {
-                    if (m.Value.StartsWith("court.", StringComparison.Ordinal)) continue;                      // the change's copy
-                    if (m.Value.StartsWith("Communal", StringComparison.Ordinal) || lines[i].Contains("CommunalTreasury")) continue;   // the settlement's own
-                    if (lines[i].TrimStart().StartsWith("Treasury =", StringComparison.Ordinal) && lines[i].TrimEnd().EndsWith(",")) continue;   // an initializer of a new record or King
-                    if (lines[i].Contains("new RoyalCourtSaveData")) continue;                                  // a new (empty) court record
-                    string file = Path.GetFileName(path);
-                    if (allowed.Any(a => a.File == file && (a.Member == "" || a.Member == member))) continue;
-                    offenders.Add($"{file}:{i + 1} [{member}] {lines[i].Trim()}");
-                }
-            }
-        }
-        offenders.Should().BeEmpty("every change to a reigning court's treasury goes through OnlineStateManager.ApplyCourtChangeAsync");
+            offenders.AddRange(InMemoryCourtWrites(Path.GetRelativePath(root, path), CodeOnly(File.ReadAllText(path))));
+        offenders.Should().BeEmpty("every change to a court goes through a guarded court change (ApplyCourtChangeAsync, ApplyKingChangeAsync or CrownAsync)");
     }
 
     [Fact]
