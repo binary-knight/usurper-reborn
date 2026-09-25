@@ -71,8 +71,13 @@ public partial class MainStreetLocation : BaseLocation
 
     private void ShowTierUnlockAnnouncement()
     {
-        string? notice = TakeDistrictsNotice(currentPlayer); // v1.1.13: once, for a character that knew the old menu
-        if (notice != null) terminal.WriteLine(notice, "bright_cyan");
+        if (!UseClassicLayout) // v1.1.14: the districts notice and the switch-to-classic tip are for the districts only
+        {
+            string? notice = TakeDistrictsNotice(currentPlayer); // v1.1.13: once, for a character that knew the old menu
+            if (notice != null) terminal.WriteLine(notice, "bright_cyan");
+            string? tip = TakeClassicLayoutTip(currentPlayer, notice != null);
+            if (tip != null) terminal.WriteLine(tip, "cyan");
+        }
         foreach (string line in TakeTierUnlockAnnouncement(currentPlayer))
             terminal.WriteLine(line, "bright_green");
         terminal.SetColor("white");

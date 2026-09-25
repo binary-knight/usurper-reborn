@@ -1585,6 +1585,7 @@ internal static class PlayerSaveEditor
         // v1.1.13: auto-combat potion threshold
         p.AutoCombatHealPercent = GameConfig.ClampAutoCombatHealPercent(EditorIO.PromptInt("Auto-combat heals at or below HP % (20-70, steps of 10)", p.AutoCombatHealPercent, min: 20, max: 70));
         p.ClassicMainStreet = EditorIO.PromptBool("Classic Main Street layout (instead of districts)", p.ClassicMainStreet); // v1.1.14
+        p.ClassicTipDraws = EditorIO.PromptInt("Switch-to-classic tip draws shown (0-10, 10 = no more)", p.ClassicTipDraws, min: 0, max: 10); // v1.1.14
         p.DateFormatPreference = EditorIO.PromptInt("DateFormat (0=MM/DD, 1=DD/MM, 2=YYYY-MM-DD)", p.DateFormatPreference, min: 0, max: 2);
         p.AutoRedistributeXP = EditorIO.PromptBool("Auto-redistribute XP when teammates die", p.AutoRedistributeXP);
     }

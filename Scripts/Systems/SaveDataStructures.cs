@@ -448,6 +448,7 @@ namespace UsurperRemake.Systems
         public bool AutoEquipDisabled { get; set; }  // Shop purchases go to inventory
         public int AutoCombatHealPercent { get; set; } = 50;  // v1.1.13: auto-combat potion threshold, HP %; old saves read 50
         public bool ClassicMainStreet { get; set; }  // v1.1.14: classic Main Street layout; old saves read false (districts)
+        public int ClassicTipDraws { get; set; }  // v1.1.14: switch-to-classic tip draws so far; old saves read 0
         public int DateFormatPreference { get; set; }  // 0=MM/DD, 1=DD/MM, 2=YYYY-MM-DD
         public bool AutoRedistributeXP { get; set; } = true; // Auto-redistribute XP when teammates die
         public int Specialization { get; set; }  // v0.65.4: player class specialization (ClassSpecialization as int; 0 = None)
