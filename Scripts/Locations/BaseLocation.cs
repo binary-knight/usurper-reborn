@@ -10722,7 +10722,7 @@ public abstract class BaseLocation
                 continue;
             }
 
-            // Score each candidate by primary stat value (class-aware — see ScoreEquipment)
+            // Score each candidate by primary stat value (v1.1.13: role-aware, see ScoreEquipment)
             var bestCandidate = candidates
                 .OrderByDescending(x => ScoreEquipment(x.item, slot, target))
                 .First();
@@ -10832,17 +10832,32 @@ public abstract class BaseLocation
             score = item.ArmorClass * 10;
         }
 
-        // Add stat bonuses (weighted equally)
-        score += (item.StrengthBonus + item.DexterityBonus + item.AgilityBonus +
-                  item.ConstitutionBonus + item.IntelligenceBonus + item.WisdomBonus +
-                  item.CharismaBonus) * 3;
-        score += item.MaxHPBonus * 2;
-        score += item.MaxManaBonus * 2;
-        score += item.DefenceBonus * 3;
-        score += item.MagicResistance * 2;
-        score += item.CriticalChanceBonus * 2;
-        score += item.LifeSteal * 2;
-        score += item.StaminaBonus * 2;
+        // v1.1.13: stats the target's role uses count triple; the others keep the old weights.
+        // With no target every stat counts once, as before.
+        var role = target != null ? GetGearRole(target) : GearRole.None;
+        int useful = score;   // weapon and armour power always count
+        int other = 0;
+        void Add(int value, int weight, params GearRole[] roles)
+        {
+            if (role == GearRole.None) useful += value * weight;
+            else if (Array.IndexOf(roles, role) >= 0) useful += value * weight * 3;
+            else other += value * weight;
+        }
+        Add(item.StrengthBonus, 3, GearRole.Tank, GearRole.Damage);
+        Add(item.DexterityBonus, 3, GearRole.Damage);
+        Add(item.AgilityBonus, 3, GearRole.Damage);
+        Add(item.ConstitutionBonus, 3, GearRole.Tank);
+        Add(item.IntelligenceBonus, 3, GearRole.Caster);
+        Add(item.WisdomBonus, 3, GearRole.Caster, GearRole.Healer);
+        Add(item.CharismaBonus, 3);
+        Add(item.MaxHPBonus, 2, GearRole.Tank);
+        Add(item.MaxManaBonus, 2, GearRole.Caster, GearRole.Healer);
+        Add(item.DefenceBonus, 3, GearRole.Tank);
+        Add(item.MagicResistance, 2, GearRole.Tank, GearRole.Damage, GearRole.Caster, GearRole.Healer);
+        Add(item.CriticalChanceBonus, 2, GearRole.Damage);
+        Add(item.LifeSteal, 2, GearRole.Damage);
+        Add(item.StaminaBonus, 2, GearRole.Tank);
+        score = useful + other;
 
         // v0.57.2 — class-aware weapon preference. Without this, auto-equip just picks the highest
         // raw-stat weapon and ignores class fantasy: Warriors got 1H weapons in off-hand instead of
@@ -10853,7 +10868,32 @@ public abstract class BaseLocation
             score = ApplyClassWeaponPreference(score, item, slot, target);
         }
 
+        // v1.1.13: an item with something the role uses always outranks one with nothing it uses
+        if (target != null && useful > 0) score += UsefulGearFloor;
+
         return score;
+    }
+
+    // v1.1.13: role for Equip Best scoring
+    protected enum GearRole { None, Tank, Healer, Caster, Damage }
+
+    private const int UsefulGearFloor = 1_000_000;
+
+    /// <summary>v1.1.13: a tank or healer specialization wins; otherwise the class decides.</summary>
+    protected static GearRole GetGearRole(Character target)
+    {
+        if (target.Specialization != ClassSpecialization.None)
+        {
+            if (SpecializationData.IsTankSpec(target.Specialization)) return GearRole.Tank;
+            if (SpecializationData.IsHealerSpec(target.Specialization)) return GearRole.Healer;
+        }
+        return target.Class switch
+        {
+            CharacterClass.Warrior or CharacterClass.Paladin or CharacterClass.Tidesworn => GearRole.Tank,
+            CharacterClass.Cleric or CharacterClass.Wavecaller => GearRole.Healer,
+            CharacterClass.Magician or CharacterClass.Sage or CharacterClass.Cyclebreaker or CharacterClass.MysticShaman => GearRole.Caster,
+            _ => GearRole.Damage,
+        };
     }
 
     /// <summary>
