@@ -78,6 +78,27 @@ public partial class OwnerProcessConflictTests
         web.Substring(at, web.IndexOf('\n', at) - at).Should().NotContain("wizard_flags");
     }
 
+    // ─── X2: no later character uses the name: grudges are forgotten with no time cut-off ───
+
+    [Fact]
+    public void AReapply_ForgetsAReStampedGrudge_WhenNoLaterCharacterUsesTheName_AndKeepsItWhenOneDoes()
+    {
+        var npc = Npc("npc_x2_1", "Grudger");
+        WorldEditLog.AppendForgetCharacter(_db, new[] { "Bob" }, "bob_account", DateTime.Now.AddMinutes(-30), untimed: true);
+        // an old binary wrote the grudge back with a time after the delete
+        Remember(npc, MemoryType.Attacked, "Bob", DateTime.Now.AddMinutes(-1));
+
+        WorldEditLog.Apply(_db, _db.GetWorldEditsToApply()).Should().BeGreaterThan(0);
+        npc.Brain!.Memory.AllMemories.Should().NotContain(m => m.InvolvedCharacter == "Bob", "no one else is Bob: the grudge is the deleted Bob's");
+
+        // a later Bob on a new account: its grudges after the delete are its own
+        Exec("INSERT INTO players (username, display_name, player_data, created_at) VALUES ('bob_two', 'Bob', " +
+             "'{\"player\":{\"name2\":\"Bob\"}}', datetime('now', '+1 minute'));");
+        Remember(npc, MemoryType.Attacked, "Bob", DateTime.Now.AddMinutes(-1));
+        WorldEditLog.Apply(_db, _db.GetWorldEditsToApply());
+        npc.Brain!.Memory.AllMemories.Should().Contain(m => m.InvolvedCharacter == "Bob", "the time cut-off holds once a later character uses the name");
+    }
+
     private static string RepoRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);

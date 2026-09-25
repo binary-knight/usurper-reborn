@@ -281,17 +281,23 @@ public class OwnerProcessTier2Tests : IDisposable
     }
 
     [Fact]
-    public void TheOwnersSet_IsEveryUnappliedEdit_AndTheLastDaysApplied()
+    public void TheOwnersSet_IsEveryUnappliedEdit_AndEveryAppliedEditNotYetPruned()
     {
         long oldUnapplied = _db.AppendWorldEdit("forget_character", "{}", "t");
         long oldApplied = _db.AppendWorldEdit("forget_character", "{}", "t");
         long recentApplied = _db.AppendWorldEdit("forget_character", "{}", "t");
         long recent = _db.AppendWorldEdit("vacate_throne", "{}", "t");
-        _db.MarkWorldEditsApplied(new[] { oldApplied, recentApplied }, "owner").Should().Be(2);
+        long pruneDue = _db.AppendWorldEdit("forget_character", "{}", "t");
+        _db.MarkWorldEditsApplied(new[] { oldApplied, recentApplied, pruneDue }, "owner").Should().Be(3);
         Exec($"UPDATE world_edits SET created_at = datetime('now', '-3 days') WHERE id IN ({oldUnapplied}, {oldApplied});");
+        Exec($"UPDATE world_edits SET applied_at = datetime('now', '-2 days') WHERE id = {oldApplied};");
+        Exec($"UPDATE world_edits SET created_at = datetime('now', '-9 days'), applied_at = datetime('now', '-8 days') WHERE id = {pruneDue};");
 
-        _db.GetWorldEditsToApply().Select(e => e.Id).Should().Equal(oldUnapplied, recentApplied, recent);
+        // v1.1.14: re-applied until pruned (7 days after it was applied), not only for 24 hours
+        _db.GetWorldEditsToApply().Select(e => e.Id).Should().Equal(oldUnapplied, oldApplied, recentApplied, recent);
         _db.GetUnappliedWorldEditsOlderThan(24).Select(e => e.Id).Should().Equal(oldUnapplied);
+        _db.PruneAppliedWorldEdits(WorldEditLog.PruneAppliedDays).Should().Be(1, "the one edit left out of the set is the one the prune deletes");
+        _db.GetWorldEditsToApply().Select(e => e.Id).Should().Equal(oldUnapplied, oldApplied, recentApplied, recent);
 
         string first = Scalar($"SELECT applied_at FROM world_edits WHERE id = {oldApplied};")!;
         _db.MarkWorldEditsApplied(new[] { oldApplied }, "other").Should().Be(0, "an applied edit keeps its first mark");

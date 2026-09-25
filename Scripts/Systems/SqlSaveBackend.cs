@@ -2277,11 +2277,12 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// v1.1.13: the edits the owner applies: every edit not yet applied, whatever its age, and every
-        /// edit made in the last reapplyHours (applied or not), oldest first.
+        /// v1.1.13: the edits the owner applies: every edit not yet applied, whatever its age, and (v1.1.14) every
+        /// applied edit the prune has not deleted: applied within reapplyHours (WorldEditLog.ReapplyHours, the
+        /// prune's 7 days), oldest first. The clock is SQLite's datetime('now') (UTC) against applied_at.
         /// </summary>
-        public List<WorldEdit> GetWorldEditsToApply(int reapplyHours = 24) =>
-            QueryWorldEdits("applied_at IS NULL OR created_at >= datetime('now', @h)", $"-{reapplyHours} hours");
+        public List<WorldEdit> GetWorldEditsToApply(int reapplyHours = WorldEditLog.ReapplyHours) =>
+            QueryWorldEdits("applied_at IS NULL OR applied_at >= datetime('now', @h)", $"-{reapplyHours} hours");
 
         /// <summary>v1.1.13: edits never applied that are older than hours (for the warning line).</summary>
         public List<WorldEdit> GetUnappliedWorldEditsOlderThan(int hours) =>
