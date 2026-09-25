@@ -549,7 +549,8 @@ public class WorldSimulator
         {
             CastleLocation.VacateThrone(npc.IsAgedDeath
                 ? "The ruler has died of old age."
-                : "The ruler has fallen in battle.");
+                : "The ruler has fallen in battle.",
+                npc.IsAgedDeath ? "Died of old age" : "Fell in battle");   // v1.1.14: recorded in the monarch history
         }
     }
 

@@ -8696,34 +8696,23 @@ public class CastleLocation : BaseLocation
     /// <summary>
     /// Called when the current king dies. Vacates the throne and posts news.
     /// Static so it can be called from WorldSimulator without a CastleLocation instance.
+    /// v1.1.14: the ended reign and a marked vacancy are one versioned write (EndReignAsync), so a fresh load
+    /// finds the throne empty; the news follows only once it lands. An empty throne is claimed later as usual.
     /// </summary>
-    public static void VacateThrone(string reason)
+    public static void VacateThrone(string reason, string endReason = "Died")
     {
         var king = GetCurrentKing();
         if (king == null || !king.IsActive) return;
 
         string kingName = king.Name;
-        king.IsActive = false;
+        if (!EndReignAsync(kingName, endReason, null).GetAwaiter().GetResult())
+        {
+            DebugLogger.Instance.LogWarning("CASTLE", $"The reign of {kingName} was not ended: the stored court no longer holds it, or kept changing.");
+            return;
+        }
 
         // Post news
         NewsSystem.Instance?.Newsy(true, $"{kingName} is no longer ruler! The throne stands vacant. {reason}");
-
-        // Persist to world_state in online mode
-        if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
-        {
-            var osm = OnlineStateManager.Instance;
-            if (osm != null)
-            {
-                _ = Task.Run(async () =>
-                {
-                    try { await osm.SaveRoyalCourtToWorldState(); }
-                    catch (Exception ex)
-                    {
-                        DebugLogger.Instance.LogError("CASTLE", $"Failed to persist throne vacancy: {ex.Message}");
-                    }
-                });
-            }
-        }
     }
 
     #region The Crown Faction Recruitment
