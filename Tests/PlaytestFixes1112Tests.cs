@@ -309,7 +309,7 @@ public class PlaytestFixes1112Tests
     [Fact]
     public void TheTrainingPointsHint_NamesTheLevelMastersKey()
     {
-        Loc.Get("base.training_points_hint").Should().Contain("[V]").And.Contain("Main Street");
+        Loc.Get("base.training_points_hint").Should().Contain("[V]").And.Contain("Main Street").And.Contain("Guild Row [G]"); // v1.1.13
         // v1.1.13: [V] is the Level Master inside Guild Row
         MainStreetLocation.StreetEntries.Should().ContainSingle(e => e.Place == MainStreetLocation.StreetPlace.LevelMaster)
             .Which.Should().Match<MainStreetLocation.StreetEntry>(e => e.Key == "V" && e.Group == MainStreetLocation.StreetGroup.GuildRow);
