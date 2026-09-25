@@ -717,8 +717,7 @@ public partial class PrisonLocation : BaseLocation
             await terminal.WriteLineAsync();
             await terminal.WriteColorLineAsync(result, TerminalEmulator.ColorGreen);
             await terminal.WriteLineAsync();
-            await terminal.WriteAsync(Loc.Get("ui.press_enter"));
-            await terminal.GetCharAsync();
+            await terminal.PressAnyKey();
         }
 
         refreshMenu = true;
@@ -753,8 +752,7 @@ public partial class PrisonLocation : BaseLocation
             await terminal.WriteLineAsync(Loc.Get("prison.days_left", player.DaysInPrison));
 
         await terminal.WriteLineAsync();
-        await terminal.WriteAsync(Loc.Get("ui.press_enter"));
-        await terminal.GetCharAsync();
+        await terminal.PressAnyKey();
     }
 
     private async Task<bool> HandleQuitConfirmation(Character player)
@@ -968,8 +966,7 @@ public partial class PrisonLocation : BaseLocation
         await terminal.WriteLineAsync(Loc.Get("prison.days_left_info", player.DaysInPrison));
 
         await terminal.WriteLineAsync();
-        await terminal.WriteAsync(Loc.Get("ui.press_enter"));
-        await terminal.GetCharAsync();
+        await terminal.PressAnyKey();
     }
 
     private async Task<List<Character>> GetOtherPrisoners(Character currentPlayer)
@@ -1265,8 +1262,7 @@ public partial class PrisonLocation : BaseLocation
         // Mark encounter as complete
         StoryProgressionSystem.Instance.SetStoryFlag("vex_prison_encounter_complete", true);
 
-        await terminal.WriteAsync(Loc.Get("ui.press_enter"));
-        await terminal.GetCharAsync();
+        await terminal.PressAnyKey();
 
         // Navigate to Main Street
         throw new LocationExitException(GameLocation.MainStreet);

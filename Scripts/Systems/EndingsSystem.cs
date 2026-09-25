@@ -251,7 +251,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("  You must choose: ascend to godhood or begin the cycle anew.", "bright_yellow");
                 terminal.WriteLine("  There is no going back to the mortal world after defeating Manwe.", "gray");
                 terminal.WriteLine("");
-                await terminal.GetInputAsync("  Press Enter to choose again...");
+                await terminal.PressAnyKey("  Press Enter to choose again...");
             }
         }
 
@@ -312,7 +312,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  {Loc.Get("ending.usurper_subtitle")}", "gray");
             terminal.WriteLine("");
 
-            await terminal.GetInputAsync(Loc.Get("ending.press_enter"));
+            await terminal.PressAnyKey(Loc.Get("ending.press_enter"));
         }
 
         private async Task PlaySaviorEnding(Character player, TerminalEmulator terminal)
@@ -374,7 +374,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  {Loc.Get("ending.savior_subtitle")}", "gray");
             terminal.WriteLine("");
 
-            await terminal.GetInputAsync(Loc.Get("ending.press_enter"));
+            await terminal.PressAnyKey(Loc.Get("ending.press_enter"));
         }
 
         private async Task PlayDefiantEnding(Character player, TerminalEmulator terminal)
@@ -437,7 +437,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  {Loc.Get("ending.defiant_subtitle")}", "gray");
             terminal.WriteLine("");
 
-            await terminal.GetInputAsync(Loc.Get("ending.press_enter"));
+            await terminal.PressAnyKey(Loc.Get("ending.press_enter"));
         }
 
         private async Task PlayTrueEnding(Character player, TerminalEmulator terminal)
@@ -511,7 +511,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  {Loc.Get("ending.true_subtitle")}", "gray");
             terminal.WriteLine("");
 
-            await terminal.GetInputAsync(Loc.Get("ending.press_enter"));
+            await terminal.PressAnyKey(Loc.Get("ending.press_enter"));
         }
 
         /// <summary>
@@ -615,7 +615,7 @@ namespace UsurperRemake.Systems
             // Moment of silence — the wave remembers
             await UIHelper.MomentOfSilence(terminal, 6000);
 
-            await terminal.GetInputAsync(Loc.Get("ending.press_enter"));
+            await terminal.PressAnyKey(Loc.Get("ending.press_enter"));
         }
 
         /// <summary>
@@ -752,7 +752,7 @@ namespace UsurperRemake.Systems
                 await PlayEnhancedTrueEnding(player, terminal);
             }
 
-            await terminal.GetInputAsync(Loc.Get("ending.dissolution_press_enter"));
+            await terminal.PressAnyKey(Loc.Get("ending.dissolution_press_enter"));
         }
 
         #endregion
@@ -890,7 +890,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("═══════════════════════════════════════════════════════════════════", "gray");
             terminal.WriteLine("");
 
-            await terminal.GetInputAsync(Loc.Get("ending.press_enter"));
+            await terminal.PressAnyKey(Loc.Get("ending.press_enter"));
 
             // Show personalized epilogue
             await ShowEpilogue(player, ending, terminal);
@@ -1033,7 +1033,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  {Loc.Get("ending.quote_attribution", player.Name2)}", "gray");
             terminal.WriteLine("");
 
-            await terminal.GetInputAsync(Loc.Get("ending.press_enter"));
+            await terminal.PressAnyKey(Loc.Get("ending.press_enter"));
         }
 
         /// <summary>
@@ -1308,7 +1308,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  {Loc.Get("ending.unlocks_apply_ngplus")}", "bright_green");
             terminal.WriteLine("");
 
-            await terminal.GetInputAsync(Loc.Get("ending.press_enter"));
+            await terminal.PressAnyKey(Loc.Get("ending.press_enter"));
         }
 
         private string GetEndingName(EndingType ending)
@@ -1547,7 +1547,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  {Loc.Get("ending.immortal_enter_pantheon")}", "bright_cyan");
             terminal.WriteLine("");
 
-            await terminal.GetInputAsync(Loc.Get("ending.immortal_enter_prompt"));
+            await terminal.PressAnyKey(Loc.Get("ending.immortal_enter_prompt"));
 
             // Mark ending sequence as completed before routing to Pantheon
             StoryProgressionSystem.Instance.SetStoryFlag("ending_sequence_completed", true);

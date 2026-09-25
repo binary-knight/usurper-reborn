@@ -226,7 +226,7 @@ namespace UsurperRemake.Systems
                     terminal.WriteLine("  ════════════════════════════════════════════════════════════════");
                 }
                 terminal.WriteLine("");
-                await terminal.GetInput($"  {Get("ui.press_enter")}");
+                await terminal.PressAnyKey();
             }
 
             foreach (var partner in partners)
@@ -287,7 +287,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.fade_bond_stronger"))}");
             terminal.WriteLine("");
 
-            await terminal.GetInput($"  {Get("ui.press_enter")}");
+            await terminal.PressAnyKey();
         }
 
         /// <summary>
@@ -518,7 +518,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.family_grown"))}");
             terminal.WriteLine("");
 
-            await terminal.GetInput($"  {Get("ui.press_enter")}");
+            await terminal.PressAnyKey();
         }
 
         /// <summary>
@@ -724,7 +724,7 @@ namespace UsurperRemake.Systems
             }
 
             terminal.WriteLine("");
-            await terminal.GetInput($"  {Get("ui.press_enter")}");
+            await terminal.PressAnyKey();
         }
 
         /// <summary>
@@ -799,7 +799,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine(physicalDesc);
             terminal.WriteLine("");
 
-            await terminal.GetInput($"  {Get("ui.press_enter")}");
+            await terminal.PressAnyKey();
         }
 
         /// <summary>
@@ -914,7 +914,7 @@ namespace UsurperRemake.Systems
             }
 
             terminal.WriteLine("");
-            await terminal.GetInput($"  {Get("ui.press_enter")}");
+            await terminal.PressAnyKey();
         }
 
         /// <summary>
@@ -972,7 +972,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.climax.timeless_l2"))}");
             terminal.WriteLine("");
 
-            await terminal.GetInput($"  {Get("ui.press_enter")}");
+            await terminal.PressAnyKey();
         }
 
         /// <summary>
@@ -1093,7 +1093,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.time_passes"))}");
             terminal.WriteLine("");
 
-            await terminal.GetInput($"  {Get("ui.press_enter")}");
+            await terminal.PressAnyKey();
         }
     }
 }

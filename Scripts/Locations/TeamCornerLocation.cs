@@ -512,8 +512,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine(Loc.Get("team.be_first"));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -589,8 +588,7 @@ public class TeamCornerLocation : BaseLocation
             if (totalPages <= 1)
             {
                 terminal.SetColor("darkgray");
-                terminal.WriteLine(Loc.Get("ui.press_enter"));
-                await terminal.ReadKeyAsync();
+                await terminal.PressAnyKey();
                 return;
             }
             terminal.SetColor("darkgray");
@@ -665,8 +663,7 @@ public class TeamCornerLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     /// <summary>
@@ -710,8 +707,7 @@ public class TeamCornerLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     /// <summary>
@@ -907,8 +903,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine("");
         }
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     private async Task ShowTeamMembers(string teamName, bool detailed)
@@ -1192,8 +1187,7 @@ public class TeamCornerLocation : BaseLocation
                 Loc.Get("team.news_formed", currentPlayer.DisplayName, teamName), "team");
 
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     /// <summary>v1.1.12: an NPC team goes by this name, in any case.</summary>
@@ -1297,8 +1291,7 @@ public class TeamCornerLocation : BaseLocation
                             Loc.Get("team.news_joined", currentPlayer.DisplayName, teamName), "team");
 
                     terminal.SetColor("darkgray");
-                    terminal.WriteLine(Loc.Get("ui.press_enter"));
-                    await terminal.ReadKeyAsync();
+                    await terminal.PressAnyKey();
                     return;
                 }
                 else if (exists)
@@ -1353,8 +1346,7 @@ public class TeamCornerLocation : BaseLocation
                     Loc.Get("team.news_joined", currentPlayer.DisplayName, teamName), "team");
 
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
         }
         else
         {
@@ -1442,8 +1434,7 @@ public class TeamCornerLocation : BaseLocation
                     Loc.Get("team.news_left", currentPlayer.DisplayName, oldTeam), "team");
 
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
         }
     }
 
@@ -1843,8 +1834,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine(Loc.Get("team.recruit_no_match", lookup));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -1868,8 +1858,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine(Loc.Get(key, chosen.DisplayName));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
         if (band == TeamSystem.RecruitmentBand.Refused)
@@ -1880,8 +1869,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine(Loc.Get($"team.recruit_refuse_hate_{idx + 1}", chosen.DisplayName));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -1959,8 +1947,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine(Loc.Get("team.team_full", MaxTeamSize));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -1976,8 +1963,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine(Loc.Get("team.recruit_unavailable_now", recruit.DisplayName));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
         if (!ReferenceEquals(liveRecruit, recruit))
@@ -2005,16 +1991,14 @@ public class TeamCornerLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("team.recruit_already_on_team", recruit.DisplayName));
                 terminal.WriteLine("");
                 terminal.SetColor("darkgray");
-                terminal.WriteLine(Loc.Get("ui.press_enter"));
-                await terminal.ReadKeyAsync();
+                await terminal.PressAnyKey();
                 return;
             }
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.recruit_unavailable_now", recruit.DisplayName));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
         if (liveBand == TeamSystem.RecruitmentBand.Refused)
@@ -2023,8 +2007,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine(Loc.Get("team.recruit_refuse_hate_1", recruit.DisplayName));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -2038,8 +2021,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine(Loc.Get("team.need_gold_recruit", $"{liveCost:N0}", $"{currentPlayer.Gold:N0}"));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -2070,8 +2052,7 @@ public class TeamCornerLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     /// <summary>
@@ -2311,8 +2292,7 @@ public class TeamCornerLocation : BaseLocation
         terminal.WriteLine("");
 
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     /// <summary>
@@ -2616,8 +2596,7 @@ public class TeamCornerLocation : BaseLocation
         }
 
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     /// <summary>v1.1.12: the gear taken on a sack, saved at once: the NPC's side first, then the player's (a
@@ -2775,8 +2754,7 @@ public class TeamCornerLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     private static long ResurrectionCost(NPC npc) => npc.Level * 1000L;
@@ -2937,8 +2915,7 @@ public class TeamCornerLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     /// <summary>v1.1.12: whether a teammate is in the echo recruit list. An entry that is a team member's save key

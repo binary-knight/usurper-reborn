@@ -481,8 +481,7 @@ namespace UsurperRemake.Locations
             terminal.WriteLine("");
 
             terminal.SetColor("gray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
         }
 
         // ════════════════════════════════════════════════════════════════════════
@@ -511,8 +510,7 @@ namespace UsurperRemake.Locations
                 terminal.WriteLine(Loc.Get("anchor_road.no_fights_left"));
                 terminal.WriteLine("");
                 terminal.SetColor("darkgray");
-                terminal.WriteLine(Loc.Get("ui.press_enter"));
-                await terminal.ReadKeyAsync();
+                await terminal.PressAnyKey();
                 return;
             }
 
@@ -522,8 +520,7 @@ namespace UsurperRemake.Locations
                 terminal.WriteLine(Loc.Get("anchor_road.gauntlet_daily_cap_reached", GameConfig.MaxGauntletRunsPerDay));
                 terminal.WriteLine("");
                 terminal.SetColor("darkgray");
-                terminal.WriteLine(Loc.Get("ui.press_enter"));
-                await terminal.ReadKeyAsync();
+                await terminal.PressAnyKey();
                 return;
             }
 
@@ -558,8 +555,7 @@ namespace UsurperRemake.Locations
                 terminal.WriteLine(Loc.Get("anchor_road.need_gold", $"{entryFee:N0}", $"{currentPlayer.Gold:N0}"));
                 terminal.WriteLine("");
                 terminal.SetColor("darkgray");
-                terminal.WriteLine(Loc.Get("ui.press_enter"));
-                await terminal.ReadKeyAsync();
+                await terminal.PressAnyKey();
                 return;
             }
 
@@ -669,8 +665,7 @@ namespace UsurperRemake.Locations
                     }
                     terminal.WriteLine("");
                     terminal.SetColor("darkgray");
-                    terminal.WriteLine(Loc.Get("ui.press_enter"));
-                    await terminal.ReadKeyAsync();
+                    await terminal.PressAnyKey();
                     return;
                 }
 
@@ -825,8 +820,7 @@ namespace UsurperRemake.Locations
             }
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
         }
 
         /// <summary>

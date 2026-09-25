@@ -301,8 +301,7 @@ public class DungeonLocation : BaseLocation
 
             term.WriteLine("");
             term.SetColor("darkgray");
-            term.Write(Loc.Get("dungeon.press_enter_continue"));
-            await term.ReadKeyAsync();
+            await term.PressAnyKey(Loc.Get("dungeon.press_enter_continue"));
         }
 
         // Refresh bounty board quests based on player level
@@ -1881,7 +1880,7 @@ public class DungeonLocation : BaseLocation
 
         term.WriteLine("");
         term.SetColor("gray");
-        await term.GetInputAsync(Loc.Get("dungeon.press_enter_continue"));
+        await term.PressAnyKey(Loc.Get("dungeon.press_enter_continue"));
     }
 
     /// <summary>
@@ -4191,7 +4190,7 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine("");
 
         terminal.SetColor("gray");
-        await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+        await terminal.PressAnyKey();
     }
 
     private string GetChapterName(StoryChapter chapter)
@@ -10668,7 +10667,7 @@ public class DungeonLocation : BaseLocation
 
             // Skip text rendering in Electron mode
             ElectronBridge.EmitPressAnyKey();
-            await terminal.GetInput("");
+            await terminal.GetInput(""); // v1.1.14: pause-exempt: Electron branch (shelved client); the overlay already got EmitPressAnyKey
             return;
         }
 
@@ -13149,7 +13148,7 @@ public class DungeonLocation : BaseLocation
 
                 // In Electron mode, skip text rendering — graphical overlay handles it
                 ElectronBridge.EmitPressAnyKey();
-                await terminal.GetInput("");
+                await terminal.GetInput(""); // v1.1.14: pause-exempt: Electron branch (shelved client); the overlay already got EmitPressAnyKey
                 return;
             }
         }
@@ -13348,8 +13347,7 @@ public class DungeonLocation : BaseLocation
             return;
         }
 
-        terminal.WriteLine($" {Loc.Get("dungeon.press_enter_continue")}");
-        await terminal.GetInput("");
+        await terminal.PressAnyKey(Loc.Get("dungeon.press_enter_continue"));
     }
 
     private async Task ShowDungeonMapScreenReader()
@@ -16141,7 +16139,7 @@ public class DungeonLocation : BaseLocation
         await Task.Delay(1500);
 
         terminal.SetColor("gray");
-        await terminal.GetInputAsync(Loc.Get("dungeon.seal_press_enter"));
+        await terminal.PressAnyKey(Loc.Get("dungeon.seal_press_enter"));
 
         // Collect the seal using the SevenSealsSystem
         var sealSystem = SevenSealsSystem.Instance;

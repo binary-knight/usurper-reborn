@@ -40,7 +40,7 @@ public class CharacterCreationLocation : BaseLocation
         terminal.WriteLine(Loc.Get("creation.intro_line6"), "white");
         terminal.WriteLine("");
 
-        await terminal.GetInputAsync(Loc.Get("creation.press_enter_begin"));
+        await terminal.PressAnyKey(Loc.Get("creation.press_enter_begin"));
         
         // Start character creation process
         await HandleCharacterCreation(player);
@@ -209,7 +209,7 @@ public class CharacterCreationLocation : BaseLocation
         terminal.WriteLine(Loc.Get("creation.fight_wisely"), "red");
         terminal.WriteLine("");
 
-        await terminal.GetInputAsync(Loc.Get("creation.press_enter_realm"));
+        await terminal.PressAnyKey(Loc.Get("creation.press_enter_realm"));
     }
     
     /// <summary>

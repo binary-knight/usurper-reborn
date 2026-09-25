@@ -343,7 +343,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  {Loc.Get("artifact.special")}: {artifact.SpecialAbility}", "bright_yellow");
             terminal.WriteLine("");
 
-            await terminal.GetInputAsync($"  {Loc.Get("ui.press_enter")}");
+            await terminal.PressAnyKey();
         }
 
         /// <summary>
@@ -464,7 +464,7 @@ namespace UsurperRemake.Systems
             StoryProgressionSystem.Instance.SetStoryFlag("void_key_obtained", true);
             StoryProgressionSystem.Instance.AdvanceChapter(StoryChapter.TheFinalConfrontation);
 
-            await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+            await terminal.PressAnyKey();
         }
 
         /// <summary>

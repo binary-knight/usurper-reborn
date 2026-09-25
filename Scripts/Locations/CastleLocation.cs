@@ -1023,8 +1023,7 @@ public class CastleLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -1063,8 +1062,7 @@ public class CastleLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     private async Task ManagePrisonCells()
@@ -2240,8 +2238,7 @@ public class CastleLocation : BaseLocation
             terminal.WriteLine("");
 
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
         }
     }
 
@@ -2375,8 +2372,7 @@ public class CastleLocation : BaseLocation
 
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
         }
     }
 
@@ -2853,8 +2849,7 @@ public class CastleLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -3310,8 +3305,7 @@ public class CastleLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     private async Task WithdrawFromTreasury()
@@ -5914,8 +5908,7 @@ public class CastleLocation : BaseLocation
         terminal.WriteLine(Loc.Get("castle.visit_quest_hall"));
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -6648,8 +6641,7 @@ public class CastleLocation : BaseLocation
             terminal.WriteLine(Loc.Get("castle.throne_room_empty"));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -6672,8 +6664,7 @@ public class CastleLocation : BaseLocation
             terminal.WriteLine(Loc.Get("castle.increase_chivalry_fame"));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -6990,8 +6981,7 @@ public class CastleLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     /// <summary>
@@ -7172,8 +7162,7 @@ public class CastleLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     /// <summary>
@@ -7269,8 +7258,7 @@ public class CastleLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     /// <summary>
@@ -7412,8 +7400,7 @@ public class CastleLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     /// <summary>
@@ -7512,8 +7499,7 @@ public class CastleLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     /// <summary>
@@ -7623,8 +7609,7 @@ public class CastleLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     /// <summary>
@@ -7710,8 +7695,7 @@ public class CastleLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     private async Task DonateToRoyalPurse()
@@ -7796,8 +7780,7 @@ public class CastleLocation : BaseLocation
             terminal.WriteLine(Loc.Get("castle.guard_no_accept"));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -7809,8 +7792,7 @@ public class CastleLocation : BaseLocation
             terminal.WriteLine(Loc.Get("castle.guard_no_positions"));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -7821,8 +7803,7 @@ public class CastleLocation : BaseLocation
             terminal.WriteLine(Loc.Get("castle.guard_already_serving"));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -7838,8 +7819,7 @@ public class CastleLocation : BaseLocation
             terminal.WriteLine(Loc.Get("castle.guard_min_level", minLevel));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -7854,8 +7834,7 @@ public class CastleLocation : BaseLocation
             terminal.WriteLine(Loc.Get("castle.guard_seek_redemption"));
             terminal.WriteLine("");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(Loc.Get("ui.press_enter"));
-            await terminal.ReadKeyAsync();
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -7932,8 +7911,7 @@ public class CastleLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -8970,7 +8948,7 @@ public class CastleLocation : BaseLocation
             terminal.WriteLine(Loc.Get("castle.crown_divided_loyalties"));
             terminal.WriteLine(Loc.Get("castle.crown_renounce_return"));
             terminal.WriteLine("");
-            await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -9027,7 +9005,7 @@ public class CastleLocation : BaseLocation
             {
                 terminal.WriteLine(Loc.Get("castle.crown_prove_worth"));
             }
-            await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -9062,7 +9040,7 @@ public class CastleLocation : BaseLocation
             terminal.WriteLine(Loc.Get("castle.crown_gates_open"));
         }
 
-        await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+        await terminal.PressAnyKey();
     }
 
     /// <summary>

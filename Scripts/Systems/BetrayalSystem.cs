@@ -424,7 +424,7 @@ namespace UsurperRemake.Systems
             }
 
             terminal.WriteLine("");
-            await terminal.GetInputAsync($"  {Loc.Get("ui.press_enter")}");
+            await terminal.PressAnyKey();
         }
 
         /// <summary>
@@ -588,7 +588,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  {Loc.Get("betrayal.door_now_open")}", "green");
 
             terminal.WriteLine("");
-            await terminal.GetInputAsync($"  {Loc.Get("ui.press_enter")}");
+            await terminal.PressAnyKey();
         }
 
         /// <summary>
@@ -642,7 +642,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine(Loc.Get("betrayal.violence_begets"), "dark_cyan");
 
             terminal.WriteLine("");
-            await terminal.GetInputAsync($"  {Loc.Get("ui.press_enter")}");
+            await terminal.PressAnyKey();
 
             OnBetrayalRevenged?.Invoke(npcId);
         }

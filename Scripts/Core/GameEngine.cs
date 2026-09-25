@@ -1866,7 +1866,7 @@ public partial class GameEngine
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("engine.admin_requires_online"));
-            await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+            await terminal.PressAnyKey();
             return;
         }
         var adminConsole = new OnlineAdminConsole(terminal, sqlBackend);
@@ -1884,7 +1884,7 @@ public partial class GameEngine
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("engine.password_requires_online"));
-            await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -1898,7 +1898,7 @@ public partial class GameEngine
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("engine.no_username"));
-            await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -1920,7 +1920,7 @@ public partial class GameEngine
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("engine.password_min_length"));
-            await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -1929,14 +1929,14 @@ public partial class GameEngine
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("engine.passwords_no_match"));
-            await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+            await terminal.PressAnyKey();
             return;
         }
 
         var (success, message) = await sqlBackend.ChangePassword(username, currentPassword, newPassword);
         terminal.SetColor(success ? "bright_green" : "red");
         terminal.WriteLine(message);
-        await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+        await terminal.PressAnyKey();
     }
 
     // ═══════════════════════════════════════════════════════════════════

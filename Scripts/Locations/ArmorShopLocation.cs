@@ -1230,8 +1230,7 @@ public class ArmorShopLocation : BaseLocation
     private async Task Pause()
     {
         terminal.SetColor("gray");
-        terminal.Write(Loc.Get("ui.press_enter"));
-        await terminal.GetInput("");
+        await terminal.PressAnyKey();
     }
 
     private static string FormatNumber(long value)

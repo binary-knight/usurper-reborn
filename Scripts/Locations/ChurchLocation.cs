@@ -65,8 +65,7 @@ namespace UsurperRemake.Locations
                 term.WriteLine(Loc.Get("church.cleanse_soul"));
                 term.WriteLine("");
                 term.SetColor("yellow");
-                term.Write(Loc.Get("church.press_return"));
-                await term.GetKeyInput();
+                await term.PressAnyKey(Loc.Get("church.press_return"));
                 throw new LocationExitException(GameLocation.MainStreet);
             }
 

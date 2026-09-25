@@ -1102,7 +1102,7 @@ namespace UsurperRemake.Systems
                 {
                     terminal!.SetColor("gray");
                     terminal.WriteLine($"  {Loc.Get("dialogue.decide_not_push")}");
-                    await terminal.GetInput($"  {Loc.Get("ui.press_enter")}");
+                    await terminal.PressAnyKey();
                 }
                 return;
             }
@@ -1209,7 +1209,7 @@ namespace UsurperRemake.Systems
             state.LastConversationDate = DateTime.Now;
 
             terminal.WriteLine("");
-            await terminal.GetInput($"  {Loc.Get("ui.press_enter")}");
+            await terminal.PressAnyKey();
         }
 
         /// <summary>
@@ -1387,7 +1387,7 @@ namespace UsurperRemake.Systems
             }
 
             terminal.WriteLine("");
-            await terminal.GetInput($"  {Loc.Get("ui.press_enter")}");
+            await terminal.PressAnyKey();
         }
 
         private string GeneratePersonalStory(NPC npc, bool intimate)
@@ -1800,7 +1800,7 @@ namespace UsurperRemake.Systems
             }
 
             terminal.WriteLine("");
-            await terminal.GetInput($"  {Loc.Get("ui.press_enter")}");
+            await terminal.PressAnyKey();
         }
 
         private async Task HandleComplimentOption(NPC npc, int relationLevel)
@@ -1828,7 +1828,7 @@ namespace UsurperRemake.Systems
             RelationshipSystem.UpdateRelationship(player!, npc, 1);
 
             terminal.WriteLine("");
-            await terminal.GetInput($"  {Loc.Get("ui.press_enter")}");
+            await terminal.PressAnyKey();
         }
 
         private async Task HandleConfessionOption(NPC npc, int relationLevel)
@@ -1956,7 +1956,7 @@ namespace UsurperRemake.Systems
             if (confessionAccepted) postState.ConfessionAccepted = true;
             npcConversationStates[npc.ID] = postState;
 
-            await terminal.GetInput($"  {Loc.Get("ui.press_enter")}");
+            await terminal.PressAnyKey();
         }
 
         private async Task HandleIntimateOption(NPC npc, int relationLevel)
@@ -2006,7 +2006,7 @@ namespace UsurperRemake.Systems
             }
 
             terminal.WriteLine("");
-            await terminal.GetInput($"  {Loc.Get("ui.press_enter")}");
+            await terminal.PressAnyKey();
         }
 
         private async Task HandlePropositionOption(NPC npc, int relationLevel)
@@ -2071,7 +2071,7 @@ namespace UsurperRemake.Systems
             }
 
             terminal.WriteLine("");
-            await terminal.GetInput($"  {Loc.Get("ui.press_enter")}");
+            await terminal.PressAnyKey();
         }
 
         private async Task HandleProvocationOption(NPC npc, int relationLevel)
@@ -2124,7 +2124,7 @@ namespace UsurperRemake.Systems
             }
 
             terminal.WriteLine("");
-            await terminal.GetInput($"  {Loc.Get("ui.press_enter")}");
+            await terminal.PressAnyKey();
         }
 
         private async Task HandleAskToLeaveOption(NPC npc, int relationLevel)
@@ -2145,7 +2145,7 @@ namespace UsurperRemake.Systems
             {
                 terminal.SetColor("gray");
                 terminal.WriteLine($"  {Loc.Get("dialogue.narr_stares_blank", npc.Name2)}");
-                await terminal.GetInput($"  {Loc.Get("ui.press_enter")}");
+                await terminal.PressAnyKey();
                 return;
             }
 
@@ -2295,7 +2295,7 @@ namespace UsurperRemake.Systems
             }
 
             terminal.WriteLine("");
-            await terminal.GetInput($"  {Loc.Get("ui.press_enter")}");
+            await terminal.PressAnyKey();
         }
 
         private async Task HandleMarriageProposal(NPC npc, int relationLevel)
@@ -2316,7 +2316,7 @@ namespace UsurperRemake.Systems
                 {
                     terminal.SetColor("red");
                     terminal.WriteLine($"  {GetVNIncestRefusal(rel, npc.DisplayName ?? npc.Name2 ?? npc.Name)}");
-                    await terminal.GetInput($"  {Loc.Get("ui.press_enter")}");
+                    await terminal.PressAnyKey();
                     return;
                 }
             }
@@ -2326,7 +2326,7 @@ namespace UsurperRemake.Systems
             {
                 terminal.SetColor("red");
                 terminal.WriteLine($"  {Loc.Get("dialogue.age_requirement", $"{GameConfig.MinimumAgeToMarry}")}");
-                await terminal.GetInput($"  {Loc.Get("ui.press_enter")}");
+                await terminal.PressAnyKey();
                 return;
             }
 
@@ -2338,7 +2338,7 @@ namespace UsurperRemake.Systems
                 {
                     terminal.SetColor("yellow");
                     terminal.WriteLine($"  {Loc.Get("dialogue.already_married")}");
-                    await terminal.GetInput($"  {Loc.Get("ui.press_enter")}");
+                    await terminal.PressAnyKey();
                     return;
                 }
             }
@@ -2349,7 +2349,7 @@ namespace UsurperRemake.Systems
             {
                 terminal.SetColor("red");
                 terminal.WriteLine($"  {Loc.Get("dialogue.wedding_cost", $"{weddingCost}", $"{player.Gold}")}");
-                await terminal.GetInput($"  {Loc.Get("ui.press_enter")}");
+                await terminal.PressAnyKey();
                 return;
             }
 
@@ -2462,7 +2462,7 @@ namespace UsurperRemake.Systems
             }
 
             terminal.WriteLine("");
-            await terminal.GetInput($"  {Loc.Get("ui.press_enter")}");
+            await terminal.PressAnyKey();
         }
 
         // v0.64.1 audit fix: case-insensitive name match between a goal's
@@ -2521,7 +2521,7 @@ namespace UsurperRemake.Systems
                 terminal!.SetColor("gray");
                 terminal.WriteLine($"  {Loc.Get("dialogue.npc_quest_target_gone", npc.Name2)}");
                 terminal.WriteLine("");
-                await terminal.GetInput($"  {Loc.Get("ui.press_enter")}");
+                await terminal.PressAnyKey();
                 return;
             }
 
@@ -2552,7 +2552,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("");
                 terminal.WriteLine($"  {Loc.Get("dialogue.npc_quest_declined", npc.Name2)}");
                 terminal.WriteLine("");
-                await terminal.GetInput($"  {Loc.Get("ui.press_enter")}");
+                await terminal.PressAnyKey();
                 return;
             }
 
@@ -2616,7 +2616,7 @@ namespace UsurperRemake.Systems
                     terminal.WriteLine("");
                     terminal.WriteLine($"  {Loc.Get("dialogue.npc_quest_failed")}");
                     terminal.WriteLine("");
-                    await terminal.GetInput($"  {Loc.Get("ui.press_enter")}");
+                    await terminal.PressAnyKey();
                     return;
                 }
 
@@ -2638,7 +2638,7 @@ namespace UsurperRemake.Systems
             }
 
             terminal.WriteLine("");
-            await terminal.GetInput($"  {Loc.Get("ui.press_enter")}");
+            await terminal.PressAnyKey();
         }
 
         private async Task PerformWeddingCeremony(NPC npc)
@@ -2759,7 +2759,7 @@ namespace UsurperRemake.Systems
             await MarriageSurnameHelper.OfferAsync(terminal, player, npc.DisplayName ?? npc.Name2);
 
             terminal.WriteLine("");
-            await terminal.GetInput($"  {Loc.Get("dialogue.press_enter_new_life")}");
+            await terminal.PressAnyKey(Loc.Get("dialogue.press_enter_new_life"));
         }
 
         /// <summary>

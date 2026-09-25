@@ -1818,8 +1818,7 @@ public partial class MainStreetLocation : BaseLocation
     {
         terminal.WriteLine(Loc.Get("main_street.mail_checking"), "cyan");
         await MailSystem.ReadPlayerMail(currentPlayer.Name2, terminal);
-        terminal.WriteLine(Loc.Get("main_street.mail_return"), "gray");
-        await terminal.GetInput("");
+        await terminal.PressAnyKey(Loc.Get("main_street.mail_return"));
     }
 
     /// <summary>

@@ -389,7 +389,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("");
             }
 
-            await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+            await terminal.PressAnyKey();
             return false;
         }
 
@@ -535,7 +535,7 @@ namespace UsurperRemake.Systems
             }
 
             terminal.WriteLine("");
-            await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+            await terminal.PressAnyKey();
         }
 
         /// <summary>

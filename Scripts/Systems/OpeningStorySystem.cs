@@ -214,7 +214,7 @@ namespace UsurperRemake.Systems
             }
 
             terminal.WriteLine("");
-            await terminal.GetInputAsync($"  {Loc.Get("ui.press_enter")}");
+            await terminal.PressAnyKey();
         }
 
         /// <summary>
@@ -319,7 +319,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  {Loc.Get("opening_story.words_burn")}", "white");
 
             terminal.WriteLine("");
-            await terminal.GetInputAsync($"  {Loc.Get("ui.press_enter")}");
+            await terminal.PressAnyKey();
         }
 
         /// <summary>
@@ -390,7 +390,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("  ─────────────────────────────────────────────────────────", "dark_cyan");
             terminal.WriteLine("");
 
-            await terminal.GetInputAsync($"  {Loc.Get("opening_story.press_enter_journey")}");
+            await terminal.PressAnyKey(Loc.Get("opening_story.press_enter_journey"));
 
             // Final transition
             terminal.Clear();
@@ -561,7 +561,7 @@ namespace UsurperRemake.Systems
             }
 
             terminal.WriteLine("");
-            await terminal.GetInputAsync($"  {Loc.Get("opening_story.press_enter_cycle")}");
+            await terminal.PressAnyKey(Loc.Get("opening_story.press_enter_cycle"));
 
             // Mark opening complete
             StoryProgressionSystem.Instance.SetStoryFlag("opening_complete", true);

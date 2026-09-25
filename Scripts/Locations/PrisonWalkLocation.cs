@@ -208,8 +208,7 @@ public partial class PrisonWalkLocation : BaseLocation
         await terminal.WriteLineAsync($"{Loc.Get("prison_walk.chivalry")}: {player.Chivalry:N0}");
         await terminal.WriteLineAsync($"{Loc.Get("prison_walk.darkness")}: {player.Darkness:N0}");
         await terminal.WriteLineAsync();
-        await terminal.WriteAsync(Loc.Get("ui.press_enter"));
-        await terminal.GetCharAsync();
+        await terminal.PressAnyKey();
     }
     
     private async Task HandleListPrisoners(Character player)
@@ -255,8 +254,7 @@ public partial class PrisonWalkLocation : BaseLocation
         }
         
         await terminal.WriteLineAsync();
-        await terminal.WriteAsync(Loc.Get("ui.press_enter"));
-        await terminal.GetCharAsync();
+        await terminal.PressAnyKey();
     }
     
     private async Task<List<Character>> GetAllPrisoners()
