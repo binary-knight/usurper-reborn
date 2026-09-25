@@ -2703,6 +2703,7 @@
   "castle.criminal_name": "Nome del criminale: ",
   "castle.bounty_amount": "Importo della taglia: ",
   "castle.bounty_placed": "Una taglia di {0} oro è stata posta su {1}!",
+  "castle.bounty_roster_busy": "Gli scrivani reali stanno ancora aggiornando i registri. Riprova tra un momento.",
   "castle.visit_orphans": "Visitate i fanciulli sotto protezione reale.",
   "castle.orphan_count": "Orfani: {0}/{1}   Costo giornaliero: {2} oro ({3} per bambino)",
   "castle.orphanage_empty": "L'orfanotrofio è vuoto. Potreste accogliere un bambino bisognoso.",

@@ -2703,6 +2703,7 @@
   "castle.criminal_name": "A bűnöző neve: ",
   "castle.bounty_amount": "Vérdíj összege: ",
   "castle.bounty_placed": "{0} arany vérdíjat tűztél ki {1} fejére!",
+  "castle.bounty_roster_busy": "A királyi írnokok még frissítik a jegyzékeket. Próbáld újra egy pillanat múlva.",
   "castle.visit_orphans": "Meglátogatod a királyi védelem alatt álló gyermekeket.",
   "castle.orphan_count": "Árvák: {0}/{1}   Napi gondozási költség: {2} arany ({3} gyermekenként)",
   "castle.orphanage_empty": "Az árvaház üres. Talán befogadhatnál egy rászoruló gyermeket.",

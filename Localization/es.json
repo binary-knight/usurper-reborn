@@ -2703,6 +2703,7 @@
   "castle.criminal_name": "Nombre del criminal: ",
   "castle.bounty_amount": "Monto de la recompensa: ",
   "castle.bounty_placed": "¡Se ha puesto una recompensa de {0} oro por {1}!",
+  "castle.bounty_roster_busy": "Los escribanos reales aún están actualizando los registros. Inténtalo de nuevo en un momento.",
   "castle.visit_orphans": "Visitas a los niños bajo protección real.",
   "castle.orphan_count": "Huérfanos: {0}/{1}   Costo diario de cuidado: {2} oro ({3} por niño)",
   "castle.orphanage_empty": "El orfanato está vacío. Quizás podrías acoger a un niño necesitado.",

@@ -3614,6 +3614,9 @@ public class CastleLocation : BaseLocation
         }
     }
 
+    /// <summary>v1.1.14: a royal decree waits while the NPC roster is not loaded or is being rebuilt (not trustworthy).</summary>
+    internal static bool DecreeMustWaitForRoster() => NPCSpawnSystem.Instance?.IsRosterTrustworthy != true;
+
     private async Task PlaceBounty()
     {
         terminal.WriteLine("");
@@ -3645,6 +3648,13 @@ public class CastleLocation : BaseLocation
             {
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("castle.insufficient_treasury"));
+            }
+            else if (DecreeMustWaitForRoster())
+            {
+                // v1.1.14: refused before any gold leaves the treasury; a decree posted now could not tell a
+                // player from an NPC briefly missing from the roster
+                terminal.SetColor("yellow");
+                terminal.WriteLine(Loc.Get("castle.bounty_roster_busy"));
             }
             else if (!await CourtChangeAsync(court => { if (court.Treasury < amount) return false; court.Treasury -= amount; return true; }))   // v1.1.13
             {

@@ -2703,6 +2703,7 @@
   "castle.criminal_name": "Name of the criminal: ",
   "castle.bounty_amount": "Bounty amount: ",
   "castle.bounty_placed": "A bounty of {0} gold has been placed on {1}!",
+  "castle.bounty_roster_busy": "The royal clerks are still updating the rolls. Try again in a moment.",
   "castle.visit_orphans": "You visit the children under royal protection.",
   "castle.orphan_count": "Orphans: {0}/{1}   Daily care cost: {2} gold ({3} per child)",
   "castle.orphanage_empty": "The orphanage is empty. Perhaps you could take in a child in need.",

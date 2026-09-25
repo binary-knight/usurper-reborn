@@ -99,6 +99,30 @@ public partial class OwnerProcessConflictTests
         npc.Brain!.Memory.AllMemories.Should().Contain(m => m.InvolvedCharacter == "Bob", "the time cut-off holds once a later character uses the name");
     }
 
+    // ─── C11: a royal decree is refused while the NPC roster is not trustworthy ───
+
+    [Fact]
+    public void ARoyalDecree_IsRefused_WhileTheRosterRebuilds_BeforeAnyGoldLeavesTheTreasury()
+    {
+        for (int i = 0; i < 20; i++) Npc($"npc_c11_{i}", $"Citizen{i}");
+        bool trusted = NPCSpawnSystem.Instance.IsRosterTrustworthy;
+        NPCSpawnSystem.Instance.IsRebuilding = true;
+        CastleLocation.DecreeMustWaitForRoster().Should().BeTrue("a roster being rebuilt cannot tell a player from a missing NPC");
+        NPCSpawnSystem.Instance.IsRebuilding = false;
+        CastleLocation.DecreeMustWaitForRoster().Should().Be(!trusted);
+
+        // the refusal comes before the treasury's court change, and says so in the player's language
+        var src = File.ReadAllText(Path.Combine(RepoRoot(), "Scripts", "Locations", "CastleLocation.cs"));
+        int at = src.IndexOf("private async Task PlaceBounty()", StringComparison.Ordinal);
+        var body = src.Substring(at, src.IndexOf("await Task.Delay(2500);", at, StringComparison.Ordinal) - at);
+        int wait = body.IndexOf("else if (DecreeMustWaitForRoster())", StringComparison.Ordinal);
+        wait.Should().BeGreaterThan(0);
+        wait.Should().BeLessThan(body.IndexOf("CourtChangeAsync(", StringComparison.Ordinal));
+        body.Substring(wait, 400).Should().Contain("Loc.Get(\"castle.bounty_roster_busy\")");
+        foreach (var lang in new[] { "en", "es", "fr", "hu", "it" })
+            File.ReadAllText(Path.Combine(RepoRoot(), "Localization", lang + ".json")).Should().Contain("\"castle.bounty_roster_busy\"");
+    }
+
     private static string RepoRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
