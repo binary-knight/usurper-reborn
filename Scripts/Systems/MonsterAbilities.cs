@@ -1366,6 +1366,17 @@ public static class MonsterAbilities
     }
 
     /// <summary>
+    /// v1.1.14: an ability the monster passes up this turn for its normal attack. Engulf is not
+    /// used on a target that is already held (stunned, webbed, engulfed, frozen, asleep or
+    /// paralyzed: anything that stops it acting), so a pack of cubes cannot stack holds on one tank.
+    /// </summary>
+    public static bool FallsBackToNormalAttack(AbilityType ability, Monster monster, Character target) => ability switch
+    {
+        AbilityType.Engulf => target != null && !target.CanAct(),
+        _ => false
+    };
+
+    /// <summary>
     /// Calculate breath weapon damage
     /// </summary>
     private static int CalculateBreathDamage(Monster monster, float multiplier)
