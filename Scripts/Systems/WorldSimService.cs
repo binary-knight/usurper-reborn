@@ -1296,7 +1296,9 @@ namespace UsurperRemake.Systems
               {
                 var npc = new NPC
                 {
-                    Id = data.Id,
+                    // v1.1.14: a record saved with no Id gets one here, once, so the roster overlay tracks the NPC by it
+                    // (not by name, where a tombstone of an earlier NPC of that name would drop it)
+                    Id = string.IsNullOrEmpty(data.Id) ? Guid.NewGuid().ToString() : data.Id,
                     ID = !string.IsNullOrEmpty(data.CharacterID) ? data.CharacterID : $"npc_{data.Name.ToLower().Replace(" ", "_")}",
                     Name1 = data.Name,
                     Name2 = data.Name,
