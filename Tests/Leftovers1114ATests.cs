@@ -345,4 +345,111 @@ public class Leftovers1114ATests : IDisposable
         // a door's embedded world sim never takes a held lock over
         program.Should().NotContain("TakeOverWorldSimLock(worldSimOwnerId)");
     }
+
+    // ─── X1: admin commands a stopped game server left 'executing' ───
+
+    private UsurperRemake.Server.MudServer AdminOnlyServer()
+    {
+        var t = typeof(UsurperRemake.Server.MudServer);
+        var server = (UsurperRemake.Server.MudServer)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(t);
+        t.GetField("_sqlBackend", Priv)!.SetValue(server, _db);
+        t.GetField("<ActiveSessions>k__BackingField", Priv)!.SetValue(server,
+            new System.Collections.Concurrent.ConcurrentDictionary<string, UsurperRemake.Server.PlayerSession>());
+        return server;
+    }
+
+    private void Account(string user, string name2, string id) =>
+        Exec($"INSERT INTO players (username, display_name, player_data) VALUES ('{user}', '{name2}', " +
+             $"'{{\"player\":{{\"name2\":\"{name2}\",\"id\":\"{id}\"}}}}');");
+
+    private int Command(string command, string? target, string status, string createdAgo)
+    {
+        Exec($"INSERT INTO admin_commands (command, target_username, status, created_at) VALUES " +
+             $"('{command}', {(target == null ? "NULL" : $"'{target}'")}, '{status}', datetime('now', '{createdAgo}'));");
+        return int.Parse(Scalar("SELECT MAX(id) FROM admin_commands;")!);
+    }
+
+    private string? Status(int id) => Scalar($"SELECT status FROM admin_commands WHERE id = {id};");
+
+    [Fact]
+    public async Task StuckAdminCommands_AreRecovered_ToAFinalStatus_Once()
+    {
+        // the delete never ran: the account still holds its save
+        Account("x1_unrun", "X1 Unrun", "id_x1_unrun");
+        int unrun = Command("delete_player", "x1_unrun", "executing", "-5 minutes");
+        // the delete landed (archived, emptied), and the game server stopped before its purge was marked
+        Account("x1_landed", "X1 Landed", "id_x1_landed");
+        int landed = Command("delete_player", "x1_landed", "executing", "-5 minutes");
+        _db.DeleteGameData("x1_landed").Should().BeTrue();
+        // the delete stopped between its archive and emptying the save: the save is still there
+        Account("x1_half", "X1 Half", "id_x1_half");
+        int half = Command("delete_player", "x1_half", "executing", "-5 minutes");
+        Exec("INSERT INTO deleted_characters (username, display_name, player_data, expires_at) " +
+             "SELECT username, display_name, player_data, datetime('now', '+7 days') FROM players WHERE username = 'x1_half';");
+        // nothing to delete: no save and no archive
+        Exec("INSERT INTO players (username, display_name, player_data) VALUES ('x1_empty', 'X1 Empty', '{}');");
+        int empty = Command("delete_player", "x1_empty", "executing", "-5 minutes");
+        // another command is not run again late
+        int kick = Command("kick", "x1_unrun", "executing", "-5 minutes");
+        // claimed moments ago (a live claim), or running in this process: left alone
+        Account("x1_fresh", "X1 Fresh", "id_x1_fresh");
+        int fresh = Command("delete_player", "x1_fresh", "executing", "-2 seconds");
+        int mine = Command("delete_player", "x1_fresh", "executing", "-5 minutes");
+
+        var server = AdminOnlyServer();
+        var reran = new List<int>();
+        Task Rerun(AdminCommand cmd)
+        {
+            reran.Add(cmd.Id);
+            return (Task)typeof(UsurperRemake.Server.MudServer).GetMethod("RunClaimedAdminCommand", Priv)!.Invoke(server, new object[] { cmd })!;
+        }
+
+        (await UsurperRemake.Server.MudServer.RecoverStuckAdminCommandsAsync(_db, id => id == mine, Rerun)).Should().Be(5);
+
+        Status(unrun).Should().Be("executed", "the delete that never ran is run now");
+        Scalar("SELECT player_data FROM players WHERE username = 'x1_unrun';").Should().Be("{}");
+        reran.Should().Equal(new[] { unrun, half }, "only a delete whose save is still there is run again");
+        Status(half).Should().Be("executed", "an archive row beside a live save is a delete that did not land");
+        Scalar("SELECT player_data FROM players WHERE username = 'x1_half';").Should().Be("{}");
+
+        Status(landed).Should().Be("executed", "the delete had landed");
+        Scalar("SELECT COUNT(*) FROM pending_purges WHERE username = 'x1_landed';").Should().Be("1", "its world purge is queued for the drain");
+        Scalar("SELECT name2 FROM pending_purges WHERE username = 'x1_landed';").Should().Be("X1 Landed", "named from the archived save");
+        Scalar("SELECT player_id FROM pending_purges WHERE username = 'x1_landed';").Should().Be("id_x1_landed");
+        Scalar("SELECT COUNT(*) FROM deleted_characters WHERE username = 'x1_landed';").Should().Be("1", "not deleted and archived a second time");
+
+        Status(empty).Should().Be("failed");
+        Status(kick).Should().Be("failed");
+        Status(fresh).Should().Be("executing");
+        Status(mine).Should().Be("executing");
+
+        // a second sweep finds nothing left to recover; the queued purge drains once
+        (await UsurperRemake.Server.MudServer.RecoverStuckAdminCommandsAsync(_db, id => id == mine, Rerun)).Should().Be(0);
+        (await UsurperRemake.Server.MudServer.DrainPendingPurgesAsync(_db)).Should().Be(1);
+    }
+
+    [Fact]
+    public void AStuckCommand_IsTakenOverOnce()
+    {
+        int id = Command("delete_player", "x1_twice", "executing", "-5 minutes");
+        _db.TryClaimStuckAdminCommand(id, 60).Should().BeTrue();
+        _db.TryClaimStuckAdminCommand(id, 60).Should().BeFalse("another recovery stamped it moments ago");
+        _db.GetStuckAdminCommands(60).Should().NotContain(c => c.Id == id);
+        // a recovery that stopped too is taken over once its stamp is old
+        Exec($"UPDATE admin_commands SET executed_at = datetime('now', '-5 minutes') WHERE id = {id};");
+        _db.GetStuckAdminCommands(60).Should().Contain(c => c.Id == id);
+        _db.TryClaimStuckAdminCommand(id, 60).Should().BeTrue();
+    }
+
+    [Fact]
+    public void TheAdminPoller_RecoversStuckCommands_BeforeItDrainsQueuedPurges_OnceTheWorldIsLoaded()
+    {
+        var mud = Source("Server", "MudServer.cs");
+        int poller = mud.IndexOf("private async Task AdminCommandPollerAsync", StringComparison.Ordinal);
+        int gate = mud.IndexOf("InitializationComplete.Task.IsCompletedSuccessfully == true", poller, StringComparison.Ordinal);
+        int recover = mud.IndexOf("await RecoverStuckAdminCommandsAsync(_sqlBackend,", poller, StringComparison.Ordinal);
+        int drain = mud.IndexOf("await DrainPendingPurgesAsync(_sqlBackend);", poller, StringComparison.Ordinal);
+        recover.Should().BeGreaterThan(gate).And.BeLessThan(drain);
+        mud.Should().Contain("AdminCommandsRunningHere[cmd.Id] = 0;");
+    }
 }

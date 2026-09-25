@@ -8208,6 +8208,129 @@ namespace UsurperRemake.Systems
             catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"RemovePendingPurge failed: {ex.Message}"); }
         }
 
+        // v1.1.14: an admin command stays 'executing' while it runs; executed_at is empty then, and is stamped
+        // when a restarted game server takes the stuck command over (TryClaimStuckAdminCommand)
+        private const string StuckExecuting =
+            "status = 'executing' AND ((executed_at IS NULL AND created_at < datetime('now', @age)) OR executed_at < datetime('now', @age))";
+
+        /// <summary>
+        /// v1.1.14: commands left 'executing' longer than olderThanSeconds: claimed by a game server that stopped
+        /// before it marked them executed or failed (the web server then waits on them in vain).
+        /// </summary>
+        public List<AdminCommand> GetStuckAdminCommands(int olderThanSeconds)
+        {
+            var commands = new List<AdminCommand>();
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT id, command, target_username, args FROM admin_commands WHERE " + StuckExecuting + " ORDER BY id LIMIT 20;";
+                cmd.Parameters.AddWithValue("@age", $"-{olderThanSeconds} seconds");
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                    commands.Add(new AdminCommand
+                    {
+                        Id = reader.GetInt32(0),
+                        Command = reader.GetString(1),
+                        TargetUsername = reader.IsDBNull(2) ? null : reader.GetString(2),
+                        Args = reader.IsDBNull(3) ? null : reader.GetString(3)
+                    });
+            }
+            catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"GetStuckAdminCommands failed: {ex.Message}"); }
+            return commands;
+        }
+
+        /// <summary>
+        /// v1.1.14: take over a stuck command (see GetStuckAdminCommands) before recovering it: true when this
+        /// call stamped it, so two recoveries never both run it. A recovery that stops too is taken over again
+        /// once the stamp is older than olderThanSeconds.
+        /// </summary>
+        public bool TryClaimStuckAdminCommand(int id, int olderThanSeconds)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "UPDATE admin_commands SET executed_at = datetime('now') WHERE id = @id AND " + StuckExecuting + ";";
+                cmd.Parameters.AddWithValue("@id", id);
+                cmd.Parameters.AddWithValue("@age", $"-{olderThanSeconds} seconds");
+                return cmd.ExecuteNonQuery() == 1;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"TryClaimStuckAdminCommand failed: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// v1.1.14: the archive row a delete of this account wrote at or after the admin command was queued (the
+        /// delete landed), with the Name2 and character ID from the archived save; null when there is none.
+        /// </summary>
+        public (string? Name2, string? DisplayName, string? PlayerId, string DeletedAt)? GetArchivedDeleteForCommand(string username, int commandId)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT CASE WHEN json_valid(player_data) THEN json_extract(player_data, '$.player.name2') END,
+                           display_name,
+                           CASE WHEN json_valid(player_data) THEN json_extract(player_data, '$.player.id') END,
+                           deleted_at
+                      FROM deleted_characters
+                     WHERE LOWER(username) = LOWER(@u)
+                       AND deleted_at >= (SELECT created_at FROM admin_commands WHERE id = @id)
+                     ORDER BY id DESC LIMIT 1;";
+                cmd.Parameters.AddWithValue("@u", username);
+                cmd.Parameters.AddWithValue("@id", commandId);
+                using var reader = cmd.ExecuteReader();
+                if (!reader.Read()) return null;
+                string? Text(int i) => reader.IsDBNull(i) ? null : Convert.ToString(reader.GetValue(i));
+                return (Text(0), Text(1), Text(2), Text(3) ?? "");
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"GetArchivedDeleteForCommand failed: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>v1.1.14: the account still holds a character save (its delete has not run).</summary>
+        public bool HasCharacterSave(string username)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT EXISTS (SELECT 1 FROM players WHERE LOWER(username) = LOWER(@u) " +
+                                  "AND player_data IS NOT NULL AND player_data != '{}' AND length(player_data) > 4);";
+                cmd.Parameters.AddWithValue("@u", username);
+                return Convert.ToInt64(cmd.ExecuteScalar()) != 0;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"HasCharacterSave failed: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>v1.1.14: queue a world purge, as the web delete does when the game server is down.</summary>
+        public void QueuePendingPurge(string username, string? name2, string? displayName, string deletedAt, string? playerId, string createdBy)
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "INSERT INTO pending_purges (username, name2, display_name, deleted_at, created_by, player_id) " +
+                              "VALUES (@u, @n, @d, @at, @by, @pid);";
+            cmd.Parameters.AddWithValue("@u", username);
+            cmd.Parameters.AddWithValue("@n", (object?)name2 ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@d", (object?)displayName ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@at", deletedAt);
+            cmd.Parameters.AddWithValue("@by", createdBy);
+            cmd.Parameters.AddWithValue("@pid", (object?)playerId ?? DBNull.Value);
+            cmd.ExecuteNonQuery();
+        }
+
         /// <summary>Expire admin commands older than 60 seconds that are still pending.</summary>
         public void ExpireStaleAdminCommands()
         {
