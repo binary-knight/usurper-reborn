@@ -192,6 +192,7 @@ public partial class MainStreetLocation : BaseLocation
 
         // Status line
         ShowStatusLine();
+        if (UseClassicLayout) base.ShowQuickCommandBar(); // v1.1.14: the classic screen kept the quick command bar
 
         // Electron emit was hoisted to the top of this method (Phase 2 — see comment there).
 
@@ -451,9 +452,16 @@ public partial class MainStreetLocation : BaseLocation
         }
 
         // v1.1.13: the district menu (one per line for a screen reader)
-        var streetLines = MainStreetLines(CurrentStreetView(), OnlinePlayerCount());
-        if (IsScreenReader) WriteStreetMenuPlain(streetLines);
-        else WriteStreetMenuCompact(streetLines);
+        if (UseClassicLayout)
+        {
+            WriteClassicLayoutBBSMenu(); // v1.1.14: the classic rows
+        }
+        else
+        {
+            var streetLines = MainStreetLines(CurrentStreetView(), OnlinePlayerCount());
+            if (IsScreenReader) WriteStreetMenuPlain(streetLines);
+            else WriteStreetMenuCompact(streetLines);
+        }
 
         // Blank line
         terminal.WriteLine("");
@@ -518,6 +526,8 @@ public partial class MainStreetLocation : BaseLocation
             terminal.Write($"({pct}%)");
         }
         terminal.WriteLine("");
+
+        if (UseClassicLayout) WriteClassicLayoutBBSQuickCommands(liveNPCs.Count); // v1.1.14: classic line 15
 
         // Line 16: Bottom border
         if (!IsScreenReader)
@@ -640,6 +650,12 @@ public partial class MainStreetLocation : BaseLocation
     /// </summary>
     private void ShowMainStreetMenu()
     {
+        if (UseClassicLayout) // v1.1.14: the classic layout, by preference
+        {
+            if (currentPlayer.ScreenReaderMode) ShowClassicLayoutScreenReaderMenu();
+            else ShowClassicLayoutMenu();
+            return;
+        }
         if (currentPlayer.ScreenReaderMode)
         {
             ShowScreenReaderMenu();
@@ -671,6 +687,8 @@ public partial class MainStreetLocation : BaseLocation
 
     protected override async Task<bool> ProcessChoice(string choice)
     {
+        if (UseClassicLayout) return await ProcessClassicChoice(choice); // v1.1.14: the classic keys, by preference
+
         if (string.IsNullOrWhiteSpace(choice))
             return false;
 
