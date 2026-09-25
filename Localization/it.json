@@ -12923,6 +12923,7 @@
   "team.war_no_rounds_pending": "Nessun round è stato combattuto. Non è stato possibile chiudere la guerra ora; la tua posta di {0} oro ti sarà restituita alla sua scadenza.",
   "team.war_result_pending": "Non è stato possibile registrare il risultato ora, quindi per il momento non si paga né si addebita nulla. Alla scadenza la guerra sarà chiusa con questo punteggio: il bottino di una vittoria arriva tramite bonifico bancario, e una sconfitta trattiene la tua posta di {0} oro.",
   "team.war_already_closed": "Questa guerra era già stata chiusa prima che il suo risultato potesse essere registrato qui, quindi qui non si paga né si addebita nulla. Un eventuale bottino o rimborso dovuto arriva tramite bonifico bancario.",
+  "team.renamed_case_notice": "La tua squadra \"{0}\" aveva lo stesso nome della squadra \"{1}\" a parte le maiuscole, quindi è stata rinominata \"{2}\". Nient'altro della tua squadra è cambiato.",
   "team.war_abandoned": "ABBANDONATA",
   "team.upgrade_not_landed": "Il potenziamento non è andato a buon fine (qualcuno l'ha fatto prima, o il caveau non bastava). Non è stato addebitato nulla.",
   "team.confirm_withdraw": "Prelevare {0} oro dal caveau della squadra? (S/N): ",

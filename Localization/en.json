@@ -13108,6 +13108,7 @@
   "team.war_no_rounds_pending": "No round could be fought. The war could not be closed just now; your {0} gold wager will be returned to you once it expires.",
   "team.war_result_pending": "The result could not be recorded just now, so nothing is paid or charged yet. When the war expires it is settled by this score: a win's spoils arrive by bank transfer, and a loss keeps your {0} gold wager.",
   "team.war_already_closed": "This war was already closed before its result could be recorded here, so nothing is paid or charged here. Any spoils or refund due arrive by bank transfer.",
+  "team.renamed_case_notice": "Your team \"{0}\" had the same name as the team \"{1}\" apart from capital letters, so it has been renamed \"{2}\". Nothing else about your team has changed.",
   "team.war_abandoned": "ABANDONED",
   "team.upgrade_not_landed": "The upgrade did not go through (someone upgraded it first, or the vault fell short). Nothing was charged.",
   "team.confirm_withdraw": "Withdraw {0} gold from the team vault? (Y/N): ",

@@ -12923,6 +12923,7 @@
   "team.war_no_rounds_pending": "No se pudo librar ningún asalto. La guerra no se pudo cerrar ahora; tu apuesta de {0} de oro se te devolverá cuando expire.",
   "team.war_result_pending": "El resultado no se pudo registrar ahora, así que todavía no se paga ni se cobra nada. Cuando la guerra expire se resolverá con este marcador: el botín de una victoria llega por transferencia bancaria y una derrota se queda con tu apuesta de {0} de oro.",
   "team.war_already_closed": "Esta guerra ya se había cerrado antes de que se pudiera registrar su resultado aquí, así que aquí no se paga ni se cobra nada. Cualquier botín o reembolso debido llega por transferencia bancaria.",
+  "team.renamed_case_notice": "Tu equipo \"{0}\" tenía el mismo nombre que el equipo \"{1}\" salvo por las mayúsculas, así que se ha renombrado \"{2}\". Nada más de tu equipo ha cambiado.",
   "team.war_abandoned": "ABANDONADA",
   "team.upgrade_not_landed": "La mejora no se realizó (alguien la mejoró antes, o faltó oro en la cámara). No se cobró nada.",
   "team.confirm_withdraw": "¿Retirar {0} de oro de la cámara del equipo? (S/N): ",

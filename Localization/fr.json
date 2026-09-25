@@ -12923,6 +12923,7 @@
   "team.war_no_rounds_pending": "Aucune manche n'a pu être livrée. La guerre n'a pas pu être close pour l'instant ; votre mise de {0} pièces d'or vous sera rendue à son expiration.",
   "team.war_result_pending": "Le résultat n'a pas pu être enregistré pour l'instant, donc rien n'est encore payé ni prélevé. À son expiration, la guerre sera réglée selon ce score : le butin d'une victoire arrive par virement bancaire, et une défaite garde votre mise de {0} pièces d'or.",
   "team.war_already_closed": "Cette guerre était déjà close avant que son résultat puisse être enregistré ici, donc rien n'est payé ni prélevé ici. Tout butin ou remboursement dû arrive par virement bancaire.",
+  "team.renamed_case_notice": "Votre équipe \"{0}\" portait le même nom que l'équipe \"{1}\" aux majuscules près ; elle a donc été renommée \"{2}\". Rien d'autre n'a changé pour votre équipe.",
   "team.war_abandoned": "ABANDONNÉE",
   "team.upgrade_not_landed": "L'amélioration n'a pas eu lieu (quelqu'un l'a faite avant vous, ou le coffre manquait d'or). Rien n'a été prélevé.",
   "team.confirm_withdraw": "Retirer {0} pièces d'or du coffre de l'équipe ? (O/N) : ",

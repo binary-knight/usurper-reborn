@@ -1034,8 +1034,128 @@ namespace UsurperRemake.Systems
             MigrateWorldBossTables(connection); // v1.1.4
 
             EnsureDisplayNameUniqueIndex(connection);   // v1.1.14
+            RenameCaseVariantTeams();                    // v1.1.14
 
             DebugLogger.Instance.LogInfo("SQL", $"Database initialized at {databasePath}");
+        }
+
+        /// <summary>
+        /// v1.1.14: teams whose names differ only in case (made before 1.1.12 refused them, ulower) stay two
+        /// teams; the newer of each pair (created_at, then row order) is renamed "name (2)", or the next free
+        /// number, unique ignoring case as ulower folds it. In one transaction per start: the team row, its
+        /// upgrades, vault, wars and sieges, each member's save ($.player.team, matched exactly), the NPC
+        /// members in the stored roster (written at the next version, so a process holding an older one reloads
+        /// it), and one mail to each player member in their language. Idempotent: a second run finds no pair and
+        /// changes nothing. Returns the number of teams renamed.
+        /// </summary>
+        internal int RenameCaseVariantTeams()
+        {
+            var renames = new List<(string Old, string New, string Kept)>();
+            try
+            {
+                using var connection = OpenConnection();
+                using var tx = connection.BeginTransaction(deferred: false);
+                var teams = new List<string>();
+                using (var q = connection.CreateCommand())
+                {
+                    q.Transaction = tx;
+                    q.CommandText = "SELECT team_name FROM player_teams ORDER BY created_at, rowid;";
+                    using var r = q.ExecuteReader();
+                    while (r.Read()) teams.Add(r.GetString(0));
+                }
+                var taken = new HashSet<string>(teams.Select(t => t.ToLowerInvariant()));
+                foreach (var group in teams.GroupBy(t => t.ToLowerInvariant()).Where(g => g.Count() > 1))
+                {
+                    string kept = group.First();
+                    foreach (var newer in group.Skip(1))
+                    {
+                        int n = 2;
+                        string name;
+                        do name = $"{kept} ({n++})"; while (taken.Contains(name.ToLowerInvariant()));
+                        taken.Add(name.ToLowerInvariant());
+                        renames.Add((newer, name, kept));
+                    }
+                }
+                if (renames.Count == 0) return 0;
+
+                void Exec(string sql, string oldName, string newName)
+                {
+                    using var cmd = connection.CreateCommand();
+                    cmd.Transaction = tx;
+                    cmd.CommandText = sql;
+                    cmd.Parameters.AddWithValue("@old", oldName);
+                    cmd.Parameters.AddWithValue("@new", newName);
+                    cmd.ExecuteNonQuery();
+                }
+                foreach (var (oldName, newName, kept) in renames)
+                {
+                    Exec("UPDATE player_teams SET team_name = @new WHERE team_name = @old;", oldName, newName);
+                    Exec("UPDATE team_upgrades SET team_name = @new WHERE team_name = @old;", oldName, newName);
+                    Exec("UPDATE team_vault SET team_name = @new WHERE team_name = @old;", oldName, newName);
+                    Exec("UPDATE team_wars SET challenger_team = @new WHERE challenger_team = @old;", oldName, newName);
+                    Exec("UPDATE team_wars SET defender_team = @new WHERE defender_team = @old;", oldName, newName);
+                    Exec("UPDATE castle_sieges SET team_name = @new WHERE team_name = @old;", oldName, newName);
+
+                    var members = new List<(string User, string Lang)>();
+                    using (var m = connection.CreateCommand())
+                    {
+                        m.Transaction = tx;
+                        m.CommandText = "SELECT username, COALESCE(language, 'en') FROM players WHERE json_valid(player_data) AND json_extract(player_data, '$.player.team') = @old;";
+                        m.Parameters.AddWithValue("@old", oldName);
+                        using var r = m.ExecuteReader();
+                        while (r.Read()) members.Add((r.GetString(0), r.GetString(1)));
+                    }
+                    Exec("UPDATE players SET player_data = json_set(player_data, '$.player.team', @new) " +
+                         "WHERE json_valid(player_data) AND json_extract(player_data, '$.player.team') = @old;", oldName, newName);
+                    foreach (var (user, lang) in members)
+                    {
+                        using var mail = connection.CreateCommand();
+                        mail.Transaction = tx;
+                        mail.CommandText = "INSERT INTO messages (from_player, to_player, message_type, message) VALUES ('System', @to, 'team_renamed', @msg);";
+                        mail.Parameters.AddWithValue("@to", user);
+                        mail.Parameters.AddWithValue("@msg", Loc.GetIn(lang, "team.renamed_case_notice", oldName, kept, newName));
+                        mail.ExecuteNonQuery();
+                    }
+                }
+
+                // the NPC members, in the stored roster
+                string? npcsJson = null;
+                using (var n = connection.CreateCommand())
+                {
+                    n.Transaction = tx;
+                    n.CommandText = "SELECT value FROM world_state WHERE key = 'npcs';";
+                    npcsJson = n.ExecuteScalar() as string;
+                }
+                if (!string.IsNullOrEmpty(npcsJson) && System.Text.Json.Nodes.JsonNode.Parse(npcsJson) is System.Text.Json.Nodes.JsonArray roster)
+                {
+                    int moved = 0;
+                    foreach (var npc in roster)
+                    {
+                        if (npc is not System.Text.Json.Nodes.JsonObject o || o["team"] is not System.Text.Json.Nodes.JsonValue v || !v.TryGetValue<string>(out var team)) continue;
+                        var hit = renames.FirstOrDefault(x => x.Old == team);
+                        if (hit.Old == null) continue;
+                        o["team"] = hit.New;
+                        moved++;
+                    }
+                    if (moved > 0)
+                    {
+                        using var w = connection.CreateCommand();
+                        w.Transaction = tx;
+                        w.CommandText = "UPDATE world_state SET value = @v, version = version + 1, updated_at = datetime('now'), updated_by = 'team_rename' WHERE key = 'npcs';";
+                        w.Parameters.AddWithValue("@v", roster.ToJsonString());
+                        w.ExecuteNonQuery();
+                    }
+                }
+                tx.Commit();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Renaming teams whose names differ only in case failed; nothing was changed, the next start tries again: {ex.Message}");
+                return 0;
+            }
+            foreach (var (oldName, newName, kept) in renames)
+                DebugLogger.Instance.LogInfo("TEAM", $"Team '{oldName}' renamed '{newName}': its name differed from team '{kept}' only in case.");
+            return renames.Count;
         }
 
         /// <summary>v1.1.14: the unique display-name index, as the live server has it.</summary>
