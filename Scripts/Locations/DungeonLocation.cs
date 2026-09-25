@@ -2939,7 +2939,7 @@ public class DungeonLocation : BaseLocation
         }
         else
         {
-            terminal.Write($"{Loc.Get("dungeon.bbs_danger")}: ");
+            terminal.Write(Loc.Get("dungeon.bbs_danger")); // v1.1.14: the label already ends in ": "
             for (int i = 0; i < room.DangerRating; i++) terminal.Write("*");
             for (int i = room.DangerRating; i < 3; i++) terminal.Write(".");
         }

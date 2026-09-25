@@ -87,3 +87,51 @@ public class StatusSheetSeparators1114Tests
         finally { GameConfig.Language = prev; }
     }
 }
+
+/// <summary>v1.1.14: the dungeon room's danger line prints its label once.</summary>
+[Collection("SharedGameSingletons")]
+public class DungeonDangerLabel1114Tests
+{
+    private const BindingFlags F = BindingFlags.NonPublic | BindingFlags.Instance;
+
+    internal static (DungeonLocation d, TerminalEmulator term, MemoryStream output) Rig(DungeonRoom room)
+    {
+        var output = new MemoryStream();
+        var term = new TerminalEmulator(new LineStream(Array.Empty<string>()), output);
+        var hero = new Character { Name1 = "dng", Name2 = "Dng", Class = CharacterClass.Warrior, Level = 12, HP = 390, MaxHP = 390, AI = CharacterAI.Human };
+        var d = new DungeonLocation();
+        typeof(BaseLocation).GetField("terminal", F)!.SetValue(d, term);
+        typeof(BaseLocation).GetField("currentPlayer", F)!.SetValue(d, hero);
+        typeof(DungeonLocation).GetField("currentDungeonLevel", F)!.SetValue(d, 6);
+        var floor = new DungeonFloor { Level = 6, Theme = DungeonTheme.Catacombs, CurrentRoomId = room.Id };
+        floor.Rooms.Add(room);
+        typeof(DungeonLocation).GetField("currentFloor", F)!.SetValue(d, floor);
+        return (d, term, output);
+    }
+
+    [Theory]
+    [InlineData("en")]
+    [InlineData("es")]
+    [InlineData("fr")]
+    [InlineData("hu")]
+    [InlineData("it")]
+    public void DangerLine_LabelOnce_NoDoubleColon(string lang)
+    {
+        var prev = GameConfig.Language;
+        bool sr = GameConfig.ScreenReaderMode;
+        try
+        {
+            GameConfig.Language = lang;
+            GameConfig.ScreenReaderMode = false;
+            var room = new DungeonRoom { Id = "r1", Name = "Hall of the Ancestors", DangerRating = 1, HasMonsters = true };
+            var (d, term, output) = Rig(room);
+            typeof(DungeonLocation).GetMethod("ShowDangerIndicators", F)!.Invoke(d, new object[] { room });
+            var text = StatusSheetSeparators1114Tests.Plain(term, output);
+            StatusSheetSeparators1114Tests.Capture($"danger-{lang}.txt", text);
+            text.Should().NotContain(": :");
+            text.Should().NotMatchRegex(@":\s*:");
+            text.Should().Contain(Loc.Get("dungeon.bbs_danger") + "*..");
+        }
+        finally { GameConfig.Language = prev; GameConfig.ScreenReaderMode = sr; }
+    }
+}
