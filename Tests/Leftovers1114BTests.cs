@@ -321,4 +321,63 @@ public class Leftovers1114BTests : IDisposable
         stored.Single(d => d.Name == "M3b Ada").Id = "kept_id";
         (await Restore(d => GameEngine.Instance.RestoreNPCs(d))).Ada.Should().Be("kept_id");
     }
+
+    // ─── X1 follow-up: a stuck delete with no archive ───
+
+    private int StuckDelete(string user, string? args)
+    {
+        Exec("INSERT INTO players (username, display_name, player_data) VALUES ('" + user + "', 'Shown " + user + "', '{}');");
+        using var conn = new SqliteConnection($"Data Source={_path}");
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "INSERT INTO admin_commands (command, target_username, args, status, created_at) " +
+                          "VALUES ('delete_player', @u, @a, 'executing', datetime('now', '-9 days'));";
+        cmd.Parameters.AddWithValue("@u", user);
+        cmd.Parameters.AddWithValue("@a", (object?)args ?? DBNull.Value);
+        cmd.ExecuteNonQuery();
+        return int.Parse(Scalar("SELECT MAX(id) FROM admin_commands;")!);
+    }
+
+    [Fact]
+    public async Task AStuckDeleteWithNoArchive_QueuesItsPurgeFromTheRequest_OrFailsWithAReasonTheAdminCanRead()
+    {
+        // the save was emptied and the archive is gone (expired after 7 days, or never written)
+        int named = StuckDelete("x1b_named", "{\"name2\":\"X1b Named\",\"display_name\":\"X1b Shown\",\"player_id\":\"id_x1b\"}");
+        int bare = StuckDelete("x1b_bare", null);
+        int noName = StuckDelete("x1b_noname", "{\"name2\":null,\"display_name\":\"Shown\",\"player_id\":null}");
+        string createdAt = Scalar($"SELECT created_at FROM admin_commands WHERE id = {named};")!;
+
+        (await UsurperRemake.Server.MudServer.RecoverStuckAdminCommandsAsync(_db, _ => false, _ => Task.CompletedTask)).Should().Be(3);
+
+        Scalar($"SELECT status FROM admin_commands WHERE id = {named};").Should().Be("executed");
+        Scalar("SELECT name2 FROM pending_purges WHERE username = 'x1b_named';").Should().Be("X1b Named", "named from the request's own record");
+        Scalar("SELECT player_id FROM pending_purges WHERE username = 'x1b_named';").Should().Be("id_x1b");
+        Scalar("SELECT display_name FROM pending_purges WHERE username = 'x1b_named';").Should().Be("X1b Shown");
+        Scalar("SELECT deleted_at FROM pending_purges WHERE username = 'x1b_named';").Should().Be(createdAt, "the request's time");
+
+        foreach (var id in new[] { bare, noName })
+        {
+            Scalar($"SELECT status FROM admin_commands WHERE id = {id};").Should().Be("failed");
+            var reason = Scalar($"SELECT result FROM admin_commands WHERE id = {id};")!;
+            reason.Should().Be(UsurperRemake.Server.MudServer.StuckDeleteUnrecoverable);
+            reason.Should().Contain("world purge").And.Contain("Delete the account again");
+        }
+        Scalar("SELECT COUNT(*) FROM pending_purges WHERE username IN ('x1b_bare', 'x1b_noname');").Should().Be("0");
+    }
+
+    [Fact]
+    public void TheWebDelete_WritesTheCharactersNamesAndId_IntoTheCommand()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "web"))) dir = dir.Parent;
+        var js = File.ReadAllText(Path.Combine(dir!.FullName, "web", "ssh-proxy.js"));
+        int route = js.IndexOf("// DELETE /api/admin/players/:username", StringComparison.Ordinal);
+        var body = js.Substring(route, js.IndexOf("// Fallback: queue the world purge", route, StringComparison.Ordinal) - route);
+        body.Should().Contain("purgeArgs = JSON.stringify({ name2: named.name2 || null, display_name: named.display_name || null, player_id: named.player_id || null });")
+            .And.Contain(".run('delete_player', playerUsername, purgeArgs, 'admin-web');");
+        // the game server reads the same field names
+        UsurperRemake.Server.MudServer.DeletePurgeArgs("{\"name2\":\"A\",\"display_name\":\"B\",\"player_id\":\"C\"}").Should().Be(("A", "B", "C"));
+        UsurperRemake.Server.MudServer.DeletePurgeArgs("{\"reason\":\"x\"}").Should().BeNull();
+        UsurperRemake.Server.MudServer.DeletePurgeArgs("not json").Should().BeNull();
+    }
 }

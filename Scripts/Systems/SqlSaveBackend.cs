@@ -8230,7 +8230,7 @@ namespace UsurperRemake.Systems
             {
                 using var connection = OpenConnection();
                 using var cmd = connection.CreateCommand();
-                cmd.CommandText = "SELECT id, command, target_username, args FROM admin_commands WHERE " + StuckExecuting + " ORDER BY id LIMIT 20;";
+                cmd.CommandText = "SELECT id, command, target_username, args, created_at FROM admin_commands WHERE " + StuckExecuting + " ORDER BY id LIMIT 20;";
                 cmd.Parameters.AddWithValue("@age", $"-{olderThanSeconds} seconds");
                 using var reader = cmd.ExecuteReader();
                 while (reader.Read())
@@ -8239,7 +8239,8 @@ namespace UsurperRemake.Systems
                         Id = reader.GetInt32(0),
                         Command = reader.GetString(1),
                         TargetUsername = reader.IsDBNull(2) ? null : reader.GetString(2),
-                        Args = reader.IsDBNull(3) ? null : reader.GetString(3)
+                        Args = reader.IsDBNull(3) ? null : reader.GetString(3),
+                        CreatedAt = reader.IsDBNull(4) ? null : Convert.ToString(reader.GetValue(4))   // v1.1.14
                     });
             }
             catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"GetStuckAdminCommands failed: {ex.Message}"); }
@@ -8614,5 +8615,6 @@ namespace UsurperRemake.Systems
         public string Command { get; set; } = "";
         public string? TargetUsername { get; set; }
         public string? Args { get; set; }
+        public string? CreatedAt { get; set; }   // v1.1.14: SQLite UTC text; filled by GetStuckAdminCommands
     }
 }
