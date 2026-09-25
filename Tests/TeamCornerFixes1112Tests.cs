@@ -198,7 +198,8 @@ public class TeamCornerFixes1112Tests : IDisposable
     }
 
     [Theory]
-    [InlineData("ConfirmAndRecruit", "var liveRecruit = NPCSpawnSystem.Instance.ActiveNPCs")]
+    // v1.1.14: the hire counts again under the membership gate, and looks the NPC up again after that count
+    [InlineData("ConfirmAndRecruit", "var live = full ? null : LiveTeamNpc(recruit);")]
     [InlineData("ResurrectTeammate", "var live = LiveTeamNpc(toResurrect);")]
     public void TheCapacityQuery_RunsBeforeTheLiveNpcLookup(string method, string lookup)
     {

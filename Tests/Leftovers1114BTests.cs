@@ -367,6 +367,29 @@ public class CombatSeed1114Tests
             (await PoisonedFight(7)).Should().Be(first, "every roll of the fight, the poison ticks included, comes from the seeded RNG");
     }
 
+    private static List<int> Rolls(CombatEngine engine) =>
+        Enumerable.Range(0, 32).Select(_ => ((Random)typeof(CombatEngine)
+            .GetField("random", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
+            .GetValue(engine)!).Next(1_000_000)).ToList();
+
+    private static CombatEngine Seeded(int seed)
+    {
+        var engine = new CombatEngine(new TerminalEmulator(new MemoryStream(), new MemoryStream()));
+        engine.SeedRandomForTests(seed);
+        return engine;
+    }
+
+    /// <summary>v1.1.14: bites on the hook itself. With SeedRandomForTests a no-op (the engine left on
+    /// Random.Shared), two engines seeded alike draw different rolls and fight different fights.</summary>
+    [Fact]
+    public async Task TwoEngines_SeededAlike_RollAlike_AndSeededApart_RollApart()
+    {
+        Rolls(Seeded(1114)).Should().Equal(Rolls(Seeded(1114)), "one seed, one roll sequence, whichever engine draws it");
+        Rolls(Seeded(1114)).Should().NotEqual(Rolls(Seeded(1115)), "another seed, another sequence");
+        (await PoisonedFight(21)).Should().Be(await PoisonedFight(21), "one seed, one fight");
+        (await PoisonedFight(21)).Should().NotBe(await PoisonedFight(22), "another seed, another fight");
+    }
+
     [Fact]
     public void AnUnseededEngine_UsesTheSharedRandom()
     {

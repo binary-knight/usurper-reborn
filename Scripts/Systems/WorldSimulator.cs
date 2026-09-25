@@ -3659,13 +3659,15 @@ public class WorldSimulator
             {
                 // Check compatibility with team leader
                 var compatibility = npc.Brain?.Personality?.GetCompatibility(teamLeader.Brain?.Personality) ?? 0.5f;
-                if (compatibility > 0.3f)
+                // v1.1.14: the group above counts only the members alive here; the whole team counts, the dead
+                // included, checked and joined under the membership gate (TeamCornerLocation.TryNpcJoin)
+                if (compatibility > 0.3f && TeamCornerLocation.TryNpcJoin(npcs, teamLeader.Team, () =>
+                    {
+                        npc.Team = teamLeader.Team;
+                        npc.TeamPW = teamLeader.TeamPW;
+                        npc.CTurf = teamLeader.CTurf;
+                    }))
                 {
-                    // Join the team!
-                    npc.Team = teamLeader.Team;
-                    npc.TeamPW = teamLeader.TeamPW;
-                    npc.CTurf = teamLeader.CTurf;
-
                     NewsSystem.Instance.Newsy(true, $"{npc.Name} joined the team '{npc.Team}'!");
                     if (UsurperRemake.BBS.DoorMode.IsOnlineMode) _npcTeamActionCooldown[npc.Id] = _currentTick;
                     return;
@@ -3774,11 +3776,15 @@ public class WorldSimulator
             recruitChance += 0.2f;
         }
 
-        if (random.NextDouble() < recruitChance)
+        // v1.1.14: the size check above counts only the living; the dead hold their slots, checked and
+        // joined under the membership gate (TeamCornerLocation.TryNpcJoin)
+        if (random.NextDouble() < recruitChance && TeamCornerLocation.TryNpcJoin(npcs, npc.Team, () =>
+            {
+                candidate.Team = npc.Team;
+                candidate.TeamPW = npc.TeamPW;
+                candidate.CTurf = npc.CTurf;
+            }))
         {
-            candidate.Team = npc.Team;
-            candidate.TeamPW = npc.TeamPW;
-            candidate.CTurf = npc.CTurf;
 
             if (random.NextDouble() < 0.3) // 30% chance to announce
             {

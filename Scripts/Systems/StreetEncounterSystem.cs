@@ -801,7 +801,22 @@ public class StreetEncounterSystem
             // Check if this is an actual existing team with members
             bool isRealTeam = eligibleTeams != null && eligibleTeams.Any(t => t.Name == gangName);
 
-            if (player.Level >= 3 && isRealTeam)
+            // v1.1.14: the rules of a Team Corner join: a king joins no team, and the team must have a free
+            // slot, counted and taken as a join there does (TeamCornerLocation.TryTakeTeamSlot). The team list
+            // above is the world's founding record, which does not follow later joins and deaths.
+            if (player.Level >= 3 && isRealTeam && player.King)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine(Loc.Get("team.king_cannot_join"));
+                result.Message = Loc.Get("street_encounter.gang.msg_not_recruiting");
+            }
+            else if (player.Level >= 3 && isRealTeam && !await TeamCornerLocation.TryTakeTeamSlot(player, gangName))
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine(Loc.Get("team.join_team_full", gangName, GameConfig.MaxTeamMembers));
+                result.Message = Loc.Get("street_encounter.gang.msg_not_recruiting");
+            }
+            else if (player.Level >= 3 && isRealTeam)
             {
                 terminal.SetColor("green");
                 terminal.WriteLine(Loc.Get("street_encounter.gang.welcome", gangName));

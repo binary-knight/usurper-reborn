@@ -520,12 +520,16 @@ public class WorldInitializerSystem
                     .OrderBy(_ => random.Next())
                     .FirstOrDefault();
 
-                if (candidate != null && random.NextDouble() < 0.5)
+                // v1.1.14: the count above leaves out the dead, who hold their slots; checked and joined under
+                // the membership gate (TeamCornerLocation.TryNpcJoin)
+                if (candidate != null && random.NextDouble() < 0.5 && TeamCornerLocation.TryNpcJoin(
+                        NPCSpawnSystem.Instance.ActiveNPCs, npc.Team, () =>
+                        {
+                            candidate.Team = npc.Team;
+                            candidate.TeamPW = npc.TeamPW;
+                            candidate.CTurf = npc.CTurf;
+                        }))
                 {
-                    candidate.Team = npc.Team;
-                    candidate.TeamPW = npc.TeamPW;
-                    candidate.CTurf = npc.CTurf;
-
                     var team = ActiveTeams.FirstOrDefault(t => t.Name == npc.Team);
                     team?.MemberNames.Add(candidate.Name);
 
