@@ -1132,6 +1132,8 @@ namespace UsurperRemake.Systems
         /// conflict; once written the in-memory court is the written copy with the new king. On a refusal the
         /// in-memory court becomes the stored one (unless reloadOnRefusal is false). The caller applies the
         /// coronation's other effects (NPC and player flags, news) only on true. beforeWrite is a test hook.
+        /// A court with no king and ThroneVacant set is a reign ended with no successor: it is written the same
+        /// way, and the in-memory king is then cleared (see IsVacancy).
         /// </summary>
         internal static async Task<bool> CrownAsync(SqlSaveBackend? sql,
             Func<RoyalCourtSaveData?, RoyalCourtSaveData?> crown, bool reloadOnRefusal = true, Func<Task>? beforeWrite = null)
@@ -1150,8 +1152,8 @@ namespace UsurperRemake.Systems
                         if (local != null && !king!.IsActive) local.ThroneVacant = true;   // a reign ended here
                     }
                     var crownedLocal = crown(local);
-                    if (crownedLocal == null || string.IsNullOrEmpty(crownedLocal.KingName)) return false;
-                    crownedLocal.ThroneVacant = false;
+                    if (crownedLocal == null || (string.IsNullOrEmpty(crownedLocal.KingName) && !IsVacancy(crownedLocal))) return false;
+                    if (!IsVacancy(crownedLocal)) crownedLocal.ThroneVacant = false;
                     lock (RoyalCourtVersionLock) ApplyCrownedCourt(crownedLocal);
                     return true;
                 }
@@ -1171,13 +1173,13 @@ namespace UsurperRemake.Systems
                     }
                     else stored = JsonSerializer.Deserialize<RoyalCourtSaveData>(json, CourtJsonOptions);
                     var crowned = crown(stored);
-                    if (crowned == null || string.IsNullOrEmpty(crowned.KingName))
+                    if (crowned == null || (string.IsNullOrEmpty(crowned.KingName) && !IsVacancy(crowned)))
                     {
                         if (reloadOnRefusal && !string.IsNullOrEmpty(json))
                             ApplyLoadedCourt(JsonSerializer.Deserialize<RoyalCourtSaveData>(json, CourtJsonOptions), version);
                         return false;
                     }
-                    crowned.ThroneVacant = false;
+                    if (!IsVacancy(crowned)) crowned.ThroneVacant = false;
                     if (beforeWrite != null) await beforeWrite();
                     if (await sql.SaveWorldStateIfVersion("royal_court", JsonSerializer.Serialize(crowned, CourtJsonOptions), version))
                     {
@@ -1214,9 +1216,20 @@ namespace UsurperRemake.Systems
         internal static string? ReigningName(RoyalCourtSaveData? court) =>
             court == null || court.ThroneVacant || string.IsNullOrEmpty(court.KingName) ? null : court.KingName;
 
-        /// <summary>v1.1.13: a crowned court becomes the in-memory court, as a new King. Call under RoyalCourtVersionLock.</summary>
+        /// <summary>v1.1.13: a court record that marks a reign ended with no successor (no king, ThroneVacant).</summary>
+        internal static bool IsVacancy(RoyalCourtSaveData court) => court.ThroneVacant && string.IsNullOrEmpty(court.KingName);
+
+        /// <summary>
+        /// v1.1.13: a crowned court becomes the in-memory court, as a new King (a vacancy clears the king). Call
+        /// under RoyalCourtVersionLock.
+        /// </summary>
         private static void ApplyCrownedCourt(RoyalCourtSaveData court)
         {
+            if (IsVacancy(court))
+            {
+                global::CastleLocation.ApplySharedThroneVacancy(court);
+                return;
+            }
             var king = new King
             {
                 Name = court.KingName,

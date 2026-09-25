@@ -1770,33 +1770,39 @@ public class CastleLocation : BaseLocation
         // THE COIN FLIP
         bool heads = Random.Shared.Next(2) == 0;
 
-        // Release all prisoners before removing king (prevents orphaned prisoners)
-        if (currentKing?.Prisoners != null)
+        // v1.1.13: the throne is left vacant (its prisoners released) as one versioned write before anything
+        // else; the releases and the player's side follow only once it lands
+        var released = new List<string>();
+        if (currentKing == null || !await EndReignAsync(currentKing.Name, null, null,
+                stored => released = stored.Prisoners.Select(p => p.CharacterName).ToList()))
         {
-            foreach (var prisonerName in currentKing.Prisoners.Keys.ToList())
+            await ShowCourtChangeFailed();
+            return;
+        }
+
+        // Release all prisoners the court held (prevents orphaned prisoners)
+        foreach (var prisonerName in released)
+        {
+            var npc = NPCSpawnSystem.Instance?.GetNPCByName(prisonerName, includeDead: true);
+            if (npc != null)
             {
-                var npc = NPCSpawnSystem.Instance?.GetNPCByName(prisonerName, includeDead: true);
-                if (npc != null)
-                {
-                    npc.DaysInPrison = 0;
-                    npc.CurrentLocation = "MainStreet";
-                }
-                // Release online players too
-                if (DoorMode.IsOnlineMode)
-                {
-                    var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
-                    if (backend != null)
-                        _ = backend.ImprisonPlayer(prisonerName, 0);
-                }
+                npc.DaysInPrison = 0;
+                npc.CurrentLocation = "MainStreet";
             }
-            currentKing.Prisoners.Clear();
+            // Release online players too
+            if (DoorMode.IsOnlineMode)
+            {
+                var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
+                if (backend != null)
+                    _ = backend.ImprisonPlayer(prisonerName, 0);
+            }
         }
 
         // Remove from throne (regardless of outcome)
         currentPlayer.King = false;
         if (currentPlayer.NobleTitle == "King" || currentPlayer.NobleTitle == "Queen")
             currentPlayer.NobleTitle = null;
-        currentKing = null;
+        playerIsKing = false;
 
         if (heads)
         {
@@ -1906,9 +1912,7 @@ public class CastleLocation : BaseLocation
                 SaveSystem.Instance.DeleteSave(currentPlayer.Name2 ?? currentPlayer.Name1 ?? "");
             }
 
-            // Clear king from world state before disconnecting
-            PersistRoyalCourtToWorldState();
-
+            // v1.1.13: the vacant throne was written before the verdict
             await terminal.PressAnyKey();
             throw new Exception("CHARACTER_DELETED_REBELLION");
         }
@@ -2079,12 +2083,9 @@ public class CastleLocation : BaseLocation
             await terminal.PressAnyKey();
 
             // Force exit — the tyrant is banished from the castle
-            PersistRoyalCourtToWorldState();
             await NavigateToLocation(GameLocation.MainStreet);
             return;
         }
-
-        PersistRoyalCourtToWorldState();
     }
 
     private async Task SetBailAmount()
@@ -6380,7 +6381,7 @@ public class CastleLocation : BaseLocation
         terminal.WriteLine(Loc.Get("castle.defeated_king", currentKing.GetTitle(), currentKing.Name));
         terminal.WriteLine(Loc.Get("castle.throne_is_yours"));
 
-        // Crown new monarch — inherit the previous king's treasury, orphans and prisoners, and record the old
+        // Crown new monarch: inherit the previous king's treasury, orphans and prisoners, and record the old
         // monarch. v1.1.13: from the stored court, as one versioned write; the rest follows only once it lands
         var oldKing = currentKing;
         string oldKingName = currentKing.Name;
@@ -6466,13 +6467,7 @@ public class CastleLocation : BaseLocation
                 return false;
             }
 
-            // Force leave team and clear dungeon party
-            string oldTeam = currentPlayer.Team;
-            CityControlSystem.Instance.ForceLeaveTeam(currentPlayer);
-            GameEngine.Instance?.ClearDungeonParty(); // Clear NPC teammates from dungeon
-            terminal.SetColor("yellow");
-            terminal.WriteLine(Loc.Get("castle.left_team_for_crown", oldTeam));
-            terminal.WriteLine("");
+            // v1.1.13: the player leaves the team once the claim is written (below)
         }
 
         var title = currentPlayer.Sex == CharacterSex.Male ? "KING" : "QUEEN";
@@ -6489,17 +6484,35 @@ public class CastleLocation : BaseLocation
             return false;
         }
 
-        // Crown the new monarch — inherit orphans and prisoners from previous reign
-        var inheritedOrphans = currentKing?.Orphans?.ToList();
-        var inheritedPrisoners = currentKing?.Prisoners?.ToDictionary(p => p.Key, p => p.Value);
-        ClearRoyalMarriage(currentKing); // Clear old king's royal spouse if any
-        currentPlayer.King = true;
-        currentKing = King.CreateNewKing(currentPlayer.DisplayName, CharacterAI.Human, currentPlayer.Sex, inheritedOrphans);
-        if (inheritedPrisoners != null && inheritedPrisoners.Count > 0)
+        // Crown the new monarch: inherit orphans and prisoners from previous reign. v1.1.13: from the stored
+        // court, as one versioned write while the throne is still empty; the rest follows only once it lands
+        var template = King.CreateNewKing(currentPlayer.DisplayName, CharacterAI.Human, currentPlayer.Sex);
+        string? endedKing = currentKing != null && !currentKing.IsActive ? currentKing.Name : null;
+        string? oldKingName = null, oldSpouse = null;
+        if (!await CrownEmptyThroneAsync(endedKing, stored =>
+            {
+                oldKingName = stored?.KingName;
+                oldSpouse = stored?.Spouse?.Name;
+                var court = NewReignCourt(template, stored);
+                if (stored != null) court.Prisoners = stored.Prisoners.ToList();
+                return court;
+            }))
         {
-            foreach (var p in inheritedPrisoners)
-                currentKing.Prisoners[p.Key] = p.Value;
+            await ShowCourtChangeFailed();
+            return false;
         }
+        if (!string.IsNullOrEmpty(currentPlayer.Team))
+        {
+            // Force leave team and clear dungeon party
+            string oldTeam = currentPlayer.Team;
+            CityControlSystem.Instance.ForceLeaveTeam(currentPlayer);
+            GameEngine.Instance?.ClearDungeonParty(); // Clear NPC teammates from dungeon
+            terminal.SetColor("yellow");
+            terminal.WriteLine(Loc.Get("castle.left_team_for_crown", oldTeam));
+            terminal.WriteLine("");
+        }
+        ClearRoyalMarriage(oldKingName, oldSpouse); // Clear old king's royal spouse if any
+        currentPlayer.King = true;
         playerIsKing = true;
 
         // Track archetype - Major Ruler moment
@@ -6522,9 +6535,6 @@ public class CastleLocation : BaseLocation
         terminal.WriteLine("");
 
         NewsSystem.Instance.Newsy(true, $"{currentPlayer.DisplayName} has claimed the empty throne! Long live the {title}!");
-
-        // Persist to world_state so world sim and other players see the new king immediately
-        PersistRoyalCourtToWorldState();
 
         await Task.Delay(4000);
         return false; // Stay in castle as new king
@@ -6552,17 +6562,16 @@ public class CastleLocation : BaseLocation
 
         if (confirm?.ToLower() == "yes")
         {
-            // Record old monarch
-            monarchHistory.Add(new MonarchRecord
+            // v1.1.13: the abdication (recorded in the history) and the NPC successor's coronation, or a vacant
+            // throne, are one versioned write; the player's side and the news follow only once it lands
+            string abdicated = currentKing.Name;
+            var successor = ChooseNPCSuccessor(currentKing.DesignatedHeir, out bool successorIsHeir);
+            string? spouseName = null;
+            if (!await EndReignAsync(abdicated, "Abdicated", successor, stored => spouseName = stored.Spouse?.Name))
             {
-                Name = currentKing.Name,
-                Title = currentKing.GetTitle(),
-                DaysReigned = (int)currentKing.TotalReign,
-                CoronationDate = currentKing.CoronationDate,
-                EndReason = "Abdicated"
-            });
-            while (monarchHistory.Count > MaxMonarchHistory)
-                monarchHistory.RemoveAt(0);
+                await ShowCourtChangeFailed();
+                return false;
+            }
 
             terminal.WriteLine("");
             terminal.SetColor("gray");
@@ -6576,9 +6585,7 @@ public class CastleLocation : BaseLocation
                 currentPlayer.NobleTitle = null;
             currentPlayer.RoyalMercenaries?.Clear(); // Dismiss bodyguards on abdication
             currentPlayer.RecalculateStats(); // Remove Royal Authority HP bonus
-            ClearRoyalMarriage(currentKing); // Clear royal spouse before abdication
-            currentKing.IsActive = false;
-            currentKing = null;
+            ClearRoyalMarriage(abdicated, spouseName); // Clear royal spouse before abdication
             playerIsKing = false;
 
             terminal.SetColor("bright_yellow");
@@ -6588,11 +6595,12 @@ public class CastleLocation : BaseLocation
 
             NewsSystem.Instance.Newsy(true, $"{currentPlayer.DisplayName} has abdicated the throne! The kingdom is in chaos!");
 
-            // Trigger immediate NPC succession so the throne doesn't stay empty
-            TriggerNPCSuccession();
-
-            // Persist the new king (or empty throne) to world_state for online mode
-            PersistRoyalCourtToWorldState();
+            // Immediate NPC succession so the throne doesn't stay empty (written with the abdication)
+            if (successor != null)
+            {
+                PayForCoronation(successor);
+                AnnounceNPCSuccession(successor, successorIsHeir);
+            }
 
             await Task.Delay(4000);
             await NavigateToLocation(GameLocation.MainStreet);
@@ -8129,21 +8137,33 @@ public class CastleLocation : BaseLocation
     /// </summary>
     private void TriggerNPCSuccession()
     {
-        var npcs = NPCSpawnSystem.Instance.ActiveNPCs;
-        if (npcs == null || npcs.Count == 0)
+        var successor = ChooseNPCSuccessor(currentKing?.DesignatedHeir, out bool isHeir);
+        if (successor == null)
             return;
 
+        // v1.1.13: the coronation is one versioned write; the announcement follows only once it lands
+        if (!CrownNPCAsync(successor).GetAwaiter().GetResult())
+            return;
+        AnnounceNPCSuccession(successor, isHeir);
+    }
+
+    /// <summary>v1.1.13: the NPC to succeed: the designated heir if eligible, else the most worthy (null: none).</summary>
+    private NPC? ChooseNPCSuccessor(string? designatedHeirName, out bool isHeir)
+    {
+        isHeir = false;
+        var npcs = NPCSpawnSystem.Instance.ActiveNPCs;
+        if (npcs == null || npcs.Count == 0)
+            return null;
+
         // Check designated heir first
-        var designatedHeirName = currentKing?.DesignatedHeir;
         if (!string.IsNullOrEmpty(designatedHeirName))
         {
             var heir = npcs.FirstOrDefault(n => n.Name == designatedHeirName &&
                 n.IsAlive && !n.IsDead && n.DaysInPrison <= 0 && n.Level >= GameConfig.MinLevelKing);
             if (heir != null)
             {
-                CrownNPC(heir);
-                NewsSystem.Instance?.Newsy(true, $"The designated heir {heir.DisplayName} has ascended to the throne as {(heir.Sex == CharacterSex.Male ? "King" : "Queen")}!");
-                return;
+                isHeir = true;
+                return heir;
             }
             else
             {
@@ -8152,20 +8172,19 @@ public class CastleLocation : BaseLocation
         }
 
         // Fallback: Find the most worthy NPC based on level, alignment (good preferred), and class
-        var candidates = npcs
+        return npcs
             .Where(npc => npc.IsAlive && npc.Level >= GameConfig.MinLevelKing)
             .OrderByDescending(npc => CalculateSuccessionScore(npc))
-            .ToList();
+            .FirstOrDefault();
+    }
 
-        if (candidates.Count == 0)
-            return;
-
-        // Crown the highest scoring NPC
-        var newMonarch = candidates.First();
-        CrownNPC(newMonarch);
-
-        // Announce succession
-        NewsSystem.Instance.Newsy(true, $"{newMonarch.DisplayName} has claimed the throne and been crowned {(newMonarch.Sex == CharacterSex.Male ? "King" : "Queen")}!");
+    /// <summary>v1.1.13: the news of an NPC's written coronation.</summary>
+    private static void AnnounceNPCSuccession(NPC monarch, bool isHeir)
+    {
+        if (isHeir)
+            NewsSystem.Instance?.Newsy(true, $"The designated heir {monarch.DisplayName} has ascended to the throne as {(monarch.Sex == CharacterSex.Male ? "King" : "Queen")}!");
+        else
+            NewsSystem.Instance?.Newsy(true, $"{monarch.DisplayName} has claimed the throne and been crowned {(monarch.Sex == CharacterSex.Male ? "King" : "Queen")}!");
     }
 
     /// <summary>
@@ -8194,43 +8213,82 @@ public class CastleLocation : BaseLocation
     }
 
     /// <summary>
-    /// Crown an NPC as the new monarch
+    /// Crown an NPC as the new monarch. v1.1.13: one versioned write of the stored court while its throne is
+    /// empty (or held by the reign that ended here); the old spouse's marriage and the NPC's gold follow only
+    /// once it lands. Internal for tests.
     /// </summary>
-    private void CrownNPC(NPC npc)
+    internal static async Task<bool> CrownNPCAsync(NPC npc)
     {
-        // Inherit prisoners and orphans from previous king
-        var inheritedPrisoners = currentKing?.Prisoners?.ToDictionary(p => p.Key, p => p.Value);
-        var inheritedOrphans = currentKing?.Orphans?.ToList();
+        string? endedKing = currentKing != null && !currentKing.IsActive ? currentKing.Name : null;
+        var template = King.CreateNewKing(npc.DisplayName, CharacterAI.Computer, npc.Sex);
+        long treasury = Math.Max(10000, npc.Gold / 2);
+        string? oldKingName = null, oldSpouse = null;
+        if (!await CrownEmptyThroneAsync(endedKing, stored =>
+            {
+                oldKingName = stored?.KingName;
+                oldSpouse = stored?.Spouse?.Name;
+                return NPCReignCourt(template, treasury, stored, null);
+            }))
+            return false;
 
-        ClearRoyalMarriage(currentKing); // Clear old king's royal spouse before crowning NPC
-        currentKing = King.CreateNewKing(npc.DisplayName, CharacterAI.Computer, npc.Sex, inheritedOrphans);
-        currentKing.Treasury = Math.Max(10000, npc.Gold / 2);
-        currentKing.TotalReign = 0;
-        currentKing.CoronationDate = DateTime.Now;
+        ClearRoyalMarriage(oldKingName, oldSpouse); // Clear old king's royal spouse before crowning NPC
+        PayForCoronation(npc);
+        return true;
+    }
 
-        if (inheritedPrisoners != null && inheritedPrisoners.Count > 0)
+    /// <summary>Deduct donated gold from NPC (prevents gold duplication); v1.1.13: once its coronation is written.</summary>
+    private static void PayForCoronation(NPC npc) => npc.Gold = Math.Max(0, npc.Gold - npc.Gold / 2);
+
+    /// <summary>
+    /// v1.1.13: an NPC's new reign as a court record: the stored court's orphans and prisoners inherited, half
+    /// the NPC's gold (at least 10,000) as its treasury, ended appended to the history, then its coronation.
+    /// </summary>
+    private static RoyalCourtSaveData NPCReignCourt(King template, long treasury, RoyalCourtSaveData? stored, MonarchRecordSaveData? ended)
+    {
+        var court = NewReignCourt(template, stored, ended);
+        court.MonarchHistory.Add(MonarchEntry(template.Name, template.GetTitle(), 0, template.CoronationDate, ""));
+        while (court.MonarchHistory.Count > MaxMonarchHistory) court.MonarchHistory.RemoveAt(0);
+        court.Treasury = treasury;
+        court.TotalReign = 0;
+        if (stored != null) court.Prisoners = stored.Prisoners.ToList();
+        return court;
+    }
+
+    /// <summary>
+    /// v1.1.13: the reign of expectedKing ends (an abdication, a rebellion) as one versioned write built from
+    /// the stored court: the ended reign recorded with endReason (null: not recorded), and successor crowned,
+    /// or a marked vacancy when there is none. saw is shown the stored court read, for the caller's own
+    /// after-effects; it only reads. False when the stored court no longer names expectedKing, or kept changing.
+    /// </summary>
+    internal static Task<bool> EndReignAsync(string expectedKing, string? endReason, NPC? successor, Action<RoyalCourtSaveData>? saw = null)
+    {
+        var template = successor == null ? null : King.CreateNewKing(successor.DisplayName, CharacterAI.Computer, successor.Sex);
+        long treasury = successor == null ? 0 : Math.Max(10000, successor.Gold / 2);
+        return CrownAsync(expectedKing, stored =>
         {
-            foreach (var p in inheritedPrisoners)
-                currentKing.Prisoners[p.Key] = p.Value;
-        }
-
-        // Deduct donated gold from NPC (prevents gold duplication)
-        npc.Gold = Math.Max(0, npc.Gold - npc.Gold / 2);
-
-        // Record the coronation
-        monarchHistory.Add(new MonarchRecord
-        {
-            Name = npc.DisplayName,
-            Title = npc.Sex == CharacterSex.Male ? "King" : "Queen",
-            CoronationDate = DateTime.Now,
-            DaysReigned = 0,
-            EndReason = ""
+            if (stored == null) return null;
+            saw?.Invoke(stored);
+            var old = OnlineStateManager.KingFromCourt(stored);
+            var ended = endReason == null ? null : MonarchEntry(old.Name, old.GetTitle(), old.TotalReign, old.CoronationDate, endReason);
+            return template == null ? VacantCourt(stored, ended) : NPCReignCourt(template, treasury, stored, ended);
         });
-        while (monarchHistory.Count > MaxMonarchHistory)
-            monarchHistory.RemoveAt(0);
+    }
 
-        // Persist to world_state so world sim picks up the new NPC king
-        PersistRoyalCourtToWorldState();
+    /// <summary>v1.1.13: a marked vacancy after the stored court's reign: its history (with ended) and orphans kept, nothing else.</summary>
+    internal static RoyalCourtSaveData VacantCourt(RoyalCourtSaveData stored, MonarchRecordSaveData? ended)
+    {
+        var history = (stored.MonarchHistory?.Count > 0 ? stored.MonarchHistory : MonarchHistorySaveData()).ToList();
+        if (ended != null) history.Add(ended);
+        while (history.Count > MaxMonarchHistory) history.RemoveAt(0);
+        return new RoyalCourtSaveData
+        {
+            KingName = "",
+            Treasury = 0,
+            KingAI = 1,
+            ThroneVacant = true,
+            MonarchHistory = history,
+            Orphans = stored.Orphans.ToList()
+        };
     }
 
     /// <summary>
@@ -8306,12 +8364,15 @@ public class CastleLocation : BaseLocation
     /// Clear the outgoing king's royal marriage state (spouse NPC + marriage registry).
     /// Must be called BEFORE overwriting currentKing when the throne changes hands.
     /// </summary>
-    private static void ClearRoyalMarriage(King outgoingKing)
-    {
-        if (outgoingKing?.Spouse == null) return;
+    private static void ClearRoyalMarriage(King outgoingKing) => ClearRoyalMarriage(outgoingKing?.Name, outgoingKing?.Spouse?.Name);
 
-        var spouseName = outgoingKing.Spouse.Name;
-        outgoingKing.Spouse = null;
+    /// <summary>
+    /// v1.1.13: by the outgoing king's and spouse's names, as the stored court held them; the court record
+    /// itself is not changed here (the new reign's write replaced it).
+    /// </summary>
+    private static void ClearRoyalMarriage(string? outgoingKingName, string? spouseName)
+    {
+        if (string.IsNullOrEmpty(spouseName)) return;
 
         // Clear marriage state on the NPC spouse
         var spouseNPC = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.Name == spouseName);
@@ -8330,7 +8391,7 @@ public class CastleLocation : BaseLocation
         }
 
         // Also try clearing by king name in case the NPC wasn't found
-        NPCMarriageRegistry.Instance?.EndMarriage(outgoingKing.Name);
+        if (!string.IsNullOrEmpty(outgoingKingName)) NPCMarriageRegistry.Instance?.EndMarriage(outgoingKingName);
 
         DebugLogger.Instance.LogInfo("CASTLE", $"Cleared royal marriage to {spouseName} (throne changed)");
     }
@@ -9553,7 +9614,7 @@ public class CastleLocation : BaseLocation
         terminal.WriteLine("");
         await Task.Delay(1500);
 
-        // Crown new monarch — inherit the previous king's treasury, orphans, and prisoners, and record the old
+        // Crown new monarch: inherit the previous king's treasury, orphans, and prisoners, and record the old
         // monarch in history. v1.1.13: from the stored court, as one versioned write; the rest follows it
         string oldKingName = currentKing.Name;
         var oldKing = currentKing;
