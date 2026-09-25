@@ -1803,7 +1803,7 @@ public class WorldSimulator
                         AI = (int)CharacterAI.Computer,
                         Sex = (int)sex,
                         DailySalary = GameConfig.BaseGuardSalary,
-                        Loyalty = 85, // High loyalty — raised by the crown
+                        Loyalty = 85, // High loyalty: raised by the crown
                         IsActive = true
                     });
                     becameGuard = true;

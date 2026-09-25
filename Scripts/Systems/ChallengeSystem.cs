@@ -529,7 +529,7 @@ public class ChallengeSystem
     /// </summary>
     internal void CrownNewKing(NPC newKing, King oldKing)
     {
-        // Create new king data — inherit orphans from previous reign (v1.1.13: from the stored court)
+        // Create new king data: inherit orphans from previous reign (v1.1.13: from the stored court)
         var template = King.CreateNewKing(newKing.Name, CharacterAI.Computer, newKing.Sex);
         var oldKingNPC = NPCSpawnSystem.Instance?.ActiveNPCs?
             .FirstOrDefault(n => n.Name == oldKing.Name);
