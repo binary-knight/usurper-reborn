@@ -24,7 +24,13 @@ public class TeamLeaderFixTests : IDisposable
     private readonly string _path = Path.Combine(Path.GetTempPath(), $"usurper-tlf-{Guid.NewGuid():N}.db");
     private readonly SqlSaveBackend _db;
 
-    public TeamLeaderFixTests() { _db = new SqlSaveBackend(_path); }
+    public TeamLeaderFixTests()
+    {
+        _db = new SqlSaveBackend(_path);
+        // v1.1.14: these fixtures are older databases whose players share display names, which is why the
+        // unique display-name index is not made on them (SqlSaveBackend.EnsureDisplayNameUniqueIndex)
+        Exec($"DROP INDEX IF EXISTS {SqlSaveBackend.DisplayNameUniqueIndex};");
+    }
 
     public void Dispose()
     {

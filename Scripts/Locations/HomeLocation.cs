@@ -4964,8 +4964,8 @@ public class HomeLocation : BaseLocation
             return;
         }
 
-        // Unequip and add to player inventory
-        var unequipped = target.UnequipSlot(selectedSlot);
+        // Unequip and add to player inventory. v1.1.14: only once this process's claim on the piece lands
+        var unequipped = ClaimGearRecovery(target, selectedSlot, selectedItem.Name) ? target.UnequipSlot(selectedSlot) : null;
         if (unequipped != null)
         {
             target.RecalculateStats();
@@ -5025,6 +5025,7 @@ public class HomeLocation : BaseLocation
                     cursedItems.Add(item.Name);
                     continue;
                 }
+                if (!ClaimGearRecovery(target, slot, item.Name)) continue;   // v1.1.14: another process took it first
 
                 var unequipped = target.UnequipSlot(slot);
                 if (unequipped != null)

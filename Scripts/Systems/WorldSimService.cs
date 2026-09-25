@@ -611,6 +611,9 @@ namespace UsurperRemake.Systems
                 // v1.1.11: then teams whose leader has left them
                 PassLeadershipOfDepartedLeaders();
 
+                // v1.1.14: and guilds left with no leader, once a member can lead (a web unban lands here)
+                (GuildSystem.Instance ?? new GuildSystem(sqlBackend.DatabasePath, register: false)).FillLeaderlessGuilds();
+
                 // v1.1.13: applied world edits go after 7 days; unapplied ones stay and are reported
                 if (WorldEditLog.IsOwnerProcess(sqlBackend))
                 {

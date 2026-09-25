@@ -637,6 +637,79 @@ public class TeamCornerFixes1112Tests : IDisposable
         });
     }
 
+    [Fact]
+    public async Task AVaultDeposit_SavesThePlayerAndCreditsTheVault_InOneTransaction()
+    {
+        // v1.1.14: the player's save failing takes the vault credit back with it
+        await TeamCornerRig.Online(async (db, path) =>
+        {
+            var hero = TeamCornerRig.Hero(name: "Vault Hero", team: "Savers", gold: 1000);
+            string key = UsurperRemake.BBS.DoorMode.GetPlayerName().ToLowerInvariant();   // the save key AutoSave uses here
+            TeamCornerRig.Exec(path, $"INSERT INTO players (username, display_name, player_data) VALUES ('{key}', 'Vault Hero', '{{}}');");
+            TeamCornerRig.Exec(path, "CREATE TRIGGER no_save_i BEFORE INSERT ON players BEGIN SELECT RAISE(ABORT, 'test'); END;" +
+                                     "CREATE TRIGGER no_save_u BEFORE UPDATE ON players BEGIN SELECT RAISE(ABORT, 'test'); END;");
+            await new TeamCornerRig(hero, new[] { "600" }).Run("DepositToVault", db, "Savers");
+            (await db.GetTeamVaultGold("Savers")).Should().Be(0, "the credit is rolled back with the save that failed");
+            hero.Gold.Should().Be(1000);
+            TeamCornerRig.Scalar(path, $"SELECT player_data FROM players WHERE username = '{key}'").Should().Be("{}");
+
+            // a save that writes no row (no row for the key, and the insert refused) is no save either
+            TeamCornerRig.Exec(path, $"DELETE FROM players WHERE username = '{key}';");
+            await new TeamCornerRig(hero, new[] { "600" }).Run("DepositToVault", db, "Savers");
+            (await db.GetTeamVaultGold("Savers")).Should().Be(0);
+            hero.Gold.Should().Be(1000);
+
+            // and the credit failing (the vault is full) writes no save without the gold
+            TeamCornerRig.Exec(path, "DROP TRIGGER no_save_i; DROP TRIGGER no_save_u;");
+            var data = new SaveGameData { Version = GameConfig.SaveVersion, Player = new PlayerData { Name1 = "vh", Name2 = "Vault Hero", Gold = 400 } };
+            (await db.WriteGameDataWithVaultDeposit("vh", data, "Savers", GameConfig.TeamVaultBaseCapacity + 1)).Should().BeFalse();
+            Convert.ToInt64(TeamCornerRig.Scalar(path, "SELECT COUNT(*) FROM players WHERE username = 'vh'")).Should().Be(0);
+            (await db.WriteGameDataWithVaultDeposit("vh", data, "Savers", 600)).Should().BeTrue();
+            (await db.GetTeamVaultGold("Savers")).Should().Be(600);
+            Convert.ToInt64(TeamCornerRig.Scalar(path, "SELECT json_extract(player_data, '$.player.gold') FROM players WHERE username = 'vh'")).Should().Be(400);
+        });
+    }
+
+    [Fact]
+    public async Task AnNpcsGear_IsTakenByOneProcessOnly_ThroughTheRecoveryClaim()
+    {
+        // v1.1.14: two processes (two backends on one database) holding a copy of the NPC wearing the same blade
+        await TeamCornerRig.Online(async (db, path) =>
+        {
+            var other = new SqlSaveBackend(path);
+            string ev = SqlSaveBackend.GearRecoveryEvent("MainHand", "Claimed Blade");
+            other.TryClaimGearRecovery("tc_claim_1", ev, "door_b").Should().BeTrue("the first claim lands");
+            db.TryClaimGearRecovery("tc_claim_1", ev, "mud").Should().BeFalse("the second process is refused");
+            db.TryClaimGearRecovery("tc_claim_2", ev, "mud").Should().BeTrue("another NPC's blade is its own event");
+
+            var blade = new Equipment { Name = "Claimed Blade", Slot = EquipmentSlot.MainHand, WeaponPower = 12, Value = 100 };
+            var helm = new Equipment { Name = "Claimed Helm", Slot = EquipmentSlot.Head, ArmorClass = 4, Value = 100 };
+            var npc = TeamCornerRig.Npc("tc_claim_1", "Claim Npc", "Claim Band");
+            npc.EquippedItems[EquipmentSlot.MainHand] = EquipmentDatabase.RegisterDynamic(blade);
+            npc.EquippedItems[EquipmentSlot.Head] = EquipmentDatabase.RegisterDynamic(helm);
+            NPCSpawnSystem.Instance.ActiveNPCs.Add(npc);
+            try
+            {
+                var hero = TeamCornerRig.Hero(team: "Claim Band");
+                var rig = new TeamCornerRig(hero, Array.Empty<string>());
+                var taken = rig.Loc.MoveEquipmentToPlayer(npc, new System.Collections.Generic.List<string>());
+                taken.Select(t => t.Name).Should().Equal(new[] { "Claimed Helm" }, "the blade another process claimed stays on this copy");
+                hero.Inventory.Should().NotContain(i => i.Name == "Claimed Blade");
+                npc.EquippedItems[EquipmentSlot.MainHand].Should().BeGreaterThan(0);
+                other.TryClaimGearRecovery("tc_claim_1", SqlSaveBackend.GearRecoveryEvent("Head", "Claimed Helm"), "door_b")
+                    .Should().BeFalse("this process claimed the helm it took");
+
+                // a claim holds for GearClaimMinutes; after that the same piece can be taken again
+                TeamCornerRig.Exec(path, $"UPDATE recovery_claims SET claimed_at = datetime('now', '-{SqlSaveBackend.GearClaimMinutes + 1} minutes');");
+                db.TryClaimGearRecovery("tc_claim_1", ev, "mud").Should().BeTrue();
+                // and gear given back is released at once
+                other.ReleaseGearClaims("tc_claim_1", new[] { ev });
+                other.TryClaimGearRecovery("tc_claim_1", ev, "door_b").Should().BeTrue();
+            }
+            finally { NPCSpawnSystem.Instance.ActiveNPCs.RemoveAll(n => n.ID == "tc_claim_1"); }
+        });
+    }
+
     // ---------- 8. equipping ----------
 
     [Fact]
@@ -861,6 +934,39 @@ public class TeamCornerFixes1112Tests : IDisposable
             Convert.ToInt64(TeamCornerRig.Scalar(path, "SELECT COUNT(*) FROM pending_gold_transfers WHERE amount = 1000")).Should().Be(1, "the wager, once");
             Convert.ToInt64(TeamCornerRig.Scalar(path, "SELECT COUNT(*) FROM pending_gold_transfers")).Should().Be(1);
         });
+    }
+
+    [Fact]
+    public async Task AWonWar_WhoseFlipFails_IsSettledByItsStoredScore_AndPaysTheSpoilsOnce()
+    {
+        // v1.1.14: the score is stored before the flip; the stale cleanup settles the war by it
+        await TeamCornerRig.Online(async (db, path) =>
+        {
+            var (hero, shown) = await WinAWar(db, path,
+                "CREATE TRIGGER no_result BEFORE UPDATE OF status ON team_wars WHEN NEW.status IN ('challenger_won', 'defender_won') BEGIN SELECT RAISE(ABORT, 'test'); END;");
+            shown.Should().Contain(Loc.Get("team.war_result_pending", $"{1000:N0}"));
+            hero.Gold.Should().Be(4000, "nothing is paid while the war is unsettled");
+            TeamCornerRig.Scalar(path, "SELECT status || ' ' || final_result || ' ' || challenger_wins || '-' || defender_wins FROM team_wars")!.ToString()
+                .Should().Be("active challenger_won 1-0", "the whole score was stored before the flip");
+
+            TeamCornerRig.Exec(path, "DROP TRIGGER no_result; UPDATE team_wars SET started_at = datetime('now', '-20 minutes');");
+            db.ExpireStaleTeamWars().Should().Be(1);
+            db.ExpireStaleTeamWars().Should().Be(0);
+            TeamCornerRig.Scalar(path, "SELECT status FROM team_wars").Should().Be("challenger_won", "settled by its score, not abandoned");
+            Convert.ToInt64(TeamCornerRig.Scalar(path, "SELECT COUNT(*) FROM pending_gold_transfers WHERE amount = 1500")).Should().Be(1, "the spoils, once");
+            Convert.ToInt64(TeamCornerRig.Scalar(path, "SELECT COUNT(*) FROM pending_gold_transfers")).Should().Be(1, "no wager refund on top");
+            (await db.CompleteTeamWar(1, "challenger_won")).Should().BeFalse("and a late completion cannot pay again");
+        });
+    }
+
+    [Fact]
+    public void ALostWar_WithAStoredResult_IsSettledAsALoss_WithNoTransfer()
+    {
+        int id = War("Reds", "Blues", minutesAgo: 20, 0, 2);
+        Exec($"UPDATE team_wars SET final_result = 'defender_won', status = 'active' WHERE id = {id};");
+        _db.ExpireStaleTeamWars().Should().Be(1);
+        Scalar($"SELECT status FROM team_wars WHERE id = {id}").Should().Be("defender_won");
+        Long("SELECT COUNT(*) FROM pending_gold_transfers").Should().Be(0, "the wager was taken at the start; a loss charges nothing more");
     }
 
     [Fact]

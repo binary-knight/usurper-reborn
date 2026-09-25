@@ -3359,8 +3359,8 @@ public class TeamCornerLocation : BaseLocation
             return;
         }
 
-        // Unequip and add to player inventory
-        var unequipped = target.UnequipSlot(selectedSlot);
+        // Unequip and add to player inventory. v1.1.14: only once this process's claim on the piece lands
+        var unequipped = ClaimGearRecovery(target, selectedSlot, selectedItem.Name) ? target.UnequipSlot(selectedSlot) : null;
         if (unequipped != null)
         {
             target.RecalculateStats();
@@ -3430,6 +3430,7 @@ public class TeamCornerLocation : BaseLocation
                     cursedItems.Add(item.Name);
                     continue;
                 }
+                if (!ClaimGearRecovery(target, slot, item.Name)) continue;   // v1.1.14: another process took it first
 
                 int id = target.EquippedItems[slot];
                 var unequipped = target.UnequipSlot(slot);
@@ -3763,9 +3764,11 @@ public class TeamCornerLocation : BaseLocation
 
         bool weWon = myWins > enemyWins;
         string result = weWon ? "challenger_won" : "defender_won";
+        // v1.1.14: the whole score and result are stored before the flip; if the flip below fails, the stale
+        // cleanup (ExpireStaleTeamWars) settles the war by them, paying a win's spoils by transfer, once
+        await backend.RecordTeamWarResult(warId, myWins, enemyWins, result);
         // v1.1.12: paid or charged only if this guarded flip landed, as in the no-round path. Otherwise nothing
-        // changes hands here: the stale cleanup (ExpireStaleTeamWars) closes the war once, refunding the wager
-        // only if no round was recorded, so a won war can never pay twice.
+        // changes hands here: the stale cleanup closes the war once, so a won war can never pay twice.
         if (!await backend.CompleteTeamWar(warId, result))
         {
             string? status = await backend.GetTeamWarStatus(warId);
@@ -3784,7 +3787,7 @@ public class TeamCornerLocation : BaseLocation
         {
             // v0.57.17 — reduced from wager*2 (net +100% per win) to wager*1.5 (net +50%
             // per win) so even within the daily cap each win is less of a printer.
-            long reward = (long)(wager * GameConfig.TeamWarRewardMultiplier);
+            long reward = SqlSaveBackend.TeamWarSpoils(wager);
             currentPlayer.Gold += reward;
             WriteSectionHeader(Loc.Get("team_corner.your_team_wins"), "bright_green");
             terminal.SetColor("yellow");
@@ -4072,14 +4075,14 @@ public class TeamCornerLocation : BaseLocation
         if (amount <= 0) return;
 
         // v1.1.12: the vault row was credited at once but the gold left the player only in memory, so a
-        // crash before the next autosave kept both. Now the gold is taken and saved first, then the vault
-        // is credited (capacity checked in the SQL); if the credit fails the gold comes back.
+        // crash before the next autosave kept both. v1.1.14: the save without the gold and the vault credit
+        // (capacity checked in the SQL) are one transaction, so a crash between them cannot lose the gold;
+        // if it does not land, nothing was written and the gold comes back in memory.
         currentPlayer.Gold -= amount;
-        bool deposited = await ForcePlayerSave() && await backend.DepositToTeamVault(teamName, amount);
+        bool deposited = await SaveSystem.Instance.SaveWithTeamVaultDeposit(currentPlayer, teamName, amount);
         if (!deposited)
         {
             currentPlayer.Gold += amount;
-            await ForcePlayerSave();
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.vault_full"));
             await Task.Delay(1500);

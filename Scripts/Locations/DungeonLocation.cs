@@ -11286,8 +11286,9 @@ public class DungeonLocation : BaseLocation
 
         var (selectedSlot, selectedItem) = equippedSlots[idx - 1];
 
-        // Unequip and give to player. v1.1.13: only what came off (a cursed item stays on, and was copied)
-        var unequipped = target.UnequipSlot(selectedSlot);
+        // Unequip and give to player. v1.1.13: only what came off (a cursed item stays on, and was copied).
+        // v1.1.14: and only once this process's claim on the piece lands
+        var unequipped = ClaimGearRecovery(target, selectedSlot, selectedItem.Name) ? target.UnequipSlot(selectedSlot) : null;
         if (unequipped == null)
         {
             terminal.SetColor("red");

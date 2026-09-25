@@ -10605,11 +10605,36 @@ public abstract class BaseLocation
         await SavePlayerForGear();
     }
 
+    /// <summary>
+    /// v1.1.14: the one-time claim on taking this piece of an NPC's gear (SqlSaveBackend.TryClaimGearRecovery),
+    /// made before it is moved; false: another process took it first, and it is not moved. Always true without
+    /// the shared SQL store, and for a companion (its gear is in the player's own save).
+    /// </summary>
+    internal static bool ClaimGearRecovery(Character target, EquipmentSlot slot, string itemName)
+    {
+        if (target == null || target.IsCompanion || target is not NPC npc || string.IsNullOrEmpty(npc.ID)) return true;
+        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode || SaveSystem.Instance?.Backend is not SqlSaveBackend sql) return true;
+        return sql.TryClaimGearRecovery(npc.ID, SqlSaveBackend.GearRecoveryEvent(slot.ToString(), itemName), WorldEditLog.ProcessLabel);
+    }
+
+    /// <summary>v1.1.14: what an NPC wears after a give may be taken again (its claims released).</summary>
+    private static void ReleaseGearClaims(Character? target)
+    {
+        if (target == null || target.IsCompanion || target is not NPC npc || string.IsNullOrEmpty(npc.ID)) return;
+        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode || SaveSystem.Instance?.Backend is not SqlSaveBackend sql) return;
+        var worn = target.EquippedItems.Where(kv => kv.Value > 0)
+            .Select(kv => (kv.Key, Item: EquipmentDatabase.GetById(kv.Value)))
+            .Where(x => x.Item != null)
+            .Select(x => SqlSaveBackend.GearRecoveryEvent(x.Key.ToString(), x.Item!.Name));
+        sql.ReleaseGearClaims(npc.ID, worn.ToList());
+    }
+
     /// <summary>v1.1.12: gear moved from the player to an NPC: the player is saved first, then the shared NPC
     /// state, for the same reason.</summary>
     protected internal async Task SaveGearGivenToNpc(Character? npc)
     {
         SyncCompanionGear(npc);
+        ReleaseGearClaims(npc);   // v1.1.14
         await SavePlayerForGear();
         if (npc != null) CombatEngine.SyncNPCTeammateToActiveNPCs(npc);
         await SaveSharedStateForGear();
