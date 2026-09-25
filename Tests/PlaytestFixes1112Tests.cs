@@ -310,7 +310,10 @@ public class PlaytestFixes1112Tests
     public void TheTrainingPointsHint_NamesTheLevelMastersKey()
     {
         Loc.Get("base.training_points_hint").Should().Contain("[V]").And.Contain("Main Street");
-        MethodBody("Scripts/Locations/MainStreetLocation.cs", "ProcessChoice").Should().MatchRegex(@"case ""V"":\s*await NavigateToLocation\(GameLocation\.Master\)");
+        // v1.1.13: [V] is the Level Master inside Guild Row
+        MainStreetLocation.StreetEntries.Should().ContainSingle(e => e.Place == MainStreetLocation.StreetPlace.LevelMaster)
+            .Which.Should().Match<MainStreetLocation.StreetEntry>(e => e.Key == "V" && e.Group == MainStreetLocation.StreetGroup.GuildRow);
+        MainStreetLocation.DestinationOf(MainStreetLocation.StreetPlace.LevelMaster, false).Should().Be(GameLocation.Master);
     }
 
     [Fact]
@@ -325,10 +328,13 @@ public class PlaytestFixes1112Tests
     [Fact]
     public void TheWorldEventsKey_IsDrawnInEveryMainStreetMenu()
     {
+        // v1.1.13: World Events is [W] on the Notice Board, which every renderer draws from the one table
         const string file = "Scripts/Locations/MainStreetLocation.cs";
-        MethodBody(file, "DisplayLocationBBS").Should().Contain("terminal.Write(\"$\")").And.Contain("main_street.menu_events_suffix");
-        MethodBody(file, "ShowClassicMenu").Should().Contain("ML(\"$\", Loc.Get(\"menu.action.world_events\")");
-        MethodBody(file, "ShowScreenReaderMenu").Should().Contain("$ - {Loc.Get(\"menu.action.world_events\")}");
+        MainStreetLocation.StreetEntries.Should().Contain(e => e.Place == MainStreetLocation.StreetPlace.WorldEvents
+            && e.Key == "W" && e.Group == MainStreetLocation.StreetGroup.NoticeBoard);
+        MethodBody(file, "DisplayLocationBBS").Should().Contain("MainStreetLines(");
+        MethodBody(file, "ShowClassicMenu").Should().Contain("MainStreetLines(");
+        MethodBody(file, "ShowScreenReaderMenu").Should().Contain("MainStreetLines(");
     }
 
     // ---------- 9. comparison for dungeon finds ----------

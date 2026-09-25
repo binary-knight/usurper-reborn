@@ -16,29 +16,29 @@ public class MenuTierAnnounce1113Tests
     public void TierRise_IsAnnouncedOnce()
     {
         var hero = Hero(1);
-        MainStreetLocation.TakeTierUnlockAnnouncement(hero).Should().BeNull("a new character has nothing new yet");
+        MainStreetLocation.TakeTierUnlockAnnouncement(hero).Should().BeEmpty("a new character has nothing new yet");
         hero.HintsShown.Should().Contain("menu_tier_1");
 
         hero.Level = GameConfig.MenuTier2Level;
-        string? line = MainStreetLocation.TakeTierUnlockAnnouncement(hero);
-        line.Should().NotBeNull();
+        string line = string.Join("\n", MainStreetLocation.TakeTierUnlockAnnouncement(hero));
+        line.Should().NotBeEmpty();
         line.Should().Contain(Loc.Get("menu.action.temple")).And.Contain(Loc.Get("menu.action.bank"))
             .And.NotContain(Loc.Get("menu.action.auction_house"));
-        MainStreetLocation.TakeTierUnlockAnnouncement(hero).Should().BeNull("the rise is told once");
+        MainStreetLocation.TakeTierUnlockAnnouncement(hero).Should().BeEmpty("the rise is told once");
 
         hero.Level = GameConfig.MenuTier3Level;
-        MainStreetLocation.TakeTierUnlockAnnouncement(hero).Should().Contain(Loc.Get("menu.action.auction_house"))
+        string.Join("\n", MainStreetLocation.TakeTierUnlockAnnouncement(hero)).Should().Contain(Loc.Get("menu.action.auction_house"))
             .And.NotContain(Loc.Get("menu.action.temple"));
-        MainStreetLocation.TakeTierUnlockAnnouncement(hero).Should().BeNull();
+        MainStreetLocation.TakeTierUnlockAnnouncement(hero).Should().BeEmpty();
     }
 
     [Fact]
     public void ExistingTier3Character_SeesNothing()
     {
         var hero = Hero(20);
-        MainStreetLocation.TakeTierUnlockAnnouncement(hero).Should().BeNull();
+        MainStreetLocation.TakeTierUnlockAnnouncement(hero).Should().BeEmpty();
         hero.HintsShown.Should().Contain(new[] { "menu_tier_1", "menu_tier_2", "menu_tier_3" });
-        MainStreetLocation.TakeTierUnlockAnnouncement(hero).Should().BeNull();
+        MainStreetLocation.TakeTierUnlockAnnouncement(hero).Should().BeEmpty();
     }
 
     [Fact]
@@ -50,6 +50,6 @@ public class MenuTierAnnounce1113Tests
         int display = src.IndexOf("protected override void DisplayLocation()");
         int bbs = src.IndexOf("private void DisplayLocationBBS()");
         src.Substring(display, bbs - display).Split("ShowTierUnlockAnnouncement();").Length.Should().Be(3, "the BBS and the full screen each call it");
-        src.Substring(bbs).Should().NotContain("ShowTierUnlockAnnouncement", "the menu methods are left as they are");
+        src.Substring(bbs).Should().NotContain("ShowTierUnlockAnnouncement", "only the two display paths call it");
     }
 }
