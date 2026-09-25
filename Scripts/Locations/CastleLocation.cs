@@ -6053,6 +6053,9 @@ public class CastleLocation : BaseLocation
             return false;
         }
 
+        // v1.1.13: the defenders the challenge beats are recorded, and written to the stored court when it fails
+        var losses = new DefenceLosses();
+
         // PHASE 1: Fight ALL monster guards at once (group combat)
         if (currentKing.MonsterGuards.Count > 0)
         {
@@ -6100,7 +6103,7 @@ public class CastleLocation : BaseLocation
                 terminal.SetColor("bright_green");
                 terminal.WriteLine(Loc.Get("castle.monster_guards_slain", currentKing.MonsterGuards.Count));
                 NewsSystem.Instance?.Newsy(true, $"{currentPlayer.DisplayName} slew all monster guards defending the throne!");
-                currentKing.MonsterGuards.Clear();
+                losses.MonstersSlain.AddRange(guardMonsters.Select(m => m.Name));
 
                 terminal.SetColor("cyan");
                 terminal.WriteLine("");
@@ -6122,7 +6125,7 @@ public class CastleLocation : BaseLocation
                     terminal.SetColor("yellow");
                     terminal.WriteLine(Loc.Get("castle.slip_past"));
                     terminal.WriteLine(Loc.Get("castle.betrayal_noted"));
-                    currentKing.Guards.Remove(guard);
+                    losses.GuardsLost.Add(guard.Name);
                     NewsSystem.Instance?.Newsy(true, $"Guard {guard.Name} has betrayed the crown to challenge the throne!");
                     await Task.Delay(1500);
                     continue;
@@ -6131,7 +6134,7 @@ public class CastleLocation : BaseLocation
                 {
                     terminal.SetColor("yellow");
                     terminal.WriteLine(Loc.Get("castle.guard_flees", guard.Name));
-                    currentKing.Guards.Remove(guard);
+                    losses.GuardsLost.Add(guard.Name);
                     NewsSystem.Instance?.Newsy(false, $"Cowardly guard {guard.Name} fled from {currentPlayer.DisplayName}!");
                     await Task.Delay(1500);
                     continue;
@@ -6204,6 +6207,7 @@ public class CastleLocation : BaseLocation
                     terminal.WriteLine(Loc.Get("castle.royal_guards_overwhelm"));
                     currentPlayer.HP = Math.Max(1, currentPlayer.HP);
                     terminal.WriteLine(Loc.Get("castle.challenge_failed"));
+                    await RecordDefenceLossesAsync(losses);
                     await Task.Delay(2500);
                     return false;
                 }
@@ -6213,7 +6217,7 @@ public class CastleLocation : BaseLocation
                     terminal.WriteLine(Loc.Get("castle.royal_guards_defeated"));
                     foreach (var guard in guardsToFight)
                     {
-                        currentKing.Guards.Remove(guard);
+                        losses.GuardsLost.Add(guard.Name);
                     }
                     NewsSystem.Instance?.Newsy(true, $"{currentPlayer.DisplayName} defeated all royal guards defending the throne!");
 
@@ -6383,6 +6387,7 @@ public class CastleLocation : BaseLocation
         bool oldKingWasHuman = currentKing.AI == CharacterAI.Human;
         if (!await CrownPlayerAsync(oldKingName, $"Defeated by {currentPlayer.DisplayName}"))
         {
+            await RecordDefenceLossesAsync(losses);
             await ShowCourtChangeFailed();
             return false;
         }
@@ -6407,6 +6412,7 @@ public class CastleLocation : BaseLocation
 
         KingFightLost:
         // Player lost the king fight
+        await RecordDefenceLossesAsync(losses);
         currentPlayer.HP = Math.Max(1, currentPlayer.HP);
         terminal.WriteLine("");
         terminal.SetColor("red");
@@ -8052,6 +8058,16 @@ public class CastleLocation : BaseLocation
         return true;
     }
 
+    /// <summary>
+    /// v1.1.13: the defenders a failed challenge or siege beat, as one guarded court change on the stored court
+    /// (nothing is written when it beat none; a court of another king is left alone)
+    /// </summary>
+    internal static async Task RecordDefenceLossesAsync(DefenceLosses losses)
+    {
+        if (!losses.Any) return;
+        await CourtChangeAsync(court => { losses.ApplyTo(court); return true; });
+    }
+
     /// <summary>v1.1.13: the court change was refused or never written; nothing changed.</summary>
     private async Task ShowCourtChangeFailed()
     {
@@ -9171,6 +9187,7 @@ public class CastleLocation : BaseLocation
 
         int guardsDefeated = 0;
         bool siegeFailed = false;
+        var losses = new DefenceLosses();   // v1.1.13: written to the stored court when the siege does not take the throne
 
         // PHASE 1: Monster Guards
         foreach (var monster in currentKing.MonsterGuards.ToList())
@@ -9221,7 +9238,7 @@ public class CastleLocation : BaseLocation
             else
             {
                 guardsDefeated++;
-                currentKing.MonsterGuards.Remove(monster);
+                losses.MonstersSlain.Add(monster.Name);
                 terminal.SetColor("bright_green");
                 terminal.WriteLine(Loc.Get("castle.siege_monster_defeated", monster.Name));
                 terminal.WriteLine("");
@@ -9244,7 +9261,7 @@ public class CastleLocation : BaseLocation
                     terminal.SetColor("bright_yellow");
                     terminal.WriteLine(Loc.Get("castle.siege_guard_surrenders", guard.Name));
                     guardsDefeated++;
-                    currentKing.Guards.Remove(guard);
+                    losses.GuardsLost.Add(guard.Name);
                     await Task.Delay(500);
                     continue;
                 }
@@ -9292,7 +9309,7 @@ public class CastleLocation : BaseLocation
                 else
                 {
                     guardsDefeated++;
-                    currentKing.Guards.Remove(guard);
+                    losses.GuardsLost.Add(guard.Name);
                     terminal.SetColor("bright_green");
                     terminal.WriteLine(Loc.Get("castle.siege_guard_defeated", guard.Name));
                     terminal.WriteLine("");
@@ -9305,6 +9322,7 @@ public class CastleLocation : BaseLocation
 
         if (siegeFailed)
         {
+            await RecordDefenceLossesAsync(losses);
             await backend.CompleteSiege(siegeId, "failed");
             terminal.WriteLine("");
             terminal.SetColor("red");
@@ -9376,6 +9394,7 @@ public class CastleLocation : BaseLocation
 
         if (!GameConfig.IsAffirmative(faceKing))
         {
+            await RecordDefenceLossesAsync(losses);
             await backend.CompleteSiege(siegeId, "retreated");
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("castle.siege_declined_king"));
@@ -9488,6 +9507,7 @@ public class CastleLocation : BaseLocation
         if (playerHP <= 0 || (kingHP > 0 && playerHP > 0))
         {
             // King wins or stalemate — siege fails
+            await RecordDefenceLossesAsync(losses);
             await backend.CompleteSiege(siegeId, "king_won");
             terminal.WriteLine("");
             terminal.SetColor("red");
@@ -9540,6 +9560,7 @@ public class CastleLocation : BaseLocation
         bool oldKingWasHuman = currentKing.AI == CharacterAI.Human;
         if (!await CrownPlayerAsync(oldKingName, $"Overthrown by {siegeTeam} siege"))
         {
+            await RecordDefenceLossesAsync(losses);
             await ShowCourtChangeFailed();
             return;
         }

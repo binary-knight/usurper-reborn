@@ -108,7 +108,7 @@ public partial class OwnerProcessConflictTests
             var dorn = Npc("npc_dorn", "Dorn");
 
             typeof(ChallengeSystem).GetMethod("ImprisonChallenger", BindingFlags.NonPublic | BindingFlags.Instance)!
-                .Invoke(ChallengeSystem.Instance, new object?[] { dorn, 7, "Failed throne challenge", true });
+                .Invoke(ChallengeSystem.Instance, new object?[] { dorn, 7, "Failed throne challenge", true, null });
             RunCourtPolitics();
 
             (await StoredCourt()).Prisoners.Select(p => p.CharacterName).Should().Contain("Dorn");

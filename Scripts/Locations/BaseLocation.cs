@@ -565,22 +565,39 @@ public abstract class BaseLocation
             }
             else
             {
-                // Player refused - severe loyalty penalty
-                playerGuard.Loyalty = Math.Max(0, playerGuard.Loyalty - 25);
+                // Player refused - severe loyalty penalty (v1.1.13: one guarded court change on the stored guard;
+                // the dismissal at low loyalty is in the same write)
+                string guardName = playerGuard.Name;
+                int loyaltyNow = playerGuard.Loyalty;
+                bool stripped = false;
+                bool penalised = await CastleLocation.CourtChangeAsync(court =>
+                {
+                    stripped = false;
+                    var stored = court.Guards.FirstOrDefault(g => g.Name == guardName);
+                    if (stored == null) return false;
+                    stored.Loyalty = Math.Max(0, stored.Loyalty - 25);
+                    loyaltyNow = stored.Loyalty;
+                    if (stored.Loyalty <= 20)
+                    {
+                        court.Guards.Remove(stored);
+                        stripped = true;
+                    }
+                    return true;
+                });
 
                 terminal.SetColor("red");
                 terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("base.guard_turn_away"));
                 terminal.WriteLine(Loc.Get("base.guard_crown_remembers"));
-                terminal.WriteLine(Loc.Get("base.guard_loyalty_dropped", playerGuard.Loyalty));
+                if (penalised)
+                    terminal.WriteLine(Loc.Get("base.guard_loyalty_dropped", loyaltyNow));
 
-                if (playerGuard.Loyalty <= 20)
+                if (stripped)
                 {
                     terminal.SetColor("bright_red");
                     terminal.WriteLine("");
                     terminal.WriteLine(Loc.Get("base.guard_stripped"));
-                    king.Guards.Remove(playerGuard);
-                    NewsSystem.Instance?.Newsy(true, Loc.Get("base.news_guard_dismissed", playerGuard.Name));
+                    NewsSystem.Instance?.Newsy(true, Loc.Get("base.news_guard_dismissed", guardName));
                 }
 
                 await terminal.PressAnyKey();

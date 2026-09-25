@@ -278,6 +278,7 @@ public class ChallengeSystem
         }
 
         // Process any pending defense event
+        var losses = new DefenceLosses();
         if (king.ActiveDefenseEvent != null)
         {
             king.ActiveDefenseEvent.TicksRemaining--;
@@ -290,12 +291,12 @@ public class ChallengeSystem
             }
 
             // Time's up - process the challenge
-            // Penalize human guards who didn't respond
+            // Penalize human guards who didn't respond (v1.1.13: recorded, and written with the challenge's outcome)
             foreach (var guard in king.Guards.Where(g => g.AI == CharacterAI.Human))
             {
                 if (!king.ActiveDefenseEvent.PlayerResponded)
                 {
-                    guard.Loyalty = Math.Max(0, guard.Loyalty - 15);
+                    losses.LoyaltyPenalties.Add((guard.Name, 15));
                     NewsSystem.Instance?.Newsy(false, $"Guard {guard.Name}'s loyalty questioned for failing to defend the throne!");
                 }
             }
@@ -305,7 +306,7 @@ public class ChallengeSystem
         }
 
         // Fight sequence: Monsters -> NPC Guards -> King
-        bool success = SimulateThroneChallenge(challenger, king);
+        bool success = SimulateThroneChallenge(challenger, king, losses);
 
         if (success)
         {
@@ -314,16 +315,18 @@ public class ChallengeSystem
         }
         else
         {
-            // Failed - go to prison
-            ImprisonChallenger(challenger, FailedThroneChallengerSentence, "Failed throne challenge");
+            // Failed - go to prison (v1.1.13: the defence's losses in the same court change as the cell)
+            ImprisonChallenger(challenger, FailedThroneChallengerSentence, "Failed throne challenge", losses: losses);
         }
     }
 
     /// <summary>
     /// Simulate a throne challenge fight sequence
     /// Returns true if challenger wins
+    /// v1.1.13: the court is not changed here; what the defence lost is recorded in losses, for the challenge's
+    /// one court change (internal for tests)
     /// </summary>
-    private bool SimulateThroneChallenge(NPC challenger, King king)
+    internal bool SimulateThroneChallenge(NPC challenger, King king, DefenceLosses losses)
     {
         long challengerHP = challenger.MaxHP;
         long challengerPower = challenger.Strength + challenger.WeapPow;
@@ -337,14 +340,15 @@ public class ChallengeSystem
             // GD.Print($"[Challenge] {challenger.Name} fights monster guard {monster.Name}");
 
             // Simulate combat
-            while (challengerHP > 0 && monster.HP > 0)
+            long monsterHP = monster.HP;
+            while (challengerHP > 0 && monsterHP > 0)
             {
                 // Challenger attacks
                 long damage = Math.Max(1, challengerPower - monster.Defence);
                 damage += random.Next(1, (int)Math.Max(2, challenger.WeapPow / 3));
-                monster.HP -= damage;
+                monsterHP -= damage;
 
-                if (monster.HP <= 0) break;
+                if (monsterHP <= 0) break;
 
                 // Monster attacks
                 long monsterDamage = Math.Max(1, monster.Strength + monster.WeapPow - challengerDefence);
@@ -352,11 +356,13 @@ public class ChallengeSystem
                 challengerHP -= monsterDamage;
             }
 
-            if (monster.HP <= 0)
+            if (monsterHP <= 0)
             {
-                king.MonsterGuards.Remove(monster);
+                losses.MonstersSlain.Add(monster.Name);
                 NewsSystem.Instance?.Newsy(true, $"{challenger.Name} slew the monster guard {monster.Name}!");
             }
+            else if (monsterHP < monster.HP)
+                losses.MonsterWounds.Add((monster.Name, monster.HP - monsterHP));
         }
 
         if (challengerHP <= 0)
@@ -381,7 +387,7 @@ public class ChallengeSystem
             // Check for low loyalty desertion/betrayal
             if (guard.Loyalty < 30 && random.Next(100) < 30)
             {
-                king.Guards.Remove(guard);
+                losses.GuardsLost.Add(guard.Name);
                 NewsSystem.Instance?.Newsy(true, $"Cowardly guard {guard.Name} fled instead of fighting!");
                 continue;
             }
@@ -389,7 +395,7 @@ public class ChallengeSystem
             // Very low loyalty - betrayal (guard joins challenger)
             if (guard.Loyalty < 15 && random.Next(100) < 20)
             {
-                king.Guards.Remove(guard);
+                losses.GuardsLost.Add(guard.Name);
                 NewsSystem.Instance?.Newsy(true, $"BETRAYAL! Guard {guard.Name} has joined {challenger.Name}'s cause!");
                 challengerHP += 100;  // Boost from having an ally
                 continue;
@@ -421,7 +427,7 @@ public class ChallengeSystem
 
             if (guardHP <= 0)
             {
-                king.Guards.Remove(guard);
+                losses.GuardsLost.Add(guard.Name);
                 NewsSystem.Instance?.Newsy(true, $"{challenger.Name} defeated guard {guard.Name}!");
             }
         }
@@ -774,7 +780,8 @@ public class ChallengeSystem
         }
 
         // Run the standard throne challenge simulation (now uses real stats + defender bonus)
-        bool success = SimulateThroneChallenge(challenger, king);
+        var losses = new DefenceLosses();
+        bool success = SimulateThroneChallenge(challenger, king, losses);
 
         if (success)
         {
@@ -793,7 +800,7 @@ public class ChallengeSystem
         else
         {
             // Player king's defenses held
-            ImprisonChallenger(challenger, FailedThroneChallengerSentence, "Failed throne challenge against player king");
+            ImprisonChallenger(challenger, FailedThroneChallengerSentence, "Failed throne challenge against player king", losses: losses);
 
             // Notify the king that their defenses held
             try
@@ -806,7 +813,7 @@ public class ChallengeSystem
         }
     }
 
-    private void ImprisonChallenger(NPC? npc, int days, string crime, bool courtRecord = true)
+    private void ImprisonChallenger(NPC? npc, int days, string crime, bool courtRecord = true, DefenceLosses? losses = null)
     {
         if (npc == null) return;
 
@@ -833,12 +840,13 @@ public class ChallengeSystem
         }
 
         // Also add to King's prison record if there's a King (v1.1.13: one guarded court change, so a later
-        // court change this tick does not drop it)
+        // court change this tick does not drop it; a failed challenge's losses go in the same write)
         if (courtRecord && CastleLocation.GetCurrentKing() != null)
         {
             string name = npc.Name;
             CastleLocation.CourtChangeAsync(court =>
             {
+                losses?.ApplyTo(court);
                 court.Prisoners.RemoveAll(p => p.CharacterName == name);
                 court.Prisoners.Add(CastleLocation.PrisonerRecord(name, days, crime));
                 return true;
@@ -896,5 +904,43 @@ public class ChallengeSystem
         public int FoughtGuards { get; set; }
         public int DamageDealt { get; set; }
         public int DamageTaken { get; set; }
+    }
+}
+
+/// <summary>
+/// v1.1.13: what a throne defence cost the court (missed-defence loyalty penalties, monsters slain or wounded,
+/// guards who fled, turned or fell), recorded while the fight runs and applied to the stored court in the
+/// challenge's one court change, so the next court change cannot put the defenders back.
+/// </summary>
+internal sealed class DefenceLosses
+{
+    public readonly List<(string Name, int Penalty)> LoyaltyPenalties = new();
+    public readonly List<string> MonstersSlain = new();
+    public readonly List<(string Name, long Damage)> MonsterWounds = new();
+    public readonly List<string> GuardsLost = new();
+
+    public bool Any => LoyaltyPenalties.Count > 0 || MonstersSlain.Count > 0 || MonsterWounds.Count > 0 || GuardsLost.Count > 0;
+
+    /// <summary>The losses applied to a court record (a court change's copy), one stored entry per recorded one.</summary>
+    public void ApplyTo(RoyalCourtSaveData court)
+    {
+        foreach (var (name, penalty) in LoyaltyPenalties)
+            foreach (var guard in court.Guards.Where(g => g.Name == name))
+                guard.Loyalty = Math.Max(0, guard.Loyalty - penalty);
+        foreach (var (name, damage) in MonsterWounds)
+        {
+            var monster = court.MonsterGuards.FirstOrDefault(m => m.Name == name);
+            if (monster != null) monster.HP = Math.Max(1, monster.HP - damage);
+        }
+        foreach (var name in MonstersSlain)
+        {
+            int i = court.MonsterGuards.FindIndex(m => m.Name == name);
+            if (i >= 0) court.MonsterGuards.RemoveAt(i);
+        }
+        foreach (var name in GuardsLost)
+        {
+            int i = court.Guards.FindIndex(g => g.Name == name);
+            if (i >= 0) court.Guards.RemoveAt(i);
+        }
     }
 }
