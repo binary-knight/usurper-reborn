@@ -2091,7 +2091,10 @@ namespace UsurperRemake.Systems
             }
         }
 
-        public async Task SaveWorldState(string key, string jsonValue)
+        public async Task SaveWorldState(string key, string jsonValue) => await TrySaveWorldState(key, jsonValue);
+
+        /// <summary>v1.1.14: SaveWorldState that says whether the write landed (false: it failed and was logged).</summary>
+        public async Task<bool> TrySaveWorldState(string key, string jsonValue)
         {
             try
             {
@@ -2108,10 +2111,12 @@ namespace UsurperRemake.Systems
                 cmd.Parameters.AddWithValue("@key", key);
                 cmd.Parameters.AddWithValue("@value", jsonValue);
                 await cmd.ExecuteNonQueryAsync();
+                return true;
             }
             catch (Exception ex)
             {
                 DebugLogger.Instance.LogError("SQL", $"Failed to save world state '{key}': {ex.Message}");
+                return false;
             }
         }
 

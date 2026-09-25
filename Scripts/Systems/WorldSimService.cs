@@ -496,6 +496,7 @@ namespace UsurperRemake.Systems
                 }
 
                 var aliveCount = NPCSpawnSystem.Instance.ActiveNPCs.Count(n => n.IsAlive && !n.IsDead);
+                bool npcsHoldEdits = false;   // v1.1.14: this pass's npcs write landed with the re-applied edits
 
                 if (jsonHash != _lastNpcJsonHash)
                 {
@@ -524,8 +525,7 @@ namespace UsurperRemake.Systems
                         lastNpcVersion = lastNpcVersion + 1;
                         OnlineStateManager.NoteLiveRosterWritten(rosterGeneration, lastNpcVersion);   // v1.1.13: the live roster is stored at this version
                         DebugLogger.Instance.LogInfo("WORLDSIM", $"State saved (v{lastNpcVersion}): {aliveCount} alive NPCs at {DateTime.UtcNow:HH:mm:ss}");
-                        // v1.1.13: the roster edits are applied once this versioned write holds them
-                        MarkEditsApplied(editsInPass, WorldEditLog.ForgetCharacter);
+                        npcsHoldEdits = true;
                     }
                     else
                     {
@@ -562,7 +562,12 @@ namespace UsurperRemake.Systems
                 await SaveChildrenState();
 
                 // Save NPC marriage registry (survives world sim restart)
-                await SaveMarriageRegistryState();
+                bool registrySaved = await SaveMarriageRegistryState();
+                // v1.1.14: a forget_character edit is applied once both records hold it: the npcs write above and
+                // the marriages record (its registry marriages ended). Marked after the npcs write alone, a crash
+                // before this save and a restart past the re-apply window loaded the marriage back.
+                if (npcsHoldEdits && registrySaved)
+                    MarkEditsApplied(editsInPass, WorldEditLog.ForgetCharacter);
 
                 // Save world events (plagues, festivals, wars, etc.)
                 await SaveWorldEventsState();
@@ -894,7 +899,7 @@ namespace UsurperRemake.Systems
         /// Save NPCMarriageRegistry to world_state.
         /// Persists NPC-NPC marriages and affair states so they survive world sim restarts.
         /// </summary>
-        private async Task SaveMarriageRegistryState()
+        private async Task<bool> SaveMarriageRegistryState()   // v1.1.14: true once the record is written
         {
             try
             {
@@ -910,11 +915,12 @@ namespace UsurperRemake.Systems
                 };
 
                 var json = JsonSerializer.Serialize(data, jsonOptions);
-                await sqlBackend.SaveWorldState(OnlineStateManager.KEY_MARRIAGES, json);
+                return await sqlBackend.TrySaveWorldState(OnlineStateManager.KEY_MARRIAGES, json);
             }
             catch (Exception ex)
             {
                 DebugLogger.Instance.LogError("WORLDSIM", $"Failed to save marriage registry: {ex.Message}");
+                return false;
             }
         }
 

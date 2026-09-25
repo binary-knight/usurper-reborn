@@ -185,4 +185,75 @@ public class Leftovers1114ATests : IDisposable
             quest.Deleted.Should().BeFalse();
         });
     }
+
+    // ─── X4: a forget edit is marked applied only once both records hold it ───
+
+    private void Exec(string sql)
+    {
+        using var conn = new SqliteConnection($"Data Source={_path}");
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = sql;
+        cmd.ExecuteNonQuery();
+    }
+
+    private string? Scalar(string sql)
+    {
+        using var conn = new SqliteConnection($"Data Source={_path}");
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = sql;
+        var v = cmd.ExecuteScalar();
+        return v == null || v == DBNull.Value ? null : Convert.ToString(v);
+    }
+
+    /// <summary>The owner's world sim, holding the lock, with its npcs baseline at this version.</summary>
+    private WorldSimService OwnerSim(string ownerId, long npcVersion)
+    {
+        _db.TryAcquireWorldSimLock(ownerId).Should().BeTrue();
+        WorldEditLog.NoteLockOwnerId(ownerId);
+        var sim = new WorldSimService(_db, heartbeatOwnerId: ownerId);
+        typeof(WorldSimService).GetField("lastNpcVersion", Priv)!.SetValue(sim, npcVersion);
+        OnlineStateManager.NoteRoyalCourtVersion(_db.GetWorldStateVersion("royal_court"));
+        return sim;
+    }
+
+    private static Task SimSave(WorldSimService sim) => (Task)typeof(WorldSimService).GetMethod("SaveWorldState", Priv)!.Invoke(sim, null)!;
+
+    private const string BlockMarriages =
+        "CREATE TRIGGER block_marriages_upd BEFORE UPDATE ON world_state WHEN NEW.key = 'marriages' BEGIN SELECT RAISE(ABORT, 'blocked'); END; " +
+        "CREATE TRIGGER block_marriages_ins BEFORE INSERT ON world_state WHEN NEW.key = 'marriages' BEGIN SELECT RAISE(ABORT, 'blocked'); END;";
+
+    [Fact]
+    public async Task AForgetEdit_IsNotMarkedApplied_UntilTheMarriagesRecordIsSaved()
+    {
+        var wife = Npc("npc_x4_w", "X4 Wife");
+        wife.SpouseName = "X4 Bob"; wife.Married = true; wife.IsMarried = true;
+        NPCMarriageRegistry.Instance.RegisterMarriage("player_x4_bob", wife.ID, "X4 Bob", "X4 Wife");
+        try
+        {
+            await _db.SaveWorldState(OnlineStateManager.KEY_NPCS, JsonSerializer.Serialize(OnlineStateManager.SerializeCurrentNPCs(), Json));
+
+            // a door process (not the owner) deletes X4 Bob: the edit, the local clean-up, the versioned write
+            await PermadeathHelper.PurgeDeletedCharacterAsync(_db, "x4_bob_account", "X4 Bob");
+            Scalar("SELECT COUNT(*) FROM world_edits WHERE kind = 'forget_character';").Should().Be("1");
+            long clean = _db.GetWorldStateVersion(OnlineStateManager.KEY_NPCS);
+
+            // the owner's save: the npcs write lands, the marriages record does not
+            var sim = OwnerSim("owner_x4", clean);
+            Exec(BlockMarriages);
+            await SimSave(sim);
+            _db.GetWorldStateVersion(OnlineStateManager.KEY_NPCS).Should().BeGreaterThan(clean, "the npcs write landed");
+            Scalar("SELECT applied_at FROM world_edits WHERE kind = 'forget_character';").Should().BeNull(
+                "the marriages record does not hold the edit yet, so a restart must still re-apply it");
+
+            // the next save writes both, then marks it
+            Exec("DROP TRIGGER block_marriages_upd; DROP TRIGGER block_marriages_ins;");
+            await SimSave(sim);
+            Scalar("SELECT applied_at FROM world_edits WHERE kind = 'forget_character';").Should().NotBeNull();
+            Scalar("SELECT applied_by FROM world_edits WHERE kind = 'forget_character';").Should().Be("owner_x4");
+            (await _db.LoadWorldState(OnlineStateManager.KEY_MARRIAGES))!.Should().NotContain("npc_x4_w", "the stored record has no such marriage");
+        }
+        finally { NPCMarriageRegistry.Instance.EndMarriage(wife.ID); }
+    }
 }
