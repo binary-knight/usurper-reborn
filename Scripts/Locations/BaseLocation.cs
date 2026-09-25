@@ -6539,35 +6539,36 @@ public abstract class BaseLocation
         terminal.WriteLine("");
 
         // Basic Info
+        // v1.1.14: the stat labels carry their own trailing space and "  |  " prefix; add neither here.
         WriteSectionHeader(Loc.Get("base.basic_information"), "yellow");
         terminal.SetColor("white");
-        terminal.Write(Loc.Get("base.stat_name") + " ");
+        terminal.Write(Loc.Get("base.stat_name"));
         terminal.SetColor("bright_white");
         terminal.WriteLine(currentPlayer.DisplayName);
 
         terminal.SetColor("white");
-        terminal.Write(Loc.Get("base.stat_class") + " ");
+        terminal.Write(Loc.Get("base.stat_class"));
         terminal.SetColor("bright_green");
         terminal.Write($"{currentPlayer.ClassName}");
         terminal.SetColor("white");
-        terminal.Write("  |  " + Loc.Get("base.stat_race") + " ");
+        terminal.Write(Loc.Get("base.stat_race"));
         terminal.SetColor("bright_green");
         terminal.Write($"{currentPlayer.Race}");
         terminal.SetColor("white");
-        terminal.Write("  |  " + Loc.Get("base.stat_sex") + " ");
+        terminal.Write(Loc.Get("base.stat_sex"));
         terminal.SetColor("bright_green");
         terminal.WriteLine($"{(currentPlayer.Sex == CharacterSex.Male ? Loc.Get("base.male") : Loc.Get("base.female"))}");
 
         terminal.SetColor("white");
-        terminal.Write(Loc.Get("base.stat_age") + " ");
+        terminal.Write(Loc.Get("base.stat_age"));
         terminal.SetColor("cyan");
         terminal.Write($"{currentPlayer.Age}");
         terminal.SetColor("white");
-        terminal.Write("  |  " + Loc.Get("base.stat_height") + " ");
+        terminal.Write(Loc.Get("base.stat_height"));
         terminal.SetColor("cyan");
         terminal.Write($"{currentPlayer.Height}cm");
         terminal.SetColor("white");
-        terminal.Write("  |  " + Loc.Get("base.stat_weight") + " ");
+        terminal.Write(Loc.Get("base.stat_weight"));
         terminal.SetColor("cyan");
         terminal.WriteLine($"{currentPlayer.Weight}kg");
 
@@ -6582,7 +6583,7 @@ public abstract class BaseLocation
         // Level & Experience
         WriteSectionHeader(Loc.Get("base.level_experience"), "yellow");
         terminal.SetColor("white");
-        terminal.Write(Loc.Get("base.stat_current_level") + " ");
+        terminal.Write(Loc.Get("base.stat_current_level"));
         terminal.SetColor("bright_yellow");
         terminal.WriteLine($"{currentPlayer.Level}");
 
@@ -6596,7 +6597,7 @@ public abstract class BaseLocation
         long xpNeeded = nextLevelXP - currentPlayer.Experience;
 
         terminal.SetColor("white");
-        terminal.Write(Loc.Get("base.stat_xp_next") + " ");
+        terminal.Write(Loc.Get("base.stat_xp_next"));
         terminal.SetColor("bright_magenta");
         terminal.Write($"{xpNeeded:N0}");
         terminal.SetColor("gray");
@@ -6705,7 +6706,7 @@ public abstract class BaseLocation
 
         // Combat style indicator
         terminal.SetColor("white");
-        terminal.Write(Loc.Get("base.stat_combat_style") + " ");
+        terminal.Write(Loc.Get("base.stat_combat_style"));
         if (currentPlayer.IsTwoHanding)
         {
             terminal.SetColor("bright_red");
@@ -7120,17 +7121,17 @@ public abstract class BaseLocation
         // Wealth
         WriteSectionHeader(Loc.Get("base.wealth"), "yellow");
         terminal.SetColor("white");
-        terminal.Write(Loc.Get("base.stat_gold_hand") + " ");
+        terminal.Write(Loc.Get("base.stat_gold_hand"));
         terminal.SetColor("bright_yellow");
         terminal.WriteLine($"{currentPlayer.Gold:N0}");
 
         terminal.SetColor("white");
-        terminal.Write(Loc.Get("base.stat_gold_bank") + " ");
+        terminal.Write(Loc.Get("base.stat_gold_bank"));
         terminal.SetColor("yellow");
         terminal.WriteLine($"{currentPlayer.BankGold:N0}");
 
         terminal.SetColor("white");
-        terminal.Write(Loc.Get("base.stat_total_wealth") + " ");
+        terminal.Write(Loc.Get("base.stat_total_wealth"));
         terminal.SetColor("bright_yellow");
         terminal.WriteLine($"{(currentPlayer.Gold + currentPlayer.BankGold):N0}");
         terminal.WriteLine("");
@@ -7144,7 +7145,7 @@ public abstract class BaseLocation
         // Relationships
         WriteSectionHeader(Loc.Get("base.relationships"), "yellow");
         terminal.SetColor("white");
-        terminal.Write(Loc.Get("base.stat_marital") + " ");
+        terminal.Write(Loc.Get("base.stat_marital"));
 
         // Check both Character properties AND RomanceTracker for marriage status
         var romanceTracker = UsurperRemake.Systems.RomanceTracker.Instance;
@@ -7174,7 +7175,7 @@ public abstract class BaseLocation
             if (!string.IsNullOrEmpty(spouseName))
             {
                 terminal.SetColor("white");
-                terminal.Write(" " + Loc.Get("base.stat_married_to") + " ");
+                terminal.Write(" " + Loc.Get("base.stat_married_to"));
                 terminal.SetColor("magenta");
                 terminal.Write(spouseName);
             }
@@ -7196,14 +7197,14 @@ public abstract class BaseLocation
             }
 
             terminal.SetColor("white");
-            terminal.Write(Loc.Get("base.stat_children") + " ");
+            terminal.Write(Loc.Get("base.stat_children"));
             terminal.SetColor("cyan");
             terminal.WriteLine($"{childCount}");
 
             if (currentPlayer.Pregnancy > 0)
             {
                 terminal.SetColor("white");
-                terminal.Write(Loc.Get("base.stat_pregnancy") + " ");
+                terminal.Write(Loc.Get("base.stat_pregnancy"));
                 terminal.SetColor("bright_cyan");
                 terminal.WriteLine(Loc.Get("base.stat_days", currentPlayer.Pregnancy));
             }
@@ -7220,7 +7221,7 @@ public abstract class BaseLocation
         }
 
         terminal.SetColor("white");
-        terminal.Write(Loc.Get("base.stat_team") + " ");
+        terminal.Write(Loc.Get("base.stat_team"));
         if (!string.IsNullOrEmpty(currentPlayer.Team))
         {
             terminal.SetColor("bright_green");
@@ -7245,11 +7246,11 @@ public abstract class BaseLocation
         terminal.WriteLine(alignText);
 
         terminal.SetColor("white");
-        terminal.Write(Loc.Get("base.stat_chivalry") + " ");
+        terminal.Write(Loc.Get("base.stat_chivalry"));
         terminal.SetColor("bright_green");
         terminal.Write($"{currentPlayer.Chivalry}/1000");
         terminal.SetColor("white");
-        terminal.Write("  |  " + Loc.Get("base.stat_darkness") + " ");
+        terminal.Write(Loc.Get("base.stat_darkness"));
         terminal.SetColor("red");
         terminal.WriteLine($"{currentPlayer.Darkness}/1000");
 
@@ -7257,7 +7258,7 @@ public abstract class BaseLocation
         if (!IsScreenReader)
         {
             terminal.SetColor("gray");
-            terminal.Write("  " + Loc.Get("base.stat_holy") + " ");
+            terminal.Write("  " + Loc.Get("base.stat_holy"));
             terminal.SetColor("bright_green");
             int chivBars = (int)Math.Min(10, currentPlayer.Chivalry / 100);
             int darkBars = (int)Math.Min(10, currentPlayer.Darkness / 100);
@@ -7383,11 +7384,11 @@ public abstract class BaseLocation
         terminal.WriteLine("");
 
         terminal.SetColor("white");
-        terminal.Write(Loc.Get("base.stat_loyalty") + " ");
+        terminal.Write(Loc.Get("base.stat_loyalty"));
         terminal.SetColor("cyan");
         terminal.Write($"{currentPlayer.Loyalty}%");
         terminal.SetColor("white");
-        terminal.Write("  |  " + Loc.Get("base.stat_mental") + " ");
+        terminal.Write(Loc.Get("base.stat_mental"));
         terminal.SetColor(currentPlayer.Mental >= 50 ? "green" : "red");
         terminal.WriteLine($"{currentPlayer.Mental}");
 
@@ -7407,12 +7408,12 @@ public abstract class BaseLocation
             var factionData = UsurperRemake.Systems.FactionSystem.Factions[faction];
 
             terminal.SetColor("white");
-            terminal.Write(Loc.Get("base.stat_allegiance") + " ");
+            terminal.Write(Loc.Get("base.stat_allegiance"));
             terminal.SetColor(GetFactionColor(faction));
             terminal.WriteLine(factionData.Name);
 
             terminal.SetColor("white");
-            terminal.Write(Loc.Get("base.stat_rank") + " ");
+            terminal.Write(Loc.Get("base.stat_rank"));
             terminal.SetColor("bright_cyan");
             terminal.Write($"{factionSystem.FactionRank}");
             terminal.SetColor("gray");
@@ -7504,20 +7505,20 @@ public abstract class BaseLocation
         // Battle Record
         WriteSectionHeader(Loc.Get("base.battle_record"), "yellow");
         terminal.SetColor("white");
-        terminal.Write(Loc.Get("base.stat_monster_kills") + " ");
+        terminal.Write(Loc.Get("base.stat_monster_kills"));
         terminal.SetColor("bright_green");
         terminal.Write($"{currentPlayer.MKills}");
         terminal.SetColor("white");
-        terminal.Write("  |  " + Loc.Get("base.stat_monster_defeats") + " ");
+        terminal.Write(Loc.Get("base.stat_monster_defeats"));
         terminal.SetColor("red");
         terminal.WriteLine($"{currentPlayer.MDefeats}");
 
         terminal.SetColor("white");
-        terminal.Write(Loc.Get("base.stat_player_kills") + " ");
+        terminal.Write(Loc.Get("base.stat_player_kills"));
         terminal.SetColor("bright_yellow");
         terminal.Write($"{currentPlayer.PKills}");
         terminal.SetColor("white");
-        terminal.Write("  |  " + Loc.Get("base.stat_player_defeats") + " ");
+        terminal.Write(Loc.Get("base.stat_player_defeats"));
         terminal.SetColor("red");
         terminal.WriteLine($"{currentPlayer.PDefeats}");
 
@@ -7529,7 +7530,7 @@ public abstract class BaseLocation
         {
             double monsterWinRate = (double)currentPlayer.MKills / totalMonsterBattles * 100;
             terminal.SetColor("white");
-            terminal.Write(Loc.Get("base.stat_monster_winrate") + " ");
+            terminal.Write(Loc.Get("base.stat_monster_winrate"));
             terminal.SetColor("cyan");
             terminal.WriteLine($"{monsterWinRate:F1}%");
         }
@@ -7538,7 +7539,7 @@ public abstract class BaseLocation
         {
             double playerWinRate = (double)currentPlayer.PKills / totalPlayerBattles * 100;
             terminal.SetColor("white");
-            terminal.Write(Loc.Get("base.stat_pvp_winrate") + " ");
+            terminal.Write(Loc.Get("base.stat_pvp_winrate"));
             terminal.SetColor("cyan");
             terminal.WriteLine($"{playerWinRate:F1}%");
         }
@@ -7547,7 +7548,7 @@ public abstract class BaseLocation
         // Dungeon Progress
         WriteSectionHeader(Loc.Get("base.dungeon_progress"), "yellow");
         terminal.SetColor("white");
-        terminal.Write(Loc.Get("base.stat_deepest_floor") + " ");
+        terminal.Write(Loc.Get("base.stat_deepest_floor"));
         int deepestFloor = currentPlayer.Statistics?.DeepestDungeonLevel ?? 1;
         if (currentPlayer is Player playerForDungeon && playerForDungeon.DungeonLevel > deepestFloor)
             deepestFloor = playerForDungeon.DungeonLevel;
@@ -7566,7 +7567,7 @@ public abstract class BaseLocation
                 .ToList();
 
             terminal.SetColor("white");
-            terminal.Write(Loc.Get("base.stat_old_gods") + " ");
+            terminal.Write(Loc.Get("base.stat_old_gods"));
             bool hasAny = false;
             if (godsDefeated > 0)
             {
@@ -7617,7 +7618,7 @@ public abstract class BaseLocation
             // Show seals collected
             int sealsCollected = storySystem.CollectedSeals.Count;
             terminal.SetColor("white");
-            terminal.Write(Loc.Get("base.stat_seals") + " ");
+            terminal.Write(Loc.Get("base.stat_seals"));
             terminal.SetColor(sealsCollected > 0 ? "bright_yellow" : "gray");
             terminal.WriteLine(Loc.Get("base.seals_collected", sealsCollected));
         }
@@ -7626,7 +7627,7 @@ public abstract class BaseLocation
         // God Worship & Divine Wrath
         WriteSectionHeader(Loc.Get("base.divine_status"), "yellow");
         terminal.SetColor("white");
-        terminal.Write(Loc.Get("base.stat_worshipped_god") + " ");
+        terminal.Write(Loc.Get("base.stat_worshipped_god"));
         string worshippedGod = UsurperRemake.GodSystemSingleton.Instance?.GetPlayerGod(currentPlayer.Name2) ?? "";
         // Also check player-created (immortal) god worship
         if (string.IsNullOrEmpty(worshippedGod) && !string.IsNullOrEmpty(currentPlayer.WorshippedGod))
@@ -8154,11 +8155,11 @@ public abstract class BaseLocation
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("base.equipment_totals"));
         terminal.SetColor("white");
-        terminal.Write("  " + Loc.Get("base.weapon_power") + " ");
+        terminal.Write("  " + Loc.Get("base.weapon_power"));
         terminal.SetColor("bright_red");
         terminal.Write($"{totalWeapPow}");
         terminal.SetColor("white");
-        terminal.Write("  |  " + Loc.Get("base.armor_class") + " ");
+        terminal.Write(Loc.Get("base.armor_class"));
         terminal.SetColor("bright_cyan");
         terminal.WriteLine($"{totalArmPow}");
 
