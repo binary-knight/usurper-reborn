@@ -112,4 +112,77 @@ public class Leftovers1114ATests : IDisposable
             return Task.CompletedTask;
         });
     }
+
+    // ─── N4: the login payout for a quest on a dead NPC ───
+
+    /// <summary>Runs body with this fixture's database as the save backend (the claim is written there).</summary>
+    private void WithSqlSaves(Action body)
+    {
+        var field = typeof(SaveSystem).GetField("instance", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var before = field.GetValue(null);
+        SaveSystem.InitializeWithBackend(_db);
+        try { body(); }
+        finally { field.SetValue(null, before); }
+    }
+
+    private static (Character player, Quest quest) DeadTargetQuest(string questId)
+    {
+        var player = new Character { Name1 = "n4_hunter", Name2 = "N4 Hunter", Level = 20, Gold = 0 };
+        var quest = new Quest
+        {
+            Id = questId, Title = "WANTED: N4 Mark", Initiator = "The Crown", QuestTarget = QuestTarget.DefeatNPC,
+            TargetNPCName = "N4 Mark", Occupier = player.Name2, Date = DateTime.Now, DaysToComplete = 30
+        };
+        player.ActiveQuests.Add(quest);
+        return (player, quest);
+    }
+
+    [Fact]
+    public void TheDeadTargetQuestPayout_PaysOnce_AcrossTwoProcesses()
+    {
+        WithSqlSaves(() =>
+        {
+            // the same character's quest, held by two processes (or replayed after a crash before the save)
+            var (first, quest) = DeadTargetQuest("q_n4_once");
+            var (second, copy) = DeadTargetQuest("q_n4_once");
+
+            GameEngine.SettleDeadNpcQuest(first, quest, out long paid).Should().BeTrue();
+            paid.Should().BeGreaterThan(0);
+            first.Gold.Should().Be(paid);
+            first.ActiveQuests.Should().NotContain(quest);
+            quest.Deleted.Should().BeTrue();
+
+            GameEngine.SettleDeadNpcQuest(second, copy, out long again).Should().BeFalse("the other process's claim landed first");
+            again.Should().Be(0);
+            second.Gold.Should().Be(0, "paid once");
+            second.RoyQuests.Should().Be(0);
+            second.ActiveQuests.Should().NotContain(copy, "it is settled; removed unpaid");
+
+            // the claim is the one the bounty payouts take: a bounty paid first leaves nothing to pay here
+            _db.TryClaimBounty("q_n4_bounty", "N4 Other").Should().BeTrue();
+            var (third, bounty) = DeadTargetQuest("q_n4_bounty");
+            GameEngine.SettleDeadNpcQuest(third, bounty, out _).Should().BeFalse();
+            third.Gold.Should().Be(0);
+        });
+    }
+
+    [Fact]
+    public void TheDeadTargetQuestPayout_WhenTheClaimCannotBeWritten_LeavesTheQuest_Unpaid()
+    {
+        WithSqlSaves(() =>
+        {
+            using (var conn = new SqliteConnection($"Data Source={_path}"))
+            {
+                conn.Open();
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = "DROP TABLE bounty_claims;";
+                cmd.ExecuteNonQuery();
+            }
+            var (player, quest) = DeadTargetQuest("q_n4_busy");
+            GameEngine.SettleDeadNpcQuest(player, quest, out _).Should().BeNull();
+            player.Gold.Should().Be(0);
+            player.ActiveQuests.Should().Contain(quest, "left for the next login");
+            quest.Deleted.Should().BeFalse();
+        });
+    }
 }

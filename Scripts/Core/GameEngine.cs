@@ -3715,7 +3715,7 @@ public partial class GameEngine
         if (questsToRemove.Count == 0)
             return;
 
-        terminal.WriteLine("");
+        bool shown = false;
         foreach (var quest in questsToRemove)
         {
             string targetDisplay = !string.IsNullOrEmpty(quest.TargetNPCName)
@@ -3723,20 +3723,10 @@ public partial class GameEngine
                 : quest.Objectives.FirstOrDefault(o =>
                     !string.IsNullOrEmpty(o.TargetName))?.TargetName ?? "Unknown";
 
-            // Give the reward
-            var rewardAmount = quest.CalculateReward(player.Level);
-            if (rewardAmount <= 0) rewardAmount = player.Level * 100;
+            // v1.1.14: paid only under the quest's claim, as the bounty payouts are
+            if (SettleDeadNpcQuest(player, quest, out long rewardAmount) != true) continue;
 
-            player.Gold += rewardAmount;
-            player.Statistics?.RecordQuestGoldReward(rewardAmount);
-            player.RoyQuests++;
-            player.Fame += 5;
-
-            // Clean up the quest
-            quest.Deleted = true;
-            quest.Occupier = "";
-            player.ActiveQuests.Remove(quest);
-
+            if (!shown) { terminal.WriteLine(""); shown = true; }
             terminal.WriteLine($"  Quest Update: {targetDisplay} has perished.", "yellow");
             terminal.WriteLine($"  \"{quest.GetDisplayTitle()}\" auto-completed. Reward: {rewardAmount:N0} gold.", "bright_green");
             terminal.WriteLine("");
@@ -3744,7 +3734,41 @@ public partial class GameEngine
             DebugLogger.Instance.LogInfo("QUEST", $"Auto-completed quest '{quest.Title}' for {player.DisplayName} — target NPC '{targetDisplay}' is permadead. Reward: {rewardAmount:N0}g");
         }
 
-        await terminal.PressAnyKey();
+        if (shown) await terminal.PressAnyKey();
+    }
+
+    /// <summary>
+    /// v1.1.14: a quest whose target NPC is permadead, settled at login. The reward is paid only when this
+    /// process's claim on the quest lands (QuestSystem.ClaimAcrossProcesses, the key the bounty payouts use),
+    /// so a crash before the save, or the quest paid in another process first, never pays it twice.
+    /// True: paid and removed. False: claimed elsewhere, removed unpaid. Null: the claim could not be
+    /// written (a busy database); the quest is left for the next login.
+    /// </summary>
+    internal static bool? SettleDeadNpcQuest(Character player, Quest quest, out long reward)
+    {
+        reward = 0;
+        bool? claim = QuestSystem.ClaimAcrossProcesses(quest, player.Name2);
+        if (claim == null)
+        {
+            DebugLogger.Instance.LogWarning("QUEST", $"Dead-target quest '{quest.Title}' for {player.DisplayName}: the claim could not be written; left for the next login.");
+            return null;
+        }
+        if (claim == true)
+        {
+            reward = quest.CalculateReward(player.Level);
+            if (reward <= 0) reward = player.Level * 100;
+            player.Gold += reward;
+            player.Statistics?.RecordQuestGoldReward(reward);
+            player.RoyQuests++;
+            player.Fame += 5;
+        }
+        else
+            DebugLogger.Instance.LogInfo("QUEST", $"Dead-target quest '{quest.Title}' for {player.DisplayName} was settled elsewhere; removed unpaid.");
+
+        quest.Deleted = true;
+        quest.Occupier = "";
+        player.ActiveQuests.Remove(quest);
+        return claim;
     }
 
     /// <summary>
