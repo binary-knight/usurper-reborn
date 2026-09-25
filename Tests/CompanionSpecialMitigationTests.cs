@@ -53,6 +53,9 @@ public class CompanionSpecialMitigationTests
         var tank = Tank();
         var result = new CombatResult { CurrentRound = 10 };
         long first = await Hit(engine, Cube(), tank, result);
+        // v1.1.14: Engulf's 45 percent stun would make the second cube skip a held target
+        // (FallsBackToNormalAttack), so the tank is freed before the second Engulf.
+        tank.ClearAllStatuses();
         long second = await Hit(engine, Cube(), tank, result);
 
         first.Should().Be((long)(800 * 1.5), "Engulf is 1.5 times attack against no defence");
