@@ -36,4 +36,43 @@ public class DecisionsB1114Tests
         var loaded = typeof(Renci.SshNet.SshClient).Assembly.GetName().Version!;
         loaded.Major.Should().BeGreaterOrEqualTo(2026, "the build must bind the patched assembly");
     }
+
+    // ---- B4: alt slot at level 25 ----
+
+    [Theory]
+    [InlineData(false, false, 1, false)]
+    [InlineData(false, false, 24, false)]   // one level short
+    [InlineData(false, false, 25, true)]    // the threshold
+    [InlineData(false, false, 60, true)]
+    [InlineData(true, false, 1, true)]      // an immortal main still opens it
+    [InlineData(false, true, 3, true)]      // an earned slot survives renouncing and a low level
+    public void AltSlot_OpensAtLevel25_OrForAnImmortal(bool immortal, bool earned, int level, bool expected)
+    {
+        GameConfig.AltSlotUnlockLevel.Should().Be(25);
+        GameEngine.AltSlotUnlocked(immortal, earned, level).Should().Be(expected);
+    }
+
+    [Fact]
+    public void AltSlot_MenuUsesTheRule_AndKeepsOneAlt()
+    {
+        string src = File.ReadAllText(Path.Combine(RepoRoot(), "Scripts", "Core", "GameEngine.cs"));
+        src.Should().Contain("bool canCreateAlt = AltSlotUnlocked(mainIsImmortal, hasAltSlot, mainLevel) && altSave == null",
+            "the menu gate uses the level rule and still refuses a second alt");
+        src.Should().NotContain("engine.immortal_required");
+    }
+
+    [Theory]
+    [InlineData("en")]
+    [InlineData("es")]
+    [InlineData("fr")]
+    [InlineData("hu")]
+    [InlineData("it")]
+    public void AltSlot_RefusalText_NamesTheLevel(string lang)
+    {
+        string json = File.ReadAllText(Path.Combine(RepoRoot(), "Localization", lang + ".json"));
+        var m = Regex.Match(json, "\"engine\\.alt_level_required\": \"([^\"]*)\"");
+        m.Success.Should().BeTrue($"{lang} has the new refusal line");
+        m.Groups[1].Value.Should().Contain("{0}", "the level is filled in from GameConfig");
+        json.Should().NotContain("\"engine.immortal_required\"");
+    }
 }

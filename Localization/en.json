@@ -8223,7 +8223,7 @@
   "engine.section_play": "  PLAY",
   "engine.section_info": "  INFO",
   "engine.section_accessibility": "  ACCESSIBILITY",
-  "engine.immortal_required": "  You must be an immortal to create an alt character.",
+  "engine.alt_level_required": "  You need a character at level {0} or higher, or an immortal, to create an alt character.",
   "engine.delete_main_warning": "WARNING: This will DELETE your main character!",
   "engine.delete_alt_unaffected": "Your alt character will NOT be affected.",
   "engine.delete_confirm_prompt": "Type 'DELETE' to confirm: ",
