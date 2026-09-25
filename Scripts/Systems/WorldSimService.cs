@@ -308,6 +308,15 @@ namespace UsurperRemake.Systems
                 // Both game server and world sim write to the same world_state key.
                 // The version auto-increments on each write, so if it changed, a player saved.
                 long currentNpcVersion = sqlBackend.GetWorldStateVersion(OnlineStateManager.KEY_NPCS);
+                // v1.1.14: a newer version this process's live roster was itself written as (a purge's write,
+                // PersistNpcWorldNow) or restored from holds nothing the live roster lacks. It is adopted, not
+                // reloaded: a reload would drop the sim's changes made since that write. A later write by
+                // another process fails the versioned write below and is reloaded on the next pass.
+                if (currentNpcVersion > lastNpcVersion && lastNpcVersion > 0 && OnlineStateManager.LiveRosterVersion == currentNpcVersion)
+                {
+                    DebugLogger.Instance.LogInfo("WORLDSIM", $"NPC data v{currentNpcVersion} was written from this process's live roster; adopted without a reload.");
+                    lastNpcVersion = currentNpcVersion;
+                }
                 if (currentNpcVersion > lastNpcVersion && lastNpcVersion > 0)
                 {
                     DebugLogger.Instance.LogInfo("WORLDSIM", $"NPC data modified by game server (v{lastNpcVersion} → v{currentNpcVersion}). Reloading to pick up player changes...");

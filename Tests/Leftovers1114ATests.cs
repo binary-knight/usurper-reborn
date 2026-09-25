@@ -256,4 +256,41 @@ public class Leftovers1114ATests : IDisposable
         }
         finally { NPCMarriageRegistry.Instance.EndMarriage(wife.ID); }
     }
+
+    // ─── M2: the sim adopts a version its own process wrote ───
+
+    [Fact]
+    public async Task ThisProcesssPurgeWrite_IsAdopted_AndTheSimsUnsavedChangesSurvive()
+    {
+        var keeper = Npc("npc_m2_k", "M2 Keeper");
+        var target = Npc("npc_m2_t", "M2 Target");
+        await _db.SaveWorldState(OnlineStateManager.KEY_NPCS, JsonSerializer.Serialize(OnlineStateManager.SerializeCurrentNPCs(), Json));
+        long loaded = _db.GetWorldStateVersion(OnlineStateManager.KEY_NPCS);
+        OnlineStateManager.NoteRosterRestored(loaded);   // the sim loaded the live roster at this version
+        var sim = OwnerSim("owner_m2", loaded);
+        WorldEditLog.OwnerOverride = true;
+
+        // a purge in this process writes the live roster at once (loaded + 1)
+        (await OnlineStateManager.PersistNpcWorldNow(_db, () => { target.Gold = 4242; return 1; }, new HashSet<string>())).Should().Be(1);
+        _db.GetWorldStateVersion(OnlineStateManager.KEY_NPCS).Should().Be(loaded + 1);
+        OnlineStateManager.LiveRosterVersion.Should().Be(loaded + 1);
+
+        // the sim changes an NPC after that write, then saves
+        keeper.Level = 42;
+        await SimSave(sim);
+
+        Find("M2 Keeper")!.Level.Should().Be(42, "the version came from this process's own roster, so it is not reloaded over the sim's change");
+        var stored = JsonSerializer.Deserialize<List<NPCData>>((await _db.LoadWorldState(OnlineStateManager.KEY_NPCS))!, Json)!;
+        stored.Single(d => d.Name == "M2 Keeper").Level.Should().Be(42, "the sim's change is written");
+        stored.Single(d => d.Name == "M2 Target").Gold.Should().Be(4242, "the purge's change is kept");
+        _db.GetWorldStateVersion(OnlineStateManager.KEY_NPCS).Should().Be(loaded + 2);
+        ((long)typeof(WorldSimService).GetField("lastNpcVersion", Priv)!.GetValue(sim)!).Should().Be(loaded + 2);
+
+        // another process's write is still reloaded
+        var other = JsonSerializer.Deserialize<List<NPCData>>(JsonSerializer.Serialize(stored, Json), Json)!;
+        other.Single(d => d.Name == "M2 Target").Gold = 99;
+        await _db.SaveWorldState(OnlineStateManager.KEY_NPCS, JsonSerializer.Serialize(other, Json));
+        await SimSave(sim);
+        Find("M2 Target")!.Gold.Should().Be(99, "a version this process did not write is reloaded");
+    }
 }
