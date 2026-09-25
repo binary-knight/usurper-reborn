@@ -989,6 +989,25 @@ namespace UsurperRemake.Systems
 
         #region Petition 4: Royal Petition
 
+        /// <summary>
+        /// v1.1.14: a ruling's cost out of the treasury, as one guarded court change that refuses when the stored
+        /// treasury is short. False (refusal shown, nothing granted) when it is short or the court changed.
+        /// </summary>
+        private static async Task<bool> PayRulingAsync(King king, long cost, TerminalEmulator terminal)
+        {
+            if (king.Treasury < cost)
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine($"\n  {Loc.Get("petition.royal.treasury_short", cost, king.Treasury)}");
+                return false;
+            }
+            if (await CastleLocation.CourtChangeAsync(court => { if (court.Treasury < cost) return false; court.Treasury -= cost; return true; }))
+                return true;
+            terminal.SetColor("red");
+            terminal.WriteLine($"\n  {Loc.Get("castle.court_change_failed")}");
+            return false;
+        }
+
         private async Task ExecuteRoyalPetition(NPC petitioner, Character player, TerminalEmulator terminal)
         {
             var king = CastleLocation.GetCurrentKing();
@@ -1071,8 +1090,7 @@ namespace UsurperRemake.Systems
                     if (choice.ToUpper() == "G")
                     {
                         long cost = king.TaxRate * 5;
-                        if (!await CastleLocation.CourtChangeAsync(court => { court.Treasury -= cost; return true; }))   // v1.1.13: one guarded court change
-                            { terminal.SetColor("red"); terminal.WriteLine($"\n  {Loc.Get("castle.court_change_failed")}"); break; }
+                        if (!await PayRulingAsync(king, cost, terminal)) break;   // v1.1.14: refused when the treasury is short
                         terminal.SetColor("bright_green");
                         terminal.WriteLine($"\n  {Loc.Get("petition.royal.tax_grant_result", cost)}");
                         AlignmentSystem.Instance.ChangeAlignment(player, 5, isGood: true, "petition.royal.tax_grant"); // v0.57.12: paired movement
@@ -1086,8 +1104,7 @@ namespace UsurperRemake.Systems
                     else if (choice.ToUpper() == "H")
                     {
                         long cost = king.TaxRate * 2;
-                        if (!await CastleLocation.CourtChangeAsync(court => { court.Treasury -= cost; return true; }))   // v1.1.13: one guarded court change
-                            { terminal.SetColor("red"); terminal.WriteLine($"\n  {Loc.Get("castle.court_change_failed")}"); break; }
+                        if (!await PayRulingAsync(king, cost, terminal)) break;   // v1.1.14: refused when the treasury is short
                         terminal.SetColor("cyan");
                         terminal.WriteLine($"\n  {Loc.Get("petition.royal.tax_halve_result", cost)}");
                         AlignmentSystem.Instance.ChangeAlignment(player, 2, isGood: true, "petition.royal.tax_halve"); // v0.57.12: paired movement
@@ -1125,8 +1142,7 @@ namespace UsurperRemake.Systems
                     else if (choice.ToUpper() == "C")
                     {
                         long comp = 200 + petitioner.Level * 20;
-                        if (!await CastleLocation.CourtChangeAsync(court => { court.Treasury -= comp; return true; }))   // v1.1.13: one guarded court change
-                            { terminal.SetColor("red"); terminal.WriteLine($"\n  {Loc.Get("castle.court_change_failed")}"); break; }
+                        if (!await PayRulingAsync(king, comp, terminal)) break;   // v1.1.14: refused when the treasury is short
                         player.Gold -= Math.Min(comp / 2, player.Gold);
                         terminal.SetColor("yellow");
                         terminal.WriteLine($"\n  {Loc.Get("petition.royal.justice_compensate_result", comp)}");
@@ -1151,8 +1167,7 @@ namespace UsurperRemake.Systems
                 case "monster":
                     if (choice.ToUpper() == "S")
                     {
-                        if (!await CastleLocation.CourtChangeAsync(court => { court.Treasury -= 500; return true; }))   // v1.1.13: one guarded court change
-                            { terminal.SetColor("red"); terminal.WriteLine($"\n  {Loc.Get("castle.court_change_failed")}"); break; }
+                        if (!await PayRulingAsync(king, 500, terminal)) break;   // v1.1.14: refused when the treasury is short
                         terminal.SetColor("bright_green");
                         terminal.WriteLine($"\n  {Loc.Get("petition.royal.monster_send_result")}");
                         AlignmentSystem.Instance.ChangeAlignment(player, 5, isGood: true, "petition.royal.monster_send"); // v0.57.12: paired movement

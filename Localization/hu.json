@@ -17655,6 +17655,7 @@
   "petition.royal.marriage_text": "Felség, {0} és én házasodni szeretnénk. A Király áldását kérjük.",
   "petition.royal.marriage_beloved": "szerelmem",
   "petition.royal.prompt": "Ítéleted, Felség? ",
+  "petition.royal.treasury_short": "A kincstár nem tudja kifizetni a döntéshez szükséges {0} aranyat (csak {1} van benne). Semmit sem adsz meg.",
   "_comment_petition_royal_tax": "--- Royal Tax ---",
   "petition.royal.tax_grant": "Engedményt adni (-{0} arany a kincstárból)",
   "petition.royal.tax_deny": "Elutasítani a kérést",

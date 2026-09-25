@@ -17632,6 +17632,7 @@
   "petition.royal.marriage_text": "Vostra Maestà, {0} e io desideriamo sposarci. Chiediamo la benedizione del Re.",
   "petition.royal.marriage_beloved": "il mio amato",
   "petition.royal.prompt": "Il vostro verdetto, Maestà? ",
+  "petition.royal.treasury_short": "Il tesoro non può pagare le {0} monete d'oro richieste da questa decisione (ne contiene {1}). Non viene concesso nulla.",
   "_comment_petition_royal_tax": "--- Tassa Reale ---",
   "petition.royal.tax_grant": "Concedere lo sgravio (-{0}o dal tesoro)",
   "petition.royal.tax_deny": "Negare la richiesta",

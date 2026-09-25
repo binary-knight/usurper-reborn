@@ -17829,6 +17829,7 @@
   "petition.royal.marriage_text": "Your Majesty, {0} and I wish to marry. We seek the King's blessing.",
   "petition.royal.marriage_beloved": "my beloved",
   "petition.royal.prompt": "Your ruling, Majesty? ",
+  "petition.royal.treasury_short": "The treasury cannot pay the {0} gold this ruling needs (it holds {1}). Nothing is granted.",
   "_comment_petition_royal_tax": "--- Royal Tax ---",
   "petition.royal.tax_grant": "Grant relief (-{0}g from treasury)",
   "petition.royal.tax_deny": "Deny the request",
