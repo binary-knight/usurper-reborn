@@ -1626,8 +1626,7 @@ public class WeaponShopLocation : BaseLocation
     private async Task Pause()
     {
         terminal.SetColor("gray");
-        terminal.Write(Loc.Get("ui.press_enter"));
-        await terminal.GetInput("");
+        await terminal.PressAnyKey();
     }
 
     /// <summary>

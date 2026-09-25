@@ -6697,8 +6697,7 @@ public abstract class BaseLocation
 
         // Pagination - Page 1 break
         terminal.SetColor("gray");
-        terminal.Write(Loc.Get("ui.press_enter"));
-        await terminal.GetInput("");
+        await terminal.PressAnyKey();
         terminal.WriteLine("");
 
         // Equipment - Full Slot Display
@@ -7138,8 +7137,7 @@ public abstract class BaseLocation
 
         // Pagination - Page 2 break
         terminal.SetColor("gray");
-        terminal.Write(Loc.Get("ui.press_enter"));
-        await terminal.GetInput("");
+        await terminal.PressAnyKey();
         terminal.WriteLine("");
 
         // Relationships
@@ -7498,8 +7496,7 @@ public abstract class BaseLocation
 
         // Pagination - Page 3 break
         terminal.SetColor("gray");
-        terminal.Write(Loc.Get("ui.press_enter"));
-        await terminal.GetInput("");
+        await terminal.PressAnyKey();
         terminal.WriteLine("");
 
         // Battle Record
@@ -8710,8 +8707,7 @@ public abstract class BaseLocation
         // Mark as read (using existing MarkMessagesRead won't work for a single message,
         // but the message has been seen)
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.ReadKeyAsync();
+        await terminal.PressAnyKey();
     }
 
     private async Task SendMail(SqlSaveBackend backend, string senderUsername)
@@ -9929,8 +9925,7 @@ public abstract class BaseLocation
         {
             terminal.SetColor("cyan");
             terminal.WriteLine(Loc.Get("base.auction_your_listing"));
-            terminal.Write(Loc.Get("base.auction_press_enter"));
-            await terminal.ReadLineAsync();
+            await terminal.PressAnyKey(Loc.Get("base.auction_press_enter"));
             return;
         }
 
@@ -9945,8 +9940,7 @@ public abstract class BaseLocation
             {
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("base.auction_req_level", requiredLevel, currentPlayer.Level));
-                terminal.Write(Loc.Get("base.auction_press_enter"));
-                await terminal.ReadLineAsync();
+                await terminal.PressAnyKey(Loc.Get("base.auction_press_enter"));
                 return;
             }
         }
@@ -9955,8 +9949,7 @@ public abstract class BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("base.auction_need_more", (listing.Price - currentPlayer.Gold).ToString("N0")));
-            terminal.Write(Loc.Get("base.auction_press_enter"));
-            await terminal.ReadLineAsync();
+            await terminal.PressAnyKey(Loc.Get("base.auction_press_enter"));
             return;
         }
 

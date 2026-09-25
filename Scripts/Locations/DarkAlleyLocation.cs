@@ -1113,7 +1113,7 @@ namespace UsurperRemake.Locations
                     terminal.SetColor("gray");
                     terminal.WriteLine(Loc.Get("dark_alley.shadows_find_us"));
                 }
-                await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+                await terminal.PressAnyKey();
                 return;
             }
 
@@ -1163,7 +1163,7 @@ namespace UsurperRemake.Locations
                 terminal.WriteLine(Loc.Get("dark_alley.shadows_too_light"));
                 terminal.WriteLine(Loc.Get("dark_alley.shadows_embrace"));
                 terminal.WriteLine(Loc.Get("dark_alley.shadows_prove"));
-                await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+                await terminal.PressAnyKey();
                 return;
             }
 
@@ -1202,7 +1202,7 @@ namespace UsurperRemake.Locations
                 terminal.WriteLine(Loc.Get("dark_alley.shadows_gone"));
             }
 
-            await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+            await terminal.PressAnyKey();
         }
 
         /// <summary>
@@ -1328,7 +1328,7 @@ namespace UsurperRemake.Locations
             terminal.WriteLine(Loc.Get("dark_alley.easter_curious"));
             terminal.WriteLine("");
 
-            await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+            await terminal.PressAnyKey();
         }
 
         #endregion

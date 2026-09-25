@@ -1231,7 +1231,7 @@ public partial class TempleLocation : BaseLocation
             }
         }
         
-        await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+        await terminal.PressAnyKey();
     }
     
     /// <summary>
@@ -1287,7 +1287,7 @@ public partial class TempleLocation : BaseLocation
             }
         }
 
-        await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+        await terminal.PressAnyKey();
     }
     
     /// <summary>
@@ -1310,7 +1310,7 @@ public partial class TempleLocation : BaseLocation
         terminal.WriteLine(Loc.Get("temple.most_powerful", stats["MostPowerfulGod"]), "yellow");
         terminal.WriteLine(Loc.Get("temple.most_popular", stats["MostPopularGod"]), "yellow");
         
-        await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+        await terminal.PressAnyKey();
     }
     
     /// <summary>
@@ -1783,7 +1783,7 @@ public partial class TempleLocation : BaseLocation
             terminal.WriteLine(Loc.Get("temple.god_none"), "gray");
         }
 
-        await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+        await terminal.PressAnyKey();
     }
 
     #region Old Gods Integration
@@ -1936,7 +1936,7 @@ public partial class TempleLocation : BaseLocation
             await DisplayDivineVision();
         }
 
-        await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+        await terminal.PressAnyKey();
     }
 
     /// <summary>
@@ -2059,7 +2059,7 @@ public partial class TempleLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("temple.aurelion_altar_dark"), "gray");
                 terminal.WriteLine(Loc.Get("temple.aurelion_ash_remains"), "gray");
                 terminal.WriteLine(Loc.Get("temple.aurelion_sense_loss"), "white");
-                await terminal.GetInputAsync(Loc.Get("temple.press_enter_return"));
+                await terminal.PressAnyKey(Loc.Get("temple.press_enter_return"));
                 return;
             }
             else if (aurelionState.Status == GodStatus.Saved)
@@ -2070,7 +2070,7 @@ public partial class TempleLocation : BaseLocation
                 terminal.WriteLine("", "white");
                 terminal.WriteLine(Loc.Get("temple.aurelion_thank_you"), "bright_cyan");
                 terminal.WriteLine(Loc.Get("temple.aurelion_new_vessel"), "bright_cyan");
-                await terminal.GetInputAsync(Loc.Get("temple.press_enter_return"));
+                await terminal.PressAnyKey(Loc.Get("temple.press_enter_return"));
                 return;
             }
         }
@@ -2130,7 +2130,7 @@ public partial class TempleLocation : BaseLocation
             terminal.WriteLine(Loc.Get("temple.aurelion_not_ready"), "bright_yellow");
         }
 
-        await terminal.GetInputAsync(Loc.Get("temple.press_enter_return"));
+        await terminal.PressAnyKey(Loc.Get("temple.press_enter_return"));
     }
 
     /// <summary>
@@ -2525,7 +2525,7 @@ public partial class TempleLocation : BaseLocation
         await Task.Delay(1500);
 
         terminal.SetColor("gray");
-        await terminal.GetInputAsync(Loc.Get("temple.press_enter_continue"));
+        await terminal.PressAnyKey(Loc.Get("temple.press_enter_continue"));
 
         // Collect the seal
         var sealSystem = UsurperRemake.Systems.SevenSealsSystem.Instance;
@@ -2889,7 +2889,7 @@ public partial class TempleLocation : BaseLocation
 
         // Mark encounter as complete
         StoryProgressionSystem.Instance.SetStoryFlag("mira_temple_encounter_complete", true);
-        await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+        await terminal.PressAnyKey();
         refreshMenu = true;
     }
 
@@ -3037,7 +3037,7 @@ public partial class TempleLocation : BaseLocation
             terminal.WriteLine(Loc.Get("temple.no_divided_loyalties"));
             terminal.WriteLine(Loc.Get("temple.renounce_seek_again"));
             terminal.WriteLine("");
-            await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+            await terminal.PressAnyKey();
             refreshMenu = true;
             return;
         }
@@ -3087,7 +3087,7 @@ public partial class TempleLocation : BaseLocation
             terminal.SetColor("bright_cyan");
             terminal.WriteLine(Loc.Get("temple.mirael_return"));
             terminal.WriteLine(Loc.Get("temple.mirael_offerings"));
-            await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+            await terminal.PressAnyKey();
             refreshMenu = true;
             return;
         }
@@ -3122,7 +3122,7 @@ public partial class TempleLocation : BaseLocation
             terminal.WriteLine(Loc.Get("temple.mirael_doors_open"));
         }
 
-        await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+        await terminal.PressAnyKey();
         refreshMenu = true;
     }
 

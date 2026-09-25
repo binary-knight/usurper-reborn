@@ -43,7 +43,7 @@ public class SysOpLocation : BaseLocation
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("sysop_location.error_bbs_only"));
             terminal.SetColor("gray");
-            await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+            await terminal.PressAnyKey();
             throw new LocationExitException(GameLocation.MainStreet);
         }
 
@@ -52,7 +52,7 @@ public class SysOpLocation : BaseLocation
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("sysop_location.access_denied"));
             terminal.SetColor("gray");
-            await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+            await terminal.PressAnyKey();
             throw new LocationExitException(GameLocation.MainStreet);
         }
 
@@ -263,7 +263,7 @@ public class SysOpLocation : BaseLocation
             {
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("sysop_location.no_save_dir"));
-                await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+                await terminal.PressAnyKey();
                 return;
             }
 
@@ -274,7 +274,7 @@ public class SysOpLocation : BaseLocation
             {
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("sysop_location.no_saves"));
-                await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+                await terminal.PressAnyKey();
                 return;
             }
 
@@ -309,7 +309,7 @@ public class SysOpLocation : BaseLocation
         }
 
         terminal.SetColor("gray");
-        await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+        await terminal.PressAnyKey();
     }
 
     private async Task DeletePlayer()
@@ -337,7 +337,7 @@ public class SysOpLocation : BaseLocation
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("sysop_location.error_delete_active"));
             terminal.WriteLine(Loc.Get("sysop_location.must_logout_first"));
-            await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -348,7 +348,7 @@ public class SysOpLocation : BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("sysop_location.player_not_found", playerName));
-            await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -398,7 +398,7 @@ public class SysOpLocation : BaseLocation
             terminal.WriteLine(Loc.Get("sysop_location.deletion_cancelled"));
         }
 
-        await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+        await terminal.PressAnyKey();
     }
 
     #endregion
@@ -448,7 +448,7 @@ public class SysOpLocation : BaseLocation
             terminal.WriteLine(Loc.Get("sysop_location.reset_cancelled"));
         }
 
-        await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+        await terminal.PressAnyKey();
     }
 
     private async Task PerformGameReset()
@@ -634,7 +634,7 @@ public class SysOpLocation : BaseLocation
                         terminal.SetColor("red");
                         terminal.WriteLine(Loc.Get("sysop_location.invalid_mult", xpInput));
                     }
-                    await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+                    await terminal.PressAnyKey();
                     break;
 
                 case "2":
@@ -653,7 +653,7 @@ public class SysOpLocation : BaseLocation
                         terminal.SetColor("red");
                         terminal.WriteLine(Loc.Get("sysop_location.invalid_mult", goldInput));
                     }
-                    await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+                    await terminal.PressAnyKey();
                     break;
 
                 case "3":
@@ -672,7 +672,7 @@ public class SysOpLocation : BaseLocation
                         terminal.SetColor("red");
                         terminal.WriteLine(Loc.Get("sysop_location.invalid_mult", hpInput));
                     }
-                    await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+                    await terminal.PressAnyKey();
                     break;
 
                 case "4":
@@ -691,7 +691,7 @@ public class SysOpLocation : BaseLocation
                         terminal.SetColor("red");
                         terminal.WriteLine(Loc.Get("sysop_location.invalid_mult", dmgInput));
                     }
-                    await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+                    await terminal.PressAnyKey();
                     break;
 
                 case "5":
@@ -703,7 +703,7 @@ public class SysOpLocation : BaseLocation
                     else
                         terminal.WriteLine(Loc.Get("sysop_location.online_enabled"));
                     DebugLogger.Instance.LogInfo("SYSOP", $"Online multiplayer {(GameConfig.DisableOnlinePlay ? "disabled" : "enabled")}");
-                    await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+                    await terminal.PressAnyKey();
                     break;
 
                 case "Q":
@@ -749,7 +749,7 @@ public class SysOpLocation : BaseLocation
         }
 
         DebugLogger.Instance.LogInfo("SYSOP", $"MOTD changed to: {newMOTD}");
-        await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+        await terminal.PressAnyKey();
     }
 
     #endregion
@@ -809,7 +809,7 @@ public class SysOpLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("gray");
-        await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+        await terminal.PressAnyKey();
     }
 
     private async Task ViewDebugLog()
@@ -823,7 +823,7 @@ public class SysOpLocation : BaseLocation
                 terminal.ClearScreen();
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("sysop_location.no_debug_log"));
-                await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+                await terminal.PressAnyKey();
                 return;
             }
 
@@ -833,7 +833,7 @@ public class SysOpLocation : BaseLocation
                 terminal.ClearScreen();
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("sysop_location.debug_log_empty"));
-                await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+                await terminal.PressAnyKey();
                 return;
             }
 
@@ -893,7 +893,7 @@ public class SysOpLocation : BaseLocation
             terminal.ClearScreen();
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("sysop_location.error_log", ex.Message));
-            await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+            await terminal.PressAnyKey();
         }
     }
 
@@ -906,7 +906,7 @@ public class SysOpLocation : BaseLocation
             terminal.ClearScreen();
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("sysop_location.no_active_npcs"));
-            await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -974,7 +974,7 @@ public class SysOpLocation : BaseLocation
             terminal.WriteLine(Loc.Get("sysop_location.steam_build"));
             terminal.WriteLine(Loc.Get("sysop_location.check_steam"));
             terminal.WriteLine("");
-            await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+            await terminal.PressAnyKey();
             return;
         }
 
@@ -1008,7 +1008,7 @@ public class SysOpLocation : BaseLocation
                 terminal.SetColor("cyan");
                 terminal.WriteLine("  https://github.com/binary-knight/usurper-reborn/releases/latest");
                 terminal.WriteLine("");
-                await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+                await terminal.PressAnyKey();
                 return;
             }
 
@@ -1021,7 +1021,7 @@ public class SysOpLocation : BaseLocation
                 terminal.WriteLine($"{Loc.Get("sysop_location.current_label")}: {checker.CurrentVersion}");
                 terminal.WriteLine($"{Loc.Get("sysop_location.latest_label")}:  {checker.LatestVersion}");
                 terminal.WriteLine("");
-                await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+                await terminal.PressAnyKey();
                 return;
             }
 
@@ -1083,12 +1083,12 @@ public class SysOpLocation : BaseLocation
                         terminal.SetColor("green");
                         terminal.WriteLine("");
                         terminal.WriteLine(Loc.Get("sysop_location.opening_browser"));
-                        await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+                        await terminal.PressAnyKey();
                         break;
                     default:
                         terminal.SetColor("gray");
                         terminal.WriteLine(Loc.Get("sysop_location.update_skipped"));
-                        await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+                        await terminal.PressAnyKey();
                         break;
                 }
             }
@@ -1110,7 +1110,7 @@ public class SysOpLocation : BaseLocation
                     terminal.WriteLine("");
                     terminal.WriteLine(Loc.Get("sysop_location.opening_browser"));
                 }
-                await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+                await terminal.PressAnyKey();
             }
         }
         catch (Exception ex)
@@ -1118,7 +1118,7 @@ public class SysOpLocation : BaseLocation
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("sysop_location.error_updates", ex.Message));
             DebugLogger.Instance.LogError("SYSOP", $"Update check failed: {ex.Message}");
-            await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+            await terminal.PressAnyKey();
         }
     }
 
@@ -1167,8 +1167,7 @@ public class SysOpLocation : BaseLocation
             DebugLogger.Instance.LogWarning("SYSOP", $"SysOp initiated auto-update to version {checker.LatestVersion}");
 
             terminal.SetColor("yellow");
-            terminal.Write(Loc.Get("sysop_location.press_enter_update"));
-            await terminal.GetInputAsync("");
+            await terminal.PressAnyKey(Loc.Get("sysop_location.press_enter_update"));
 
             // Exit the game to let the updater run
             Environment.Exit(0);
@@ -1191,7 +1190,7 @@ public class SysOpLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("sysop_location.opening_browser"));
             }
 
-            await terminal.GetInputAsync(Loc.Get("ui.press_enter"));
+            await terminal.PressAnyKey();
         }
     }
 
