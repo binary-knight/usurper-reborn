@@ -280,7 +280,7 @@ public partial class OwnerProcessConflictTests
         var lines = File.ReadAllLines(Path.Combine(RepoRoot(), "Scripts", "Systems", "SaveSystem.cs"))
             .Where(l => l.Contains("the WorldSimService already saves NPC state every 5 minutes")).ToList();
         lines.Should().ContainSingle();
-        lines[0].Should().NotContain("—").And.NotContain("–");
+        lines[0].Should().NotContain("\u2014").And.NotContain("\u2013");
     }
 
     private static string RepoRoot()
