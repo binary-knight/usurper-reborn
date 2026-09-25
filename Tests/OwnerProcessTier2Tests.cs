@@ -609,7 +609,7 @@ public class OwnerProcessTier2Tests : IDisposable
         int save = src.IndexOf("public async Task SaveSharedNPCs(", StringComparison.Ordinal);
         src.IndexOf("!WorldEditLog.IsOwnerProcess(sql)", save, StringComparison.Ordinal)
             .Should().BeLessThan(src.IndexOf("await backend.SaveWorldState(KEY_NPCS, json);", save, StringComparison.Ordinal));
-        Source("Systems", "SaveSystem.cs").Should().Contain("await OnlineStateManager.Instance.SaveSharedNPCs(sharedNpcData);");
+        Source("Systems", "SaveSystem.cs").Should().Contain("await OnlineStateManager.Instance.SaveSharedNPCs(sharedNpcData, generation);");   // v1.1.14: with its generation
         Source("Core", "GameEngine.cs").Split("OnlineStateManager.Instance.NoteNpcBaseline();").Length.Should().Be(3, "both online loads record the baseline");
     }
 

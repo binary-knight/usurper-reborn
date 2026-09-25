@@ -2094,7 +2094,13 @@ namespace UsurperRemake.Systems
         public async Task SaveWorldState(string key, string jsonValue) => await TrySaveWorldState(key, jsonValue);
 
         /// <summary>v1.1.14: SaveWorldState that says whether the write landed (false: it failed and was logged).</summary>
-        public async Task<bool> TrySaveWorldState(string key, string jsonValue)
+        public async Task<bool> TrySaveWorldState(string key, string jsonValue) => await SaveWorldStateReturningVersion(key, jsonValue) != null;
+
+        /// <summary>
+        /// v1.1.14: SaveWorldState that returns the version the row now has, read in the same statement (RETURNING),
+        /// so a writer learns the version of its own write, never a later writer's. Null when the write failed.
+        /// </summary>
+        public async Task<long?> SaveWorldStateReturningVersion(string key, string jsonValue)
         {
             try
             {
@@ -2106,17 +2112,17 @@ namespace UsurperRemake.Systems
                     ON CONFLICT(key) DO UPDATE SET
                         value = @value,
                         version = version + 1,
-                        updated_at = datetime('now');
+                        updated_at = datetime('now')
+                    RETURNING version;
                 ";
                 cmd.Parameters.AddWithValue("@key", key);
                 cmd.Parameters.AddWithValue("@value", jsonValue);
-                await cmd.ExecuteNonQueryAsync();
-                return true;
+                return Convert.ToInt64(await cmd.ExecuteScalarAsync());
             }
             catch (Exception ex)
             {
                 DebugLogger.Instance.LogError("SQL", $"Failed to save world state '{key}': {ex.Message}");
-                return false;
+                return null;
             }
         }
 
