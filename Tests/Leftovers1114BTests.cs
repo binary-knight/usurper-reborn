@@ -151,4 +151,131 @@ public class Leftovers1114BTests : IDisposable
         // the owner's write is the only unconditional npcs write, and it notes its version
         osm.Split("SaveWorldStateReturningVersion(KEY_NPCS, json)").Length.Should().Be(2);
     }
+
+    // ─── M1 follow-up: a door's or the standalone world sim pauses while another process holds the lock ───
+
+    [Fact]
+    public async Task AWorldSimThatLostTheLock_PausesAndWritesNothing_ThenReloadsWhenItTakesItBack()
+    {
+        var npc = Npc("npc_m1b_1", "M1b Baker");
+        await _db.SaveWorldState(OnlineStateManager.KEY_NPCS, JsonSerializer.Serialize(OnlineStateManager.SerializeCurrentNPCs(), Json));
+        long loaded = _db.GetWorldStateVersion(OnlineStateManager.KEY_NPCS);
+        _db.TryAcquireWorldSimLock("door_sim").Should().BeTrue();
+        var sim = new WorldSimService(_db, heartbeatOwnerId: "door_sim", pauseWithoutLock: true);
+        typeof(WorldSimService).GetField("lastNpcVersion", Priv)!.SetValue(sim, loaded);
+        (await sim.BeatWorldSimLockAsync()).Should().BeTrue("it holds the lock");
+
+        // the MUD takes the lock over at its start and writes the roster
+        _db.TakeOverWorldSimLock("mud_1");
+        (await sim.BeatWorldSimLockAsync()).Should().BeFalse("paused: another process holds the lock");
+        sim.PausedWithoutLock.Should().BeTrue();
+        _db.WorldSimLockOwner().Should().Be("mud_1", "the paused sim does not take it back while the MUD beats");
+        var mudRoster = JsonSerializer.Deserialize<List<NPCData>>((await _db.LoadWorldState(OnlineStateManager.KEY_NPCS))!, Json)!;
+        mudRoster.Single().Gold = 5150;
+        await _db.SaveWorldState(OnlineStateManager.KEY_NPCS, JsonSerializer.Serialize(mudRoster, Json));
+        long mudVersion = _db.GetWorldStateVersion(OnlineStateManager.KEY_NPCS);
+
+        // the paused sim writes nothing, neither the periodic save nor the final one on shutdown
+        npc.Level = 77;
+        await SimSave(sim);
+        _db.GetWorldStateVersion(OnlineStateManager.KEY_NPCS).Should().Be(mudVersion);
+        (await _db.LoadWorldState(OnlineStateManager.KEY_MARRIAGES)).Should().BeNull("no record at all is written");
+        (await sim.BeatWorldSimLockAsync()).Should().BeFalse();
+
+        // the MUD stops beating: the lock goes stale, the next beat takes it through the normal CAS and the sim
+        // loads the records the MUD wrote before it ticks again
+        var stale = JsonSerializer.Serialize(new { owner = "mud_1", heartbeat = DateTime.UtcNow.AddMinutes(-5).ToString("o"), pid = 1, acquired = DateTime.UtcNow.AddMinutes(-60).ToString("o") });
+        Exec($"UPDATE world_state SET value = '{stale}' WHERE key = 'worldsim_lock';");
+        (await sim.BeatWorldSimLockAsync()).Should().BeTrue();
+        sim.PausedWithoutLock.Should().BeFalse();
+        _db.WorldSimLockOwner().Should().Be("door_sim");
+        Find("M1b Baker")!.Gold.Should().Be(5150, "the MUD's roster was loaded");
+        ((long)typeof(WorldSimService).GetField("lastNpcVersion", Priv)!.GetValue(sim)!).Should().Be(mudVersion);
+    }
+
+    /// <summary>Every world_state row but the lock, with its version and value: what a process has written.</summary>
+    private Dictionary<string, string> WorldStateRows()
+    {
+        var rows = new Dictionary<string, string>();
+        using var conn = new SqliteConnection($"Data Source={_path}");
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT key, version, value FROM world_state WHERE key != 'worldsim_lock';";
+        using var r = cmd.ExecuteReader();
+        while (r.Read()) rows[r.GetString(0)] = r.GetInt64(1) + ":" + r.GetString(2);
+        return rows;
+    }
+
+    [Fact]
+    public async Task AWorldSimThatLosesTheLockMidRun_WritesNothingAfterwards_NotEvenOnShutdown()
+    {
+        var kingBefore = CastleLocation.GetCurrentKing();
+        var courtVersionBefore = OnlineStateManager.RoyalCourtVersion;
+        try
+        {
+            var npc = Npc("npc_m1c_1", "M1c Miller");
+            await _db.SaveWorldState(OnlineStateManager.KEY_NPCS, JsonSerializer.Serialize(OnlineStateManager.SerializeCurrentNPCs(), Json));
+            long loaded = _db.GetWorldStateVersion(OnlineStateManager.KEY_NPCS);
+            _db.TryAcquireWorldSimLock("door_sim_c").Should().BeTrue();
+            // a save is due on every pass, so an unpaused pass would write at once
+            var sim = new WorldSimService(_db, saveIntervalMinutes: 0, heartbeatOwnerId: "door_sim_c", pauseWithoutLock: true);
+            typeof(WorldSimService).GetField("lastNpcVersion", Priv)!.SetValue(sim, loaded);
+            (await sim.BeatWorldSimLockAsync()).Should().BeTrue("running: it holds the lock");
+
+            // mid-run the MUD takes the lock over and writes the roster and the court
+            _db.TakeOverWorldSimLock("mud_c");
+            var mudRoster = JsonSerializer.Deserialize<List<NPCData>>((await _db.LoadWorldState(OnlineStateManager.KEY_NPCS))!, Json)!;
+            mudRoster.Single().Gold = 6060;
+            await _db.SaveWorldState(OnlineStateManager.KEY_NPCS, JsonSerializer.Serialize(mudRoster, Json));
+            await _db.SaveWorldState("royal_court", JsonSerializer.Serialize(new RoyalCourtSaveData
+                { KingName = "Mud Monarch", KingAI = (int)CharacterAI.Computer, Treasury = 9000, TaxRate = 7 }, Json));
+            var before = WorldStateRows();
+
+            // the sim's own changes are pending; its passes and its shutdown write none of them
+            npc.Level = 88;
+            bool ticked = await sim.RunOneTickAsync();
+            ticked |= await sim.RunOneTickAsync();
+            await sim.ShutdownAsync();
+
+            WorldStateRows().Should().BeEquivalentTo(before, "no world_state row (npcs, royal_court, marriages, children, events) is written by the paused sim");
+            ticked.Should().BeFalse("paused: no tick");
+            _db.WorldSimLockOwner().Should().Be("mud_c", "its shutdown does not release a lock it does not hold");
+        }
+        finally
+        {
+            CastleLocation.SetKing(kingBefore!);
+            OnlineStateManager.NoteRoyalCourtVersion(courtVersionBefore);
+        }
+    }
+
+    [Fact]
+    public async Task TheMudsWorldSim_NeverPauses()
+    {
+        _db.TakeOverWorldSimLock("someone_else");
+        var sim = new WorldSimService(_db, heartbeatOwnerId: "mud_2");
+        (await sim.BeatWorldSimLockAsync()).Should().BeTrue("the MUD owns the shared records by design");
+        sim.PausedWithoutLock.Should().BeFalse();
+    }
+
+    [Fact]
+    public void TheLoop_BeatsBeforeItTicks_AndTheDoorAndStandaloneSimsPause()
+    {
+        var sim = Source("Systems", "WorldSimService.cs");
+        int loop = sim.IndexOf("while (!cancellationToken.IsCancellationRequested)", StringComparison.Ordinal);
+        int run = sim.IndexOf("public async Task RunAsync", StringComparison.Ordinal);
+        sim.IndexOf("await RunOneTickAsync();", loop, StringComparison.Ordinal).Should().BeGreaterThan(loop);
+        sim.IndexOf("await ShutdownAsync();", loop, StringComparison.Ordinal).Should().BeGreaterThan(loop, "the loop's finally");
+        run.Should().BeGreaterThan(0);
+        int tick = sim.IndexOf("internal async Task<bool> RunOneTickAsync()", StringComparison.Ordinal);
+        int beat = sim.IndexOf("if (!await BeatWorldSimLockAsync()) return false;", tick, StringComparison.Ordinal);
+        beat.Should().BeGreaterThan(tick).And.BeLessThan(sim.IndexOf("worldSimulator?.SimulateStep();", tick, StringComparison.Ordinal));
+        sim.IndexOf("if (PausedWithoutLock)", sim.IndexOf("private async Task SaveWorldState()", StringComparison.Ordinal), StringComparison.Ordinal)
+            .Should().BeGreaterThan(0);
+
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "Console"))) dir = dir.Parent;
+        var program = File.ReadAllText(Path.Combine(dir!.FullName, "Console", "Bootstrap", "Program.cs"));
+        program.Split("pauseWithoutLock: true").Length.Should().Be(3, "the door's embedded sim and the standalone sim");
+        Source("Server", "MudServer.cs").Should().NotContain("pauseWithoutLock");
+    }
 }
