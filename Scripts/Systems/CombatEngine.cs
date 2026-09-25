@@ -6855,6 +6855,7 @@ public partial class CombatEngine
         {
             terminal.WriteLine(msg, color);
         }
+        TickPvPControl(teammate); // v1.1.14: a hold that ended starts the teammate's immunity, as for the player
         if (!teammate.IsAlive) return; // DoT could have killed the teammate
         if (!teammate.CanAct())
         {
@@ -18391,6 +18392,7 @@ public partial class CombatEngine
         {
             terminal.WriteLine(msg, color);
         }
+        TickPvPControl(teammate); // v1.1.14: a hold that ended starts the teammate's immunity, as for the player
         if (!teammate.IsAlive)
         {
             // DoT killed the teammate: run the real death pipeline (permadeath,
@@ -19956,8 +19958,12 @@ public partial class CombatEngine
                         }
                         else if (random.Next(100) < abilityResult.StatusChance)
                         {
-                            companion.ApplyStatus(abilityResult.InflictStatus, abilityResult.StatusDuration);
-                            terminal.WriteLine($"{companion.DisplayName} is afflicted with {abilityResult.InflictStatus}!", "yellow");
+                            // v1.1.14: a stun or web on a teammate follows the duel control rules, as on the player
+                            if (!abilityResult.InflictStatus.PreventsAction())
+                                companion.ApplyStatus(abilityResult.InflictStatus, abilityResult.StatusDuration);
+                            if (!abilityResult.InflictStatus.PreventsAction()
+                                || TryApplyPvPControl(companion, abilityResult.InflictStatus, abilityResult.StatusDuration))
+                                terminal.WriteLine($"{companion.DisplayName} is afflicted with {abilityResult.InflictStatus}!", "yellow");
                         }
                         else
                         {
@@ -29897,6 +29903,7 @@ public partial class CombatEngine
             terminal.WriteLine(msg, color);
             remoteTerminal.WriteLine(msg, color);
         }
+        TickPvPControl(teammate); // v1.1.14: a hold that ended starts the grouped player's immunity, as for the leader
         if (!teammate.IsAlive)
         {
             await HandleTeammateDeathDispatch(teammate, Loc.Get("combat.dot_killer"), result);

@@ -268,3 +268,66 @@ public class TeamJoinSlotClaim1114Tests
         }
     }
 }
+
+/// <summary>v1.1.14 (D2): a monster's stun on a teammate follows the hold rules the player has had since 1.1.13.</summary>
+[Collection("SharedGameSingletons")]
+public class TeammateHoldRules1114Tests
+{
+    private const System.Reflection.BindingFlags F = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+
+    private static (CombatEngine engine, Character mate, Func<bool> blow) OgreOnTeammate()
+    {
+        var engine = new CombatEngine(new TerminalEmulator(new MemoryStream(), new MemoryStream()));
+        typeof(CombatEngine).GetField("random", F)!.SetValue(engine, new LowRandom());   // every roll passes
+        var mate = new Character { Name1 = "Mate", Name2 = "Mate", Class = CharacterClass.Warrior, Level = 6, HP = 100_000, MaxHP = 100_000 };
+        var ogre = new Monster { Name = "Ogre", Level = 5, HP = 200, MaxHP = 200, Strength = 20 };
+        ogre.SpecialAbilities = new List<string> { "CrushingBlow" };   // stuns 2 rounds, 25%
+        var m = typeof(CombatEngine).GetMethod("MonsterAttacksCompanion", F)!;
+        var result = new CombatResult { Player = new Character { Name1 = "Lead", Name2 = "Lead", HP = 100, MaxHP = 100 } };
+        bool Blow()
+        {
+            bool held = mate.HasStatus(StatusEffect.Stunned);
+            ((Task)m.Invoke(engine, new object?[] { ogre, mate, result, null })!).GetAwaiter().GetResult();
+            return !held && mate.HasStatus(StatusEffect.Stunned);
+        }
+        return (engine, mate, Blow);
+    }
+
+    private static void EndRound(CombatEngine engine, Character c) { c.ProcessStatusEffects(); engine.TickPvPControl(c); }
+
+    [Fact]
+    public void Ogre_CannotReStunATeammate_WhileHeld_OrInTheImmunityWindow()
+    {
+        var (engine, mate, blow) = OgreOnTeammate();
+        blow().Should().BeTrue("the first stun lands");
+        EndRound(engine, mate);
+        mate.HasStatus(StatusEffect.Stunned).Should().BeTrue();
+        mate.ActiveStatuses[StatusEffect.Stunned] = 1;
+        blow();
+        mate.ActiveStatuses[StatusEffect.Stunned].Should().Be(1, "a new stun does not reset the clock while one holds");
+        EndRound(engine, mate);                       // the stun runs out; immunity starts
+        mate.HasStatus(StatusEffect.Stunned).Should().BeFalse();
+        for (int r = 0; r < GameConfig.StunImmunityRoundsAfterRecovery; r++)
+        {
+            blow().Should().BeFalse($"immune round {r + 1}");
+            EndRound(engine, mate);
+        }
+        blow().Should().BeTrue("the immunity has run out");
+    }
+
+    [Fact]
+    public void EveryTeammateTurn_TicksTheHoldState()
+    {
+        // comments stripped, so a commented-out call fails the check as a deleted one does
+        var src = string.Join("\n", File.ReadAllText(Path.Combine(Leftovers1114BTests.RepoRoot(), "Scripts", "Systems", "CombatEngine.cs"))
+            .Split('\n').Select(l => { int c = l.IndexOf("//", StringComparison.Ordinal); return c >= 0 ? l.Substring(0, c) : l; }));
+        foreach (var method in new[] { "private async Task ProcessTeammateAction(", "private async Task ProcessTeammateActionMultiMonster(", "private async Task ProcessGroupedPlayerTurn(" })
+        {
+            int start = src.IndexOf(method, StringComparison.Ordinal);
+            start.Should().BeGreaterThan(0, method);
+            int tick = src.IndexOf("teammate.ProcessStatusEffects()", start, StringComparison.Ordinal);
+            tick.Should().BeGreaterThan(start, method);
+            src.Substring(tick, 400).Should().Contain("TickPvPControl(teammate);", method);
+        }
+    }
+}
