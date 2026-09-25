@@ -161,8 +161,8 @@ namespace UsurperRemake.Systems
                 {
                     try
                     {
-                        var sharedNpcData = OnlineStateManager.SerializeCurrentNPCs();
-                        await OnlineStateManager.Instance.SaveSharedNPCs(sharedNpcData);
+                        var (sharedNpcData, generation) = OnlineStateManager.SnapshotLiveRoster();   // v1.1.14: with its rebuild
+                        await OnlineStateManager.Instance.SaveSharedNPCs(sharedNpcData, generation);
                         await OnlineStateManager.Instance.SaveRoyalCourtToWorldState();
                         await OnlineStateManager.Instance.SaveEconomyToWorldState();
                         DebugLogger.Instance.LogDebug("SAVE", "NPC, royal court, and economy synced to world_state");

@@ -1925,7 +1925,9 @@ public class MudServer
     /// did not empty it and is run now by rerunDelete, which marks it; one whose delete landed (the save emptied,
     /// its archive row at or after the command) is marked executed and its world purge queued in pending_purges,
     /// with the archived Name2, ID and delete time, for the drain that follows (a deferred purge leaves a
-    /// character made again since alone); one with neither is marked failed. Any other command is marked failed, not run again
+    /// character made again since alone); one with neither has its purge queued from the command's own record of
+    /// the character (v1.1.14: the args the web delete writes) and is marked executed, or, with no such record,
+    /// is marked failed with StuckDeleteUnrecoverable, which the admin page shows. Any other command is marked failed, not run again
     /// (a kick, a broadcast or a shutdown is not safe to repeat late). Returns the commands recovered.
     /// </summary>
     internal static async Task<int> RecoverStuckAdminCommandsAsync(SqlSaveBackend db, Func<int, bool> runningHere,
@@ -1954,8 +1956,15 @@ public class MudServer
                     db.QueuePendingPurge(user!, a.Name2, a.DisplayName, a.DeletedAt, a.PlayerId, "mud-recovery");
                     db.MarkAdminCommandExecuted(cmd.Id, $"Deleted {user} (world purge queued again after a game server restart)");
                 }
+                // v1.1.14: no archive (expired after 7 days, or never written): the command's own record of the
+                // character, written by the web delete when it queued the command, names the purge instead
+                else if (DeletePurgeArgs(cmd.Args) is { } p && !string.IsNullOrWhiteSpace(cmd.CreatedAt))
+                {
+                    db.QueuePendingPurge(user!, p.Name2, p.DisplayName, cmd.CreatedAt!, p.PlayerId, "mud-recovery");
+                    db.MarkAdminCommandExecuted(cmd.Id, $"Deleted {user} (world purge queued after a game server restart, from the delete request's record)");
+                }
                 else
-                    db.MarkAdminCommandFailed(cmd.Id, "Interrupted by a game server restart; no save or archive of the character was found");
+                    db.MarkAdminCommandFailed(cmd.Id, StuckDeleteUnrecoverable);
                 Console.Error.WriteLine($"[MUD] Recovered admin command {cmd.Id} ({cmd.Command} {user}) left executing by a stopped game server");
             }
             catch (Exception ex)
@@ -1964,6 +1973,33 @@ public class MudServer
             }
         }
         return recovered;
+    }
+
+    /// <summary>v1.1.14: the admin page's result for a stuck delete whose world purge cannot be queued.</summary>
+    internal const string StuckDeleteUnrecoverable =
+        "Interrupted by a game server restart after the character's save was emptied. No delete archive (kept 7 days) " +
+        "and no record of the character's name were found, so the world purge (NPC grudges, marriages, the throne) " +
+        "was not queued. Delete the account again from this panel to run the purge by its display name.";
+
+    /// <summary>
+    /// v1.1.14: the character a delete_player command names in its args (the web delete writes name2, display_name
+    /// and player_id when it queues the command). Null without a Name2: then the save held no character when the
+    /// delete was asked for, and nothing names the purge.
+    /// </summary>
+    internal static (string Name2, string? DisplayName, string? PlayerId)? DeletePurgeArgs(string? args)
+    {
+        if (string.IsNullOrWhiteSpace(args)) return null;
+        try
+        {
+            using var doc = JsonDocument.Parse(args);
+            var root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object) return null;
+            string? Text(string name) => root.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
+            string? name2 = Text("name2");
+            if (string.IsNullOrWhiteSpace(name2)) return null;
+            return (name2!, Text("display_name"), Text("player_id"));
+        }
+        catch (JsonException) { return null; }
     }
 
     private async Task RunClaimedAdminCommand(AdminCommand cmd)

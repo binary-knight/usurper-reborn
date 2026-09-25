@@ -500,9 +500,12 @@ public class OwnerProcessTier2Tests : IDisposable
 
         var sim = Source("Systems", "WorldSimService.cs");
         int run = sim.IndexOf("public async Task RunAsync", StringComparison.Ordinal);
-        int loaded = sim.IndexOf("LoadUsedNamesState();", run, StringComparison.Ordinal);
-        sim.IndexOf("ReapplyWorldEdits();", run, StringComparison.Ordinal).Should().BeGreaterThan(loaded, "after every record is loaded")
-            .And.BeLessThan(sim.IndexOf("while (!cancellationToken.IsCancellationRequested)", run, StringComparison.Ordinal));
+        // v1.1.14: the loads and the re-apply moved to LoadSharedRecordsAsync, which RunAsync calls before its loop
+        sim.IndexOf("await LoadSharedRecordsAsync();", run, StringComparison.Ordinal)
+            .Should().BeLessThan(sim.IndexOf("while (!cancellationToken.IsCancellationRequested)", run, StringComparison.Ordinal));
+        int records = sim.IndexOf("private async Task LoadSharedRecordsAsync()", StringComparison.Ordinal);
+        int loaded = sim.IndexOf("LoadUsedNamesState();", records, StringComparison.Ordinal);
+        sim.IndexOf("ReapplyWorldEdits();", records, StringComparison.Ordinal).Should().BeGreaterThan(loaded, "after every record is loaded");
         int save = sim.IndexOf("private async Task SaveWorldState()", StringComparison.Ordinal);
         int reload = sim.IndexOf("await LoadWorldState();", save, StringComparison.Ordinal);
         int courtReload = sim.IndexOf("Royal court modified by player", save, StringComparison.Ordinal);
@@ -615,7 +618,7 @@ public class OwnerProcessTier2Tests : IDisposable
         int save = src.IndexOf("public async Task SaveSharedNPCs(", StringComparison.Ordinal);
         src.IndexOf("!WorldEditLog.IsOwnerProcess(sql)", save, StringComparison.Ordinal)
             .Should().BeLessThan(src.IndexOf("await backend.SaveWorldState(KEY_NPCS, json);", save, StringComparison.Ordinal));
-        Source("Systems", "SaveSystem.cs").Should().Contain("await OnlineStateManager.Instance.SaveSharedNPCs(sharedNpcData);");
+        Source("Systems", "SaveSystem.cs").Should().Contain("await OnlineStateManager.Instance.SaveSharedNPCs(sharedNpcData, generation);");   // v1.1.14: with its generation
         Source("Core", "GameEngine.cs").Split("OnlineStateManager.Instance.NoteNpcBaseline();").Length.Should().Be(3, "both online loads record the baseline");
     }
 

@@ -104,8 +104,11 @@ namespace UsurperRemake.Systems
         /// <summary>
         /// Save NPC data to shared world state.
         /// Called after NPC changes that should be visible to all players.
+        /// v1.1.14: generation is the live roster's rebuild count when npcData was serialized (SnapshotLiveRoster);
+        /// with it, the owner's write notes the live roster as stored at the version it wrote, so the world sim of
+        /// this process adopts that version instead of reloading over its own unsaved changes.
         /// </summary>
-        public async Task SaveSharedNPCs(List<NPCData> npcData)
+        public async Task SaveSharedNPCs(List<NPCData> npcData, long? generation = null)
         {
             try
             {
@@ -116,7 +119,13 @@ namespace UsurperRemake.Systems
                     return;
                 }
                 var json = JsonSerializer.Serialize(npcData, jsonOptions);
-                await backend.SaveWorldState(KEY_NPCS, json);
+                if (backend is SqlSaveBackend owner)
+                {
+                    long? written = await owner.SaveWorldStateReturningVersion(KEY_NPCS, json);
+                    if (written != null && generation != null) NoteLiveRosterWritten(generation.Value, written.Value);
+                }
+                else
+                    await backend.SaveWorldState(KEY_NPCS, json);
                 DebugLogger.Instance.LogDebug("ONLINE", $"Saved {npcData.Count} NPCs to shared state");
             }
             catch (Exception ex)
@@ -841,9 +850,9 @@ namespace UsurperRemake.Systems
             try
             {
                 // NPCs
-                var npcData = SerializeCurrentNPCs();
+                var (npcData, generation) = SnapshotLiveRoster();   // v1.1.14: with the rebuild it belongs to
                 if (npcData.Count > 0)
-                    await SaveSharedNPCs(npcData);
+                    await SaveSharedNPCs(npcData, generation);
 
                 // World events
                 var events = SerializeCurrentWorldEvents();

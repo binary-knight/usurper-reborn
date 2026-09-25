@@ -446,7 +446,8 @@ namespace UsurperConsole
                             simIntervalSeconds: DoorMode.SimIntervalSeconds,
                             npcXpMultiplier: DoorMode.NpcXpMultiplier,
                             saveIntervalMinutes: DoorMode.SaveIntervalMinutes,
-                            heartbeatOwnerId: worldSimOwnerId
+                            heartbeatOwnerId: worldSimOwnerId,
+                            pauseWithoutLock: true   // v1.1.14: no ticks or writes while another process holds the lock
                         );
 
                         // Start worldsim on background thread
@@ -712,7 +713,8 @@ namespace UsurperConsole
                 simIntervalSeconds: DoorMode.SimIntervalSeconds,
                 npcXpMultiplier: DoorMode.NpcXpMultiplier,
                 saveIntervalMinutes: DoorMode.SaveIntervalMinutes,
-                heartbeatOwnerId: ownerId
+                heartbeatOwnerId: ownerId,
+                pauseWithoutLock: true   // v1.1.14: a MUD that took the lock over owns the world; this sim waits
             );
 
             await service.RunAsync(cts.Token);

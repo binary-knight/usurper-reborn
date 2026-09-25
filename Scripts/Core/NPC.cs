@@ -202,6 +202,23 @@ public partial class NPC : Character
     
     // Missing properties for API compatibility
     public string Id { get; set; } = Guid.NewGuid().ToString();  // Unique identifier
+
+    /// <summary>
+    /// v1.1.14: the Id of an NPC record saved without one (older saves). A name-based UUID (version 5 layout,
+    /// SHA-1) of the record's Name and CharacterID, the fields every copy of the record carries unchanged, so
+    /// every process that restores the same record gives it the same Id. Two records alike in both fields get
+    /// one Id, as they shared one roster key (by name) before. New NPCs are never Id-less (the Guid above).
+    /// </summary>
+    public static string LegacyIdFor(string? name, string? characterId)
+    {
+        var hash = System.Security.Cryptography.SHA1.HashData(
+            System.Text.Encoding.UTF8.GetBytes("usurper-npc-legacy-id|" + (name ?? "") + "|" + (characterId ?? "")));
+        var bytes = new byte[16];
+        Array.Copy(hash, bytes, 16);
+        bytes[6] = (byte)((bytes[6] & 0x0F) | 0x50);   // version 5
+        bytes[8] = (byte)((bytes[8] & 0x3F) | 0x80);   // RFC 4122 variant
+        return new Guid(bytes, bigEndian: true).ToString();
+    }
     public new string TeamPassword { get; set; } = "";               // Team password for joining
 
     // Marketplace inventory - items NPC has available to sell (uses global Item class)

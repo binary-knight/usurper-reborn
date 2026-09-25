@@ -41,6 +41,12 @@ namespace UsurperRemake.Systems
         // Heartbeat support for embedded worldsim (database-level leader election)
         private string? _heartbeatOwnerId;
         private bool _heldWorldSimLock = true;   // v1.1.14: the last heartbeat's outcome, to log a change once
+        // v1.1.14: a world sim that is not the owner by design (a door's embedded sim, the standalone sim) pauses
+        // while another process holds the lock: no ticks, no world state writes, no final save
+        private readonly bool _pauseWithoutLock;
+
+        /// <summary>v1.1.14: this sim lost the lock and is paused until a heartbeat takes it back.</summary>
+        internal bool PausedWithoutLock => _pauseWithoutLock && _heartbeatOwnerId != null && !_heldWorldSimLock;
 
         /// <summary>
         /// Signals when initialization (systems + world state load) is complete.
@@ -61,13 +67,15 @@ namespace UsurperRemake.Systems
             int simIntervalSeconds = 60,
             float npcXpMultiplier = 0.25f,
             int saveIntervalMinutes = 5,
-            string? heartbeatOwnerId = null)
+            string? heartbeatOwnerId = null,
+            bool pauseWithoutLock = false)
         {
             this.sqlBackend = backend;
             this.simIntervalSeconds = simIntervalSeconds;
             this.npcXpMultiplier = npcXpMultiplier;
             this.saveIntervalMinutes = saveIntervalMinutes;
             this._heartbeatOwnerId = heartbeatOwnerId;
+            this._pauseWithoutLock = pauseWithoutLock;
         }
 
         /// <summary>
@@ -83,6 +91,141 @@ namespace UsurperRemake.Systems
             WorldEditLog.NoteLockOwnerId(_heartbeatOwnerId);   // v1.1.13: the lock this process's world sim holds
             OnlineStateManager.SimCourtStore = sqlBackend;   // v1.1.13: the court the sim's own court changes write to
 
+            await LoadSharedRecordsAsync();   // v1.1.14: Phase 2 (NPCs, court, children, marriages, events, edits)
+
+            // Phase 3: Set the NPC XP multiplier
+            WorldSimulator.NpcXpMultiplier = npcXpMultiplier;
+
+            // Phase 4: Run simulation loop
+            lastSaveTime = DateTime.UtcNow;
+
+            var aliveCount = NPCSpawnSystem.Instance.ActiveNPCs.Count(n => n.IsAlive && !n.IsDead);
+            DebugLogger.Instance.LogInfo("WORLDSIM", $"Simulation running. NPCs: {aliveCount} alive / {NPCSpawnSystem.Instance.ActiveNPCs.Count} total");
+
+            // Signal that initialization is complete (for embedded mode)
+            InitializationComplete.TrySetResult(true);
+
+            try
+            {
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    try
+                    {
+                        await RunOneTickAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        DebugLogger.Instance.LogError("WORLDSIM", $"Simulation step error: {ex.Message}\n{ex.StackTrace}");
+                    }
+
+                    await Task.Delay(TimeSpan.FromSeconds(simIntervalSeconds), cancellationToken);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected on shutdown
+            }
+            finally
+            {
+                await ShutdownAsync();
+            }
+        }
+
+        private int _tickCount;
+
+        /// <summary>
+        /// One pass of the loop: the heartbeat, then the tick, the daily reset, the world boss and a save when one is
+        /// due. v1.1.14: a sim paused without the lock stops after the heartbeat, so it neither ticks nor writes.
+        /// Returns whether it ticked.
+        /// </summary>
+        internal async Task<bool> RunOneTickAsync()
+        {
+            // Update heartbeat (embedded mode leader election)
+            if (!await BeatWorldSimLockAsync()) return false;
+
+            // Run one simulation tick
+            worldSimulator?.SimulateStep();
+            _tickCount++;
+
+            // Check for 7 PM ET world daily reset
+            CheckWorldDailyReset();
+
+            // v1.1.4: the world boss tick (schedule, spawn, window end, Rally, phase, notices)
+            await WorldBossSystem.Instance.Tick(sqlBackend);
+
+            // Log status every 10 ticks
+            if (_tickCount % 10 == 0)
+            {
+                var alive = NPCSpawnSystem.Instance.ActiveNPCs.Count(n => n.IsAlive && !n.IsDead);
+                var dead = NPCSpawnSystem.Instance.ActiveNPCs.Count(n => !n.IsAlive || n.IsDead);
+                DebugLogger.Instance.LogDebug("WORLDSIM", $"Tick {_tickCount}: {alive} alive, {dead} dead NPCs");
+            }
+
+            // Check if it's time to persist state
+            if ((DateTime.UtcNow - lastSaveTime).TotalMinutes >= saveIntervalMinutes)
+            {
+                await SaveWorldState();
+                lastSaveTime = DateTime.UtcNow;
+            }
+            return true;
+        }
+
+        /// <summary>The loop's end: the final save (v1.1.14: skipped by a sim paused without the lock), then the lock released.</summary>
+        internal async Task ShutdownAsync()
+        {
+            // Graceful shutdown: save state one final time
+            DebugLogger.Instance.LogInfo("WORLDSIM", "Shutting down - saving final state...");
+            await SaveWorldState();
+
+            // Release worldsim lock (embedded mode)
+            if (_heartbeatOwnerId != null)
+            {
+                sqlBackend.ReleaseWorldSimLock(_heartbeatOwnerId);
+                DebugLogger.Instance.LogInfo("WORLDSIM", "Released worldsim lock");
+            }
+
+            // Clear database callback
+            NewsSystem.DatabaseCallback = null;
+
+            // Signal initialization complete in case we're shutting down before init finished
+            InitializationComplete.TrySetResult(false);
+
+            DebugLogger.Instance.LogInfo("WORLDSIM", "Final state saved. Goodbye.");
+        }
+
+        /// <summary>
+        /// v1.1.14: the heartbeat (a compare-and-swap on the lock). Returns whether this sim may tick and write:
+        /// always for a sim that does not pause (the MUD's, the owner by design), else only while it holds the
+        /// lock. A paused sim that takes the lock back loads every shared record again first, since the process
+        /// that held the lock meanwhile wrote them and this sim's copies are stale.
+        /// </summary>
+        internal async Task<bool> BeatWorldSimLockAsync()
+        {
+            if (_heartbeatOwnerId == null) return true;
+            bool wasPaused = PausedWithoutLock;
+            bool held = sqlBackend.UpdateWorldSimHeartbeat(_heartbeatOwnerId);
+            if (held != _heldWorldSimLock)
+                DebugLogger.Instance.LogWarning("WORLDSIM", held
+                    ? "This world sim holds the world sim lock again."
+                    : _pauseWithoutLock
+                        ? "Another process holds the world sim lock; this world sim pauses (no ticks, no writes) until it takes it back."
+                        : "Another process holds the world sim lock; this world sim no longer claims it.");
+            _heldWorldSimLock = held;
+            if (wasPaused && held)
+            {
+                await LoadSharedRecordsAsync();
+                _lastNpcJsonHash = null;
+                lastSaveTime = DateTime.UtcNow;
+            }
+            return !PausedWithoutLock;
+        }
+
+        /// <summary>
+        /// The shared records the sim holds in memory, loaded from world_state, with the world edits re-applied and
+        /// the npcs version noted. v1.1.14: at start, and when a paused sim takes the lock back.
+        /// </summary>
+        private async Task LoadSharedRecordsAsync()
+        {
             // Phase 2: Load NPC state from database
             await LoadWorldState();
 
@@ -109,96 +252,6 @@ namespace UsurperRemake.Systems
             // Track initial versions so we can detect player modifications
             lastNpcVersion = sqlBackend.GetWorldStateVersion(OnlineStateManager.KEY_NPCS);
             DebugLogger.Instance.LogInfo("WORLDSIM", $"Initial versions - NPC: {lastNpcVersion}, Royal court: {lastRoyalCourtVersion}");
-
-            // Phase 3: Set the NPC XP multiplier
-            WorldSimulator.NpcXpMultiplier = npcXpMultiplier;
-
-            // Phase 4: Run simulation loop
-            lastSaveTime = DateTime.UtcNow;
-
-            var aliveCount = NPCSpawnSystem.Instance.ActiveNPCs.Count(n => n.IsAlive && !n.IsDead);
-            DebugLogger.Instance.LogInfo("WORLDSIM", $"Simulation running. NPCs: {aliveCount} alive / {NPCSpawnSystem.Instance.ActiveNPCs.Count} total");
-
-            // Signal that initialization is complete (for embedded mode)
-            InitializationComplete.TrySetResult(true);
-
-            try
-            {
-                int tickCount = 0;
-                while (!cancellationToken.IsCancellationRequested)
-                {
-                    try
-                    {
-                        // Run one simulation tick
-                        worldSimulator?.SimulateStep();
-                        tickCount++;
-
-                        // Update heartbeat (embedded mode leader election)
-                        if (_heartbeatOwnerId != null)
-                        {
-                            // v1.1.14: the beat lands only while this sim holds the lock (or it is free or stale)
-                            bool held = sqlBackend.UpdateWorldSimHeartbeat(_heartbeatOwnerId);
-                            if (held != _heldWorldSimLock)
-                                DebugLogger.Instance.LogWarning("WORLDSIM", held
-                                    ? "This world sim holds the world sim lock again."
-                                    : "Another process holds the world sim lock; this world sim no longer claims it.");
-                            _heldWorldSimLock = held;
-                        }
-
-                        // Check for 7 PM ET world daily reset
-                        CheckWorldDailyReset();
-
-                        // v1.1.4: the world boss tick (schedule, spawn, window end, Rally, phase, notices)
-                        await WorldBossSystem.Instance.Tick(sqlBackend);
-
-                        // Log status every 10 ticks
-                        if (tickCount % 10 == 0)
-                        {
-                            var alive = NPCSpawnSystem.Instance.ActiveNPCs.Count(n => n.IsAlive && !n.IsDead);
-                            var dead = NPCSpawnSystem.Instance.ActiveNPCs.Count(n => !n.IsAlive || n.IsDead);
-                            DebugLogger.Instance.LogDebug("WORLDSIM", $"Tick {tickCount}: {alive} alive, {dead} dead NPCs");
-                        }
-
-                        // Check if it's time to persist state
-                        if ((DateTime.UtcNow - lastSaveTime).TotalMinutes >= saveIntervalMinutes)
-                        {
-                            await SaveWorldState();
-                            lastSaveTime = DateTime.UtcNow;
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        DebugLogger.Instance.LogError("WORLDSIM", $"Simulation step error: {ex.Message}\n{ex.StackTrace}");
-                    }
-
-                    await Task.Delay(TimeSpan.FromSeconds(simIntervalSeconds), cancellationToken);
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                // Expected on shutdown
-            }
-            finally
-            {
-                // Graceful shutdown: save state one final time
-                DebugLogger.Instance.LogInfo("WORLDSIM", "Shutting down - saving final state...");
-                await SaveWorldState();
-
-                // Release worldsim lock (embedded mode)
-                if (_heartbeatOwnerId != null)
-                {
-                    sqlBackend.ReleaseWorldSimLock(_heartbeatOwnerId);
-                    DebugLogger.Instance.LogInfo("WORLDSIM", "Released worldsim lock");
-                }
-
-                // Clear database callback
-                NewsSystem.DatabaseCallback = null;
-
-                // Signal initialization complete in case we're shutting down before init finished
-                InitializationComplete.TrySetResult(false);
-
-                DebugLogger.Instance.LogInfo("WORLDSIM", "Final state saved. Goodbye.");
-            }
         }
 
         /// <summary>
@@ -309,6 +362,12 @@ namespace UsurperRemake.Systems
         /// </summary>
         private async Task SaveWorldState()
         {
+            // v1.1.14: a sim paused without the lock writes nothing (the periodic save and the final one)
+            if (PausedWithoutLock)
+            {
+                DebugLogger.Instance.LogInfo("WORLDSIM", "World state not saved: another process holds the world sim lock.");
+                return;
+            }
             try
             {
                 // Check if NPC data was modified by a player session since our last save.
@@ -1321,9 +1380,9 @@ namespace UsurperRemake.Systems
               {
                 var npc = new NPC
                 {
-                    // v1.1.14: a record saved with no Id gets one here, once, so the roster overlay tracks the NPC by it
-                    // (not by name, where a tombstone of an earlier NPC of that name would drop it)
-                    Id = string.IsNullOrEmpty(data.Id) ? Guid.NewGuid().ToString() : data.Id,
+                    // v1.1.14: a record saved with no Id gets one here, derived from its name and character ID, so every
+                    // process restoring the same record gives it the same Id and the roster overlay tracks the NPC by it
+                    Id = string.IsNullOrEmpty(data.Id) ? NPC.LegacyIdFor(data.Name, data.CharacterID) : data.Id,
                     ID = !string.IsNullOrEmpty(data.CharacterID) ? data.CharacterID : $"npc_{data.Name.ToLower().Replace(" ", "_")}",
                     Name1 = data.Name,
                     Name2 = data.Name,

@@ -6523,7 +6523,7 @@ public class WorldSimulator
         working.Guards.Add(guard);
         working.Treasury -= GameConfig.GuardRecruitmentCost;
 
-        news.Add((false, $"{applicant.Name} has joined the Royal Guard!"));   // v1.1.14: posted after the write
+        news.Add((false, Loc.Get("worldsim.court.guard_joined", applicant.Name)));   // v1.1.14: posted after the write
         // GD.Print($"[WorldSim] {applicant.Name} recruited as Royal Guard");
     }
 
@@ -6639,11 +6639,17 @@ public class WorldSimulator
                 }
             }
 
-            // v0.62.1 (article fix): plot types include "Assassination" / "Espionage"
-            // which need "An" not "A". Lowercased so the helper still finds the vowel.
-            string plotTypeLc = plot.PlotType.ToLower();
-            news.Add((true,
-                $"{GameConfig.GetIndefiniteArticle(plotTypeLc)} {plotTypeLc} plot against {working.GetTitle()} {working.Name} was discovered!"));
+            // v1.1.14: one line per plot type in every language (the English article is in the text), and a
+            // plain one for a plot type stored by an older release
+            string plotKey = plot.PlotType switch
+            {
+                "Assassination" => "worldsim.court.plot_discovered.assassination",
+                "Coup" => "worldsim.court.plot_discovered.coup",
+                "Scandal" => "worldsim.court.plot_discovered.scandal",
+                "Sabotage" => "worldsim.court.plot_discovered.sabotage",
+                _ => "worldsim.court.plot_discovered"
+            };
+            news.Add((true, Loc.Get(plotKey, CourtTitle(working), working.Name)));
 
             working.ActivePlots.Remove(plot);
             return;
@@ -6659,6 +6665,9 @@ public class WorldSimulator
     /// <summary>
     /// Execute a completed plot
     /// </summary>
+    /// <summary>v1.1.14: the monarch's title in the news language (castle.king / castle.queen).</summary>
+    private static string CourtTitle(King working) => Loc.Get(working.Sex == CharacterSex.Male ? "castle.king" : "castle.queen");
+
     private void ExecutePlot(King working, CourtIntrigue plot, List<(bool Important, string Text)> news)
     {
         switch (plot.PlotType)
@@ -6666,8 +6675,7 @@ public class WorldSimulator
             case "Assassination":
                 // King "survives" but is weakened
                 working.Treasury /= 2;
-                news.Add((true,
-                    $"ASSASSINATION ATTEMPT! {working.GetTitle()} {working.Name} narrowly survived an assassination plot!"));
+                news.Add((true, Loc.Get("worldsim.court.assassination_attempt", CourtTitle(working), working.Name)));
                 break;
 
             case "Coup":
@@ -6678,23 +6686,20 @@ public class WorldSimulator
                 {
                     working.Guards.Remove(guard);
                 }
-                news.Add((true,
-                    $"COUP ATTEMPT! {deserters.Count} guards joined the conspiracy against {working.GetTitle()} {working.Name}!"));
+                news.Add((true, Loc.Get("worldsim.court.coup_attempt", deserters.Count, CourtTitle(working), working.Name)));
                 break;
 
             case "Scandal":
                 // King's reputation damaged - harder to collect taxes
                 working.TaxRate = Math.Max(0, working.TaxRate - 10);
-                news.Add((true,
-                    $"SCANDAL! Shocking revelations about {working.GetTitle()} {working.Name} rock the kingdom!"));
+                news.Add((true, Loc.Get("worldsim.court.scandal", CourtTitle(working), working.Name)));
                 break;
 
             case "Sabotage":
                 // Treasury damaged
                 working.Treasury = Math.Max(0, working.Treasury - 5000);
                 working.MagicBudget = Math.Max(0, working.MagicBudget - 2000);
-                news.Add((true,
-                    $"SABOTAGE! The royal treasury has been plundered!"));
+                news.Add((true, Loc.Get("worldsim.court.sabotage")));
                 break;
         }
 
