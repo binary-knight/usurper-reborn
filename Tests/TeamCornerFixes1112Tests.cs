@@ -864,6 +864,39 @@ public class TeamCornerFixes1112Tests : IDisposable
     }
 
     [Fact]
+    public async Task AWonWar_WhoseFlipFails_IsSettledByItsStoredScore_AndPaysTheSpoilsOnce()
+    {
+        // v1.1.14: the score is stored before the flip; the stale cleanup settles the war by it
+        await TeamCornerRig.Online(async (db, path) =>
+        {
+            var (hero, shown) = await WinAWar(db, path,
+                "CREATE TRIGGER no_result BEFORE UPDATE OF status ON team_wars WHEN NEW.status IN ('challenger_won', 'defender_won') BEGIN SELECT RAISE(ABORT, 'test'); END;");
+            shown.Should().Contain(Loc.Get("team.war_result_pending", $"{1000:N0}"));
+            hero.Gold.Should().Be(4000, "nothing is paid while the war is unsettled");
+            TeamCornerRig.Scalar(path, "SELECT status || ' ' || final_result || ' ' || challenger_wins || '-' || defender_wins FROM team_wars")!.ToString()
+                .Should().Be("active challenger_won 1-0", "the whole score was stored before the flip");
+
+            TeamCornerRig.Exec(path, "DROP TRIGGER no_result; UPDATE team_wars SET started_at = datetime('now', '-20 minutes');");
+            db.ExpireStaleTeamWars().Should().Be(1);
+            db.ExpireStaleTeamWars().Should().Be(0);
+            TeamCornerRig.Scalar(path, "SELECT status FROM team_wars").Should().Be("challenger_won", "settled by its score, not abandoned");
+            Convert.ToInt64(TeamCornerRig.Scalar(path, "SELECT COUNT(*) FROM pending_gold_transfers WHERE amount = 1500")).Should().Be(1, "the spoils, once");
+            Convert.ToInt64(TeamCornerRig.Scalar(path, "SELECT COUNT(*) FROM pending_gold_transfers")).Should().Be(1, "no wager refund on top");
+            (await db.CompleteTeamWar(1, "challenger_won")).Should().BeFalse("and a late completion cannot pay again");
+        });
+    }
+
+    [Fact]
+    public void ALostWar_WithAStoredResult_IsSettledAsALoss_WithNoTransfer()
+    {
+        int id = War("Reds", "Blues", minutesAgo: 20, 0, 2);
+        Exec($"UPDATE team_wars SET final_result = 'defender_won', status = 'active' WHERE id = {id};");
+        _db.ExpireStaleTeamWars().Should().Be(1);
+        Scalar($"SELECT status FROM team_wars WHERE id = {id}").Should().Be("defender_won");
+        Long("SELECT COUNT(*) FROM pending_gold_transfers").Should().Be(0, "the wager was taken at the start; a loss charges nothing more");
+    }
+
+    [Fact]
     public async Task AWonWar_TheCleanupClosedFirst_PaysNothing_AndSaysSo()
     {
         await TeamCornerRig.Online(async (db, path) =>

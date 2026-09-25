@@ -3753,9 +3753,11 @@ public class TeamCornerLocation : BaseLocation
 
         bool weWon = myWins > enemyWins;
         string result = weWon ? "challenger_won" : "defender_won";
+        // v1.1.14: the whole score and result are stored before the flip; if the flip below fails, the stale
+        // cleanup (ExpireStaleTeamWars) settles the war by them, paying a win's spoils by transfer, once
+        await backend.RecordTeamWarResult(warId, myWins, enemyWins, result);
         // v1.1.12: paid or charged only if this guarded flip landed, as in the no-round path. Otherwise nothing
-        // changes hands here: the stale cleanup (ExpireStaleTeamWars) closes the war once, refunding the wager
-        // only if no round was recorded, so a won war can never pay twice.
+        // changes hands here: the stale cleanup closes the war once, so a won war can never pay twice.
         if (!await backend.CompleteTeamWar(warId, result))
         {
             string? status = await backend.GetTeamWarStatus(warId);
@@ -3774,7 +3776,7 @@ public class TeamCornerLocation : BaseLocation
         {
             // v0.57.17 — reduced from wager*2 (net +100% per win) to wager*1.5 (net +50%
             // per win) so even within the daily cap each win is less of a printer.
-            long reward = (long)(wager * GameConfig.TeamWarRewardMultiplier);
+            long reward = SqlSaveBackend.TeamWarSpoils(wager);
             currentPlayer.Gold += reward;
             WriteSectionHeader(Loc.Get("team_corner.your_team_wins"), "bright_green");
             terminal.SetColor("yellow");

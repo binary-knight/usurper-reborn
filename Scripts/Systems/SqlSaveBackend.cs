@@ -947,6 +947,15 @@ namespace UsurperRemake.Systems
             }
             catch { /* Column already exists - expected */ }
 
+            // v1.1.14: a fought war's result, stored before its completion flip, for the stale sweep to settle by
+            try
+            {
+                using var migCmd = connection.CreateCommand();
+                migCmd.CommandText = "ALTER TABLE team_wars ADD COLUMN final_result TEXT;";
+                migCmd.ExecuteNonQuery();
+            }
+            catch { /* Column already exists - expected */ }
+
             // v0.60.5: add created_ip column for per-IP registration rate limiting
             try
             {
@@ -7316,9 +7325,13 @@ namespace UsurperRemake.Systems
     /// v1.1.12: a war still 'active' after GameConfig.TeamWarStaleMinutes was left by a lost session and
     /// would block both teams for ever. It is marked 'abandoned'; if no round was recorded, the wager goes
     /// back to its payer by a queued transfer, in the same transaction and only by the process that flipped
-    /// the row. A war with rounds recorded is not refunded, so leaving a losing war does not pay. It is not
-    /// settled by score either, since a challenger could leave while ahead; this holds too for a fought war
-    /// whose own completion failed (TeamCornerLocation pays nothing then). Returns the number expired.
+    /// the row. A war with rounds recorded is not refunded, so leaving a losing war does not pay, and it is
+    /// not settled by its running score, since a challenger could leave while ahead.
+    /// v1.1.14: a war whose whole result was stored (RecordTeamWarResult, written after the last round and
+    /// before the completion flip) but whose flip failed is settled by that result instead: flipped to it,
+    /// and a challenger's win pays the spoils by a queued transfer, in the same transaction and only by the
+    /// process whose flip landed, so it pays once. A loss needs nothing: the wager was taken at the start.
+    /// Returns the number expired.
     /// </summary>
     public int ExpireStaleTeamWars(int? staleMinutes = null)
     {
@@ -7327,24 +7340,40 @@ namespace UsurperRemake.Systems
         {
             using var connection = OpenConnection();
             using var tx = connection.BeginTransaction();
-            var stale = new List<(int Id, long Wager, int Wins, string Key, string Team)>();
+            var stale = new List<(int Id, long Wager, int Wins, string Key, string Team, string Result)>();
             using (var q = connection.CreateCommand())
             {
                 q.Transaction = tx;
-                q.CommandText = @"SELECT id, gold_wagered, challenger_wins + defender_wins, COALESCE(challenger_key, ''), challenger_team
+                q.CommandText = @"SELECT id, gold_wagered, challenger_wins + defender_wins, COALESCE(challenger_key, ''), challenger_team, COALESCE(final_result, '')
                                   FROM team_wars WHERE status = 'active' AND started_at < datetime('now', '-' || @mins || ' minutes');";
                 q.Parameters.AddWithValue("@mins", staleMinutes ?? GameConfig.TeamWarStaleMinutes);
                 using var r = q.ExecuteReader();
-                while (r.Read()) stale.Add((r.GetInt32(0), r.GetInt64(1), r.GetInt32(2), r.GetString(3), r.GetString(4)));
+                while (r.Read()) stale.Add((r.GetInt32(0), r.GetInt64(1), r.GetInt32(2), r.GetString(3), r.GetString(4), r.GetString(5)));
             }
             foreach (var war in stale)
             {
+                // v1.1.14: a stored result settles the war by it; otherwise it is abandoned as before
+                bool settled = war.Result == "challenger_won" || war.Result == "defender_won";
                 using var flip = connection.CreateCommand();
                 flip.Transaction = tx;
-                flip.CommandText = "UPDATE team_wars SET status = 'abandoned', finished_at = datetime('now') WHERE id = @id AND status = 'active';";
+                flip.CommandText = "UPDATE team_wars SET status = @status, finished_at = datetime('now') WHERE id = @id AND status = 'active';";
                 flip.Parameters.AddWithValue("@id", war.Id);
+                flip.Parameters.AddWithValue("@status", settled ? war.Result : "abandoned");
                 if (flip.ExecuteNonQuery() != 1) continue;
                 expired++;
+                if (settled)
+                {
+                    if (war.Result != "challenger_won" || war.Wager <= 0 || string.IsNullOrEmpty(war.Key)) continue;
+                    using var spoils = connection.CreateCommand();
+                    spoils.Transaction = tx;
+                    spoils.CommandText = @"INSERT INTO pending_gold_transfers (recipient_username, sender_display, amount, note)
+                                           VALUES (@user, @sender, @amount, 'Team war winnings');";
+                    spoils.Parameters.AddWithValue("@user", war.Key);
+                    spoils.Parameters.AddWithValue("@sender", war.Team);
+                    spoils.Parameters.AddWithValue("@amount", TeamWarSpoils(war.Wager));
+                    spoils.ExecuteNonQuery();
+                    continue;
+                }
                 if (war.Wins != 0 || war.Wager <= 0 || string.IsNullOrEmpty(war.Key)) continue;
                 using var refund = connection.CreateCommand();
                 refund.Transaction = tx;
@@ -7359,6 +7388,30 @@ namespace UsurperRemake.Systems
         }
         catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to expire stale team wars: {ex.Message}"); }
         return expired;
+    }
+
+    /// <summary>v1.1.14: what a won war pays its challenger (TeamCornerLocation and the stale sweep alike).</summary>
+    public static long TeamWarSpoils(long wager) => (long)(wager * GameConfig.TeamWarRewardMultiplier);
+
+    /// <summary>
+    /// v1.1.14: a fought war's whole score and result, stored while it is still active, before its completion
+    /// flip (CompleteTeamWar). If that flip fails, the stale sweep settles the war by this result. True when stored.
+    /// </summary>
+    public async Task<bool> RecordTeamWarResult(int warId, int challengerWins, int defenderWins, string result)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"UPDATE team_wars SET challenger_wins = @c, defender_wins = @d, final_result = @r
+                                WHERE id = @id AND status = 'active';";
+            cmd.Parameters.AddWithValue("@id", warId);
+            cmd.Parameters.AddWithValue("@c", challengerWins);
+            cmd.Parameters.AddWithValue("@d", defenderWins);
+            cmd.Parameters.AddWithValue("@r", result);
+            return await cmd.ExecuteNonQueryAsync() == 1;
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to record team war result: {ex.Message}"); return false; }
     }
 
     public async Task UpdateTeamWarScore(int warId, bool challengerWon)
