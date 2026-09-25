@@ -1012,6 +1012,15 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex) { DebugLogger.Instance.LogWarning("SQL", $"bounty_claims not ensured: {ex.Message}"); }
 
+            // v1.1.14: the king's sales tax not yet in the stored treasury, kept across a restart
+            try
+            {
+                using var migCmd = connection.CreateCommand();
+                migCmd.CommandText = "CREATE TABLE IF NOT EXISTS pending_sales_tax (id INTEGER PRIMARY KEY CHECK (id = 1), amount INTEGER NOT NULL DEFAULT 0);";
+                migCmd.ExecuteNonQuery();
+            }
+            catch (Exception ex) { DebugLogger.Instance.LogWarning("SQL", $"pending_sales_tax not ensured: {ex.Message}"); }
+
             // v1.1.14: one-time claims on an NPC's gear, so two processes cannot both take the same piece
             try
             {
@@ -2254,12 +2263,30 @@ namespace UsurperRemake.Systems
         /// SaveAllSharedState). expectedVersion 0 = "key should not exist
         /// yet" (first-ever write).
         /// </summary>
-        public async Task<bool> SaveWorldStateIfVersion(string key, string jsonValue, long expectedVersion)
+        public async Task<bool> SaveWorldStateIfVersion(string key, string jsonValue, long expectedVersion) =>
+            await SaveWorldStateIfVersion(key, jsonValue, expectedVersion, 0);
+
+        /// <summary>
+        /// v1.1.14: the same versioned write, also taking takePendingSalesTax out of the stored pending sales tax
+        /// (pending_sales_tax) in the same transaction: the write lands only if that much is still pending, so a
+        /// court write that adds the pending tax to the treasury clears it at once, and two processes cannot both
+        /// credit it. False (nothing written) on a conflict of either.
+        /// </summary>
+        public async Task<bool> SaveWorldStateIfVersion(string key, string jsonValue, long expectedVersion, long takePendingSalesTax)
         {
             try
             {
                 using var connection = OpenConnection();
                 using var transaction = connection.BeginTransaction();
+
+                if (takePendingSalesTax > 0)
+                {
+                    using var take = connection.CreateCommand();
+                    take.Transaction = transaction;
+                    take.CommandText = "UPDATE pending_sales_tax SET amount = amount - @t WHERE id = 1 AND amount >= @t;";
+                    take.Parameters.AddWithValue("@t", takePendingSalesTax);
+                    if (await take.ExecuteNonQueryAsync() != 1) { transaction.Rollback(); return false; }
+                }
 
                 long currentVersion = -1; // -1 = row absent
                 using (var readCmd = connection.CreateCommand())
@@ -2307,6 +2334,39 @@ namespace UsurperRemake.Systems
                 DebugLogger.Instance.LogError("SQL", $"SaveWorldStateIfVersion('{key}') failed: {ex.Message}");
                 return false;
             }
+        }
+
+        /// <summary>v1.1.14: add the king's share of a sale to the stored pending sales tax. False if it could not be stored.</summary>
+        public bool AddPendingSalesTax(long amount)
+        {
+            if (amount <= 0) return true;
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "INSERT INTO pending_sales_tax (id, amount) VALUES (1, @a) ON CONFLICT(id) DO UPDATE SET amount = amount + @a;";
+                cmd.Parameters.AddWithValue("@a", amount);
+                return cmd.ExecuteNonQuery() == 1;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"AddPendingSalesTax failed: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>v1.1.14: the stored pending sales tax (0 when none or unreadable).</summary>
+        public long GetPendingSalesTax()
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT amount FROM pending_sales_tax WHERE id = 1;";
+                var r = cmd.ExecuteScalar();
+                return r == null || r is DBNull ? 0 : Math.Max(0, Convert.ToInt64(r));
+            }
+            catch { return 0; }
         }
 
         public async Task SaveWorldState(string key, string jsonValue)

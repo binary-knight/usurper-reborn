@@ -1091,13 +1091,17 @@ namespace UsurperRemake.Systems
             var gate = CourtGateFor(sql);
             await gate.WaitAsync();
             // v1.1.14: sales tax an earlier court change gave up on is taken here and added to this change's copy;
-            // it leaves the pending total only once this write lands, and goes back to it otherwise (exactly once)
+            // it leaves the pending total only once this write lands, and goes back to it otherwise (exactly once).
+            // With SQL the tax pending is stored (pending_sales_tax, kept across a restart): each attempt reads it,
+            // adds it, and the court write takes it out in the same transaction (SaveWorldStateIfVersion)
             long carried = Interlocked.Exchange(ref _pendingSalesTax, 0);
             bool carriedStored = false;
+            long storedPending = 0;
             bool change(RoyalCourtSaveData court)
             {
                 if (!requested(court)) return false;
-                if (carried > 0) court.Treasury = court.Treasury > long.MaxValue - carried ? long.MaxValue : court.Treasury + carried;
+                long add = carried + storedPending;
+                if (add > 0) court.Treasury = court.Treasury > long.MaxValue - add ? long.MaxValue : court.Treasury + add;
                 return true;
             }
             try
@@ -1118,6 +1122,7 @@ namespace UsurperRemake.Systems
                 }
                 for (int attempt = 0; attempt < 5; attempt++)
                 {
+                    storedPending = sql.GetPendingSalesTax();   // v1.1.14: what this write will take, if it lands
                     long version = sql.GetWorldStateVersion("royal_court");   // read before the value, so a later write is a conflict
                     var json = await sql.LoadWorldState("royal_court");
                     RoyalCourtSaveData? court;
@@ -1139,7 +1144,7 @@ namespace UsurperRemake.Systems
                         return false;
                     }
                     if (beforeWrite != null) await beforeWrite();
-                    if (await sql.SaveWorldStateIfVersion("royal_court", JsonSerializer.Serialize(court, CourtJsonOptions), version))
+                    if (await sql.SaveWorldStateIfVersion("royal_court", JsonSerializer.Serialize(court, CourtJsonOptions), version, storedPending))
                     {
                         lock (RoyalCourtVersionLock)
                         {
