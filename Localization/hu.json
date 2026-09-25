@@ -8046,7 +8046,7 @@
   "engine.section_play": "  JÁTÉK",
   "engine.section_info": "  INFORMÁCIÓ",
   "engine.section_accessibility": "  AKADÁLYMENTESÍTÉS",
-  "engine.immortal_required": "  Másodlagos karakter létrehozásához halhatatlannak kell lenned.",
+  "engine.alt_level_required": "  Másodlagos karakter létrehozásához legalább {0}. szintű karakter kell, vagy halhatatlannak kell lenned.",
   "engine.delete_main_warning": "FIGYELEM: Ez TÖRÖLNI fogja a fő karakteredet!",
   "engine.delete_alt_unaffected": "A másodlagos karakteredet NEM érinti.",
   "engine.delete_confirm_prompt": "Írd be, hogy 'DELETE' a megerősítéshez: ",

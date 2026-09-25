@@ -593,6 +593,7 @@ public static class MonsterAbilities
 
             // Goblinoid
             case AbilityType.CriticalStrike:
+                monster.HasUsedCriticalStrike = true; // v1.1.14: once per fight for a goblin (FallsBackToNormalAttack)
                 result.DamageMultiplier = 2.0f;
                 result.Message = Loc.Get("mability.critical_strike", monster.Name);
                 result.MessageColor = "bright_red";
@@ -1364,6 +1365,23 @@ public static class MonsterAbilities
 
         return result;
     }
+
+    /// <summary>
+    /// v1.1.14: an ability the monster passes up this turn for its normal attack. Engulf is not
+    /// used on a target that is already held (stunned, webbed, engulfed, frozen, asleep or
+    /// paralyzed: anything that stops it acting), so a pack of cubes cannot stack holds on one tank.
+    /// A goblin (the Goblinoid family) uses its Critical Strike once per fight; each goblin has its own.
+    /// </summary>
+    public static bool FallsBackToNormalAttack(AbilityType ability, Monster monster, Character target) => ability switch
+    {
+        AbilityType.Engulf => target != null && !target.CanAct(),
+        AbilityType.CriticalStrike => monster.HasUsedCriticalStrike && IsGoblin(monster),
+        _ => false
+    };
+
+    /// <summary>v1.1.14: the goblin family, whose Critical Strike is once per fight.</summary>
+    public static bool IsGoblin(Monster monster) =>
+        string.Equals(monster.FamilyName, "Goblinoid", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Calculate breath weapon damage

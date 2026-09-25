@@ -8038,7 +8038,7 @@
   "engine.section_play": "  JUGAR",
   "engine.section_info": "  INFO",
   "engine.section_accessibility": "  ACCESIBILIDAD",
-  "engine.immortal_required": "  Debes ser inmortal para crear un personaje alt.",
+  "engine.alt_level_required": "  Necesitas un personaje de nivel {0} o superior, o ser inmortal, para crear un personaje alt.",
   "engine.delete_main_warning": "¡ADVERTENCIA: Esto BORRARÁ tu personaje principal!",
   "engine.delete_alt_unaffected": "Tu personaje alt NO se verá afectado.",
   "engine.delete_confirm_prompt": "Escribe 'DELETE' para confirmar: ",

@@ -8038,7 +8038,7 @@
   "engine.section_play": "  GIOCA",
   "engine.section_info": "  INFO",
   "engine.section_accessibility": "  ACCESSIBILITÀ",
-  "engine.immortal_required": "  Devi essere un immortale per creare un personaggio alternativo.",
+  "engine.alt_level_required": "  Ti serve un personaggio di livello {0} o superiore, oppure essere un immortale, per creare un personaggio alternativo.",
   "engine.delete_main_warning": "ATTENZIONE: Questo ELIMINERÀ il tuo personaggio principale!",
   "engine.delete_alt_unaffected": "Il tuo personaggio alternativo NON sarà toccato.",
   "engine.delete_confirm_prompt": "Digita 'DELETE' per confermare: ",

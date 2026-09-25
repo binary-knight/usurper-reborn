@@ -5703,6 +5703,10 @@ public partial class CombatEngine
         if (!Enum.TryParse<MonsterAbilities.AbilityType>(abilityName, true, out var abilityType))
             return false; // Unknown ability name
 
+        // v1.1.14: an ability the monster passes up (Engulf on a held target) becomes its normal attack
+        if (MonsterAbilities.FallsBackToNormalAttack(abilityType, monster, player))
+            return false;
+
         // Execute the ability
         var abilityResult = MonsterAbilities.ExecuteAbility(abilityType, monster, player);
 
@@ -19855,7 +19859,8 @@ public partial class CombatEngine
             if (random.Next(100) < abilityChance)
             {
                 string abilityName = monster.SpecialAbilities[random.Next(monster.SpecialAbilities.Count)];
-                if (Enum.TryParse<MonsterAbilities.AbilityType>(abilityName, true, out var abilityType))
+                if (Enum.TryParse<MonsterAbilities.AbilityType>(abilityName, true, out var abilityType)
+                    && !MonsterAbilities.FallsBackToNormalAttack(abilityType, monster, companion)) // v1.1.14: else the normal attack below
                 {
                     var abilityResult = MonsterAbilities.ExecuteAbility(abilityType, monster, companion);
                     // Show "attacks companion!" only if ability targets them (not self-only like Regeneration)

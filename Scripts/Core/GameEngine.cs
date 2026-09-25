@@ -371,6 +371,13 @@ public partial class GameEngine
     }
 
     /// <summary>
+    /// v1.1.14: the alt slot opens when the main is immortal, has earned the slot (it persists
+    /// through renouncing), or has reached GameConfig.AltSlotUnlockLevel. Immortal only before.
+    /// </summary>
+    internal static bool AltSlotUnlocked(bool mainIsImmortal, bool hasEarnedAltSlot, int mainLevel) =>
+        mainIsImmortal || hasEarnedAltSlot || mainLevel >= GameConfig.AltSlotUnlockLevel;
+
+    /// <summary>
     /// BBS Door mode - automatically loads or creates character based on drop file
     /// </summary>
     private async Task RunBBSDoorMode()
@@ -427,6 +434,7 @@ public partial class GameEngine
         // Peek at main save to check immortal/alt slot status
         bool mainIsImmortal = false;
         bool hasAltSlot = false;
+        int mainLevel = mainSave?.Level ?? 0;
         if (mainSave != null)
         {
             try
@@ -434,6 +442,7 @@ public partial class GameEngine
                 var mainData = await SaveSystem.Instance.LoadSaveByFileName(accountName);
                 mainIsImmortal = mainData?.Player?.IsImmortal == true;
                 hasAltSlot = mainData?.Player?.HasEarnedAltSlot == true;
+                if (mainData?.Player != null) mainLevel = mainData.Player.Level;
             }
             catch (Exception ex) { DebugLogger.Instance.LogError("ENGINE", $"[ShowCharacterSlots] Failed to peek alt slot data: {ex.Message}"); }
         }
@@ -460,7 +469,8 @@ public partial class GameEngine
             terminal.WriteLine("");
 
         // Show alt creation option if eligible (has alt slot but no alt character yet)
-        bool canCreateAlt = (mainIsImmortal || hasAltSlot) && altSave == null && UsurperRemake.BBS.DoorMode.IsOnlineMode;
+        // v1.1.14: a level-25 main opens the slot too; still one alt per account.
+        bool canCreateAlt = AltSlotUnlocked(mainIsImmortal, hasAltSlot, mainLevel) && altSave == null && UsurperRemake.BBS.DoorMode.IsOnlineMode;
 
         // Compact BBS menu (fits 24-line terminals) vs full menu for MUD/local
         bool compactMenu = UsurperRemake.BBS.DoorMode.IsInDoorMode;
@@ -648,7 +658,7 @@ public partial class GameEngine
                 }
                 else
                 {
-                    terminal.WriteLine(Loc.Get("engine.immortal_required"), "red");
+                    terminal.WriteLine(Loc.Get("engine.alt_level_required", GameConfig.AltSlotUnlockLevel), "red");
                     await Task.Delay(2000);
                     await RunBBSDoorMode();
                     return;
