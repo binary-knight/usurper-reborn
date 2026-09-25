@@ -1320,12 +1320,15 @@ namespace UsurperRemake.Systems
         {
             if (string.IsNullOrWhiteSpace(fullName)) return null;
 
+            // v1.1.13: a legacy numeral is not a surname ("Halvar Copperfield II" gives "Copperfield")
+            // v1.1.14: stripped before the alias check, so an alias with a numeral is still an alias
+            string stripped = NPCSpawnSystem.StripRomanNumeralSuffix(fullName);
+
             // Alias-style names where the last word is a first name, not a surname.
             // These are criminal/rogue NPCs known by nicknames, not real names.
-            if (AliasNames.Contains(fullName)) return null;
+            if (AliasNames.Contains(stripped)) return null;
 
-            // v1.1.13: a legacy numeral is not a surname ("Halvar Copperfield II" gives "Copperfield")
-            var parts = NPCSpawnSystem.StripRomanNumeralSuffix(fullName).Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            var parts = stripped.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length < 2) return null;
 
             // Skip title-style names: "The Stranger", "The Executioner"

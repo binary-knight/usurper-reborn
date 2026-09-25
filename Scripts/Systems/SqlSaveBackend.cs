@@ -6298,6 +6298,61 @@ namespace UsurperRemake.Systems
         }
     }
 
+    /// <summary>
+    /// v1.1.14: a join's last slot check and its membership write, in one BEGIN IMMEDIATE transaction.
+    /// Membership lives in the saves, and a join used to check the count and then write the whole save
+    /// later, so two joins at once could both pass and take a team to six. The count of player members
+    /// (as UpdatePlayerTeamMemberCount counts them, the joiner left out) plus the NPC slots the caller
+    /// counted must leave a free slot; then the team goes into the joiner's save by json_set before the
+    /// write lock is released, so the next join counts it. True when the slot was taken. A joiner with no
+    /// save row yet is counted by no one, as before; the check still runs and nothing is written.
+    /// </summary>
+    public async Task<bool> TryClaimTeamSlot(string teamName, string joinerKey, int npcSlotsUsed, int maxSlots)
+    {
+        try
+        {
+            return await Task.Run(() =>
+            {
+                using var connection = OpenConnection();
+                using var tx = connection.BeginTransaction(deferred: false);   // BEGIN IMMEDIATE: joins queue here
+                long players;
+                using (var count = connection.CreateCommand())
+                {
+                    count.Transaction = tx;
+                    count.CommandText = @"
+                        SELECT COUNT(*) FROM players
+                        WHERE (CASE WHEN json_valid(player_data) THEN json_extract(player_data, '$.player.team') END) = @team
+                        AND player_data != '{}' AND LENGTH(player_data) > 2
+                        AND is_banned = 0 AND username NOT LIKE 'emergency_%'
+                        AND LOWER(username) != LOWER(@joiner);";
+                    count.Parameters.AddWithValue("@team", teamName);
+                    count.Parameters.AddWithValue("@joiner", joinerKey);
+                    players = Convert.ToInt64(count.ExecuteScalar() ?? 0L);
+                }
+                if (players + npcSlotsUsed >= maxSlots) { tx.Rollback(); return false; }
+                using (var write = connection.CreateCommand())
+                {
+                    write.Transaction = tx;
+                    write.CommandText = @"
+                        UPDATE players SET player_data = json_set(player_data, '$.player.team', @team)
+                        WHERE LOWER(username) = LOWER(@joiner) AND json_valid(player_data)
+                        AND player_data != '{}' AND LENGTH(player_data) > 2;";
+                    write.Parameters.AddWithValue("@team", teamName);
+                    write.Parameters.AddWithValue("@joiner", joinerKey);
+                    if (write.ExecuteNonQuery() == 0)
+                        DebugLogger.Instance.LogWarning("SQL", $"Team join for '{joinerKey}' has no save row to write into; the slot check ran");
+                }
+                tx.Commit();
+                return true;
+            });
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to claim a slot in team '{teamName}': {ex.Message}");
+            return false;
+        }
+    }
+
     public async Task UpdatePlayerTeamMemberCount(string teamName)
     {
         try
@@ -7383,10 +7438,12 @@ namespace UsurperRemake.Systems
         {
             using var connection = OpenConnection();
             using var cmd = connection.CreateCommand();
+            // v1.1.14: only the wars of this team, not of a removed team of the same name (TeamCreatedAtSql)
             cmd.CommandText = @"SELECT id, challenger_team, defender_team, status, challenger_wins, defender_wins,
                                        gold_wagered, started_at, finished_at
                                 FROM team_wars
                                 WHERE (challenger_team = @team OR defender_team = @team)
+                                AND started_at >= " + TeamCreatedAtSql + @"
                                 ORDER BY started_at DESC LIMIT @limit;";
             cmd.Parameters.AddWithValue("@team", teamName);
             cmd.Parameters.AddWithValue("@limit", limit);
@@ -7609,6 +7666,14 @@ namespace UsurperRemake.Systems
         catch (Exception ex) { DebugLogger.Instance.LogError("SQL", $"Failed to complete siege: {ex.Message}"); }
     }
 
+    /// <summary>
+    /// v1.1.14: team_wars and castle_sieges are keyed by name, and a team removed by DeleteEmptyTeam leaves
+    /// them behind. A row counts for a player team only from the team's created_at, so a new team of that
+    /// name does not inherit the old one's wars, siege cooldown or war cooldowns. The rows stay, so the
+    /// other team's history keeps them. No player_teams row (an NPC team) keeps every row.
+    /// </summary>
+    private const string TeamCreatedAtSql = "COALESCE((SELECT created_at FROM player_teams WHERE team_name = @team), '')";
+
     public bool CanTeamSiege(string teamName)
     {
         try
@@ -7617,7 +7682,8 @@ namespace UsurperRemake.Systems
             using var cmd = connection.CreateCommand();
             // 24h cooldown between sieges
             cmd.CommandText = @"SELECT COUNT(*) FROM castle_sieges
-                                WHERE team_name = @team AND started_at > datetime('now', '-24 hours');";
+                                WHERE team_name = @team AND started_at > datetime('now', '-24 hours')
+                                AND started_at >= " + TeamCreatedAtSql + ";";   // v1.1.14
             cmd.Parameters.AddWithValue("@team", teamName);
             return Convert.ToInt32(cmd.ExecuteScalar()) == 0;
         }

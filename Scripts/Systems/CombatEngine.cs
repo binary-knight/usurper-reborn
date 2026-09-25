@@ -29,6 +29,14 @@ public partial class CombatEngine
 
     private TerminalEmulator terminal;
     private Random random = Random.Shared;
+
+    /// <summary>
+    /// v1.1.14: test-only. Gives this engine its own RNG from a seed, so a test that drives a fight gets the
+    /// same rolls every run. Every roll the engine makes itself goes through this field; a game never calls
+    /// this, so play keeps Random.Shared. Rolls made outside the engine (monster abilities, items) are not
+    /// covered.
+    /// </summary>
+    internal void SeedRandomForTests(int seed) => random = new Random(seed);
     private bool _lastMonsterTargetedGroupPlayer; // Set by ProcessMonsterAction when monster attacks a grouped player
     private int _lootRoundRobinIndex = 0; // Round-robin index for group loot distribution
 
@@ -1210,7 +1218,7 @@ public partial class CombatEngine
         // Only monsters that win the roll get a free attack — partial ambushes are common.
         if (isAmbush && player.IsAlive && monsters.Any(m => m.IsAlive))
         {
-            var ambushRng = Random.Shared;
+            var ambushRng = random;   // v1.1.14: the engine RNG, so a test seed covers it
 
             // Party awareness: use the best AGI + DEX from anyone in the party (leader or teammates)
             long bestAgi = player.BaseAgility;
@@ -1547,7 +1555,7 @@ public partial class CombatEngine
             // Poison counter tick (player.Poison from traps/monster attacks — separate from StatusEffect.Poisoned)
             if (player.Poison > 0 && player.IsAlive)
             {
-                int poisonBase = 2 + Random.Shared.Next(4); // 2-5
+                int poisonBase = 2 + random.Next(4); // 2-5 (v1.1.14: the engine RNG)
                 int poisonLevel = (int)(player.Level / 10);
                 int poisonIntensity = player.Poison / 5;
                 int poisonDmg = Math.Min(poisonBase + poisonLevel + poisonIntensity,
@@ -3681,7 +3689,7 @@ public partial class CombatEngine
         }
 
         // Additional Dexterity-based critical hit chance (on top of natural 20)
-        bool dexCrit = !attackRoll.IsCriticalSuccess && !stealthCrit && StatEffectsSystem.RollCriticalHit(attacker);
+        bool dexCrit = !attackRoll.IsCriticalSuccess && !stealthCrit && StatEffectsSystem.RollCriticalHit(attacker, random);
         if (dexCrit)
         {
             // Apply Dexterity-based crit multiplier
@@ -5120,7 +5128,7 @@ public partial class CombatEngine
         {
             if (random.Next(100) < 20)
             {
-                var missMessage = CombatMessages.GetMonsterAttackMessage(monster.Name, monster.MonsterColor, 0, player.MaxHP);
+                var missMessage = CombatMessages.GetMonsterAttackMessage(monster.Name, monster.MonsterColor, 0, player.MaxHP, random);   // v1.1.14: the engine RNG
                 terminal.WriteLine(missMessage);
                 terminal.WriteLine(Loc.Get("combat.blur_miss"), "gray");
                 result.CombatLog.Add($"{monster.Name} misses due to blur");
@@ -5130,7 +5138,7 @@ public partial class CombatEngine
         }
 
         // Agility-based dodge chance (from StatEffectsSystem)
-        if (monsterRoll.Success && StatEffectsSystem.RollDodge(player))
+        if (monsterRoll.Success && StatEffectsSystem.RollDodge(player, random))
         {
             terminal.SetColor("bright_cyan");
             terminal.WriteLine(Loc.Get("combat.you_dodge", monster.Name) + $" ({StatEffectsSystem.GetDodgeChance(player.Agility)}% dodge)");
@@ -5213,7 +5221,7 @@ public partial class CombatEngine
         }
 
         // Use colored combat message
-        var attackMessage = CombatMessages.GetMonsterAttackMessage(monster.Name, monster.MonsterColor, monsterAttack, player.MaxHP);
+        var attackMessage = CombatMessages.GetMonsterAttackMessage(monster.Name, monster.MonsterColor, monsterAttack, player.MaxHP, random);   // v1.1.14: the engine RNG
         terminal.WriteLine(attackMessage);
 
         // Check for shield block (20% chance to block, halves incoming damage)
@@ -6859,6 +6867,7 @@ public partial class CombatEngine
         {
             terminal.WriteLine(msg, color);
         }
+        TickPvPControl(teammate); // v1.1.14: a hold that ended starts the teammate's immunity, as for the player
         if (!teammate.IsAlive) return; // DoT could have killed the teammate
         if (!teammate.CanAct())
         {
@@ -8180,7 +8189,7 @@ public partial class CombatEngine
             terminal.WriteLine(Loc.Get("combat.stealth_crit"), "bright_yellow");
         }
 
-        bool crit = !alreadyCrit && StatEffectsSystem.RollCriticalHit(player);
+        bool crit = !alreadyCrit && StatEffectsSystem.RollCriticalHit(player, random);
         if (!crit && !alreadyCrit && player.Class == CharacterClass.Wavecaller
             && player.TempAttackBonus > 0 && player.TempAttackBonusDuration > 0)
         {
@@ -12846,17 +12855,17 @@ public partial class CombatEngine
         else if (attacker != null && attacker != currentPlayer && attacker.IsCompanion)
         {
             // Companion/ally attack
-            attackMessage = CombatMessages.GetAllyAttackMessage(attacker.DisplayName, target.Name, actualDamage, target.MaxHP);
+            attackMessage = CombatMessages.GetAllyAttackMessage(attacker.DisplayName, target.Name, actualDamage, target.MaxHP, random);   // v1.1.14: the engine RNG
         }
         else if (attacker != null && attacker != currentPlayer)
         {
             // Teammate attack (NPC, echo, or other non-player ally)
-            attackMessage = CombatMessages.GetAllyAttackMessage(attacker.DisplayName, target.Name, actualDamage, target.MaxHP);
+            attackMessage = CombatMessages.GetAllyAttackMessage(attacker.DisplayName, target.Name, actualDamage, target.MaxHP, random);   // v1.1.14: the engine RNG
         }
         else
         {
             // Player attack
-            attackMessage = CombatMessages.GetPlayerAttackMessage(target.Name, actualDamage, target.MaxHP);
+            attackMessage = CombatMessages.GetPlayerAttackMessage(target.Name, actualDamage, target.MaxHP, random);   // v1.1.14: the engine RNG
         }
         terminal.WriteLine(attackMessage);
 
@@ -12865,7 +12874,7 @@ public partial class CombatEngine
             target.HP = 0;
 
             // Use new colored death message
-            var deathMessage = CombatMessages.GetDeathMessage(target.Name, target.MonsterColor);
+            var deathMessage = CombatMessages.GetDeathMessage(target.Name, target.MonsterColor, random);   // v1.1.14: the engine RNG
             terminal.WriteLine(deathMessage);
 
             // Broadcast monster death to group
@@ -13075,7 +13084,7 @@ public partial class CombatEngine
                             terminal.WriteLine(Loc.Get("combat.stealth_crit"), "bright_yellow");
                         }
                         bool isCrit = !stealthCrit && random.Next(1, 21) == 20; // natural 20
-                        bool dexCrit = !stealthCrit && !isCrit && StatEffectsSystem.RollCriticalHit(player);
+                        bool dexCrit = !stealthCrit && !isCrit && StatEffectsSystem.RollCriticalHit(player, random);
                         if (isCrit)
                         {
                             rollMult = 1.5f + (float)(random.NextDouble() * 0.5); // 1.5-2.0
@@ -13953,7 +13962,7 @@ public partial class CombatEngine
             terminal.SetColor("bright_yellow");
             terminal.WriteLine(Loc.Get("combat.stealth_crit"));
         }
-        else if (StatEffectsSystem.RollCriticalHit(player) && random.Next(2) == 0)
+        else if (StatEffectsSystem.RollCriticalHit(player, random) && random.Next(2) == 0)
         {
             rollMultiplier = StatEffectsSystem.GetCriticalDamageMultiplier(player.Dexterity, player.GetEquipmentCritDamageBonus());
         }
@@ -14510,7 +14519,7 @@ public partial class CombatEngine
             }
 
             // Critical hit roll for abilities — skip if ability already has guaranteed crit (e.g. Backstab, Umbral Step)
-            bool abilityCrit = !abilityAlreadyCrit && StatEffectsSystem.RollCriticalHit(player);
+            bool abilityCrit = !abilityAlreadyCrit && StatEffectsSystem.RollCriticalHit(player, random);
             // Wavecaller Ocean's Voice: +20% bonus crit chance when buff active
             if (!abilityCrit && !abilityAlreadyCrit && actualDamage > 0 && player.Class == CharacterClass.Wavecaller
                 && player.TempAttackBonus > 0 && player.TempAttackBonusDuration > 0)
@@ -18395,6 +18404,7 @@ public partial class CombatEngine
         {
             terminal.WriteLine(msg, color);
         }
+        TickPvPControl(teammate); // v1.1.14: a hold that ended starts the teammate's immunity, as for the player
         if (!teammate.IsAlive)
         {
             // DoT killed the teammate: run the real death pipeline (permadeath,
@@ -19961,8 +19971,12 @@ public partial class CombatEngine
                         }
                         else if (random.Next(100) < abilityResult.StatusChance)
                         {
-                            companion.ApplyStatus(abilityResult.InflictStatus, abilityResult.StatusDuration);
-                            terminal.WriteLine($"{companion.DisplayName} is afflicted with {abilityResult.InflictStatus}!", "yellow");
+                            // v1.1.14: a stun or web on a teammate follows the duel control rules, as on the player
+                            if (!abilityResult.InflictStatus.PreventsAction())
+                                companion.ApplyStatus(abilityResult.InflictStatus, abilityResult.StatusDuration);
+                            if (!abilityResult.InflictStatus.PreventsAction()
+                                || TryApplyPvPControl(companion, abilityResult.InflictStatus, abilityResult.StatusDuration))
+                                terminal.WriteLine($"{companion.DisplayName} is afflicted with {abilityResult.InflictStatus}!", "yellow");
                         }
                         else
                         {
@@ -22151,7 +22165,7 @@ public partial class CombatEngine
             var filledSlots = equippedSlots.Where(s => player.GetEquipment(s) != null).ToList();
             if (filledSlots.Count > 0)
             {
-                var rng = Random.Shared;
+                var rng = random;   // v1.1.14: the engine RNG
                 var lostSlot = filledSlots[rng.Next(filledSlots.Count)];
                 var lostItem = player.GetEquipment(lostSlot);
                 lostItemName = lostItem?.Name ?? "equipment";
@@ -22254,7 +22268,7 @@ public partial class CombatEngine
             // Dark bargain — v0.57.12: cost scaled from 10,000 → 500 to match AlignmentCap=1000.
             long darknessBefore = player.Darkness;
             player.Darkness -= 500;
-            var random = Random.Shared;
+            // v1.1.14: the engine RNG (was a local Random.Shared), so a test seed covers it
             int statLoss = 2 + random.Next(4);
 
             // Reduce a random stat permanently
@@ -22298,7 +22312,7 @@ public partial class CombatEngine
     private async Task ApplyDeathPenalties(CombatResult result)
     {
         var player = result.Player;
-        var random = Random.Shared;
+        // v1.1.14: the engine RNG (was a local Random.Shared), so a test seed covers it
 
         terminal.SetColor("red");
         terminal.WriteLine("");
@@ -22966,7 +22980,7 @@ public partial class CombatEngine
             }
 
             // Critical hit roll for abilities — skip if ability already has guaranteed crit (e.g. Backstab, Umbral Step)
-            bool abilityCrit = !abilityAlreadyCrit && StatEffectsSystem.RollCriticalHit(player);
+            bool abilityCrit = !abilityAlreadyCrit && StatEffectsSystem.RollCriticalHit(player, random);
             // Wavecaller Ocean's Voice: +20% bonus crit chance when buff active
             if (!abilityCrit && !abilityAlreadyCrit && player.Class == CharacterClass.Wavecaller
                 && player.TempAttackBonus > 0 && player.TempAttackBonusDuration > 0)
@@ -27296,7 +27310,7 @@ public partial class CombatEngine
             terminal.SetColor("bright_yellow");
             terminal.WriteLine(Loc.Get("combat.stealth_crit"));
         }
-        else if (StatEffectsSystem.RollCriticalHit(attacker) && random.Next(2) == 0)
+        else if (StatEffectsSystem.RollCriticalHit(attacker, random) && random.Next(2) == 0)
         {
             // Half-rate DEX crit (matches the "half basic rate" design choice)
             rollMultiplier = StatEffectsSystem.GetCriticalDamageMultiplier(attacker.Dexterity, attacker.GetEquipmentCritDamageBonus());
@@ -28075,7 +28089,7 @@ public partial class CombatEngine
             attacks += 1;
 
         // Agility-based extra attack chance (from StatEffectsSystem)
-        if (StatEffectsSystem.RollExtraAttack(attacker))
+        if (StatEffectsSystem.RollExtraAttack(attacker, random))
             attacks += 1;
 
         // Shadow Crown artifact: extra strike per round (+2 during Manwe fight)
@@ -28097,7 +28111,7 @@ public partial class CombatEngine
         // mainhand attack"). Message is suppressed for teammates so it doesn't spam.
         if (attacker.ActiveTotemType == 4 && attacker.ActiveTotemRounds > 0)
         {
-            if (Random.Shared.Next(100) < attacker.ActiveTotemPower)
+            if (random.Next(100) < attacker.ActiveTotemPower)   // v1.1.14: the engine RNG
             {
                 attacks++;
                 windfuryProcced = true;
@@ -29902,6 +29916,7 @@ public partial class CombatEngine
             terminal.WriteLine(msg, color);
             remoteTerminal.WriteLine(msg, color);
         }
+        TickPvPControl(teammate); // v1.1.14: a hold that ended starts the grouped player's immunity, as for the leader
         if (!teammate.IsAlive)
         {
             await HandleTeammateDeathDispatch(teammate, Loc.Get("combat.dot_killer"), result);

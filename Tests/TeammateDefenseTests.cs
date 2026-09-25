@@ -78,6 +78,7 @@ public class TeammateDefenseTests
         var script = new System.IO.MemoryStream(System.Text.Encoding.UTF8.GetBytes(string.Concat(Enumerable.Repeat("A\n", 12)) + string.Concat(Enumerable.Repeat("P\n", 6))));
         var term = new TerminalEmulator(script, new System.IO.MemoryStream());
         var engine = new CombatEngine(term);
+        engine.SeedRandomForTests(1114);   // v1.1.14: the same rolls every run
         var rat = new Monster { Name = "Sewer Rat", Level = 1, HP = 1, MaxHP = 1, Strength = 1, Defence = 0, Experience = 5, Gold = 3 };
         var result = await engine.PlayerVsMonsters(owner, new List<Monster> { rat }, new List<Character> { tm }, offerMonkEncounter: false);
         result.Outcome.Should().Be(CombatOutcome.Victory);

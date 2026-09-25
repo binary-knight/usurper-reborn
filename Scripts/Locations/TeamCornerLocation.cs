@@ -1201,12 +1201,33 @@ public class TeamCornerLocation : BaseLocation
     private async Task<bool> RefuseJoinIfFull(string teamName)
     {
         if (await TeamSlotsUsed(teamName) < MaxTeamSize) return false;
+        await ShowJoinTeamFull(teamName);
+        return true;
+    }
+
+    /// <summary>
+    /// v1.1.14: the last check of a join, after the password. Online, the slot count and the membership
+    /// write are one transaction (SqlSaveBackend.TryClaimTeamSlot), so of two players joining at once only
+    /// one takes the last slot; before, both passed the check and the saves that followed made six.
+    /// Offline no other player can join. True when the player may join.
+    /// </summary>
+    private async Task<bool> ClaimJoinSlot(string teamName)
+    {
+        if (!(DoorMode.IsOnlineMode && SaveSystem.Instance.Backend is SqlSaveBackend backend))
+            return !await RefuseJoinIfFull(teamName);
+        int npcSlots = CountTeamSlots(NPCSpawnSystem.Instance.ActiveNPCs, teamName, 0);
+        if (await backend.TryClaimTeamSlot(teamName, GameEngine.InheritanceKey(currentPlayer), npcSlots, MaxTeamSize)) return true;
+        await ShowJoinTeamFull(teamName);
+        return false;
+    }
+
+    private async Task ShowJoinTeamFull(string teamName)
+    {
         terminal.WriteLine("");
         terminal.SetColor("red");
         terminal.WriteLine(Loc.Get("team.join_team_full", teamName, MaxTeamSize));
         terminal.WriteLine("");
         await Task.Delay(2000);
-        return true;
     }
 
     /// <summary>
@@ -1270,7 +1291,7 @@ public class TeamCornerLocation : BaseLocation
                 var (exists, pwCorrect) = await backend.VerifyPlayerTeam(teamName, password);
                 if (exists && pwCorrect)
                 {
-                    if (await RefuseJoinIfFull(teamName)) return;
+                    if (!await ClaimJoinSlot(teamName)) return;   // v1.1.14: the check and the write, together
                     currentPlayer.Team = teamName;
                     currentPlayer.TeamPW = password;
                     currentPlayer.CTurf = false;
@@ -1326,7 +1347,7 @@ public class TeamCornerLocation : BaseLocation
 
         if (npcPassword == teamMember.TeamPW)
         {
-            if (await RefuseJoinIfFull(teamName)) return;
+            if (!await ClaimJoinSlot(teamName)) return;   // v1.1.14: online, the check and the write together
             currentPlayer.Team = teamName;
             currentPlayer.TeamPW = npcPassword;
             currentPlayer.CTurf = teamMember.CTurf;
@@ -3526,6 +3547,22 @@ public class TeamCornerLocation : BaseLocation
         }
     }
 
+    /// <summary>
+    /// v1.1.14: the latest war between the two teams since the cutoff that holds the per-opponent cooldown
+    /// (moved from ChallengeTeamWar). A war counts only if it is in both teams' history, so a war fought by a
+    /// removed team of either name does not hold the cooldown for the team now using that name.
+    /// </summary>
+    internal static async Task<TeamWarInfo?> RecentWarAgainst(SqlSaveBackend backend, string myTeam, string enemyTeam, DateTime cutoff)
+    {
+        var recentHistory = await backend.GetTeamWarHistory(myTeam, limit: 20);
+        var enemyWarIds = (await backend.GetTeamWarHistory(enemyTeam, limit: 100)).Select(w => w.Id).ToHashSet();
+        return recentHistory.FirstOrDefault(w =>
+            w.StartedAt > cutoff && w.Status != "abandoned" &&   // v1.1.12: a war that never ran does not count
+            enemyWarIds.Contains(w.Id) &&
+            ((w.ChallengerTeam == myTeam && w.DefenderTeam == enemyTeam) ||
+             (w.DefenderTeam == myTeam && w.ChallengerTeam == enemyTeam)));
+    }
+
     private async Task ChallengeTeamWar(SqlSaveBackend backend)
     {
         string myTeam = currentPlayer.Team;
@@ -3590,12 +3627,8 @@ public class TeamCornerLocation : BaseLocation
         // the same defender. Reads from the team_wars history rather than tracking
         // separate state — any war (won or lost, by any challenger from our team)
         // counts toward the cooldown.
-        var recentHistory = await backend.GetTeamWarHistory(myTeam, limit: 20);
         var cooldownCutoff = DateTime.UtcNow.AddHours(-GameConfig.TeamWarOpponentCooldownHours);
-        var recentVsThisOpponent = recentHistory.FirstOrDefault(w =>
-            w.StartedAt > cooldownCutoff && w.Status != "abandoned" &&   // v1.1.12: a war that never ran does not count
-            ((w.ChallengerTeam == myTeam && w.DefenderTeam == enemyTeam.TeamName) ||
-             (w.DefenderTeam == myTeam && w.ChallengerTeam == enemyTeam.TeamName)));
+        var recentVsThisOpponent = await RecentWarAgainst(backend, myTeam, enemyTeam.TeamName, cooldownCutoff);
         if (recentVsThisOpponent != null)
         {
             var hoursLeft = Math.Max(1, (int)Math.Ceiling((recentVsThisOpponent.StartedAt - cooldownCutoff).TotalHours));
