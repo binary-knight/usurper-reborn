@@ -232,6 +232,17 @@ public partial class OwnerProcessConflictTests
         _db.GetWorldStateVersion(OnlineStateManager.KEY_NPCS).Should().Be(npcsVersion + 1);
     }
 
+    // ─── v1.1.14 follow-up: the save builder's moved comment carries no dash ───
+
+    [Fact]
+    public void TheMovedAutoSaveComment_HasNoDash()
+    {
+        var lines = File.ReadAllLines(Path.Combine(RepoRoot(), "Scripts", "Systems", "SaveSystem.cs"))
+            .Where(l => l.Contains("the WorldSimService already saves NPC state every 5 minutes")).ToList();
+        lines.Should().ContainSingle();
+        lines[0].Should().NotContain("—").And.NotContain("–");
+    }
+
     private static string RepoRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
