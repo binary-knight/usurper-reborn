@@ -41,4 +41,30 @@ public class Leftovers1114BTests
         fr["item.shadow_cloak"].Should().Be("Cape d'Ombre");
         fr["item.cloak_of_shadows"].Should().Be("Cape des Ombres");
     }
+
+    // ---------- N3: surnames from names with a legacy numeral ----------
+
+    private static string? FamilySurname(string name) =>
+        (string?)typeof(UsurperRemake.Systems.FamilySystem)
+            .GetMethod("ExtractSurname", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!
+            .Invoke(null, new object[] { name });
+
+    [Theory]
+    [InlineData("Nimble Nick II", null)]
+    [InlineData("Nimble Nick", null)]
+    [InlineData("Scarface Sam IV", null)]
+    [InlineData("Halvar Copperfield II", "Copperfield")]
+    [InlineData("Borin Hammerhand", "Hammerhand")]
+    public void FamilySurname_StripsTheNumeral_BeforeTheAliasCheck(string name, string? expected) =>
+        FamilySurname(name).Should().Be(expected);
+
+    [Theory]
+    [InlineData("Ansel II VI", "")]
+    [InlineData("Ansel VI", "")]
+    [InlineData("Wren Copperfield II", "Copperfield")]
+    [InlineData("Wren Copperfield", "Copperfield")]
+    [InlineData("VI", "")]
+    [InlineData("Wren", "")]
+    public void MarriageSurname_NeverOffersARomanNumeral(string name, string expected) =>
+        MarriageSurnameHelper.ExtractSurname(name).Should().Be(expected);
 }
