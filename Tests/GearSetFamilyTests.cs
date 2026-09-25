@@ -98,8 +98,9 @@ public class GearSetFamilyTests
         _out.WriteLine($"checked {checkedNames:N0} names and {checkedDecorated:N0} enchanted names ({decorations.Count} enchant decorations, {bossPrefixes.Count} world boss prefixes) across {Loc.AvailableLanguages.Length} languages; {failures.Count} wrong");
         foreach (var a in ambiguous) _out.WriteLine($"ambiguous, resolves to none: {a}");
         foreach (var f in failures.Take(60)) _out.WriteLine(f);
-        // the only shared names in the shipped tables; a new one needs a look before it ships
-        ambiguous.Should().BeEquivalentTo(new[] { "fr: Cloak of Shadows / Shadow Cloak" });
+        // a shared name involving a set piece needs a look before it ships
+        // v1.1.14: the French Shadow Cloak has its own name now, so none is left
+        ambiguous.Should().BeEmpty();
         // a table that checked nothing passes; the first run of this test did exactly that
         Loc.AvailableLanguages.Length.Should().BeGreaterThanOrEqualTo(5, "every language a player can drop loot in");
         checkedNames.Should().BeGreaterThan(10_000, "every template in every form in every language");
@@ -146,7 +147,6 @@ public class GearSetFamilyTests
                         if (d == null || string.IsNullOrEmpty(d.Family)) continue;
                         checkedDrops++;
                         string? expected = GearSetRegistry.ForFamily(d.Family) != null ? d.Family : null;
-                        if (code == "fr" && (d.Family is "Shadow Cloak" or "Cloak of Shadows")) expected = null;   // the one shared name
                         var got = GearSetFamilyResolver.FamilyOf(null, d.Name, GearSetFamilyResolver.KindOf(d));
                         if (got != expected)
                             failures.Add($"[{code}] {d.Type} '{d.Name}' (family '{d.Family}') -> {got ?? "none"}, expected {expected ?? "none"}");
@@ -218,7 +218,7 @@ public class GearSetFamilyTests
     [InlineData("Cloak of Shadows (Warded)", GearSetSlotKind.Cloak)]
     [InlineData("Shadowforged Cloak (Predator) +4 Str", GearSetSlotKind.Cloak)]
     [InlineData("Forged-Thread Cape (Lifedrinker)", GearSetSlotKind.Cloak)]
-    [InlineData("Cape des Ombres (Blessed)", GearSetSlotKind.Cloak)]   // the French shared name stays undecided
+    [InlineData("Cape des Ombres (Blessed)", GearSetSlotKind.Cloak)]   // v1.1.14: the French Cloak of Shadows only
     [InlineData("Studded Leather of the Sentinel +3", GearSetSlotKind.Body)]
     [InlineData("Abyssal Studded Leather Cap (Warded)", GearSetSlotKind.Head)]   // a world boss prefix too
     public void EnchantedNamesThatAreNotSetPieces_StayNull(string name, GearSetSlotKind kind) =>
