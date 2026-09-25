@@ -289,7 +289,7 @@ namespace UsurperRemake.Systems
             FactionReputation = 0;
 
             // Set standing with joined faction
-            FactionStanding[faction] = Math.Max(FactionStanding[faction], 100) + 100;
+            FactionStanding[faction] = Saturate(Math.Max(FactionStanding[faction], 100) + 100L);   // v1.1.14: saturating
 
             // Apply faction-specific hostility effects
             switch (faction)
@@ -298,7 +298,7 @@ namespace UsurperRemake.Systems
                     // Faith and Shadows are mortal enemies
                     FactionStanding[Faction.TheShadows] = Math.Min(FactionStanding[Faction.TheShadows], -100);
                     // Crown is neutral-ish to Faith
-                    FactionStanding[Faction.TheCrown] -= 25;
+                    AddStanding(Faction.TheCrown, -25);
                     break;
 
                 case Faction.TheShadows:
@@ -312,7 +312,7 @@ namespace UsurperRemake.Systems
                     // Crown and Shadows don't get along (anti-government)
                     FactionStanding[Faction.TheShadows] = Math.Min(FactionStanding[Faction.TheShadows], -75);
                     // Crown is relatively neutral to Faith
-                    FactionStanding[Faction.TheFaith] -= 25;
+                    AddStanding(Faction.TheFaith, -25);
                     break;
             }
 
@@ -344,7 +344,7 @@ namespace UsurperRemake.Systems
             BetrayedFaction = oldFaction;
 
             // Severe reputation hit
-            FactionStanding[oldFaction] -= 500;
+            AddStanding(oldFaction, -500);
 
             PlayerFaction = null;
             FactionRank = 0;
@@ -357,18 +357,27 @@ namespace UsurperRemake.Systems
         /// </summary>
         public void ModifyReputation(Faction faction, int amount)
         {
-            FactionStanding[faction] += amount;
+            AddStanding(faction, amount);   // v1.1.14: saturating, so a huge gain never wraps negative
 
             // If this is player's faction, also modify internal reputation
             if (faction == PlayerFaction)
             {
-                FactionReputation += amount;
+                FactionReputation = Saturate((long)FactionReputation + amount);
                 CheckRankUp();
             }
 
             // Apply cascade effects based on faction relationships
             ApplyReputationCascade(faction, amount);
         }
+
+        /// <summary>
+        /// v1.1.14: standing is a plain int (it can be negative, with no other bound), so every change to it
+        /// saturates at int.MinValue and int.MaxValue instead of wrapping around.
+        /// </summary>
+        public void AddStanding(Faction faction, long amount) =>
+            FactionStanding[faction] = Saturate(FactionStanding.GetValueOrDefault(faction) + amount);
+
+        private static int Saturate(long value) => (int)Math.Clamp(value, int.MinValue, int.MaxValue);
 
         /// <summary>
         /// Apply reputation cascade effects to other factions based on relationships
@@ -382,23 +391,23 @@ namespace UsurperRemake.Systems
             {
                 case Faction.TheFaith:
                     // Faith and Shadows are direct opposites
-                    FactionStanding[Faction.TheShadows] -= amount / 2;
+                    AddStanding(Faction.TheShadows, -(amount / 2));
                     // Faith has mild positive relation with Crown (both establishment)
-                    FactionStanding[Faction.TheCrown] += amount / 5;
+                    AddStanding(Faction.TheCrown, amount / 5);
                     break;
 
                 case Faction.TheShadows:
                     // Shadows and Faith are direct opposites
-                    FactionStanding[Faction.TheFaith] -= amount / 2;
+                    AddStanding(Faction.TheFaith, -(amount / 2));
                     // Shadows are anti-government, so Crown dislikes them
-                    FactionStanding[Faction.TheCrown] -= amount / 3;
+                    AddStanding(Faction.TheCrown, -(amount / 3));
                     break;
 
                 case Faction.TheCrown:
                     // Crown has mild positive with Faith (both establishment)
-                    FactionStanding[Faction.TheFaith] += amount / 5;
+                    AddStanding(Faction.TheFaith, amount / 5);
                     // Crown is strongly opposed to Shadows (anti-government)
-                    FactionStanding[Faction.TheShadows] -= amount / 2;
+                    AddStanding(Faction.TheShadows, -(amount / 2));
                     break;
             }
         }

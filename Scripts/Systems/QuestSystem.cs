@@ -180,7 +180,7 @@ public partial class QuestSystem
             var factionSystem = FactionSystem.Instance;
             if (factionSystem != null)
             {
-                factionSystem.FactionStanding[questFaction.Value] += 50;
+                factionSystem.AddStanding(questFaction.Value, 50);   // v1.1.14: saturating
                 factionSystem.CompletedFactionQuests.Add(quest.Id);
                 terminal.WriteLine(Loc.Get("quest.standing_improved", quest.GetDisplayInitiator()), "bright_cyan");
             }
