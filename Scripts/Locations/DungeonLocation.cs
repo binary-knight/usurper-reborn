@@ -6023,10 +6023,10 @@ public class DungeonLocation : BaseLocation
                 await SecretBossEncounter();
                 break;
             case DungeonEventType.Settlement:
-                await SettlementEncounter();
+                await SettlementEncounter(room);
                 break;
             default:
-                await RandomDungeonEvent();
+                await RandomDungeonEvent(room);   // v1.1.14: a chest or shrine it picks waits for the choice
                 break;
         }
     }
@@ -14778,11 +14778,11 @@ public class DungeonLocation : BaseLocation
     /// <summary>
     /// Settlement encounter — safe outpost with NPC, healing, trading, lore
     /// </summary>
-    private async Task SettlementEncounter()
+    private async Task SettlementEncounter(DungeonRoom? room = null)
     {
         var player = GetCurrentPlayer();
         var settlement = DungeonSettlementData.GetSettlement(currentDungeonLevel);
-        if (settlement == null) { await RandomDungeonEvent(); return; }
+        if (settlement == null) { await RandomDungeonEvent(room); return; }   // v1.1.14: the room, as in RunRoomEvent
 
         // Track first visit
         bool firstVisit = !player.VisitedSettlements.Contains(settlement.Id);
@@ -15495,10 +15495,17 @@ public class DungeonLocation : BaseLocation
     /// <summary>
     /// Random fallback dungeon event
     /// </summary>
-    private async Task RandomDungeonEvent()
+    private async Task RandomDungeonEvent(DungeonRoom? room = null)
     {
         // Pick a random existing event
         var eventType = dungeonRandom.Next(6);
+        // v1.1.14: a chest or shrine picked here is spent by the player's choice, as a chest or shrine room
+        // is (HandleRoomEvent), and not before the prompt; a lost connection there leaves it for later
+        if (room != null && eventType is 0 or 2)
+        {
+            room.EventCompleted = false;
+            _roomEventAwaitingChoice = room;
+        }
         switch (eventType)
         {
             case 0: await TreasureChestEncounter(); break;

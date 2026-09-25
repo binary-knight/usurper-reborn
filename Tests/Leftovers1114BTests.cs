@@ -4,6 +4,8 @@ using System.IO;
 using System.Text.Json;
 using System.Threading.Tasks;
 using FluentAssertions;
+using UsurperRemake;
+using UsurperRemake.Systems;
 using Xunit;
 
 namespace UsurperReborn.Tests;
@@ -131,5 +133,52 @@ public class TeamRecordsSinceCreation1114Tests : IDisposable
         Exec("INSERT INTO castle_sieges (team_name, total_guards, result, started_at) VALUES ('Wolves', 5, 'failed', datetime('now', '-1 hours'));");
         (await _db.GetTeamWarHistory("Wolves")).Should().HaveCount(1);
         _db.CanTeamSiege("Wolves").Should().BeFalse();
+    }
+}
+
+/// <summary>v1.1.14 (D1): a chest or shrine picked by the random room event is spent by the player's choice.</summary>
+[Collection("SharedGameSingletons")]
+public class RandomRoomEventChoice1114Tests
+{
+    private const System.Reflection.BindingFlags F = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+
+    private static DungeonLocation Dungeon(Random rnd, params string[] lines)
+    {
+        var term = new TerminalEmulator(new LineStream(lines), new MemoryStream());
+        var hero = new Character { Name1 = "rre", Name2 = "Rre", Class = CharacterClass.Warrior, Level = 8, HP = 300, MaxHP = 300, Gold = 1000,
+                                   AI = CharacterAI.Human, Dexterity = 60, Wisdom = 60 };
+        var d = new DungeonLocation();
+        typeof(BaseLocation).GetField("terminal", F)!.SetValue(d, term);
+        typeof(BaseLocation).GetField("currentPlayer", F)!.SetValue(d, hero);
+        typeof(DungeonLocation).GetField("currentDungeonLevel", F)!.SetValue(d, 5);
+        typeof(DungeonLocation).GetField("dungeonRandom", F)!.SetValue(d, rnd);
+        return d;
+    }
+
+    private static Task HandleRoomEvent(DungeonLocation d, DungeonRoom room) =>
+        (Task)typeof(DungeonLocation).GetMethod("HandleRoomEvent", F)!.Invoke(d, new object[] { room })!;
+
+    // Trap has no case of its own in RunRoomEvent, so it goes to RandomDungeonEvent; roll 0 is a chest, 2 a shrine
+    private static DungeonRoom Room() => new DungeonRoom { Id = "r1", HasEvent = true, EventType = DungeonEventType.Trap };
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(2)]
+    public async Task ARandomChestOrShrine_IsNotSpent_WhenTheConnectionDropsAtThePrompt(int roll)
+    {
+        var room = Room();
+        Func<Task> act = () => HandleRoomEvent(Dungeon(new ScriptRandom(roll)), room);   // no lines: the stream ends at the prompt
+        await act.Should().ThrowAsync<IOException>();
+        room.EventCompleted.Should().BeFalse("no choice was made");
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(2)]
+    public async Task ARandomChestOrShrine_IsSpent_ByAValidChoice(int roll)
+    {
+        var room = Room();
+        await HandleRoomEvent(Dungeon(new ScriptRandom(roll), "L", "", "", ""), room);
+        room.EventCompleted.Should().BeTrue("leaving is a valid choice");
     }
 }
