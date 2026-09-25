@@ -2579,18 +2579,19 @@ public class DungeonLocation : BaseLocation
         if (currentPlayer != null && currentPlayer.IsBloodMoon)
         {
             terminal.SetColor("red");
-            terminal.WriteLine($"  {Loc.Get("dungeon.blood_moon_atmosphere")}");
+            UsurperRemake.UI.UIHelper.WriteWrapped(terminal, Loc.Get("dungeon.blood_moon_atmosphere"), "  ");
             terminal.WriteLine("");
         }
 
         // Room description
+        // v1.1.14: wrap at word boundaries, not at the terminal's 80th column.
         terminal.SetColor("white");
-        terminal.WriteLine(room.Description);
+        UsurperRemake.UI.UIHelper.WriteWrapped(terminal, room.Description);
         terminal.WriteLine("");
 
         // Atmospheric text (builds tension)
         terminal.SetColor("gray");
-        terminal.WriteLine(room.AtmosphereText);
+        UsurperRemake.UI.UIHelper.WriteWrapped(terminal, room.AtmosphereText);
         terminal.WriteLine("");
 
         // Mystery breadcrumbs — early floors hint at something deeper (v0.49.6)
@@ -2608,7 +2609,7 @@ public class DungeonLocation : BaseLocation
                 Loc.Get("dungeon.breadcrumb_8"),
             };
             terminal.SetColor("dark_magenta");
-            terminal.WriteLine($"  {breadcrumbs[Random.Shared.Next(breadcrumbs.Length)]}");
+            UsurperRemake.UI.UIHelper.WriteWrapped(terminal, breadcrumbs[Random.Shared.Next(breadcrumbs.Length)], "  ");
             terminal.SetColor("white");
             terminal.WriteLine("");
         }
@@ -2656,9 +2657,14 @@ public class DungeonLocation : BaseLocation
 
         // Line 2: Theme
         terminal.SetColor(GetThemeColor(currentFloor.Theme));
-        terminal.Write($" {GetThemeShortName(currentFloor.Theme)}");
+        string themeName = GetThemeShortName(currentFloor.Theme);
+        terminal.Write($" {themeName}");
         terminal.SetColor("gray");
-        terminal.WriteLine($" | {room.Description}");
+        // v1.1.14: wrap the description at word boundaries after the theme prefix.
+        var descLines = UsurperRemake.UI.UIHelper.WordWrap(room.Description, UsurperRemake.UI.UIHelper.WrapWidth - 1, themeName.Length + 3);
+        terminal.WriteLine($" | {descLines[0]}");
+        foreach (var line in descLines.Skip(1))
+            terminal.WriteLine($" {line}");
 
         // Blood Moon atmosphere (v0.52.0)
         if (player != null && player.IsBloodMoon)
@@ -5317,7 +5323,7 @@ public class DungeonLocation : BaseLocation
         {
             WriteBoxHeader(Loc.Get("dungeon.boss_encounter"), "red", 51);
             terminal.WriteLine("");
-            terminal.WriteLine(room.Description);
+            UsurperRemake.UI.UIHelper.WriteWrapped(terminal, room.Description); // v1.1.14
 
             // Check for Old God boss encounters on specific floors
             bool hadOldGodEncounter = await TryOldGodBossEncounter(player!, room);
@@ -17920,10 +17926,13 @@ public class DungeonLocation : BaseLocation
         sb.AppendLine();
 
         // Description + atmosphere
+        // v1.1.14: word-wrapped, two-space indent on every line.
         if (!string.IsNullOrEmpty(room.Description))
-            sb.AppendLine($"\u001b[37m  {room.Description}\u001b[0m");
+            foreach (var line in UsurperRemake.UI.UIHelper.WordWrap(room.Description, UsurperRemake.UI.UIHelper.WrapWidth - 2))
+                sb.AppendLine($"\u001b[37m  {line}\u001b[0m");
         if (!string.IsNullOrEmpty(room.AtmosphereText))
-            sb.AppendLine($"\u001b[90m  {room.AtmosphereText}\u001b[0m");
+            foreach (var line in UsurperRemake.UI.UIHelper.WordWrap(room.AtmosphereText, UsurperRemake.UI.UIHelper.WrapWidth - 2))
+                sb.AppendLine($"\u001b[90m  {line}\u001b[0m");
         sb.AppendLine();
 
         // Room contents

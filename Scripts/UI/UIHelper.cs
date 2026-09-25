@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -267,6 +268,60 @@ namespace UsurperRemake.UI
         {
             int filled = (int)(ratio * width);
             return $"[{new string('█', filled)}{new string('░', width - filled)}]";
+        }
+
+        // v1.1.14: 79, not 80: a full 80-column line makes many terminals autowrap and leave a blank row.
+        public const int WrapWidth = TotalWidth - 1;
+
+        private static readonly System.Text.RegularExpressions.Regex AnsiEscape =
+            new System.Text.RegularExpressions.Regex("\u001b\\[[0-9;?]*[A-Za-z]");
+
+        /// <summary>v1.1.14: visible length of a string, not counting ANSI escape sequences.</summary>
+        public static int VisibleLength(string text) =>
+            string.IsNullOrEmpty(text) ? 0 : AnsiEscape.Replace(text, "").Length;
+
+        /// <summary>
+        /// v1.1.14: word-wrap text at spaces so no line is wider than width visible columns.
+        /// ANSI sequences are kept intact and not counted. Existing newlines start a new line.
+        /// A single word wider than width stays whole on its own line. firstLineOffset is the
+        /// number of columns already used on the first line.
+        /// </summary>
+        public static List<string> WordWrap(string? text, int width = WrapWidth, int firstLineOffset = 0)
+        {
+            var lines = new List<string>();
+            if (string.IsNullOrEmpty(text)) { lines.Add(""); return lines; }
+            foreach (var para in text.Replace("\r\n", "\n").Split('\n'))
+            {
+                var sb = new StringBuilder();
+                int used = lines.Count == 0 ? firstLineOffset : 0;
+                int len = 0;
+                foreach (var word in para.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    int w = VisibleLength(word);
+                    if (len > 0 && used + len + 1 + w > width)
+                    {
+                        lines.Add(sb.ToString());
+                        sb.Clear();
+                        len = 0;
+                        used = 0;
+                    }
+                    if (len > 0) { sb.Append(' '); len++; }
+                    sb.Append(word);
+                    len += w;
+                }
+                lines.Add(sb.ToString());
+            }
+            return lines;
+        }
+
+        /// <summary>
+        /// v1.1.14: write text word-wrapped to the terminal, each line prefixed with indent.
+        /// Screen reader mode wraps too, as the hint boxes do: word breaks read cleanly.
+        /// </summary>
+        public static void WriteWrapped(TerminalEmulator terminal, string? text, string indent = "", int width = WrapWidth)
+        {
+            foreach (var line in WordWrap(text, width - indent.Length))
+                terminal.WriteLine(indent + line);
         }
 
         /// <summary>

@@ -135,3 +135,70 @@ public class DungeonDangerLabel1114Tests
         finally { GameConfig.Language = prev; GameConfig.ScreenReaderMode = sr; }
     }
 }
+
+/// <summary>v1.1.14: room descriptions and ambient lines wrap at word boundaries.</summary>
+[Collection("SharedGameSingletons")]
+public class RoomTextWrap1114Tests
+{
+    private const BindingFlags F = BindingFlags.NonPublic | BindingFlags.Instance;
+    private static string Desc => Loc.GetIn("en", "dg.cat.hall.d");
+    private static string Ambient => Loc.GetIn("en", "dg.cat.hall.a");
+
+    [Theory]
+    [InlineData(79)]
+    [InlineData(40)]
+    [InlineData(20)]
+    public void WordWrap_BreaksOnlyAtSpaces_AndFitsTheWidth(int width)
+    {
+        var lines = UsurperRemake.UI.UIHelper.WordWrap(Desc, width);
+        lines.Count.Should().BeGreaterThan(1);
+        lines.Should().OnlyContain(l => l.Length <= width);
+        lines.Should().OnlyContain(l => l.Length > 0 && l == l.Trim());
+        string.Join(" ", lines).Should().Be(Desc, "joining at spaces gives the original text back");
+    }
+
+    [Fact]
+    public void WordWrap_KeepsAnsiIntact_AndDoesNotCountIt()
+    {
+        string red = "\u001b[31m", reset = "\u001b[0m";
+        string text = $"{red}Candles{reset} that should have {red}burned out{reset} centuries ago still flicker with pale blue flame.";
+        var lines = UsurperRemake.UI.UIHelper.WordWrap(text, 30);
+        string.Join(" ", lines).Should().Be(text);
+        lines.Should().OnlyContain(l => UsurperRemake.UI.UIHelper.VisibleLength(l) <= 30);
+        UsurperRemake.UI.UIHelper.WordWrap($"{red}{new string('x', 29)}{reset} y", 30).Should().HaveCount(2, "escapes are not counted, so the first word fits");
+    }
+
+    [Fact]
+    public void WordWrap_OffsetAndNewlines()
+    {
+        UsurperRemake.UI.UIHelper.WordWrap("aaa bbb ccc", 10, 4).Should().Equal("aaa", "bbb ccc");
+        UsurperRemake.UI.UIHelper.WordWrap("one\ntwo", 79).Should().Equal("one", "two");
+        UsurperRemake.UI.UIHelper.WordWrap("", 79).Should().Equal("");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RoomView_DescriptionAndAmbient_WrapAtWords(bool screenReader)
+    {
+        var prev = GameConfig.Language;
+        bool sr = GameConfig.ScreenReaderMode;
+        try
+        {
+            GameConfig.Language = "en";
+            GameConfig.ScreenReaderMode = screenReader;
+            var room = new DungeonRoom { Id = "r1", Name = "Hall of the Ancestors", Description = Desc, AtmosphereText = Ambient, DangerRating = 1, HasMonsters = true };
+            var (d, term, output) = DungeonDangerLabel1114Tests.Rig(room);
+            typeof(DungeonLocation).GetMethod("DisplayRoomView", F)!.Invoke(d, new object[] { room });
+            var text = StatusSheetSeparators1114Tests.Plain(term, output);
+            StatusSheetSeparators1114Tests.Capture($"room-{(screenReader ? "sr" : "tty")}.txt", text);
+            var lines = text.Replace("\r", "").Split('\n');
+            lines.Should().OnlyContain(l => l.Length <= 80, "no line may exceed the terminal width");
+            lines.Should().Contain(l => l.EndsWith("their"), "the 80-column break falls inside \"empty\"; the wrap moves it whole");
+            var tokens = text.Split(new[] { ' ', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries).ToHashSet();
+            foreach (var word in (Desc + " " + Ambient).Split(' '))
+                tokens.Should().Contain(word, "each word of the description is printed whole");
+        }
+        finally { GameConfig.Language = prev; GameConfig.ScreenReaderMode = sr; }
+    }
+}
