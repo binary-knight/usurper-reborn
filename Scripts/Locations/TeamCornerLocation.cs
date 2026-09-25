@@ -1219,12 +1219,59 @@ public class TeamCornerLocation : BaseLocation
     /// </summary>
     private async Task<bool> ClaimJoinSlot(string teamName)
     {
-        if (!(DoorMode.IsOnlineMode && SaveSystem.Instance.Backend is SqlSaveBackend backend))
-            return !await RefuseJoinIfFull(teamName);
-        int npcSlots = CountTeamSlots(NPCSpawnSystem.Instance.ActiveNPCs, teamName, 0);
-        if (await backend.TryClaimTeamSlot(teamName, GameEngine.InheritanceKey(currentPlayer), npcSlots, MaxTeamSize)) return true;
+        if (await TryTakeTeamSlot(currentPlayer, teamName)) return true;
         await ShowJoinTeamFull(teamName);
         return false;
+    }
+
+    /// <summary>
+    /// v1.1.14: every change that adds a member to a team counts the slots and makes the change under this
+    /// gate: a player's join (TryTakeTeamSlot), a hired NPC (RecruitNPCToTeam) and an NPC joining on its own
+    /// (TryNpcJoin). Before, a join and a hire in the same process could each count four and make six.
+    /// </summary>
+    internal static readonly System.Threading.SemaphoreSlim TeamMembershipGate = new(1, 1);
+
+    /// <summary>
+    /// v1.1.14: a player's last slot check before joining a team, for every join path (Team Corner and the
+    /// street gang). Online, the count and the membership write are one transaction
+    /// (SqlSaveBackend.TryClaimTeamSlot), so of two players joining at once only one takes the last slot.
+    /// Offline only the team's NPCs can hold slots. On success the team is registered as a player team
+    /// before the gate opens, so NPCs stop joining it on their own. True when the player may join.
+    /// </summary>
+    internal static async Task<bool> TryTakeTeamSlot(Character player, string teamName)
+    {
+        await TeamMembershipGate.WaitAsync();
+        try
+        {
+            int npcSlots = CountTeamSlots(NPCSpawnSystem.Instance.ActiveNPCs, teamName, 0);
+            bool taken = DoorMode.IsOnlineMode && SaveSystem.Instance.Backend is SqlSaveBackend backend
+                ? await backend.TryClaimTeamSlot(teamName, GameEngine.InheritanceKey(player), npcSlots, MaxTeamSize)
+                : npcSlots < MaxTeamSize;
+            if (taken) WorldSimulator.RegisterPlayerTeam(teamName);
+            return taken;
+        }
+        finally { TeamMembershipGate.Release(); }
+    }
+
+    /// <summary>
+    /// v1.1.14: an NPC joining a team on its own (world simulation, world creation). Only an NPC team with a
+    /// free slot: a team with a player member is left to its players; the dead hold their slots
+    /// (CountTeamSlots); online the player members are counted from the saves as well, for a world sim that
+    /// runs in its own process. Never waits: if a join or a hire holds the gate, the NPC tries another time.
+    /// join makes the change and runs under the gate. True when it ran.
+    /// </summary>
+    internal static bool TryNpcJoin(IEnumerable<NPC> npcs, string teamName, Action join)
+    {
+        if (string.IsNullOrEmpty(teamName) || !TeamMembershipGate.Wait(0)) return false;
+        try
+        {
+            if (WorldSimulator.IsPlayerTeam(teamName)) return false;
+            int players = SaveSystem.Instance.Backend is SqlSaveBackend backend ? backend.CountPlayerTeamMembers(teamName) : 0;
+            if (CountTeamSlots(npcs, teamName, players) >= MaxTeamSize) return false;
+            join();
+            return true;
+        }
+        finally { TeamMembershipGate.Release(); }
     }
 
     private async Task ShowJoinTeamFull(string teamName)
@@ -2064,11 +2111,37 @@ public class TeamCornerLocation : BaseLocation
             return;
         }
 
-        // Recruitment success
-        currentPlayer.Gold -= liveCost;
-        recruit.Team = currentPlayer.Team;
-        recruit.TeamPW = currentPlayer.TeamPW;
-        recruit.CTurf = currentPlayer.CTurf;
+        // v1.1.14: the last slot count and the hire under the membership gate (TeamMembershipGate), so a
+        // player's join or an NPC joining on its own cannot take the slot between the count and the hire.
+        // The count queries the saves and yields, so the NPC is looked up again after it.
+        bool full = false, gone = false;
+        await TeamMembershipGate.WaitAsync();
+        try
+        {
+            full = await TeamSlotsUsed(currentPlayer.Team) >= MaxTeamSize;
+            var live = full ? null : LiveTeamNpc(recruit);
+            gone = !full && (live == null || !string.IsNullOrEmpty(live.Team));
+            if (!full && !gone)
+            {
+                recruit = live!;
+                // Recruitment success
+                currentPlayer.Gold -= liveCost;
+                recruit.Team = currentPlayer.Team;
+                recruit.TeamPW = currentPlayer.TeamPW;
+                recruit.CTurf = currentPlayer.CTurf;
+            }
+        }
+        finally { TeamMembershipGate.Release(); }
+        if (full || gone)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine(full ? Loc.Get("team.team_full", MaxTeamSize) : Loc.Get("team.recruit_unavailable_now", recruit.DisplayName));
+            terminal.WriteLine("");
+            terminal.SetColor("darkgray");
+            terminal.WriteLine(Loc.Get("ui.press_enter"));
+            await terminal.ReadKeyAsync();
+            return;
+        }
 
         terminal.WriteLine("");
         terminal.SetColor("bright_green");

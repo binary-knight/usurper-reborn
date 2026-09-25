@@ -6287,6 +6287,32 @@ namespace UsurperRemake.Systems
     /// write lock is released, so the next join counts it. True when the slot was taken. A joiner with no
     /// save row yet is counted by no one, as before; the check still runs and nothing is written.
     /// </summary>
+    /// <summary>
+    /// v1.1.14: the team's player members in the saves, counted as TryClaimTeamSlot counts them; for an NPC
+    /// joining a team on its own (TeamCornerLocation.TryNpcJoin), which runs on the world sim's thread.
+    /// On a failed read, MaxTeamMembers, so the NPC does not join.
+    /// </summary>
+    public int CountPlayerTeamMembers(string teamName)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"
+                SELECT COUNT(*) FROM players
+                WHERE (CASE WHEN json_valid(player_data) THEN json_extract(player_data, '$.player.team') END) = @team
+                AND player_data != '{}' AND LENGTH(player_data) > 2
+                AND is_banned = 0 AND username NOT LIKE 'emergency_%';";
+            cmd.Parameters.AddWithValue("@team", teamName);
+            return Convert.ToInt32(cmd.ExecuteScalar() ?? 0L);
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to count the player members of '{teamName}': {ex.Message}");
+            return GameConfig.MaxTeamMembers;
+        }
+    }
+
     public async Task<bool> TryClaimTeamSlot(string teamName, string joinerKey, int npcSlotsUsed, int maxSlots)
     {
         try
