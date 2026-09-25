@@ -167,19 +167,19 @@ public class King
     /// <summary>
     /// v1.1.13: the day's royal court activities on the stored court (income less expenses into the
     /// treasury, the reign's day, prisoners' time served and release, the magic budget's top-up), as one
-    /// guarded court change. The day's sales-tax takings are counted from the in-memory court, which then
-    /// starts the next day at zero. Returns false (nothing done) when the court kept changing or has no king.
+    /// guarded court change. Sales tax is not in that income: each sale already paid it into the stored
+    /// treasury (CityControlSystem.AddSalesTaxAsync), and the day's takings (DailyTaxRevenue) are only
+    /// reported, then start the next day at zero. Returns false (nothing done) when the court kept changing or has no king.
     /// </summary>
     public static async System.Threading.Tasks.Task<bool> ProcessDailyActivitiesAsync(UsurperRemake.Systems.SqlSaveBackend? sql,
         Func<UsurperRemake.Systems.RoyalCourtSaveData, bool>? alsoToday = null, Func<System.Threading.Tasks.Task>? beforeWrite = null)
     {
         var king = CastleLocation.GetCurrentKing();
         if (king == null) return false;
-        long salesTax = king.DailyTaxRevenue;
         var released = new List<string>();
         bool done = await UsurperRemake.Systems.OnlineStateManager.ApplyCourtChangeAsync(sql, court =>
         {
-            released = ApplyDailyActivities(court, salesTax);
+            released = ApplyDailyActivities(court);
             return alsoToday == null || alsoToday(court);
         }, beforeWrite);
         if (!done) return false;
@@ -205,9 +205,10 @@ public class King
     }
 
     /// <summary>v1.1.13: the day's court activities applied to a court record; returns the prisoners released.</summary>
-    internal static List<string> ApplyDailyActivities(UsurperRemake.Systems.RoyalCourtSaveData court, long salesTaxIncome)
+    internal static List<string> ApplyDailyActivities(UsurperRemake.Systems.RoyalCourtSaveData court)
     {
-        var income = DailyIncomeOf(court, salesTaxIncome);
+        // v1.1.13: citizen tax only; the day's sales tax went into the treasury sale by sale
+        var income = DailyIncomeOf(court, 0);
         var expenses = DailyExpensesOf(court);
 
         // Ensure treasury doesn't go negative

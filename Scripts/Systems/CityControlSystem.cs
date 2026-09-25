@@ -163,7 +163,7 @@ public class CityControlSystem
             // Minimum 1 gold tax to match what the buyer was charged
             long kingShare = Math.Max(1, (saleAmount * kingTaxPercent) / 100);
             // v1.1.13: into the stored treasury as one guarded court change (not awaited: the sale is done);
-            // the day's takings are counted in memory, where the daily court change reads them
+            // the day's takings are counted in memory for the reports only; the daily reset does not credit them
             _ = AddSalesTaxAsync(kingShare);
             king.DailyTaxRevenue += kingShare;
         }
