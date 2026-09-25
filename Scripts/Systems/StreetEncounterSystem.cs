@@ -2953,11 +2953,13 @@ public class StreetEncounterSystem
                     terminal.WriteLine(Loc.Get("street_encounter.throne.still_king", challenger.Name2));
                     player.Fame += 25;
 
-                    // Imprison the challenger
-                    NPCSpawnSystem.Instance?.ImprisonNPC(challenger, 7);
-                    terminal.SetColor("yellow");
-                    terminal.WriteLine(Loc.Get("street_encounter.throne.imprisoned", challenger.Name2, 7));
-                    NewsSystem.Instance?.Newsy($"King {player.Name2} defeated {challenger.Name2}'s throne challenge! The challenger is imprisoned.");
+                    // Imprison the challenger (v1.1.14: with a court prison record, so the court's upkeep releases them)
+                    if (await ImprisonWithRecordAsync(challenger, 7, "Failed throne challenge", guardsLoseLoyalty: false))
+                    {
+                        terminal.SetColor("yellow");
+                        terminal.WriteLine(Loc.Get("street_encounter.throne.imprisoned", challenger.Name2, 7));
+                        NewsSystem.Instance?.Newsy($"King {player.Name2} defeated {challenger.Name2}'s throne challenge! The challenger is imprisoned.");
+                    }
                 }
                 else
                 {
@@ -3037,19 +3039,20 @@ public class StreetEncounterSystem
                     terminal.SetColor("red");
                     terminal.WriteLine(Loc.Get("street_encounter.throne.seize_treason"));
 
-                    // Guards lose loyalty (tyrannical act); v1.1.13: one guarded court change, the arrest after it
-                    await CastleLocation.CourtChangeAsync(court =>
+                    // Guards lose loyalty (tyrannical act); v1.1.14: in the same guarded court change as the prison
+                    // record, and the arrest only once it is written
+                    if (await ImprisonWithRecordAsync(challenger, 14, "Treason", guardsLoseLoyalty: true))
                     {
-                        foreach (var guard in court.Guards)
-                            guard.Loyalty = Math.Max(0, guard.Loyalty - 10);
-                        return true;
-                    });
-                    NPCSpawnSystem.Instance?.ImprisonNPC(challenger, 14);
-
-                    terminal.SetColor("yellow");
-                    terminal.WriteLine(Loc.Get("street_encounter.throne.dragged_away", challenger.Name2));
-                    player.Darkness += 5;
-                    NewsSystem.Instance?.Newsy($"King {player.Name2} imprisoned {challenger.Name2} for challenging the throne.");
+                        terminal.SetColor("yellow");
+                        terminal.WriteLine(Loc.Get("street_encounter.throne.dragged_away", challenger.Name2));
+                        player.Darkness += 5;
+                        NewsSystem.Instance?.Newsy($"King {player.Name2} imprisoned {challenger.Name2} for challenging the throne.");
+                    }
+                    else
+                    {
+                        terminal.SetColor("red");
+                        terminal.WriteLine(Loc.Get("castle.court_change_failed"));
+                    }
                 }
                 else
                 {
@@ -3063,6 +3066,27 @@ public class StreetEncounterSystem
         }
 
         await terminal.PressAnyKey();
+    }
+
+    /// <summary>
+    /// v1.1.14: an NPC imprisoned with a court prison record (as the Castle's and a failed challenge's arrests are),
+    /// the record and the guards' loyalty loss in one guarded court change; the NPC is imprisoned only once it is written.
+    /// </summary>
+    private static async Task<bool> ImprisonWithRecordAsync(NPC npc, int days, string crime, bool guardsLoseLoyalty)
+    {
+        string name = npc.Name;
+        if (!await CastleLocation.CourtChangeAsync(court =>
+            {
+                if (guardsLoseLoyalty)
+                    foreach (var guard in court.Guards)
+                        guard.Loyalty = Math.Max(0, guard.Loyalty - 10);
+                court.Prisoners.RemoveAll(p => p.CharacterName == name);
+                court.Prisoners.Add(CastleLocation.PrisonerRecord(name, days, crime));
+                return true;
+            }))
+            return false;
+        NPCSpawnSystem.Instance?.ImprisonNPC(npc, days);
+        return true;
     }
 
     private async Task ExecuteCityControlContest(NPC rival, Character player,
