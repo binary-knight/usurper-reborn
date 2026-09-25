@@ -24222,7 +24222,7 @@
   "dungeon.tut.p8.tips": "Alcuni consigli importanti:",
   "dungeon.tut.p8.t1": "  • Sono accessibili i piani entro ±10 livelli dal tuo.",
   "dungeon.tut.p8.t2": "  • I piani 25, 40, 55, 70, 85, 95 e 100 ospitano i boss degli Antichi Dei.",
-  "dungeon.tut.p8.t3": "    Non puoi lasciare questi piani finché non li affronti.",
+  "dungeon.tut.p8.t3": "    Puoi ritirarti, ma non puoi scendere oltre finché il dio di quel piano non è sconfitto o conquistato alla tua causa.",
   "dungeon.tut.p8.t4": "  • I piani 15, 30, 45, 60, 80 e 99 custodiscono antichi Sigilli da raccogliere.",
   "dungeon.tut.p8.t5": "  • Usa /health in qualsiasi momento per vedere stato completo e bonus attivi.",
   "dungeon.tut.p8.t6": "  • Usa /gear per ispezionare gli oggetti equipaggiati e i loro bonus.",

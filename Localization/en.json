@@ -4122,7 +4122,7 @@
   "dungeon.tut.p8.tips": "A few important tips:",
   "dungeon.tut.p8.t1": "  • Floors within ±10 levels of yours are accessible.",
   "dungeon.tut.p8.t2": "  • Floor 25, 40, 55, 70, 85, 95, 100 have Old God bosses.",
-  "dungeon.tut.p8.t3": "    You cannot leave these floors until you fight them.",
+  "dungeon.tut.p8.t3": "    You may retreat, but you cannot go deeper until the god there is defeated or won over.",
   "dungeon.tut.p8.t4": "  • Floors 15, 30, 45, 60, 80, 99 hold ancient Seals to collect.",
   "dungeon.tut.p8.t5": "  • Use /health anytime to see your full status and active buffs.",
   "dungeon.tut.p8.t6": "  • Use /gear to inspect your equipped items and their bonuses.",

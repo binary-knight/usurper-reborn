@@ -24222,7 +24222,7 @@
   "dungeon.tut.p8.tips": "Quelques astuces importantes :",
   "dungeon.tut.p8.t1": "  • Les étages à ±10 niveaux du tien sont accessibles.",
   "dungeon.tut.p8.t2": "  • Les étages 25, 40, 55, 70, 85, 95 et 100 abritent les boss des Dieux Anciens.",
-  "dungeon.tut.p8.t3": "    Tu ne peux pas quitter ces étages sans les affronter.",
+  "dungeon.tut.p8.t3": "    Tu peux battre en retraite, mais tu ne peux pas descendre plus bas tant que le dieu de cet étage n'est pas vaincu ou rallié.",
   "dungeon.tut.p8.t4": "  • Les étages 15, 30, 45, 60, 80 et 99 recèlent des Sceaux anciens à collecter.",
   "dungeon.tut.p8.t5": "  • Utilise /health à tout moment pour voir ton statut complet et tes bonus actifs.",
   "dungeon.tut.p8.t6": "  • Utilise /gear pour inspecter tes objets équipés et leurs bonus.",
