@@ -174,9 +174,9 @@ public static class CombatMessages
     /// <summary>
     /// Get death message
     /// </summary>
-    public static string GetDeathMessage(string name, string color = "white")
+    public static string GetDeathMessage(string name, string color = "white", Random? random = null)
     {
-        int idx = Random.Shared.Next(4) + 1;
+        int idx = (random ?? Random.Shared).Next(4) + 1;   // v1.1.14: the caller's RNG when given (a seeded test)
         return Loc.Get($"combat.death_msg_{idx}", color, name);
     }
 

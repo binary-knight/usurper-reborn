@@ -331,3 +331,57 @@ public class TeammateHoldRules1114Tests
         }
     }
 }
+
+/// <summary>v1.1.14 (D8): a test can seed the combat engine's RNG; play keeps Random.Shared.</summary>
+[Collection("SharedGameSingletons")]
+public class CombatSeed1114Tests
+{
+    /// <summary>A poisoned player swings at a dummy that cannot hurt them until the input runs out.</summary>
+    internal static async Task<string> PoisonedFight(int? seed)
+    {
+        var output = new MemoryStream();
+        var term = new TerminalEmulator(new LineStream(Enumerable.Repeat("A", 8)), output);
+        var engine = new CombatEngine(term);
+        if (seed.HasValue) engine.SeedRandomForTests(seed.Value);
+        var p = new Character
+        {
+            Name1 = "seedy", Name2 = "Seedy", Class = CharacterClass.Warrior, Race = CharacterRace.Human, Level = 10,
+            HP = 5000, MaxHP = 5000, BaseMaxHP = 5000, Strength = 80, BaseStrength = 80, Defence = 40, BaseDefence = 40,
+            Dexterity = 30, BaseDexterity = 30, Agility = 25, BaseAgility = 25, Constitution = 30, BaseConstitution = 30,
+            Stamina = 100, CombatSpeed = CombatSpeed.Instant, Poison = 40,
+        };
+        var dummy = new Monster { Name = "Straw Dummy", Level = 1, HP = 5_000_000, MaxHP = 5_000_000, Strength = 0, Defence = 0, Experience = 1, Gold = 0 };
+        try { await engine.PlayerVsMonsters(p, new List<Monster> { dummy }, offerMonkEncounter: false); }
+        catch (IOException) { }   // the scripted input ran out
+        term.StreamWriterInternal?.Flush();
+        return System.Text.RegularExpressions.Regex.Replace(System.Text.Encoding.UTF8.GetString(output.ToArray()), "\u001b\\[[0-9;]*[A-Za-z]", "")
+               + $"\nHP left {p.HP}, dummy HP left {dummy.HP}";
+    }
+
+    [Fact]
+    public async Task TheSameSeed_GivesTheSameFight()
+    {
+        string first = await PoisonedFight(7);
+        first.Should().Contain("Straw Dummy");
+        for (int i = 0; i < 5; i++)
+            (await PoisonedFight(7)).Should().Be(first, "every roll of the fight, the poison ticks included, comes from the seeded RNG");
+    }
+
+    [Fact]
+    public void AnUnseededEngine_UsesTheSharedRandom()
+    {
+        var engine = new CombatEngine(new TerminalEmulator(new MemoryStream(), new MemoryStream()));
+        typeof(CombatEngine).GetField("random", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
+            .GetValue(engine).Should().BeSameAs(Random.Shared, "play is not seeded");
+    }
+
+    [Fact]
+    public void TheEngine_RollsOnlyThroughItsOwnRng()
+    {
+        // comments stripped; a Random.Shared roll inside the engine would escape a test seed
+        var lines = File.ReadAllLines(Path.Combine(Leftovers1114BTests.RepoRoot(), "Scripts", "Systems", "CombatEngine.cs"))
+            .Select(l => { int c = l.IndexOf("//", StringComparison.Ordinal); return c >= 0 ? l.Substring(0, c) : l; })
+            .Where(l => l.Contains("Random.Shared") || l.Contains("new Random(")).Select(l => l.Trim()).ToList();
+        lines.Should().BeEquivalentTo(new[] { "private Random random = Random.Shared;", "internal void SeedRandomForTests(int seed) => random = new Random(seed);" });
+    }
+}

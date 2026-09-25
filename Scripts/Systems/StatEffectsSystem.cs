@@ -429,7 +429,8 @@ public static class StatEffectsSystem
     /// <summary>
     /// Roll for a critical hit
     /// </summary>
-    public static bool RollCriticalHit(Character attacker) => _random.Next(100) < CritChance(attacker);
+    /// v1.1.14: rng is the combat engine's own (seeded in tests); Random.Shared otherwise.
+    public static bool RollCriticalHit(Character attacker, Random? rng = null) => (rng ?? _random).Next(100) < CritChance(attacker);
 
     /// <summary>
     /// The crit chance RollCriticalHit rolls against, with every bonus stacked. v1.1.10: split out so
@@ -486,7 +487,7 @@ public static class StatEffectsSystem
     /// <summary>
     /// Roll for dodge
     /// </summary>
-    public static bool RollDodge(Character defender)
+    public static bool RollDodge(Character defender, Random? rng = null)   // v1.1.14: rng as in RollCriticalHit
     {
         // Apply drug AgilityBonus/AgilityPenalty to effective agility for dodge
         var drugEffects = DrugSystem.GetDrugEffects(defender);
@@ -504,7 +505,7 @@ public static class StatEffectsSystem
         dodgeChance += (int)(armorDodgeBonus * 100);
         dodgeChance = Math.Min(dodgeChance, 45); // Cap at 45% with armor bonus (base cap was 35%)
 
-        return _random.Next(100) < dodgeChance;
+        return (rng ?? _random).Next(100) < dodgeChance;
     }
 
     /// <summary>
@@ -531,10 +532,10 @@ public static class StatEffectsSystem
     /// <summary>
     /// Roll for extra attack this round
     /// </summary>
-    public static bool RollExtraAttack(Character attacker)
+    public static bool RollExtraAttack(Character attacker, Random? rng = null)   // v1.1.14: rng as in RollCriticalHit
     {
         int chance = GetExtraAttackChance(attacker.Agility);
-        return _random.Next(100) < chance;
+        return (rng ?? _random).Next(100) < chance;
     }
 
     /// <summary>
