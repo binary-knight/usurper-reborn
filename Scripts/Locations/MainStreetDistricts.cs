@@ -438,6 +438,7 @@ public partial class MainStreetLocation
         bool firstSeen = !player.HintsShown.Contains("menu_tier_1");
         var added = Enumerable.Range(1, tier).Where(t => player.HintsShown.Add($"menu_tier_{t}")).ToList();
         if (firstSeen || added.Count == 0) return new List<string>();
+        if (player.ClassicMainStreet) return ClassicUnlockLines(added.Min() - 1, tier); // v1.1.14: no districts to name
         return UnlockLines(added.Min() - 1, tier);
     }
 
@@ -450,6 +451,20 @@ public partial class MainStreetLocation
         if (player == null || !player.HintsShown.Add(DistrictsNoticeHint)) return null;
         bool brandNew = player.Level == 1 && player.MKills == 0;
         return brandNew ? null : Loc.Get("main_street.districts_notice");
+    }
+
+    internal const int ClassicTipDrawLimit = 10;
+
+    /// <summary>
+    /// v1.1.14: the "switch back to the classic layout" tip, on a character's first ten district Main Street
+    /// draws that show it (counted and saved per character; classic draws do not count). The draw that shows the
+    /// one-time reorganisation notice, which names the same setting, shows no tip and is not counted.
+    /// </summary>
+    internal static string? TakeClassicLayoutTip(Character player, bool noticeShown)
+    {
+        if (player == null || player.ClassicMainStreet || noticeShown || player.ClassicTipDraws >= ClassicTipDrawLimit) return null;
+        player.ClassicTipDraws++;
+        return Loc.Get("main_street.classic_tip");
     }
 
     /// <summary>v1.1.13: the help screen: every unlocked place under the key path that reaches it.</summary>

@@ -1,0 +1,410 @@
+##### tier 1 offline visual
+
+ [D]Dungeons     [I]Inn
+ [W]Weapon Shop  [A]Armor Shop   [M]Magic Shop   [U]Music Shop
+ [1]Healer       [2]Quest Hall   [V]Level Master
+
+ [S]Status
+ [Q]Quit Game    [~]Settings
+
+╚═════════════════════════════════════════════════════════════════════════════╝
+
+##### end
+##### tier 1 offline screenreader
+
+Main Street Menu
+
+Locations:
+  D - Dungeons
+  I - Inn
+
+Shops:
+  W - Weapon Shop
+  A - Armor Shop
+  M - Magic Shop
+  U - Music Shop
+  1 - Healer
+
+Services:
+  V - Level Master
+  2 - Quest Hall
+
+  S - Status
+
+Other:
+  Q - Quit
+  ? - Help
+  ! - Report Bug
+
+##### end
+##### tier 1 offline bbs
+ [D] Dungeons   [W] Weapon Shop[A] Armor Shop [M] Magic Shop [U]Music Shop
+ [I] Inn        [1]Healer     [2]Quest Hall [V]Master
+ [Q] Quit       [~]Settings
+ Numpad: 1=Healer 2=Quests 3=Wpn 4=Armor 5=Temple 6=Castle 7=Home 8=Master
+ [S] Status[*]Inv [?]Help [~]Prefs [!]Bug
+##### end
+##### tier 1 online visual
+
+ [D]Dungeons     [I]Inn
+ [W]Weapon Shop  [A]Armor Shop   [M]Magic Shop   [U]Music Shop
+ [1]Healer       [2]Quest Hall   [V]Level Master
+
+ [S]Status
+ [Q]Quit Game    [~]Settings
+
+ ═══ Online ═══
+ [3]Who's Online (0 players)
+ [4]Chat         [5]News Feed    [6]Arena (PvP)  [7]World Boss  [R]Guild Board
+
+╚═════════════════════════════════════════════════════════════════════════════╝
+
+##### end
+##### tier 1 online screenreader
+
+Main Street Menu
+
+Locations:
+  D - Dungeons
+  I - Inn
+
+Shops:
+  W - Weapon Shop
+  A - Armor Shop
+  M - Magic Shop
+  U - Music Shop
+  1 - Healer
+
+Services:
+  V - Level Master
+  2 - Quest Hall
+
+  S - Status
+
+Other:
+  Q - Quit
+  ? - Help
+  ! - Report Bug
+
+Online:
+  3 - Who's Online
+  4 - Chat
+  5 - News Feed
+  6 - Arena (PvP)
+  7 - World Boss
+  R - Guild Board
+  /say message - Broadcast chat
+  /tell player message - Private message
+  /who - See online players
+  /news - Recent news
+
+##### end
+##### tier 1 online bbs
+ [D] Dungeons   [W] Weapon Shop[A] Armor Shop [M] Magic Shop [U]Music Shop
+ [I] Inn        [1]Healer     [2]Quest Hall [V]Master
+ [Q] Quit       [~]Settings
+ ── Online ── [3]Who(0) [4]Chat [5]News [6]Arena [7]Boss[R]Guild Board
+ [S] Status[*]Inv [?]Help [~]Prefs [!]Bug
+##### end
+##### tier 2 offline visual
+
+ [D]Dungeons     [I]Inn          [T]Temple       [O]Old Church
+ [W]Weapon Shop  [A]Armor Shop   [M]Magic Shop   [U]Music Shop
+ [B]Bank         [1]Healer       [2]Quest Hall   [V]Level Master
+ [K]Castle       [H]Home
+
+ [S]Status       [N]News         [F]Fame         [E]Wilderness   [$]World Events
+ [Q]Quit Game    [~]Settings
+
+╚═════════════════════════════════════════════════════════════════════════════╝
+
+##### end
+##### tier 2 offline screenreader
+
+Main Street Menu
+
+Locations:
+  D - Dungeons
+  I - Inn
+  T - Temple
+  K - Castle
+  H - Home
+
+Shops:
+  W - Weapon Shop
+  A - Armor Shop
+  M - Magic Shop
+  U - Music Shop
+  B - Bank
+  1 - Healer
+
+Services:
+  V - Level Master
+  2 - Quest Hall
+
+Information:
+  S - Status
+  N - News
+  F - Fame
+  $ - World Events
+
+Exploration:
+  E - The Wilderness
+
+Other:
+  Q - Quit
+  ? - Help
+  ! - Report Bug
+
+##### end
+##### tier 2 offline bbs
+ [D] Dungeons   [W] Weapon Shop[A] Armor Shop [M] Magic Shop [U]Music Shop
+ [I] Inn        [1]Healer     [2]Quest Hall [V]Master
+ [B] Bank       [T] Temple     [K]Castle     [H] Home
+ [N] News       [F] Fame       [E] Explore    [$] World Events
+ [Q] Quit       [~]Settings
+ Numpad: 1=Healer 2=Quests 3=Wpn 4=Armor 5=Temple 6=Castle 7=Home 8=Master
+ [S] Status[*]Inv [?]Help [~]Prefs [!]Bug
+##### end
+##### tier 2 online visual
+
+ [D]Dungeons     [I]Inn          [T]Temple       [O]Old Church
+ [W]Weapon Shop  [A]Armor Shop   [M]Magic Shop   [U]Music Shop
+ [B]Bank         [1]Healer       [2]Quest Hall   [V]Level Master
+ [K]Castle       [H]Home
+
+ [S]Status       [N]News         [F]Fame         [E]Wilderness   [$]World Events
+ [Q]Quit Game    [~]Settings
+
+ ═══ Online ═══
+ [3]Who's Online (0 players)
+ [4]Chat         [5]News Feed    [6]Arena (PvP)  [7]World Boss  [R]Guild Board
+
+╚═════════════════════════════════════════════════════════════════════════════╝
+
+##### end
+##### tier 2 online screenreader
+
+Main Street Menu
+
+Locations:
+  D - Dungeons
+  I - Inn
+  T - Temple
+  K - Castle
+  H - Home
+
+Shops:
+  W - Weapon Shop
+  A - Armor Shop
+  M - Magic Shop
+  U - Music Shop
+  B - Bank
+  1 - Healer
+
+Services:
+  V - Level Master
+  2 - Quest Hall
+
+Information:
+  S - Status
+  N - News
+  F - Fame
+  $ - World Events
+
+Exploration:
+  E - The Wilderness
+
+Other:
+  Q - Quit
+  ? - Help
+  ! - Report Bug
+
+Online:
+  3 - Who's Online
+  4 - Chat
+  5 - News Feed
+  6 - Arena (PvP)
+  7 - World Boss
+  R - Guild Board
+  /say message - Broadcast chat
+  /tell player message - Private message
+  /who - See online players
+  /news - Recent news
+
+##### end
+##### tier 2 online bbs
+ [D] Dungeons   [W] Weapon Shop[A] Armor Shop [M] Magic Shop [U]Music Shop
+ [I] Inn        [1]Healer     [2]Quest Hall [V]Master
+ [B] Bank       [T] Temple     [K]Castle     [H] Home
+ [N] News       [F] Fame       [E] Explore    [$] World Events
+ [Q] Quit       [~]Settings
+ ── Online ── [3]Who(0) [4]Chat [5]News [6]Arena [7]Boss[R]Guild Board
+ [S] Status[*]Inv [?]Help [~]Prefs [!]Bug
+##### end
+##### tier 3 offline visual
+
+ [D]Dungeons     [I]Inn          [T]Temple       [O]Old Church
+ [W]Weapon Shop  [A]Armor Shop   [M]Magic Shop   [U]Music Shop   [J]Auctions
+ [B]Bank         [1]Healer       [2]Quest Hall   [V]Level Master
+ [K]Castle       [H]Home         [C]Challenges   [L]Lodging      [Z]Team Corner
+
+ [S]Status       [N]News         [F]Fame         [E]Wilderness   [$]World Events
+ [=]Stats Record [P]Progress
+ [Y]Dark Alley   [+]The Sanctum  [X]Love Street  [Q]Quit Game    [~]Settings
+
+╚═════════════════════════════════════════════════════════════════════════════╝
+
+##### end
+##### tier 3 offline screenreader
+
+Main Street Menu
+
+Locations:
+  D - Dungeons
+  I - Inn
+  T - Temple
+  K - Castle
+  H - Home
+  O - Church
+  L - Lodging (Dormitory)
+
+Shops:
+  W - Weapon Shop
+  A - Armor Shop
+  M - Magic Shop
+  U - Music Shop
+  J - Auctions
+  B - Bank
+  1 - Healer
+
+Services:
+  V - Level Master
+  2 - Quest Hall
+  C - Challenges
+  Z - Team Corner
+
+Information:
+  S - Status
+  N - News
+  F - Fame
+  $ - World Events
+  = - Stats Record
+  P - Progress
+
+Exploration:
+  E - The Wilderness
+
+Other:
+  Y - Dark Alley
+  + - The Sanctum
+  X - Love Street
+  Q - Quit
+  ? - Help
+  ! - Report Bug
+
+##### end
+##### tier 3 offline bbs
+  > Next: An ancient seal sleeps on floor 15. Descend the Dungeons [D].  (/journal for more)
+ [D] Dungeons   [W] Weapon Shop[A] Armor Shop [M] Magic Shop [U]Music Shop
+ [I] Inn        [1]Healer     [2]Quest Hall [V]Master
+ [B] Bank       [T] Temple     [K]Castle     [H] Home
+ [N] News       [F] Fame       [E] Explore    [$] World Events
+ [Y]Dark Alley [+]Sanctum [X]Love St    [O] Old Church [J]Auction
+ [C] Challenges [L] Lodging    [=]Stats      [P] Progress
+ [Z]Team Corner
+[Q] Quit       [~]Settings
+ Numpad: 1=Healer 2=Quests 3=Wpn 4=Armor 5=Temple 6=Castle 7=Home 8=Master
+ [S] Status[*]Inv [?]Help [~]Prefs [!]Bug
+##### end
+##### tier 3 online visual
+
+ [D]Dungeons     [I]Inn          [T]Temple       [O]Old Church
+ [W]Weapon Shop  [A]Armor Shop   [M]Magic Shop   [U]Music Shop   [J]Auctions
+ [B]Bank         [1]Healer       [2]Quest Hall   [V]Level Master
+ [K]Castle       [H]Home         [C]Challenges   [L]Lodging      [Z]Team Corner
+
+ [S]Status       [N]News         [F]Fame         [E]Wilderness   [$]World Events
+ [=]Stats Record [P]Progress
+ [Y]Dark Alley   [+]The Sanctum  [X]Love Street  [Q]Quit Game    [~]Settings
+
+ ═══ Online ═══
+ [3]Who's Online (0 players)
+ [4]Chat         [5]News Feed    [6]Arena (PvP)  [7]World Boss  [R]Guild Board
+
+╚═════════════════════════════════════════════════════════════════════════════╝
+
+##### end
+##### tier 3 online screenreader
+
+Main Street Menu
+
+Locations:
+  D - Dungeons
+  I - Inn
+  T - Temple
+  K - Castle
+  H - Home
+  O - Church
+  L - Lodging (Dormitory)
+
+Shops:
+  W - Weapon Shop
+  A - Armor Shop
+  M - Magic Shop
+  U - Music Shop
+  J - Auctions
+  B - Bank
+  1 - Healer
+
+Services:
+  V - Level Master
+  2 - Quest Hall
+  C - Challenges
+  Z - Team Corner
+
+Information:
+  S - Status
+  N - News
+  F - Fame
+  $ - World Events
+  = - Stats Record
+  P - Progress
+
+Exploration:
+  E - The Wilderness
+
+Other:
+  Y - Dark Alley
+  + - The Sanctum
+  X - Love Street
+  Q - Quit
+  ? - Help
+  ! - Report Bug
+
+Online:
+  3 - Who's Online
+  4 - Chat
+  5 - News Feed
+  6 - Arena (PvP)
+  7 - World Boss
+  R - Guild Board
+  /say message - Broadcast chat
+  /tell player message - Private message
+  /who - See online players
+  /news - Recent news
+
+##### end
+##### tier 3 online bbs
+  > Next: An ancient seal sleeps on floor 15. Descend the Dungeons [D].  (/journal for more)
+ [D] Dungeons   [W] Weapon Shop[A] Armor Shop [M] Magic Shop [U]Music Shop
+ [I] Inn        [1]Healer     [2]Quest Hall [V]Master
+ [B] Bank       [T] Temple     [K]Castle     [H] Home
+ [N] News       [F] Fame       [E] Explore    [$] World Events
+ [Y]Dark Alley [+]Sanctum [X]Love St    [O] Old Church [J]Auction
+ [C] Challenges [L] Lodging    [=]Stats      [P] Progress
+ [Z]Team Corner
+[Q] Quit       [~]Settings
+ ── Online ── [3]Who(0) [4]Chat [5]News [6]Arena [7]Boss[R]Guild Board
+ [S] Status[*]Inv [?]Help [~]Prefs [!]Bug
+##### end

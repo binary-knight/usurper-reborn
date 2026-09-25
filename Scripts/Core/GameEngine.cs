@@ -5579,6 +5579,8 @@ public partial class GameEngine
             AutoLevelUp = playerData.AutoLevelUp,
             AutoEquipDisabled = playerData.AutoEquipDisabled,
             AutoCombatHealPercent = GameConfig.ClampAutoCombatHealPercent(playerData.AutoCombatHealPercent), // v1.1.13: in range
+            ClassicMainStreet = playerData.ClassicMainStreet, // v1.1.14: Main Street layout preference
+            ClassicTipDraws = Math.Max(0, playerData.ClassicTipDraws), // v1.1.14: switch-to-classic tip count
             DateFormatPreference = playerData.DateFormatPreference,
             AutoRedistributeXP = playerData.AutoRedistributeXP,
             Specialization = (ClassSpecialization)playerData.Specialization,

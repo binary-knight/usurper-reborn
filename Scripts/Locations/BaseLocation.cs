@@ -4192,6 +4192,10 @@ public abstract class BaseLocation
     /// <summary>
     /// Show quick preferences menu (accessible from any location via ~)
     /// </summary>
+    /// <summary>v1.1.14: the Main Street layout preference's value as the prefs menu shows it.</summary>
+    internal static string MainStreetLayoutName(bool classic) =>
+        Loc.Get(classic ? "prefs.main_street_classic" : "prefs.main_street_districts");
+
     protected virtual async Task ShowPreferencesMenu()
     {
         bool exitPrefs = false;
@@ -4228,6 +4232,7 @@ public abstract class BaseLocation
                     terminal.WriteLine($"  {Loc.Get("prefs.auto_look")}: {(currentPlayer.AutoLook ? Loc.Get("prefs.enabled") : Loc.Get("prefs.disabled"))}");
                 terminal.WriteLine($"  {Loc.Get("prefs.auto_equip")}: {(currentPlayer.AutoEquipDisabled ? Loc.Get("prefs.disabled") : Loc.Get("prefs.enabled"))}");
                 terminal.WriteLine($"  {Loc.Get("prefs.auto_combat_heal")}: {currentPlayer.AutoCombatHealPercent}%"); // v1.1.13: heal threshold
+                terminal.WriteLine($"  {Loc.Get("prefs.main_street_layout")}: {MainStreetLayoutName(currentPlayer.ClassicMainStreet)}"); // v1.1.14
                 terminal.WriteLine("");
 
                 string srDateFormat = currentPlayer.DateFormatPreference switch { 1 => "DD/MM/YYYY", 2 => "YYYY-MM-DD", _ => "MM/DD/YYYY" };
@@ -4249,6 +4254,7 @@ public abstract class BaseLocation
                     terminal.WriteLine($"  L. {Loc.Get("prefs.toggle", Loc.Get("prefs.auto_look"))}");
                 terminal.WriteLine($"  M. {Loc.Get("prefs.toggle", Loc.Get("prefs.dungeon_automap"))}");
                 terminal.WriteLine($"  D. {Loc.Get("base.prefs_date_format")} ({srDateFormat})");
+                terminal.WriteLine($"  S. {Loc.Get("prefs.main_street_layout")} ({MainStreetLayoutName(currentPlayer.ClassicMainStreet)})"); // v1.1.14
                 if (IsRunningInWezTerm())
                     terminal.WriteLine($"  7. {Loc.Get("prefs.terminal_font")}");
                 terminal.WriteLine(Loc.Get("base.prefs_accessibility"));
@@ -4323,6 +4329,7 @@ public abstract class BaseLocation
                 if (!IsBBSSession && !GameConfig.ScreenReaderMode)
                     WriteMenuOption("M", $"{Loc.Get("prefs.dungeon_automap")}: {onOff(currentPlayer.DungeonAutoMap)}");
                 WriteMenuOption("D", $"{Loc.Get("base.prefs_date_format")}: {dateFormatName}");
+                WriteMenuOption("S", $"{Loc.Get("prefs.main_street_layout")}: {MainStreetLayoutName(currentPlayer.ClassicMainStreet)}"); // v1.1.14
                 if (IsRunningInWezTerm())
                     WriteMenuOption("7", $"{Loc.Get("prefs.terminal_font")}: {ReadCurrentFont()}");
                 terminal.WriteLine("");
@@ -4474,6 +4481,14 @@ public abstract class BaseLocation
                     }
                     await GameEngine.Instance.SaveCurrentGame();
                     await Task.Delay(1000);
+                    break;
+
+                case "S":
+                    // v1.1.14: Main Street layout, the districts (default) or the classic pre-1.1.13 menu
+                    currentPlayer.ClassicMainStreet = !currentPlayer.ClassicMainStreet;
+                    terminal.WriteLine(Loc.Get("base.pref_main_street_layout_set", MainStreetLayoutName(currentPlayer.ClassicMainStreet)), "green");
+                    await GameEngine.Instance.SaveCurrentGame();
+                    await Task.Delay(800);
                     break;
 
                 case "H":
