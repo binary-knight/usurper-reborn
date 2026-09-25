@@ -3272,7 +3272,8 @@ async function handleAdminRequest(req, res) {
       }
 
       // Delete from all related tables
-      const tables = ['players', 'wizard_flags', 'sleeping_players', 'online_players', 'pvp_log'];
+      // v1.1.14: wizard_flags (frozen, muted) are kept by account name through a delete and recreate
+      const tables = ['players', 'sleeping_players', 'online_players', 'pvp_log'];
       for (const table of tables) {
         try {
           dbWrite.prepare(`DELETE FROM ${table} WHERE LOWER(username) = LOWER(?)`).run(playerUsername);

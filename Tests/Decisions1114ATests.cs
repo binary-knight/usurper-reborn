@@ -59,4 +59,29 @@ public partial class OwnerProcessConflictTests
             finally { OnlineStateManager.PendingSalesTax = 0; }
         });
     }
+
+    // ─── X6: admin flags are kept by account name through a delete and recreate ───
+
+    [Fact]
+    public async Task AFrozenAndMutedAccount_KeepsItsFlags_ThroughACharacterDeleteAndRecreate()
+    {
+        await _db.SetFrozen("Bob", true, "admin");
+        await _db.SetMuted("bob", true, "admin");
+        _db.PurgePlayerWorldState("bob", "Bob");
+        _db.DeleteGameData("bob");
+        (await _db.GetWizardFlags("BOB")).Should().Be((true, true), "the flags are the account's, not the character's");
+
+        // the web delete removes the rows of the account's character, never its flags
+        var web = File.ReadAllText(Path.Combine(RepoRoot(), "web", "ssh-proxy.js"));
+        int at = web.IndexOf("const tables = ['players'", StringComparison.Ordinal);
+        at.Should().BeGreaterThan(0);
+        web.Substring(at, web.IndexOf('\n', at) - at).Should().NotContain("wizard_flags");
+    }
+
+    private static string RepoRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "Scripts"))) dir = dir.Parent;
+        return dir!.FullName;
+    }
 }

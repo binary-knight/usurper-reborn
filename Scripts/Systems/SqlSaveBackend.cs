@@ -1291,7 +1291,8 @@ namespace UsurperRemake.Systems
                 ExecPurge(connection, tx, "guild_members",     "LOWER(username) = LOWER(@u)", username);
                 ExecPurge(connection, tx, "online_players",    "LOWER(username) = LOWER(@u)", username);
                 ExecPurge(connection, tx, "sleeping_players",  "LOWER(username) = LOWER(@u)", username);
-                ExecPurge(connection, tx, "wizard_flags",      "LOWER(username) = LOWER(@u)", username);
+                // v1.1.14: wizard_flags (frozen, muted) are the account's, keyed by its login name; they are kept
+                // through a delete, so deleting and recreating a character no longer sheds them
 
                 // Multi-column tables: the username can appear as sender/recipient,
                 // attacker/defender, etc. Clear all of them.
