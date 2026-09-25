@@ -69,6 +69,44 @@ public class MainStreetLocation : BaseLocation
         return 1;
     }
 
+    // v1.1.13: the places each tier adds, as the classic menu labels them
+    private static readonly string[][] TierUnlockLabelKeys =
+    {
+        new string[0],
+        new string[0],
+        new[] { "menu.action.temple", "menu.action.old_church", "menu.action.bank", "menu.action.castle", "menu.action.home",
+                "menu.action.news", "menu.action.fame", "menu.action.explore", "menu.action.world_events" },
+        new[] { "menu.action.auction_house", "menu.action.challenges", "menu.action.lodging_short", "menu.action.team_corner",
+                "menu.action.stats_record", "menu.action.progress", "menu.action.dark_alley", "menu.action.sanctum", "menu.action.love_street" },
+    };
+
+    /// <summary>
+    /// v1.1.13: returns the "New on Main Street" line once per tier rise, or null. A character seen for the
+    /// first time (no menu_tier_1 key) has every tier it already reached marked as announced, silently.
+    /// </summary>
+    internal static string? TakeTierUnlockAnnouncement(Character player)
+    {
+        if (player == null) return null;
+        int tier = player.Level >= GameConfig.MenuTier3Level ? 3 : player.Level >= GameConfig.MenuTier2Level ? 2 : 1;
+        bool firstSeen = !player.HintsShown.Contains("menu_tier_1");
+        var opened = new List<string>();
+        for (int t = 1; t <= tier; t++)
+        {
+            if (!player.HintsShown.Add($"menu_tier_{t}") || firstSeen) continue;
+            opened.AddRange(TierUnlockLabelKeys[t].Select(k => Loc.Get(k)));
+        }
+        return opened.Count == 0 ? null : Loc.Get("main_street.unlock_announce", string.Join(", ", opened));
+    }
+
+    private void ShowTierUnlockAnnouncement()
+    {
+        string? line = TakeTierUnlockAnnouncement(currentPlayer);
+        if (line == null) return;
+        terminal.SetColor("bright_green");
+        terminal.WriteLine(line);
+        terminal.SetColor("white");
+    }
+
     protected override string[]? GetAmbientMessages() => new[]
     {
         Loc.Get("main_street.ambient_merchant"),
@@ -103,6 +141,7 @@ public class MainStreetLocation : BaseLocation
 
         if (IsBBSSession)
         {
+            ShowTierUnlockAnnouncement(); // v1.1.13: above the BBS screen, which is left as is
             DisplayLocationBBS();
             return;
         }
@@ -170,6 +209,9 @@ public class MainStreetLocation : BaseLocation
 
         // Show NPCs in location
         ShowNPCsInLocation();
+
+        // v1.1.13: one line naming places a tier rise just opened
+        ShowTierUnlockAnnouncement();
 
         // Main Street menu (Pascal-style layout)
         ShowMainStreetMenu();

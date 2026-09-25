@@ -197,6 +197,7 @@
   "main_street.section_ocean": "OCEAN PHILOSOPHY",
   "main_street.section_alignment": "ALIGNMENT",
   "main_street.menu_title": "Main Street Menu",
+  "main_street.unlock_announce": "New on Main Street: {0}.",
   "main_street.menu_dungeons_suffix": " Dungeons   ",
   "main_street.menu_weapon_suffix": " Weapon Shop",
   "main_street.menu_armor_suffix": " Armor Shop ",

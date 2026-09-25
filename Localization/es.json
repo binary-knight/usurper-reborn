@@ -197,6 +197,7 @@
   "main_street.section_ocean": "FILOSOFÍA DEL OCÉANO",
   "main_street.section_alignment": "ALINEAMIENTO",
   "main_street.menu_title": "Menú de la Calle Principal",
+  "main_street.unlock_announce": "Novedades en la Calle Principal: {0}.",
   "main_street.menu_dungeons_suffix": " Mazmorras  ",
   "main_street.menu_weapon_suffix": " Armas      ",
   "main_street.menu_armor_suffix": " Armadura   ",

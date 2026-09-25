@@ -197,6 +197,7 @@
   "main_street.section_ocean": "FILOSOFIA DELL'OCEANO",
   "main_street.section_alignment": "ALLINEAMENTO",
   "main_street.menu_title": "Menu Via Principale",
+  "main_street.unlock_announce": "Novità in Via Principale: {0}.",
   "main_street.menu_dungeons_suffix": " Sotterranei",
   "main_street.menu_weapon_suffix": " Armi       ",
   "main_street.menu_armor_suffix": " Armature   ",
