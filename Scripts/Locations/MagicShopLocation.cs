@@ -919,7 +919,7 @@ public partial class MagicShopLocation : BaseLocation
         DisplayMessage("");
         CityControlSystem.Instance.DisplayTaxBreakdown(terminal, Loc.Get("magic_shop.curse_removal"), cost);
         // v1.1.15: yesno-convert-a, strict (Y/N)
-        if (await terminal.AskYesNoAsync($"Remove curse from {ownerName}'s {targetEquip.Name} for {curseTotalWithTax:N0} gold? (Y/N) "))
+        if (await terminal.AskYesNoAsync(Loc.Get("magic_shop.curse_confirm_team", ownerName, targetEquip.Name, $"{curseTotalWithTax:N0}")))
         {
             player.Gold -= curseTotalWithTax;
             CityControlSystem.Instance.ProcessSaleTax(cost);
@@ -3601,7 +3601,7 @@ public partial class MagicShopLocation : BaseLocation
             terminal.SetColor("blue");
             terminal.WriteLine("  Your noble heart resists this dark path.");
             // v1.1.15: yesno-convert-a, strict (Y/N)
-            if (!await terminal.AskYesNoAsync("  Are you sure you want to proceed? (Y/N): ")) return;
+            if (!await terminal.AskYesNoAsync($"  {Loc.Get("magic_shop.proceed_yn")}")) return;
         }
 
         // Build target list: exclude protected NPCs, spouse, and current King
