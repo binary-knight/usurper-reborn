@@ -4490,21 +4490,21 @@ public class InnLocation : BaseLocation
                     terminal.SetColor(isDisabled ? "darkgray" : "bright_green");
                     terminal.Write(isDisabled ? "[OFF] " : "[ON]  ");
                     terminal.SetColor(isDisabled ? "gray" : "white");
-                    terminal.Write($"{spell.Name,-24}");
+                    terminal.Write($"{spell.DisplayName,-24}");
                     terminal.SetColor("darkgray");
                     terminal.Write($" {spell.ManaCost,2} MP  Lv{SpellSystem.GetLevelRequired(charClass, spell.Level),-3}  ");
                     terminal.SetColor(isDisabled ? "darkgray" : "gray");
-                    if (IsScreenReader || spell.Description.Length <= 35)
+                    if (IsScreenReader || spell.DisplayDescription.Length <= 35)
                     {
-                        terminal.WriteLine(spell.Description);
+                        terminal.WriteLine(spell.DisplayDescription);
                     }
                     else
                     {
-                        int breakAt = spell.Description.LastIndexOf(' ', 35);
+                        int breakAt = spell.DisplayDescription.LastIndexOf(' ', 35);
                         if (breakAt <= 10) breakAt = 35;
-                        terminal.WriteLine(spell.Description[..breakAt]);
+                        terminal.WriteLine(spell.DisplayDescription[..breakAt]);
                         terminal.SetColor("dark_gray");
-                        terminal.WriteLine($"        {spell.Description[breakAt..].TrimStart()}");
+                        terminal.WriteLine($"        {spell.DisplayDescription[breakAt..].TrimStart()}");
                     }
                 }
             }
@@ -4563,13 +4563,13 @@ public class InnLocation : BaseLocation
                     {
                         companion.DisabledSpells.Remove(spell.Name);
                         terminal.SetColor("bright_green");
-                        terminal.WriteLine($"  Enabled: {spell.Name}");
+                        terminal.WriteLine($"  Enabled: {spell.DisplayName}");
                     }
                     else
                     {
                         companion.DisabledSpells.Add(spell.Name);
                         terminal.SetColor("red");
-                        terminal.WriteLine($"  Disabled: {spell.Name}");
+                        terminal.WriteLine($"  Disabled: {spell.DisplayName}");
                     }
                 }
                 await Task.Delay(600);
