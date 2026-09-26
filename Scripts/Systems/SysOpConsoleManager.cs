@@ -575,7 +575,7 @@ namespace UsurperRemake.Systems
             if (string.IsNullOrWhiteSpace(reason)) reason = "No reason given";
 
             terminal.SetColor("bright_red");
-            if (!await terminal.AskYesNoAsync($" Ban '{target.DisplayName}'? (Y/N): ")) return;
+            if (!await terminal.AskYesNoAsync(Loc.Get("sysop.ban_confirm", target.DisplayName))) return;
 
             await sqlBackend.BanPlayer(target.Username, reason);
             terminal.SetColor("green");
@@ -625,7 +625,7 @@ namespace UsurperRemake.Systems
 
             var target = banned[sel - 1];
             terminal.SetColor("yellow");
-            if (!await terminal.AskYesNoAsync($" Unban '{target.displayName}'? (Y/N): ")) return;
+            if (!await terminal.AskYesNoAsync(Loc.Get("sysop.unban_confirm", target.displayName))) return;
 
             await sqlBackend.UnbanPlayer(target.username);
             terminal.SetColor("green");
@@ -1674,7 +1674,7 @@ namespace UsurperRemake.Systems
                     var target = kickable[idx - 1];
                     terminal.SetColor("bright_yellow");
                     terminal.WriteLine($"  Kick {target.DisplayName}?");
-                    if (await terminal.AskYesNoAsync("  Type Y to confirm: "))
+                    if (await terminal.AskYesNoAsync($"  {Loc.Get("ui.yn_prompt")}"))
                     {
                         await sqlBackend.UnregisterOnline(target.Username);
                         terminal.SetColor("bright_green");

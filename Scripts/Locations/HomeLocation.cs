@@ -4245,7 +4245,7 @@ public class HomeLocation : BaseLocation
 
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("home.upgrade_confirm", name, $"{cost:N0}"));
-        if (await terminal.AskYesNoAsync("(Y/N): "))
+        if (await terminal.AskYesNoAsync(Loc.Get("ui.yn_prompt")))
         {
             currentPlayer.Gold -= cost;
             currentPlayer.Statistics.RecordGoldSpent(cost);

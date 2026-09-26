@@ -9020,7 +9020,7 @@ public class CastleLocation : BaseLocation
         terminal.WriteLine("");
 
         // v1.1.15: yesno-convert-a, strict (Y/N)
-        if (await terminal.AskYesNoAsync("Join The Crown? (Y/N) "))
+        if (await terminal.AskYesNoAsync(Loc.Get("castle.crown_join_yn")))
         {
             await PerformCrownOath(factionSystem);
         }
