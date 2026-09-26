@@ -1060,7 +1060,8 @@ public static class SpellSystem
             case 4: // Sleep
                 result.SpecialEffect = "sleep";
                 result.Duration = (int)((random.Next(5) + 3 + (caster.Level / 20)) * profMult);
-                result.Message += $" {target?.Name2 ?? "The enemy"} falls into magical slumber!";
+                // v1.1.15: the hold can be resisted, so the cast line does not claim it landed
+                result.Message += $" {Loc.Get("combat.spell_sleep_cast")}";
                 break;
 
             case 5: // Frost Touch - Base: 40-58 damage
@@ -1247,8 +1248,9 @@ public static class SpellSystem
 
             case 4: // Freeze
                 result.SpecialEffect = "freeze";
-                result.Duration = (int)((random.Next(5) + 2 + (caster.Level / 20)) * profMult);
-                result.Message += $" {target?.Name2 ?? "The enemy"} is frozen in ice!";
+                // v1.1.15: 1-2 rounds plus one per 40 levels; the hold budget caps it at 3 (1 on a boss)
+                result.Duration = 1 + random.Next(2) + (caster.Level / 40);
+                result.Message += $" {Loc.Get("combat.spell_freeze_cast")}";
                 break;
 
             case 5: // Duplicate - Protection +14
