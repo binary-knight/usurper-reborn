@@ -174,7 +174,7 @@ public static class SpellSystem
         [CharacterClass.Sage] = new Dictionary<int, SpellInfo>
         {
             // --- EARLY TIER (Levels 1-25) - First Awakening (Shore Walker) ---
-            [1] = new SpellInfo(1, "Fog of War", "Mist obscures the battlefield. Only you see clearly. Protection: +5. Duration: whole fight.", 5, 1, "Exadmasaxmarie", false, "Buff"),
+            [1] = new SpellInfo(1, "Fog of War", "Mist hides the whole party from the enemy. All allies: protection +5, scales with level. Duration: whole fight.", 5, 1, "Exadmasaxmarie", true, "Buff"),
             [2] = new SpellInfo(2, "Poison Touch", "Inflict magical toxins on your enemy. Damage over time. Duration: varies.", 8, 2, "Exadlimmarie", false, "Debuff"),
             [3] = new SpellInfo(3, "Mind Spike", "A psychic attack that damages and disorients. Damage: 8-14. Duration: 1 turn.", 10, 3, "Mindspikearie", false, "Attack"),
             [4] = new SpellInfo(4, "Freeze", "Encase the target in ice. Effect: cannot move. Duration: varies.", 15, 4, "Excadaliemarie", false, "Debuff"),
@@ -188,22 +188,22 @@ public static class SpellSystem
             [10] = new SpellInfo(10, "Slumber Mist", "A drowsy mist settles on the enemy. Effect: all enemies asleep, any damage wakes them, bosses immune. Duration: 2 rounds.", 40, 10, "Excadmassumarie", true, "Debuff"),
             [11] = new SpellInfo(11, "Steal Life", "Drain the enemy's vitality. Damage: 35-50, heals half. Duration: 1 turn.", 45, 11, "Steallifearie", false, "Attack"),
             [12] = new SpellInfo(12, "Psychic Scream", "A mental blast assaults all enemies. Damage: 40-55 to all, and their accuracy drops. Duration: 2 rounds.", 50, 12, "Psychscrearie", true, "Attack"),
-            [13] = new SpellInfo(13, "Shadow Cloak", "Wrap yourself in living shadow. Protection: +35. Duration: whole fight.", 55, 13, "Shadowcloakarie", false, "Buff"),
+            [13] = new SpellInfo(13, "Shadow Cloak", "Wrap the whole party in living shadow. All allies: protection +35 and Blur. Duration: whole fight.", 55, 13, "Shadowcloakarie", true, "Buff"),
             [14] = new SpellInfo(14, "Compel", "Bend every enemy's will toward your tank. Effect: all enemies taunted and weakened; Old Gods resist. Duration: 2 rounds.", 60, 14, "Dominatarie", true, "Debuff"),
 
             // --- HIGH TIER (Levels 51-75) - Third Awakening (Wave Dancer) ---
             [15] = new SpellInfo(15, "Energy Drain", "Force victim to channel energy into their own destruction. Damage: 90-120. Duration: 1 turn.", 75, 15, "Examdammasaxmarie", false, "Attack"),
-            [16] = new SpellInfo(16, "Mind Blank", "Render your thoughts impervious. Protection: +50, immune to mind effects. Duration: whole fight.", 85, 16, "Mindblankarie", false, "Buff"),
+            [16] = new SpellInfo(16, "Mind Blank", "Seal every ally's mind. All allies: protection +50 and immune to status effects. Duration: whole fight.", 85, 16, "Mindblankarie", true, "Buff"),
             [17] = new SpellInfo(17, "Shadow Step", "Teleport through shadows to strike. Damage: 80-100, ignores defense. Duration: 1 turn.", 95, 17, "Shadowsteparie", false, "Attack"),
             [18] = new SpellInfo(18, "Unveil the Pattern", "Lay bare the weak points of the whole enemy line. Effect: all enemies marked, +30% damage from every ally. Duration: 2 rounds.", 110, 18, "Edujnomed", true, "Debuff"),
             [19] = new SpellInfo(19, "Mass Confusion", "Drive all enemies mad with visions. Effect: all enemies confused. Duration: varies.", 125, 19, "Massconfusarie", true, "Debuff"),
-            [20] = new SpellInfo(20, "Noctura's Veil", "The Shadow Goddess protects her follower. Protection: +70. Duration: whole fight.", 140, 20, "Nocturaveilarie", false, "Buff"),
+            [20] = new SpellInfo(20, "Noctura's Veil", "The Shadow Goddess shelters your party. All allies: protection +70 and Blur. Duration: whole fight.", 140, 20, "Nocturaveilarie", true, "Buff"),
 
             // --- LEGENDARY TIER (Levels 76-100) - Deep Awakening (Abyss Gazer) ---
             [21] = new SpellInfo(21, "Soul Rend", "Tear the very soul from your enemy. Damage: 150-200. Duration: 1 turn.", 160, 21, "Soulrendarie", false, "Attack"),
-            [22] = new SpellInfo(22, "Ocean's Memory", "Tap into the infinite wisdom. All spells cost half mana. Duration: whole fight.", 180, 22, "Oceanmemarie", false, "Buff"),
+            [22] = new SpellInfo(22, "Ocean's Memory", "Tap into the infinite wisdom. All allies: spells cost half mana. Duration: whole fight.", 180, 22, "Oceanmemarie", true, "Buff"),
             [23] = new SpellInfo(23, "Temporal Paradox", "Trap the enemy in a time loop. Damage: 180-220. Duration: 1 turn.", 200, 23, "Temporalarie", false, "Attack"),
-            [24] = new SpellInfo(24, "Veloura's Embrace", "Channel the lost Goddess of Love. Heals 250 + Protection +80. Duration: whole fight.", 230, 24, "Velouralovearie", false, "Heal"),
+            [24] = new SpellInfo(24, "Veloura's Embrace", "Channel the lost Goddess of Love. All allies: heal 250 and protection +80. Duration: whole fight.", 230, 24, "Velouralovearie", true, "Heal"),
             [25] = new SpellInfo(25, "Death Kiss", "The ultimate draining of life force. Damage: 280-380. Duration: 1 turn.", 300, 25, "Exmasdamliemasumarie", false, "Attack")
         },
 
@@ -1248,8 +1248,9 @@ public static class SpellSystem
         switch (spellLevel)
         {
             // --- EARLY TIER (Levels 1-25) - First Awakening ---
-            case 1: // Fog of War - Protection +7
-                result.ProtectionBonus = ScaleProtectionEffect(7 + (caster.Level / 12), caster, profMult);
+            case 1: // Fog of War
+                // v1.1.15: now reaches the whole party, so smaller (was 7 + Level/12)
+                result.ProtectionBonus = ScaleProtectionEffect(5 + (caster.Level / 15), caster, profMult);
                 result.Duration = 999;
                 result.SpecialEffect = "fog";
                 result.Message += $" Mist obscures the battlefield! (+{result.ProtectionBonus} defense)";
@@ -1334,7 +1335,7 @@ public static class SpellSystem
                 result.Message += $" A psychic scream assaults all enemies for {result.Damage} damage!";
                 break;
 
-            case 13: // Shadow Cloak - Protection +38
+            case 13: // Shadow Cloak: party protection and Blur (v1.1.15)
                 result.ProtectionBonus = ScaleProtectionEffect(38 + (caster.Level / 5), caster, profMult);
                 result.Duration = 999;
                 result.SpecialEffect = "shadow";
@@ -1357,7 +1358,7 @@ public static class SpellSystem
                 result.Message += $" Energy is drained from {target?.Name2 ?? "the target"} for {result.Damage} damage!";
                 break;
 
-            case 16: // Mind Blank - Protection +55, immune to mind
+            case 16: // Mind Blank: party protection and status immunity (v1.1.15)
                 result.ProtectionBonus = ScaleProtectionEffect(55 + (caster.Level / 3), caster, profMult);
                 result.Duration = 999;
                 result.SpecialEffect = "mindblank";
@@ -1386,7 +1387,7 @@ public static class SpellSystem
                 result.Message += $" All enemies are driven mad with visions!";
                 break;
 
-            case 20: // Noctura's Veil - Protection +75
+            case 20: // Noctura's Veil: party protection and Blur (v1.1.15)
                 result.ProtectionBonus = ScaleProtectionEffect(75 + (caster.Level / 2), caster, profMult);
                 result.Duration = 999;
                 result.SpecialEffect = "shadow";
@@ -1401,7 +1402,7 @@ public static class SpellSystem
                 result.Message += $" The soul is torn from {target?.Name2 ?? "the target"} for {result.Damage} damage!";
                 break;
 
-            case 22: // Ocean's Memory - Half mana cost
+            case 22: // Ocean's Memory: half mana cost for the party (v1.1.15)
                 result.SpecialEffect = "ocean_memory";
                 result.Duration = 999;
                 caster.HasOceanMemory = true;  // Set flag for half mana cost
@@ -1415,7 +1416,7 @@ public static class SpellSystem
                 result.Message += $" {target?.Name2 ?? "The target"} is trapped in a time loop for {result.Damage} damage!";
                 break;
 
-            case 24: // Veloura's Embrace - Heal 280 + Protection +85
+            case 24: // Veloura's Embrace: party heal and protection (v1.1.15)
                 int baseHeal24 = 240 + random.Next(81);
                 result.Healing = ScaleHealingEffect(baseHeal24, caster, random, profMult);
                 result.ProtectionBonus = ScaleProtectionEffect(85 + (caster.Level / 2), caster, profMult);
