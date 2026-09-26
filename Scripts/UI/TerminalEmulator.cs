@@ -1524,7 +1524,7 @@ public partial class TerminalEmulator
         {
             try
             {
-                await Task.Run(() => Console.ReadKey(true));
+                await Task.Run(() => ConsoleReadKey());
                 WriteLine("");
             }
             catch
@@ -1619,6 +1619,9 @@ public partial class TerminalEmulator
         }
     }
     
+    /// <summary>v1.1.15: the one-key console read; a test seam so the console branch can be driven.</summary>
+    internal static Func<ConsoleKeyInfo> ConsoleReadKey = () => Console.ReadKey(intercept: true);
+
     public async Task<string> GetKeyInput()
     {
         // MUD stream mode - use line input since we can't read single keys from TCP
@@ -1650,12 +1653,19 @@ public partial class TerminalEmulator
             var input = (await GetInput("")).Trim();
             return string.IsNullOrEmpty(input) ? "" : input[0].ToString();
         }
+        else if (GameConfig.MenuKeysNeedEnter)
+        {
+            // v1.1.15: single-player console, the player types the key and presses Enter, as online.
+            // Pauses (PressAnyKey) do not come through here and still continue on one key.
+            var input = (await GetInput("")).Trim();
+            return string.IsNullOrEmpty(input) ? "" : input[0].ToString();
+        }
         else
         {
-            // Console mode - read single key without Enter
+            // Console mode - read single key without Enter (the "menu keys need Enter" setting is off)
             try
             {
-                var keyInfo = Console.ReadKey(intercept: true);
+                var keyInfo = ConsoleReadKey();
                 var result = keyInfo.KeyChar.ToString();
                 WriteLine(result, "cyan");
                 return result;
