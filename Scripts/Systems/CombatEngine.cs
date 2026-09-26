@@ -4839,6 +4839,17 @@ public partial class CombatEngine
             }
         }
 
+        // v1.1.15: Slumber Mist breaks on any damage taken since it landed, a hit or a damage
+        // over time tick above; the monster wakes and acts this turn.
+        if (monster.IsSleeping && monster.SlumberHpMark >= 0 && monster.HP < monster.SlumberHpMark)
+        {
+            monster.IsSleeping = false;
+            monster.SleepDuration = 0;
+            monster.SlumberHpMark = -1;
+            monster.StunImmunityRounds = GameConfig.StunImmunityRoundsAfterRecovery;
+            terminal.WriteLine(Loc.Get("combat.sage_slumber_broken", monster.Name), "yellow");
+        }
+
         // Check if monster is sleeping (from Sleep spell or ability)
         if (monster.IsSleeping)
         {
@@ -4847,6 +4858,7 @@ public partial class CombatEngine
             if (monster.SleepDuration <= 0)
             {
                 monster.IsSleeping = false;
+                monster.SlumberHpMark = -1;
                 // v1.1.15: sleep is a hold; the same post-hold immunity as a stun follows it
                 monster.StunImmunityRounds = GameConfig.StunImmunityRoundsAfterRecovery;
                 terminal.WriteLine(Loc.Get("combat.monster_wakes", monster.Name), "yellow");
@@ -5060,6 +5072,15 @@ public partial class CombatEngine
                 monster.TauntedBy = null;
                 monster.TauntStickChance = 100;
             }
+        }
+
+        // v1.1.15: Psychic Scream's distraction is armed again once a round while it lasts
+        if (firstActionThisRound && monster.DistractedRounds > 0)
+        {
+            monster.DistractedRounds--;
+            monster.Distracted = true;
+            monster.DistractedPenalty = Math.Max(monster.DistractedPenalty, monster.DistractedRoundsPenalty);
+            if (monster.DistractedRounds <= 0) monster.DistractedRoundsPenalty = 0;
         }
 
         if (aliveTeammates != null && aliveTeammates.Count > 0)
@@ -8599,6 +8620,162 @@ public partial class CombatEngine
         target.RecentStunCount++;
         target.RoundsSinceLastStun = 0;
         return true;
+    }
+
+    /// <summary>
+    /// v1.1.15: soft control (slow, distract, mark, taunt, confusion) on a boss or mini-boss.
+    /// A boss shrugs it off GameConfig.BossSoftControlResistPercent of the time and otherwise
+    /// takes half the rounds, at least one. Returns the rounds to apply; 0 when resisted.
+    /// </summary>
+    internal int SoftControlRounds(Monster target, int rounds)
+    {
+        if (target == null || rounds <= 0) return 0;
+        if (!(target.IsBoss || target.IsMiniBoss)) return rounds;
+        if (random.Next(100) < GameConfig.BossSoftControlResistPercent) return 0;
+        return Math.Max(1, rounds / 2);
+    }
+
+    /// <summary>
+    /// v1.1.15: an area spell deals damage when it rolled some, or when it is an attack spell (which
+    /// then takes the level-based fallback). A control spell with no damage of its own deals none.
+    /// </summary>
+    internal static bool AreaSpellDealsDamage(string spellType, long rolledDamage) =>
+        rolledDamage > 0 || spellType == "Attack";
+
+    /// <summary>v1.1.15: a tank by class, by companion role or by specialization.</summary>
+    internal static bool IsPartyTank(Character c)
+    {
+        if (c == null) return false;
+        if (c.Class == CharacterClass.Warrior || c.Class == CharacterClass.Paladin || c.Class == CharacterClass.Barbarian)
+            return true;
+        if (c.IsCompanion && c.CompanionId.HasValue &&
+            UsurperRemake.Systems.CompanionSystem.Instance?.GetCompanion(c.CompanionId.Value)?.CombatRole == UsurperRemake.Systems.CombatRole.Tank)
+            return true;
+        // Spec-based tank detection (Protection Warrior, Juggernaut Barbarian)
+        return c is NPC tankNpc && UsurperRemake.Data.SpecializationData.IsTankSpec(tankNpc.Specialization);
+    }
+
+    /// <summary>
+    /// v1.1.15: who Compel turns the enemy onto. The living tank with the most hit points among
+    /// the caster, the party leader and the teammates; with no tank, the living member with the
+    /// most hit points.
+    /// </summary>
+    internal Character? FindCompelTarget(Character caster, CombatResult? result)
+    {
+        var party = new List<Character>();
+        if (caster != null) party.Add(caster);
+        if (result?.Player != null && !party.Contains(result.Player)) party.Add(result.Player);
+        if (currentTeammates != null)
+            foreach (var t in currentTeammates)
+                if (t != null && !party.Contains(t)) party.Add(t);
+        var alive = party.Where(c => c.IsAlive).ToList();
+        return alive.Where(IsPartyTank).OrderByDescending(c => c.MaxHP).FirstOrDefault()
+            ?? alive.OrderByDescending(c => c.MaxHP).FirstOrDefault();
+    }
+
+    /// <summary>
+    /// v1.1.15: the Sage's control spells on one monster, and the boss rules for Confusion and
+    /// Mass Confusion. Shared by the multi-monster and single-monster spell paths. False when the
+    /// effect is not one of these.
+    /// </summary>
+    private bool ApplySageControl(Monster target, string effect, int duration, Character caster, CombatResult? result)
+    {
+        if (target == null || !target.IsAlive) return false;
+        switch (effect)
+        {
+            case "dulling_mist":
+            {
+                int rounds = SoftControlRounds(target, duration > 0 ? duration : 2);
+                if (rounds == 0) { terminal.WriteLine(Loc.Get("combat.sage_control_resist", target.Name), "yellow"); return true; }
+                target.IsSlowed = true;
+                target.SlowDuration = Math.Max(target.SlowDuration, rounds);
+                terminal.WriteLine(Loc.Get("combat.spell_slowed", target.Name), "gray");
+                return true;
+            }
+
+            case "scholars_mark":
+            case "unveil_pattern":
+            {
+                int rounds = SoftControlRounds(target, duration > 0 ? duration : (effect == "scholars_mark" ? 3 : 2));
+                if (rounds == 0) { terminal.WriteLine(Loc.Get("combat.sage_control_resist", target.Name), "yellow"); return true; }
+                target.IsMarked = true;
+                target.MarkedDuration = Math.Max(target.MarkedDuration, rounds);
+                terminal.WriteLine(Loc.Get("combat.sage_marked", target.Name, rounds), "bright_yellow");
+                return true;
+            }
+
+            case "slumber_mist":
+                if (target.IsBoss || target.IsMiniBoss)
+                {
+                    terminal.WriteLine(Loc.Get("combat.sage_slumber_boss_immune", target.Name), "yellow");
+                    return true;
+                }
+                if (TryHoldMonster(target, HoldKind.Sleep, duration > 0 ? duration : 2))
+                {
+                    target.SlumberHpMark = target.HP;
+                    terminal.WriteLine(Loc.Get("combat.spell_sleep", target.Name), "cyan");
+                }
+                else
+                {
+                    terminal.WriteLine(Loc.Get("combat.spell_sleep_resist", target.Name), "yellow");
+                }
+                return true;
+
+            case "psychic_scream":
+            {
+                // the old psychic rider stays: a quarter of the time the blast confuses for a round
+                if (random.Next(100) < 25)
+                {
+                    target.IsConfused = true;
+                    target.ConfusedDuration = Math.Max(target.ConfusedDuration, 1);
+                    terminal.WriteLine(Loc.Get("combat.spell_psychic", target.Name), "magenta");
+                }
+                int rounds = SoftControlRounds(target, duration > 0 ? duration : 2);
+                if (rounds == 0) { terminal.WriteLine(Loc.Get("combat.sage_control_resist", target.Name), "yellow"); return true; }
+                int penalty = 5 + (caster?.Level ?? 0) / 5 + (int)((caster?.Wisdom ?? 0) / 10);
+                target.Distracted = true;
+                target.DistractedPenalty = Math.Max(target.DistractedPenalty, penalty);
+                target.DistractedRounds = Math.Max(target.DistractedRounds, rounds);
+                target.DistractedRoundsPenalty = Math.Max(target.DistractedRoundsPenalty, penalty);
+                terminal.WriteLine(Loc.Get("combat.distracted", target.Name, penalty), "yellow");
+                return true;
+            }
+
+            case "compel":
+            {
+                if (target.FamilyName == "OldGod")
+                {
+                    terminal.WriteLine(Loc.Get("combat.sage_compel_old_god", target.Name), "yellow");
+                    return true;
+                }
+                int rounds = SoftControlRounds(target, duration > 0 ? duration : 2);
+                if (rounds == 0) { terminal.WriteLine(Loc.Get("combat.sage_control_resist", target.Name), "yellow"); return true; }
+                var tank = FindCompelTarget(caster, result);
+                if (tank != null)
+                {
+                    target.TauntedBy = tank.DisplayName;
+                    target.TauntRoundsLeft = Math.Max(target.TauntRoundsLeft, rounds);
+                    target.TauntStickChance = GameConfig.SoftTauntStickChance;
+                }
+                target.WeakenRounds = Math.Max(target.WeakenRounds, rounds);
+                terminal.WriteLine(Loc.Get("combat.sage_compel", target.Name, tank?.DisplayName ?? caster?.DisplayName ?? ""), "bright_magenta");
+                return true;
+            }
+
+            case "confusion":
+            case "mass_confusion":
+            {
+                int rounds = SoftControlRounds(target, duration > 0 ? duration : 3);
+                if (rounds == 0) { terminal.WriteLine(Loc.Get("combat.sage_control_resist", target.Name), "yellow"); return true; }
+                if (effect == "mass_confusion" && (target.IsBoss || target.IsMiniBoss))
+                    rounds = Math.Min(rounds, GameConfig.MassConfusionBossMaxRounds);
+                target.IsConfused = true;
+                target.ConfusedDuration = rounds;
+                terminal.WriteLine(Loc.Get(effect == "confusion" ? "combat.confusion_stumble" : "combat.spell_mass_confusion", target.Name), "magenta");
+                return true;
+            }
+        }
+        return false;
     }
 
     /// <summary>
@@ -13342,7 +13519,7 @@ public partial class CombatEngine
                 terminal.SetColor("white");
                 terminal.Write($"[{i + 1}] ");
                 terminal.SetColor("cyan");
-                terminal.Write($"{spell.Name}");
+                terminal.Write($"{spell.DisplayName}");
                 terminal.SetColor("gray");
                 terminal.Write(Loc.Get("combat.spell_level", spell.Level));
                 terminal.SetColor("yellow");
@@ -13351,7 +13528,7 @@ public partial class CombatEngine
             else
             {
                 terminal.SetColor("darkgray");
-                terminal.WriteLine(Loc.Get("combat.spell_not_enough_mana", i + 1, spell.Name, spell.Level, manaCost));
+                terminal.WriteLine(Loc.Get("combat.spell_not_enough_mana", i + 1, spell.DisplayName, spell.Level, manaCost));
             }
         }
 
@@ -17061,7 +17238,7 @@ public partial class CombatEngine
 
         terminal.WriteLine("");
         terminal.SetColor("magenta");
-        terminal.WriteLine(Loc.Get("combat.you_cast_spell", spellInfo.Name));
+        terminal.WriteLine(Loc.Get("combat.you_cast_spell", spellInfo.DisplayName));
 
         // When targeting an ally, strip the spell effect portion from the message
         // (caster-named heal/buff text) since the correct target messages are shown by ApplySpellEffects
@@ -17326,13 +17503,19 @@ public partial class CombatEngine
         {
             // Use the spell's calculated damage
             long totalDamage = spellResult.Damage;
-            if (totalDamage <= 0)
+            // v1.1.15: the fallback is for attack spells only. A control spell that sets no
+            // damage (Mass Confusion, Slumber Mist, Compel) was hitting every enemy for about
+            // spell level x 50, which would also wake a Slumber Mist at once.
+            if (AreaSpellDealsDamage(spellInfo.SpellType, totalDamage))
             {
-                // Fallback if spell didn't set damage
-                totalDamage = spellInfo.Level * 50 + (player.Intelligence / 2);
+                if (totalDamage <= 0)
+                {
+                    // Fallback if spell didn't set damage
+                    totalDamage = spellInfo.Level * 50 + (player.Intelligence / 2);
+                }
+                totalDamage = DifficultySystem.ApplyPlayerDamageMultiplier(totalDamage);
+                await ApplyAoEDamage(monsters, totalDamage, result, spellInfo.Name, isSpellDamage: true);
             }
-            totalDamage = DifficultySystem.ApplyPlayerDamageMultiplier(totalDamage);
-            await ApplyAoEDamage(monsters, totalDamage, result, spellInfo.Name, isSpellDamage: true);
 
             // Apply self-healing from attack spells (e.g. Deluge of Sanctity)
             if (spellResult.Healing > 0)
@@ -17426,7 +17609,7 @@ public partial class CombatEngine
         if (spellResult.SkillImproved && !string.IsNullOrEmpty(spellResult.NewProficiencyLevel))
         {
             terminal.SetColor("bright_yellow");
-            terminal.WriteLine(Loc.Get("combat.spell_proficiency_up", spellInfo.Name, spellResult.NewProficiencyLevel));
+            terminal.WriteLine(Loc.Get("combat.spell_proficiency_up", spellInfo.DisplayName, spellResult.NewProficiencyLevel));
             await Task.Delay(GetCombatDelay(800));
         }
     }
@@ -17436,6 +17619,9 @@ public partial class CombatEngine
     /// </summary>
     private void HandleSpecialSpellEffectOnMonster(Monster target, string effect, int duration, Character player, long spellDamage, CombatResult result)
     {
+        // v1.1.15: the Sage's control spells, and the boss rules for Confusion and Mass Confusion
+        if (ApplySageControl(target, effect.ToLower(), duration, player, result)) return;
+
         switch (effect.ToLower())
         {
             case "sleep":
@@ -17489,18 +17675,6 @@ public partial class CombatEngine
                     terminal.WriteLine(Loc.Get("combat.spell_web", target.Name), "white");
                 else
                     terminal.WriteLine(Loc.Get("combat.spell_web_resist", target.Name), "white");
-                break;
-
-            case "confusion":
-                target.IsConfused = true;
-                target.ConfusedDuration = duration > 0 ? duration : 3;
-                terminal.WriteLine(Loc.Get("combat.confusion_stumble", target.Name), "magenta");
-                break;
-
-            case "mass_confusion":
-                target.IsConfused = true;
-                target.ConfusedDuration = duration > 0 ? duration : 3;
-                terminal.WriteLine(Loc.Get("combat.spell_mass_confusion", target.Name), "magenta");
                 break;
 
             case "dominate":
@@ -18213,7 +18387,7 @@ public partial class CombatEngine
             {
                 var spell = healSpells[i];
                 terminal.SetColor("cyan");
-                terminal.WriteLine($"  [{i + 1}] {spell.Name} - {Loc.Get("combat.mana_label")}: {SpellSystem.CalculateManaCost(spell, player)}"); // v1.1.1: real cost, not the table cost
+                terminal.WriteLine($"  [{i + 1}] {spell.DisplayName} - {Loc.Get("combat.mana_label")}: {SpellSystem.CalculateManaCost(spell, player)}"); // v1.1.1: real cost, not the table cost
             }
             terminal.SetColor("gray");
             terminal.WriteLine($"  {Loc.Get("combat.cancel_option")}");
@@ -18250,7 +18424,7 @@ public partial class CombatEngine
 
             terminal.WriteLine("");
             terminal.SetColor("bright_magenta");
-            terminal.WriteLine(Loc.Get("combat.cast_spell_on_ally", selectedSpell.Name, targetAlly.DisplayName));
+            terminal.WriteLine(Loc.Get("combat.cast_spell_on_ally", selectedSpell.DisplayName, targetAlly.DisplayName));
             terminal.WriteLine(spellResult.Message);
 
             if (spellResult.Success && spellResult.Healing > 0)
@@ -18742,7 +18916,7 @@ public partial class CombatEngine
             // Multi-target heal (e.g. Mass Cure) — heal entire party
             if (healSpell.IsMultiTarget)
             {
-                terminal.WriteLine(Loc.Get("combat.teammate_casts_party", teammate.DisplayName, healSpell.Name));
+                terminal.WriteLine(Loc.Get("combat.teammate_casts_party", teammate.DisplayName, healSpell.DisplayName));
 
                 // Heal the player
                 long oldPlayerHP = currentPlayer.HP;
@@ -18793,7 +18967,7 @@ public partial class CombatEngine
             {
                 // Single-target heal
                 string targetName = target == currentPlayer ? Loc.Get("combat.you_lowercase") : target.DisplayName;
-                terminal.WriteLine(Loc.Get("combat.teammate_casts_on", teammate.DisplayName, healSpell.Name, targetName));
+                terminal.WriteLine(Loc.Get("combat.teammate_casts_on", teammate.DisplayName, healSpell.DisplayName, targetName));
 
                 long oldHP = target.HP;
                 target.HP = Math.Min(target.MaxHP, target.HP + spellResult.Healing);
@@ -18817,7 +18991,7 @@ public partial class CombatEngine
         else
         {
             string targetName = target == currentPlayer ? Loc.Get("combat.you_lowercase") : target.DisplayName;
-            terminal.WriteLine(Loc.Get("combat.teammate_casts_on", teammate.DisplayName, healSpell.Name, targetName));
+            terminal.WriteLine(Loc.Get("combat.teammate_casts_on", teammate.DisplayName, healSpell.DisplayName, targetName));
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("combat.spell_fizzles"));
             result.CombatLog.Add($"{teammate.DisplayName}'s healing spell fizzles.");
@@ -19039,7 +19213,7 @@ public partial class CombatEngine
 
         terminal.WriteLine("");
         terminal.SetColor("magenta");
-        terminal.WriteLine(Loc.Get("combat.teammate_casts_spell", teammate.DisplayName, spell.Name));
+        terminal.WriteLine(Loc.Get("combat.teammate_casts_spell", teammate.DisplayName, spell.DisplayName));
 
         if (!spellResult.Success)
         {
@@ -19070,6 +19244,8 @@ public partial class CombatEngine
                 // announce the immunity-absorbs message once per AoE cast.
                 long adjustedDamage = ApplyBossSpellProtections(monster, damagePerTarget, announce: !immunityAnnounced);
                 if (monster.IsMagicalImmune) immunityAnnounced = true;
+                // v1.1.15: a marked target takes 30% more from a teammate's spell too
+                if (monster.IsMarked) adjustedDamage += (long)(adjustedDamage * 0.3);
                 adjustedDamage = TeamHQBonus.ApplyAttack(teammate, adjustedDamage); // v1.1.11: Team HQ Armory, before the HP cap.
                 long actualDamage = Math.Min(adjustedDamage, monster.HP);
                 monster.HP -= actualDamage;
@@ -19107,6 +19283,8 @@ public partial class CombatEngine
                 // bypassed here, allowing e.g. a companion Power Word: Kill to hit Manwe at
                 // full damage despite magical immunity.
                 long adjustedDamage = ApplyBossSpellProtections(target, damage, announce: true);
+                // v1.1.15: a marked target takes 30% more from a teammate's spell too
+                if (target.IsMarked) adjustedDamage += (long)(adjustedDamage * 0.3);
                 adjustedDamage = TeamHQBonus.ApplyAttack(teammate, adjustedDamage); // v1.1.11: Team HQ Armory, before the HP cap.
                 long actualDamage = Math.Min(adjustedDamage, target.HP);
                 target.HP -= actualDamage;
@@ -19298,14 +19476,7 @@ public partial class CombatEngine
                 SayWhyOnce(teammate, "combat.teammate_hangs_back");
             }
         }
-        bool isTankClass = teammate.Class == CharacterClass.Warrior || teammate.Class == CharacterClass.Paladin
-            || teammate.Class == CharacterClass.Barbarian;
-        bool isTankCompanion = teammate.IsCompanion && teammate.CompanionId.HasValue &&
-            UsurperRemake.Systems.CompanionSystem.Instance?.GetCompanion(teammate.CompanionId.Value)?.CombatRole == UsurperRemake.Systems.CombatRole.Tank;
-        // Spec-based tank detection (Protection Warrior, Juggernaut Barbarian)
-        bool isTankSpec = teammate is NPC tankNpc && UsurperRemake.Data.SpecializationData.IsTankSpec(tankNpc.Specialization);
-
-        if (isTankClass || isTankCompanion || isTankSpec)
+        if (IsPartyTank(teammate))
         {
             bool anyTaunted = livingMonsters.Any(m => !string.IsNullOrEmpty(m.TauntedBy) && m.TauntRoundsLeft > 0);
             if (!anyTaunted)
@@ -26641,7 +26812,7 @@ public partial class CombatEngine
             var color = canCast ? ConsoleColor.White : ConsoleColor.DarkGray;
 
             terminal.SetColor(color);
-            terminal.WriteLine($"{i + 1}. {spell.Name} ({Loc.Get("combat.level_label")} {spell.Level}) - {manaCost} {Loc.Get("combat.mana_label")}");
+            terminal.WriteLine($"{i + 1}. {spell.DisplayName} ({Loc.Get("combat.level_label")} {spell.Level}) - {manaCost} {Loc.Get("combat.mana_label")}");
             if (!canCast)
             {
                 terminal.WriteLine($"   {Loc.Get("combat.not_enough_mana")}");
@@ -26687,7 +26858,7 @@ public partial class CombatEngine
             if (spellResult.SkillImproved && !string.IsNullOrEmpty(spellResult.NewProficiencyLevel))
             {
                 terminal.SetColor("bright_yellow");
-                terminal.WriteLine(Loc.Get("combat.proficiency_improved", selectedSpell.Name, spellResult.NewProficiencyLevel));
+                terminal.WriteLine(Loc.Get("combat.proficiency_improved", selectedSpell.DisplayName, spellResult.NewProficiencyLevel));
             }
 
             terminal.PressAnyKey();
@@ -26783,6 +26954,9 @@ public partial class CombatEngine
     /// </summary>
     private void HandleSpecialSpellEffect(Character caster, Monster? target, string effect, int duration)
     {
+        // v1.1.15: the Sage's control spells, and the boss rules for Confusion and Mass Confusion
+        if (target != null && ApplySageControl(target, effect.ToLower(), duration, caster, null)) return;
+
         switch (effect.ToLower())
         {
             case "poison":
@@ -28581,20 +28755,20 @@ public partial class CombatEngine
                 string displayName;
                 int cdRemaining = player.UnmakingCooldown > 0 ? player.UnmakingCooldown : player.DelugeCooldown;
                 if (onCooldown)
-                    displayName = $"{spell.Name} (CD:{cdRemaining})";
+                    displayName = $"{spell.DisplayName} (CD:{cdRemaining})";
                 else if (!SpellSystem.HasRequiredSpellWeapon(player))
                 {
                     var reqType = SpellSystem.GetSpellWeaponRequirement(player.Class);
-                    displayName = Loc.Get("combat.qb_need_weapon", spell.Name, reqType);
+                    displayName = Loc.Get("combat.qb_need_weapon", spell.DisplayName, reqType);
                 }
                 else if (!player.CanCastSpells())
-                    displayName = Loc.Get("combat.qb_silenced", spell.Name);
+                    displayName = Loc.Get("combat.qb_silenced", spell.DisplayName);
                 else if (player.Mana < manaCost)
                     // v1.1.11: say why it cannot be cast (player report: a new Magician read "unavailable" and
                     // suspected the staff)
-                    displayName = Loc.Get("combat.qb_need_mana", spell.Name, manaCost, player.Mana);
+                    displayName = Loc.Get("combat.qb_need_mana", spell.DisplayName, manaCost, player.Mana);
                 else
-                    displayName = $"{spell.Name} ({manaCost} MP)";
+                    displayName = $"{spell.DisplayName} ({manaCost} MP)";
                 actions.Add(((i + 1).ToString(), slotId, displayName, canCast));
             }
             else
@@ -28754,7 +28928,7 @@ public partial class CombatEngine
                     if (spellOnCD)
                     {
                         int cdLeft = player.UnmakingCooldown > 0 ? player.UnmakingCooldown : player.DelugeCooldown;
-                        terminal.WriteLine(Loc.Get("combat.spell_on_cooldown", spell.Name, cdLeft), "red");
+                        terminal.WriteLine(Loc.Get("combat.spell_on_cooldown", spell.DisplayName, cdLeft), "red");
                     }
                     else if (!SpellSystem.HasRequiredSpellWeapon(player))
                     {
@@ -28762,7 +28936,7 @@ public partial class CombatEngine
                         terminal.WriteLine(Loc.Get("combat.need_weapon_spell", reqType), "red");
                     }
                     else if (!player.CanCastSpells())
-                        terminal.WriteLine(Loc.Get("combat.spell_silenced", spell.Name), "red");
+                        terminal.WriteLine(Loc.Get("combat.spell_silenced", spell.DisplayName), "red");
                     else
                         terminal.WriteLine(Loc.Get("combat.not_enough_mana_detail", manaCost, player.Mana), "red");
                 }
@@ -28878,7 +29052,7 @@ public partial class CombatEngine
                     if (spellOnCD)
                     {
                         int cdLeft = player.UnmakingCooldown > 0 ? player.UnmakingCooldown : player.DelugeCooldown;
-                        terminal.WriteLine(Loc.Get("combat.spell_on_cooldown", spell.Name, cdLeft), "red");
+                        terminal.WriteLine(Loc.Get("combat.spell_on_cooldown", spell.DisplayName, cdLeft), "red");
                     }
                     else if (!SpellSystem.HasRequiredSpellWeapon(player))
                     {
@@ -28886,7 +29060,7 @@ public partial class CombatEngine
                         terminal.WriteLine(Loc.Get("combat.need_weapon_spell", reqType), "red");
                     }
                     else if (!player.CanCastSpells())
-                        terminal.WriteLine(Loc.Get("combat.spell_silenced", spell.Name), "red");
+                        terminal.WriteLine(Loc.Get("combat.spell_silenced", spell.DisplayName), "red");
                     else
                         terminal.WriteLine(Loc.Get("combat.not_enough_mana_detail", manaCost, player.Mana), "red");
                 }

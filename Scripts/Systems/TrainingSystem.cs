@@ -1196,7 +1196,7 @@ public static class TrainingSystem
                 if (!learned) continue;
 
                 string skillId = GetSpellSkillId(character.Class, spell.Level);
-                skills.Add((skillId, spell.Name));
+                skills.Add((skillId, spell.DisplayName));
             }
         }
 

@@ -1630,7 +1630,7 @@ namespace UsurperRemake.Systems
                 if (SpellSystem.CanCastSpell(player, spell.Level))
                 {
                     terminal.SetColor("cyan");
-                    terminal.WriteLine($"  [{castableSpells.Count + 1}] {spell.Name} (Mana: {spell.ManaCost})");
+                    terminal.WriteLine($"  [{castableSpells.Count + 1}] {spell.DisplayName} (Mana: {spell.ManaCost})");
                     castableSpells.Add(spell);
                 }
             }
