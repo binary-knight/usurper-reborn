@@ -18572,6 +18572,11 @@ public partial class CombatEngine
                 {
                     CompanionSystem.Instance.SyncCompanionHP(targetAlly);
                 }
+
+                // v1.1.15: a heal that carries a ward (Power Hat) wards the ally too, the same as
+                // the combat cast (ApplyHealTo) and a teammate's single-target heal.
+                if (spellResult.ProtectionBonus > 0)
+                    WardAlly(targetAlly, spellResult.ProtectionBonus, spellResult.Duration > 0 ? spellResult.Duration : 999);
             }
             else if (!spellResult.Success)
             {
