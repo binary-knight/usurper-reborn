@@ -798,6 +798,7 @@ namespace UsurperRemake.Systems
                 AutoCombatHealPercent = player.AutoCombatHealPercent, // v1.1.13: auto-combat potion threshold
                 ClassicMainStreet = player.ClassicMainStreet, // v1.1.14: Main Street layout preference
                 ClassicTipDraws = player.ClassicTipDraws, // v1.1.14: switch-to-classic tip count
+                MenuKeysNeedEnter = player.MenuKeysNeedEnter, // v1.1.15: menu keys need Enter preference
                 DateFormatPreference = player.DateFormatPreference,
                 AutoRedistributeXP = player.AutoRedistributeXP,
                 Specialization = (int)player.Specialization,

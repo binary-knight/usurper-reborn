@@ -296,6 +296,14 @@ public static partial class GameConfig
     /// </summary>
     private static bool _compactModeGlobal = false;
 
+    /// <summary>
+    /// v1.1.15: single-player in a local console reads a menu key as a line (type the key, press Enter)
+    /// when true, or acts on one keypress when false. Mirrored from Character.MenuKeysNeedEnter on load.
+    /// Only the local console branch of TerminalEmulator.GetKeyInput reads it; MUD, BBS and door input
+    /// always read a line, so a plain static is enough.
+    /// </summary>
+    public static bool MenuKeysNeedEnter { get; set; } = true;
+
     public static bool CompactMode
     {
         get

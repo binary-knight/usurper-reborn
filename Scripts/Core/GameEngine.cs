@@ -912,6 +912,7 @@ public partial class GameEngine
             PendingNewGamePlus = false;
             // Preserve player preferences before deleting old save
             bool preserveScreenReader = currentPlayer?.ScreenReaderMode ?? GameConfig.ScreenReaderMode;
+            bool preserveMenuKeys = currentPlayer?.MenuKeysNeedEnter ?? GameConfig.MenuKeysNeedEnter; // v1.1.15
             var preserveOrientation = currentPlayer?.Orientation ?? SexualOrientation.Straight;
             // Use the active character key (could be main or alt)
             var activeKey = UsurperRemake.BBS.DoorMode.GetPlayerName()?.ToLowerInvariant() ?? accountName;
@@ -924,6 +925,8 @@ public partial class GameEngine
             {
                 currentPlayer.ScreenReaderMode = preserveScreenReader;
                 currentPlayer.Orientation = preserveOrientation;
+                currentPlayer.MenuKeysNeedEnter = preserveMenuKeys; // v1.1.15
+                GameConfig.MenuKeysNeedEnter = preserveMenuKeys;
             }
         }
     }
@@ -5033,6 +5036,9 @@ public partial class GameEngine
         currentPlayer.DisableCharacterMonsterArt = GameConfig.DisableCharacterMonsterArt;
         currentPlayer.Language = GameConfig.Language;
 
+        // v1.1.15: a new character starts with menu keys needing Enter; a prior character's choice does not carry over
+        GameConfig.MenuKeysNeedEnter = currentPlayer.MenuKeysNeedEnter;
+
         // Auto-populate quickbar with starting spells/abilities
         AutoPopulateQuickbar(currentPlayer);
 
@@ -5605,6 +5611,7 @@ public partial class GameEngine
             AutoCombatHealPercent = GameConfig.ClampAutoCombatHealPercent(playerData.AutoCombatHealPercent), // v1.1.13: in range
             ClassicMainStreet = playerData.ClassicMainStreet, // v1.1.14: Main Street layout preference
             ClassicTipDraws = Math.Max(0, playerData.ClassicTipDraws), // v1.1.14: switch-to-classic tip count
+            MenuKeysNeedEnter = playerData.MenuKeysNeedEnter, // v1.1.15: menu keys need Enter preference
             DateFormatPreference = playerData.DateFormatPreference,
             AutoRedistributeXP = playerData.AutoRedistributeXP,
             Specialization = (ClassSpecialization)playerData.Specialization,
@@ -6352,6 +6359,7 @@ public partial class GameEngine
 
         // Sync compact mode and language from player save to global
         GameConfig.CompactMode = player.CompactMode;
+        GameConfig.MenuKeysNeedEnter = player.MenuKeysNeedEnter; // v1.1.15
         GameConfig.AutoLook = player.AutoLook;
         GameConfig.DisableCharacterMonsterArt = player.DisableCharacterMonsterArt;
         // If the player actively chose a language on the main menu this session, keep it
