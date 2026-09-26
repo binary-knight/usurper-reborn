@@ -595,6 +595,10 @@ public class Character
     /// <summary>Combats fought this session. Used to throttle diminishing-returns messages.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public int SessionCombatCount { get; set; }
+    /// <summary>v1.1.15: dungeon strain carried toward the next Mental point, in hundredths of a
+    /// per mille (100_000 = 1 point). Transient in this piece; see MentalSystem.AddStrain.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int MentalStrainRemainder { get; set; }
 
     // Team HQ upgrade levels (v0.52.8) — cached from DB on login, not serialized
     public int HQArmoryLevel { get; set; }    // +5% attack per level
