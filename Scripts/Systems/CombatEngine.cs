@@ -8695,14 +8695,28 @@ public partial class CombatEngine
     /// <summary>
     /// v1.1.15: a ward keeps the stronger of what the ally has and what it is given. Every ward
     /// (the Sage's, the Cleric's, the Wavecaller's) lives in MagicACBonus, so wards never stack.
-    /// True when the new ward went on.
+    /// True when the new ward went on. On an equal value the longer ward wins, so a short ward
+    /// no longer blocks a whole-fight one of the same strength.
     /// </summary>
     internal static bool ApplyWardHighestWins(Character tgt, int bonus, int duration)
     {
-        if (tgt == null || bonus <= 0 || tgt.MagicACBonus >= bonus) return false;
+        if (tgt == null || bonus <= 0 || tgt.MagicACBonus > bonus) return false;
+        if (tgt.MagicACBonus == bonus && WardRoundsLeft(tgt) >= duration) return false;
         tgt.MagicACBonus = bonus;
         tgt.ApplyStatus(StatusEffect.Blessed, duration);
         return true;
+    }
+
+    /// <summary>
+    /// v1.1.15: rounds left on the ward in MagicACBonus. Blessed, Protected and Defending each clear
+    /// it when they end; with none of them up the ward has no clock, so it counts as endless.
+    /// </summary>
+    private static int WardRoundsLeft(Character tgt)
+    {
+        int left = -1;
+        foreach (var s in new[] { StatusEffect.Blessed, StatusEffect.Protected, StatusEffect.Defending })
+            if (tgt.ActiveStatuses.TryGetValue(s, out int rounds)) left = Math.Max(left, rounds);
+        return left < 0 ? int.MaxValue : left;
     }
 
     /// <summary>v1.1.15: puts a ward on one ally under the highest-wins rule and says what happened.</summary>
@@ -19179,14 +19193,20 @@ public partial class CombatEngine
         {
             var companion = CompanionSystem.Instance.GetCompanion(caster.CompanionId.Value);
             if (companion?.DisabledSpells != null && companion.DisabledSpells.Count > 0)
+            {
+                SpellSystem.RemapLegacySageDisabledSpells(caster, companion.DisabledSpells); // v1.1.15
                 return companion.DisabledSpells;
+            }
             return new HashSet<string>();
         }
         // v0.65.1: non-companion teammates read the controlling player's spell toggles.
         if (currentPlayer != null
             && currentPlayer.TeammateDisabledSpells.TryGetValue(caster.GetSkillToggleKey(), out var disabledSpells)
             && disabledSpells.Count > 0)
+        {
+            SpellSystem.RemapLegacySageDisabledSpells(caster, disabledSpells); // v1.1.15: renamed Sage spells
             return new HashSet<string>(disabledSpells);
+        }
         return new HashSet<string>();
     }
 

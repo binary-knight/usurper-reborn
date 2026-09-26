@@ -216,6 +216,62 @@ public class SageCompanion1115Tests
         pack.Should().OnlyContain(m => m.IsSlowed, "Dulling Mist reaches every enemy");
     }
 
+    // ---- renamed spells in a teammate's disabled list ----
+
+    private static HashSet<string> Disabled(CombatEngine engine, Character caster) =>
+        (HashSet<string>)typeof(CombatEngine).GetMethod("GetDisabledSpellsFor", F)!.Invoke(engine, new object[] { caster })!;
+
+    [Fact]
+    public void ASagesOldSpellNames_MoveToTheNewNames()
+    {
+        var (engine, sage, leader, _, _) = Party(75);
+        var stored = new List<string> { "Duplicate", "Roast", "Giant Form", "Dominate", "Summon Demon", "Mind Spike" };
+        leader.TeammateDisabledSpells[sage.GetSkillToggleKey()] = stored;
+        Disabled(engine, sage).Should().BeEquivalentTo(new[]
+            { "Dulling Mist", "Scholar's Mark", "Slumber Mist", "Compel", "Unveil the Pattern", "Mind Spike" });
+        stored.Should().BeEquivalentTo(new[]
+            { "Dulling Mist", "Scholar's Mark", "Slumber Mist", "Compel", "Unveil the Pattern", "Mind Spike" }, "the stored list is fixed too");
+    }
+
+    [Fact]
+    public void AMagiciansSummonDemon_KeepsItsName()
+    {
+        var (engine, _, leader, _, _) = Party(75);
+        var mage = Ally("Mage", CharacterClass.Magician);
+        leader.TeammateDisabledSpells[mage.GetSkillToggleKey()] = new List<string> { "Summon Demon", "Dominate" };
+        Disabled(engine, mage).Should().BeEquivalentTo(new[] { "Summon Demon", "Dominate" });
+        SpellSystem.RemapLegacySageDisabledSpells(mage, new List<string> { "Summon Demon" }).Should().BeFalse();
+    }
+
+    [Fact]
+    public void TheSkillEditor_AlsoRenames()
+    {
+        string src = File.ReadAllText(Path.Combine(Leftovers1114BTests.RepoRoot(), "Scripts", "Locations", "DungeonLocation.cs"));
+        src.Should().Contain("SpellSystem.RemapLegacySageDisabledSpells(teammate, disabledSpells);");
+    }
+
+    // ---- equal wards: the longer one wins ----
+
+    [Fact]
+    public void AnEqualWholeFightWard_ReplacesAShortOne()
+    {
+        var ally = Ally("Tank", CharacterClass.Warrior);
+        CombatEngine.ApplyWardHighestWins(ally, 100, 5).Should().BeTrue();
+        CombatEngine.ApplyWardHighestWins(ally, 100, 999).Should().BeTrue("same strength, longer ward");
+        ally.ActiveStatuses[StatusEffect.Blessed].Should().Be(999);
+    }
+
+    [Fact]
+    public void AnEqualShortWard_DoesNotCutAWholeFightOne()
+    {
+        var ally = Ally("Tank", CharacterClass.Warrior);
+        CombatEngine.ApplyWardHighestWins(ally, 100, 999).Should().BeTrue();
+        CombatEngine.ApplyWardHighestWins(ally, 100, 5).Should().BeFalse();
+        CombatEngine.ApplyWardHighestWins(ally, 100, 999).Should().BeFalse("the same ward again changes nothing");
+        ally.ActiveStatuses[StatusEffect.Blessed].Should().Be(999);
+        ally.MagicACBonus.Should().Be(100);
+    }
+
     [Fact]
     public void TheTeammateTurn_TriesTheSageSpellsFirst()
     {

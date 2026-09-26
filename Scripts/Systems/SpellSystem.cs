@@ -444,7 +444,34 @@ public static class SpellSystem
         
         return null;
     }
-    
+
+    /// <summary>v1.1.15: the Sage spells renamed this release, old name to slot.</summary>
+    private static readonly (string oldName, int slot)[] LegacySageSpellSlots =
+    {
+        ("Duplicate", 5), ("Roast", 6), ("Giant Form", 10), ("Dominate", 14), ("Summon Demon", 18),
+    };
+
+    /// <summary>
+    /// v1.1.15: a Sage teammate's disabled-spell list is kept by spell name, so an entry under a
+    /// renamed spell's old name is moved to the slot's current name. Sage only: the Magician's
+    /// Summon Demon keeps its name. Changes the list in place; true when anything moved.
+    /// </summary>
+    public static bool RemapLegacySageDisabledSpells(Character teammate, ICollection<string> names)
+    {
+        if (teammate == null || teammate.Class != CharacterClass.Sage || names == null || names.Count == 0) return false;
+        bool changed = false;
+        foreach (var (oldName, slot) in LegacySageSpellSlots)
+        {
+            if (!names.Contains(oldName)) continue;
+            string newName = GetSpellInfo(CharacterClass.Sage, slot)?.Name;
+            if (string.IsNullOrEmpty(newName) || newName == oldName) continue;
+            names.Remove(oldName);
+            if (!names.Contains(newName)) names.Add(newName);
+            changed = true;
+        }
+        return changed;
+    }
+
     /// <summary>
     /// Get all available spells for character
     /// Only returns spells that have been learned (Spell[level-1][0] == true)
