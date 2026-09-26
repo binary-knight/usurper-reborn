@@ -445,6 +445,7 @@ public partial class CombatEngine
         c.TempAttackBonus = 0; c.TempAttackBonusDuration = 0;
         c.TempDefenseBonus = 0; c.TempDefenseBonusDuration = 0;
         c.MagicACBonus = 0;
+        c.HasOceanMemory = false; // v1.1.15
         c.DodgeNextAttack = false;
         c.HasBloodlust = false;
         c.TempCritChanceBonus = 0;
@@ -455,7 +456,7 @@ public partial class CombatEngine
         c.TempDamageReductionPercent = 0; c.TempDamageReductionDuration = 0;
         c.TempThornReflectPercent = 0; c.TempThornReflectDuration = 0;
         c.TempPercentRegenPerRound = 0; c.TempPercentRegenDuration = 0;
-        foreach (var st in new[] { StatusEffect.Protected, StatusEffect.Blessed, StatusEffect.Haste, StatusEffect.Reflecting,
+        foreach (var st in new[] { StatusEffect.Protected, StatusEffect.Blessed, StatusEffect.Haste, StatusEffect.Reflecting, StatusEffect.Blur,
                                    StatusEffect.Stunned, StatusEffect.Paralyzed, StatusEffect.Sleeping, StatusEffect.Frozen, StatusEffect.Slow })
             c.RemoveStatus(st);
     }
@@ -525,6 +526,18 @@ public partial class CombatEngine
         // the window is rounds with no hold: a held round does not count towards forgetting the last one
         // (Codex review: counting held rounds, and then the round a hold ended, reset the returns early)
         if (!IsHeld(fighter) && ++st.RoundsSinceLast >= GameConfig.StunDRWindowRounds) st.RecentCount = 0;
+    }
+
+    /// <summary>
+    /// v1.1.15: a Blinded fighter misses GameConfig.PvPBlindedMissPercent of their weapon swings in
+    /// a duel. Before this Blinded did nothing in a duel. True when the swing missed.
+    /// </summary>
+    internal bool PvPBlindedMiss(Character attacker)
+    {
+        if (attacker == null || !attacker.HasStatus(StatusEffect.Blinded)) return false;
+        if (random.Next(100) >= GameConfig.PvPBlindedMissPercent) return false;
+        terminal.WriteLine(Loc.Get("combat.pvp_blinded_miss", attacker.DisplayName), "gray");
+        return true;
     }
 
     private void EndPvPCombat(Character attacker, Character defender)
@@ -906,6 +919,7 @@ public partial class CombatEngine
         player.TempDefenseBonus = 0;
         player.TempDefenseBonusDuration = 0;
         player.MagicACBonus = 0; // Clear spell protection buffs from previous fight
+        player.HasOceanMemory = false; // v1.1.15: Ocean's Memory lasts one fight
         player.DodgeNextAttack = false;
         player.HasBloodlust = false;
         player.HasStatusImmunity = false;
@@ -1099,6 +1113,7 @@ public partial class CombatEngine
                     teammate.TempDefenseBonus = 0;
                     teammate.TempDefenseBonusDuration = 0;
                     teammate.MagicACBonus = 0;
+                    teammate.HasOceanMemory = false; // v1.1.15: Ocean's Memory lasts one fight
                     teammate.DodgeNextAttack = false;
                     teammate.HasBloodlust = false;
                     // v1.2: a brace on the round the last monster fell skips the round-end clear
@@ -2104,12 +2119,14 @@ public partial class CombatEngine
         player.TempDefenseBonus = 0;
         player.TempDefenseBonusDuration = 0;
         player.MagicACBonus = 0;
+        player.HasOceanMemory = false; // v1.1.15: it never ended before
         player.DodgeNextAttack = false;
         player.HasBloodlust = false;
         player.HasStatusImmunity = false;
         player.StatusImmunityDuration = 0;
         player.DeathsEmbraceActive = false;
         player.StatusLifestealPercent = 0;
+        player.RemoveStatus(StatusEffect.Blur); // v1.1.15: a whole-fight Blur ends with the fight
         player.RemoveStatus(StatusEffect.Protected);
         player.RemoveStatus(StatusEffect.Blessed);
         player.RemoveStatus(StatusEffect.Haste);
@@ -2136,6 +2153,8 @@ public partial class CombatEngine
             foreach (var teammate in result.Teammates)
             {
                 if (teammate == null) continue;
+                teammate.HasOceanMemory = false; // v1.1.15: the Sage's party spells end with the fight
+                teammate.RemoveStatus(StatusEffect.Blur);
                 teammate.RemoveStatus(StatusEffect.Protected);
                 teammate.RemoveStatus(StatusEffect.Blessed);
                 teammate.RemoveStatus(StatusEffect.Haste);
@@ -8671,6 +8690,72 @@ public partial class CombatEngine
         var alive = party.Where(c => c.IsAlive).ToList();
         return alive.Where(IsPartyTank).OrderByDescending(c => c.MaxHP).FirstOrDefault()
             ?? alive.OrderByDescending(c => c.MaxHP).FirstOrDefault();
+    }
+
+    /// <summary>
+    /// v1.1.15: a ward keeps the stronger of what the ally has and what it is given. Every ward
+    /// (the Sage's, the Cleric's, the Wavecaller's) lives in MagicACBonus, so wards never stack.
+    /// True when the new ward went on.
+    /// </summary>
+    internal static bool ApplyWardHighestWins(Character tgt, int bonus, int duration)
+    {
+        if (tgt == null || bonus <= 0 || tgt.MagicACBonus >= bonus) return false;
+        tgt.MagicACBonus = bonus;
+        tgt.ApplyStatus(StatusEffect.Blessed, duration);
+        return true;
+    }
+
+    /// <summary>v1.1.15: puts a ward on one ally under the highest-wins rule and says what happened.</summary>
+    private void WardAlly(Character tgt, int bonus, int duration)
+    {
+        if (ApplyWardHighestWins(tgt, bonus, duration))
+            terminal.WriteLine(Loc.Get("combat.magically_protected", tgt.DisplayName, bonus), "blue");
+        else
+            terminal.WriteLine(Loc.Get("combat.ward_stronger_holds", tgt.DisplayName), "gray");
+    }
+
+    /// <summary>v1.1.15: the caster, every living teammate, and the leader when a follower casts.</summary>
+    private List<Character> LivingPartyOf(Character caster, CombatResult? result)
+    {
+        var party = new List<Character>();
+        if (caster != null && caster.IsAlive) party.Add(caster);
+        if (currentTeammates != null)
+            foreach (var t in currentTeammates)
+                if (t != null && t.IsAlive && !party.Contains(t)) party.Add(t);
+        if (result?.Player != null && result.Player.IsAlive && !party.Contains(result.Player)) party.Add(result.Player);
+        return party;
+    }
+
+    /// <summary>
+    /// v1.1.15: the Sage's party wards reach every ally. Fog of War: protection. Shadow Cloak and
+    /// Noctura's Veil: protection and Blur. Mind Blank: protection and status immunity. Ocean's
+    /// Memory: half mana cost. Protection follows the highest-wins rule.
+    /// </summary>
+    internal void ApplySagePartyWard(Character caster, SpellSystem.SpellResult spellResult, CombatResult? result)
+    {
+        int dur = spellResult.Duration > 0 ? spellResult.Duration : 999;
+        string effect = (spellResult.SpecialEffect ?? "").ToLowerInvariant();
+        foreach (var ally in LivingPartyOf(caster, result))
+        {
+            if (spellResult.ProtectionBonus > 0) WardAlly(ally, spellResult.ProtectionBonus, dur);
+            switch (effect)
+            {
+                case "shadow":
+                    ally.ApplyStatus(StatusEffect.Blur, dur);
+                    terminal.WriteLine(Loc.Get("combat.shimmers_blurs", ally.DisplayName), "cyan");
+                    break;
+                case "mindblank":
+                    ally.HasStatusImmunity = true;
+                    ally.StatusImmunityDuration = Math.Max(ally.StatusImmunityDuration, dur);
+                    terminal.WriteLine(Loc.Get("combat.impenetrable_fortress", ally.DisplayName), "bright_white");
+                    break;
+                case "ocean_memory":
+                    ally.HasOceanMemory = true;
+                    if (ally != caster)
+                        terminal.WriteLine(Loc.Get("combat.sage_ocean_memory_ally", ally.DisplayName), "bright_cyan");
+                    break;
+            }
+        }
     }
 
     /// <summary>
@@ -17297,13 +17382,7 @@ public partial class CombatEngine
                         CompanionSystem.Instance.SyncCompanionHP(tgt);
                 }
                 if (spellResult.ProtectionBonus > 0)
-                {
-                    int dur = spellResult.Duration > 0 ? spellResult.Duration : 999;
-                    tgt.MagicACBonus = spellResult.ProtectionBonus;
-                    tgt.ApplyStatus(StatusEffect.Blessed, dur);
-                    terminal.SetColor("blue");
-                    terminal.WriteLine(Loc.Get("combat.magically_protected", tgt.DisplayName, spellResult.ProtectionBonus));
-                }
+                    WardAlly(tgt, spellResult.ProtectionBonus, spellResult.Duration > 0 ? spellResult.Duration : 999);
                 result.CombatLog.Add($"{player.DisplayName} casts {spellInfo.Name} on {tgt.DisplayName}.");
             }
             void ApplyBuffTo(Character tgt)
@@ -17327,6 +17406,12 @@ public partial class CombatEngine
                 else if (spellInfo.SpellType == "Heal") ApplyHealTo(overrideTgt);
                 else ApplyBuffTo(overrideTgt);
             }
+            // v1.1.15: the Sage's party wards and Ocean's Memory reach every ally
+            else if (spellInfo.IsMultiTarget && spellInfo.SpellType == "Buff" && player.Class == CharacterClass.Sage)
+            {
+                ApplySagePartyWard(player, spellResult, result);
+                result.CombatLog.Add($"{player.DisplayName} casts {spellInfo.Name} on the whole party.");
+            }
             // Multi-target buff (e.g. Covenant of the Deep, Symphony of the Depths) — buff caster AND all teammates
             else if (spellInfo.IsMultiTarget && spellInfo.SpellType == "Buff")
             {
@@ -17339,12 +17424,7 @@ public partial class CombatEngine
                     foreach (var tm in currentTeammates.Where(t => t.IsAlive))
                     {
                         if (spellResult.ProtectionBonus > 0)
-                        {
-                            int dur = spellResult.Duration > 0 ? spellResult.Duration : 999;
-                            tm.MagicACBonus = spellResult.ProtectionBonus;
-                            tm.ApplyStatus(StatusEffect.Blessed, dur);
-                            terminal.WriteLine(Loc.Get("combat.magically_protected", tm.DisplayName, spellResult.ProtectionBonus), "blue");
-                        }
+                            WardAlly(tm, spellResult.ProtectionBonus, spellResult.Duration > 0 ? spellResult.Duration : 999);
                         if (spellResult.AttackBonus > 0)
                         {
                             int dur = spellResult.Duration > 0 ? spellResult.Duration : 3;
@@ -17377,12 +17457,7 @@ public partial class CombatEngine
                 {
                     var lead = result.Player;
                     if (spellResult.ProtectionBonus > 0)
-                    {
-                        int dur = spellResult.Duration > 0 ? spellResult.Duration : 999;
-                        lead.MagicACBonus = spellResult.ProtectionBonus;
-                        lead.ApplyStatus(StatusEffect.Blessed, dur);
-                        terminal.WriteLine(Loc.Get("combat.magically_protected", lead.DisplayName, spellResult.ProtectionBonus), "blue");
-                    }
+                        WardAlly(lead, spellResult.ProtectionBonus, spellResult.Duration > 0 ? spellResult.Duration : 999);
                     if (spellResult.AttackBonus > 0)
                     {
                         int dur = spellResult.Duration > 0 ? spellResult.Duration : 3;
@@ -17449,30 +17524,12 @@ public partial class CombatEngine
                 }
 
                 // Apply any protection/buff bonus from the spell to entire party
+                // v1.1.15: the highest ward wins on each ally (Veloura's Embrace)
                 if (spellResult.ProtectionBonus > 0)
                 {
                     int dur = spellResult.Duration > 0 ? spellResult.Duration : 999;
-                    player.MagicACBonus = spellResult.ProtectionBonus;
-                    player.ApplyStatus(StatusEffect.Blessed, dur);
-                    terminal.WriteLine(Loc.Get("combat.you_magically_protected", spellResult.ProtectionBonus), "blue");
-
-                    if (currentTeammates != null)
-                    {
-                        foreach (var tm in currentTeammates.Where(t => t.IsAlive))
-                        {
-                            tm.MagicACBonus = spellResult.ProtectionBonus;
-                            tm.ApplyStatus(StatusEffect.Blessed, dur);
-                            terminal.WriteLine(Loc.Get("combat.magically_protected", tm.DisplayName, spellResult.ProtectionBonus), "blue");
-                        }
-                    }
-                    // v0.65.1: leader inclusion (see above).
-                    if (result.Player != null && result.Player != player && result.Player.IsAlive
-                        && (currentTeammates == null || !currentTeammates.Contains(result.Player)))
-                    {
-                        result.Player.MagicACBonus = spellResult.ProtectionBonus;
-                        result.Player.ApplyStatus(StatusEffect.Blessed, dur);
-                        terminal.WriteLine(Loc.Get("combat.magically_protected", result.Player.DisplayName, spellResult.ProtectionBonus), "blue");
-                    }
+                    foreach (var ally in LivingPartyOf(player, result))
+                        WardAlly(ally, spellResult.ProtectionBonus, dur);
                 }
 
                 result.CombatLog.Add($"{player.DisplayName} casts {spellInfo.Name} on the whole party.");
@@ -20276,6 +20333,16 @@ public partial class CombatEngine
                 await Task.Delay(GetCombatDelay(500));
                 return;
             }
+        }
+
+        // v1.1.15: Blur makes a monster miss a teammate 20% of the time, as it does the player
+        // (the Sage's Shadow Cloak and Noctura's Veil now blur the whole party)
+        if (companion.HasStatus(StatusEffect.Blur) && random.Next(100) < 20)
+        {
+            terminal.WriteLine(Loc.Get("combat.blur_miss"), "gray");
+            result.CombatLog.Add($"{monster.Name} misses {companion.DisplayName} due to blur");
+            await Task.Delay(GetCombatDelay(500));
+            return;
         }
 
         // Calculate monster damage
@@ -25772,6 +25839,13 @@ public partial class CombatEngine
             terminal.WriteLine(Loc.Get("combat.off_hand_strike"));
         }
 
+        if (PvPBlindedMiss(attacker))
+        {
+            result.CombatLog.Add($"{attacker.DisplayName} misses {defender.DisplayName} (blinded)");
+            await Task.Delay(GetCombatDelay(800));
+            return;
+        }
+
         long attackPower = attacker.Strength + GetEffectiveWeapPow(attacker.WeapPow) + random.Next(1, 16);
 
         // Weapon config modifier; the off-hand flag applies the same reduced-power
@@ -26345,6 +26419,12 @@ public partial class CombatEngine
         }
 
         // 3. Default attack (with weapon soft cap)
+        if (PvPBlindedMiss(computer))
+        {
+            result.CombatLog.Add($"{computer.DisplayName} misses {opponent.DisplayName} (blinded)");
+            await Task.Delay(GetCombatDelay(800));
+            return;
+        }
         long attackPower = computer.Strength + GetEffectiveWeapPow(computer.WeapPow) + random.Next(1, 16);
 
         // Apply weapon configuration damage modifier
@@ -26927,10 +27007,14 @@ public partial class CombatEngine
         if (spellResult.ProtectionBonus > 0)
         {
             int dur = spellResult.Duration > 0 ? spellResult.Duration : 999;
-            caster.MagicACBonus = spellResult.ProtectionBonus;
-            caster.ApplyStatus(StatusEffect.Blessed, dur);
-            string durText = dur >= 999 ? Loc.Get("combat.whole_fight") : Loc.Get("combat.n_rounds", dur);
-            terminal.WriteLine(Loc.Get("combat.caster_protected", caster.DisplayName, spellResult.ProtectionBonus, durText), "blue");
+            // v1.1.15: a weaker ward no longer replaces a stronger one
+            if (ApplyWardHighestWins(caster, spellResult.ProtectionBonus, dur))
+            {
+                string durText = dur >= 999 ? Loc.Get("combat.whole_fight") : Loc.Get("combat.n_rounds", dur);
+                terminal.WriteLine(Loc.Get("combat.caster_protected", caster.DisplayName, spellResult.ProtectionBonus, durText), "blue");
+            }
+            else
+                terminal.WriteLine(Loc.Get("combat.ward_stronger_holds", caster.DisplayName), "gray");
         }
 
         if (spellResult.AttackBonus > 0)
@@ -27290,6 +27374,32 @@ public partial class CombatEngine
             case "freeze":
                 if (TryApplyPvPControl(target, StatusEffect.Frozen, duration))
                     terminal.WriteLine(Loc.Get("combat.is_frozen", target.DisplayName), "bright_cyan");
+                break;
+
+            // v1.1.15: the Sage's control spells in a duel. Slumber Mist is a hold, so it goes
+            // through the duel control rules; Dulling Mist slows, as frost does; Psychic Scream's
+            // accuracy loss is Blinded.
+            case "slumber_mist":
+                if (TryApplyPvPControl(target, StatusEffect.Sleeping, duration))
+                    terminal.WriteLine(Loc.Get("combat.magical_slumber", target.DisplayName), "cyan");
+                break;
+
+            case "dulling_mist":
+                target.ApplyStatus(StatusEffect.Slow, duration);
+                terminal.WriteLine(Loc.Get("combat.is_slowed", target.DisplayName), "gray");
+                break;
+
+            case "psychic_scream":
+                target.ApplyStatus(StatusEffect.Blinded, duration);
+                terminal.WriteLine(Loc.Get("combat.is_blinded", target.DisplayName), "gray");
+                break;
+
+            // v1.1.15: Scholar's Mark, Unveil the Pattern and Compel work through allies and the
+            // party's tank; a duel has neither, so they do nothing there.
+            case "scholars_mark":
+            case "unveil_pattern":
+            case "compel":
+                terminal.WriteLine(Loc.Get("combat.pvp_party_spell_no_effect"), "gray");
                 break;
 
             // v1.1.10: frost slows, as it does against a monster. Frost Touch and Ice Storm are the

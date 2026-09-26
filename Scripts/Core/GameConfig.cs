@@ -1920,6 +1920,7 @@ public static partial class GameConfig
     public const float BossStunResistChance = 0.50f;          // Bosses resist stun outright at this rate
     public const int BossSoftControlResistPercent = 25;        // v1.1.15: bosses shrug off soft control (slow, distract, mark, taunt, confusion) this often
     public const int MassConfusionBossMaxRounds = 2;          // v1.1.15: Mass Confusion holds a boss at most this long
+    public const int PvPBlindedMissPercent = 25;              // v1.1.15: a Blinded fighter misses this share of weapon swings in a duel
     public const float PoisonEnchantProcChance = 0.20f;       // 20% chance to poison per attack
     public const float HolyEnchantProcChance = 0.25f;         // 25% chance for holy damage (bonus vs undead)
     public const float HolyEnchantDamageMultiplier = 0.20f;   // Holy damage = weapon damage * 20%
