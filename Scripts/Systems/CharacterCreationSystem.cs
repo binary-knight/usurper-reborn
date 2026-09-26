@@ -182,8 +182,8 @@ public class CharacterCreationSystem
             // Step 9: Show character summary and confirm
             await ShowCharacterSummary(character);
             
-            var confirm = await terminal.GetInputAsync(Loc.Get("creation.confirm"));
-            if (!string.IsNullOrEmpty(confirm) && !GameConfig.IsAffirmative(confirm))
+            // v1.1.15: yesno-convert-a, prompt shows (Y/n) so a bare Enter keeps the old default of Yes
+            if (!await terminal.AskYesNoAsync(Loc.Get("creation.confirm"), enterDefault: true))
             {
                 terminal.WriteLine(Loc.Get("creation.aborted"), "red");
                 return null;
@@ -196,10 +196,8 @@ public class CharacterCreationSystem
                 terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("creation.autolook_prompt"), "bright_cyan");
                 terminal.WriteLine(Loc.Get("creation.autolook_desc"), "gray");
-                var autoLookAns = (await terminal.GetInputAsync(Loc.Get("creation.autolook_ask")) ?? "").Trim().ToUpperInvariant();
-                // Accept localized affirmatives: Yes / Igen (hu) / Si (es,it) / Oui (fr)
-                character.AutoLook = autoLookAns.StartsWith("Y") || autoLookAns.StartsWith("I")
-                    || autoLookAns.StartsWith("S") || autoLookAns.StartsWith("O");
+                // v1.1.15: yesno-convert-a, prompt shows (y/N) so a bare Enter keeps the old default of No
+                character.AutoLook = await terminal.AskYesNoAsync(Loc.Get("creation.autolook_ask"), enterDefault: false);
                 GameConfig.AutoLook = character.AutoLook;
                 terminal.WriteLine(character.AutoLook
                     ? Loc.Get("creation.autolook_on")
@@ -557,9 +555,8 @@ public class CharacterCreationSystem
 
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("creation.name_confirm", name), "yellow");
-            var confirm = await terminal.GetInputAsync("");
-
-            if (string.IsNullOrEmpty(confirm) || GameConfig.IsAffirmative(confirm))
+            // v1.1.15: yesno-convert-a, prompt shows (Y/n) so a bare Enter keeps the old default of Yes
+            if (await terminal.AskYesNoAsync("", enterDefault: true))
             {
                 validName = true;
             }
@@ -738,8 +735,8 @@ public class CharacterCreationSystem
                     terminal.WriteLine(Loc.Get("creation.difficulty.nightmare_desc2"), "red");
                     terminal.WriteLine(Loc.Get("creation.difficulty.nightmare_desc3"), "red");
                     terminal.WriteLine("");
-                    var confirm = await terminal.GetInputAsync(Loc.Get("creation.difficulty.nightmare_confirm"));
-                    if (GameConfig.IsAffirmative(confirm))
+                    // v1.1.15: yesno-convert-a, prompt shows (y/N) so a bare Enter keeps the old default of No
+                    if (await terminal.AskYesNoAsync(Loc.Get("creation.difficulty.nightmare_confirm"), enterDefault: false))
                     {
                         terminal.WriteLine(Loc.Get("creation.difficulty.nightmare_sealed"), "bright_red");
                         await Task.Delay(1500);
@@ -1137,10 +1134,8 @@ public class CharacterCreationSystem
         terminal.Write(new string('═', TOTAL_W - 2), "gray");
         terminal.WriteLine("╝", "gray");
 
-        var response = await terminal.GetInputAsync("");
-
-        return !string.IsNullOrEmpty(response) &&
-               (GameConfig.IsAffirmative(response) || response.ToUpper() == "YES");
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        return await terminal.AskYesNoAsync("");
     }
 
     /// <summary>
@@ -1414,10 +1409,8 @@ public class CharacterCreationSystem
         // ── Confirm prompt ──
         terminal.WriteLine("");
         var raceDesc = GameConfig.RaceDescriptions[race];
-        var response = await terminal.GetInputAsync($"{pad} {Loc.Get("creation.preview.be_race_yn", raceDesc)}");
-
-        return !string.IsNullOrEmpty(response) &&
-               (GameConfig.IsAffirmative(response) || response.ToUpper() == "YES");
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        return await terminal.AskYesNoAsync($"{pad} {Loc.Get("creation.preview.be_race_yn", raceDesc)}");
     }
 
     /// <summary>
@@ -1675,10 +1668,8 @@ public class CharacterCreationSystem
         terminal.Write(new string('═', TOTAL_W - 2), "gray");
         terminal.WriteLine("╝", "gray");
 
-        var response = await terminal.GetInputAsync("");
-
-        return !string.IsNullOrEmpty(response) &&
-               (GameConfig.IsAffirmative(response) || response.ToUpper() == "YES");
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        return await terminal.AskYesNoAsync("");
     }
 
     /// <summary>
@@ -1915,10 +1906,8 @@ public class CharacterCreationSystem
         // ── Confirm prompt ──
         terminal.WriteLine("");
         var article = "aeiouAEIOU".Contains(className[0]) ? "an" : "a";
-        var response = await terminal.GetInputAsync($"{pad} {Loc.Get("creation.preview.be_class_yn", article, className)}");
-
-        return !string.IsNullOrEmpty(response) &&
-               (GameConfig.IsAffirmative(response) || response.ToUpper() == "YES");
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        return await terminal.AskYesNoAsync($"{pad} {Loc.Get("creation.preview.be_class_yn", article, className)}");
     }
 
     /// <summary>Screen reader race preview: plain text, no boxes or stat bars.</summary>
@@ -1976,10 +1965,8 @@ public class CharacterCreationSystem
 
         terminal.WriteLine("");
         var raceDesc = GameConfig.RaceDescriptions[race];
-        var response = await terminal.GetInputAsync(Loc.Get("creation.preview.be_race_yn", raceDesc));
-
-        return !string.IsNullOrEmpty(response) &&
-               (GameConfig.IsAffirmative(response) || response.ToUpper() == "YES");
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        return await terminal.AskYesNoAsync(Loc.Get("creation.preview.be_race_yn", raceDesc));
     }
 
     /// <summary>Screen reader class preview: plain text, no boxes or stat bars.</summary>
@@ -2022,10 +2009,8 @@ public class CharacterCreationSystem
 
         terminal.WriteLine("");
         var article = "aeiouAEIOU".Contains(className[0]) ? "an" : "a";
-        var response = await terminal.GetInputAsync(Loc.Get("creation.preview.be_class_yn", article, className));
-
-        return !string.IsNullOrEmpty(response) &&
-               (GameConfig.IsAffirmative(response) || response.ToUpper() == "YES");
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        return await terminal.AskYesNoAsync(Loc.Get("creation.preview.be_class_yn", article, className));
     }
 
     private static string GetClassDescription(CharacterClass cls) => cls switch
@@ -2909,14 +2894,8 @@ public class CharacterCreationSystem
     private async Task<bool> ConfirmChoice(string message, bool defaultYes)
     {
         var hint = defaultYes ? "Y/n" : "y/N";
-        var response = await terminal.GetInputAsync($"{message}? ({hint}): ");
-
-        if (string.IsNullOrEmpty(response))
-        {
-            return defaultYes;
-        }
-
-        return GameConfig.IsAffirmative(response);
+        // v1.1.15: yesno-convert-a, the hint here already shows the caller's own default
+        return await terminal.AskYesNoAsync($"{message}? ({hint}): ", enterDefault: defaultYes);
     }
     
     /// <summary>

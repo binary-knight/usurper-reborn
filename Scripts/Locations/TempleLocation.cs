@@ -753,8 +753,8 @@ public partial class TempleLocation : BaseLocation
         if (string.IsNullOrEmpty(currentGod) && !string.IsNullOrEmpty(currentPlayer.WorshippedGod))
         {
             terminal.WriteLine(Loc.Get("temple.follow_immortal_currently", currentPlayer.WorshippedGod), "bright_yellow");
-            var choice = await terminal.GetInputAsync(Loc.Get("temple.abandon_for_elder", currentPlayer.WorshippedGod));
-            if (GameConfig.IsAffirmative(choice))
+            // v1.1.15: yesno-convert-a, strict (Y/N)
+            if (await terminal.AskYesNoAsync(Loc.Get("temple.abandon_for_elder", currentPlayer.WorshippedGod)))
             {
                 string oldGod = currentPlayer.WorshippedGod;
                 currentPlayer.WorshippedGod = "";
@@ -786,17 +786,17 @@ public partial class TempleLocation : BaseLocation
         {
             terminal.WriteLine(Loc.Get("temple.currently_worship", currentGod), "white");
 
-            var choice = await terminal.GetInputAsync(Loc.Get("temple.lost_faith", currentGod));
-            if (GameConfig.IsAffirmative(choice))
+            // v1.1.15: yesno-convert-a, strict (Y/N)
+            if (await terminal.AskYesNoAsync(Loc.Get("temple.lost_faith", currentGod)))
             {
                 // Abandon faith
                 terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("temple.dont_believe", currentGod), "white");
                 terminal.WriteLine(Loc.Get("temple.powers_diminish", currentGod), "yellow");
 
-                var noteChoice = await terminal.GetInputAsync(Loc.Get("temple.send_note", currentGod));
                 string note = "";
-                if (GameConfig.IsAffirmative(noteChoice))
+                // v1.1.15: yesno-convert-a, strict (Y/N)
+                if (await terminal.AskYesNoAsync(Loc.Get("temple.send_note", currentGod)))
                 {
                     note = await terminal.GetInputAsync(Loc.Get("temple.note_prompt"));
                     terminal.WriteLine(Loc.Get("temple.done"), "green");
@@ -901,8 +901,8 @@ public partial class TempleLocation : BaseLocation
             return;
         }
 
-        var choice = await terminal.GetInputAsync(Loc.Get("temple.upset_gods"));
-        if (!GameConfig.IsAffirmative(choice))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (!await terminal.AskYesNoAsync(Loc.Get("temple.upset_gods")))
         {
             terminal.WriteLine(Loc.Get("temple.good_for_you"), "green");
             await Task.Delay(1000);
@@ -922,8 +922,8 @@ public partial class TempleLocation : BaseLocation
         }
 
         terminal.SetColor("red");
-        var confirmChoice = await terminal.GetInputAsync(Loc.Get("temple.confirm_desecrate", selectedGod.Name));
-        if (!GameConfig.IsAffirmative(confirmChoice))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (!await terminal.AskYesNoAsync(Loc.Get("temple.confirm_desecrate", selectedGod.Name)))
         {
             terminal.WriteLine(Loc.Get("temple.wise_choice"), "gray");
             return;
@@ -1132,8 +1132,8 @@ public partial class TempleLocation : BaseLocation
         }
 
         terminal.SetColor("white");
-        var confirm = await terminal.GetInputAsync(Loc.Get("temple.rite_confirm", cost));
-        if (!GameConfig.IsAffirmative(confirm))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (!await terminal.AskYesNoAsync(Loc.Get("temple.rite_confirm", cost)))
         {
             terminal.WriteLine(Loc.Get("temple.rite_cancel"), "gray");
             await terminal.PressAnyKey();
@@ -1185,8 +1185,8 @@ public partial class TempleLocation : BaseLocation
             terminal.WriteLine(Loc.Get("temple.not_your_god", selectedGod.Name), "red");
             terminal.WriteLine(Loc.Get("temple.mighty_not_happy", playerGod), "red");
 
-            var choice = await terminal.GetInputAsync(Loc.Get("temple.continue_prompt"));
-            if (GameConfig.IsAffirmative(choice))
+            // v1.1.15: yesno-convert-a, strict (Y/N)
+            if (await terminal.AskYesNoAsync(Loc.Get("temple.continue_prompt")))
             {
                 wrongGod = true;
             }
@@ -1401,8 +1401,8 @@ public partial class TempleLocation : BaseLocation
             if (requireConfirmation)
             {
                 terminal.WriteLine("");
-                var confirm = await terminal.GetInputAsync(Loc.Get("ui.confirm_choose", selectedGod.Name));
-                if (!GameConfig.IsAffirmative(confirm))
+                // v1.1.15: yesno-convert-a, strict (Y/N)
+                if (!await terminal.AskYesNoAsync(Loc.Get("ui.confirm_choose", selectedGod.Name)))
                 {
                     terminal.WriteLine(Loc.Get("temple.selection_cancelled"), "gray");
                     continue;
@@ -1629,8 +1629,8 @@ public partial class TempleLocation : BaseLocation
             return;
         }
 
-        var choice = await terminal.GetInputAsync(Loc.Get("temple.confirm_sacrifice_gold", goldAmount, god.Name));
-        if (!GameConfig.IsAffirmative(choice)) return;
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (!await terminal.AskYesNoAsync(Loc.Get("temple.confirm_sacrifice_gold", goldAmount, god.Name))) return;
 
         // Process sacrifice
         currentPlayer.Gold -= goldAmount;
@@ -2084,9 +2084,8 @@ public partial class TempleLocation : BaseLocation
         terminal.WriteLine(Loc.Get("temple.aurelion_few_can"), "bright_yellow");
         terminal.WriteLine("");
 
-        var choice = await terminal.GetInputAsync(Loc.Get("temple.approach_light"));
-
-        if (GameConfig.IsAffirmative(choice))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (await terminal.AskYesNoAsync(Loc.Get("temple.approach_light")))
         {
             story.SetStoryFlag("aurelion_encountered", true);
 
@@ -2193,8 +2192,8 @@ public partial class TempleLocation : BaseLocation
             return;
         }
 
-        var confirm = await terminal.GetInputAsync(Loc.Get("temple.confirm_sacrifice_weapon", currentPlayer.WeapPow, godName));
-        if (!GameConfig.IsAffirmative(confirm)) return;
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (!await terminal.AskYesNoAsync(Loc.Get("temple.confirm_sacrifice_weapon", currentPlayer.WeapPow, godName))) return;
 
         long powerGained = currentPlayer.WeapPow * 2;
         godSystem.ProcessGoldSacrifice(godName, powerGained * 100, currentPlayer.Name2); // Convert to equivalent gold power
@@ -2236,8 +2235,8 @@ public partial class TempleLocation : BaseLocation
             return;
         }
 
-        var confirm = await terminal.GetInputAsync(Loc.Get("temple.confirm_sacrifice_armor", currentPlayer.ArmPow, godName));
-        if (!GameConfig.IsAffirmative(confirm)) return;
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (!await terminal.AskYesNoAsync(Loc.Get("temple.confirm_sacrifice_armor", currentPlayer.ArmPow, godName))) return;
 
         long powerGained = currentPlayer.ArmPow * 2;
         godSystem.ProcessGoldSacrifice(godName, powerGained * 100, currentPlayer.Name2);
@@ -2295,8 +2294,8 @@ public partial class TempleLocation : BaseLocation
             return;
         }
 
-        var confirm = await terminal.GetInputAsync(Loc.Get("temple.confirm_sacrifice_potions", amount, godName));
-        if (!GameConfig.IsAffirmative(confirm)) return;
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (!await terminal.AskYesNoAsync(Loc.Get("temple.confirm_sacrifice_potions", amount, godName))) return;
 
         long powerGained = amount * 5; // Each potion gives 5 power
         godSystem.ProcessGoldSacrifice(godName, powerGained * 50, currentPlayer.Name2);
@@ -2478,9 +2477,8 @@ public partial class TempleLocation : BaseLocation
         terminal.WriteLine("");
         await Task.Delay(1500);
 
-        var choice = await terminal.GetInputAsync(Loc.Get("temple.touch_stone"));
-
-        if (!GameConfig.IsAffirmative(choice))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (!await terminal.AskYesNoAsync(Loc.Get("temple.touch_stone")))
         {
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("temple.step_back_stones"), "gray");
@@ -2984,8 +2982,8 @@ public partial class TempleLocation : BaseLocation
         terminal.WriteLine("");
         await Task.Delay(2000);
 
-        var followUp = await terminal.GetInputAsync(Loc.Get("temple.ask_join_prompt"));
-        if (GameConfig.IsAffirmative(followUp))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (await terminal.AskYesNoAsync(Loc.Get("temple.ask_join_prompt")))
         {
             await AttemptMiraRecruitment(mira);
         }
@@ -3107,9 +3105,8 @@ public partial class TempleLocation : BaseLocation
         terminal.WriteLine(Loc.Get("temple.join_decrease"));
         terminal.WriteLine("");
 
-        var choice = await terminal.GetInputAsync(Loc.Get("temple.join_prompt"));
-
-        if (GameConfig.IsAffirmative(choice))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (await terminal.AskYesNoAsync(Loc.Get("temple.join_prompt")))
         {
             await PerformFaithOath(factionSystem);
         }
@@ -3240,8 +3237,8 @@ public partial class TempleLocation : BaseLocation
         terminal.WriteLine(Loc.Get("temple.sanctum_gold_label", currentPlayer.Gold.ToString("N0")));
         terminal.WriteLine("");
 
-        var input = await terminal.GetInput(Loc.Get("temple.sanctum_enter_prompt"));
-        if (!GameConfig.IsAffirmative(input))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (!await terminal.AskYesNoAsync(Loc.Get("temple.sanctum_enter_prompt")))
             return;
 
         if (currentPlayer.Gold < GameConfig.InnerSanctumCost)
@@ -3413,8 +3410,8 @@ public partial class TempleLocation : BaseLocation
         if (!string.IsNullOrEmpty(currentPlayer.WorshippedGod))
         {
             terminal.WriteLine(Loc.Get("temple.currently_follow", currentPlayer.WorshippedGod), "yellow");
-            string confirm = await terminal.GetInputAsync(Loc.Get("temple.abandon_prompt"));
-            if (!GameConfig.IsAffirmative(confirm)) return;
+            // v1.1.15: yesno-convert-a, strict (Y/N)
+            if (!await terminal.AskYesNoAsync(Loc.Get("temple.abandon_prompt"))) return;
         }
 
         // If following an NPC god, renounce them — the elder god may punish apostasy
@@ -3422,8 +3419,8 @@ public partial class TempleLocation : BaseLocation
         if (!string.IsNullOrEmpty(oldNpcGod))
         {
             terminal.WriteLine(Loc.Get("temple.currently_worship_elder", oldNpcGod), "yellow");
-            string confirm = await terminal.GetInputAsync(Loc.Get("temple.abandon_elder_prompt", oldNpcGod));
-            if (!GameConfig.IsAffirmative(confirm)) return;
+            // v1.1.15: yesno-convert-a, strict (Y/N)
+            if (!await terminal.AskYesNoAsync(Loc.Get("temple.abandon_elder_prompt", oldNpcGod))) return;
 
             godSystem.SetPlayerGod(currentPlayer.Name2, "");
             terminal.WriteLine("");
@@ -3632,8 +3629,8 @@ public partial class TempleLocation : BaseLocation
         }
 
         string godName = currentPlayer.WorshippedGod;
-        string confirm = await terminal.GetInputAsync(Loc.Get("temple.abandon_faith_prompt", godName));
-        if (!GameConfig.IsAffirmative(confirm)) return;
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (!await terminal.AskYesNoAsync(Loc.Get("temple.abandon_faith_prompt", godName))) return;
 
         currentPlayer.WorshippedGod = "";
         terminal.WriteLine("");

@@ -621,9 +621,8 @@ public class HealerLocation : BaseLocation
 
         CityControlSystem.Instance.DisplayTaxBreakdown(terminal, Loc.Get("healer.tax_full_healing"), cost);
 
-        var confirm = await terminal.GetInput(Loc.Get("healer.proceed_full_heal"));
-
-        if (!GameConfig.IsAffirmative(confirm))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (!await terminal.AskYesNoAsync(Loc.Get("healer.proceed_full_heal")))
         {
             terminal.WriteLine(Loc.Get("healer.as_you_wish"), "cyan");
             await Task.Delay(1000);
@@ -900,9 +899,8 @@ public class HealerLocation : BaseLocation
 
         CityControlSystem.Instance.DisplayTaxBreakdown(terminal, Loc.Get("healer.tax_poison_cure"), cost);
 
-        var confirm = await terminal.GetInput(Loc.Get("healer.cure_poison_prompt"));
-
-        if (!GameConfig.IsAffirmative(confirm))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (!await terminal.AskYesNoAsync(Loc.Get("healer.cure_poison_prompt")))
         {
             terminal.WriteLine(Loc.Get("healer.careful_poison"), "yellow");
             await Task.Delay(1500);
@@ -1009,8 +1007,8 @@ public class HealerLocation : BaseLocation
 
             CityControlSystem.Instance.DisplayTaxBreakdown(terminal, Loc.Get("healer.tax_disease_cures"), totalCost);
 
-            var confirm = await terminal.GetInput(Loc.Get("healer.go_ahead_pay"));
-            if (!GameConfig.IsAffirmative(confirm))
+            // v1.1.15: yesno-convert-a, strict (Y/N)
+            if (!await terminal.AskYesNoAsync(Loc.Get("healer.go_ahead_pay")))
             {
                 return;
             }
@@ -1044,8 +1042,8 @@ public class HealerLocation : BaseLocation
 
             CityControlSystem.Instance.DisplayTaxBreakdown(terminal, Loc.Get("healer.tax_disease_cure"), disease.Cost);
 
-            var confirm = await terminal.GetInput(Loc.Get("healer.go_ahead_pay"));
-            if (!GameConfig.IsAffirmative(confirm))
+            // v1.1.15: yesno-convert-a, strict (Y/N)
+            if (!await terminal.AskYesNoAsync(Loc.Get("healer.go_ahead_pay")))
             {
                 return;
             }
@@ -1190,9 +1188,8 @@ public class HealerLocation : BaseLocation
 
             CityControlSystem.Instance.DisplayTaxBreakdown(terminal, Loc.Get("healer.tax_curse_removal"), cost);
 
-            var confirm = await terminal.GetInput(Loc.Get("healer.remove_curse_prompt"));
-
-            if (GameConfig.IsAffirmative(confirm))
+            // v1.1.15: yesno-convert-a, strict (Y/N)
+            if (await terminal.AskYesNoAsync(Loc.Get("healer.remove_curse_prompt")))
             {
                 if (player.Gold < curseTotalWithTax)
                 {
@@ -1395,9 +1392,8 @@ public class HealerLocation : BaseLocation
 
         CityControlSystem.Instance.DisplayTaxBreakdown(terminal, Loc.Get("healer.tax_rehab"), totalCost);
 
-        var confirm = await terminal.GetInput(Loc.Get("healer.proceed_rehab"));
-
-        if (!GameConfig.IsAffirmative(confirm))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (!await terminal.AskYesNoAsync(Loc.Get("healer.proceed_rehab")))
         {
             terminal.WriteLine(Loc.Get("healer.door_open", player.Name2), "cyan");
             await Task.Delay(1000);

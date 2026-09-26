@@ -497,13 +497,13 @@ public class DungeonLocation : BaseLocation
         term.WriteLine(Loc.Get("dungeon.tut.intro_skip"), "darkgray");
         term.WriteLine("");
 
-        string ans = await term.GetInput(Loc.Get(isSR ? "dungeon.tut.prompt_sr" : "dungeon.tut.prompt"));
-        ans = ans.Trim().ToUpperInvariant();
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        bool tutorialAns = await term.AskYesNoAsync(Loc.Get(isSR ? "dungeon.tut.prompt_sr" : "dungeon.tut.prompt"));
 
         // Mark as seen regardless of choice so we never ask again
         player.HintsShown.Add(DUNGEON_TUTORIAL_FLAG);
 
-        if (!GameConfig.IsAffirmative(ans))
+        if (!tutorialAns)
         {
             term.WriteLine(Loc.Get("dungeon.tut.declined"), "gray");
             await Task.Delay(1200);
@@ -1061,8 +1061,8 @@ public class DungeonLocation : BaseLocation
                     await Task.Delay(2000);
 
                     term.WriteLine(Loc.Get("dungeon.face_maelketh"), "yellow");
-                    var response = await term.GetInput("> ");
-                    if (GameConfig.IsAffirmative(response))
+                    // v1.1.15: yesno-convert-a, strict (Y/N)
+                    if (await term.AskYesNoAsync("> "))
                     {
                         var result = await OldGodBossSystem.Instance.StartBossEncounter(player, OldGodType.Maelketh, term, teammates);
                         await HandleGodEncounterResult(result, player, term);
@@ -1765,9 +1765,8 @@ public class DungeonLocation : BaseLocation
             if (affordableFee > 0 && affordableTeammates.Any(t => breakdown.Any(b => b.npc == t && b.fee > 0)))
             {
                 term.SetColor("cyan");
-                var payChoice = await term.GetInput(Loc.Get("dungeon.pay_affordable", affordableFee.ToString("N0")));
-
-                if (GameConfig.IsAffirmative(payChoice))
+                // v1.1.15: yesno-convert-a, strict (Y/N)
+                if (await term.AskYesNoAsync(Loc.Get("dungeon.pay_affordable", affordableFee.ToString("N0"))))
                 {
                     player.Gold -= affordableFee;
                     term.SetColor("green");
@@ -1811,9 +1810,8 @@ public class DungeonLocation : BaseLocation
 
         // Player can afford all fees - ask for confirmation
         term.SetColor("cyan");
-        var confirm = await term.GetInput(Loc.Get("dungeon.pay_all_allies", totalFee.ToString("N0")));
-
-        if (GameConfig.IsAffirmative(confirm))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (await term.AskYesNoAsync(Loc.Get("dungeon.pay_all_allies", totalFee.ToString("N0"))))
         {
             player.Gold -= totalFee;
             term.SetColor("green");
@@ -4053,8 +4051,8 @@ public class DungeonLocation : BaseLocation
                 terminal.SetColor("yellow");
                 terminal.Write(Loc.Get("dungeon.confirm_leave"));
                 terminal.SetColor("white");
-                string exitConfirm = (await terminal.GetInput("")).Trim().ToUpper();
-                if (GameConfig.IsAffirmative(exitConfirm))
+                // v1.1.15: yesno-convert-a, strict (Y/N)
+                if (await terminal.AskYesNoAsync(""))
                 {
                     await NavigateToLocation(GameLocation.MainStreet);
                     return true;
@@ -5309,8 +5307,8 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine("");
                 foreach (var t in low)
                     terminal.WriteLine($"  {Loc.Get("dungeon.ally_low_hp_warning", t.DisplayName, (int)(100.0 * t.HP / t.MaxHP))}", "yellow");
-                var go = await terminal.GetInput(Loc.Get("dungeon.fight_anyway_prompt"));
-                if (!GameConfig.IsAffirmative(go)) return;
+                // v1.1.15: yesno-convert-a, strict (Y/N)
+                if (!await terminal.AskYesNoAsync(Loc.Get("dungeon.fight_anyway_prompt"))) return;
             }
         }
 
@@ -5776,9 +5774,8 @@ public class DungeonLocation : BaseLocation
 
         terminal.SetColor("bright_yellow");
         terminal.WriteLine(Loc.Get("dungeon.face_god_prompt", godName));
-        var response = await terminal.GetInput("> ");
-
-        if (GameConfig.IsAffirmative(response))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (await terminal.AskYesNoAsync("> "))
         {
             var result = await OldGodBossSystem.Instance.StartBossEncounter(player, godType.Value, terminal, teammates);
             await HandleGodEncounterResult(result, player, terminal);
@@ -6854,8 +6851,8 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine("");
                 terminal.WriteLine($"  {Loc.Get("dungeon.ally_outleveled_warning", t.DisplayName, player.Level - t.Level)}", "yellow");
                 if (_declinedCautious.Contains(TeammateStances.KeyFor(t))) continue; // warned, asked once this visit
-                var answer = await terminal.GetInput(Loc.Get("dungeon.offer_cautious_prompt", t.DisplayName));
-                if (!GameConfig.IsAffirmative(answer)) { _declinedCautious.Add(TeammateStances.KeyFor(t)); continue; }
+                // v1.1.15: yesno-convert-a, strict (Y/N)
+                if (!await terminal.AskYesNoAsync(Loc.Get("dungeon.offer_cautious_prompt", t.DisplayName))) { _declinedCautious.Add(TeammateStances.KeyFor(t)); continue; }
                 TeammateStances.Set(player, TeammateStances.KeyFor(t), TeammateStance.Cautious);
                 terminal.WriteLine(Loc.Get("dungeon.stance_set", t.DisplayName, Loc.Get(TeammateStances.NameKey(TeammateStance.Cautious))), "bright_green");
                 try { await SaveSystem.Instance.AutoSave(player); } catch { /* best-effort */ }
@@ -7525,9 +7522,8 @@ public class DungeonLocation : BaseLocation
         }
 
         terminal.WriteLine("");
-        var recite = await terminal.GetInput(Loc.Get("dungeon.recite_scroll_prompt"));
-        
-        if (GameConfig.IsAffirmative(recite))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (await terminal.AskYesNoAsync(Loc.Get("dungeon.recite_scroll_prompt")))
         {
             await ExecuteScrollMagic(scrollType, currentPlayer);
         }
@@ -9103,8 +9099,8 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine($"\"{lyris.DialogueHints[2]}\"");
                 terminal.WriteLine("");
 
-                var followUp = await terminal.GetInput(Loc.Get("quest.lyris_shrine.ask_join_yn"));
-                if (GameConfig.IsAffirmative(followUp))
+                // v1.1.15: yesno-convert-a, strict (Y/N)
+                if (await terminal.AskYesNoAsync(Loc.Get("quest.lyris_shrine.ask_join_yn")))
                 {
                     await TryRecruitCompanionInDungeon(
                         UsurperRemake.Systems.CompanionId.Lyris, player);
@@ -9944,9 +9940,8 @@ public class DungeonLocation : BaseLocation
 
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("dungeon.merchant_purchase_confirm", item.Name, item.Price));
-        var confirm = (await terminal.GetInput("")).Trim().ToUpper();
-
-        if (GameConfig.IsAffirmative(confirm))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (await terminal.AskYesNoAsync(""))
         {
             player.Gold -= item.Price;
             item.Sold = true;
@@ -11344,8 +11339,8 @@ public class DungeonLocation : BaseLocation
 
                 terminal.WriteLine("");
                 terminal.SetColor("cyan");
-                var confirm = await terminal.GetInput(Loc.Get("dungeon.pay_fee_confirm", fee));
-                if (!GameConfig.IsAffirmative(confirm))
+                // v1.1.15: yesno-convert-a, strict (Y/N)
+                if (!await terminal.AskYesNoAsync(Loc.Get("dungeon.pay_fee_confirm", fee)))
                 {
                     terminal.SetColor("gray");
                     terminal.WriteLine(Loc.Get("dungeon.npc_shrugs", npc.DisplayName));
@@ -12750,9 +12745,8 @@ public class DungeonLocation : BaseLocation
 
         terminal.SetColor("white");
         terminal.Write(Loc.Get("ui.choice"));
-        var choice = (await terminal.GetInput("")).Trim().ToUpper();
-
-        if (!GameConfig.IsAffirmative(choice))
+        // v1.1.15: yesno-convert-a, a Y/N menu, strict
+        if (!await terminal.AskYesNoAsync(""))
         {
             return;
         }
@@ -12893,9 +12887,8 @@ public class DungeonLocation : BaseLocation
 
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("dungeon.will_use_potions", potionsToUse));
-        string confirm = (await terminal.GetInput("")).Trim().ToUpper();
-
-        if (!GameConfig.IsAffirmative(confirm))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (!await terminal.AskYesNoAsync(""))
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("ui.cancelled"));
