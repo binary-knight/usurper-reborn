@@ -8112,7 +8112,7 @@
   "engine.menu_admin": "Admin",
   "engine.menu_support": "Supporto",
   "engine.menu_quit": "Esci",
-  "engine.menu_create_mortal_alt": "Crea personaggio alternativo mortale",
+  "engine.menu_create_mortal_alt": "Crea personaggio alternativo",
   "engine.menu_delete_alt_full": "Elimina personaggio alternativo",
   "engine.menu_create_new": "Crea nuovo personaggio",
   "engine.menu_new_overwrite_full": "Nuovo personaggio (ATTENZIONE: Sovrascrive il principale!)",
