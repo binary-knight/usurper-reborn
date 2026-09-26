@@ -6360,6 +6360,7 @@
   "combat.sage_unveil_cast": "The pattern of the enemy line lies bare!",
   "combat.sage_control_resist": "{0} shrugs it off!",
   "combat.sage_marked": "{0} is marked! (+30% damage from every ally, {1} rounds)",
+  "combat.sage_marked_library": "{0} is marked, and Library study sharpens it! (+{2}% damage from every ally, {1} rounds)",
   "combat.sage_slumber_boss_immune": "{0} is too mighty to be lulled to sleep!",
   "combat.sage_slumber_broken": "The pain jolts {0} awake!",
   "combat.sage_compel_old_god": "{0} stands beyond any mortal will!",
