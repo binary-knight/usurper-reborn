@@ -18735,6 +18735,11 @@ public partial class CombatEngine
         {
             return;
         }
+        // v1.1.15: a Sage teammate wards the party and controls the enemy before it attacks
+        if (teammate.Class == CharacterClass.Sage && await TryTeammateSageSpell(teammate, monsters, result))
+        {
+            return;
+        }
         // Check if teammate should cast an offensive spell
         var spellAction = await TryTeammateOffensiveSpell(teammate, monsters, result);
         if (spellAction)
@@ -19365,6 +19370,160 @@ public partial class CombatEngine
 
                 result.CombatLog.Add($"{teammate.DisplayName} casts {spell.Name} on {target.Name} for {actualDamage} damage!");
             }
+        }
+
+        await Task.Delay(GetCombatDelay(800));
+        return true;
+    }
+
+    /// <summary>v1.1.15: the Sage's party wards by slot, strongest first, and what each one gives.</summary>
+    private static readonly (int slot, string kind)[] SageTeammateWards =
+    {
+        (20, "shadow"), (16, "mindblank"), (13, "shadow"), (1, "fog"), (22, "ocean_memory"),
+    };
+
+    /// <summary>v1.1.15: the Sage's area control by slot, strongest first. Psychic Scream is an attack spell and stays with the offensive path.</summary>
+    private static readonly (int slot, string effect)[] SageTeammateAreaControl =
+    {
+        (19, "mass_confusion"), (18, "unveil_pattern"), (14, "compel"), (10, "slumber_mist"), (5, "dulling_mist"),
+    };
+
+    /// <summary>v1.1.15: true when some living ally lacks what this kind of ward gives.</summary>
+    internal static bool PartyLacksWard(string kind, List<Character> party)
+    {
+        bool noWard = party.Any(c => c.MagicACBonus <= 0);
+        return kind switch
+        {
+            "fog" => noWard,
+            "shadow" => noWard || party.Any(c => !c.HasStatus(StatusEffect.Blur)),
+            "mindblank" => noWard || party.Any(c => !c.HasStatusImmunity),
+            "ocean_memory" => party.Any(c => !c.HasOceanMemory),
+            _ => false,
+        };
+    }
+
+    /// <summary>
+    /// v1.1.15: a monster an area control effect would still do something to. Slumber skips bosses
+    /// (immune) and anything the hold budget refuses; Compel skips Old Gods.
+    /// </summary>
+    internal static bool SageControlWouldLand(Monster m, string effect)
+    {
+        if (m == null || !m.IsAlive) return false;
+        bool holdable = !m.IsHeld && m.StunImmunityRounds <= 0 && m.HoldsThisFight < 3;
+        return effect switch
+        {
+            "dulling_mist" => !m.IsSlowed,
+            "slumber_mist" => !(m.IsBoss || m.IsMiniBoss) && holdable,
+            "compel" => m.FamilyName != "OldGod" && m.TauntRoundsLeft <= 0,
+            "mass_confusion" or "confusion" => !m.IsConfused,
+            "unveil_pattern" or "scholars_mark" => !m.IsMarked,
+            "freeze" => holdable,
+            _ => false,
+        };
+    }
+
+    /// <summary>
+    /// v1.1.15: what a Sage teammate casts this turn, if anything besides an attack. In order: a party
+    /// ward the party lacks; area control on a pack of three or more when it still reaches at least
+    /// two enemies and at least half the pack; Freeze, Scholar's Mark or Confusion on one strong
+    /// target (a boss, a mini-boss, or a monster at least the Sage's level). Null when none applies.
+    /// </summary>
+    internal (SpellSystem.SpellInfo spell, Monster? target, bool isWard)? ChooseSageTeammateSpell(Character teammate, List<Monster> monsters, CombatResult? result)
+    {
+        if (teammate == null || teammate.Class != CharacterClass.Sage) return null;
+        var living = monsters.Where(m => m.IsAlive).ToList();
+        if (living.Count == 0) return null;
+        var disabled = GetDisabledSpellsFor(teammate);
+
+        SpellSystem.SpellInfo? Usable(int slot)
+        {
+            var s = SpellSystem.GetSpellInfo(CharacterClass.Sage, slot);
+            if (s == null) return null;
+            if (teammate.Level < SpellSystem.GetLevelRequired(CharacterClass.Sage, slot)) return null;
+            if (!SpellSystem.CanCastSpell(teammate, slot)) return null;
+            if (disabled.Contains(s.Name)) return null;
+            return s;
+        }
+
+        var party = LivingPartyOf(teammate, result);
+        foreach (var (slot, kind) in SageTeammateWards)
+        {
+            var s = Usable(slot);
+            if (s != null && PartyLacksWard(kind, party)) return (s, null, true);
+        }
+
+        if (living.Count >= 3)
+        {
+            foreach (var (slot, effect) in SageTeammateAreaControl)
+            {
+                var s = Usable(slot);
+                if (s == null) continue;
+                int reach = living.Count(m => SageControlWouldLand(m, effect));
+                if (reach >= 2 && reach * 2 >= living.Count) return (s, null, false);
+            }
+        }
+
+        var strong = living
+            .Where(m => m.IsBoss || m.IsMiniBoss || m.Level >= teammate.Level)
+            .OrderByDescending(m => m.HP)
+            .FirstOrDefault();
+        if (strong != null)
+        {
+            bool boss = strong.IsBoss || strong.IsMiniBoss;
+            var order = boss
+                ? new[] { (6, "scholars_mark"), (7, "confusion"), (4, "freeze") }
+                : new[] { (4, "freeze"), (6, "scholars_mark"), (7, "confusion") };
+            foreach (var (slot, effect) in order)
+            {
+                var s = Usable(slot);
+                if (s != null && SageControlWouldLand(strong, effect)) return (s, strong, false);
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// v1.1.15: a Sage teammate casts a party ward, area control or single-target control (see
+    /// ChooseSageTeammateSpell). Holds go through HandleSpecialSpellEffectOnMonster, so the shared
+    /// hold budget applies. True when the turn was used.
+    /// </summary>
+    internal async Task<bool> TryTeammateSageSpell(Character teammate, List<Monster> monsters, CombatResult result)
+    {
+        var choice = ChooseSageTeammateSpell(teammate, monsters, result);
+        if (choice == null) return false;
+        var (spell, target, isWard) = choice.Value;
+
+        var spellResult = SpellSystem.CastSpell(teammate, spell.Level, null);
+        terminal.WriteLine("");
+        terminal.SetColor("magenta");
+        if (isWard)
+            terminal.WriteLine(Loc.Get("combat.teammate_casts_party", teammate.DisplayName, spell.DisplayName));
+        else if (target != null)
+            terminal.WriteLine(Loc.Get("combat.teammate_casts_on", teammate.DisplayName, spell.DisplayName, target.Name));
+        else
+            terminal.WriteLine(Loc.Get("combat.teammate_casts_spell", teammate.DisplayName, spell.DisplayName));
+
+        if (!spellResult.Success)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine(Loc.Get("combat.spell_fizzles"));
+            result.CombatLog.Add($"{teammate.DisplayName}'s {spell.Name} fizzles.");
+            await Task.Delay(GetCombatDelay(600));
+            return true;
+        }
+
+        if (isWard)
+        {
+            ApplySagePartyWard(teammate, spellResult, result);
+            result.CombatLog.Add($"{teammate.DisplayName} casts {spell.Name} on the whole party.");
+        }
+        else
+        {
+            string effect = spellResult.SpecialEffect ?? "";
+            var targets = target != null ? new List<Monster> { target } : monsters.Where(m => m.IsAlive).ToList();
+            foreach (var m in targets.Where(m => m.IsAlive))
+                HandleSpecialSpellEffectOnMonster(m, effect, spellResult.Duration, teammate, spellResult.Damage, result);
+            result.CombatLog.Add($"{teammate.DisplayName} casts {spell.Name}.");
         }
 
         await Task.Delay(GetCombatDelay(800));
