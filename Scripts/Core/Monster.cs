@@ -148,6 +148,15 @@ public class Monster
     public bool IsSlowed { get; set; } = false;
     public int SlowDuration { get; set; } = 0;
 
+    // v1.1.15: Slumber Mist. The HP the monster had when the slumber landed; any damage since
+    // (a hit or a damage over time tick) wakes it at its next turn. -1 when no slumber is on it.
+    public long SlumberHpMark { get; set; } = -1;
+
+    // v1.1.15: Psychic Scream. Distracted is spent on the next attack roll; while DistractedRounds
+    // is above 0 it is armed again once a round with DistractedRoundsPenalty.
+    public int DistractedRounds { get; set; } = 0;
+    public int DistractedRoundsPenalty { get; set; } = 0;
+
     // Ability-applied status effects
     public bool IsMarked { get; set; } = false;        // Marked for death/hunt - takes bonus damage
     public int MarkedDuration { get; set; } = 0;

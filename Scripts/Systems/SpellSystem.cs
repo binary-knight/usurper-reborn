@@ -156,24 +156,24 @@ public static class SpellSystem
             [2] = new SpellInfo(2, "Poison Touch", "Inflict magical toxins on your enemy. Damage over time. Duration: varies.", 8, 2, "Exadlimmarie", false, "Debuff"),
             [3] = new SpellInfo(3, "Mind Spike", "A psychic attack that damages and disorients. Damage: 8-14. Duration: 1 turn.", 10, 3, "Mindspikearie", false, "Attack"),
             [4] = new SpellInfo(4, "Freeze", "Encase the target in ice. Effect: cannot move. Duration: varies.", 15, 4, "Excadaliemarie", false, "Debuff"),
-            [5] = new SpellInfo(5, "Duplicate", "Create an illusory copy to confuse enemies. Protection: +12. Duration: whole fight.", 18, 5, "Exmassesumarie", false, "Buff"),
-            [6] = new SpellInfo(6, "Roast", "Hellfire scorches the target. Damage: 20-30 + burn. Duration: 1 turn.", 22, 6, "Exdamseaxmarie", false, "Attack"),
+            [5] = new SpellInfo(5, "Dulling Mist", "A grey mist dulls every enemy. Effect: all enemies slowed. Duration: 2 rounds.", 18, 5, "Exmassesumarie", true, "Debuff"),
+            [6] = new SpellInfo(6, "Scholar's Mark", "Reveal one foe's weak points. Effect: it takes +30% damage from every ally. Duration: 3 rounds.", 22, 6, "Exdamseaxmarie", false, "Debuff"),
             [7] = new SpellInfo(7, "Confusion", "Muddle your enemy's thoughts. Effect: may attack self. Duration: varies.", 25, 7, "Confusarie", false, "Debuff"),
 
             // --- MID TIER (Levels 26-50) - Second Awakening (Tide Reader) ---
             [8] = new SpellInfo(8, "Hit Self", "Force the target to strike itself. Damage: 40-55. Duration: 1 turn.", 30, 8, "Exadliemasumarie", false, "Attack"),
             [9] = new SpellInfo(9, "Escape", "Vanish from battle instantly. Success based on level. Effect: ends combat.", 35, 9, "Exemarie", false, "Escape"),
-            [10] = new SpellInfo(10, "Giant Form", "Transform into a mighty giant. Attack: +30. Duration: whole fight.", 40, 10, "Excadmassumarie", false, "Buff"),
+            [10] = new SpellInfo(10, "Slumber Mist", "A drowsy mist settles on the enemy. Effect: all enemies asleep, any damage wakes them, bosses immune. Duration: 2 rounds.", 40, 10, "Excadmassumarie", true, "Debuff"),
             [11] = new SpellInfo(11, "Steal Life", "Drain the enemy's vitality. Damage: 35-50, heals half. Duration: 1 turn.", 45, 11, "Steallifearie", false, "Attack"),
-            [12] = new SpellInfo(12, "Psychic Scream", "A mental blast assaults all enemies. Damage: 40-55 to all. Duration: 1 turn.", 50, 12, "Psychscrearie", true, "Attack"),
+            [12] = new SpellInfo(12, "Psychic Scream", "A mental blast assaults all enemies. Damage: 40-55 to all, and their accuracy drops. Duration: 2 rounds.", 50, 12, "Psychscrearie", true, "Attack"),
             [13] = new SpellInfo(13, "Shadow Cloak", "Wrap yourself in living shadow. Protection: +35. Duration: whole fight.", 55, 13, "Shadowcloakarie", false, "Buff"),
-            [14] = new SpellInfo(14, "Dominate", "Seize control of a weak-minded foe. Effect: enemy attacks allies. Duration: varies.", 60, 14, "Dominatarie", false, "Debuff"),
+            [14] = new SpellInfo(14, "Compel", "Bend every enemy's will toward your tank. Effect: all enemies taunted and weakened; Old Gods resist. Duration: 2 rounds.", 60, 14, "Dominatarie", true, "Debuff"),
 
             // --- HIGH TIER (Levels 51-75) - Third Awakening (Wave Dancer) ---
             [15] = new SpellInfo(15, "Energy Drain", "Force victim to channel energy into their own destruction. Damage: 90-120. Duration: 1 turn.", 75, 15, "Examdammasaxmarie", false, "Attack"),
             [16] = new SpellInfo(16, "Mind Blank", "Render your thoughts impervious. Protection: +50, immune to mind effects. Duration: whole fight.", 85, 16, "Mindblankarie", false, "Buff"),
             [17] = new SpellInfo(17, "Shadow Step", "Teleport through shadows to strike. Damage: 80-100, ignores defense. Duration: 1 turn.", 95, 17, "Shadowsteparie", false, "Attack"),
-            [18] = new SpellInfo(18, "Summon Demon", "Call a servant-demon from the nether. Attack: +70. Duration: whole fight.", 110, 18, "Edujnomed", false, "Summon"),
+            [18] = new SpellInfo(18, "Unveil the Pattern", "Lay bare the weak points of the whole enemy line. Effect: all enemies marked, +30% damage from every ally. Duration: 2 rounds.", 110, 18, "Edujnomed", true, "Debuff"),
             [19] = new SpellInfo(19, "Mass Confusion", "Drive all enemies mad with visions. Effect: all enemies confused. Duration: varies.", 125, 19, "Massconfusarie", true, "Debuff"),
             [20] = new SpellInfo(20, "Noctura's Veil", "The Shadow Goddess protects her follower. Protection: +70. Duration: whole fight.", 140, 20, "Nocturaveilarie", false, "Buff"),
 
@@ -1253,18 +1253,19 @@ public static class SpellSystem
                 result.Message += $" {Loc.Get("combat.spell_freeze_cast")}";
                 break;
 
-            case 5: // Duplicate - Protection +14
-                result.ProtectionBonus = ScaleProtectionEffect(14 + (caster.Level / 8), caster, profMult);
-                result.Duration = 999;
-                result.SpecialEffect = "duplicate";
-                result.Message += $" An illusory duplicate confuses enemies! (+{result.ProtectionBonus} defense)";
+            case 5: // Dulling Mist
+                // v1.1.15: all enemies slowed 2 rounds (bosses 1 round, and they resist a quarter of the time)
+                result.SpecialEffect = "dulling_mist";
+                result.IsMultiTarget = true;
+                result.Duration = 2;
+                result.Message += $" {Loc.Get("combat.sage_dulling_mist_cast")}";
                 break;
 
-            case 6: // Roast - Base: 25-38 damage
-                int baseDamage6 = 25 + random.Next(14);
-                result.Damage = ScaleSpellEffect(baseDamage6, caster, random, profMult);
-                result.SpecialEffect = "fire";
-                result.Message += $" Hellfire scorches {target?.Name2 ?? "the target"} for {result.Damage} damage!";
+            case 6: // Scholar's Mark
+                // v1.1.15: one target takes +30% damage from every ally for 3 rounds
+                result.SpecialEffect = "scholars_mark";
+                result.Duration = 3;
+                result.Message += $" {Loc.Get("combat.sage_scholars_mark_cast")}";
                 break;
 
             case 7: // Confusion
@@ -1286,12 +1287,12 @@ public static class SpellSystem
                 result.Message += $" {caster.Name2} vanishes from battle!";
                 break;
 
-            case 10: // Giant Form - Attack +32
-                int baseAttack10 = (int)((32 + (caster.Level / 4)) * profMult);
-                result.AttackBonus = baseAttack10;
-                result.Duration = 999;
-                result.SpecialEffect = "giant";
-                result.Message += $" {caster.Name2} transforms into a GIANT! (+{result.AttackBonus} attack)";
+            case 10: // Slumber Mist
+                // v1.1.15: all enemies asleep 2 rounds through the hold rules; any damage wakes; bosses immune
+                result.SpecialEffect = "slumber_mist";
+                result.IsMultiTarget = true;
+                result.Duration = 2;
+                result.Message += $" {Loc.Get("combat.sage_slumber_mist_cast")}";
                 break;
 
             case 11: // Steal Life - Base: 40-60 damage, heals half (via drain handler)
@@ -1305,7 +1306,9 @@ public static class SpellSystem
                 int baseDamage12 = 45 + random.Next(21);
                 result.Damage = ScaleSpellEffect(baseDamage12, caster, random, profMult);
                 result.IsMultiTarget = true;
-                result.SpecialEffect = "psychic";
+                // v1.1.15: the damage stays; every enemy hit is also distracted for 2 rounds
+                result.SpecialEffect = "psychic_scream";
+                result.Duration = 2;
                 result.Message += $" A psychic scream assaults all enemies for {result.Damage} damage!";
                 break;
 
@@ -1316,10 +1319,12 @@ public static class SpellSystem
                 result.Message += $" Living shadow cloaks {caster.Name2}! (+{result.ProtectionBonus} defense)";
                 break;
 
-            case 14: // Dominate
-                result.SpecialEffect = "dominate";
-                result.Duration = (int)((random.Next(3) + 2 + (caster.Level / 25)) * profMult);
-                result.Message += $" {caster.Name2} seizes control of {target?.Name2 ?? "the enemy"}'s mind!";
+            case 14: // Compel
+                // v1.1.15: all enemies taunted onto the party's tank and weakened, 2 rounds; Old Gods resist
+                result.SpecialEffect = "compel";
+                result.IsMultiTarget = true;
+                result.Duration = 2;
+                result.Message += $" {Loc.Get("combat.sage_compel_cast")}";
                 break;
 
             // --- HIGH TIER (Levels 51-75) - Third Awakening ---
@@ -1344,12 +1349,12 @@ public static class SpellSystem
                 result.Message += $" {caster.Name2} strikes through shadows for {result.Damage} damage!";
                 break;
 
-            case 18: // Summon Demon - Attack +75
-                int baseAttack18 = (int)((75 + (caster.Level)) * profMult);
-                result.AttackBonus = baseAttack18;
-                result.Duration = 999;
-                result.SpecialEffect = "demon";
-                result.Message += $" A servant-demon answers the call! (+{result.AttackBonus} attack)";
+            case 18: // Unveil the Pattern
+                // v1.1.15: every enemy marked for 2 rounds (+30% damage from every ally)
+                result.SpecialEffect = "unveil_pattern";
+                result.IsMultiTarget = true;
+                result.Duration = 2;
+                result.Message += $" {Loc.Get("combat.sage_unveil_cast")}";
                 break;
 
             case 19: // Mass Confusion - All enemies confused
