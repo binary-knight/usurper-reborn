@@ -1584,6 +1584,31 @@ public partial class TerminalEmulator
         return int.Parse(await GetValidChoice(prompt, keys, "0", hint));
     }
 
+    /// <summary>
+    /// v1.1.15: a strict yes/no prompt that asks again on anything but a localized yes or a localized
+    /// no, instead of GameConfig.IsAffirmative alone silently reading a typo or a stray Enter as "No"
+    /// (see DiscoverySystem.RunRisk, where that used to walk a player away from a dungeon discovery
+    /// and use it up for the price of one wrong keystroke). Reads with GetInput(prompt); an
+    /// affirmative answer in any supported language returns true, a negative answer returns false.
+    /// A bare Enter (empty input) takes enterDefault when the caller gave one; otherwise it is
+    /// invalid like any other junk. Any other invalid answer prints a localized re-ask line and
+    /// tries again. After MaxInvalidChoiceAttempts invalid answers, or when the connection is gone,
+    /// returns false (No is the safe answer; a dead peer reading empty lines must not spin here).
+    /// </summary>
+    public async Task<bool> AskYesNoAsync(string prompt, bool? enterDefault = null)
+    {
+        for (int attempt = 0; attempt < MaxInvalidChoiceAttempts; attempt++)
+        {
+            string input = (await GetInput(prompt)).Trim();
+            if (GameConfig.IsAffirmative(input)) return true;
+            if (GameConfig.IsNegative(input)) return false;
+            if (input.Length == 0 && enterDefault.HasValue) return enterDefault.Value;
+            if (DoorMode.IsDisconnected) break;
+            WriteLine(UsurperRemake.Systems.Loc.Get("ui.answer_yes_no"), "red");
+        }
+        return false;
+    }
+
     /// <summary>v1.1.13: MUD stream (MUD, telnet, web, relay) and BBS socket modes read a whole line at a pause.</summary>
     private bool IsLineBasedPause => (_streamWriter != null && _streamReader != null) || ShouldUseBBSAdapter();
 
@@ -1849,41 +1874,16 @@ public partial class TerminalEmulator
     public async Task<bool> ConfirmAsync(string? message = null)
     {
         message ??= Loc.Get("ui.confirm");
-        while (true)
-        {
-            WriteLine(message, "yellow");
-            var input = await GetInput();
-            var response = input.ToUpper().Trim();
-            
-            if (GameConfig.IsAffirmative(input) || response == "YES")
-                return true;
-            if (response == "N" || response == "NO")
-                return false;
-                
-            WriteLine("Please answer Y or N.", "red");
-        }
+        WriteLine(message, "yellow");
+        return await AskYesNoAsync("> ");
     }
-    
+
     // Overload for ConfirmAsync that takes a boolean parameter
     public async Task<bool> ConfirmAsync(string message, bool defaultValue)
     {
-        while (true)
-        {
-            string prompt = defaultValue ? $"{message} (Y/n): " : $"{message} (y/N): ";
-            WriteLine(prompt, "yellow");
-            var input = await GetInput();
-            var response = input.ToUpper().Trim();
-            
-            if (string.IsNullOrEmpty(response))
-                return defaultValue;
-            
-            if (GameConfig.IsAffirmative(input) || response == "YES")
-                return true;
-            if (response == "N" || response == "NO")
-                return false;
-                
-            WriteLine("Please answer Y or N.", "red");
-        }
+        string prompt = defaultValue ? $"{message} (Y/n): " : $"{message} (y/N): ";
+        WriteLine(prompt, "yellow");
+        return await AskYesNoAsync("> ", defaultValue);
     }
     
     public async Task<string> GetStringAsync(string prompt = "")

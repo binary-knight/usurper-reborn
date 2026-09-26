@@ -6708,6 +6708,7 @@
   "home.equip_stats_int": "  INT: {0}  SAG: {1}  CAR: {2}  DIF: {3}",
   "ui.invalid_choice": "Scelta non valida.",
   "ui.invalid_choice_choose": "Scelta non valida; scegli {0}.",
+  "ui.answer_yes_no": "Per favore rispondi S o N.",
   "ui.choice_range_or_zero": "{0} o 0",
   "ui.cursed": "maledetto",
   "bank.gold_on_hand": "Oro Disponibile:  ",

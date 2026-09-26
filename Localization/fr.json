@@ -6708,6 +6708,7 @@
   "home.equip_stats_int": "  INT : {0}  SAG : {1}  CHA : {2}  DEF : {3}",
   "ui.invalid_choice": "Choix invalide.",
   "ui.invalid_choice_choose": "Choix invalide ; choisissez {0}.",
+  "ui.answer_yes_no": "Veuillez répondre O ou N.",
   "ui.choice_range_or_zero": "{0} ou 0",
   "ui.cursed": "maudit",
   "bank.gold_on_hand": "Or en poche :  ",
