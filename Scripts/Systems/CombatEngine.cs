@@ -163,7 +163,7 @@ public partial class CombatEngine
         if (teammates != null)
             foreach (var t in teammates)
                 if (t.IsAlive && t.MaxHP > 0 && t.HP * 2 < t.MaxHP) _lowAlliesAtTurnStart.Add(t);
-        _ownerAidedThisTurn = action.Type == CombatActionType.HealAlly;
+        _ownerAidedThisTurn = action.Type == CombatActionType.HealAlly || action.FromAidMenu;
     }
 
     /// <summary>Could <paramref name="owner"/> have saved <paramref name="ally"/>: the ally was
@@ -18167,8 +18167,9 @@ public partial class CombatEngine
     }
 
     /// <summary>
-    /// Handle player aiding an ally - choose between HP potion, mana potion, or heal spell, then choose target
-    /// Returns the action to execute, or null if cancelled
+    /// Handle player aiding an ally. Prompt order: the aid option (HP potion, mana potion or heal
+    /// spell); for a heal spell, the spell; then the ally. A party heal skips the ally pick and
+    /// returns the spell menu's CastSpell action. Returns the action to execute, or null if cancelled
     /// </summary>
     private async Task<CombatAction?> HandleHealAlly(Character player, List<Monster> monsters)
     {
@@ -18241,6 +18242,64 @@ public partial class CombatEngine
             terminal.WriteLine(Loc.Get("combat.invalid_choice"), "red");
             await Task.Delay(GetCombatDelay(500));
             return null;
+        }
+
+        // v1.1.15: a heal spell is picked before the ally. A party heal (Veloura's Embrace) needs
+        // no ally: it becomes the same cast the spell menu makes, so it heals and wards the whole
+        // living party through the spell menu's party heal path.
+        SpellSystem.SpellInfo? selectedSpell = null;
+        if (selectedOption.type == "spell")
+        {
+            // Show heal spells and let player choose
+            var healSpells = GetAvailableHealSpells(player);
+            if (healSpells.Count == 0)
+            {
+                terminal.WriteLine(Loc.Get("combat.aid_no_heal_spells"), "yellow");
+                await Task.Delay(GetCombatDelay(1000));
+                return null;
+            }
+
+            terminal.WriteLine("");
+            terminal.SetColor("bright_blue");
+            terminal.WriteLine(Loc.Get("combat.select_healing_spell"));
+            for (int i = 0; i < healSpells.Count; i++)
+            {
+                var spell = healSpells[i];
+                terminal.SetColor("cyan");
+                terminal.WriteLine($"  [{i + 1}] {spell.DisplayName} - {Loc.Get("combat.mana_label")}: {SpellSystem.CalculateManaCost(spell, player)}"); // v1.1.1: real cost, not the table cost
+            }
+            terminal.SetColor("gray");
+            terminal.WriteLine($"  {Loc.Get("combat.cancel_option")}");
+            terminal.WriteLine("");
+
+            terminal.SetColor("white");
+            terminal.Write(Loc.Get("combat.choose_spell"));
+            var spellInput = await terminal.GetInput("");
+
+            if (!int.TryParse(spellInput, out int spellChoice) || spellChoice == 0)
+            {
+                return null;
+            }
+
+            if (spellChoice < 1 || spellChoice > healSpells.Count)
+            {
+                terminal.WriteLine(Loc.Get("combat.invalid_spell"), "red");
+                await Task.Delay(GetCombatDelay(500));
+                return null;
+            }
+
+            selectedSpell = healSpells[spellChoice - 1];
+
+            // Check mana
+            if (player.Mana < SpellSystem.CalculateManaCost(selectedSpell, player)) // v1.1.1: the list used the real cost; this check did not
+            {
+                terminal.WriteLine(Loc.Get("combat.not_enough_mana"), "red");
+                await Task.Delay(GetCombatDelay(1000));
+                return null;
+            }
+
+            if (selectedSpell.IsMultiTarget)
+                return new CombatAction { Type = CombatActionType.CastSpell, SpellIndex = selectedSpell.Level, FromAidMenu = true };
         }
 
         // For mana potions, show MP status; for HP, show HP status
@@ -18504,56 +18563,8 @@ public partial class CombatEngine
                 return null;
             }
 
-            // Show heal spells and let player choose
-            var healSpells = GetAvailableHealSpells(player);
-            if (healSpells.Count == 0)
-            {
-                terminal.WriteLine(Loc.Get("combat.aid_no_heal_spells"), "yellow");
-                await Task.Delay(GetCombatDelay(1000));
-                return null;
-            }
-
-            terminal.WriteLine("");
-            terminal.SetColor("bright_blue");
-            terminal.WriteLine(Loc.Get("combat.select_healing_spell"));
-            for (int i = 0; i < healSpells.Count; i++)
-            {
-                var spell = healSpells[i];
-                terminal.SetColor("cyan");
-                terminal.WriteLine($"  [{i + 1}] {spell.DisplayName} - {Loc.Get("combat.mana_label")}: {SpellSystem.CalculateManaCost(spell, player)}"); // v1.1.1: real cost, not the table cost
-            }
-            terminal.SetColor("gray");
-            terminal.WriteLine($"  {Loc.Get("combat.cancel_option")}");
-            terminal.WriteLine("");
-
-            terminal.SetColor("white");
-            terminal.Write(Loc.Get("combat.choose_spell"));
-            var spellInput = await terminal.GetInput("");
-
-            if (!int.TryParse(spellInput, out int spellChoice) || spellChoice == 0)
-            {
-                return null;
-            }
-
-            if (spellChoice < 1 || spellChoice > healSpells.Count)
-            {
-                terminal.WriteLine(Loc.Get("combat.invalid_spell"), "red");
-                await Task.Delay(GetCombatDelay(500));
-                return null;
-            }
-
-            var selectedSpell = healSpells[spellChoice - 1];
-
-            // Check mana
-            if (player.Mana < SpellSystem.CalculateManaCost(selectedSpell, player)) // v1.1.1: the list used the real cost; this check did not
-            {
-                terminal.WriteLine(Loc.Get("combat.not_enough_mana"), "red");
-                await Task.Delay(GetCombatDelay(1000));
-                return null;
-            }
-
-            // Cast the heal spell on the ally
-            var spellResult = SpellSystem.CastSpell(player, selectedSpell.Level, null);
+            // Cast the heal spell on the ally (picked above, before the ally)
+            var spellResult = SpellSystem.CastSpell(player, selectedSpell!.Level, null);
 
             terminal.WriteLine("");
             terminal.SetColor("bright_magenta");
@@ -31513,6 +31524,10 @@ public class CombatAction
     // The leader is NOT in currentTeammates during a follower's turn, so an index can't reach
     // them; a direct Character reference can, and is stable if HP changes between select and apply.
     public Character? HealTargetOverride { get; set; }
+
+    // v1.1.15: a party heal chosen from the Heal Ally menu, cast as a CastSpell. It still counts
+    // as aid to an ally (NoteOwnerTurn), as every Heal Ally choice does.
+    public bool FromAidMenu { get; set; }
 }
 
 /// <summary>
