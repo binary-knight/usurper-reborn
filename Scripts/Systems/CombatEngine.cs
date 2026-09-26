@@ -4848,6 +4848,8 @@ public partial class CombatEngine
             if (monster.SleepDuration <= 0)
             {
                 monster.IsSleeping = false;
+                // v1.1.15: sleep is a hold; the same post-hold immunity as a stun follows it
+                monster.StunImmunityRounds = GameConfig.StunImmunityRoundsAfterRecovery;
                 terminal.WriteLine(Loc.Get("combat.monster_wakes", monster.Name), "yellow");
             }
             await Task.Delay(GetCombatDelay(600));
@@ -4940,6 +4942,8 @@ public partial class CombatEngine
             if (monster.FrozenDuration <= 0)
             {
                 monster.IsFrozen = false;
+                // v1.1.15: freeze is a hold; the same post-hold immunity as a stun follows it
+                monster.StunImmunityRounds = GameConfig.StunImmunityRoundsAfterRecovery;
                 terminal.WriteLine(Loc.Get("combat.ice_shatters", monster.Name), "cyan");
             }
             await Task.Delay(GetCombatDelay(600));
@@ -8512,7 +8516,8 @@ public partial class CombatEngine
 
         // Already stunned in ANY system: refuse. Refresh-stacking was the primary
         // perma-stun path -- spell or proc kept extending an existing stun's clock.
-        if (target.IsStunned || target.Stunned || target.StunRounds > 0)
+        // v1.1.15: frozen or asleep counts too; one hold at a time.
+        if (target.IsHeld)
             return false;
 
         // Post-recovery immunity window
@@ -8545,6 +8550,55 @@ public partial class CombatEngine
 
         target.IsStunned = true;
         target.StunDuration = duration;
+        target.RecentStunCount++;
+        target.RoundsSinceLastStun = 0;
+        target.HoldsThisFight++;
+        return true;
+    }
+
+    internal enum HoldKind { Freeze, Sleep }
+
+    /// <summary>
+    /// v1.1.15: freeze and sleep on a monster, under the shared hold budget with stun and web.
+    /// Refused while the target is held in any way or in its post-hold immunity. Diminishing
+    /// returns per fight: the first hold runs full length, the second half, the third a quarter,
+    /// then the monster is immune to freeze and sleep for the fight. Capped at
+    /// GameConfig.MaxStunDurationNormal rounds; bosses and mini-bosses resist at
+    /// GameConfig.BossStunResistChance and are held at most GameConfig.MaxStunDurationBoss.
+    /// A landed hold also counts toward the stun diminishing returns. True when it landed.
+    /// </summary>
+    internal bool TryHoldMonster(Monster target, HoldKind kind, int requestedRounds)
+    {
+        if (target == null || !target.IsAlive) return false;
+        if (target.IsHeld) return false;
+        if (target.StunImmunityRounds > 0) return false;
+
+        int percent = target.HoldsThisFight switch { 0 => 100, 1 => 50, 2 => 25, _ => 0 };
+        if (percent == 0) return false;
+        int duration = Math.Max(1, (Math.Max(1, requestedRounds) * percent + 99) / 100);
+
+        if (target.IsBoss || target.IsMiniBoss)
+        {
+            if (random.Next(100) < (int)(GameConfig.BossStunResistChance * 100))
+                return false;
+            duration = Math.Min(duration, GameConfig.MaxStunDurationBoss);
+        }
+        else
+        {
+            duration = Math.Min(duration, GameConfig.MaxStunDurationNormal);
+        }
+
+        if (kind == HoldKind.Freeze)
+        {
+            target.IsFrozen = true;
+            target.FrozenDuration = duration;
+        }
+        else
+        {
+            target.IsSleeping = true;
+            target.SleepDuration = duration;
+        }
+        target.HoldsThisFight++;
         target.RecentStunCount++;
         target.RoundsSinceLastStun = 0;
         return true;
@@ -15251,11 +15305,11 @@ public partial class CombatEngine
             case "freeze":
                 if (target != null && target.IsAlive)
                 {
-                    int freezeChance = target.IsBoss ? 40 : 75;
-                    if (random.Next(100) < freezeChance)
+                    // v1.1.15: the freeze goes through the shared hold budget; its boss resist
+                    // replaces the old 40% boss chance (75% then half: about 37% on a boss)
+                    if (random.Next(100) < 75
+                        && TryHoldMonster(target, HoldKind.Freeze, abilityResult.Duration > 0 ? abilityResult.Duration : 2))
                     {
-                        target.IsFrozen = true;
-                        target.FrozenDuration = abilityResult.Duration > 0 ? abilityResult.Duration : 2;
                         terminal.SetColor("bright_cyan");
                         terminal.WriteLine(Loc.Get("combat.ability_frozen", target.Name));
                     }
@@ -15977,9 +16031,10 @@ public partial class CombatEngine
                         m.WeakenRounds = Math.Max(m.WeakenRounds, abilityResult.Duration);
                         m.IsMarked = true;
                         m.MarkedDuration = Math.Max(m.MarkedDuration, abilityResult.Duration);
-                        if (random.Next(100) < 25 && m.StunImmunityRounds <= 0) m.Stunned = true;
+                        // v1.1.15: through the hold rules, like the single-target twin
+                        bool waveStun = random.Next(100) < 25 && TryStunMonster(m, 1);
                         terminal.SetColor("magenta");
-                        terminal.WriteLine(Loc.Get(m.Stunned ? "combat.ability_dissonant_wave_stun" : "combat.ability_dissonant_wave", m.Name));
+                        terminal.WriteLine(Loc.Get(waveStun ? "combat.ability_dissonant_wave_stun" : "combat.ability_dissonant_wave", m.Name));
                     }
                 }
                 break;
@@ -17390,9 +17445,10 @@ public partial class CombatEngine
         switch (effect.ToLower())
         {
             case "sleep":
-                target.IsSleeping = true;
-                target.SleepDuration = duration > 0 ? duration : 3;
-                terminal.WriteLine(Loc.Get("combat.spell_sleep", target.Name), "cyan");
+                if (TryHoldMonster(target, HoldKind.Sleep, duration > 0 ? duration : 3))
+                    terminal.WriteLine(Loc.Get("combat.spell_sleep", target.Name), "cyan");
+                else
+                    terminal.WriteLine(Loc.Get("combat.spell_sleep_resist", target.Name), "yellow");
                 break;
 
             case "fear":
@@ -17422,9 +17478,10 @@ public partial class CombatEngine
                 break;
 
             case "freeze":
-                target.IsFrozen = true;
-                target.FrozenDuration = duration > 0 ? duration : 2;
-                terminal.WriteLine(Loc.Get("combat.spell_frozen", target.Name), "bright_cyan");
+                if (TryHoldMonster(target, HoldKind.Freeze, duration > 0 ? duration : 2))
+                    terminal.WriteLine(Loc.Get("combat.spell_frozen", target.Name), "bright_cyan");
+                else
+                    terminal.WriteLine(Loc.Get("combat.spell_freeze_resist", target.Name), "cyan");
                 break;
 
             case "frost":
@@ -23520,11 +23577,11 @@ public partial class CombatEngine
             case "freeze":
                 if (monster != null && monster.IsAlive)
                 {
-                    int freezeChance = monster.IsBoss ? 40 : 75;
-                    if (random.Next(100) < freezeChance)
+                    // v1.1.15: the freeze goes through the shared hold budget; its boss resist
+                    // replaces the old 40% boss chance (75% then half: about 37% on a boss)
+                    if (random.Next(100) < 75
+                        && TryHoldMonster(monster, HoldKind.Freeze, abilityResult.Duration > 0 ? abilityResult.Duration : 2))
                     {
-                        monster.IsFrozen = true;
-                        monster.FrozenDuration = abilityResult.Duration > 0 ? abilityResult.Duration : 2;
                         terminal.SetColor("bright_cyan");
                         terminal.WriteLine(Loc.Get("combat.frozen_solid", monster.Name));
                     }
@@ -26745,18 +26802,20 @@ public partial class CombatEngine
             case "sleep":
                 if (target != null)
                 {
-                    target.IsSleeping = true;
-                    target.SleepDuration = duration > 0 ? duration : 3;
-                    terminal.WriteLine(Loc.Get("combat.magical_slumber", target.Name), "cyan");
+                    if (TryHoldMonster(target, HoldKind.Sleep, duration > 0 ? duration : 3))
+                        terminal.WriteLine(Loc.Get("combat.magical_slumber", target.Name), "cyan");
+                    else
+                        terminal.WriteLine(Loc.Get("combat.spell_sleep_resist", target.Name), "yellow");
                 }
                 break;
 
             case "freeze":
                 if (target != null)
                 {
-                    target.IsFrozen = true;
-                    target.FrozenDuration = duration > 0 ? duration : 2;
-                    terminal.WriteLine(Loc.Get("combat.spell_frozen", target.Name), "bright_cyan");
+                    if (TryHoldMonster(target, HoldKind.Freeze, duration > 0 ? duration : 2))
+                        terminal.WriteLine(Loc.Get("combat.spell_frozen", target.Name), "bright_cyan");
+                    else
+                        terminal.WriteLine(Loc.Get("combat.spell_freeze_resist", target.Name), "cyan");
                 }
                 break;
 

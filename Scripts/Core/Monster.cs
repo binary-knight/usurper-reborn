@@ -136,6 +136,15 @@ public class Monster
     // 2nd = 50%, 3rd = 25%, 4th+ = full immunity until the window resets).
     public int RecentStunCount { get; set; } = 0;
     public int RoundsSinceLastStun { get; set; } = 0;
+
+    // v1.1.15: the shared hold budget. Every hold that lands this fight (stun, web, freeze,
+    // sleep) counts here; it never decays, so CombatEngine.TryHoldMonster gives a freeze or
+    // sleep full, half, then quarter duration, and after three holds the monster is immune
+    // to them for the rest of the fight.
+    public int HoldsThisFight { get; set; } = 0;
+
+    /// <summary>v1.1.15: held in any way (stun, web, freeze, sleep); no new hold lands on top.</summary>
+    public bool IsHeld => IsStunned || Stunned || StunRounds > 0 || IsFrozen || IsSleeping;
     public bool IsSlowed { get; set; } = false;
     public int SlowDuration { get; set; } = 0;
 
