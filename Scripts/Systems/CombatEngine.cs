@@ -19052,14 +19052,17 @@ public partial class CombatEngine
             {
                 terminal.WriteLine(Loc.Get("combat.teammate_casts_party", teammate.DisplayName, healSpell.DisplayName));
 
-                // Heal the player
-                long oldPlayerHP = currentPlayer.HP;
-                currentPlayer.HP = Math.Min(currentPlayer.MaxHP, currentPlayer.HP + spellResult.Healing);
-                long playerHeal = currentPlayer.HP - oldPlayerHP;
-                if (playerHeal > 0)
+                // Heal the player (v1.1.15: skip a fallen player, matching WardPartyFromHeal below)
+                if (currentPlayer.IsAlive)
                 {
-                    terminal.SetColor("bright_green");
-                    terminal.WriteLine(Loc.Get("combat.you_recover_hp", playerHeal));
+                    long oldPlayerHP = currentPlayer.HP;
+                    currentPlayer.HP = Math.Min(currentPlayer.MaxHP, currentPlayer.HP + spellResult.Healing);
+                    long playerHeal = currentPlayer.HP - oldPlayerHP;
+                    if (playerHeal > 0)
+                    {
+                        terminal.SetColor("bright_green");
+                        terminal.WriteLine(Loc.Get("combat.you_recover_hp", playerHeal));
+                    }
                 }
 
                 // Heal the caster themselves
