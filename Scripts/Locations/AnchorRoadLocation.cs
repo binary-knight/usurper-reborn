@@ -909,9 +909,8 @@ public class AnchorRoadLocation : BaseLocation
         terminal.SetColor("cyan");
         terminal.Write(Loc.Get("anchor_road.enter_gauntlet_prompt", $"{entryFee:N0}"));
         terminal.SetColor("white");
-        string response = await terminal.ReadLineAsync();
-
-        if (!GameConfig.IsAffirmative(response))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (!await terminal.AskYesNoAsync(""))
         {
             terminal.SetColor("white");
             terminal.WriteLine(Loc.Get("anchor_road.come_back_later"));
@@ -1389,8 +1388,8 @@ public class AnchorRoadLocation : BaseLocation
         terminal.WriteLine("");
         terminal.SetColor("white");
         terminal.Write(Loc.Get("anchor_road.surrender_prompt_question"));
-        string? response = await terminal.ReadLineAsync();
-        return response != null && GameConfig.IsAffirmative(response);
+        // v1.1.15: yesno-convert-a, prompt shows (y/N) so a bare Enter keeps the old default of No
+        return await terminal.AskYesNoAsync("", enterDefault: false);
     }
 
     /// <summary>Generate and award the champion's themed equipment drop. Stats scale to
@@ -1592,9 +1591,8 @@ public class AnchorRoadLocation : BaseLocation
             terminal.SetColor("cyan");
             terminal.Write(Loc.Get("anchor_road.claim_prompt"));
             terminal.SetColor("white");
-            string claimResponse = await terminal.ReadLineAsync();
-
-            if (GameConfig.IsAffirmative(claimResponse))
+            // v1.1.15: yesno-convert-a, strict (Y/N)
+            if (await terminal.AskYesNoAsync(""))
             {
                 currentPlayer.CTurf = true;
                 currentPlayer.TeamRec = 0;
@@ -1653,9 +1651,8 @@ public class AnchorRoadLocation : BaseLocation
         terminal.WriteLine(Loc.Get("anchor_road.leave_town_open"));
         terminal.Write(Loc.Get("anchor_road.abandon_prompt"));
         terminal.SetColor("white");
-        string response = await terminal.ReadLineAsync();
-
-        if (GameConfig.IsAffirmative(response))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (await terminal.AskYesNoAsync(""))
         {
             // Remove turf control from all team members
             currentPlayer.CTurf = false;
@@ -1749,9 +1746,8 @@ public class AnchorRoadLocation : BaseLocation
         terminal.SetColor("cyan");
         terminal.Write(Loc.Get("anchor_road.proceed_jailbreak"));
         terminal.SetColor("white");
-        string response = await terminal.ReadLineAsync();
-
-        if (GameConfig.IsAffirmative(response))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (await terminal.AskYesNoAsync(""))
         {
             int successChance = 30 + currentPlayer.Level + (int)(currentPlayer.Agility / 5);
             bool success = random.Next(100) < successChance;
@@ -2024,8 +2020,8 @@ public class AnchorRoadLocation : BaseLocation
         }
 
         terminal.SetColor("white");
-        string choice = (await terminal.GetInput(Loc.Get("merc.contract_claim_prompt"))).Trim().ToUpperInvariant();
-        if (GameConfig.IsAffirmative(choice))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (await terminal.AskYesNoAsync(Loc.Get("merc.contract_claim_prompt")))
         {
             quest.Occupier = currentPlayer.Name2;
             quest.OccupierRace = currentPlayer.Race;
