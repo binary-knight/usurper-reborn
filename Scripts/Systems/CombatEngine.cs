@@ -528,6 +528,18 @@ public partial class CombatEngine
         if (!IsHeld(fighter) && ++st.RoundsSinceLast >= GameConfig.StunDRWindowRounds) st.RecentCount = 0;
     }
 
+    /// <summary>
+    /// v1.1.15: a Blinded fighter misses GameConfig.PvPBlindedMissPercent of their weapon swings in
+    /// a duel. Before this Blinded did nothing in a duel. True when the swing missed.
+    /// </summary>
+    internal bool PvPBlindedMiss(Character attacker)
+    {
+        if (attacker == null || !attacker.HasStatus(StatusEffect.Blinded)) return false;
+        if (random.Next(100) >= GameConfig.PvPBlindedMissPercent) return false;
+        terminal.WriteLine(Loc.Get("combat.pvp_blinded_miss", attacker.DisplayName), "gray");
+        return true;
+    }
+
     private void EndPvPCombat(Character attacker, Character defender)
     {
         foreach (var kv in _pvpDisarmedWeapPow) kv.Key.WeapPow = kv.Value;
@@ -25827,6 +25839,13 @@ public partial class CombatEngine
             terminal.WriteLine(Loc.Get("combat.off_hand_strike"));
         }
 
+        if (PvPBlindedMiss(attacker))
+        {
+            result.CombatLog.Add($"{attacker.DisplayName} misses {defender.DisplayName} (blinded)");
+            await Task.Delay(GetCombatDelay(800));
+            return;
+        }
+
         long attackPower = attacker.Strength + GetEffectiveWeapPow(attacker.WeapPow) + random.Next(1, 16);
 
         // Weapon config modifier; the off-hand flag applies the same reduced-power
@@ -26400,6 +26419,12 @@ public partial class CombatEngine
         }
 
         // 3. Default attack (with weapon soft cap)
+        if (PvPBlindedMiss(computer))
+        {
+            result.CombatLog.Add($"{computer.DisplayName} misses {opponent.DisplayName} (blinded)");
+            await Task.Delay(GetCombatDelay(800));
+            return;
+        }
         long attackPower = computer.Strength + GetEffectiveWeapPow(computer.WeapPow) + random.Next(1, 16);
 
         // Apply weapon configuration damage modifier
@@ -27349,6 +27374,32 @@ public partial class CombatEngine
             case "freeze":
                 if (TryApplyPvPControl(target, StatusEffect.Frozen, duration))
                     terminal.WriteLine(Loc.Get("combat.is_frozen", target.DisplayName), "bright_cyan");
+                break;
+
+            // v1.1.15: the Sage's control spells in a duel. Slumber Mist is a hold, so it goes
+            // through the duel control rules; Dulling Mist slows, as frost does; Psychic Scream's
+            // accuracy loss is Blinded.
+            case "slumber_mist":
+                if (TryApplyPvPControl(target, StatusEffect.Sleeping, duration))
+                    terminal.WriteLine(Loc.Get("combat.magical_slumber", target.DisplayName), "cyan");
+                break;
+
+            case "dulling_mist":
+                target.ApplyStatus(StatusEffect.Slow, duration);
+                terminal.WriteLine(Loc.Get("combat.is_slowed", target.DisplayName), "gray");
+                break;
+
+            case "psychic_scream":
+                target.ApplyStatus(StatusEffect.Blinded, duration);
+                terminal.WriteLine(Loc.Get("combat.is_blinded", target.DisplayName), "gray");
+                break;
+
+            // v1.1.15: Scholar's Mark, Unveil the Pattern and Compel work through allies and the
+            // party's tank; a duel has neither, so they do nothing there.
+            case "scholars_mark":
+            case "unveil_pattern":
+            case "compel":
+                terminal.WriteLine(Loc.Get("combat.pvp_party_spell_no_effect"), "gray");
                 break;
 
             // v1.1.10: frost slows, as it does against a monster. Frost Touch and Ice Storm are the

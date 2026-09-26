@@ -6183,6 +6183,8 @@
   "combat.sage_compel": "{0} kénytelen {1} ellen fordulni!",
   "combat.ward_stronger_holds": "{0} erősebb védelmet tart meg.",
   "combat.sage_ocean_memory_ally": "{0} varázslatai mostantól fele annyi manába kerülnek.",
+  "combat.pvp_party_spell_no_effect": "A varázslat a szövetségeseken át hat, egy párbajban pedig nincs egy sem. Semmi sem történik.",
+  "combat.pvp_blinded_miss": "{0} vakon lendít, és mellétalál!",
   "combat.spell_web": "{0} beleragadt a ragacsos hálókba!",
   "combat.spell_mass_confusion": "{0}-t letaglózza a pszichikai káosz!",
   "combat.spell_dominate": "{0} akarata megtört -- mostantól téged szolgál!",

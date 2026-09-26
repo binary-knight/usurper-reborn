@@ -256,13 +256,126 @@ public class SageWards1115Tests
         else tank.HP.Should().BeLessThan(tank.MaxHP);
     }
 
+    // ---- duels ----
+
+    private static void DuelEffect(CombatEngine engine, Character caster, Character target, SpellSystem.SpellResult r) =>
+        typeof(CombatEngine).GetMethod("ApplyPvPSpellEffect", F)!.Invoke(engine, new object[] { caster, target, r });
+
+    private static Character Duelist() => new Character
+    {
+        Name1 = "Rival", Name2 = "Rival", Class = CharacterClass.Warrior, Level = 40, HP = 5_000, MaxHP = 5_000,
+        Strength = 200, Defence = 10, CombatSpeed = CombatSpeed.Instant,
+    };
+
+    [Fact]
+    public void Duel_SlumberMist_IsSleeping_ThroughTheControlGuard()
+    {
+        var sage = Sage();
+        var rival = Duelist();
+        var (engine, _) = Engine(sage, new List<Character>());
+        var r = Cast(sage, 10);
+        DuelEffect(engine, sage, rival, r);
+        rival.HasStatus(StatusEffect.Sleeping).Should().BeTrue();
+        // the guard: no new hold while one holds
+        engine.TryApplyPvPControl(rival, StatusEffect.Stunned, 2).Should().BeFalse();
+        string src = File.ReadAllText(Path.Combine(Leftovers1114BTests.RepoRoot(), "Scripts", "Systems", "CombatEngine.cs"));
+        src.Replace("\r\n", "\n").Should().Contain("case \"slumber_mist\":\n                if (TryApplyPvPControl(target, StatusEffect.Sleeping, duration))");
+    }
+
+    [Theory]
+    [InlineData(5, StatusEffect.Slow)]
+    [InlineData(12, StatusEffect.Blinded)]
+    public void Duel_DullingMist_Slows_AndPsychicScream_Blinds(int slot, StatusEffect expected)
+    {
+        var sage = Sage();
+        var rival = Duelist();
+        var (engine, _) = Engine(sage, new List<Character>());
+        var r = Cast(sage, slot);
+        DuelEffect(engine, sage, rival, r);
+        rival.HasStatus(expected).Should().BeTrue();
+        rival.ActiveStatuses[expected].Should().Be(2);
+    }
+
+    [Theory]
+    [InlineData(6)]
+    [InlineData(14)]
+    [InlineData(18)]
+    public void Duel_MarkUnveilAndCompel_DoNothing(int slot)
+    {
+        var sage = Sage();
+        var rival = Duelist();
+        var (engine, output) = Engine(sage, new List<Character>());
+        DuelEffect(engine, sage, rival, Cast(sage, slot));
+        rival.ActiveStatuses.Should().BeEmpty();
+        rival.HP.Should().Be(rival.MaxHP);
+        sage.ActiveStatuses.Should().BeEmpty();
+        Text(engine, output).Should().Contain("a duel has none");
+    }
+
+    [Fact]
+    public async Task Duel_AWard_StaysOnTheCaster()
+    {
+        var sage = Sage();
+        var staff = EquipmentDatabase.GetAll().First(e => e.WeaponType == WeaponType.Staff);
+        sage.EquippedItems[EquipmentSlot.MainHand] = staff.Id;
+        sage.Spell = Enumerable.Range(0, GameConfig.MaxSpells).Select(_ => new List<bool> { false, false }).ToList();
+        sage.Spell[19][0] = true; // Noctura's Veil, learned
+        var rival = Duelist();
+        var (engine, _) = Engine(sage, new List<Character>());
+        var action = new CombatAction { Type = CombatActionType.CastSpell, SpellIndex = 20 };
+        var cast = typeof(CombatEngine).GetMethod("ExecutePvPSpell", F)!;
+        for (int i = 0; i < 200 && sage.MagicACBonus == 0; i++)
+            await (Task)cast.Invoke(engine, new object[] { sage, rival, action, new CombatResult { Player = sage } })!;
+        sage.MagicACBonus.Should().BeGreaterThan(0, "the Veil lands on the caster");
+        rival.MagicACBonus.Should().Be(0);
+        rival.HasStatus(StatusEffect.Blur).Should().BeFalse();
+        rival.HasStatus(StatusEffect.Blessed).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Duel_OceansMemory_StaysOnTheCaster()
+    {
+        var sage = Sage();
+        var rival = Duelist();
+        var (engine, _) = Engine(sage, new List<Character>());
+        DuelEffect(engine, sage, rival, Cast(sage, 22));
+        sage.HasOceanMemory.Should().BeTrue();
+        rival.HasOceanMemory.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Duel_ABlindedFighter_CanMiss(bool blinded)
+    {
+        var rival = Duelist();
+        var target = Duelist();
+        if (blinded) rival.ApplyStatus(StatusEffect.Blinded, 2);
+        var (engine, _) = Engine(rival, new List<Character>(), new LowRandom());
+        await (Task)typeof(CombatEngine).GetMethod("ExecutePvPSingleHit", F)!
+            .Invoke(engine, new object[] { rival, target, new CombatResult { Player = rival }, false })!;
+        if (blinded) target.HP.Should().Be(target.MaxHP);
+        else target.HP.Should().BeLessThan(target.MaxHP);
+
+        var (sure, _) = Engine(rival, new List<Character>(), new HighRandom());
+        sure.PvPBlindedMiss(rival).Should().BeFalse("a high roll lands");
+    }
+
+    [Fact]
+    public void Duel_TheAIsSwing_AlsoChecksBlinded()
+    {
+        string src = File.ReadAllText(Path.Combine(Leftovers1114BTests.RepoRoot(), "Scripts", "Systems", "CombatEngine.cs"));
+        src.Replace("\r\n", "\n").Should().Contain("// 3. Default attack (with weapon soft cap)\n        if (PvPBlindedMiss(computer))");
+    }
+
     // ---- text ----
 
     [Fact]
     public void TheNewLines_AreInEveryLanguage()
     {
         string dir = Path.Combine(Leftovers1114BTests.RepoRoot(), "Localization");
-        var keys = new List<string> { "combat.ward_stronger_holds", "combat.sage_ocean_memory_ally" };
+        var keys = new List<string> { "combat.ward_stronger_holds", "combat.sage_ocean_memory_ally",
+            "combat.pvp_party_spell_no_effect", "combat.pvp_blinded_miss" };
         foreach (int slot in new[] { 1, 13, 16, 20, 22, 24 }) keys.Add($"spell.sage.{slot}.desc");
         foreach (var lang in new[] { "en", "es", "fr", "hu", "it" })
         {
