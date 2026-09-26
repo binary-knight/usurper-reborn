@@ -492,6 +492,60 @@ public class SageCompanion1115Tests
             File.ReadAllText(Path.Combine(dir, lang + ".json")).Should().Contain("\"combat.sage_seal_ward\":", lang);
     }
 
+    // ---- a teammate's Veloura's Embrace wards the party ----
+
+    /// <summary>
+    /// A Sage teammate casts its party heal until the cast lands (SpellSystem.CastSpell rolls on
+    /// Random.Shared and can fizzle). Returns the party and the ward value the landed cast gave.
+    /// </summary>
+    private static (Character sage, Character leader, Character tank, Character fallen, int ward) TeammateEmbrace(int tankWard)
+    {
+        for (int attempt = 0; attempt < 100; attempt++)
+        {
+            var (engine, sage, leader, tank, result) = Party(100);
+            var fallen = Ally("Fallen", CharacterClass.Warrior);
+            fallen.HP = 0;
+            typeof(CombatEngine).GetField("currentTeammates", F)!.SetValue(engine, new List<Character> { sage, tank, fallen });
+            if (tankWard > 0) CombatEngine.ApplyWardHighestWins(tank, tankWard, 999);
+            leader.HP = 1000;
+            var cast = ((Task<bool>)typeof(CombatEngine).GetMethod("TeammateHealWithSpell", F)!
+                .Invoke(engine, new object[] { sage, leader, result })!).GetAwaiter().GetResult();
+            cast.Should().BeTrue();
+            if (leader.HP == 1000) continue;   // the cast fizzled
+            return (sage, leader, tank, fallen, leader.MagicACBonus);
+        }
+        throw new Exception("the party heal never landed");
+    }
+
+    [Fact]
+    public void ATeammatesVelourasEmbrace_WardsEachLivingAlly()
+    {
+        var (sage, leader, tank, _, ward) = TeammateEmbrace(0);
+        ward.Should().BeGreaterThan(0, "the party heal carries a ward");
+        foreach (var c in new[] { sage, leader, tank })
+        {
+            c.MagicACBonus.Should().Be(ward, c.DisplayName);
+            c.ActiveStatuses.Should().ContainKey(StatusEffect.Blessed, c.DisplayName);
+        }
+    }
+
+    [Fact]
+    public void ATeammatesVelourasEmbrace_KeepsAStrongerWard()
+    {
+        var (_, leader, tank, _, ward) = TeammateEmbrace(100_000);
+        ward.Should().BeGreaterThan(0);
+        tank.MagicACBonus.Should().Be(100_000, "the highest ward wins on the teammate path too");
+    }
+
+    [Fact]
+    public void ATeammatesVelourasEmbrace_SkipsAFallenAlly()
+    {
+        var (_, _, _, fallen, ward) = TeammateEmbrace(0);
+        ward.Should().BeGreaterThan(0);
+        fallen.MagicACBonus.Should().Be(0, "a fallen ally gets no ward");
+        fallen.ActiveStatuses.Should().NotContainKey(StatusEffect.Blessed);
+    }
+
     [Fact]
     public void TheTeammateTurn_TriesTheSageSpellsFirst()
     {

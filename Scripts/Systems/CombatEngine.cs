@@ -8729,6 +8729,18 @@ public partial class CombatEngine
             terminal.WriteLine(Loc.Get("combat.ward_stronger_holds", tgt.DisplayName), "gray");
     }
 
+    /// <summary>
+    /// v1.1.15: the ward a multi-target heal carries (Veloura's Embrace) on every living ally, the
+    /// highest ward winning on each. Shared by the player's cast and a teammate's.
+    /// </summary>
+    internal void WardPartyFromHeal(Character caster, SpellSystem.SpellResult spellResult, CombatResult? result)
+    {
+        if (spellResult.ProtectionBonus <= 0) return;
+        int dur = spellResult.Duration > 0 ? spellResult.Duration : 999;
+        foreach (var ally in LivingPartyOf(caster, result))
+            WardAlly(ally, spellResult.ProtectionBonus, dur);
+    }
+
     /// <summary>v1.1.15: the caster, every living teammate, and the leader when a follower casts.</summary>
     private List<Character> LivingPartyOf(Character caster, CombatResult? result)
     {
@@ -17590,13 +17602,7 @@ public partial class CombatEngine
                 }
 
                 // Apply any protection/buff bonus from the spell to entire party
-                // v1.1.15: the highest ward wins on each ally (Veloura's Embrace)
-                if (spellResult.ProtectionBonus > 0)
-                {
-                    int dur = spellResult.Duration > 0 ? spellResult.Duration : 999;
-                    foreach (var ally in LivingPartyOf(player, result))
-                        WardAlly(ally, spellResult.ProtectionBonus, dur);
-                }
+                WardPartyFromHeal(player, spellResult, result);
 
                 result.CombatLog.Add($"{player.DisplayName} casts {spellInfo.Name} on the whole party.");
             }
@@ -19088,6 +19094,9 @@ public partial class CombatEngine
                         }
                     }
                 }
+
+                // v1.1.15: a party heal that carries a ward (Veloura's Embrace) wards the party too
+                WardPartyFromHeal(teammate, spellResult, result);
 
                 result.CombatLog.Add($"{teammate.DisplayName} casts {healSpell.Name} on the whole party.");
             }
