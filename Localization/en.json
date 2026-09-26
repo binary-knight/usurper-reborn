@@ -6899,6 +6899,7 @@
   "home.equip_stats_int": "  INT: {0}  WIS: {1}  CHA: {2}  DEF: {3}",
   "ui.invalid_choice": "Invalid choice.",
   "ui.invalid_choice_choose": "Invalid choice; choose {0}.",
+  "ui.answer_yes_no": "Please answer Y or N.",
   "ui.choice_range_or_zero": "{0} or 0",
   "ui.cursed": "cursed",
   "bank.gold_on_hand": "Gold on Hand:  ",

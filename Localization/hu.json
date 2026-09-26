@@ -6716,6 +6716,7 @@
   "home.equip_stats_int": "  INT: {0}  BÖL: {1}  KAR: {2}  VÉD: {3}",
   "ui.invalid_choice": "Érvénytelen választás.",
   "ui.invalid_choice_choose": "Érvénytelen választás; válassz: {0}.",
+  "ui.answer_yes_no": "Kérlek válaszolj I-vel vagy N-nel.",
   "ui.choice_range_or_zero": "{0} vagy 0",
   "ui.cursed": "elátkozott",
   "bank.gold_on_hand": "Nálad lévő arany:  ",

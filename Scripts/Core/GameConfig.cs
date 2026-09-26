@@ -2473,6 +2473,22 @@ public static partial class GameConfig
     }
 
     /// <summary>
+    /// v1.1.15: Centralized localized yes/no test, the negative half of IsAffirmative. Returns true
+    /// when the player's input is a negative in ANY supported language: N (English No), N (Spanish
+    /// "No" / Italian "No", same letter), N (French "Non"), N (Hungarian "Nem"). Every displayed
+    /// yes/no hint in this game shows N as its negative letter regardless of language (checked the
+    /// (S/N), (O/N) and (I/N) prompts), so no extra single letter is needed here, only the full
+    /// words. Used together with IsAffirmative so a stray key or a typo is neither yes nor no and a
+    /// caller can ask again instead of one of the two silently winning by default.
+    /// </summary>
+    public static bool IsNegative(string? input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return false;
+        var c = input.Trim().ToUpperInvariant();
+        return c == "N" || c == "NO" || c == "NON" || c == "NEM";
+    }
+
+    /// <summary>
     /// v0.65.1: Short human-readable weapon-class tag (One-Handed / Two-Handed /
     /// Shield / Buckler / Tower Shield / Off-Hand) for item displays, so players
     /// can tell a weapon's handedness and spot shields WITHOUT equipping it
