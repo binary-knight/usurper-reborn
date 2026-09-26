@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -18,35 +17,15 @@ namespace UsurperReborn.Tests;
 /// DarkAlleyLocation, DungeonLocation, MagicShopLocation, CharacterCreationSystem, TeamCornerLocation,
 /// HealerLocation, AnchorRoadLocation) had their hand-rolled yes/no reads (GameConfig.IsAffirmative
 /// alone, or the StartsWith("Y") / == "Y" equivalents) converted to TerminalEmulator.AskYesNoAsync, so
-/// a stray key or a typo re-asks instead of silently counting as No. A source check confirms none of
-/// the old bare checks remain, and a handful of the converted sites are exercised end to end: a junk
-/// answer re-asks (and the loc'd re-ask line is shown), then a real Y or N is honored.
+/// a stray key or a typo re-asks instead of silently counting as No. A handful of the converted sites
+/// are exercised end to end: a junk answer re-asks (and the loc'd re-ask line is shown), then a real Y
+/// or N is honored. YesNoGuard1115Tests carries the repo-wide source check that none of the old bare
+/// checks remain, across this file's sites and every other one.
 /// </summary>
 [Collection("SharedGameSingletons")]
 public class YesNoConvert1115ATests
 {
     private const BindingFlags NonPublicInstance = BindingFlags.NonPublic | BindingFlags.Instance;
-
-    private static readonly string[] ConvertedFiles =
-    {
-        "Scripts/Locations/TempleLocation.cs",
-        "Scripts/Locations/CastleLocation.cs",
-        "Scripts/Locations/DarkAlleyLocation.cs",
-        "Scripts/Locations/DungeonLocation.cs",
-        "Scripts/Locations/MagicShopLocation.cs",
-        "Scripts/Systems/CharacterCreationSystem.cs",
-        "Scripts/Locations/TeamCornerLocation.cs",
-        "Scripts/Locations/HealerLocation.cs",
-        "Scripts/Locations/AnchorRoadLocation.cs",
-    };
-
-    private static string RepoRoot()
-    {
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir != null && !(Directory.Exists(Path.Combine(dir.FullName, "Scripts")) && Directory.Exists(Path.Combine(dir.FullName, "Localization"))))
-            dir = dir.Parent;
-        return dir!.FullName;
-    }
 
     private static (TerminalEmulator term, MemoryStream output) Stream(params string[] lines)
     {
@@ -58,21 +37,6 @@ public class YesNoConvert1115ATests
     {
         term.StreamWriterInternal?.Flush();
         return Regex.Replace(Encoding.UTF8.GetString(output.ToArray()), "\u001b\\[[0-9;]*[A-Za-z]", "");
-    }
-
-    // ---------- source check: no bare hand-rolled yes/no test remains ----------
-
-    [Fact]
-    public void ConvertedFiles_HaveNoBareYesNoCheck_OutsideAnExemptLine()
-    {
-        var bare = new Regex(@"IsAffirmative\(|StartsWith\(""Y""\)|==\s*""Y""", RegexOptions.Compiled);
-        foreach (var relPath in ConvertedFiles)
-        {
-            var offenders = File.ReadAllLines(Path.Combine(RepoRoot(), relPath))
-                .Where(l => bare.IsMatch(l) && !l.Contains("yesno-exempt"))
-                .ToList();
-            offenders.Should().BeEmpty($"{relPath} must route yes/no reads through AskYesNoAsync, not a bare check");
-        }
     }
 
     // ---------- CharacterCreationSystem.ConfirmChoice (a shared helper, several call sites) ----------

@@ -1,7 +1,5 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -18,9 +16,10 @@ namespace UsurperReborn.Tests;
 /// yes/no sites in a second batch of files to TerminalEmulator.AskYesNoAsync / AskYesNoKeyAsync (see
 /// YesNoPrompt1115Tests for the shared helper's own tests, and DiscoverySystem.RunRisk for the first
 /// converted call site). This file covers: behaviour at a representative handful of the converted
-/// call sites in this batch, the AskYesNoKeyAsync single-key sibling, and a source-level sweep that
-/// nothing in this batch's files still tests GameConfig.IsAffirmative, StartsWith("Y") or =="Y"
-/// outside a line that carries a "yesno-exempt" marker explaining why it is not a plain yes/no.
+/// call sites in this batch, and the AskYesNoKeyAsync single-key sibling. YesNoGuard1115Tests carries
+/// the repo-wide source sweep that nothing in this batch's files, or any other, still tests
+/// GameConfig.IsAffirmative, StartsWith("Y") or =="Y" outside a line that carries a "yesno-exempt"
+/// marker explaining why it is not a plain yes/no.
 /// </summary>
 [Collection("SharedGameSingletons")]
 public class YesNoConvert1115BTests
@@ -119,84 +118,7 @@ public class YesNoConvert1115BTests
         (await term.AskYesNoKeyAsync()).Should().BeFalse("a dead or confused peer cannot spin the prompt; No is the safe fallback");
     }
 
-    // ---------- source-level: no leftover hand-rolled yes/no checks outside an exempt marker ----------
-
-    private static string RepoRoot()
-    {
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir != null && !(Directory.Exists(Path.Combine(dir.FullName, "Scripts")) && Directory.Exists(Path.Combine(dir.FullName, "Localization"))))
-            dir = dir.Parent;
-        dir.Should().NotBeNull("the test must run inside the repository");
-        return dir!.FullName;
-    }
-
-    // The files this piece (yesno-convert-b) owns. TerminalEmulator.cs is edited only for
-    // AskYesNoKeyAsync and is intentionally not swept here (it implements IsAffirmative/IsNegative).
-    private static readonly string[] OwnedFiles =
-    {
-        "Scripts/Locations/BaseLocation.cs",
-        "Scripts/Locations/InnLocation.cs",
-        "Scripts/Systems/OnlineAdminConsole.cs",
-        "Scripts/Locations/ChurchLocation.cs",
-        "Scripts/Systems/CombatEngine.cs",
-        "Scripts/Systems/SysOpConsoleManager.cs",
-        "Scripts/Locations/HomeLocation.cs",
-        "Scripts/Systems/VersionChecker.cs",
-        "Scripts/Locations/WeaponShopLocation.cs",
-        "Scripts/Locations/SanctumLocation.cs",
-        "Scripts/Locations/LoveStreetLocation.cs",
-        "Scripts/Locations/BankLocation.cs",
-        "Scripts/Systems/EndingsSystem.cs",
-        "Scripts/Locations/WildernessLocation.cs",
-        "Scripts/Locations/LoveCornerLocation.cs",
-        "Scripts/Locations/ArmorShopLocation.cs",
-        "Scripts/Core/GameEngine.cs",
-        "Scripts/Systems/VisualNovelDialogueSystem.cs",
-        "Scripts/Systems/TrainingSystem.cs",
-        "Scripts/Systems/StreetEncounterSystem.cs",
-        "Scripts/Systems/RareEncounters.cs",
-        "Scripts/Systems/InventorySystem.cs",
-        "Scripts/Systems/HagglingEngine.cs",
-        "Scripts/Locations/SysOpLocation.cs",
-        "Scripts/Locations/QuestHallLocation.cs",
-        "Scripts/Locations/PrisonLocation.cs",
-        "Scripts/Locations/MusicShopLocation.cs",
-        "Scripts/Locations/MainStreetLocation.cs",
-        "Scripts/Systems/OnlinePlaySystem.cs",
-        "Scripts/Systems/LocationManager.cs",
-        "Scripts/Systems/FeatureInteractionSystem.cs",
-        "Scripts/Locations/LevelMasterLocation.cs",
-        "Scripts/Locations/CharacterCreationLocation.cs",
-        "Scripts/Locations/ArenaLocation.cs",
-    };
-
-    // IsAffirmative(...), StartsWith("Y" / 'Y', and =="Y" / =='Y' -- the hand-rolled yes/no shapes
-    // this piece converts. A remaining hit must carry "yesno-exempt" on the same line, explaining why
-    // it is a menu (Y is one option among others) or another documented exception, not a plain yes/no.
-    private static readonly Regex HandRolledYesNo = new(
-        "IsAffirmative\\(|StartsWith\\(\"Y\"|StartsWith\\('Y'|==\\s*\"Y\"|==\\s*'Y'",
-        RegexOptions.Compiled);
-
-    [Fact]
-    public void OwnedFiles_HaveNoHandRolledYesNoChecks_OutsideAnExemptMarker()
-    {
-        var root = RepoRoot();
-        var offenders = new List<string>();
-        foreach (var rel in OwnedFiles)
-        {
-            var path = Path.Combine(root, rel.Replace('/', Path.DirectorySeparatorChar));
-            File.Exists(path).Should().BeTrue($"{rel} should exist");
-            var lines = File.ReadAllLines(path);
-            for (int i = 0; i < lines.Length; i++)
-            {
-                if (HandRolledYesNo.IsMatch(lines[i]) && !lines[i].Contains("yesno-exempt"))
-                {
-                    offenders.Add($"{rel}:{i + 1}: {lines[i].Trim()}");
-                }
-            }
-        }
-        offenders.Should().BeEmpty(
-            "every remaining hand-rolled yes/no check in these files must be converted to AskYesNoAsync/AskYesNoKeyAsync, " +
-            "or carry a 'yesno-exempt' comment explaining why it is a menu and not a plain yes/no");
-    }
+    // Source-level sweep: YesNoGuard1115Tests carries the repo-wide check that nothing in this
+    // batch's files (or any other) still tests GameConfig.IsAffirmative, StartsWith("Y")/'Y', or
+    // =="Y"/'Y' outside a line that carries a "yesno-exempt" marker.
 }
