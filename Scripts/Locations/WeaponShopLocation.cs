@@ -858,7 +858,7 @@ public class WeaponShopLocation : BaseLocation
                 }
                 continue;
             }
-            if (!GameConfig.IsAffirmative(confirm))
+            if (!GameConfig.IsAffirmative(confirm)) // v1.1.15: yesno-exempt: three-way haggle menu (H/Y/N), not a plain yes/no
             {
                 return;
             }
@@ -1078,9 +1078,7 @@ public class WeaponShopLocation : BaseLocation
             long totalGold = sellable.Sum(i => (long)((i.Value / 2) * fenceModifier));
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("weapon_shop.bulk_sell_confirm", sellable.Count, FormatNumber(totalGold)));
-            var bulkConfirm = (await terminal.GetInput("")).Trim().ToUpper();
-
-            if (GameConfig.IsAffirmative(bulkConfirm))
+            if (await terminal.AskYesNoAsync(""))
             {
                 foreach (var item in sellable)
                     currentPlayer.Inventory.Remove(item);
@@ -1124,8 +1122,7 @@ public class WeaponShopLocation : BaseLocation
 
         terminal.Write(Loc.Get("weapon_shop.sell_confirm", selected.name, FormatNumber(price)));
 
-        var confirm = await terminal.GetInput("");
-        if (GameConfig.IsAffirmative(confirm))
+        if (await terminal.AskYesNoAsync(""))
         {
             if (selected.isEquipped && selected.slot.HasValue)
             {
@@ -1226,8 +1223,7 @@ public class WeaponShopLocation : BaseLocation
         terminal.WriteLine(Loc.Get("weapon_shop.reforge_warning"));
         terminal.WriteLine("");
 
-        var confirm = await terminal.GetInput(Loc.Get("weapon_shop.reforge_confirm"));
-        if (!GameConfig.IsAffirmative(confirm))
+        if (!await terminal.AskYesNoAsync(Loc.Get("weapon_shop.reforge_confirm")))
         {
             terminal.WriteLine(Loc.Get("ui.cancelled"), "gray");
             await terminal.PressAnyKey();

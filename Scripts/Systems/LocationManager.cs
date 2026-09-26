@@ -515,9 +515,7 @@ public class LocationManager
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("location.resurrections_available", player.Resurrections));
             terminal.WriteLine("");
-            var resurrect = await terminal.GetInput(Loc.Get("location.use_resurrection_prompt"));
-
-            if (resurrect.ToUpper().StartsWith("Y"))
+            if (await terminal.AskYesNoAsync(Loc.Get("location.use_resurrection_prompt")))
             {
                 player.Resurrections--;
                 player.Statistics.RecordResurrection();

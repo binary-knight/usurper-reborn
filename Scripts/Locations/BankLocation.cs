@@ -778,8 +778,7 @@ public class BankLocation : BaseLocation
         terminal.WriteLine(Loc.Get("bank.wire_confirm_fee", $"{fee:N0}", (GameConfig.BankTransferFeePercent * 100).ToString("0.#")));
         terminal.WriteLine(Loc.Get("bank.wire_confirm_net", $"{net:N0}"));
         terminal.SetColor("white");
-        string confirm = (await terminal.GetInput(Loc.Get("bank.wire_confirm_prompt"))).Trim().ToUpper();
-        if (!GameConfig.IsAffirmative(confirm))
+        if (!await terminal.AskYesNoAsync(Loc.Get("bank.wire_confirm_prompt")))
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("bank.transfer_cancelled"));
@@ -1101,9 +1100,7 @@ public class BankLocation : BaseLocation
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("bank.guard_accept_prompt"));
 
-        string accept = await terminal.GetInput("> ");
-
-        if (GameConfig.IsAffirmative(accept))
+        if (await terminal.AskYesNoAsync("> "))
         {
             currentPlayer.BankGuard = true;
             currentPlayer.BankWage = guardWage;
@@ -1125,8 +1122,7 @@ public class BankLocation : BaseLocation
             terminal.WriteLine(Loc.Get("bank.guard_public_prompt"));
             terminal.WriteLine(Loc.Get("bank.guard_public_hint"));
 
-            string goPublic = await terminal.GetInput("> ");
-            if (GameConfig.IsAffirmative(goPublic))
+            if (await terminal.AskYesNoAsync("> "))
             {
                 NewsSystem.Instance.Newsy(true, $"{currentPlayer.DisplayName} has been hired as a guard at the Ironvault Bank!");
             }
@@ -1164,9 +1160,7 @@ public class BankLocation : BaseLocation
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("bank.resign_confirm"));
 
-        string confirm = await terminal.GetInput("> ");
-
-        if (GameConfig.IsAffirmative(confirm))
+        if (await terminal.AskYesNoAsync("> "))
         {
             currentPlayer.BankGuard = false;
             currentPlayer.BankWage = 0;

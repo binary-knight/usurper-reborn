@@ -243,9 +243,7 @@ public class InnLocation : BaseLocation
         }
         terminal.WriteLine("");
 
-        var choice = await GetChoice();
-
-        if (GameConfig.IsAffirmative(choice))
+        if (await terminal.AskYesNoAsync(Loc.Get("ui.your_choice")))
         {
             bool success = await CompanionSystem.Instance.RecruitCompanion(CompanionId.Aldric, currentPlayer, terminal);
             if (success)
@@ -875,9 +873,7 @@ public class InnLocation : BaseLocation
         }
         terminal.WriteLine("");
 
-        var confirm = await terminal.GetInput(Loc.Get("ui.confirm_fight"));
-
-        if (GameConfig.IsAffirmative(confirm))
+        if (await terminal.AskYesNoAsync(Loc.Get("ui.confirm_fight"), enterDefault: false))
         {
             await FightSethAble();
         }
@@ -1307,8 +1303,7 @@ public class InnLocation : BaseLocation
         terminal.WriteLine(Loc.Get("inn.npc_regret_decision"));
         terminal.WriteLine("");
 
-        var confirm = await terminal.GetInput(Loc.Get("inn.fight_now_prompt"));
-        if (!GameConfig.IsAffirmative(confirm))
+        if (!await terminal.AskYesNoAsync(Loc.Get("inn.fight_now_prompt"), enterDefault: false))
         {
             terminal.WriteLine(Loc.Get("inn.npc_changed_mind", npc.Name2), "gray");
             await Task.Delay(2000);
@@ -3512,9 +3507,7 @@ public class InnLocation : BaseLocation
             terminal.WriteLine($" {Loc.Get("inn.not_yet")}");
             terminal.WriteLine("");
 
-            var choice = await terminal.GetInput(Loc.Get("inn.will_you_help"));
-
-            if (GameConfig.IsAffirmative(choice))
+            if (await terminal.AskYesNoAsync(Loc.Get("inn.will_you_help")))
             {
                 bool started = CompanionSystem.Instance.StartPersonalQuest(companion.Id);
                 if (started)
@@ -4298,8 +4291,7 @@ public class InnLocation : BaseLocation
         terminal.Write(Loc.Get("inn.leave_nothing"));
         terminal.SetColor("white");
 
-        var confirm = await terminal.ReadLineAsync();
-        if (!GameConfig.IsAffirmative(confirm))
+        if (!await terminal.AskYesNoAsync(""))
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("ui.cancelled"));
@@ -5049,9 +5041,7 @@ public class InnLocation : BaseLocation
                     terminal.SetColor("cyan");
                     terminal.Write(" ");
                     terminal.SetColor("white");
-                    string dd = (await terminal.ReadLineAsync()).ToUpper().Trim();
-
-                    if (GameConfig.IsAffirmative(dd))
+                    if (await terminal.AskYesNoAsync(""))
                         continue; // the pot rides; only the stake was ever real money
 
                     currentPlayer.Gold += pot;
@@ -5326,9 +5316,7 @@ public class InnLocation : BaseLocation
         terminal.SetColor("cyan");
         terminal.Write(" ");
         terminal.SetColor("white");
-        string accept = (await terminal.ReadLineAsync()).ToUpper().Trim();
-
-        if (!GameConfig.IsAffirmative(accept))
+        if (!await terminal.AskYesNoAsync(""))
         {
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("inn.aw_back_away"));
@@ -5499,8 +5487,7 @@ public class InnLocation : BaseLocation
         long totalCost = roomCost + totalGuardCost;
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("inn.rent_total_cost", totalCost.ToString("N0"), roomCost.ToString("N0"), totalGuardCost.ToString("N0")));
-        var confirm = await terminal.GetInput(Loc.Get("inn.rent_confirm"));
-        if (!GameConfig.IsAffirmative(confirm))
+        if (!await terminal.AskYesNoAsync(Loc.Get("inn.rent_confirm"), enterDefault: false))
         {
             terminal.WriteLine(Loc.Get("inn.rent_cancelled"), "gray");
             await Task.Delay(1000);

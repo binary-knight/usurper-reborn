@@ -84,6 +84,24 @@ namespace UsurperRemake.Systems
             return Sanitize(await terminal.GetInputAsync(prompt));
         }
 
+        /// <summary>
+        /// v1.1.15: the strict yes/no prompt (see TerminalEmulator.AskYesNoAsync) but reading through
+        /// this console's own ReadInput, which drains pending input and sanitizes the answer before
+        /// GameConfig ever sees it. A direct call to terminal.AskYesNoAsync would skip that.
+        /// </summary>
+        private async Task<bool> AskYesNo(string prompt)
+        {
+            for (int attempt = 0; attempt < TerminalEmulator.MaxInvalidChoiceAttempts; attempt++)
+            {
+                string input = (await ReadInput(prompt)).Trim();
+                if (GameConfig.IsAffirmative(input)) return true; // v1.1.15: yesno-exempt: local strict-loop building block, mirrors TerminalEmulator.AskYesNoCore
+                if (GameConfig.IsNegative(input)) return false; // v1.1.15: yesno-exempt: local strict-loop building block, mirrors TerminalEmulator.AskYesNoCore
+                if (DoorMode.IsDisconnected) break;
+                terminal.WriteLine(Loc.Get("ui.answer_yes_no"), "red");
+            }
+            return false;
+        }
+
         public async Task Run()
         {
             bool done = false;
@@ -518,8 +536,7 @@ namespace UsurperRemake.Systems
 
             terminal.WriteLine("");
             terminal.SetColor("bright_red");
-            var confirm = await ReadInput($"Ban '{target.DisplayName}'? (Y/N): ");
-            if (!GameConfig.IsAffirmative(confirm))
+            if (!await AskYesNo($"Ban '{target.DisplayName}'? (Y/N): "))
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine("Ban cancelled.");
@@ -584,8 +601,7 @@ namespace UsurperRemake.Systems
 
             var target = banned[selection - 1];
             terminal.SetColor("yellow");
-            var confirm = await ReadInput($"Unban '{target.displayName}'? (Y/N): ");
-            if (!GameConfig.IsAffirmative(confirm))
+            if (!await AskYesNo($"Unban '{target.displayName}'? (Y/N): "))
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine("Unban cancelled.");
@@ -903,8 +919,7 @@ namespace UsurperRemake.Systems
                         if (modified)
                         {
                             terminal.SetColor("yellow");
-                            var discard = await ReadInput("Discard unsaved changes? (Y/N): ");
-                            if (!GameConfig.IsAffirmative(discard))
+                            if (!await AskYesNo("Discard unsaved changes? (Y/N): "))
                                 break;
                         }
                         return;
@@ -1932,12 +1947,11 @@ namespace UsurperRemake.Systems
                 if (choice == "Q") break;
 
                 PlayerSummary? pick = null;
-                if ((choice == "" || choice == "Y") && suggested != null) pick = suggested;
+                if ((choice == "" || choice == "Y") && suggested != null) pick = suggested; // v1.1.15: yesno-exempt: blank Enter and Y both mean "take the suggested match", not a strict yes/no
                 else if (int.TryParse(choice, out int n) && n >= 1 && n <= team.Members.Count) pick = team.Members[n - 1];
                 if (pick == null) continue;   // S, or anything else, skips this team
 
-                var confirm = await ReadInput($"Set the leader of {team.TeamName} to {pick.DisplayName} ({pick.Username})? (Y/N) ");
-                if (!GameConfig.IsAffirmative(confirm)) continue;
+                if (!await AskYesNo($"Set the leader of {team.TeamName} to {pick.DisplayName} ({pick.Username})? (Y/N) ")) continue;
 
                 if (backend.SetTeamLeaderKey(team.TeamName, team.OldKey, pick.Username, out int bequests, out bool keyShared))
                 {
@@ -1982,8 +1996,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("");
 
             terminal.SetColor("white");
-            var confirm = await ReadInput(Loc.Get("ui.confirm"));
-            if (!GameConfig.IsAffirmative(confirm))
+            if (!await AskYesNo(Loc.Get("ui.confirm")))
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine(Loc.Get("ui.cancelled"));
@@ -2036,8 +2049,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("");
             terminal.SetColor("yellow");
             terminal.WriteLine($"Message: *** {message} ***");
-            var confirm = await ReadInput("Set as persistent broadcast? (Y/N): ");
-            if (!GameConfig.IsAffirmative(confirm))
+            if (!await AskYesNo("Set as persistent broadcast? (Y/N): "))
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine("Broadcast cancelled.");

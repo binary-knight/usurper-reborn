@@ -575,8 +575,7 @@ namespace UsurperRemake.Systems
             if (string.IsNullOrWhiteSpace(reason)) reason = "No reason given";
 
             terminal.SetColor("bright_red");
-            var confirm = await terminal.GetInputAsync($" Ban '{target.DisplayName}'? (Y/N): ");
-            if (!GameConfig.IsAffirmative(confirm)) return;
+            if (!await terminal.AskYesNoAsync($" Ban '{target.DisplayName}'? (Y/N): ")) return;
 
             await sqlBackend.BanPlayer(target.Username, reason);
             terminal.SetColor("green");
@@ -626,8 +625,7 @@ namespace UsurperRemake.Systems
 
             var target = banned[sel - 1];
             terminal.SetColor("yellow");
-            var confirm = await terminal.GetInputAsync($" Unban '{target.displayName}'? (Y/N): ");
-            if (!GameConfig.IsAffirmative(confirm)) return;
+            if (!await terminal.AskYesNoAsync($" Unban '{target.displayName}'? (Y/N): ")) return;
 
             await sqlBackend.UnbanPlayer(target.username);
             terminal.SetColor("green");
@@ -1676,8 +1674,7 @@ namespace UsurperRemake.Systems
                     var target = kickable[idx - 1];
                     terminal.SetColor("bright_yellow");
                     terminal.WriteLine($"  Kick {target.DisplayName}?");
-                    var confirm = await terminal.GetInputAsync("  Type Y to confirm: ");
-                    if (GameConfig.IsAffirmative(confirm))
+                    if (await terminal.AskYesNoAsync("  Type Y to confirm: "))
                     {
                         await sqlBackend.UnregisterOnline(target.Username);
                         terminal.SetColor("bright_green");
@@ -2100,9 +2097,8 @@ namespace UsurperRemake.Systems
 
                     terminal.SetColor("cyan");
                     terminal.Write("Open download page in browser? (Y/N): ");
-                    var response = await terminal.GetInputAsync("");
 
-                    if (GameConfig.IsAffirmative(response))
+                    if (await terminal.AskYesNoAsync(""))
                     {
                         checker.OpenDownloadPage();
                         terminal.SetColor("green");
@@ -2172,9 +2168,8 @@ namespace UsurperRemake.Systems
 
                 terminal.SetColor("gray");
                 terminal.Write("Would you like to open the download page instead? (Y/N): ");
-                var response = await terminal.GetInputAsync("");
 
-                if (GameConfig.IsAffirmative(response))
+                if (await terminal.AskYesNoAsync(""))
                 {
                     checker.OpenDownloadPage();
                     terminal.SetColor("green");

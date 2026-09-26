@@ -312,9 +312,7 @@ public class ArenaLocation : BaseLocation
         terminal.WriteLine($"  {Loc.Get("arena.warning_damage")}");
         terminal.WriteLine($"  {Loc.Get("arena.gold_steal_rule", GameConfig.PvPGoldStealPercent * 100)}");
         terminal.WriteLine("");
-        var confirm = await terminal.GetInput($"  {Loc.Get("arena.confirm_prompt")}");
-
-        if (!GameConfig.IsAffirmative(confirm))
+        if (!await terminal.AskYesNoAsync($"  {Loc.Get("arena.confirm_prompt")}"))
         {
             terminal.SetColor("gray");
             terminal.WriteLine($"  {Loc.Get("arena.step_back")}");

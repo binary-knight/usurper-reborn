@@ -534,9 +534,7 @@ public abstract class BaseLocation
             terminal.Write(Loc.Get("base.guard_rush_prompt"));
             terminal.SetColor("white");
 
-            string response = await terminal.ReadLineAsync();
-
-            if (GameConfig.IsAffirmative(response))
+            if (await terminal.AskYesNoAsync(""))
             {
                 king.ActiveDefenseEvent.PlayerResponded = true;
                 terminal.SetColor("bright_green");
@@ -4844,8 +4842,7 @@ public abstract class BaseLocation
             terminal.WriteLine(Loc.Get("prefs.difficulty_nightmare_note"));
             terminal.WriteLine("");
             terminal.SetColor("white");
-            var confirm = await terminal.GetInput(Loc.Get("creation.difficulty.nightmare_confirm"));
-            if (!GameConfig.IsAffirmative(confirm))
+            if (!await terminal.AskYesNoAsync(Loc.Get("creation.difficulty.nightmare_confirm"), enterDefault: false))
             {
                 terminal.WriteLine(Loc.Get("creation.difficulty.nightmare_wise"), "green");
                 await Task.Delay(1200);
@@ -6130,8 +6127,7 @@ public abstract class BaseLocation
             terminal.WriteLine("");
             terminal.SetColor("white");
             terminal.Write($"  {Loc.Get("base.murder_confirm_yn")} ");
-            var murderConfirm = await terminal.GetInput("");
-            if (!GameConfig.IsAffirmative(murderConfirm))
+            if (!await terminal.AskYesNoAsync(""))
             {
                 terminal.SetColor("green");
                 terminal.WriteLine($"  {Loc.Get("base.murder_walk_away")}");
@@ -6158,8 +6154,7 @@ public abstract class BaseLocation
             terminal.SetColor("bright_red");
             terminal.WriteLine(Loc.Get("base.attack_dangerous", npc.Name2, npc.Level));
             terminal.Write(Loc.Get("base.attack_confirm"));
-            var confirm = await terminal.GetInput("");
-            if (!GameConfig.IsAffirmative(confirm))
+            if (!await terminal.AskYesNoAsync(""))
             {
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("base.attack_reconsider"));
@@ -9243,9 +9238,7 @@ public abstract class BaseLocation
             terminal.Write(Loc.Get("base.trade_gold_amount", goldAmount.ToString("N0")));
         terminal.Write(Loc.Get("base.trade_to_confirm", recipient));
         terminal.SetColor("white");
-        string confirm = await terminal.ReadLineAsync();
-
-        if (!GameConfig.IsAffirmative(confirm))
+        if (!await terminal.AskYesNoAsync(""))
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("ui.cancelled"));
@@ -9991,8 +9984,7 @@ public abstract class BaseLocation
 
         terminal.SetColor("yellow");
         terminal.Write(Loc.Get("base.auction_buy_confirm", listing.Price.ToString("N0")));
-        string confirm = (await terminal.ReadLineAsync())?.Trim().ToUpper() ?? "";
-        if (!GameConfig.IsAffirmative(confirm)) return;
+        if (!await terminal.AskYesNoAsync("")) return;
 
         bool success = await backend.BuyAuctionListing(listing.Id, username);
         if (!success)
@@ -10167,8 +10159,7 @@ public abstract class BaseLocation
         // Confirm
         terminal.SetColor("yellow");
         terminal.Write(Loc.Get("base.auction_list_confirm", item.Name, price.ToString("N0"), chosenLabel, listingFee.ToString("N0")));
-        string confirm = (await terminal.ReadLineAsync())?.Trim().ToUpper() ?? "";
-        if (!GameConfig.IsAffirmative(confirm)) return;
+        if (!await terminal.AskYesNoAsync("")) return;
 
         string itemJson = System.Text.Json.JsonSerializer.Serialize(item);
         int id = await backend.CreateAuctionListing(currentPlayer.DisplayName.ToLower(), item.Name, itemJson, price, chosenHours);
@@ -10720,8 +10711,7 @@ public abstract class BaseLocation
 
         terminal.SetColor("white");
         terminal.Write(Loc.Get("inn.equip_best_confirm", target.DisplayName));
-        var confirm = (await terminal.ReadLineAsync()).ToUpper().Trim();
-        if (!GameConfig.IsAffirmative(confirm))
+        if (!await terminal.AskYesNoAsync(""))
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("ui.cancelled"));
@@ -11396,9 +11386,7 @@ public abstract class BaseLocation
         terminal.WriteLine("");
         terminal.SetColor("yellow");
         terminal.Write(Loc.Get("shop.filter_confirm", filtered.Count, totalGold.ToString("N0")));
-        var confirm = (await terminal.GetInput("")).Trim().ToUpper();
-
-        if (GameConfig.IsAffirmative(confirm))
+        if (await terminal.AskYesNoAsync(""))
         {
             foreach (var item in filtered)
                 currentPlayer.Inventory.Remove(item);

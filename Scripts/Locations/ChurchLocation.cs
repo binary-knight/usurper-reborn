@@ -401,8 +401,7 @@ namespace UsurperRemake.Locations
             }
 
             // Confirm donation
-            var confirm = await terminal.GetInput(Loc.Get("church.donate_confirm", amount.ToString("N0"), GameConfig.MoneyType));
-            if (!GameConfig.IsAffirmative(confirm))
+            if (!await terminal.AskYesNoAsync(Loc.Get("church.donate_confirm", amount.ToString("N0"), GameConfig.MoneyType)))
             {
                 terminal.WriteLine(Loc.Get("church.donate_cancelled"), "gray");
                 await Task.Delay(1500);
@@ -544,8 +543,7 @@ namespace UsurperRemake.Locations
             }
 
             // Confirm blessing purchase
-            var confirm = await terminal.GetInput(Loc.Get("church.blessing_confirm", amount.ToString("N0"), GameConfig.MoneyType));
-            if (!GameConfig.IsAffirmative(confirm))
+            if (!await terminal.AskYesNoAsync(Loc.Get("church.blessing_confirm", amount.ToString("N0"), GameConfig.MoneyType)))
             {
                 terminal.WriteLine(Loc.Get("church.blessing_cancelled"), "gray");
                 await Task.Delay(1500);
@@ -774,8 +772,7 @@ namespace UsurperRemake.Locations
                 return;
             }
 
-            var confirm = await terminal.GetInput(Loc.Get("church.heal_pay_confirm", cost.ToString("N0"), GameConfig.MoneyType, service));
-            if (!GameConfig.IsAffirmative(confirm))
+            if (!await terminal.AskYesNoAsync(Loc.Get("church.heal_pay_confirm", cost.ToString("N0"), GameConfig.MoneyType, service)))
             {
                 terminal.WriteLine(Loc.Get("church.heal_cancelled"), "gray");
                 await Task.Delay(1500);
@@ -1014,8 +1011,7 @@ namespace UsurperRemake.Locations
                 return;
             }
 
-            var confirm = await terminal.GetInput(Loc.Get("church.marriage_proceed", targetNPC.Name2, ceremonyCost.ToString("N0"), GameConfig.MoneyType));
-            if (!GameConfig.IsAffirmative(confirm))
+            if (!await terminal.AskYesNoAsync(Loc.Get("church.marriage_proceed", targetNPC.Name2, ceremonyCost.ToString("N0"), GameConfig.MoneyType)))
             {
                 terminal.WriteLine(Loc.Get("church.marriage_more_certain"), "gray");
                 await Task.Delay(1500);
@@ -1171,8 +1167,7 @@ namespace UsurperRemake.Locations
             terminal.WriteLine(Loc.Get("church.confess_penance_cost", penanceCost.ToString("N0"), GameConfig.MoneyType), "yellow");
             terminal.WriteLine("");
 
-            var confess = await terminal.GetInput(Loc.Get("church.confess_prompt"));
-            if (!GameConfig.IsAffirmative(confess))
+            if (!await terminal.AskYesNoAsync(Loc.Get("church.confess_prompt")))
             {
                 terminal.WriteLine(Loc.Get("church.confess_return"), "gray");
                 await Task.Delay(1500);
@@ -1237,8 +1232,7 @@ namespace UsurperRemake.Locations
                 terminal.WriteLine(Loc.Get("church.blood_weight_reduced_by", GameConfig.MurderWeightConfessionReduction.ToString("F1")));
                 terminal.WriteLine("");
 
-                var absolve = await terminal.GetInput(Loc.Get("church.blood_accept"));
-                if (GameConfig.IsAffirmative(absolve))
+                if (await terminal.AskYesNoAsync(Loc.Get("church.blood_accept")))
                 {
                     if (currentPlayer.Gold >= absolveCost)
                     {
@@ -1358,8 +1352,7 @@ namespace UsurperRemake.Locations
                 {
                     terminal.WriteLine("");
                     terminal.WriteLine(Loc.Get("church.bishop_insist"), "bright_red");
-                    var forceConfess = await terminal.GetInput(Loc.Get("church.bishop_force_confess"));
-                    if (GameConfig.IsAffirmative(forceConfess))
+                    if (await terminal.AskYesNoAsync(Loc.Get("church.bishop_force_confess")))
                     {
                         await ProcessConfession();
                         return;

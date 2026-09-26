@@ -751,7 +751,10 @@ public class InvalidChoice1113Tests
         await (Task)typeof(FeatureInteractionSystem).GetMethod("HandleRiskReward", F)!.Invoke(fis, new object[] { feature, hero, 5, t2, new FeatureOutcome() })!;
         t2.StreamWriterInternal?.Flush();
         string s2 = Encoding.UTF8.GetString(out2.ToArray());
-        s2.Should().Contain(Loc.Get("ui.invalid_choice_choose", Loc.Get("feature.risk_answers")));
+        // v1.1.15: HandleRiskReward now reads its yes/no through the shared AskYesNoAsync
+        // (yesno-convert-b), so a typo re-asks with the shared line instead of the old
+        // GetValidChoice-specific "Invalid choice; choose Y/N." message.
+        s2.Should().Contain(Loc.Get("ui.answer_yes_no"));
         s2.Should().Contain(Loc.Get("feature.wisdom_leave"));
         (hero.Gold, hero.HP).Should().Be((gold, hp));
     }

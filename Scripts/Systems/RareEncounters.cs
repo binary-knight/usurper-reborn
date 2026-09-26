@@ -295,9 +295,7 @@ namespace UsurperRemake.Systems
             }
 
             terminal.Write(Loc.Get("encounter.tavern.gamble_bet_prompt", bet), "white");
-            var choice = await terminal.GetInput("");
-
-            if (GameConfig.IsAffirmative(choice))
+            if (await terminal.AskYesNoAsync(""))
             {
                 player.Gold -= bet;
                 await Task.Delay(1000);
@@ -373,8 +371,7 @@ namespace UsurperRemake.Systems
                     terminal.WriteLine(Loc.Get("encounter.tavern.stranger_deal_3"));
                     terminal.WriteLine("");
                     terminal.Write(Loc.Get("encounter.tavern.stranger_deal_prompt"), "white");
-                    var accept = await terminal.GetInput("");
-                    if (GameConfig.IsAffirmative(accept))
+                    if (await terminal.AskYesNoAsync(""))
                     {
                         player.Strength += 5;
                         player.Defence += 5;

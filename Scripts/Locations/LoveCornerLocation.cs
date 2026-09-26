@@ -348,8 +348,7 @@ public class LoveCornerLocation : BaseLocation
         terminal.WriteLine(Loc.Get("love_corner.cost_label", weddingCost));
         terminal.WriteLine();
 
-        string confirm = await terminal.GetInput(Loc.Get("love_corner.proceed_ceremony"));
-        if (!GameConfig.IsAffirmative(confirm))
+        if (!await terminal.AskYesNoAsync(Loc.Get("love_corner.proceed_ceremony")))
         {
             terminal.WriteLine(Loc.Get("love_corner.wedding_cancelled"));
             await terminal.PressAnyKey();
@@ -429,16 +428,14 @@ public class LoveCornerLocation : BaseLocation
             return true;
         }
 
-        string confirm1 = await terminal.GetInput(Loc.Get("ui.confirm_divorce"));
-        if (!GameConfig.IsAffirmative(confirm1))
+        if (!await terminal.AskYesNoAsync(Loc.Get("ui.confirm_divorce")))
         {
             terminal.WriteLine(Loc.Get("love_corner.divorce_cancelled"));
             await terminal.PressAnyKey();
             return true;
         }
 
-        string confirm2 = await terminal.GetInput(Loc.Get("love_corner.confirm_custody"));
-        if (!GameConfig.IsAffirmative(confirm2))
+        if (!await terminal.AskYesNoAsync(Loc.Get("love_corner.confirm_custody")))
         {
             terminal.WriteLine(Loc.Get("love_corner.divorce_cancelled"));
             await terminal.PressAnyKey();
