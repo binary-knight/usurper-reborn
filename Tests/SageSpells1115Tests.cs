@@ -90,6 +90,22 @@ public class SageSpells1115Tests
         }
     }
 
+    [Theory]
+    [InlineData(5, "Dulling Mist", "dulling_mist", 2)]
+    [InlineData(6, "Scholar's Mark", "scholars_mark", 3)]
+    [InlineData(10, "Slumber Mist", "slumber_mist", 2)]
+    [InlineData(12, "Psychic Scream", "psychic_scream", 2)]
+    [InlineData(14, "Compel", "compel", 2)]
+    [InlineData(18, "Unveil the Pattern", "unveil_pattern", 2)]
+    public void EachNewSpell_CastsItsEffect_ForItsRounds(int slot, string name, string effect, int rounds)
+    {
+        string src = File.ReadAllText(Path.Combine(Leftovers1114BTests.RepoRoot(), "Scripts", "Systems", "SpellSystem.cs"));
+        var m = Regex.Match(src, @"case " + slot + @": // " + Regex.Escape(name) + @"\b(.*?)break;", RegexOptions.Singleline);
+        m.Success.Should().BeTrue(name);
+        m.Groups[1].Value.Should().Contain($"result.SpecialEffect = \"{effect}\";");
+        m.Groups[1].Value.Should().Contain($"result.Duration = {rounds};");
+    }
+
     [Fact]
     public void AControlSpell_WithNoDamage_DealsNoAreaDamage()
     {
