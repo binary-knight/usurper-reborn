@@ -228,7 +228,7 @@ public static class GmcpBridge
             if (spell == null) continue;
             spells.Add(new
             {
-                name = spell.Name,
+                name = spell.DisplayName,
                 manaCost = spell.ManaCost,
                 requiresLevel = spell.LevelRequired
             });

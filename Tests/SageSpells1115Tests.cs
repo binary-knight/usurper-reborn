@@ -385,11 +385,23 @@ public class SageSpells1115Tests
                 dict.Should().ContainKey($"spell.sage.{slot}.desc", lang);
             }
         }
+        // v1.1.15 (spell loc): slots 6 and 18's Loc desc was corrected to also name the
+        // +45% Library-study case (the code's default literal still says only +30%, since
+        // that literal is also the DisplayDescription override-detection baseline -- see
+        // Tests/SpellLoc1115Tests.cs for the digit-preservation and all-languages coverage).
+        var slotsWithFixedDesc = new HashSet<int> { 6, 18 };
         foreach (var slot in new[] { 5, 6, 10, 12, 14, 18 })
         {
             var info = SpellSystem.GetSpellInfo(CharacterClass.Sage, slot);
             Loc.GetIn("en", $"spell.sage.{slot}.name").Should().Be(info.Name, "English matches the table");
-            Loc.GetIn("en", $"spell.sage.{slot}.desc").Should().Be(info.Description);
+            if (slotsWithFixedDesc.Contains(slot))
+            {
+                Loc.GetIn("en", $"spell.sage.{slot}.desc").Should().Contain("+30%").And.Contain("+45%");
+            }
+            else
+            {
+                Loc.GetIn("en", $"spell.sage.{slot}.desc").Should().Be(info.Description);
+            }
         }
     }
 

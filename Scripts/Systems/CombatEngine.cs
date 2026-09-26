@@ -17647,7 +17647,7 @@ public partial class CombatEngine
                     totalDamage = spellInfo.Level * 50 + (player.Intelligence / 2);
                 }
                 totalDamage = DifficultySystem.ApplyPlayerDamageMultiplier(totalDamage);
-                await ApplyAoEDamage(monsters, totalDamage, result, spellInfo.Name, isSpellDamage: true);
+                await ApplyAoEDamage(monsters, totalDamage, result, spellInfo.DisplayName, isSpellDamage: true);
             }
 
             // Apply self-healing from attack spells (e.g. Deluge of Sanctity)
@@ -26205,7 +26205,7 @@ public partial class CombatEngine
             for (int i = 0; i < spells.Count; i++)
             {
                 var sp = spells[i];
-                terminal.WriteLine($"  [{i + 1}] {sp.Name} ({Loc.Get("combat.level_label")} {sp.Level}, {Loc.Get("combat.cost_label")}: {sp.ManaCost})", "white");
+                terminal.WriteLine($"  [{i + 1}] {sp.DisplayName} ({Loc.Get("combat.level_label")} {sp.Level}, {Loc.Get("combat.cost_label")}: {sp.ManaCost})", "white");
             }
 
             var choice = await terminal.GetInput(Loc.Get("combat.cast_which_spell"));
@@ -29067,7 +29067,7 @@ public partial class CombatEngine
         {
             var spell = SpellSystem.GetSpellInfo(player.Class, spellLevel.Value);
             if (spell == null) { terminal.WriteLine($"  {Loc.Get("combat.quickbar_info_empty", slot + 1)}", "gray"); return true; }
-            name = spell.Name; desc = spell.Description;
+            name = spell.DisplayName; desc = spell.DisplayDescription;
         }
         else
         {
@@ -30572,7 +30572,7 @@ public partial class CombatEngine
                         terminal.SetColor("bright_yellow");
                         terminal.Write($"C{si + 1}");
                         terminal.SetColor("darkgray");
-                        terminal.Write($"={sp.Name}({cost}mp) ");
+                        terminal.Write($"={sp.DisplayName}({cost}mp) ");
                     }
                     terminal.WriteLine("");
                 }
