@@ -8734,10 +8734,14 @@ public partial class CombatEngine
     /// highest ward winning on each. Shared by the player's cast and a teammate's.
     /// </summary>
     internal void WardPartyFromHeal(Character caster, SpellSystem.SpellResult spellResult, CombatResult? result)
+        => WardPartyFromHeal(LivingPartyOf(caster, result), spellResult);
+
+    /// <summary>v1.1.15: the same ward on a party list the caller already healed.</summary>
+    private void WardPartyFromHeal(List<Character> party, SpellSystem.SpellResult spellResult)
     {
         if (spellResult.ProtectionBonus <= 0) return;
         int dur = spellResult.Duration > 0 ? spellResult.Duration : 999;
-        foreach (var ally in LivingPartyOf(caster, result))
+        foreach (var ally in party)
             WardAlly(ally, spellResult.ProtectionBonus, dur);
     }
 
@@ -19057,54 +19061,29 @@ public partial class CombatEngine
             {
                 terminal.WriteLine(Loc.Get("combat.teammate_casts_party", teammate.DisplayName, healSpell.DisplayName));
 
-                // Heal the player (v1.1.15: skip a fallen player, matching WardPartyFromHeal below)
-                if (currentPlayer.IsAlive)
+                // v1.1.15: one list for the heal and the ward: the caster, every living teammate and
+                // the living combat owner (result.Player), the same set the player's own party heal
+                // covers. A fallen player is skipped. The combat owner is listed first.
+                var party = LivingPartyOf(teammate, result)
+                    .OrderBy(a => a == result.Player ? 0 : 1).ToList();
+                foreach (var ally in party)
                 {
-                    long oldPlayerHP = currentPlayer.HP;
-                    currentPlayer.HP = Math.Min(currentPlayer.MaxHP, currentPlayer.HP + spellResult.Healing);
-                    long playerHeal = currentPlayer.HP - oldPlayerHP;
-                    if (playerHeal > 0)
+                    long oldHP = ally.HP;
+                    ally.HP = Math.Min(ally.MaxHP, ally.HP + spellResult.Healing);
+                    long actualHeal = ally.HP - oldHP;
+                    if (actualHeal > 0)
                     {
                         terminal.SetColor("bright_green");
-                        terminal.WriteLine(Loc.Get("combat.you_recover_hp", playerHeal));
+                        terminal.WriteLine(ally == currentPlayer
+                            ? Loc.Get("combat.you_recover_hp", actualHeal)
+                            : Loc.Get("combat.ally_recovers_hp", ally.DisplayName, actualHeal));
                     }
+                    if (ally.IsCompanion && ally.CompanionId.HasValue)
+                        CompanionSystem.Instance.SyncCompanionHP(ally);
                 }
 
-                // Heal the caster themselves
-                if (teammate != currentPlayer)
-                {
-                    long oldTmHP = teammate.HP;
-                    teammate.HP = Math.Min(teammate.MaxHP, teammate.HP + spellResult.Healing);
-                    long tmHeal = teammate.HP - oldTmHP;
-                    if (tmHeal > 0)
-                    {
-                        terminal.SetColor("bright_green");
-                        terminal.WriteLine(Loc.Get("combat.ally_recovers_hp", teammate.DisplayName, tmHeal));
-                    }
-                    if (teammate.IsCompanion && teammate.CompanionId.HasValue)
-                        CompanionSystem.Instance.SyncCompanionHP(teammate);
-                }
-
-                // Heal all other living teammates
-                if (currentTeammates != null)
-                {
-                    foreach (var tm in currentTeammates.Where(t => t.IsAlive && t != teammate))
-                    {
-                        long oldHP = tm.HP;
-                        tm.HP = Math.Min(tm.MaxHP, tm.HP + spellResult.Healing);
-                        long actualHeal = tm.HP - oldHP;
-                        if (actualHeal > 0)
-                        {
-                            terminal.SetColor("bright_green");
-                            terminal.WriteLine(Loc.Get("combat.ally_recovers_hp", tm.DisplayName, actualHeal));
-                            if (tm.IsCompanion && tm.CompanionId.HasValue)
-                                CompanionSystem.Instance.SyncCompanionHP(tm);
-                        }
-                    }
-                }
-
-                // v1.1.15: a party heal that carries a ward (Veloura's Embrace) wards the party too
-                WardPartyFromHeal(teammate, spellResult, result);
+                // v1.1.15: a party heal that carries a ward (Veloura's Embrace) wards the same party
+                WardPartyFromHeal(party, spellResult);
 
                 result.CombatLog.Add($"{teammate.DisplayName} casts {healSpell.Name} on the whole party.");
             }
