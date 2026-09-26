@@ -134,6 +134,33 @@ public class SageSpells1115Tests
         Hit(engine, marked, 1000, ally).Should().Be(1000);
     }
 
+    [Fact]
+    public void ScholarsMark_AlsoRaisesATeammatesSpellDamage()
+    {
+        // SpellSystem.CastSpell rolls on Random.Shared, so cast until one lands
+        for (int attempt = 0; attempt < 100; attempt++)
+        {
+            var (engine, _) = Engine(new LowRandom());
+            var cleric = new Character
+            {
+                Name1 = "Ilse", Name2 = "Ilse", Class = CharacterClass.Cleric, Level = 100, Wisdom = 200, Intelligence = 200,
+                Mana = 1_000_000, MaxMana = 1_000_000, HP = 5000, MaxHP = 5000, CombatSpeed = CombatSpeed.Instant,
+            };
+            var monsters = new List<Monster> { Ogre(), Ogre(), Ogre() };
+            foreach (var o in monsters) { o.HP = 1_000_000; o.MaxHP = 1_000_000; }
+            monsters[0].IsMarked = true;
+            monsters[0].MarkedDuration = 3;
+            ((Task<bool>)typeof(CombatEngine).GetMethod("TryTeammateOffensiveSpell", F)!
+                .Invoke(engine, new object[] { cleric, monsters, new CombatResult { Player = Sage() } })!).GetAwaiter().GetResult();
+            long marked = 1_000_000 - monsters[0].HP, plain = 1_000_000 - monsters[1].HP;
+            if (plain <= 0) continue;   // the cast fizzled
+            (1_000_000 - monsters[2].HP).Should().Be(plain);
+            marked.Should().Be(plain + (long)(plain * 0.3), "+30% on the marked target");
+            return;
+        }
+        throw new Exception("no teammate spell landed in 100 casts");
+    }
+
     // ---- Slumber Mist ----
 
     [Fact]
@@ -307,5 +334,67 @@ public class SageSpells1115Tests
         for (int i = 0; i < 400; i++)
             if (engine.SoftControlRounds(Ogre(boss: true), 2) == 0) resisted++;
         resisted.Should().BeInRange(70, 130);
+    }
+
+    // ---- names and descriptions ----
+
+    [Theory]
+    [InlineData("es", "Niebla del Sueño")]
+    [InlineData("fr", "Brume du Sommeil")]
+    [InlineData("en", "Slumber Mist")]
+    public void TheNewSpells_ShowTheirNameInThePlayersLanguage(string lang, string expected)
+    {
+        var before = GameConfig.Language;
+        try
+        {
+            GameConfig.Language = lang;
+            var info = SpellSystem.GetSpellInfo(CharacterClass.Sage, 10);
+            info.DisplayName.Should().Be(expected);
+            info.DisplayDescription.Should().Be(Loc.Get("spell.sage.10.desc"));
+            info.Name.Should().Be("Slumber Mist", "the identifier stays English");
+        }
+        finally { GameConfig.Language = before; }
+    }
+
+    [Fact]
+    public void EveryNewSageSpell_HasItsNameAndDescription_InAllFiveLanguages()
+    {
+        foreach (var lang in new[] { "en", "es", "fr", "hu", "it" })
+        {
+            var dict = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(
+                File.ReadAllText(Path.Combine(Leftovers1114BTests.RepoRoot(), "Localization", lang + ".json")))!;
+            foreach (var slot in new[] { 5, 6, 10, 12, 14, 18 })
+            {
+                dict.Should().ContainKey($"spell.sage.{slot}.name", lang);
+                dict.Should().ContainKey($"spell.sage.{slot}.desc", lang);
+            }
+        }
+        foreach (var slot in new[] { 5, 6, 10, 12, 14, 18 })
+        {
+            var info = SpellSystem.GetSpellInfo(CharacterClass.Sage, slot);
+            Loc.GetIn("en", $"spell.sage.{slot}.name").Should().Be(info.Name, "English matches the table");
+            Loc.GetIn("en", $"spell.sage.{slot}.desc").Should().Be(info.Description);
+        }
+    }
+
+    [Fact]
+    public void AServerOverride_OfTheName_StillShows()
+    {
+        var info = new SpellSystem.SpellInfo(10, "Slumber Mist", "d", 1, 1, "w") { LocKeyBase = "spell.sage.10" };
+        info.Name = "Dream Fog";
+        info.DisplayName.Should().Be("Dream Fog");
+    }
+
+    [Fact]
+    public void TheSpellScreens_ShowTheDisplayName()
+    {
+        string root = Leftovers1114BTests.RepoRoot();
+        string combat = File.ReadAllText(Path.Combine(root, "Scripts", "Systems", "CombatEngine.cs"));
+        combat.Should().Contain("Loc.Get(\"combat.you_cast_spell\", spellInfo.DisplayName)");
+        combat.Should().Contain("Loc.Get(\"combat.teammate_casts_spell\", teammate.DisplayName, spell.DisplayName)");
+        combat.Should().Contain("displayName = $\"{spell.DisplayName} ({manaCost} MP)\";");
+        string library = File.ReadAllText(Path.Combine(root, "Scripts", "Systems", "SpellLearningSystem.cs"));
+        Regex.IsMatch(library, @"\b(spell|chosen|currentSpell\?|knownUnequipped\[i\])\.(Name|Description)\b")
+            .Should().BeFalse("the spell library shows the display name and description");
     }
 }

@@ -58,7 +58,29 @@ public static class SpellSystem
             MagicWords = magicWords;
             IsMultiTarget = isMultiTarget;
             SpellType = spellType;
+            DefaultName = name;
+            DefaultDescription = description;
         }
+
+        // v1.1.15: Name stays the English identifier (disabled-spell lists, overrides, code checks).
+        // What the player sees comes from spell.<class>.<level>.name / .desc when that key exists
+        // and the name or description was not overridden by the server.
+        public string DefaultName { get; }
+        public string DefaultDescription { get; }
+        public string LocKeyBase { get; set; } = "";
+
+        public string DisplayName =>
+            LocKeyBase.Length > 0 && Name == DefaultName && Loc.Has(LocKeyBase + ".name") ? Loc.Get(LocKeyBase + ".name") : Name;
+
+        public string DisplayDescription =>
+            LocKeyBase.Length > 0 && Description == DefaultDescription && Loc.Has(LocKeyBase + ".desc") ? Loc.Get(LocKeyBase + ".desc") : Description;
+    }
+
+    static SpellSystem()
+    {
+        foreach (var cls in SpellBook)
+            foreach (var spell in cls.Value)
+                spell.Value.LocKeyBase = $"spell.{cls.Key.ToString().ToLowerInvariant()}.{spell.Key}";
     }
     
     // Expanded spell system - 25 spells per class spread across 100 levels

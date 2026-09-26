@@ -10949,7 +10949,7 @@ public class DungeonLocation : BaseLocation
                 foreach (var sp in spells)
                 {
                     row++;
-                    WriteSkillToggleRow(row, sp.Name, sp.Description, disabledSpells.Contains(sp.Name));
+                    WriteSkillToggleRow(row, sp.DisplayName, sp.DisplayDescription, disabledSpells.Contains(sp.Name));
                 }
             }
 

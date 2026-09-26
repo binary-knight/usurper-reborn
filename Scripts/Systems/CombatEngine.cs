@@ -13519,7 +13519,7 @@ public partial class CombatEngine
                 terminal.SetColor("white");
                 terminal.Write($"[{i + 1}] ");
                 terminal.SetColor("cyan");
-                terminal.Write($"{spell.Name}");
+                terminal.Write($"{spell.DisplayName}");
                 terminal.SetColor("gray");
                 terminal.Write(Loc.Get("combat.spell_level", spell.Level));
                 terminal.SetColor("yellow");
@@ -13528,7 +13528,7 @@ public partial class CombatEngine
             else
             {
                 terminal.SetColor("darkgray");
-                terminal.WriteLine(Loc.Get("combat.spell_not_enough_mana", i + 1, spell.Name, spell.Level, manaCost));
+                terminal.WriteLine(Loc.Get("combat.spell_not_enough_mana", i + 1, spell.DisplayName, spell.Level, manaCost));
             }
         }
 
@@ -17238,7 +17238,7 @@ public partial class CombatEngine
 
         terminal.WriteLine("");
         terminal.SetColor("magenta");
-        terminal.WriteLine(Loc.Get("combat.you_cast_spell", spellInfo.Name));
+        terminal.WriteLine(Loc.Get("combat.you_cast_spell", spellInfo.DisplayName));
 
         // When targeting an ally, strip the spell effect portion from the message
         // (caster-named heal/buff text) since the correct target messages are shown by ApplySpellEffects
@@ -17609,7 +17609,7 @@ public partial class CombatEngine
         if (spellResult.SkillImproved && !string.IsNullOrEmpty(spellResult.NewProficiencyLevel))
         {
             terminal.SetColor("bright_yellow");
-            terminal.WriteLine(Loc.Get("combat.spell_proficiency_up", spellInfo.Name, spellResult.NewProficiencyLevel));
+            terminal.WriteLine(Loc.Get("combat.spell_proficiency_up", spellInfo.DisplayName, spellResult.NewProficiencyLevel));
             await Task.Delay(GetCombatDelay(800));
         }
     }
@@ -18387,7 +18387,7 @@ public partial class CombatEngine
             {
                 var spell = healSpells[i];
                 terminal.SetColor("cyan");
-                terminal.WriteLine($"  [{i + 1}] {spell.Name} - {Loc.Get("combat.mana_label")}: {SpellSystem.CalculateManaCost(spell, player)}"); // v1.1.1: real cost, not the table cost
+                terminal.WriteLine($"  [{i + 1}] {spell.DisplayName} - {Loc.Get("combat.mana_label")}: {SpellSystem.CalculateManaCost(spell, player)}"); // v1.1.1: real cost, not the table cost
             }
             terminal.SetColor("gray");
             terminal.WriteLine($"  {Loc.Get("combat.cancel_option")}");
@@ -18424,7 +18424,7 @@ public partial class CombatEngine
 
             terminal.WriteLine("");
             terminal.SetColor("bright_magenta");
-            terminal.WriteLine(Loc.Get("combat.cast_spell_on_ally", selectedSpell.Name, targetAlly.DisplayName));
+            terminal.WriteLine(Loc.Get("combat.cast_spell_on_ally", selectedSpell.DisplayName, targetAlly.DisplayName));
             terminal.WriteLine(spellResult.Message);
 
             if (spellResult.Success && spellResult.Healing > 0)
@@ -18916,7 +18916,7 @@ public partial class CombatEngine
             // Multi-target heal (e.g. Mass Cure) — heal entire party
             if (healSpell.IsMultiTarget)
             {
-                terminal.WriteLine(Loc.Get("combat.teammate_casts_party", teammate.DisplayName, healSpell.Name));
+                terminal.WriteLine(Loc.Get("combat.teammate_casts_party", teammate.DisplayName, healSpell.DisplayName));
 
                 // Heal the player
                 long oldPlayerHP = currentPlayer.HP;
@@ -18967,7 +18967,7 @@ public partial class CombatEngine
             {
                 // Single-target heal
                 string targetName = target == currentPlayer ? Loc.Get("combat.you_lowercase") : target.DisplayName;
-                terminal.WriteLine(Loc.Get("combat.teammate_casts_on", teammate.DisplayName, healSpell.Name, targetName));
+                terminal.WriteLine(Loc.Get("combat.teammate_casts_on", teammate.DisplayName, healSpell.DisplayName, targetName));
 
                 long oldHP = target.HP;
                 target.HP = Math.Min(target.MaxHP, target.HP + spellResult.Healing);
@@ -18991,7 +18991,7 @@ public partial class CombatEngine
         else
         {
             string targetName = target == currentPlayer ? Loc.Get("combat.you_lowercase") : target.DisplayName;
-            terminal.WriteLine(Loc.Get("combat.teammate_casts_on", teammate.DisplayName, healSpell.Name, targetName));
+            terminal.WriteLine(Loc.Get("combat.teammate_casts_on", teammate.DisplayName, healSpell.DisplayName, targetName));
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("combat.spell_fizzles"));
             result.CombatLog.Add($"{teammate.DisplayName}'s healing spell fizzles.");
@@ -19213,7 +19213,7 @@ public partial class CombatEngine
 
         terminal.WriteLine("");
         terminal.SetColor("magenta");
-        terminal.WriteLine(Loc.Get("combat.teammate_casts_spell", teammate.DisplayName, spell.Name));
+        terminal.WriteLine(Loc.Get("combat.teammate_casts_spell", teammate.DisplayName, spell.DisplayName));
 
         if (!spellResult.Success)
         {
@@ -26812,7 +26812,7 @@ public partial class CombatEngine
             var color = canCast ? ConsoleColor.White : ConsoleColor.DarkGray;
 
             terminal.SetColor(color);
-            terminal.WriteLine($"{i + 1}. {spell.Name} ({Loc.Get("combat.level_label")} {spell.Level}) - {manaCost} {Loc.Get("combat.mana_label")}");
+            terminal.WriteLine($"{i + 1}. {spell.DisplayName} ({Loc.Get("combat.level_label")} {spell.Level}) - {manaCost} {Loc.Get("combat.mana_label")}");
             if (!canCast)
             {
                 terminal.WriteLine($"   {Loc.Get("combat.not_enough_mana")}");
@@ -26858,7 +26858,7 @@ public partial class CombatEngine
             if (spellResult.SkillImproved && !string.IsNullOrEmpty(spellResult.NewProficiencyLevel))
             {
                 terminal.SetColor("bright_yellow");
-                terminal.WriteLine(Loc.Get("combat.proficiency_improved", selectedSpell.Name, spellResult.NewProficiencyLevel));
+                terminal.WriteLine(Loc.Get("combat.proficiency_improved", selectedSpell.DisplayName, spellResult.NewProficiencyLevel));
             }
 
             terminal.PressAnyKey();
@@ -28755,20 +28755,20 @@ public partial class CombatEngine
                 string displayName;
                 int cdRemaining = player.UnmakingCooldown > 0 ? player.UnmakingCooldown : player.DelugeCooldown;
                 if (onCooldown)
-                    displayName = $"{spell.Name} (CD:{cdRemaining})";
+                    displayName = $"{spell.DisplayName} (CD:{cdRemaining})";
                 else if (!SpellSystem.HasRequiredSpellWeapon(player))
                 {
                     var reqType = SpellSystem.GetSpellWeaponRequirement(player.Class);
-                    displayName = Loc.Get("combat.qb_need_weapon", spell.Name, reqType);
+                    displayName = Loc.Get("combat.qb_need_weapon", spell.DisplayName, reqType);
                 }
                 else if (!player.CanCastSpells())
-                    displayName = Loc.Get("combat.qb_silenced", spell.Name);
+                    displayName = Loc.Get("combat.qb_silenced", spell.DisplayName);
                 else if (player.Mana < manaCost)
                     // v1.1.11: say why it cannot be cast (player report: a new Magician read "unavailable" and
                     // suspected the staff)
-                    displayName = Loc.Get("combat.qb_need_mana", spell.Name, manaCost, player.Mana);
+                    displayName = Loc.Get("combat.qb_need_mana", spell.DisplayName, manaCost, player.Mana);
                 else
-                    displayName = $"{spell.Name} ({manaCost} MP)";
+                    displayName = $"{spell.DisplayName} ({manaCost} MP)";
                 actions.Add(((i + 1).ToString(), slotId, displayName, canCast));
             }
             else
@@ -28928,7 +28928,7 @@ public partial class CombatEngine
                     if (spellOnCD)
                     {
                         int cdLeft = player.UnmakingCooldown > 0 ? player.UnmakingCooldown : player.DelugeCooldown;
-                        terminal.WriteLine(Loc.Get("combat.spell_on_cooldown", spell.Name, cdLeft), "red");
+                        terminal.WriteLine(Loc.Get("combat.spell_on_cooldown", spell.DisplayName, cdLeft), "red");
                     }
                     else if (!SpellSystem.HasRequiredSpellWeapon(player))
                     {
@@ -28936,7 +28936,7 @@ public partial class CombatEngine
                         terminal.WriteLine(Loc.Get("combat.need_weapon_spell", reqType), "red");
                     }
                     else if (!player.CanCastSpells())
-                        terminal.WriteLine(Loc.Get("combat.spell_silenced", spell.Name), "red");
+                        terminal.WriteLine(Loc.Get("combat.spell_silenced", spell.DisplayName), "red");
                     else
                         terminal.WriteLine(Loc.Get("combat.not_enough_mana_detail", manaCost, player.Mana), "red");
                 }
@@ -29052,7 +29052,7 @@ public partial class CombatEngine
                     if (spellOnCD)
                     {
                         int cdLeft = player.UnmakingCooldown > 0 ? player.UnmakingCooldown : player.DelugeCooldown;
-                        terminal.WriteLine(Loc.Get("combat.spell_on_cooldown", spell.Name, cdLeft), "red");
+                        terminal.WriteLine(Loc.Get("combat.spell_on_cooldown", spell.DisplayName, cdLeft), "red");
                     }
                     else if (!SpellSystem.HasRequiredSpellWeapon(player))
                     {
@@ -29060,7 +29060,7 @@ public partial class CombatEngine
                         terminal.WriteLine(Loc.Get("combat.need_weapon_spell", reqType), "red");
                     }
                     else if (!player.CanCastSpells())
-                        terminal.WriteLine(Loc.Get("combat.spell_silenced", spell.Name), "red");
+                        terminal.WriteLine(Loc.Get("combat.spell_silenced", spell.DisplayName), "red");
                     else
                         terminal.WriteLine(Loc.Get("combat.not_enough_mana_detail", manaCost, player.Mana), "red");
                 }
