@@ -272,6 +272,111 @@ public class SageCompanion1115Tests
         ally.MagicACBonus.Should().Be(100);
     }
 
+    // ---- knowledge: the seals and the Settlement Library ----
+
+    /// <summary>The player's own Sage casting (currentPlayer is the caster), with some seals collected.</summary>
+    private static (CombatEngine engine, Character sage, Character ally, CombatResult result) PlayerSage(int seals)
+    {
+        var sage = Sage(60);
+        var ally = Ally("Tank", CharacterClass.Warrior);
+        var engine = new CombatEngine(new TerminalEmulator(new MemoryStream(), new MemoryStream()));
+        typeof(CombatEngine).GetField("random", F)!.SetValue(engine, new Random(7));
+        typeof(CombatEngine).GetField("currentPlayer", F)!.SetValue(engine, sage);
+        typeof(CombatEngine).GetField("currentTeammates", F)!.SetValue(engine, new List<Character> { ally });
+        var story = StoryProgressionSystem.Instance.CollectedSeals;
+        story.Clear();
+        foreach (var s in Enum.GetValues<SealType>().Take(seals)) story.Add(s);
+        return (engine, sage, ally, new CombatResult { Player = sage });
+    }
+
+    private static SpellSystem.SpellResult Ward(int bonus, int duration, string effect = "fog") =>
+        new SpellSystem.SpellResult { Success = true, ProtectionBonus = bonus, Duration = duration, SpecialEffect = effect };
+
+    private static void GiveLibrary(Character c)
+    {
+        c.SettlementBuffType = (int)SettlementBuffType.LibraryXP;
+        c.SettlementBuffCombats = 5;
+    }
+
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(1, 5)]
+    [InlineData(3, 15)]
+    [InlineData(7, 35)]
+    [InlineData(9, 35)]
+    public void EachSeal_AddsFivePercent_UpToThirtyFive(int seals, int percent)
+    {
+        CombatEngine.SageSealWardPercentFor(seals).Should().Be(percent);
+    }
+
+    [Fact]
+    public void TheSealBonus_CountsBeforeHighestWins()
+    {
+        var (engine, sage, ally, result) = PlayerSage(7);
+        try
+        {
+            CombatEngine.ApplyWardHighestWins(ally, 120, 999);
+            engine.ApplySagePartyWard(sage, Ward(100, 999), result);
+            ally.MagicACBonus.Should().Be(135, "100 plus 35% beats the 120 ward already up");
+            sage.MagicACBonus.Should().Be(135);
+        }
+        finally { StoryProgressionSystem.Instance.CollectedSeals.Clear(); }
+    }
+
+    [Fact]
+    public void ASageTeammate_GetsNoSealBonus()
+    {
+        var (engine, _, ally, result) = PlayerSage(7);
+        try
+        {
+            var teammate = Sage(60);
+            engine.ApplySagePartyWard(teammate, Ward(100, 999), result);
+            ally.MagicACBonus.Should().Be(100, "the seals are the player's story, not the teammate's");
+        }
+        finally { StoryProgressionSystem.Instance.CollectedSeals.Clear(); }
+    }
+
+    [Fact]
+    public void TheLibrary_DoublesAWardsRounds()
+    {
+        var (engine, sage, ally, result) = PlayerSage(0);
+        GiveLibrary(sage);
+        engine.ApplySagePartyWard(sage, Ward(100, 4, "shadow"), result);
+        ally.ActiveStatuses[StatusEffect.Blessed].Should().Be(8);
+        ally.ActiveStatuses[StatusEffect.Blur].Should().Be(8);
+
+        var (engine2, sage2, ally2, result2) = PlayerSage(0);
+        engine2.ApplySagePartyWard(sage2, Ward(100, 4, "shadow"), result2);
+        ally2.ActiveStatuses[StatusEffect.Blessed].Should().Be(4, "no Library visit, no longer ward");
+
+        CombatEngine.SageLibraryWardDuration(sage, 999).Should().Be(999, "a whole-fight ward stays a whole-fight ward");
+    }
+
+    [Fact]
+    public void TheLibrary_DoesNotLengthenAHold()
+    {
+        var (engine, sage, _, result) = PlayerSage(0);
+        GiveLibrary(sage);
+        var brute = Ogre(45);
+        typeof(CombatEngine).GetMethod("HandleSpecialSpellEffectOnMonster", F)!
+            .Invoke(engine, new object[] { brute, "freeze", 2, sage, 0L, result });
+        brute.IsFrozen.Should().BeTrue();
+        brute.FrozenDuration.Should().Be(2, "the Library lengthens wards, never a hold");
+
+        var pack = Ogre(45);
+        typeof(CombatEngine).GetMethod("HandleSpecialSpellEffectOnMonster", F)!
+            .Invoke(engine, new object[] { pack, "slumber_mist", 2, sage, 0L, result });
+        pack.SleepDuration.Should().Be(2);
+    }
+
+    [Fact]
+    public void TheSealLine_IsInEveryLanguage()
+    {
+        string dir = Path.Combine(Leftovers1114BTests.RepoRoot(), "Localization");
+        foreach (var lang in new[] { "en", "es", "fr", "hu", "it" })
+            File.ReadAllText(Path.Combine(dir, lang + ".json")).Should().Contain("\"combat.sage_seal_ward\":", lang);
+    }
+
     [Fact]
     public void TheTeammateTurn_TriesTheSageSpellsFirst()
     {

@@ -6175,6 +6175,7 @@
   "combat.sage_compel": "{0} è costretto a rivoltarsi contro {1}!",
   "combat.ward_stronger_holds": "{0} mantiene una protezione più forte.",
   "combat.sage_ocean_memory_ally": "Gli incantesimi di {0} ora costano metà mana.",
+  "combat.sage_seal_ward": "La conoscenza dei sigilli di {0} rafforza la protezione (+{1}%).",
   "combat.pvp_party_spell_no_effect": "L'incantesimo agisce tramite gli alleati, e in un duello non ce ne sono. Non succede nulla.",
   "combat.pvp_blinded_miss": "{0} colpisce alla cieca e manca!",
   "combat.spell_web": "{0} è intrappolato in ragnatele appiccicose!",

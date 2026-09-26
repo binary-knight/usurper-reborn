@@ -8740,6 +8740,33 @@ public partial class CombatEngine
         return party;
     }
 
+    /// <summary>v1.1.15: the seal bonus to a Sage's ward strength for a number of seals, capped.</summary>
+    internal static int SageSealWardPercentFor(int seals) =>
+        Math.Clamp(seals * GameConfig.SageSealWardPercentPerSeal, 0, GameConfig.SageSealWardMaxPercent);
+
+    /// <summary>
+    /// v1.1.15: how much the seals the player has collected strengthen this Sage's wards. Only the
+    /// player whose story it is: a Sage teammate or a follower gets none.
+    /// </summary>
+    internal int SageSealWardPercent(Character caster)
+    {
+        if (caster == null || caster.Class != CharacterClass.Sage || caster != currentPlayer) return 0;
+        if (caster is NPC || caster.IsCompanion) return 0;
+        return SageSealWardPercentFor(StoryProgressionSystem.Instance?.CollectedSeals?.Count ?? 0);
+    }
+
+    /// <summary>
+    /// v1.1.15: a Sage fresh from the Settlement Library (its Library buff is up) keeps a party ward
+    /// twice as long. A whole-fight ward stays a whole-fight ward. Wards and buffs only: hold and
+    /// control durations never pass through here.
+    /// </summary>
+    internal static int SageLibraryWardDuration(Character caster, int duration)
+    {
+        if (caster == null || caster.Class != CharacterClass.Sage || duration <= 0 || duration >= 999) return duration;
+        if (!caster.HasSettlementBuff || caster.SettlementBuffType != (int)SettlementBuffType.LibraryXP) return duration;
+        return Math.Min(998, duration * 2);
+    }
+
     /// <summary>
     /// v1.1.15: the Sage's party wards reach every ally. Fog of War: protection. Shadow Cloak and
     /// Noctura's Veil: protection and Blur. Mind Blank: protection and status immunity. Ocean's
@@ -8747,11 +8774,18 @@ public partial class CombatEngine
     /// </summary>
     internal void ApplySagePartyWard(Character caster, SpellSystem.SpellResult spellResult, CombatResult? result)
     {
-        int dur = spellResult.Duration > 0 ? spellResult.Duration : 999;
+        int dur = SageLibraryWardDuration(caster, spellResult.Duration > 0 ? spellResult.Duration : 999);
         string effect = (spellResult.SpecialEffect ?? "").ToLowerInvariant();
+        int bonus = spellResult.ProtectionBonus;
+        int sealPercent = SageSealWardPercent(caster);
+        if (bonus > 0 && sealPercent > 0)
+        {
+            bonus += bonus * sealPercent / 100;
+            terminal.WriteLine(Loc.Get("combat.sage_seal_ward", caster.DisplayName, sealPercent), "bright_cyan");
+        }
         foreach (var ally in LivingPartyOf(caster, result))
         {
-            if (spellResult.ProtectionBonus > 0) WardAlly(ally, spellResult.ProtectionBonus, dur);
+            if (bonus > 0) WardAlly(ally, bonus, dur);
             switch (effect)
             {
                 case "shadow":

@@ -6366,6 +6366,7 @@
   "combat.sage_compel": "{0} is compelled to turn on {1}!",
   "combat.ward_stronger_holds": "{0} keeps a stronger ward.",
   "combat.sage_ocean_memory_ally": "{0}'s spells now cost half mana.",
+  "combat.sage_seal_ward": "{0}'s knowledge of the seals strengthens the ward (+{1}%).",
   "combat.pvp_party_spell_no_effect": "The spell works through allies, and a duel has none. Nothing happens.",
   "combat.pvp_blinded_miss": "{0} swings blindly and misses!",
   "combat.spell_web": "{0} is entangled in sticky webs!",
