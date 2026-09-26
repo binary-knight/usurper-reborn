@@ -138,4 +138,44 @@ public class SpellLoc1115Tests
         string src = ReadScript(Path.Combine("Scripts", "Server", "GmcpBridge.cs"));
         src.Should().Contain("name = spell.DisplayName,");
     }
+
+    // --- commit 2: Sage cast messages route through Loc in all languages ---
+
+    private static readonly string[] SageCastKeys =
+    {
+        "combat.sage_fog_cast", "combat.sage_poison_touch_cast", "combat.sage_mind_spike_cast",
+        "combat.sage_confusion_cast", "combat.sage_hit_self_cast", "combat.sage_escape_cast",
+        "combat.sage_steal_life_cast", "combat.sage_psychic_scream_cast", "combat.sage_shadow_cloak_cast",
+        "combat.sage_energy_drain_cast", "combat.sage_mind_blank_cast", "combat.sage_shadow_step_cast",
+        "combat.sage_mass_confusion_cast", "combat.sage_noctura_veil_cast", "combat.sage_soul_rend_cast",
+        "combat.sage_ocean_memory_cast", "combat.sage_temporal_paradox_cast", "combat.sage_veloura_embrace_cast",
+        "combat.sage_death_kiss_cast",
+        "combat.sage_the_enemy", "combat.sage_the_target",
+    };
+
+    [Fact]
+    public void Every_sage_cast_message_key_exists_in_every_language()
+    {
+        var missing = new List<string>();
+        foreach (var key in SageCastKeys)
+            foreach (var lang in Langs)
+            {
+                var d = Load(lang);
+                if (!d.TryGetValue(key, out var v) || string.IsNullOrWhiteSpace(v))
+                    missing.Add($"{lang}:{key}");
+            }
+        missing.Should().BeEmpty($"missing sage cast-message keys: {string.Join(", ", missing.Take(20))}");
+    }
+
+    [Fact]
+    public void ExecuteSageSpell_no_longer_builds_cast_messages_from_english_literals()
+    {
+        string src = ReadScript(Path.Combine("Scripts", "Systems", "SpellSystem.cs"));
+        int start = src.IndexOf("private static void ExecuteSageSpell(");
+        start.Should().BeGreaterThan(0);
+        int end = src.IndexOf("\n    }\n", start);
+        string body = src.Substring(start, end - start);
+        foreach (var key in SageCastKeys.Where(k => k.EndsWith("_cast")))
+            body.Should().Contain(key, $"ExecuteSageSpell must build its message through Loc.Get(\"{key}\")");
+    }
 }
