@@ -1389,14 +1389,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  {Loc.Get("ending.immortal_renounce")}", "gray");
             terminal.WriteLine("");
 
-            string response;
-            while (true)
-            {
-                response = (await terminal.GetInputAsync(Loc.Get("ending.immortal_ascend_prompt"))).Trim().ToUpper();
-                if (GameConfig.IsAffirmative(response) || response == "YES") break;
-                if (response == "N" || response == "NO") return false;
-                terminal.WriteLine("  Please enter Y or N.", "gray");
-            }
+            if (!await terminal.AskYesNoAsync(Loc.Get("ending.immortal_ascend_prompt"))) return false;
 
             // Choose divine name
             terminal.WriteLine("");
@@ -1650,16 +1643,7 @@ namespace UsurperRemake.Systems
             }
             terminal.WriteLine("");
 
-            string response;
-            while (true)
-            {
-                response = (await terminal.GetInputAsync($"  {Loc.Get("ending.ngplus_begin_prompt")} ")).Trim().ToUpper();
-                // Accept any localized yes (Y/S/O/I/...) or no (N is "no" in all 5 langs).
-                if (GameConfig.IsAffirmative(response) || response == "N" || response == "NO") break;
-                terminal.WriteLine("  Please enter Y or N.", "gray");
-            }
-
-            if (GameConfig.IsAffirmative(response))
+            if (await terminal.AskYesNoAsync($"  {Loc.Get("ending.ngplus_begin_prompt")} "))
             {
                 await CycleSystem.Instance.StartNewCycle(player, ending, terminal);
                 // Signal the game to restart with a new character

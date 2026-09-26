@@ -1597,9 +1597,25 @@ public partial class TerminalEmulator
     /// </summary>
     public async Task<bool> AskYesNoAsync(string prompt, bool? enterDefault = null)
     {
+        return await AskYesNoCore(() => GetInput(prompt), enterDefault);
+    }
+
+    /// <summary>
+    /// v1.1.15: the single-key sibling of AskYesNoAsync, for the handful of sites that read a yes/no
+    /// answer with GetKeyInput instead of a line (no Enter needed). Shares the same strict loop and
+    /// fallback through AskYesNoCore rather than duplicating it.
+    /// </summary>
+    public async Task<bool> AskYesNoKeyAsync(bool? enterDefault = null)
+    {
+        return await AskYesNoCore(GetKeyInput, enterDefault);
+    }
+
+    /// <summary>v1.1.15: shared strict yes/no loop behind AskYesNoAsync and AskYesNoKeyAsync.</summary>
+    private async Task<bool> AskYesNoCore(Func<Task<string>> read, bool? enterDefault)
+    {
         for (int attempt = 0; attempt < MaxInvalidChoiceAttempts; attempt++)
         {
-            string input = (await GetInput(prompt)).Trim();
+            string input = (await read()).Trim();
             if (GameConfig.IsAffirmative(input)) return true;
             if (GameConfig.IsNegative(input)) return false;
             if (input.Length == 0 && enterDefault.HasValue) return enterDefault.Value;

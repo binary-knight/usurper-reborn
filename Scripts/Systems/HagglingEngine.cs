@@ -80,8 +80,7 @@ public static class HagglingEngine
         terminal.SetColor("green");
         terminal.WriteLine(Loc.Get("haggle.got_deal", player.DisplayName));
         
-        var confirm = await terminal.GetInput(Loc.Get("haggle.accept_price"));
-        if (GameConfig.IsAffirmative(confirm))
+        if (await terminal.AskYesNoAsync(Loc.Get("haggle.accept_price")))
         {
             return new HaggleResult(offer, false);
         }
@@ -175,9 +174,7 @@ public static class HagglingEngine
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("haggle.insist_or_leave"));
 
-        var choice = await terminal.GetInput(Loc.Get("haggle.insist_prompt"));
-        
-        if (GameConfig.IsAffirmative(choice))
+        if (await terminal.AskYesNoAsync(Loc.Get("haggle.insist_prompt")))
         {
             // Player gets kicked out!
             terminal.SetColor("bright_red");

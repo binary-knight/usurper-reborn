@@ -7473,12 +7473,11 @@ public partial class GameEngine
                 terminal.WriteLine(Loc.Get("engine.creation_cancelled"), "yellow");
                 terminal.WriteLine(Loc.Get("engine.must_create"), "white");
 
-                var retry = await terminal.GetInputAsync(Loc.Get("engine.retry_prompt"));
-                if (GameConfig.IsAffirmative(retry))
+                if (await terminal.AskYesNoAsync(Loc.Get("engine.retry_prompt")))
                 {
                     return await CreateNewPlayer(playerName); // Retry
                 }
-                
+
                 return null; // User chose not to retry
             }
             
@@ -7496,12 +7495,11 @@ public partial class GameEngine
             UsurperRemake.Systems.DebugLogger.Instance.LogError("CRASH", $"Character creation error:\n{ex}");
 
             terminal.WriteLine(Loc.Get("engine.please_try_again"), "yellow");
-            var retry = await terminal.GetInputAsync(Loc.Get("engine.retry_prompt"));
-            if (GameConfig.IsAffirmative(retry))
+            if (await terminal.AskYesNoAsync(Loc.Get("engine.retry_prompt")))
             {
                 return await CreateNewPlayer(playerName); // Retry
             }
-            
+
             return null;
         }
     }
@@ -7616,9 +7614,7 @@ public partial class GameEngine
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("engine.resurrections_available", currentPlayer.Resurrections));
             terminal.WriteLine("");
-            var resurrect = await terminal.GetInput(Loc.Get("engine.use_resurrection_prompt"));
-
-            if (GameConfig.IsAffirmative(resurrect))
+            if (await terminal.AskYesNoAsync(Loc.Get("engine.use_resurrection_prompt")))
             {
                 currentPlayer.Resurrections--;
                 currentPlayer.Statistics.RecordResurrection();

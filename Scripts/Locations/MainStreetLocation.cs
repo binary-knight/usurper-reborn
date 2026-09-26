@@ -1372,9 +1372,7 @@ public partial class MainStreetLocation : BaseLocation
             terminal.WriteLine($"\n  {Loc.Get("main_street.attack_warning")}");
             terminal.WriteLine($"  {Loc.Get("main_street.attack_confirm")}");
 
-            string confirm = (await terminal.GetKeyInput()).ToUpperInvariant();
-
-            if (GameConfig.IsAffirmative(confirm))
+            if (await terminal.AskYesNoKeyAsync())
             {
                 // Attack!
                 var encounterResult = await StreetEncounterSystem.Instance.AttackCharacter(
@@ -1781,9 +1779,7 @@ public partial class MainStreetLocation : BaseLocation
         terminal.WriteLine(Loc.Get("main_street.combat_test_weapon", testMonster.Name, testMonster.Weapon));
         terminal.WriteLine("");
         
-        var confirm = await terminal.GetInput(Loc.Get("main_street.combat_test_confirm"));
-        
-        if (GameConfig.IsAffirmative(confirm))
+        if (await terminal.AskYesNoAsync(Loc.Get("main_street.combat_test_confirm")))
         {
             // Initialize combat engine
             var combatEngine = new CombatEngine(terminal);

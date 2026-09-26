@@ -2683,8 +2683,7 @@ public class HomeLocation : BaseLocation
         terminal.WriteLine($" {Loc.Get("home.divorce_no")}");
         terminal.WriteLine();
 
-        var input = await terminal.GetInput(Loc.Get("ui.choice"));
-        if (!GameConfig.IsAffirmative(input))
+        if (!await terminal.AskYesNoAsync(Loc.Get("ui.choice")))
         {
             terminal.WriteLine();
             terminal.SetColor("bright_cyan");
@@ -3144,8 +3143,7 @@ public class HomeLocation : BaseLocation
             terminal.WriteLine($" {Loc.Get("home.alt_no_another_time")}");
             terminal.WriteLine();
 
-            var input = await terminal.GetInput(Loc.Get("ui.choice"));
-            if (GameConfig.IsAffirmative(input))
+            if (await terminal.AskYesNoAsync(Loc.Get("ui.choice")))
             {
                 await PlayHotwifingScene(spouse, spouseData);
             }
@@ -3362,8 +3360,7 @@ public class HomeLocation : BaseLocation
             terminal.WriteLine($" {Loc.Get("home.alt_no_another_time")}");
             terminal.WriteLine();
 
-            var input = await terminal.GetInput(Loc.Get("ui.choice"));
-            if (GameConfig.IsAffirmative(input))
+            if (await terminal.AskYesNoAsync(Loc.Get("ui.choice")))
             {
                 await PlayCuckoldingScene(spouse, spouseData);
             }
@@ -4248,9 +4245,7 @@ public class HomeLocation : BaseLocation
 
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("home.upgrade_confirm", name, $"{cost:N0}"));
-        var confirm = await terminal.GetInput("(Y/N): ");
-
-        if (GameConfig.IsAffirmative(confirm))
+        if (await terminal.AskYesNoAsync("(Y/N): "))
         {
             currentPlayer.Gold -= cost;
             currentPlayer.Statistics.RecordGoldSpent(cost);
@@ -5002,8 +4997,7 @@ public class HomeLocation : BaseLocation
         terminal.Write(Loc.Get("home.take_all_warning"));
         terminal.SetColor("white");
 
-        var confirm = await terminal.ReadLineAsync();
-        if (!GameConfig.IsAffirmative(confirm))
+        if (!await terminal.AskYesNoAsync(""))
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("ui.cancelled"));

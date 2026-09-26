@@ -909,7 +909,7 @@ public class StreetEncounterSystem
 
         string choice = (await terminal.GetKeyInput()).ToUpperInvariant();
 
-        if (GameConfig.IsAffirmative(choice) || choice == "F")
+        if (GameConfig.IsAffirmative(choice) || choice == "F") // v1.1.15: yesno-exempt: F (flirt) is a third accept key alongside Y/N, not a plain yes/no
         {
             terminal.SetColor("magenta");
             terminal.WriteLine(Loc.Get("street_encounter.romance.pleasant_time"));
@@ -1754,9 +1754,7 @@ public class StreetEncounterSystem
         terminal.Write("N", "bright_yellow");
         terminal.WriteLine($"]{Loc.Get("street_encounter.bribe.opt_no")}", "white");
 
-        string choice = (await terminal.GetKeyInput()).ToUpperInvariant();
-
-        if (GameConfig.IsAffirmative(choice))
+        if (await terminal.AskYesNoKeyAsync())
         {
             int bribeChance = 50 + (int)(player.Charisma - 10) * 3;
             if (_random.Next(100) < bribeChance)

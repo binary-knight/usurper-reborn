@@ -2035,8 +2035,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine($"  [{Loc.Get("dialogue.intimate_warning")}]");
                 terminal.WriteLine("");
 
-                string confirm = await terminal.GetInput("  ");
-                if (GameConfig.IsAffirmative(confirm))
+                if (await terminal.AskYesNoAsync("  "))
                 {
                     // Trigger intimacy system with full scene
                     await IntimacySystem.Instance.StartIntimateScene(player!, npc, terminal);
@@ -2544,7 +2543,7 @@ namespace UsurperRemake.Systems
             terminal.SetColor("gray");
             terminal.WriteLine($"  {Loc.Get("dialogue.npc_quest_accept_options")}");
             string choice = (await terminal.GetInput("  > "))?.Trim().ToUpperInvariant() ?? "";
-            bool accepted = GameConfig.IsAffirmative(choice) || choice == "1";
+            bool accepted = GameConfig.IsAffirmative(choice) || choice == "1"; // v1.1.15: yesno-exempt: "1" is a kept legacy accept alias alongside Y/N, not a plain yes/no
 
             if (!accepted)
             {

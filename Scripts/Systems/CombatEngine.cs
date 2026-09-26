@@ -4321,8 +4321,7 @@ public partial class CombatEngine
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("combat.poison_already_coated", $"{PoisonData.GetName(player.ActivePoisonType)} ({player.PoisonCoatingCombats} combats remaining)"));
             terminal.Write(Loc.Get("combat.replace_yn"));
-            var confirm = await terminal.GetInput("");
-            if (!GameConfig.IsAffirmative(confirm))
+            if (!await terminal.AskYesNoAsync(""))
             {
                 terminal.WriteLine(Loc.Get("combat.poison_keep_current"), "gray");
                 await Task.Delay(GetCombatDelay(500));
@@ -6809,10 +6808,10 @@ public partial class CombatEngine
                     terminal.WriteLine($"  {Loc.Get("combat.manwe_no_more")}", "bright_yellow");
                     terminal.WriteLine("");
                     terminal.Write($"  {Loc.Get("combat.manwe_accept_prompt")}", "bright_white");
-                    string response = (await terminal.GetKeyInput()).ToUpperInvariant();
+                    bool accepted = await terminal.AskYesNoKeyAsync();
                     terminal.WriteLine("");
 
-                    if (GameConfig.IsAffirmative(response))
+                    if (accepted)
                     {
                         // Peaceful resolution — mark as spared
                         terminal.WriteLine($"  {Loc.Get("combat.manwe_lower_weapon")}", "bright_cyan");
@@ -7429,8 +7428,7 @@ public partial class CombatEngine
         if (result.Monster.GrabWeap && !string.IsNullOrEmpty(result.Monster.Weapon))
         {
             terminal.WriteLine(Loc.Get("combat.pickup_weapon", result.Monster.Weapon), "yellow");
-            var input = await terminal.GetInput("> ");
-            if (GameConfig.IsAffirmative(input))
+            if (await terminal.AskYesNoAsync("> "))
             {
                 Item lootItem;
                 var baseWeapon = ItemManager.GetClassicWeapon((int)result.Monster.WeapNr);
@@ -7472,8 +7470,7 @@ public partial class CombatEngine
         if (result.Monster.GrabArm && !string.IsNullOrEmpty(result.Monster.Armor))
         {
             terminal.WriteLine(Loc.Get("combat.pickup_armor", result.Monster.Armor), "yellow");
-            var input = await terminal.GetInput("> ");
-            if (GameConfig.IsAffirmative(input))
+            if (await terminal.AskYesNoAsync("> "))
             {
                 Item lootItem;
                 var baseArmor = ItemManager.GetClassicArmor((int)result.Monster.ArmNr);
@@ -10920,10 +10917,7 @@ public partial class CombatEngine
         terminal.SetColor("yellow");
         terminal.Write(Loc.Get("combat.loot_ally_confirm_prompt", tname));
 
-        string ch = (await terminal.GetKeyInput()).Trim().ToUpper();
-        // Accept affirmative first-letter across supported languages: English Y, Spanish S (Sí),
-        // French O (Oui), Italian S (Sì), Hungarian I (Igen). Falls through to N otherwise.
-        bool approved = GameConfig.IsAffirmative(ch);
+        bool approved = await terminal.AskYesNoKeyAsync();
 
         // v0.57.8: only print the declined message here. The "approved" line
         // ("You nod. Aldric gears up.") is printed by the caller AFTER EquipItem
@@ -26308,8 +26302,9 @@ public partial class CombatEngine
         // else defaults to Finish: the irreversible branch should require a
         // deliberate Spare, but a localized "yes" must not execute the NPC
         // the player meant to save.
-        bool spared = choice == "1" || choice == "S" || choice == "SPARE"
-            || choice == "Y" || choice == "O" || choice == "I" || choice == "SI" || choice == "IGEN";
+        // v1.1.15: yesno-exempt: displayed menu is [1] Spare / [2] Finish; Y/S/O/I/SI/IGEN are legacy aliases for "1", not a plain yes/no, and any junk must default to Finish (irreversible) on the first read, not re-ask
+        bool spared = choice == "1" || choice == "S" || choice == "SPARE" // v1.1.15: yesno-exempt
+            || choice == "Y" || choice == "O" || choice == "I" || choice == "SI" || choice == "IGEN"; // v1.1.15: yesno-exempt
         if (spared)
         {
             result.Outcome = CombatOutcome.OpponentSpared;
