@@ -14958,10 +14958,10 @@ public partial class CombatEngine
             case "weaken":
                 if (target != null && target.IsAlive)
                 {
+                    // v1.1.15: the timed cut only (Monster.GetAttackPower/GetDefensePower apply
+                    // -30%/-20% while WeakenRounds > 0); base Strength and Defence stay as they were
                     int weakenAtkReduction = Math.Max(1, (int)(target.Strength * 0.30));
                     int weakenDefReduction = Math.Max(1, (int)(target.Defence * 0.20));
-                    target.Strength = Math.Max(0, target.Strength - weakenAtkReduction);
-                    target.Defence = Math.Max(0, target.Defence - weakenDefReduction);
                     target.WeakenRounds = Math.Max(target.WeakenRounds, abilityResult.Duration > 0 ? abilityResult.Duration : 4);
                     terminal.SetColor("yellow");
                     terminal.WriteLine(Loc.Get("combat.resolve_crumbles", target.Name, weakenAtkReduction, weakenDefReduction));
@@ -17767,12 +17767,12 @@ public partial class CombatEngine
                 break;
 
             case "weaken":
-                // Reduce attack and defense — used by Siren's Lament, Cutting Words, etc.
+                // Reduce attack and defense for a time; used by Siren's Lament, Noctura's Whisper, etc.
+                // v1.1.15: the timed cut only (Monster.GetAttackPower/GetDefensePower apply
+                // -30%/-20% while WeakenRounds > 0); base Strength and Defence stay as they were
                 {
                     int atkReduction = Math.Max(1, (int)(target.Strength * 0.30));
                     int defReduction2 = Math.Max(1, (int)(target.Defence * 0.20));
-                    target.Strength = Math.Max(0, target.Strength - atkReduction);
-                    target.Defence = Math.Max(0, target.Defence - defReduction2);
                     target.WeakenRounds = Math.Max(target.WeakenRounds, duration > 0 ? duration : 4);
                     terminal.WriteLine(Loc.Get("combat.resolve_crumbles", target.Name, atkReduction, defReduction2), "yellow");
                 }
@@ -27070,13 +27070,12 @@ public partial class CombatEngine
                 break;
 
             case "weaken":
-                // Reduce attack and defense — used by Siren's Lament, etc.
+                // Reduce attack and defense for a time; used by Siren's Lament, etc.
+                // v1.1.15: the timed cut only; base Strength and Defence stay as they were
                 if (target != null)
                 {
                     int atkReduction = Math.Max(1, (int)(target.Strength * 0.30));
                     int defReduction = Math.Max(1, (int)(target.Defence * 0.20));
-                    target.Strength = Math.Max(0, target.Strength - atkReduction);
-                    target.Defence = Math.Max(0, target.Defence - defReduction);
                     target.WeakenRounds = Math.Max(target.WeakenRounds, duration > 0 ? duration : 4);
                     terminal.WriteLine(Loc.Get("combat.resolve_crumbles", target.Name, atkReduction, defReduction), "yellow");
                 }
