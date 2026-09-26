@@ -8120,7 +8120,7 @@
   "engine.menu_admin": "Adminisztrátor",
   "engine.menu_support": "Támogatás",
   "engine.menu_quit": "Kilépés",
-  "engine.menu_create_mortal_alt": "Halandó másodlagos karakter létrehozása",
+  "engine.menu_create_mortal_alt": "Másodlagos karakter létrehozása",
   "engine.menu_delete_alt_full": "Másodlagos karakter törlése",
   "engine.menu_create_new": "Új karakter létrehozása",
   "engine.menu_new_overwrite_full": "Új karakter (FIGYELEM: Felülírja a fő karaktert!)",
