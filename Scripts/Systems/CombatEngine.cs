@@ -18167,8 +18167,9 @@ public partial class CombatEngine
     }
 
     /// <summary>
-    /// Handle player aiding an ally - choose between HP potion, mana potion, or heal spell, then choose target
-    /// Returns the action to execute, or null if cancelled
+    /// Handle player aiding an ally. Prompt order: the aid option (HP potion, mana potion or heal
+    /// spell); for a heal spell, the spell; then the ally. A party heal skips the ally pick and
+    /// returns the spell menu's CastSpell action. Returns the action to execute, or null if cancelled
     /// </summary>
     private async Task<CombatAction?> HandleHealAlly(Character player, List<Monster> monsters)
     {
