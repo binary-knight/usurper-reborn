@@ -1640,6 +1640,19 @@ public static partial class GameConfig
     public const float FatigueExhaustedDamagePenalty = -0.10f; // -10% damage when Exhausted
     public const float FatigueExhaustedDefensePenalty = -0.10f; // -10% defense when Exhausted
     public const float FatigueExhaustedXPPenalty = -0.10f;    // -10% XP when Exhausted
+    // Mental health (v1.1.15), both modes, see MentalSystem. Max is MaxMentalStability.
+    public const int MentalStableThreshold = 75;              // 75-100 = Stable
+    public const int MentalStrainedThreshold = 50;            // 50-74 = Strained
+    public const int MentalShakenThreshold = 25;              // 25-49 = Shaken
+    public const int MentalBreakingThreshold = 1;             // 1-24 = Breaking, 0 = Broken
+    public const float MentalShakenCombatPenalty = 0.05f;     // Positive magnitude: 5% damage and defence lost when Shaken
+    public const float MentalBreakingCombatPenalty = 0.10f;   // Positive magnitude: 10% lost when Breaking or Broken
+    public const int MentalStrainPerPoint = 1000;             // Strain is per mille: every full 1000 costs 1 Mental
+    public const int MentalStrainPctDevout = 80;              // Cleric, Paladin, Tidesworn take 80% of dungeon strain
+    public const int MentalStrainPctSage = 85;                // Sage takes 85%
+    public const int MentalStrainPctHardy = 90;               // Barbarian class; Troll, Orc, Gnoll races take 90%
+    public const int MentalStrainCompanionCutPct = 10;        // Each story companion in the party cuts strain 10%
+    public const int MentalStrainCompanionCutMaxPct = 20;     // Companion cut stops at 20%
     // Session XP diminishing returns (v0.54.0) — online mode only
     // Threshold scales with level: max(100000, XP_for_next_level * 8) — allows ~8 full levels per session
     public const long SessionXPDiminishBaseThreshold = 100000;  // Minimum threshold for low-level players
