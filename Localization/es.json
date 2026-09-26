@@ -6169,6 +6169,7 @@
   "combat.sage_unveil_cast": "¡El patrón de la línea enemiga queda al descubierto!",
   "combat.sage_control_resist": "¡{0} se lo sacude de encima!",
   "combat.sage_marked": "¡{0} está marcado! (+30% de daño de cada aliado, {1} rondas)",
+  "combat.sage_marked_library": "¡{0} está marcado, y el estudio en la Biblioteca afina la marca! (+{2}% de daño de cada aliado, {1} rondas)",
   "combat.sage_slumber_boss_immune": "¡{0} es demasiado poderoso para caer dormido!",
   "combat.sage_slumber_broken": "¡El dolor despierta a {0} de golpe!",
   "combat.sage_compel_old_god": "¡{0} está más allá de cualquier voluntad mortal!",

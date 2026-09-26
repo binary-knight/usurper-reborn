@@ -160,6 +160,7 @@ public class Monster
     // Ability-applied status effects
     public bool IsMarked { get; set; } = false;        // Marked for death/hunt - takes bonus damage
     public int MarkedDuration { get; set; } = 0;
+    public int MarkedBonusPercent { get; set; } = 0;  // v1.1.15: set at cast by a Sage mark; 0 means the usual GameConfig.MarkedBonusPercent. Combat only, never saved.
     public bool IsFrozen { get; set; } = false;         // Frozen solid - cannot act
     public int FrozenDuration { get; set; } = 0;
     public long PowerSurgeStrength { get; set; } = 0;   // v1.1.10: Strength a boss's power surge added, taken back when it ends

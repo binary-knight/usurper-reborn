@@ -1922,6 +1922,8 @@ public static partial class GameConfig
     public const int MassConfusionBossMaxRounds = 2;          // v1.1.15: Mass Confusion holds a boss at most this long
     public const int SageSealWardPercentPerSeal = 5;          // v1.1.15: each seal collected strengthens the Sage's party wards this much
     public const int SageSealWardMaxPercent = 35;             // v1.1.15: cap on the seal bonus (seven seals)
+    public const int MarkedBonusPercent = 30;                 // a marked monster takes this much more damage from every ally
+    public const int SageLibraryMarkBonusPercent = 45;        // v1.1.15: Scholar's Mark or Unveil cast by a Sage with the Settlement Library buff up
     public const int PvPBlindedMissPercent = 25;              // v1.1.15: a Blinded fighter misses this share of weapon swings in a duel
     public const float PoisonEnchantProcChance = 0.20f;       // 20% chance to poison per attack
     public const float HolyEnchantProcChance = 0.25f;         // 25% chance for holy damage (bonus vs undead)

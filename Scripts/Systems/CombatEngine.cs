@@ -5035,6 +5035,7 @@ public partial class CombatEngine
             if (monster.MarkedDuration <= 0)
             {
                 monster.IsMarked = false;
+                monster.MarkedBonusPercent = 0;
                 terminal.WriteLine(Loc.Get("combat.mark_fades", monster.Name), "gray");
             }
         }
@@ -8246,7 +8247,7 @@ public partial class CombatEngine
 
         if (target.IsMarked)
         {
-            long markedBonus = (long)(actualDamage * 0.3);
+            long markedBonus = MarkedBonusDamage(target, actualDamage);
             actualDamage += markedBonus;
             terminal.SetColor("bright_red");
             terminal.WriteLine(Loc.Get("combat.marked_bonus", markedBonus));
@@ -8756,15 +8757,25 @@ public partial class CombatEngine
     }
 
     /// <summary>
-    /// v1.1.15: a Sage fresh from the Settlement Library (its Library buff is up) keeps a party ward
-    /// twice as long. A whole-fight ward stays a whole-fight ward. Wards and buffs only: hold and
-    /// control durations never pass through here.
+    /// v1.1.15: the extra damage a marked monster takes on a hit: the percent its mark set at cast,
+    /// or the usual GameConfig.MarkedBonusPercent for a mark that set none.
     /// </summary>
-    internal static int SageLibraryWardDuration(Character caster, int duration)
+    internal static long MarkedBonusDamage(Monster target, long damage)
     {
-        if (caster == null || caster.Class != CharacterClass.Sage || duration <= 0 || duration >= 999) return duration;
-        if (!caster.HasSettlementBuff || caster.SettlementBuffType != (int)SettlementBuffType.LibraryXP) return duration;
-        return Math.Min(998, duration * 2);
+        int percent = target.MarkedBonusPercent > 0 ? target.MarkedBonusPercent : GameConfig.MarkedBonusPercent;
+        return damage * percent / 100;
+    }
+
+    /// <summary>
+    /// v1.1.15: the percent a Sage's Scholar's Mark or Unveil the Pattern sets on its target: higher
+    /// while the caster's Settlement Library buff is up. Read once, at cast.
+    /// </summary>
+    internal static int SageMarkBonusPercent(Character? caster)
+    {
+        if (caster != null && caster.Class == CharacterClass.Sage && caster.HasSettlementBuff
+            && caster.SettlementBuffType == (int)SettlementBuffType.LibraryXP)
+            return GameConfig.SageLibraryMarkBonusPercent;
+        return GameConfig.MarkedBonusPercent;
     }
 
     /// <summary>
@@ -8774,7 +8785,7 @@ public partial class CombatEngine
     /// </summary>
     internal void ApplySagePartyWard(Character caster, SpellSystem.SpellResult spellResult, CombatResult? result)
     {
-        int dur = SageLibraryWardDuration(caster, spellResult.Duration > 0 ? spellResult.Duration : 999);
+        int dur = spellResult.Duration > 0 ? spellResult.Duration : 999;
         string effect = (spellResult.SpecialEffect ?? "").ToLowerInvariant();
         int bonus = spellResult.ProtectionBonus;
         int sealPercent = SageSealWardPercent(caster);
@@ -8831,9 +8842,16 @@ public partial class CombatEngine
             {
                 int rounds = SoftControlRounds(target, duration > 0 ? duration : (effect == "scholars_mark" ? 3 : 2));
                 if (rounds == 0) { terminal.WriteLine(Loc.Get("combat.sage_control_resist", target.Name), "yellow"); return true; }
+                // the percent is fixed at cast; a mark already up keeps the higher of the two
+                int percent = SageMarkBonusPercent(caster);
+                if (target.IsMarked) percent = Math.Max(percent, target.MarkedBonusPercent > 0 ? target.MarkedBonusPercent : GameConfig.MarkedBonusPercent);
                 target.IsMarked = true;
                 target.MarkedDuration = Math.Max(target.MarkedDuration, rounds);
-                terminal.WriteLine(Loc.Get("combat.sage_marked", target.Name, rounds), "bright_yellow");
+                target.MarkedBonusPercent = percent;
+                if (percent > GameConfig.MarkedBonusPercent)
+                    terminal.WriteLine(Loc.Get("combat.sage_marked_library", target.Name, rounds, percent), "bright_yellow");
+                else
+                    terminal.WriteLine(Loc.Get("combat.sage_marked", target.Name, rounds), "bright_yellow");
                 return true;
             }
 
@@ -12978,9 +12996,9 @@ public partial class CombatEngine
             if (monster.IsCorroded) armor = Math.Max(0, (long)(armor * 0.6));
             long actualDamage = Math.Max(1, damagePerMonster - armor);
 
-            // Marked targets take 30% bonus damage
+            // Marked targets take bonus damage (30%, or what a Sage's mark set)
             if (monster.IsMarked)
-                actualDamage = (long)(actualDamage * 1.3);
+                actualDamage += MarkedBonusDamage(monster, actualDamage);
 
             // Sleeping monsters take 50% bonus damage but stay asleep
             if (monster.IsSleeping)
@@ -13143,10 +13161,10 @@ public partial class CombatEngine
                 $"magImmune={target.IsMagicalImmune}");
         }
 
-        // Marked target takes 30% bonus damage
+        // Marked target takes bonus damage (30%, or what a Sage mark set)
         if (target.IsMarked)
         {
-            long markedBonus = (long)(actualDamage * 0.3);
+            long markedBonus = MarkedBonusDamage(target, actualDamage);
             actualDamage += markedBonus;
             terminal.SetColor("bright_red");
             terminal.WriteLine(Loc.Get("combat.marked_bonus", markedBonus));
@@ -14902,14 +14920,14 @@ public partial class CombatEngine
                     actualDamage = Math.Max(1, actualDamage - defense);
                 }
 
-                // Marked target takes 30% bonus damage. Player report: Shield Bash (and
+                // Marked target takes bonus damage (30%, or what a Sage mark set). Player report: Shield Bash (and
                 // every other single-target class ability) skipped the Marked bonus
                 // because this path applies damage directly to target.HP instead of
                 // routing through ApplySingleMonsterDamage. Mirrors the basic-attack
                 // path at line ~11234 and the AoE path at line ~11114.
                 if (target.IsMarked)
                 {
-                    long markedBonus = (long)(actualDamage * 0.3);
+                    long markedBonus = MarkedBonusDamage(target, actualDamage);
                     actualDamage += markedBonus;
                     terminal.SetColor("bright_red");
                     terminal.WriteLine(Loc.Get("combat.marked_bonus", markedBonus));
@@ -19360,8 +19378,8 @@ public partial class CombatEngine
                 // announce the immunity-absorbs message once per AoE cast.
                 long adjustedDamage = ApplyBossSpellProtections(monster, damagePerTarget, announce: !immunityAnnounced);
                 if (monster.IsMagicalImmune) immunityAnnounced = true;
-                // v1.1.15: a marked target takes 30% more from a teammate's spell too
-                if (monster.IsMarked) adjustedDamage += (long)(adjustedDamage * 0.3);
+                // v1.1.15: a marked target takes the mark's bonus from a teammate's spell too
+                if (monster.IsMarked) adjustedDamage += MarkedBonusDamage(monster, adjustedDamage);
                 adjustedDamage = TeamHQBonus.ApplyAttack(teammate, adjustedDamage); // v1.1.11: Team HQ Armory, before the HP cap.
                 long actualDamage = Math.Min(adjustedDamage, monster.HP);
                 monster.HP -= actualDamage;
@@ -19399,8 +19417,8 @@ public partial class CombatEngine
                 // bypassed here, allowing e.g. a companion Power Word: Kill to hit Manwe at
                 // full damage despite magical immunity.
                 long adjustedDamage = ApplyBossSpellProtections(target, damage, announce: true);
-                // v1.1.15: a marked target takes 30% more from a teammate's spell too
-                if (target.IsMarked) adjustedDamage += (long)(adjustedDamage * 0.3);
+                // v1.1.15: a marked target takes the mark's bonus from a teammate's spell too
+                if (target.IsMarked) adjustedDamage += MarkedBonusDamage(target, adjustedDamage);
                 adjustedDamage = TeamHQBonus.ApplyAttack(teammate, adjustedDamage); // v1.1.11: Team HQ Armory, before the HP cap.
                 long actualDamage = Math.Min(adjustedDamage, target.HP);
                 target.HP -= actualDamage;
@@ -23504,7 +23522,7 @@ public partial class CombatEngine
                 actualDamage = Math.Max(1, actualDamage - defense);
             }
 
-            // Marked target takes 30% bonus damage. Player report: Shield Bash (and
+            // Marked target takes bonus damage (30%, or what a Sage mark set). Player report: Shield Bash (and
             // every other single-target class ability) skipped the Marked bonus
             // because this path applies damage directly to monster.HP instead of
             // routing through ApplySingleMonsterDamage. Basic attacks honor Marked
@@ -23512,7 +23530,7 @@ public partial class CombatEngine
             // single-target ability path was the only damage path that didn't.
             if (monster.IsMarked)
             {
-                long markedBonus = (long)(actualDamage * 0.3);
+                long markedBonus = MarkedBonusDamage(monster, actualDamage);
                 actualDamage += markedBonus;
                 terminal.SetColor("bright_red");
                 terminal.WriteLine(Loc.Get("combat.marked_bonus", markedBonus));

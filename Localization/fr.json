@@ -6169,6 +6169,7 @@
   "combat.sage_unveil_cast": "Le schéma de la ligne ennemie est mis à nu !",
   "combat.sage_control_resist": "{0} s'en débarrasse !",
   "combat.sage_marked": "{0} est marqué ! (+30 % de dégâts de chaque allié, {1} tours)",
+  "combat.sage_marked_library": "{0} est marqué, et l'étude à la Bibliothèque affine la marque ! (+{2} % de dégâts de chaque allié, {1} tours)",
   "combat.sage_slumber_boss_immune": "{0} est trop puissant pour être endormi !",
   "combat.sage_slumber_broken": "La douleur réveille {0} en sursaut !",
   "combat.sage_compel_old_god": "{0} se tient au-delà de toute volonté mortelle !",

@@ -6177,6 +6177,7 @@
   "combat.sage_unveil_cast": "Az ellenséges sor mintázata feltárul!",
   "combat.sage_control_resist": "{0} lerázza magáról!",
   "combat.sage_marked": "{0} megjelölve! (+30% sebzés minden szövetségestől, {1} kör)",
+  "combat.sage_marked_library": "{0} megjelölve, és a könyvtári tanulás élesíti a jelet! (+{2}% sebzés minden szövetségestől, {1} kör)",
   "combat.sage_slumber_boss_immune": "{0} túl hatalmas ahhoz, hogy álomba merüljön!",
   "combat.sage_slumber_broken": "A fájdalom felriasztja {0} álmából!",
   "combat.sage_compel_old_god": "{0} minden halandó akaraton felül áll!",

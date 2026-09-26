@@ -336,37 +336,152 @@ public class SageCompanion1115Tests
         finally { StoryProgressionSystem.Instance.CollectedSeals.Clear(); }
     }
 
-    [Fact]
-    public void TheLibrary_DoublesAWardsRounds()
+    /// <summary>An engine whose printed text can be read back.</summary>
+    private static (CombatEngine engine, MemoryStream output) MarkEngine(Character player)
     {
-        var (engine, sage, ally, result) = PlayerSage(0);
-        GiveLibrary(sage);
-        engine.ApplySagePartyWard(sage, Ward(100, 4, "shadow"), result);
-        ally.ActiveStatuses[StatusEffect.Blessed].Should().Be(8);
-        ally.ActiveStatuses[StatusEffect.Blur].Should().Be(8);
+        var output = new MemoryStream();
+        var engine = new CombatEngine(new TerminalEmulator(new MemoryStream(), output));
+        typeof(CombatEngine).GetField("random", F)!.SetValue(engine, new Random(7));
+        typeof(CombatEngine).GetField("currentPlayer", F)!.SetValue(engine, player);
+        typeof(CombatEngine).GetField("currentTeammates", F)!.SetValue(engine, new List<Character>());
+        return (engine, output);
+    }
 
-        var (engine2, sage2, ally2, result2) = PlayerSage(0);
-        engine2.ApplySagePartyWard(sage2, Ward(100, 4, "shadow"), result2);
-        ally2.ActiveStatuses[StatusEffect.Blessed].Should().Be(4, "no Library visit, no longer ward");
+    private static string Printed(CombatEngine engine, MemoryStream output)
+    {
+        var term = (TerminalEmulator)typeof(CombatEngine).GetField("terminal", F)!.GetValue(engine)!;
+        term.StreamWriterInternal?.Flush();
+        return System.Text.RegularExpressions.Regex.Replace(System.Text.Encoding.UTF8.GetString(output.ToArray()), "\u001b\\[[0-9;]*[A-Za-z]", "");
+    }
 
-        CombatEngine.SageLibraryWardDuration(sage, 999).Should().Be(999, "a whole-fight ward stays a whole-fight ward");
+    private static void Mark(CombatEngine engine, Monster m, string effect, Character caster) =>
+        typeof(CombatEngine).GetMethod("HandleSpecialSpellEffectOnMonster", F)!
+            .Invoke(engine, new object[] { m, effect, effect == "scholars_mark" ? 3 : 2, caster, 0L, new CombatResult { Player = caster } });
+
+    /// <summary>One hit of 1000 on the monster through the shared damage path; the damage it took.</summary>
+    private static long HitFor1000(CombatEngine engine, Monster m, Character player)
+    {
+        m.ArmPow = 0;
+        long before = m.HP;
+        ((Task<bool>)typeof(CombatEngine).GetMethod("ApplySingleMonsterDamage", F)!
+            .Invoke(engine, new object?[] { m, 1000L, new CombatResult { Player = player }, "attack", null, false })!).GetAwaiter().GetResult();
+        return before - m.HP;
     }
 
     [Fact]
-    public void TheLibrary_DoesNotLengthenAHold()
+    public void TheLibrary_SharpensScholarsMark_To45Percent()
     {
-        var (engine, sage, _, result) = PlayerSage(0);
+        var sage = Sage(60);
         GiveLibrary(sage);
+        var (engine, output) = MarkEngine(sage);
+        var ogre = Ogre(45);
+        Mark(engine, ogre, "scholars_mark", sage);
+        ogre.IsMarked.Should().BeTrue();
+        ogre.MarkedBonusPercent.Should().Be(45);
+        HitFor1000(engine, ogre, sage).Should().Be(1450, "a Library-sharpened mark adds 45%");
+        Printed(engine, output).Should().Contain("Library study sharpens it", "the sharper mark says so when it lands");
+    }
+
+    [Fact]
+    public void WithoutTheLibrary_ScholarsMarkStaysAt30Percent()
+    {
+        var sage = Sage(60);
+        var (engine, output) = MarkEngine(sage);
+        var ogre = Ogre(45);
+        Mark(engine, ogre, "scholars_mark", sage);
+        ogre.IsMarked.Should().BeTrue();
+        HitFor1000(engine, ogre, sage).Should().Be(1300, "no Library visit, the usual 30%");
+        Printed(engine, output).Should().NotContain("Library study sharpens it");
+    }
+
+    [Fact]
+    public void TheSharperMark_IsFixedAtCast()
+    {
+        var sage = Sage(60);
+        GiveLibrary(sage);
+        var (engine, _) = MarkEngine(sage);
+        var ogre = Ogre(45);
+        Mark(engine, ogre, "scholars_mark", sage);
+        sage.SettlementBuffCombats = 0;   // the Library buff runs out while the mark is up
+        sage.HasSettlementBuff.Should().BeFalse();
+        HitFor1000(engine, ogre, sage).Should().Be(1450, "the mark keeps the percent it was cast with");
+    }
+
+    [Fact]
+    public void TheLibrary_SharpensUnveilThePattern_Too()
+    {
+        var sage = Sage(60);
+        GiveLibrary(sage);
+        var (engine, _) = MarkEngine(sage);
+        var ogre = Ogre(45);
+        Mark(engine, ogre, "unveil_pattern", sage);
+        ogre.MarkedBonusPercent.Should().Be(45);
+        HitFor1000(engine, ogre, sage).Should().Be(1450);
+    }
+
+    [Fact]
+    public void ASageTeammate_MarksThroughTheSamePath()
+    {
+        var leader = Ally("Leader", CharacterClass.Ranger);
+        var (engine, _) = MarkEngine(leader);
+        var teammate = Sage(60);
+        var plain = Ogre(45);
+        Mark(engine, plain, "scholars_mark", teammate);
+        HitFor1000(engine, plain, leader).Should().Be(1300, "a teammate without the Library buff marks for 30%");
+
+        GiveLibrary(teammate);
+        var sharp = Ogre(45);
+        Mark(engine, sharp, "scholars_mark", teammate);
+        HitFor1000(engine, sharp, leader).Should().Be(1450, "the buff is read from the caster, player or teammate");
+    }
+
+    [Fact]
+    public void TheLibrary_LeavesMarkRoundsWardsAndHoldsAlone()
+    {
+        var sage = Sage(60);
+        GiveLibrary(sage);
+        var (engine, _) = MarkEngine(sage);
+        var ogre = Ogre(45);
+        Mark(engine, ogre, "scholars_mark", sage);
+        ogre.MarkedDuration.Should().Be(3, "the Library changes the percent, not the rounds");
+
+        var (wardEngine, wardSage, ally, result) = PlayerSage(0);
+        GiveLibrary(wardSage);
+        wardEngine.ApplySagePartyWard(wardSage, Ward(100, 4, "shadow"), result);
+        ally.ActiveStatuses[StatusEffect.Blessed].Should().Be(4, "the Library no longer touches a ward");
+        ally.ActiveStatuses[StatusEffect.Blur].Should().Be(4);
+
         var brute = Ogre(45);
         typeof(CombatEngine).GetMethod("HandleSpecialSpellEffectOnMonster", F)!
-            .Invoke(engine, new object[] { brute, "freeze", 2, sage, 0L, result });
+            .Invoke(wardEngine, new object[] { brute, "freeze", 2, wardSage, 0L, result });
         brute.IsFrozen.Should().BeTrue();
-        brute.FrozenDuration.Should().Be(2, "the Library lengthens wards, never a hold");
+        brute.FrozenDuration.Should().Be(2, "never a hold");
+    }
 
-        var pack = Ogre(45);
-        typeof(CombatEngine).GetMethod("HandleSpecialSpellEffectOnMonster", F)!
-            .Invoke(engine, new object[] { pack, "slumber_mist", 2, sage, 0L, result });
-        pack.SleepDuration.Should().Be(2);
+    [Fact]
+    public void AnEndedMark_ForgetsItsPercent()
+    {
+        var sage = Sage(60);
+        GiveLibrary(sage);
+        var (engine, _) = MarkEngine(sage);
+        var ogre = Ogre(45);
+        Mark(engine, ogre, "scholars_mark", sage);
+        ogre.MarkedDuration = 1;
+        ogre.StatusTickedThisRound = false;
+        ((Task)typeof(CombatEngine).GetMethod("ProcessMonsterAction", F)!
+            .Invoke(engine, new object?[] { ogre, sage, new CombatResult { Player = sage }, null })!).GetAwaiter().GetResult();
+        ogre.IsMarked.Should().BeFalse();
+        ogre.MarkedBonusPercent.Should().Be(0, "a later plain mark must not inherit 45%");
+        ogre.IsMarked = true; ogre.MarkedDuration = 3;   // another class's mark sets no percent
+        HitFor1000(engine, ogre, sage).Should().Be(1300);
+    }
+
+    [Fact]
+    public void TheSharperMarkLine_IsInEveryLanguage()
+    {
+        string dir = Path.Combine(Leftovers1114BTests.RepoRoot(), "Localization");
+        foreach (var lang in new[] { "en", "es", "fr", "hu", "it" })
+            File.ReadAllText(Path.Combine(dir, lang + ".json")).Should().Contain("\"combat.sage_marked_library\":", lang);
     }
 
     [Fact]
