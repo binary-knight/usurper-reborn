@@ -19052,14 +19052,17 @@ public partial class CombatEngine
             {
                 terminal.WriteLine(Loc.Get("combat.teammate_casts_party", teammate.DisplayName, healSpell.DisplayName));
 
-                // Heal the player
-                long oldPlayerHP = currentPlayer.HP;
-                currentPlayer.HP = Math.Min(currentPlayer.MaxHP, currentPlayer.HP + spellResult.Healing);
-                long playerHeal = currentPlayer.HP - oldPlayerHP;
-                if (playerHeal > 0)
+                // Heal the player (v1.1.15: skip a fallen player, matching WardPartyFromHeal below)
+                if (currentPlayer.IsAlive)
                 {
-                    terminal.SetColor("bright_green");
-                    terminal.WriteLine(Loc.Get("combat.you_recover_hp", playerHeal));
+                    long oldPlayerHP = currentPlayer.HP;
+                    currentPlayer.HP = Math.Min(currentPlayer.MaxHP, currentPlayer.HP + spellResult.Healing);
+                    long playerHeal = currentPlayer.HP - oldPlayerHP;
+                    if (playerHeal > 0)
+                    {
+                        terminal.SetColor("bright_green");
+                        terminal.WriteLine(Loc.Get("combat.you_recover_hp", playerHeal));
+                    }
                 }
 
                 // Heal the caster themselves
@@ -19121,6 +19124,11 @@ public partial class CombatEngine
                 {
                     CompanionSystem.Instance.SyncCompanionHP(target);
                 }
+
+                // v1.1.15: a single-target heal that carries a ward (Power Hat) wards the target too,
+                // the same as the player's own single-target cast (ApplyHealTo).
+                if (spellResult.ProtectionBonus > 0)
+                    WardAlly(target, spellResult.ProtectionBonus, spellResult.Duration > 0 ? spellResult.Duration : 999);
 
                 result.CombatLog.Add($"{teammate.DisplayName} heals {target.DisplayName} for {actualHeal} HP.");
             }
