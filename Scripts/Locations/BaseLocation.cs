@@ -4196,6 +4196,12 @@ public abstract class BaseLocation
     internal static string MainStreetLayoutName(bool classic) =>
         Loc.Get(classic ? "prefs.main_street_classic" : "prefs.main_street_districts");
 
+    /// <summary>
+    /// v1.1.15: the "menu keys need Enter" setting only changes single-player in a local console;
+    /// online, MUD and door play always read a line, so the entry is hidden there.
+    /// </summary>
+    internal static bool MenuKeysSettingShown => !UsurperRemake.BBS.DoorMode.ShouldUseAnsiOutput && !UsurperRemake.BBS.DoorMode.IsMudServerMode;
+
     protected virtual async Task ShowPreferencesMenu()
     {
         bool exitPrefs = false;
@@ -4233,6 +4239,8 @@ public abstract class BaseLocation
                 terminal.WriteLine($"  {Loc.Get("prefs.auto_equip")}: {(currentPlayer.AutoEquipDisabled ? Loc.Get("prefs.disabled") : Loc.Get("prefs.enabled"))}");
                 terminal.WriteLine($"  {Loc.Get("prefs.auto_combat_heal")}: {currentPlayer.AutoCombatHealPercent}%"); // v1.1.13: heal threshold
                 terminal.WriteLine($"  {Loc.Get("prefs.main_street_layout")}: {MainStreetLayoutName(currentPlayer.ClassicMainStreet)}"); // v1.1.14
+                if (MenuKeysSettingShown)
+                    terminal.WriteLine($"  {Loc.Get("prefs.menu_keys_need_enter")}: {(currentPlayer.MenuKeysNeedEnter ? Loc.Get("prefs.enabled") : Loc.Get("prefs.disabled"))}"); // v1.1.15
                 terminal.WriteLine("");
 
                 string srDateFormat = currentPlayer.DateFormatPreference switch { 1 => "DD/MM/YYYY", 2 => "YYYY-MM-DD", _ => "MM/DD/YYYY" };
@@ -4255,6 +4263,8 @@ public abstract class BaseLocation
                 terminal.WriteLine($"  M. {Loc.Get("prefs.toggle", Loc.Get("prefs.dungeon_automap"))}");
                 terminal.WriteLine($"  D. {Loc.Get("base.prefs_date_format")} ({srDateFormat})");
                 terminal.WriteLine($"  S. {Loc.Get("prefs.main_street_layout")} ({MainStreetLayoutName(currentPlayer.ClassicMainStreet)})"); // v1.1.14
+                if (MenuKeysSettingShown)
+                    terminal.WriteLine($"  E. {Loc.Get("prefs.toggle", Loc.Get("prefs.menu_keys_need_enter"))}"); // v1.1.15
                 if (IsRunningInWezTerm())
                     terminal.WriteLine($"  7. {Loc.Get("prefs.terminal_font")}");
                 terminal.WriteLine(Loc.Get("base.prefs_accessibility"));
@@ -4330,6 +4340,8 @@ public abstract class BaseLocation
                     WriteMenuOption("M", $"{Loc.Get("prefs.dungeon_automap")}: {onOff(currentPlayer.DungeonAutoMap)}");
                 WriteMenuOption("D", $"{Loc.Get("base.prefs_date_format")}: {dateFormatName}");
                 WriteMenuOption("S", $"{Loc.Get("prefs.main_street_layout")}: {MainStreetLayoutName(currentPlayer.ClassicMainStreet)}"); // v1.1.14
+                if (MenuKeysSettingShown)
+                    WriteMenuOption("E", $"{Loc.Get("prefs.menu_keys_need_enter")}: {onOff(currentPlayer.MenuKeysNeedEnter)}"); // v1.1.15
                 if (IsRunningInWezTerm())
                     WriteMenuOption("7", $"{Loc.Get("prefs.terminal_font")}: {ReadCurrentFont()}");
                 terminal.WriteLine("");
@@ -4487,6 +4499,15 @@ public abstract class BaseLocation
                     // v1.1.14: Main Street layout, the districts (default) or the classic pre-1.1.13 menu
                     currentPlayer.ClassicMainStreet = !currentPlayer.ClassicMainStreet;
                     terminal.WriteLine(Loc.Get("base.pref_main_street_layout_set", MainStreetLayoutName(currentPlayer.ClassicMainStreet)), "green");
+                    await GameEngine.Instance.SaveCurrentGame();
+                    await Task.Delay(800);
+                    break;
+
+                case "E" when MenuKeysSettingShown:
+                    // v1.1.15: single-player console menus wait for Enter (default) or act on one key
+                    currentPlayer.MenuKeysNeedEnter = !currentPlayer.MenuKeysNeedEnter;
+                    GameConfig.MenuKeysNeedEnter = currentPlayer.MenuKeysNeedEnter;
+                    terminal.WriteLine(Loc.Get("base.pref_menu_keys_need_enter_set", Loc.Get(currentPlayer.MenuKeysNeedEnter ? "prefs.on" : "prefs.off")), "green");
                     await GameEngine.Instance.SaveCurrentGame();
                     await Task.Delay(800);
                     break;
