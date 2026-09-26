@@ -6175,6 +6175,7 @@
   "combat.sage_compel": "¡{0} se ve obligado a volverse contra {1}!",
   "combat.ward_stronger_holds": "{0} conserva una protección más fuerte.",
   "combat.sage_ocean_memory_ally": "Los hechizos de {0} ahora cuestan la mitad de maná.",
+  "combat.sage_seal_ward": "El conocimiento de los sellos de {0} refuerza la protección (+{1}%).",
   "combat.pvp_party_spell_no_effect": "El hechizo actúa a través de los aliados, y en un duelo no hay ninguno. No ocurre nada.",
   "combat.pvp_blinded_miss": "¡{0} golpea a ciegas y falla!",
   "combat.spell_web": "¡{0} está enredado en telarañas pegajosas!",

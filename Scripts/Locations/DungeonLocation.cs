@@ -10909,6 +10909,7 @@ public class DungeonLocation : BaseLocation
         var disabledSpells = isCompanion
             ? companion!.DisabledSpells
             : new HashSet<string>(owner.TeammateDisabledSpells.TryGetValue(key, out var savedS) ? savedS : new List<string>());
+        SpellSystem.RemapLegacySageDisabledSpells(teammate, disabledSpells); // v1.1.15: renamed Sage spells show under their new names
 
         var abilities = ClassAbilitySystem.GetAvailableAbilities(teammate) ?? new();
         var spells = SpellSystem.GetAllSpellsForClass(teammate.Class)

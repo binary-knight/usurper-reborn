@@ -6175,6 +6175,7 @@
   "combat.sage_compel": "{0} est contraint de se retourner contre {1} !",
   "combat.ward_stronger_holds": "{0} garde une protection plus forte.",
   "combat.sage_ocean_memory_ally": "Les sorts de {0} coûtent désormais moitié moins de mana.",
+  "combat.sage_seal_ward": "La connaissance des sceaux de {0} renforce la protection (+{1} %).",
   "combat.pvp_party_spell_no_effect": "Le sort agit par les alliés, et un duel n'en a aucun. Rien ne se passe.",
   "combat.pvp_blinded_miss": "{0} frappe à l'aveugle et manque !",
   "combat.spell_web": "{0} est pris(e) dans des toiles collantes!",
