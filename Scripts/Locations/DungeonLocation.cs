@@ -2759,6 +2759,8 @@ public class DungeonLocation : BaseLocation
             row1.Add(("D", "bright_yellow", Loc.Get("dungeon.bbs_descend")));
         if ((room.IsCleared || !room.HasMonsters) && !hasCampedThisFloor)
             row1.Add(("R", "bright_yellow", Loc.Get("dungeon.bbs_camp")));
+        if (player.WillowDraughts > 0)
+            row1.Add(("U", "bright_yellow", Loc.Get("dungeon.bbs_willow", player.WillowDraughts)));
 
         if (row1.Count > 0)
             ShowBBSMenuRow(row1.ToArray());
@@ -3169,6 +3171,8 @@ public class DungeonLocation : BaseLocation
             WriteSRMenuOption("P", Loc.Get("dungeon.potions"));
             if (currentPlayer.TotalHerbCount > 0)
                 WriteSRMenuOption("J", Loc.Get("dungeon.herbs", currentPlayer.TotalHerbCount.ToString()));
+            if (currentPlayer.WillowDraughts > 0)
+                WriteSRMenuOption("U", Loc.Get("dungeon.willow", currentPlayer.WillowDraughts.ToString()));
             if (teammates.Count > 0)
                 WriteSRMenuOption("Y", Loc.Get("dungeon.party"));
             WriteSRMenuOption("%", Loc.Get("dungeon.status"));
@@ -3302,6 +3306,18 @@ public class DungeonLocation : BaseLocation
             terminal.Write("] ");
             terminal.SetColor("bright_green");
             terminal.Write($"{Loc.Get("dungeon.herbs", currentPlayer.TotalHerbCount.ToString())}  ");
+        }
+
+        if (currentPlayer.WillowDraughts > 0)
+        {
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("U");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            terminal.SetColor("bright_cyan");
+            terminal.Write($"{Loc.Get("dungeon.willow", currentPlayer.WillowDraughts.ToString())}  ");
         }
 
         if (teammates.Count > 0)
@@ -4672,6 +4688,11 @@ public class DungeonLocation : BaseLocation
 
             case "J":
                 await HomeLocation.UseHerbMenu(currentPlayer, terminal);
+                RequestRedisplay();
+                return false;
+
+            case "U":
+                await DrinkWillowDraught();
                 RequestRedisplay();
                 return false;
 
@@ -6052,6 +6073,31 @@ public class DungeonLocation : BaseLocation
     {
         terminal.WriteLine($"  {Loc.Get(key)}", "gray");
         await Task.Delay(800);
+    }
+
+    /// <summary>
+    /// v1.1.15: drink a Willow Draught bought at the Healer, room key U. None carried, or Mental
+    /// already at the cap, says so and keeps the draught; otherwise MentalSystem.DrinkWillowDraught.
+    /// </summary>
+    private async Task DrinkWillowDraught()
+    {
+        var player = currentPlayer;
+        if (player == null) return;
+        if (player.WillowDraughts <= 0)
+        {
+            await ExplainNoAction("dungeon.no_willow");
+            return;
+        }
+        if (player.Mental >= MentalSystem.GetCap(player))
+        {
+            await ExplainNoAction("dungeon.willow_at_cap");
+            return;
+        }
+        int mentalBefore = player.Mental;
+        int applied = MentalSystem.DrinkWillowDraught(player);
+        terminal.WriteLine($"  {Loc.Get("dungeon.willow_drink", player.WillowDraughts)}", "bright_cyan");
+        MentalUi.ReportGain(terminal, player, mentalBefore, applied);
+        await terminal.PressAnyKey();
     }
 
     private async Task RunRoomEvent(DungeonRoom room)

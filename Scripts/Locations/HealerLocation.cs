@@ -170,7 +170,8 @@ public class HealerLocation : BaseLocation
         // Menu rows
         ShowBBSMenuRow(("H", "bright_yellow", Loc.Get("healer.heal")), ("F", "bright_yellow", Loc.Get("healer.full_heal")), ("B", "bright_yellow", Loc.Get("healer.buy_potions")), ("M", "bright_yellow", Loc.Get("healer.mana_potions")));
         ShowBBSMenuRow(("P", "bright_yellow", Loc.Get("healer.cure_poison")), ("C", "bright_yellow", Loc.Get("healer.cure_disease")), ("D", "bright_yellow", Loc.Get("healer.decurse")), ("N", "bright_yellow", Loc.Get("healer.buy_antidotes")));
-        ShowBBSMenuRow(("A", "bright_yellow", Loc.Get("healer.addiction")), ("S", "bright_yellow", Loc.Get("healer.status")), ("R", "bright_yellow", Loc.Get("healer.return")));
+        ShowBBSMenuRow(("A", "bright_yellow", Loc.Get("healer.addiction")), ("T", "bright_yellow", Loc.Get("healer.therapy")), ("W", "bright_yellow", Loc.Get("healer.willow")));
+        ShowBBSMenuRow(("S", "bright_yellow", Loc.Get("healer.status")), ("R", "bright_yellow", Loc.Get("healer.return")));
         ShowBBSFooter();
     }
 
@@ -207,6 +208,8 @@ public class HealerLocation : BaseLocation
         WriteSRMenuOption("D", Loc.Get("healer.decurse"));
         WriteSRMenuOption("N", Loc.Get("healer.buy_antidotes"));
         WriteSRMenuOption("A", Loc.Get("healer.addiction"));
+        WriteSRMenuOption("T", Loc.Get("healer.therapy"));
+        WriteSRMenuOption("W", Loc.Get("healer.willow"));
         WriteSRMenuOption("S", Loc.Get("healer.status"));
         WriteSRMenuOption("R", Loc.Get("healer.return"));
         terminal.WriteLine("");
@@ -252,6 +255,12 @@ public class HealerLocation : BaseLocation
             case "A":
                 await CureAddiction();
                 return false; // Stay in location
+            case "T":
+                await TalkTherapy();
+                return false;
+            case "W":
+                await BuyWillowDraught();
+                return false;
             case "R":
                 await NavigateToLocation(GameLocation.MainStreet);
                 return true; // Exit location (navigating away)
@@ -400,6 +409,25 @@ public class HealerLocation : BaseLocation
         terminal.SetColor("darkgray");
         terminal.Write("[");
         terminal.SetColor("bright_yellow");
+        terminal.Write("T");
+        terminal.SetColor("darkgray");
+        terminal.Write("]");
+        terminal.SetColor("white");
+        terminal.Write(Loc.Get("healer.menu_therapy_suffix"));
+
+        terminal.SetColor("darkgray");
+        terminal.Write("[");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("W");
+        terminal.SetColor("darkgray");
+        terminal.Write("]");
+        terminal.SetColor("white");
+        terminal.WriteLine(Loc.Get("healer.menu_willow_suffix"));
+
+        // Row 4 - Status & Navigation
+        terminal.SetColor("darkgray");
+        terminal.Write(" [");
+        terminal.SetColor("bright_yellow");
         terminal.Write("S");
         terminal.SetColor("darkgray");
         terminal.Write("]");
@@ -452,6 +480,8 @@ public class HealerLocation : BaseLocation
         terminal.WriteLine(Loc.Get("healer.menu_decurse", $"{CalculateDiseaseCost(CursedItemBaseCost, player.Level):N0}"));
         long rehabCost = GameConfig.RehabBaseCost + (player.Addict * GameConfig.RehabPerAddictionCost);
         terminal.WriteLine(Loc.Get("healer.menu_addiction", $"{rehabCost:N0}"));
+        terminal.WriteLine(Loc.Get("healer.menu_therapy", $"{MentalSystem.TherapyCost(player):N0}"));
+        terminal.WriteLine(Loc.Get("healer.menu_willow", $"{CityControlSystem.CalculateHealingTaxedPrice(MentalSystem.WillowDraughtPrice(player.Level)).total:N0}", GameConfig.MentalWillowDraughtGain, GameConfig.MaxWillowDraughts));
         terminal.WriteLine(Loc.Get("healer.menu_status"));
         terminal.WriteLine(Loc.Get("healer.menu_return"));
         terminal.WriteLine("");
@@ -1340,6 +1370,104 @@ public class HealerLocation : BaseLocation
     }
 
     /// <summary>
+    /// v1.1.15 talk therapy: restores Mental to the maximum, even above the addiction cap, and
+    /// clears the Broken affliction, for MentalSystem.TherapyCost gold (untaxed). Nothing to treat
+    /// charges nothing; short of gold is refused before the confirm.
+    /// </summary>
+    private async Task TalkTherapy()
+    {
+        var player = GetCurrentPlayer();
+        terminal.WriteLine("");
+
+        if (!MentalSystem.NeedsTherapy(player))
+        {
+            terminal.WriteLine(Loc.Get("healer.therapy_nothing", player.Name2, Manager), "cyan");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        long cost = MentalSystem.TherapyCost(player);
+        WriteSectionHeader(Loc.Get("healer.therapy_title"), "bright_magenta");
+        terminal.WriteLine("");
+        terminal.WriteLine(Loc.Get("healer.therapy_intro", Manager), "cyan");
+        terminal.WriteLine(Loc.Get("healer.therapy_quote", player.Mental, GameConfig.MaxMentalStability, $"{cost:N0}"), "white");
+        terminal.WriteLine("");
+
+        if (player.Gold < cost)
+        {
+            terminal.WriteLine(Loc.Get("healer.therapy_cant_afford", player.Name2), "red");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        if (!await terminal.AskYesNoAsync(Loc.Get("healer.therapy_confirm")))
+        {
+            terminal.WriteLine(Loc.Get("healer.door_open", player.Name2), "cyan");
+            await Task.Delay(1000);
+            return;
+        }
+
+        player.Gold -= cost;
+        player.Statistics.RecordGoldSpent(cost);
+        bool wasBroken = player.MentalBroken;
+        int mentalBefore = player.Mental;
+        int restored = MentalSystem.RestoreFull(player);
+
+        terminal.WriteLine("");
+        terminal.WriteLine(Loc.Get("healer.therapy_session", Manager), "gray");
+        MentalUi.ReportGain(terminal, player, mentalBefore, restored);
+        if (wasBroken)
+            terminal.WriteLine(Loc.Get("mental.broken_cleared"), "bright_green");
+        terminal.WriteLine(Loc.Get("healer.cost_line", $"{cost:N0}"), "yellow");
+        await terminal.PressAnyKey();
+    }
+
+    /// <summary>
+    /// v1.1.15 Willow Draught: one per purchase at MentalSystem.WillowDraughtPrice (two healing
+    /// potions) with the healing tax, as BuyPotions charges; refused at GameConfig.MaxWillowDraughts.
+    /// Drunk in the dungeon for +MentalWillowDraughtGain Mental.
+    /// </summary>
+    private async Task BuyWillowDraught()
+    {
+        var player = GetCurrentPlayer();
+        terminal.WriteLine("");
+
+        if (player.WillowDraughts >= GameConfig.MaxWillowDraughts)
+        {
+            terminal.WriteLine(Loc.Get("healer.willow_max", GameConfig.MaxWillowDraughts), "red");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        long price = MentalSystem.WillowDraughtPrice(player.Level);
+        var (_, _, priceWithTax) = CityControlSystem.CalculateHealingTaxedPrice(price);
+        terminal.WriteLine(Loc.Get("healer.willow_desc", Manager, GameConfig.MentalWillowDraughtGain), "cyan");
+        terminal.WriteLine(Loc.Get("healer.willow_price", $"{priceWithTax:N0}", player.WillowDraughts, GameConfig.MaxWillowDraughts), "gray");
+
+        if (player.Gold < priceWithTax)
+        {
+            terminal.WriteLine(Loc.Get("healer.willow_cant_afford"), "red");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        CityControlSystem.Instance.DisplayTaxBreakdown(terminal, Loc.Get("healer.tax_willow"), price);
+
+        if (!await terminal.AskYesNoAsync(Loc.Get("healer.willow_confirm")))
+            return;
+
+        player.Gold -= priceWithTax;
+        player.Statistics.RecordPurchase(priceWithTax);
+        CityControlSystem.Instance.ProcessSaleTax(price);
+        player.WillowDraughts++;
+
+        terminal.WriteLine("");
+        terminal.WriteLine(Loc.Get("healer.willow_bought", player.WillowDraughts, GameConfig.MaxWillowDraughts), "green");
+        terminal.WriteLine(Loc.Get("healer.cost_line", $"{priceWithTax:N0}"), "yellow");
+        await terminal.PressAnyKey();
+    }
+
+    /// <summary>
     /// Addiction rehabilitation - cures addiction, clears tolerance, clears active drug
     /// </summary>
     private async Task CureAddiction()
@@ -1448,6 +1576,13 @@ public class HealerLocation : BaseLocation
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("healer.free_chains", player.Name2));
         terminal.WriteLine(Loc.Get("healer.stay_clean", Manager), "gray");
+
+        // v1.1.15: Addict is 0 above, so the addiction cap has lifted; rehab then eases the mind and clears a collapse
+        bool wasBrokenBeforeRehab = player.MentalBroken;
+        int mentalBeforeRehab = player.Mental;
+        MentalUi.ReportGain(terminal, player, mentalBeforeRehab, MentalSystem.ApplyRehab(player));
+        if (wasBrokenBeforeRehab)
+            terminal.WriteLine(Loc.Get("mental.broken_cleared"), "bright_green");
 
         await terminal.PressAnyKey();
     }

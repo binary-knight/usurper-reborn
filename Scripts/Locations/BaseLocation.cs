@@ -7487,6 +7487,11 @@ public abstract class BaseLocation
             string capSuffix = mentalCapText.Length > 0 ? $" ({mentalCapText})" : "";
             terminal.WriteLine($"{mentalVal}/{GameConfig.MaxMentalStability} ({mentalLabel}){capSuffix}");
         }
+        if (currentPlayer.WillowDraughts > 0)
+        {
+            terminal.SetColor("white");
+            terminal.WriteLine(Loc.Get("status.willow_draughts", currentPlayer.WillowDraughts, GameConfig.MaxWillowDraughts));
+        }
 
         // Afflictions (v1.1.15): shown from Shaken down, percentage read straight off
         // MentalSystem.GetCombatPenalty so it can never drift from the real combat effect.
