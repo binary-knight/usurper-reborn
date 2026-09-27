@@ -17,7 +17,7 @@ public enum MentalBand
 /// <summary>
 /// v1.1.15: once-a-day Mental recovery sources, saved on Character.MentalRecoveryUsedToday and
 /// cleared by MentalSystem.ApplyDailyReset. MentalSystem.TryDailyGain applies a source's gain and
-/// marks it; InnTable and InnFriend share one daily use.
+/// marks it; InnTable and InnFriend share one daily use. HomeSleep covers online home sleep only.
 /// </summary>
 [Flags]
 public enum MentalDailySource
@@ -33,6 +33,7 @@ public enum MentalDailySource
     Learning = 1 << 7,
     WitnessLoss = 1 << 8,
     HomeRest = 1 << 9,
+    HomeSleep = 1 << 10,      // online home sleep behind the reinforced door
 }
 
 /// <summary>
@@ -243,6 +244,17 @@ public static class MentalSystem
     public static bool IsFriend(Character player, Character npc) =>
         player != null && npc != null && !ReferenceEquals(player, npc)
         && RelationshipSystem.GetRelationshipStatus(player, npc) <= GameConfig.RelationFriendship;
+
+    /// <summary>
+    /// Partner time at Home counts for a spouse or a current lover (not friends with benefits or
+    /// exes): RomanceTracker.GetRelationType(npcId) is Spouse or Lover. Both share the Spouse bit.
+    /// </summary>
+    public static bool IsPartner(string? npcId)
+    {
+        if (string.IsNullOrEmpty(npcId)) return false;
+        var type = RomanceTracker.Instance.GetRelationType(npcId);
+        return type == RomanceRelationType.Spouse || type == RomanceRelationType.Lover;
+    }
 
     /// <summary>
     /// Inn table rest: MentalInnFriendGain when any NPC friend is present, else MentalInnTableGain.
