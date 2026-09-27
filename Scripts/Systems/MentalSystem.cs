@@ -165,13 +165,14 @@ public static class MentalSystem
     /// Monster fight end as one net change: the strain points (floor x MentalFightStrainPerFloor per
     /// mille, through the race x class multiplier and the companion cut) plus the flat losses, applied
     /// by a single Change. Floor 0 (outside the dungeon) adds no strain. Returns the change applied
-    /// (0 or negative). NPCs are skipped.
+    /// (0 or negative). NPCs are skipped. died adds MentalDeathLoss to the same change and drops
+    /// flee and near death (used for a grouped follower who died in the leader's fight).
     /// </summary>
-    public static int ApplyFightEnd(Character c, int floor, int storyCompanionsInParty, bool fled, bool nearDeath, bool boss, bool oldGod)
+    public static int ApplyFightEnd(Character c, int floor, int storyCompanionsInParty, bool fled, bool nearDeath, bool boss, bool oldGod, bool died = false)
     {
         if (c == null || c.IsNPC) return 0;
         int points = floor <= 0 ? 0 : TakeStrainPoints(c, floor * GameConfig.MentalFightStrainPerFloor, storyCompanionsInParty);
-        long loss = (long)points + GetFightEndFlatLoss(fled, nearDeath, boss, oldGod);
+        long loss = (long)points + (died ? GameConfig.MentalDeathLoss + GetFightEndFlatLoss(false, false, boss, oldGod) : GetFightEndFlatLoss(fled, nearDeath, boss, oldGod));
         if (loss <= 0) return 0;
         return Change(c, (int)-Math.Min(loss, int.MaxValue));
     }

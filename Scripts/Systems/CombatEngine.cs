@@ -2216,7 +2216,7 @@ public partial class CombatEngine
 
         // v1.1.15: Mental fight-end losses (strain, flee, near death, boss, Old God), one net change and
         // one announcement per player. Strain only in the dungeon, on the leader's floor.
-        int mentalFloor = player.Location == (int)GameLocation.Dungeons ? Math.Max(1, player.LastDungeonFloor) : 0;
+        int mentalFloor = MentalFightFloor(player);
         ApplyMentalFightEnd(result, mentalFloor, globalEscape, BossContext != null, terminal, mentalAtFightStart);
 
         // v0.60.3: GMCP Char.Combat.End — single return point for PlayerVsMonsters
@@ -20805,6 +20805,7 @@ public partial class CombatEngine
                     companion.CombatInputChannel.Writer.TryComplete();
                     companion.CombatInputChannel = null;
                 }
+                ApplyMentalFollowerDeath(companion, result);   // v1.1.15: before Mark hands the death to their session
                 UsurperRemake.Server.GroupFollowerDeath.Mark(companion, monster.Name); // v1.2: their own session resolves the death
                 companion.IsAwaitingCombatInput = false;
             }
@@ -20873,6 +20874,7 @@ public partial class CombatEngine
                 tm.CombatInputChannel = null;
             }
             tm.IsAwaitingCombatInput = false;
+            ApplyMentalFollowerDeath(tm, result);   // v1.1.15: before Mark hands the death to their session
             UsurperRemake.Server.GroupFollowerDeath.Mark(tm, killerName); // v1.2: their own session resolves the death
         }
         else
@@ -22219,11 +22221,45 @@ public partial class CombatEngine
         foreach (var mate in result.Teammates.ToList())
         {
             if (mate == null || !mate.IsGroupedPlayer || !mate.IsAlive || mate.IsNPC || ReferenceEquals(mate, leader)) continue;
+            if (result.MentalDeadFollowers.Contains(mate)) continue;   // took the death share already
             int before = mate.Mental;
             MentalSystem.ApplyFightEnd(mate, floor, companions, fled, MentalSystem.IsNearDeath(mate), boss, oldGod);
             if (mate.RemoteTerminal != null) MentalUi.AnnounceMentalChange(mate.RemoteTerminal, mate, before);
         }
     }
+
+    /// <summary>
+    /// v1.1.15: strain floor for a monster fight: the leader's dungeon floor (at least 1) in the
+    /// Dungeons, else 0 (no strain).
+    /// </summary>
+    internal static int MentalFightFloor(Character? leader) =>
+        leader != null && leader.Location == (int)GameLocation.Dungeons ? Math.Max(1, leader.LastDungeonFloor) : 0;
+
+    /// <summary>
+    /// v1.1.15: a grouped human follower died in the leader's monster fight. Same as a dead leader:
+    /// the death loss plus the fight's strain and boss or Old God loss, no flee or near death, as one
+    /// net change and one announcement on the follower's own terminal, once per fight. Runs on the
+    /// leader's combat thread at the death site, before GroupFollowerDeath.Mark hands the death to
+    /// the follower's session (resurrection, HP reset, save). NPC teammates, companions, echoes and
+    /// pets are skipped; PvP, arrest and exhibition fights are exempt.
+    /// </summary>
+    internal static void ApplyMentalFollowerDeath(CombatResult? result, Character? follower, int floor, bool oldGod)
+    {
+        var leader = result?.Player;
+        if (leader == null || follower == null || result!.Opponent != null || leader.IsArrestCombat || leader.IsExhibitionCombat) return;
+        if (!follower.IsGroupedPlayer || follower.IsNPC || ReferenceEquals(follower, leader)) return;
+        if (!result.MentalDeadFollowers.Add(follower)) return;
+
+        bool boss = result.Monsters?.Any(m => m != null && (m.IsBoss || m.IsMiniBoss)) == true;
+        oldGod |= result.Monsters?.Any(m => m != null && m.FamilyName == "OldGod") == true;
+        int companions = MentalSystem.CountStoryCompanions(result.Teammates);
+        int before = follower.Mental;
+        MentalSystem.ApplyFightEnd(follower, floor, companions, false, false, boss, oldGod, died: true);
+        if (follower.RemoteTerminal != null) MentalUi.AnnounceMentalChange(follower.RemoteTerminal, follower, before);
+    }
+
+    private void ApplyMentalFollowerDeath(Character follower, CombatResult result) =>
+        ApplyMentalFollowerDeath(result, follower, MentalFightFloor(result?.Player), BossContext != null);
 
     private async Task HandlePlayerDeath(CombatResult result)
     {
@@ -30340,6 +30376,7 @@ public partial class CombatEngine
                         tm.CombatInputChannel = null;
                     }
                     tm.IsAwaitingCombatInput = false;
+                    ApplyMentalFollowerDeath(tm, result);   // v1.1.15: before Mark hands the death to their session
                     UsurperRemake.Server.GroupFollowerDeath.Mark(tm, killerName); // v1.2: their own session resolves the death
                 }
                 else
@@ -31646,6 +31683,8 @@ public class CombatResult
     public bool PlayerActuallyDied { get; set; }
     // v1.1.15: the Mental death loss was already taken this fight (applied once)
     public bool MentalDeathApplied { get; set; }
+    // v1.1.15: grouped followers who already took their Mental death loss this fight (applied once each)
+    public HashSet<Character> MentalDeadFollowers { get; } = new HashSet<Character>(ReferenceEqualityComparer.Instance);
 }
 
 /// <summary>
