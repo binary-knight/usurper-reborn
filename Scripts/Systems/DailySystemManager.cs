@@ -789,14 +789,18 @@ public class DailySystemManager
         // Process drug effects
         try
         {
-            if (player != null && (player.OnDrugs || player.IsAddicted))
+            // v1.1.15: runs after MentalSystem.ApplyDailyReset, which keeps a pending high, so the
+            // crash comes off the high once; a boost pending without a drug crashes here too
+            if (player != null && (player.OnDrugs || player.IsAddicted || player.MentalDrugBoost > 0))
             {
+                int mentalBeforeDrugs = player.Mental;
                 string drugMessage = DrugSystem.ProcessDailyDrugEffects(player);
                 if (!string.IsNullOrEmpty(drugMessage) && terminal != null)
                 {
                     terminal.SetColor("bright_magenta");
                     terminal.WriteLine(drugMessage);
                 }
+                if (terminal != null) MentalUi.AnnounceMentalChange(terminal, player, mentalBeforeDrugs);
             }
         }
         catch { /* Drug system error */ }
@@ -936,14 +940,18 @@ public class DailySystemManager
         try
         {
             var drugPlayer = GameEngine.Instance?.CurrentPlayer;
-            if (drugPlayer != null && (drugPlayer.OnDrugs || drugPlayer.IsAddicted))
+            // v1.1.15: runs after MentalSystem.ApplyDailyReset, which keeps a pending high, so the
+            // crash comes off the high once; a boost pending without a drug crashes here too
+            if (drugPlayer != null && (drugPlayer.OnDrugs || drugPlayer.IsAddicted || drugPlayer.MentalDrugBoost > 0))
             {
+                int mentalBeforeDrugs = drugPlayer.Mental;
                 string drugMessage = DrugSystem.ProcessDailyDrugEffects(drugPlayer);
                 if (!string.IsNullOrEmpty(drugMessage) && terminal != null)
                 {
                     terminal.SetColor("bright_magenta");
                     terminal.WriteLine(drugMessage);
                 }
+                if (terminal != null) MentalUi.AnnounceMentalChange(terminal, drugPlayer, mentalBeforeDrugs);
             }
         }
         catch { /* Drug system error */ }

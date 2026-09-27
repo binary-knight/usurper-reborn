@@ -1701,7 +1701,17 @@ public static partial class GameConfig
     public const int MentalGriefDepressionLoss = 8;           // A grief entered the Depression stage
     public const int MentalGriefAcceptanceGain = 10;          // A grief reached Acceptance
     public const int MentalWitnessLoss = 3;                   // Witnessed a town NPC death or a world disaster, once a day (WitnessLoss)
-    public const int MentalSchemaCurrent = 1;                 // Current Mental save schema; below this, restore resets Mental to full and stamps this
+    // Drugs (piece 6): the high may pass the addiction cap (never MaxMentalStability) until the drug wears off
+    public const int MentalDrugHighGain = 8;                  // High on use
+    public const int MentalDrugHighStrongGain = 15;           // High for DarkEssence and DemonBlood
+    public const int MentalDrugToleranceWindowDays = 3;       // DEFAULT: a use within this many days of the last one counts toward tolerance
+    public const int MentalDrugHighStepPct = 25;              // DEFAULT: each counted use after the first shrinks the high by this percent
+    public const int MentalDrugHighMinPct = 25;               // DEFAULT: the high never falls below this percent
+    public const int MentalDrugCrashBaseHalves = 4;           // DEFAULT: the crash is boost x (4 + CrashStepHalves x (uses - 1)) / 2, rounded half up
+    public const int MentalDrugCrashStepHalves = 1;           // DEFAULT: each counted use after the first adds half the boost to the crash
+    public const int MentalOverdoseLoss = 8;                  // Overdose when stacking drugs
+    public const int MentalWithdrawalLossPerSeverity = 3;     // Daily withdrawal loss per severity point (Addict / 25)
+    public const int MentalSchemaCurrent = 1;                // Current Mental save schema; below this, restore resets Mental to full and stamps this
     public const int MaxWillowDraughts = 3;                   // Healer Willow Draught: carryable cap
     // Session XP diminishing returns (v0.54.0) — online mode only
     // Threshold scales with level: max(100000, XP_for_next_level * 8) — allows ~8 full levels per session

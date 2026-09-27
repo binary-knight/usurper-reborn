@@ -2907,7 +2907,8 @@ public static class DrugSystem
                 long hpLoss = (long)(character.MaxHP * GameConfig.DrugOverdoseHPLoss);
                 character.HP = Math.Max(1, character.HP - hpLoss);
                 character.Addict = Math.Min(100, (int)(character.Addict * GameConfig.DrugOverdoseAddictionMultiplier) + 10);
-                return (false, $"OVERDOSE! The substances react violently! You lose {hpLoss} HP and your addiction worsens!");
+                MentalSystem.ApplyOverdose(character);   // v1.1.15: no high, not counted as a use
+                return (false, Loc.Get("drugs.overdose", hpLoss));
             }
             // No overdose — replace current drug
             character.ActiveDrug = DrugType.None;
@@ -2955,8 +2956,27 @@ public static class DrugSystem
             character.Addict = Math.Min(100, character.Addict + _random.Next(5, 15));
         }
 
-        return (true, $"You take the {drug}. You feel its effects coursing through you!");
+        // v1.1.15: the Mental high (may pass the addiction cap until the drug wears off)
+        MentalSystem.ApplyDrugHigh(character, drug, DailySystemManager.Instance.CurrentDay);
+
+        return (true, Loc.Get("drugs.taken", GetDrugName(drug)));
     }
+
+    /// <summary>v1.1.15: the drug's display name, the Drug Palace's localized names.</summary>
+    public static string GetDrugName(DrugType drug) => drug switch
+    {
+        DrugType.Steroids => Loc.Get("dark_alley.drug_name_steroids"),
+        DrugType.BerserkerRage => Loc.Get("dark_alley.drug_name_berserker"),
+        DrugType.Haste => Loc.Get("dark_alley.drug_name_haste"),
+        DrugType.QuickSilver => Loc.Get("dark_alley.drug_name_quicksilver"),
+        DrugType.ManaBoost => Loc.Get("dark_alley.drug_name_mana_boost"),
+        DrugType.ThirdEye => Loc.Get("dark_alley.drug_name_third_eye"),
+        DrugType.Ironhide => Loc.Get("dark_alley.drug_name_ironhide"),
+        DrugType.Stoneskin => Loc.Get("dark_alley.drug_name_stoneskin"),
+        DrugType.DarkEssence => Loc.Get("dark_alley.drug_name_dark_essence"),
+        DrugType.DemonBlood => Loc.Get("dark_alley.drug_name_demon_blood"),
+        _ => drug.ToString()
+    };
 
     /// <summary>
     /// Get stat bonuses from active drug
@@ -2996,17 +3016,25 @@ public static class DrugSystem
             {
                 // Check drug type BEFORE clearing it for crash effects
                 var expiringDrug = character.ActiveDrug;
-                messages.Add($"The effects of {expiringDrug} have worn off.");
+                messages.Add(Loc.Get("drugs.worn_off", GetDrugName(expiringDrug)));
 
                 // Crash effects for some drugs
                 if (expiringDrug == DrugType.DarkEssence)
                 {
                     character.HP = Math.Max(1, character.HP - character.MaxHP / 4);
-                    messages.Add("You crash hard from the Dark Essence. Your body aches.");
+                    messages.Add(Loc.Get("drugs.dark_essence_crash"));
                 }
 
                 character.ActiveDrug = DrugType.None;
             }
+        }
+
+        // v1.1.15: the Mental crash once no drug is active (the wear-off above, or a boost left
+        // pending), taken from the high the daily reset kept
+        if (!character.OnDrugs && character.MentalDrugBoost > 0)
+        {
+            MentalSystem.ApplyDrugCrash(character);
+            messages.Add(Loc.Get("drugs.mental_crash"));
         }
 
         // Reduce steroid duration
@@ -3023,14 +3051,15 @@ public static class DrugSystem
             // Stat penalties during withdrawal
             character.Strength = Math.Max(1, character.Strength - withdrawalSeverity);
             character.Agility = Math.Max(1, character.Agility - withdrawalSeverity);
+            MentalSystem.ApplyWithdrawal(character, withdrawalSeverity);   // v1.1.15
 
             if (withdrawalSeverity >= 2)
             {
-                messages.Add("Your hands shake... you crave your next fix.");
+                messages.Add(Loc.Get("drugs.withdrawal_shakes"));
             }
             if (withdrawalSeverity >= 3)
             {
-                messages.Add("The withdrawal is agonizing. Your body screams for drugs.");
+                messages.Add(Loc.Get("drugs.withdrawal_agony"));
             }
 
             // Slow addiction recovery if clean
