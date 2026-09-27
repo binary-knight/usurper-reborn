@@ -3433,55 +3433,79 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine("");
         }
 
+        // v1.1.15: visible column on the current line, tracked from each plain string actually
+        // written (not a guess), so the trailing tags below wrap correctly regardless of language,
+        // screen-reader mode (no bar) or stat width (HP/gold/XP digits).
+        int col = 0;
+
         // Health bar
         terminal.SetColor("white");
-        terminal.Write($"{Loc.Get("status.hp")}: ");
+        string hpLabel = $"{Loc.Get("status.hp")}: ";
+        terminal.Write(hpLabel);
+        col += hpLabel.Length;
         DrawBar(player.HP, player.MaxHP, 20, "red", "darkgray");
-        terminal.Write($" {player.HP}/{player.MaxHP}");
+        col += GameConfig.ScreenReaderMode ? 0 : 22; // "[" + 20 fill chars + "]"; DrawBar itself no-ops under screen reader
+        string hpValue = $" {player.HP}/{player.MaxHP}";
+        terminal.Write(hpValue);
+        col += hpValue.Length;
 
         terminal.Write("  ");
+        col += 2;
 
         // Potions
         terminal.SetColor("green");
-        terminal.Write($"{Loc.Get("status.potions")}: {player.Healing}/{player.MaxPotions}");
+        string potionsText = $"{Loc.Get("status.potions")}: {player.Healing}/{player.MaxPotions}";
+        terminal.Write(potionsText);
+        col += potionsText.Length;
 
         terminal.Write("  ");
+        col += 2;
 
         // Gold
         terminal.SetColor("yellow");
-        terminal.Write($"{Loc.Get("status.gold_label")}: {player.Gold:N0}");
+        string goldText = $"{Loc.Get("status.gold_label")}: {player.Gold:N0}";
+        terminal.Write(goldText);
+        col += goldText.Length;
 
         // v0.65.4: ambient XP progress -- makes every fight visibly count toward the next level,
         // the cheapest lever on the "one more fight before I log off" impulse (and the L1-3 stall).
         terminal.Write("  ");
+        col += 2;
         terminal.SetColor("bright_cyan");
-        if (player.Level < 100)
+        string xpText = player.Level < 100
+            ? Loc.Get("status.xp_compact", player.Level, player.Experience, GameConfig.GetExperienceForLevel(player.Level + 1))
+            : Loc.Get("status.xp_max", player.Level);
+        terminal.Write(xpText);
+        col += xpText.Length;
+
+        // v1.1.15: trailing tags (fatigue, mental, danger) each wrap to a new line whenever
+        // appending them (plus their "  " separator) would push the line past 80 visible columns.
+        // A tag that still would not fit alone at the start of a fresh line is written anyway
+        // (nothing shorter to fall back to); that has not happened with any current tag text.
+        void AppendTag(string text, string color)
         {
-            long nextXp = GameConfig.GetExperienceForLevel(player.Level + 1);
-            terminal.Write(Loc.Get("status.xp_compact", player.Level, player.Experience, nextXp));
-        }
-        else
-        {
-            terminal.Write(Loc.Get("status.xp_max", player.Level));
+            if (string.IsNullOrEmpty(text)) return;
+            int sep = col > 0 ? 2 : 0;
+            if (col > 0 && col + sep + text.Length > 80)
+            {
+                terminal.WriteLine("");
+                col = 0;
+                sep = 0;
+            }
+            if (sep > 0) terminal.Write("  ");
+            terminal.SetColor(color);
+            terminal.Write(text);
+            col += sep + text.Length;
         }
 
         // Fatigue indicator (only when Tired or Exhausted)
         var (fatigueLabel, fatigueColor) = player.GetFatigueTier();
         if (!string.IsNullOrEmpty(fatigueLabel) && fatigueLabel != "Well-Rested")
-        {
-            terminal.Write("  ");
-            terminal.SetColor(fatigueColor);
-            terminal.Write(fatigueLabel);
-        }
+            AppendTag(fatigueLabel, fatigueColor);
 
         // Mental band tag (v1.1.15), both modes; empty at Stable
         var (mentalTagLabel, mentalTagColor) = MentalUi.GetMentalTag(player);
-        if (!string.IsNullOrEmpty(mentalTagLabel))
-        {
-            terminal.Write("  ");
-            terminal.SetColor(mentalTagColor);
-            terminal.Write(mentalTagLabel);
-        }
+        AppendTag(mentalTagLabel, mentalTagColor);
 
         // v0.65.6 compact floor danger tag: persistent room-bar reminder whenever
         // the floor runs above the player's level (all floor-change paths -- entry,
@@ -3489,11 +3513,11 @@ public class DungeonLocation : BaseLocation
         int dangerGap = currentDungeonLevel - player.Level;
         if (dangerGap >= 1)
         {
-            terminal.Write("  ");
-            terminal.SetColor(dangerGap >= 6 ? "bright_red" : dangerGap >= 3 ? "red" : "yellow");
-            terminal.Write(Loc.Get(dangerGap >= 6 ? "dungeon.danger_tag_deadly"
+            string dangerColor = dangerGap >= 6 ? "bright_red" : dangerGap >= 3 ? "red" : "yellow";
+            string dangerText = Loc.Get(dangerGap >= 6 ? "dungeon.danger_tag_deadly"
                 : dangerGap >= 3 ? "dungeon.danger_tag_dangerous"
-                : "dungeon.danger_tag_risky", dangerGap));
+                : "dungeon.danger_tag_risky", dangerGap);
+            AppendTag(dangerText, dangerColor);
         }
 
         terminal.WriteLine("");
