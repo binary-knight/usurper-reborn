@@ -4745,6 +4745,50 @@ public class DungeonLocation : BaseLocation
     }
 
     /// <summary>
+    /// v1.1.15: the Mental band's room line for a new room (MentalSystem.PickRoomLine): an uneasy
+    /// line while Strained, a harmless hallucination while Shaken or worse. Rolled for the player and
+    /// for every living grouped human follower from their own Mental, printed as plain text on their
+    /// own terminal. Nothing changes; flavour only.
+    /// </summary>
+    internal void ShowRoomMindLines()
+    {
+        var player = GetCurrentPlayer();
+        if (player == null) return;
+        var key = MentalSystem.PickRoomLine(player, dungeonRandom);
+        if (key != null)
+        {
+            terminal.SetColor("magenta");
+            terminal.WriteLine(Loc.Get(key));
+        }
+        foreach (var mate in teammates.ToList())
+        {
+            if (mate == null || !mate.IsGroupedPlayer || !mate.IsAlive || mate.IsNPC || ReferenceEquals(mate, player) || mate.RemoteTerminal == null) continue;
+            var mateKey = MentalSystem.PickRoomLine(mate, dungeonRandom);
+            if (mateKey == null) continue;
+            mate.RemoteTerminal.SetColor("magenta");
+            mate.RemoteTerminal.WriteLine(Loc.Get(mateKey));
+        }
+    }
+
+    /// <summary>
+    /// v1.1.15: the Mental check before going deeper (the stairs, or a jump to a deeper floor).
+    /// Breaking asks two yes/no questions (AskYesNoAsync) and either no turns the player back.
+    /// Returns true when the descent may go ahead.
+    /// </summary>
+    internal async Task<bool> ConfirmMentalDescent(Character? player)
+    {
+        if (player == null) return true;
+        if (MentalSystem.GetDescentRule(player) != MentalDescent.AskTwice) return true;
+        terminal.WriteLine("");
+        if (await terminal.AskYesNoAsync(Loc.Get("mental.descend_confirm_1"))
+            && await terminal.AskYesNoAsync(Loc.Get("mental.descend_confirm_2")))
+            return true;
+        terminal.WriteLine(Loc.Get("mental.descend_turned_back"), "gray");
+        await Task.Delay(1000);
+        return false;
+    }
+
+    /// <summary>
     /// v1.1.15: Mental recovery for a dungeon rest (camp or Safe Haven), gain Mental up to the cap, on
     /// the player and on every living grouped human follower resting with them (NPC teammates and
     /// companions are skipped by MentalSystem). Rides the one-rest-per-floor limit the callers
@@ -4874,6 +4918,8 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("dungeon.you_enter_room", targetRoom.Name));
             // v1.1.15: Mental strain for a new room, both modes, leader and grouped followers
             ApplyRoomMentalStrain();
+            // v1.1.15: a band's room line (Strained uneasy, Shaken and worse hallucinations), each from their own Mental
+            ShowRoomMindLines();
             await Task.Delay(500);
 
             // Check for seal discovery on this floor
@@ -6978,6 +7024,10 @@ public class DungeonLocation : BaseLocation
             return;
         }
 
+        // v1.1.15: Mental at the stairs (Breaking asks twice)
+        if (!await ConfirmMentalDescent(player))
+            return;
+
         // v1.1.3 (council ruling 5): the floor guard. An ally eleven or more levels below the
         // player gets a warning and the offer of Cautious; nothing is switched silently.
         if (player != null)
@@ -7341,6 +7391,10 @@ public class DungeonLocation : BaseLocation
         if (targetLevel != currentDungeonLevel)
         {
             var player = GetCurrentPlayer();
+
+            // v1.1.15: Mental before a jump deeper (Breaking asks twice); going up is never asked
+            if (targetLevel > currentDungeonLevel && !await ConfirmMentalDescent(player))
+                return;
 
             // Save current floor state before leaving
             if (player != null)

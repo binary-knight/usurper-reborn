@@ -14,6 +14,13 @@ public enum MentalBand
     Broken      // 0
 }
 
+/// <summary>v1.1.15: what the stairs do for a character's Mental when they go deeper (MentalSystem.GetDescentRule).</summary>
+public enum MentalDescent
+{
+    Allowed,
+    AskTwice,   // Breaking: two yes/no questions, either no turns back
+}
+
 /// <summary>
 /// v1.1.15: once-a-day Mental recovery sources, saved on Character.MentalRecoveryUsedToday and
 /// cleared by MentalSystem.ApplyDailyReset. MentalSystem.TryDailyGain applies a source's gain and
@@ -453,8 +460,7 @@ public static class MentalSystem
     /// <summary>
     /// Combat penalty from Mental alone, as a positive fraction of damage and defence lost:
     /// 0 for Stable and Strained, 0.05 for Shaken, 0.10 for Breaking and Broken.
-    /// Taking the worse of this and Grief, and the -15% Mental plus Fatigue cap, belong to a later
-    /// piece (band effects), not here.
+    /// CombinePenalties takes the worse of this and Grief and applies the Mental plus Fatigue cap.
     /// </summary>
     public static float GetCombatPenalty(int mental) => GetBand(mental) switch
     {
@@ -462,4 +468,111 @@ public static class MentalSystem
         MentalBand.Breaking or MentalBand.Broken => GameConfig.MentalBreakingCombatPenalty,
         _ => 0f
     };
+
+    /// <summary>The Mental share of the combat penalty for a character: GetCombatPenalty of their Mental; NPCs 0.</summary>
+    public static float GetMentalPenalty(Character c) =>
+        c == null || c.IsNPC ? 0f : GetCombatPenalty(c.Mental);
+
+    /// <summary>
+    /// The Fatigue share of the combat penalty as a positive fraction: single-player only (0 online),
+    /// Tired and Exhausted from the existing Fatigue constants, damage or defence.
+    /// </summary>
+    public static float GetFatiguePenalty(Character c, bool online, bool defence)
+    {
+        if (c == null || online || c.Fatigue < GameConfig.FatigueTiredThreshold) return 0f;
+        bool exhausted = c.Fatigue >= GameConfig.FatigueExhaustedThreshold;
+        float signed = defence
+            ? (exhausted ? GameConfig.FatigueExhaustedDefensePenalty : GameConfig.FatigueTiredDefensePenalty)
+            : (exhausted ? GameConfig.FatigueExhaustedDamagePenalty : GameConfig.FatigueTiredDamagePenalty);
+        return Math.Abs(signed);
+    }
+
+    /// <summary>
+    /// The one combine rule for the mind and body penalties, all positive fractions lost. Grief and
+    /// Mental are never summed: the result is the worse of Grief plus Fatigue and Mental plus Fatigue.
+    /// When capMentalFatigue (single-player), Mental plus Fatigue stops at GameConfig.MentalFatigueCombatCap;
+    /// Grief plus Fatigue keeps its old uncapped size. Never below 0 or above 1.
+    /// </summary>
+    public static float CombinePenalties(float mental, float grief, float fatigue, bool capMentalFatigue)
+    {
+        mental = Math.Max(0f, mental);
+        grief = Math.Max(0f, grief);
+        fatigue = Math.Max(0f, fatigue);
+        float mentalAndFatigue = mental + fatigue;
+        if (capMentalFatigue) mentalAndFatigue = Math.Min(mentalAndFatigue, GameConfig.MentalFatigueCombatCap);
+        return Math.Clamp(Math.Max(grief + fatigue, mentalAndFatigue), 0f, 1f);
+    }
+
+    /// <summary>
+    /// The multiplier for a character's damage (or defence) from Grief, Mental and Fatigue together.
+    /// griefModifier is the signed Grief total the combat engine already reads (damage: Damage +
+    /// Combat + AllStat; defence: Defense + AllStat). A positive total is a bonus and is kept as
+    /// before; a negative total is the Grief penalty that CombinePenalties weighs against Mental.
+    /// Returns (1 + grief bonus) x (1 - combined penalty).
+    /// </summary>
+    public static float GetCombatMultiplier(Character c, float griefModifier, bool online, bool defence)
+    {
+        float griefBonus = Math.Max(0f, griefModifier);
+        float griefPenalty = Math.Max(0f, -griefModifier);
+        float total = CombinePenalties(GetMentalPenalty(c), griefPenalty, GetFatiguePenalty(c, online, defence), !online);
+        return (1f + griefBonus) * (1f - total);
+    }
+
+    /// <summary>Chance in percent of a harmless hallucination per new dungeon room: Shaken 4, Breaking and Broken 8, else 0.</summary>
+    public static int GetHallucinationChancePct(int mental) => GetBand(mental) switch
+    {
+        MentalBand.Shaken => GameConfig.MentalShakenHallucinationPct,
+        MentalBand.Breaking or MentalBand.Broken => GameConfig.MentalBreakingHallucinationPct,
+        _ => 0
+    };
+
+    /// <summary>Chance in percent of an uneasy room line (flavour only): Strained only.</summary>
+    public static int GetUneasyChancePct(int mental) =>
+        GetBand(mental) == MentalBand.Strained ? GameConfig.MentalStrainedUneasyPct : 0;
+
+    /// <summary>Chance in percent of fear at combat start (the first action is lost): Shaken 10, Breaking and Broken 20, else 0.</summary>
+    public static int GetFearChancePct(int mental) => GetBand(mental) switch
+    {
+        MentalBand.Shaken => GameConfig.MentalShakenFearPct,
+        MentalBand.Breaking or MentalBand.Broken => GameConfig.MentalBreakingFearPct,
+        _ => 0
+    };
+
+    /// <summary>Rolls fear at combat start for a human character: true with GetFearChancePct. NPCs never.</summary>
+    public static bool RollFear(Character c, Random rng)
+    {
+        if (c == null || c.IsNPC || rng == null) return false;
+        int pct = GetFearChancePct(c.Mental);
+        return pct > 0 && rng.Next(100) < pct;
+    }
+
+    /// <summary>The Loc key of a fear line from the pool, mental.fear_1 to mental.fear_N.</summary>
+    public static string PickFearLine(Random rng) =>
+        "mental.fear_" + (rng.Next(GameConfig.MentalFearLineCount) + 1);
+
+    /// <summary>
+    /// The Loc key of a room line for a new dungeon room, or null for none. Hallucinations roll
+    /// first (Shaken and worse), then the Strained uneasy line. Plain text for screen readers. NPCs none.
+    /// </summary>
+    public static string? PickRoomLine(Character c, Random rng)
+    {
+        if (c == null || c.IsNPC || rng == null) return null;
+        int hallucination = GetHallucinationChancePct(c.Mental);
+        if (hallucination > 0)
+            return rng.Next(100) < hallucination ? "mental.hallucination_" + (rng.Next(GameConfig.MentalHallucinationLineCount) + 1) : null;
+        int uneasy = GetUneasyChancePct(c.Mental);
+        if (uneasy > 0 && rng.Next(100) < uneasy)
+            return "mental.uneasy_" + (rng.Next(GameConfig.MentalUneasyLineCount) + 1);
+        return null;
+    }
+
+    /// <summary>
+    /// Going one or more floors deeper: Allowed, or AskTwice while Breaking (1 to 24; the stairs
+    /// ask two yes/no questions and either no turns the player back).
+    /// </summary>
+    public static MentalDescent GetDescentRule(Character c)
+    {
+        if (c == null || c.IsNPC) return MentalDescent.Allowed;
+        return GetBand(c.Mental) is MentalBand.Breaking or MentalBand.Broken ? MentalDescent.AskTwice : MentalDescent.Allowed;
+    }
 }

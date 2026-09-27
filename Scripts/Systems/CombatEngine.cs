@@ -475,6 +475,44 @@ public partial class CombatEngine
     // v1.1.10: the fighters whose turn has come this duel round. A hold put on one of them ticks once
     // at the end of this round before it can cost a turn (Codex round 7).
     private readonly HashSet<Character> _pvpTurnTakenThisRound = new();
+    // v1.1.15: the players (leader and grouped followers) whose Mental fear at combat start costs their first action
+    private readonly HashSet<Character> _mentalFeared = new();
+
+    /// <summary>
+    /// v1.1.15: rolls Mental fear at the start of a monster fight for the leader and every living
+    /// grouped human follower (MentalSystem.RollFear with the engine RNG); a feared player loses
+    /// their first action. NPC teammates, companions and pets never roll. PvP does not come here.
+    /// </summary>
+    internal void RollMentalFear(Character player, IEnumerable<Character>? teammates)
+    {
+        _mentalFeared.Clear();
+        if (MentalSystem.RollFear(player, random)) _mentalFeared.Add(player);
+        if (teammates == null) return;
+        foreach (var mate in teammates.ToList())
+            if (mate != null && mate.IsGroupedPlayer && mate.IsAlive && !ReferenceEquals(mate, player) && MentalSystem.RollFear(mate, random))
+                _mentalFeared.Add(mate);
+    }
+
+    /// <summary>
+    /// v1.1.15: true once for a player who rolled fear at combat start: prints a fear line on
+    /// their own terminal (and a third-person line on the leader's when a follower) and clears it,
+    /// so the caller skips that action. False for everyone else.
+    /// </summary>
+    internal bool ConsumeMentalFear(Character c, TerminalEmulator? own)
+    {
+        if (c == null || !_mentalFeared.Remove(c)) return false;
+        if (own != null)
+        {
+            own.SetColor("magenta");
+            own.WriteLine(Loc.Get(MentalSystem.PickFearLine(random)));
+        }
+        if (!ReferenceEquals(own, terminal) && terminal != null)
+        {
+            terminal.SetColor("magenta");
+            terminal.WriteLine(Loc.Get("mental.fear_other", c.DisplayName));
+        }
+        return true;
+    }
 
     /// <summary>v1.1.13: auto-combat drinks a potion at or below the player's HP threshold.</summary>
     internal static bool ShouldAutoCombatHeal(Character p) =>
@@ -1174,6 +1212,8 @@ public partial class CombatEngine
             terminal.SetColor(mentalTagColor);
             terminal.WriteLine(Loc.Get("combat.mental_tag", mentalTagLabel));
         }
+        // v1.1.15: Mental fear at combat start, the leader and grouped followers each from their own Mental
+        RollMentalFear(player, result.Teammates);
 
         // Show first combat hint for new players
         HintSystem.Instance.TryShowHint(HintSystem.HINT_FIRST_COMBAT, terminal, player.HintsShown);
@@ -1644,7 +1684,12 @@ public partial class CombatEngine
 
                 CombatAction playerAction;
 
-                if (autoCombat)
+                if (ConsumeMentalFear(player, terminal))
+                {
+                    // v1.1.15: Mental fear at combat start, the first action is lost
+                    playerAction = new CombatAction { Type = CombatActionType.None };
+                }
+                else if (autoCombat)
                 {
                     // Auto-combat: automatically attack random living monster
                     terminal.SetColor("bright_cyan");
@@ -3763,15 +3808,16 @@ public partial class CombatEngine
         }
 
         // Apply grief effects - grief stage can modify damage dealt
+        // v1.1.15: Grief, Mental and Fatigue in one multiplier (MentalSystem.CombinePenalties): the worse of
+        // Grief and Mental, never the sum, and Mental plus Fatigue capped in single-player.
         var griefEffects = GriefSystem.Instance.GetCurrentEffects();
+        float mindDamageMult = MentalSystem.GetCombatMultiplier(attacker,
+            griefEffects.DamageModifier + griefEffects.CombatModifier + griefEffects.AllStatModifier,
+            UsurperRemake.BBS.DoorMode.IsOnlineMode, defence: false);
+        if (mindDamageMult != 1f)
+            attackPower = (long)(attackPower * mindDamageMult);
         if (griefEffects.DamageModifier != 0 || griefEffects.CombatModifier != 0 || griefEffects.AllStatModifier != 0)
         {
-            // Damage modifier: positive = more damage (Anger stage), negative = less damage
-            // Combat modifier: general combat effectiveness (Denial/Bargaining)
-            // AllStatModifier: affects everything (Depression)
-            float totalGriefMod = 1.0f + griefEffects.DamageModifier + griefEffects.CombatModifier + griefEffects.AllStatModifier;
-            attackPower = (long)(attackPower * totalGriefMod);
-
             // Show grief effect message for significant modifiers
             if (griefEffects.DamageModifier > 0.1f)
             {
@@ -3852,14 +3898,7 @@ public partial class CombatEngine
             attackPower += (long)(attackPower * attacker.SettlementBuffValue);
         }
 
-        // Fatigue damage penalty (single-player only)
-        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && attacker.Fatigue >= GameConfig.FatigueTiredThreshold)
-        {
-            float fatigueDmgPenalty = attacker.Fatigue >= GameConfig.FatigueExhaustedThreshold
-                ? GameConfig.FatigueExhaustedDamagePenalty
-                : GameConfig.FatigueTiredDamagePenalty;
-            attackPower += (long)(attackPower * fatigueDmgPenalty);
-        }
+        // Fatigue damage penalty (single-player only): v1.1.15, taken with Grief and Mental above
 
         // Blood Price combat penalty — guilt weighs on killers (v0.53.0)
         if (attacker.MurderWeight >= GameConfig.MurderWeightTier3Threshold)
@@ -5318,14 +5357,13 @@ public partial class CombatEngine
         playerDefense += player.TempDefenseBonus;
 
         // Apply grief effects to defense - grief stage can modify defense
+        // v1.1.15: Grief, Mental and Fatigue in one multiplier (MentalSystem.CombinePenalties)
         var griefDefenseEffects = GriefSystem.Instance.GetCurrentEffects();
-        if (griefDefenseEffects.DefenseModifier != 0 || griefDefenseEffects.AllStatModifier != 0)
-        {
-            // Defense modifier: positive = more defense, negative = less defense (Anger stage)
-            // AllStatModifier: affects everything (Depression)
-            float totalGriefDefMod = 1.0f + griefDefenseEffects.DefenseModifier + griefDefenseEffects.AllStatModifier;
-            playerDefense = (long)(playerDefense * totalGriefDefMod);
-        }
+        float mindDefenceMult = MentalSystem.GetCombatMultiplier(player,
+            griefDefenseEffects.DefenseModifier + griefDefenseEffects.AllStatModifier,
+            UsurperRemake.BBS.DoorMode.IsOnlineMode, defence: true);
+        if (mindDefenceMult != 1f)
+            playerDefense = (long)(playerDefense * mindDefenceMult);
 
         // Apply Royal Authority bonus (+10% defense while player is king)
         if (player.King)
@@ -5351,14 +5389,7 @@ public partial class CombatEngine
             playerDefense += (long)(playerDefense * player.SettlementBuffValue);
         }
 
-        // Fatigue defense penalty (single-player only)
-        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && player.Fatigue >= GameConfig.FatigueTiredThreshold)
-        {
-            float fatigueDefPenalty = player.Fatigue >= GameConfig.FatigueExhaustedThreshold
-                ? GameConfig.FatigueExhaustedDefensePenalty
-                : GameConfig.FatigueTiredDefensePenalty;
-            playerDefense += (long)(playerDefense * fatigueDefPenalty);
-        }
+        // Fatigue defense penalty (single-player only): v1.1.15, taken with Grief and Mental above
 
         // Ironbark Root herb defense bonus
         if (player.HerbBuffType == (int)HerbType.IronbarkRoot && player.HerbBuffCombats > 0)
@@ -13524,13 +13555,16 @@ public partial class CombatEngine
                         // Grief effects
                         var griefFx = GriefSystem.Instance.GetCurrentEffects();
                         long preGriefAttack = attackPower;
-                        if (griefFx.DamageModifier != 0 || griefFx.CombatModifier != 0 || griefFx.AllStatModifier != 0)
+                        // v1.1.15: Grief, Mental and Fatigue in one multiplier (MentalSystem.CombinePenalties)
+                        float totalGriefMod = MentalSystem.GetCombatMultiplier(player,
+                            griefFx.DamageModifier + griefFx.CombatModifier + griefFx.AllStatModifier,
+                            UsurperRemake.BBS.DoorMode.IsOnlineMode, defence: false);
+                        if (totalGriefMod != 1f)
                         {
-                            float totalGriefMod = 1.0f + griefFx.DamageModifier + griefFx.CombatModifier + griefFx.AllStatModifier;
                             attackPower = (long)(attackPower * totalGriefMod);
                             DebugLogger.Instance.LogInfo("COMBAT_GRIEF",
                                 $"player={player.Name} griefDmg={griefFx.DamageModifier:F2} griefCombat={griefFx.CombatModifier:F2} " +
-                                $"griefAllStat={griefFx.AllStatModifier:F2} totalGriefMod={totalGriefMod:F2} " +
+                                $"griefAllStat={griefFx.AllStatModifier:F2} mental={player.Mental} fatigue={player.Fatigue} totalMindMod={totalGriefMod:F2} " +
                                 $"preGrief={preGriefAttack} postGrief={attackPower}");
                         }
 
@@ -13554,14 +13588,7 @@ public partial class CombatEngine
                             attackPower += (long)(attackPower * player.GodSlayerDamageBonus);
                         if (player.HasDarkPactBuff)
                             attackPower += (long)(attackPower * player.DarkPactDamageBonus);
-                        // Fatigue damage penalty (single-player only, multi-monster path)
-                        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && player.Fatigue >= GameConfig.FatigueTiredThreshold)
-                        {
-                            float fatigueDmgPenaltyMM = player.Fatigue >= GameConfig.FatigueExhaustedThreshold
-                                ? GameConfig.FatigueExhaustedDamagePenalty
-                                : GameConfig.FatigueTiredDamagePenalty;
-                            attackPower += (long)(attackPower * fatigueDmgPenaltyMM);
-                        }
+                        // Fatigue damage penalty (single-player only, multi-monster path): v1.1.15, taken with Grief and Mental above
                         if (player.LoversBlissCombats > 0 && player.LoversBlissBonus > 0f)
                             attackPower += (long)(attackPower * player.LoversBlissBonus);
                         if (player.HerbBuffType == (int)HerbType.FirebloomPetal && player.HerbBuffCombats > 0)
@@ -30609,6 +30636,12 @@ public partial class CombatEngine
             string prevented = Loc.Get("combat.teammate_status_prevented", teammate.DisplayName, preventingStatus.ToString().ToLower());
             terminal.WriteLine(prevented, "yellow");
             remoteTerminal.WriteLine(prevented, "yellow");
+            await Task.Delay(GetCombatDelay(800));
+            return;
+        }
+        // v1.1.15: Mental fear at combat start costs the follower their first action
+        if (ConsumeMentalFear(teammate, remoteTerminal))
+        {
             await Task.Delay(GetCombatDelay(800));
             return;
         }

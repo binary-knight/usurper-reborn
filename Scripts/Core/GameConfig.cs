@@ -1711,6 +1711,16 @@ public static partial class GameConfig
     public const int MentalDrugCrashStepHalves = 1;           // DEFAULT: each counted use after the first adds half the boost to the crash
     public const int MentalOverdoseLoss = 8;                  // Overdose when stacking drugs
     public const int MentalWithdrawalLossPerSeverity = 3;     // Daily withdrawal loss per severity point (Addict / 25)
+    // Band effects (piece 7): chances in percent, rolled per new dungeon room or at combat start
+    public const int MentalStrainedUneasyPct = 3;             // DEFAULT: Strained, an uneasy room line (flavour only)
+    public const int MentalShakenHallucinationPct = 4;        // Shaken, a harmless hallucination line per new room
+    public const int MentalBreakingHallucinationPct = 8;      // Breaking, a harmless hallucination line per new room
+    public const int MentalShakenFearPct = 10;                // Shaken, fear at combat start: the first action is lost
+    public const int MentalBreakingFearPct = 20;              // Breaking, panic at combat start: the first action is lost
+    public const float MentalFatigueCombatCap = 0.15f;        // Single-player: Mental plus Fatigue never cost more than 15% damage or defence
+    public const int MentalHallucinationLineCount = 5;        // Loc pool mental.hallucination_1..5
+    public const int MentalUneasyLineCount = 3;               // Loc pool mental.uneasy_1..3
+    public const int MentalFearLineCount = 3;                 // Loc pool mental.fear_1..3
     public const int MentalSchemaCurrent = 1;                // Current Mental save schema; below this, restore resets Mental to full and stamps this
     public const int MaxWillowDraughts = 3;                   // Healer Willow Draught: carryable cap
     // Session XP diminishing returns (v0.54.0) — online mode only
