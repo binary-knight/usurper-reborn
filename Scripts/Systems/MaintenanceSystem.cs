@@ -425,9 +425,11 @@ public class MaintenanceSystem
         if (player.Mental < GameConfig.MaxMentalStability && 
             random.Next(GameConfig.DailyMentalStabilityChance) == 0)
         {
-            var increase = random.Next(1, GameConfig.MentalStabilityIncrease + 1);
-            player.Mental = Math.Min(GameConfig.MaxMentalStability, player.Mental + increase);
-            
+            // v1.1.15: routed through MentalSystem.Change (stops at the addiction cap, skips NPCs);
+            // the message and mail report what was actually applied. Replaced by ApplyDailyReset later.
+            var increase = MentalSystem.Change(player, random.Next(1, GameConfig.MentalStabilityIncrease + 1));
+            if (increase <= 0) return;
+
             WriteIfNotSilent($"  {player.Name2}: Mental stability increased by {increase}", "bright_green");
             
             // Send mail notification (Pascal: mental stability mail)

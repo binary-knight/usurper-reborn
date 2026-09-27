@@ -67,39 +67,47 @@ public static class MentalSystem
         if (c == null || c.IsNPC) return 0;
         int before = c.Mental;
         int after;
+        // The sum is taken in long so an absurd delta (int.MaxValue, int.MinValue) cannot wrap.
         if (delta > 0)
         {
             int cap = GetCap(c);
-            after = before >= cap ? before : Math.Min(before + delta, cap);
+            after = before >= cap ? before : (int)Math.Min((long)before + delta, cap);
         }
         else
         {
-            after = Math.Max(before + delta, 0);
+            after = (int)Math.Max((long)before + delta, 0L);
         }
         c.Mental = after;
         return after - before;
     }
 
     /// <summary>
-    /// Strain percentage for class and race. When both qualify the lower (kinder) value is taken,
-    /// for example a Troll Cleric takes 80. MysticShaman has no class entry; as it is Troll, Orc or
-    /// Gnoll only, it lands on 90 through its race.
+    /// Strain percentage for race and class: the race percent times the class percent, divided by
+    /// 100 and rounded half up to a whole percent, computed as (racePct x classPct + 50) / 100 in
+    /// integer math. Race: Troll, Orc, Gnoll, Mutant 80; Elf, Hobbit 120; HalfElf, Gnome 110;
+    /// others 100. Class: Assassin, Abysswarden, Voidreaver 85; Barbarian 90; Cleric, Paladin,
+    /// Tidesworn 90; Bard, Jester 110; Sage 85; others 100. Examples: Troll Sage 68, Elf Bard 132,
+    /// HalfElf Sage 93.5 rounds to 94.
     /// </summary>
     public static int GetStrainPct(CharacterClass cls, CharacterRace race)
     {
-        int classPct = cls switch
-        {
-            CharacterClass.Cleric or CharacterClass.Paladin or CharacterClass.Tidesworn => GameConfig.MentalStrainPctDevout,
-            CharacterClass.Sage => GameConfig.MentalStrainPctSage,
-            CharacterClass.Barbarian => GameConfig.MentalStrainPctHardy,
-            _ => 100
-        };
         int racePct = race switch
         {
-            CharacterRace.Troll or CharacterRace.Orc or CharacterRace.Gnoll => GameConfig.MentalStrainPctHardy,
+            CharacterRace.Troll or CharacterRace.Orc or CharacterRace.Gnoll or CharacterRace.Mutant => GameConfig.MentalStrainRacePctHardy,
+            CharacterRace.Elf or CharacterRace.Hobbit => GameConfig.MentalStrainRacePctSensitive,
+            CharacterRace.HalfElf or CharacterRace.Gnome => GameConfig.MentalStrainRacePctUneasy,
             _ => 100
         };
-        return Math.Min(classPct, racePct);
+        int classPct = cls switch
+        {
+            CharacterClass.Assassin or CharacterClass.Abysswarden or CharacterClass.Voidreaver => GameConfig.MentalStrainClassPctDark,
+            CharacterClass.Barbarian => GameConfig.MentalStrainClassPctBarbarian,
+            CharacterClass.Cleric or CharacterClass.Paladin or CharacterClass.Tidesworn => GameConfig.MentalStrainClassPctDevout,
+            CharacterClass.Bard or CharacterClass.Jester => GameConfig.MentalStrainClassPctPerformer,
+            CharacterClass.Sage => GameConfig.MentalStrainClassPctSage,
+            _ => 100
+        };
+        return (racePct * classPct + 50) / 100;
     }
 
     /// <summary>Companion cut in percent: 10 per story companion in the party, at most 20.</summary>

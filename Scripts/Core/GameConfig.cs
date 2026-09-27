@@ -1651,11 +1651,18 @@ public static partial class GameConfig
     public const float MentalShakenCombatPenalty = 0.05f;     // Positive magnitude: 5% damage and defence lost when Shaken
     public const float MentalBreakingCombatPenalty = 0.10f;   // Positive magnitude: 10% lost when Breaking or Broken
     public const int MentalStrainPerPoint = 1000;             // Strain is per mille: every full 1000 costs 1 Mental
-    public const int MentalStrainPctDevout = 80;              // Cleric, Paladin, Tidesworn take 80% of dungeon strain
-    public const int MentalStrainPctSage = 85;                // Sage takes 85%
-    public const int MentalStrainPctHardy = 90;               // Barbarian class; Troll, Orc, Gnoll races take 90%
+    // Strain multipliers, race x class, in percent (MentalSystem.GetStrainPct multiplies the two)
+    public const int MentalStrainRacePctHardy = 80;           // Troll, Orc, Gnoll, Mutant
+    public const int MentalStrainRacePctSensitive = 120;      // Elf, Hobbit
+    public const int MentalStrainRacePctUneasy = 110;         // HalfElf, Gnome
+    public const int MentalStrainClassPctDark = 85;           // Assassin, Abysswarden, Voidreaver
+    public const int MentalStrainClassPctBarbarian = 90;      // Barbarian
+    public const int MentalStrainClassPctDevout = 90;         // Cleric, Paladin, Tidesworn
+    public const int MentalStrainClassPctPerformer = 110;     // Bard, Jester
+    public const int MentalStrainClassPctSage = 85;           // Sage
     public const int MentalStrainCompanionCutPct = 10;        // Each story companion in the party cuts strain 10%
     public const int MentalStrainCompanionCutMaxPct = 20;     // Companion cut stops at 20%
+    public const int MentalMemoryRecoveryGain = 1;            // Recovering a lost memory fragment (FeatureInteractionSystem)
     public const int MentalDailyReset = 10;                   // Daily gain applied by MentalSystem.ApplyDailyReset
     public const int MentalSchemaCurrent = 1;                 // Current Mental save schema; below this, restore resets Mental to full and stamps this
     public const int MaxWillowDraughts = 3;                   // Healer Willow Draught: carryable cap
