@@ -10358,6 +10358,7 @@
   "character_creation.stat_desc_mana_grows": "Szintlépésekkel növekszik",
   "character_creation.total_stats": "Összesített tulajdonságok",
   "character_creation.rerolls_remaining": "Hátralévő újradobások: {0}",
+  "character_creation.roll_resumed": "A kapcsolat megszakadása előtti dobásod visszaállt.",
   "character_creation.accept_stats": "(A) Elfogadom",
   "character_creation.reroll_stats": "(R) Újradobás",
   "character_creation.stats_accepted": "Tulajdonságok elfogadva!",

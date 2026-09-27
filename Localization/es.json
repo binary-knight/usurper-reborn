@@ -10350,6 +10350,7 @@
   "character_creation.stat_desc_mana_grows": "Crece con las subidas de nivel",
   "character_creation.total_stats": "Estadísticas Totales",
   "character_creation.rerolls_remaining": "Re-tiradas restantes: {0}",
+  "character_creation.roll_resumed": "Se ha restaurado tu tirada de antes de que se cortara la conexión.",
   "character_creation.accept_stats": "(A)ceptar estas estadísticas",
   "character_creation.reroll_stats": "(R)e-tirar nuevas estadísticas",
   "character_creation.stats_accepted": "¡Estadísticas aceptadas!",

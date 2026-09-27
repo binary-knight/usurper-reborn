@@ -10535,6 +10535,7 @@
   "character_creation.stat_desc_mana_grows": "Grows with level-ups",
   "character_creation.total_stats": "Total Stats",
   "character_creation.rerolls_remaining": "Re-rolls remaining: {0}",
+  "character_creation.roll_resumed": "Your roll from before the connection dropped is restored.",
   "character_creation.accept_stats": "(A)ccept these stats",
   "character_creation.reroll_stats": "(R)e-roll for new stats",
   "character_creation.stats_accepted": "Stats accepted!",
