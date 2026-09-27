@@ -269,6 +269,17 @@ internal static class PlayerSaveEditor
         p.King = EditorIO.PromptBool("Is the current king?", p.King);
         p.Immortal = EditorIO.PromptBool("Immortal (ascended, pantheon)", p.Immortal);
 
+        EditorIO.Info("-- Mental health (v1.1.15) --");
+        p.MentalSchema = EditorIO.PromptInt("Mental schema (0 = legacy, resets Mental to full on load; 1 = current)", p.MentalSchema, min: 0, max: GameConfig.MentalSchemaCurrent);
+        p.MentalStrainRemainder = EditorIO.PromptInt("Mental strain remainder (hundredths of a per mille toward the next point)", p.MentalStrainRemainder, min: 0);
+        p.WillowDraughts = EditorIO.PromptInt($"Willow Draughts carried (0-{GameConfig.MaxWillowDraughts})", p.WillowDraughts, min: 0, max: GameConfig.MaxWillowDraughts);
+        p.MentalRecoveryUsedToday = EditorIO.PromptInt("Mental recovery sources used today (MentalDailySource bitmask, 0 = none)", p.MentalRecoveryUsedToday, min: 0);
+        p.MentalBroken = EditorIO.PromptBool("Mental collapse (Broken) affliction active", p.MentalBroken);
+        p.MentalHintShown = EditorIO.PromptBool("First mental-health hint already shown", p.MentalHintShown);
+        p.MentalDrugBoost = EditorIO.PromptInt("Pending drug-high Mental boost to crash later", p.MentalDrugBoost, min: 0);
+        p.MentalDrugUses = EditorIO.PromptInt("Drug uses within the tolerance window", p.MentalDrugUses, min: 0);
+        p.MentalLastDrugDay = EditorIO.PromptInt("Game day of the last drug use", p.MentalLastDrugDay, min: 0);
+
         EditorIO.Info("— Difficulty —");
         p.Difficulty = EditorIO.PromptEnum("Difficulty", p.Difficulty);
     }

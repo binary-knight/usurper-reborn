@@ -374,6 +374,15 @@ namespace UsurperRemake.Systems
         public long Darkness { get; set; }
         public int Fame { get; set; }
         public int Mental { get; set; }
+        public int MentalSchema { get; set; }  // v1.1.15: 0 = a save written before Mental existed; old saves read 0
+        public int MentalStrainRemainder { get; set; }  // v1.1.15: dungeon strain toward the next Mental point
+        public int WillowDraughts { get; set; }  // v1.1.15: Willow Draughts carried, 0..GameConfig.MaxWillowDraughts
+        public int MentalRecoveryUsedToday { get; set; }  // v1.1.15: MentalDailySource flags already used today
+        public bool MentalBroken { get; set; }  // v1.1.15: Broken collapse affliction
+        public bool MentalHintShown { get; set; }  // v1.1.15: first drop-below-75 Mental hint already shown
+        public int MentalDrugBoost { get; set; }  // v1.1.15: pending drug-high Mental boost to crash later
+        public int MentalDrugUses { get; set; }  // v1.1.15: drug uses within the tolerance window
+        public int MentalLastDrugDay { get; set; }  // v1.1.15: DailySystemManager.CurrentDay of the last drug use
         public int Poison { get; set; }
         public int PoisonTurns { get; set; }  // Remaining turns of poison
 
