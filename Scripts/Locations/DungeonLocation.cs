@@ -3434,68 +3434,80 @@ public class DungeonLocation : BaseLocation
         }
 
         // v1.1.15: visible column on the current line, tracked from each plain string actually
-        // written (not a guess), so the trailing tags below wrap correctly regardless of language,
-        // screen-reader mode (no bar) or stat width (HP/gold/XP digits).
+        // written (not a guess), so every segment below (HP, Potions, Gold, XP, then the trailing
+        // tags) wraps correctly regardless of language, screen-reader mode (no bar) or stat width
+        // (HP/gold/XP digits can each run much wider at high level than at level 1).
         int col = 0;
 
-        // Health bar
-        terminal.SetColor("white");
-        string hpLabel = $"{Loc.Get("status.hp")}: ";
-        terminal.Write(hpLabel);
-        col += hpLabel.Length;
-        DrawBar(player.HP, player.MaxHP, 20, "red", "darkgray");
-        col += GameConfig.ScreenReaderMode ? 0 : 22; // "[" + 20 fill chars + "]"; DrawBar itself no-ops under screen reader
-        string hpValue = $" {player.HP}/{player.MaxHP}";
-        terminal.Write(hpValue);
-        col += hpValue.Length;
-
-        terminal.Write("  ");
-        col += 2;
-
-        // Potions
-        terminal.SetColor("green");
-        string potionsText = $"{Loc.Get("status.potions")}: {player.Healing}/{player.MaxPotions}";
-        terminal.Write(potionsText);
-        col += potionsText.Length;
-
-        terminal.Write("  ");
-        col += 2;
-
-        // Gold
-        terminal.SetColor("yellow");
-        string goldText = $"{Loc.Get("status.gold_label")}: {player.Gold:N0}";
-        terminal.Write(goldText);
-        col += goldText.Length;
-
-        // v0.65.4: ambient XP progress -- makes every fight visibly count toward the next level,
-        // the cheapest lever on the "one more fight before I log off" impulse (and the L1-3 stall).
-        terminal.Write("  ");
-        col += 2;
-        terminal.SetColor("bright_cyan");
-        string xpText = player.Level < 100
-            ? Loc.Get("status.xp_compact", player.Level, player.Experience, GameConfig.GetExperienceForLevel(player.Level + 1))
-            : Loc.Get("status.xp_max", player.Level);
-        terminal.Write(xpText);
-        col += xpText.Length;
-
-        // v1.1.15: trailing tags (fatigue, mental, danger) each wrap to a new line whenever
-        // appending them (plus their "  " separator) would push the line past 80 visible columns.
-        // A tag that still would not fit alone at the start of a fresh line is written anyway
-        // (nothing shorter to fall back to); that has not happened with any current tag text.
-        void AppendTag(string text, string color)
+        // v1.1.15: every segment wraps to a new line whenever appending it (plus its "  "
+        // separator) would push the line past 80 visible columns. A segment that still would not
+        // fit alone at the start of a fresh line is written anyway (nothing shorter to fall back
+        // to); that has not happened with any current segment or tag text. `write` performs the
+        // segment's own SetColor/Write calls so a multi-part segment (the HP bar) is never split
+        // across the wrap point.
+        void AppendSegment(int width, Action write)
         {
-            if (string.IsNullOrEmpty(text)) return;
             int sep = col > 0 ? 2 : 0;
-            if (col > 0 && col + sep + text.Length > 80)
+            if (col > 0 && col + sep + width > 80)
             {
                 terminal.WriteLine("");
                 col = 0;
                 sep = 0;
             }
             if (sep > 0) terminal.Write("  ");
-            terminal.SetColor(color);
-            terminal.Write(text);
-            col += sep + text.Length;
+            write();
+            col += sep + width;
+        }
+
+        // Health bar
+        string hpLabel = $"{Loc.Get("status.hp")}: ";
+        string hpValue = $" {player.HP}/{player.MaxHP}";
+        int hpBarWidth = GameConfig.ScreenReaderMode ? 0 : 22; // "[" + 20 fill chars + "]"; DrawBar itself no-ops under screen reader
+        AppendSegment(hpLabel.Length + hpBarWidth + hpValue.Length, () =>
+        {
+            terminal.SetColor("white");
+            terminal.Write(hpLabel);
+            DrawBar(player.HP, player.MaxHP, 20, "red", "darkgray");
+            terminal.SetColor("white");
+            terminal.Write(hpValue);
+        });
+
+        // Potions
+        string potionsText = $"{Loc.Get("status.potions")}: {player.Healing}/{player.MaxPotions}";
+        AppendSegment(potionsText.Length, () =>
+        {
+            terminal.SetColor("green");
+            terminal.Write(potionsText);
+        });
+
+        // Gold
+        string goldText = $"{Loc.Get("status.gold_label")}: {player.Gold:N0}";
+        AppendSegment(goldText.Length, () =>
+        {
+            terminal.SetColor("yellow");
+            terminal.Write(goldText);
+        });
+
+        // v0.65.4: ambient XP progress -- makes every fight visibly count toward the next level,
+        // the cheapest lever on the "one more fight before I log off" impulse (and the L1-3 stall).
+        string xpText = player.Level < 100
+            ? Loc.Get("status.xp_compact", player.Level, player.Experience, GameConfig.GetExperienceForLevel(player.Level + 1))
+            : Loc.Get("status.xp_max", player.Level);
+        AppendSegment(xpText.Length, () =>
+        {
+            terminal.SetColor("bright_cyan");
+            terminal.Write(xpText);
+        });
+
+        // Trailing tags (fatigue, mental, danger) go through the same wrap.
+        void AppendTag(string text, string color)
+        {
+            if (string.IsNullOrEmpty(text)) return;
+            AppendSegment(text.Length, () =>
+            {
+                terminal.SetColor(color);
+                terminal.Write(text);
+            });
         }
 
         // Fatigue indicator (only when Tired or Exhausted)
