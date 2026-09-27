@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace UsurperRemake.Systems;
 
@@ -125,14 +127,57 @@ public static class MentalSystem
     /// </summary>
     public static int AddStrain(Character c, int perMille, int storyCompanionsInParty)
     {
-        if (c == null || c.IsNPC || perMille <= 0) return 0;
-        long scaled = (long)perMille * GetStrainPct(c.Class, c.Race) * (100 - GetCompanionCutPct(storyCompanionsInParty)) / 100;
-        long total = c.MentalStrainRemainder + scaled;
-        int points = (int)(total / StrainUnitsPerPoint);
-        c.MentalStrainRemainder = (int)(total % StrainUnitsPerPoint);
+        if (c == null || c.IsNPC) return 0;
+        int points = TakeStrainPoints(c, perMille, storyCompanionsInParty);
         if (points == 0) return 0;
         return -Change(c, -points);
     }
+
+    /// <summary>Scales the strain, updates the remainder and returns the whole points it costs, without applying them.</summary>
+    private static int TakeStrainPoints(Character c, int perMille, int storyCompanionsInParty)
+    {
+        if (perMille <= 0) return 0;
+        long scaled = (long)perMille * GetStrainPct(c.Class, c.Race) * (100 - GetCompanionCutPct(storyCompanionsInParty)) / 100;
+        long total = c.MentalStrainRemainder + scaled;
+        c.MentalStrainRemainder = (int)(total % StrainUnitsPerPoint);
+        return (int)Math.Min(total / StrainUnitsPerPoint, int.MaxValue);
+    }
+
+    /// <summary>Story companions (Lyris, Aldric, Mira, Vex, Melodia) alive in the party; dead ones do not count.</summary>
+    public static int CountStoryCompanions(IEnumerable<Character>? party) =>
+        party?.Count(t => t != null && t.IsAlive && t.IsCompanion && t.CompanionId.HasValue) ?? 0;
+
+    /// <summary>At or below GameConfig.MentalNearDeathHpPct of max HP and still standing.</summary>
+    public static bool IsNearDeath(Character c) =>
+        c != null && c.MaxHP > 0 && c.HP > 0 && c.HP * 100 <= c.MaxHP * GameConfig.MentalNearDeathHpPct;
+
+    /// <summary>Strain for entering a new dungeon room: floor x MentalRoomStrainPerFloor per mille. Returns points lost.</summary>
+    public static int ApplyRoomStrain(Character c, int floor, int storyCompanionsInParty) =>
+        floor <= 0 ? 0 : AddStrain(c, floor * GameConfig.MentalRoomStrainPerFloor, storyCompanionsInParty);
+
+    /// <summary>Flat fight-end losses: flee, near death, and an Old God (which replaces the boss loss) or a boss.</summary>
+    public static int GetFightEndFlatLoss(bool fled, bool nearDeath, bool boss, bool oldGod) =>
+        (fled ? GameConfig.MentalFleeLoss : 0)
+        + (nearDeath ? GameConfig.MentalNearDeathLoss : 0)
+        + (oldGod ? GameConfig.MentalOldGodLoss : boss ? GameConfig.MentalBossLoss : 0);
+
+    /// <summary>
+    /// Monster fight end as one net change: the strain points (floor x MentalFightStrainPerFloor per
+    /// mille, through the race x class multiplier and the companion cut) plus the flat losses, applied
+    /// by a single Change. Floor 0 (outside the dungeon) adds no strain. Returns the change applied
+    /// (0 or negative). NPCs are skipped.
+    /// </summary>
+    public static int ApplyFightEnd(Character c, int floor, int storyCompanionsInParty, bool fled, bool nearDeath, bool boss, bool oldGod)
+    {
+        if (c == null || c.IsNPC) return 0;
+        int points = floor <= 0 ? 0 : TakeStrainPoints(c, floor * GameConfig.MentalFightStrainPerFloor, storyCompanionsInParty);
+        long loss = (long)points + GetFightEndFlatLoss(fled, nearDeath, boss, oldGod);
+        if (loss <= 0) return 0;
+        return Change(c, (int)-Math.Min(loss, int.MaxValue));
+    }
+
+    /// <summary>Death in a monster fight: MentalDeathLoss. Returns the change applied.</summary>
+    public static int ApplyDeath(Character c) => Change(c, -GameConfig.MentalDeathLoss);
 
     /// <summary>
     /// Daily reset and returns the change actually applied. Clears MentalRecoveryUsedToday to
