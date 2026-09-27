@@ -1653,6 +1653,7 @@ public static partial class GameConfig
     public const int MentalStrainPctHardy = 90;               // Barbarian class; Troll, Orc, Gnoll races take 90%
     public const int MentalStrainCompanionCutPct = 10;        // Each story companion in the party cuts strain 10%
     public const int MentalStrainCompanionCutMaxPct = 20;     // Companion cut stops at 20%
+    public const int MentalDailyReset = 10;                   // Daily gain applied by MentalSystem.ApplyDailyReset
     // Session XP diminishing returns (v0.54.0) — online mode only
     // Threshold scales with level: max(100000, XP_for_next_level * 8) — allows ~8 full levels per session
     public const long SessionXPDiminishBaseThreshold = 100000;  // Minimum threshold for low-level players

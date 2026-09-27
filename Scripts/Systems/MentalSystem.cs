@@ -106,6 +106,25 @@ public static class MentalSystem
     }
 
     /// <summary>
+    /// Daily reset and returns the change actually applied. If Mental is above GetCap(c) it drops
+    /// straight to the cap and the daily gain is skipped. Otherwise it gains GameConfig.MentalDailyReset
+    /// through Change, which stops at the cap. NPCs are skipped and return 0. Not called from
+    /// anywhere yet; the daily-reset wiring is a later piece.
+    /// </summary>
+    public static int ApplyDailyReset(Character c)
+    {
+        if (c == null || c.IsNPC) return 0;
+        int cap = GetCap(c);
+        if (c.Mental > cap)
+        {
+            int before = c.Mental;
+            c.Mental = cap;
+            return cap - before;
+        }
+        return Change(c, GameConfig.MentalDailyReset);
+    }
+
+    /// <summary>
     /// Combat penalty from Mental alone, as a positive fraction of damage and defence lost:
     /// 0 for Stable and Strained, 0.05 for Shaken, 0.10 for Breaking and Broken.
     /// Taking the worse of this and Grief, and the -15% Mental plus Fatigue cap, belong to a later

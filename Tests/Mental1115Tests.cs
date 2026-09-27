@@ -4,7 +4,7 @@ using Xunit;
 
 namespace UsurperReborn.Tests;
 
-/// <summary>v1.1.15: the pure Mental core (bands, cap, clamped change, dungeon strain, combat penalty).</summary>
+/// <summary>v1.1.15: the pure Mental core (bands, cap, change, dungeon strain, daily reset, combat penalty).</summary>
 public class Mental1115Tests
 {
     private static Character Hero(int mental = 100, CharacterClass cls = CharacterClass.Warrior,
@@ -14,10 +14,10 @@ public class Mental1115Tests
         Class = cls, Race = race, Mental = mental, Addict = addict,
     };
 
-    private static Character Npc(int mental = 100) => new Character
+    private static Character Npc(int mental = 100, int addict = 0) => new Character
     {
         Name1 = "Townsfolk", Name2 = "Townsfolk", AI = CharacterAI.Computer,
-        Class = CharacterClass.Warrior, Race = CharacterRace.Human, Mental = mental,
+        Class = CharacterClass.Warrior, Race = CharacterRace.Human, Mental = mental, Addict = addict,
     };
 
     // Bands
@@ -245,6 +245,48 @@ public class Mental1115Tests
         MentalSystem.AddStrain(n, 5500, 0).Should().Be(0);
         n.Mental.Should().Be(60);
         n.MentalStrainRemainder.Should().Be(0);
+    }
+
+    // Daily reset
+
+    [Fact]
+    public void Daily_reset_above_the_cap_drops_to_it_and_skips_the_gain()
+    {
+        var c = Hero(90, addict: 80);   // cap 60
+        MentalSystem.ApplyDailyReset(c).Should().Be(-30);
+        c.Mental.Should().Be(60);
+    }
+
+    [Fact]
+    public void Daily_reset_below_the_cap_gains_ten()
+    {
+        var c = Hero(50);   // cap 100
+        MentalSystem.ApplyDailyReset(c).Should().Be(10);
+        c.Mental.Should().Be(60);
+    }
+
+    [Fact]
+    public void Daily_reset_near_the_cap_stops_at_it()
+    {
+        var c = Hero(55, addict: 80);   // cap 60
+        MentalSystem.ApplyDailyReset(c).Should().Be(5);
+        c.Mental.Should().Be(60);
+    }
+
+    [Fact]
+    public void Daily_reset_exactly_at_the_cap_gains_nothing()
+    {
+        var c = Hero(60, addict: 80);   // cap 60
+        MentalSystem.ApplyDailyReset(c).Should().Be(0);
+        c.Mental.Should().Be(60);
+    }
+
+    [Fact]
+    public void Daily_reset_skips_npcs()
+    {
+        var n = Npc(90, addict: 80);   // cap 60, above the cap
+        MentalSystem.ApplyDailyReset(n).Should().Be(0);
+        n.Mental.Should().Be(90);
     }
 
     // Combat penalty
