@@ -1021,6 +1021,16 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex) { DebugLogger.Instance.LogWarning("SQL", $"pending_sales_tax not ensured: {ex.Message}"); }
 
+            // v1.1.15: a character creation stat roll in progress (dice and rerolls left), kept per save key until the
+            // character is accepted, so dropping the connection at the roll is not a free reroll
+            try
+            {
+                using var migCmd = connection.CreateCommand();
+                migCmd.CommandText = "CREATE TABLE IF NOT EXISTS creation_rolls (username TEXT PRIMARY KEY, data TEXT NOT NULL, updated_at TEXT DEFAULT (datetime('now')));";
+                migCmd.ExecuteNonQuery();
+            }
+            catch (Exception ex) { DebugLogger.Instance.LogWarning("SQL", $"creation_rolls not ensured: {ex.Message}"); }
+
             // v1.1.14: one-time claims on an NPC's gear, so two processes cannot both take the same piece
             try
             {
@@ -1517,6 +1527,7 @@ namespace UsurperRemake.Systems
                 ExecPurge(connection, tx, "guild_members",     "LOWER(username) = LOWER(@u)", username);
                 ExecPurge(connection, tx, "online_players",    "LOWER(username) = LOWER(@u)", username);
                 ExecPurge(connection, tx, "sleeping_players",  "LOWER(username) = LOWER(@u)", username);
+                ExecPurge(connection, tx, "creation_rolls",    "LOWER(username) = LOWER(@u)", username); // v1.1.15
                 // v1.1.14: wizard_flags (frozen, muted) are the account's, keyed by its login name; they are kept
                 // through a delete, so deleting and recreating a character no longer sheds them
 
@@ -4427,6 +4438,7 @@ namespace UsurperRemake.Systems
                         DELETE FROM castle_sieges;
                         DELETE FROM wizard_flags;
                         DELETE FROM sleeping_players;
+                        DELETE FROM creation_rolls;
                     ";
                     await cmd.ExecuteNonQueryAsync();
                 }
@@ -8841,6 +8853,63 @@ namespace UsurperRemake.Systems
         // =====================================================================
         // Sleeping Player Vulnerability System
         // =====================================================================
+
+        // =====================================================================
+        // v1.1.15: Character creation stat roll in progress
+        // =====================================================================
+
+        /// <summary>v1.1.15: the stat roll in progress for a save key (JSON), or null when there is none.</summary>
+        public string? LoadCreationRoll(string username)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT data FROM creation_rolls WHERE username = LOWER(@username);";
+                cmd.Parameters.AddWithValue("@username", username);
+                return cmd.ExecuteScalar() as string;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to load creation roll for {username}: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>v1.1.15: store the stat roll in progress for a save key, replacing any earlier one.</summary>
+        public void SaveCreationRoll(string username, string data)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "INSERT OR REPLACE INTO creation_rolls (username, data, updated_at) VALUES (LOWER(@username), @data, datetime('now'));";
+                cmd.Parameters.AddWithValue("@username", username);
+                cmd.Parameters.AddWithValue("@data", data);
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to save creation roll for {username}: {ex.Message}");
+            }
+        }
+
+        /// <summary>v1.1.15: drop the stat roll in progress for a save key (the character was accepted).</summary>
+        public void ClearCreationRoll(string username)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "DELETE FROM creation_rolls WHERE username = LOWER(@username);";
+                cmd.Parameters.AddWithValue("@username", username);
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to clear creation roll for {username}: {ex.Message}");
+            }
+        }
 
         public async Task RegisterSleepingPlayer(string username, string location, string guardsJson, int innBoost)
         {

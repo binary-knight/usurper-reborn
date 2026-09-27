@@ -10350,6 +10350,7 @@
   "character_creation.stat_desc_mana_grows": "Croît avec les niveaux",
   "character_creation.total_stats": "Total des stats",
   "character_creation.rerolls_remaining": "Relances restantes : {0}",
+  "character_creation.roll_resumed": "Votre tirage d'avant la coupure de connexion est rétabli.",
   "character_creation.accept_stats": "(A)ccepter ces stats",
   "character_creation.reroll_stats": "(R)elancer pour de nouvelles stats",
   "character_creation.stats_accepted": "Stats acceptées!",
