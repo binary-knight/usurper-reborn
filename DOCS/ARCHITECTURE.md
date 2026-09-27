@@ -1048,7 +1048,7 @@ Bundled into the existing TTYPE probe at session connect. Initial telnet packet 
 ### Packages Shipped
 | Package | Trigger | Payload |
 |---|---|---|
-| `Char.Vitals` | Top of `BaseLocation.LocationLoop` (delta-tracked, only when changed) | `{ hp, maxHp, mp, maxMp, sp }` |
+| `Char.Vitals` | Top of `BaseLocation.LocationLoop` (delta-tracked, only when changed) | `{ hp, maxHp, mp, maxMp, sp, mental, maxMental }` (v1.1.15: mental and maxMental added, both modes) |
 | `Char.Status` | Every location change | `{ name, class, level, race, gold, bank, xp, location }` |
 | `Room.Info` | Every location change | `{ num, name, area, exits }` (exits placeholder) |
 | `Comm.Channel.Text` | All chat broadcasts | `{ channel, talker, text }` |
