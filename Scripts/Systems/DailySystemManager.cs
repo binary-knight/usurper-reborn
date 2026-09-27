@@ -404,6 +404,12 @@ public class DailySystemManager
         // Reset fatigue on full sleep (v0.49.1)
         player.Fatigue = 0;
 
+        // v1.1.15: Mental daily reset (clears the once-a-day recovery flags, then +MentalDailyReset
+        // up to the cap, or drops a surplus above the cap to it). The only production caller.
+        int mentalBefore = player.Mental;
+        MentalSystem.ApplyDailyReset(player);
+        if (terminal != null) MentalUi.AnnounceMentalChange(terminal, player, mentalBefore);
+
         // Weekly rankings update (every Monday) — only in online mode
         // Must use Eastern time for day-of-week check since daily reset fires at 7 PM Eastern
         if (UsurperRemake.BBS.DoorMode.IsOnlineMode)

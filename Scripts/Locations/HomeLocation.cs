@@ -742,6 +742,10 @@ public class HomeLocation : BaseLocation
 
         currentPlayer.HomeRestsToday++;
 
+        // v1.1.15: Mental, once a day, alongside the HomeRestsToday limit.
+        int mentalBeforeRest = currentPlayer.Mental;
+        MentalUi.ReportGain(terminal, currentPlayer, mentalBeforeRest, MentalSystem.TryDailyGain(currentPlayer, MentalDailySource.HomeRest, GameConfig.MentalHomeRestGain));
+
         // Reduce fatigue from home rest (single-player only)
         if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && currentPlayer.Fatigue > 0)
         {
@@ -822,6 +826,10 @@ public class HomeLocation : BaseLocation
             var username = UsurperRemake.BBS.DoorMode.OnlineUsername ?? currentPlayer.Name2;
             await backend.RegisterSleepingPlayer(username, "home", "[]", 1);
         }
+
+        // v1.1.15: sleeping at home eases the mind (no daily flag beyond the sleep itself).
+        int mentalBeforeSleep = currentPlayer.Mental;
+        MentalUi.ReportGain(terminal, currentPlayer, mentalBeforeSleep, MentalSystem.Change(currentPlayer, GameConfig.MentalHomeSleepGain));
 
         terminal.SetColor("gray");
         terminal.WriteLine($"\n  {Loc.Get("home.sleep_reinforced")}");
@@ -937,6 +945,10 @@ public class HomeLocation : BaseLocation
             terminal.WriteLine("");
             DreamSystem.Instance.ExperienceDream(dream.Id);
         }
+
+        // v1.1.15: a night's sleep at home eases the mind (no daily flag beyond the sleep itself).
+        int mentalBeforeSleep = currentPlayer.Mental;
+        MentalUi.ReportGain(terminal, currentPlayer, mentalBeforeSleep, MentalSystem.Change(currentPlayer, GameConfig.MentalHomeSleepGain));
 
         // Advance to morning
         terminal.WriteLine("");
@@ -2363,6 +2375,13 @@ public class HomeLocation : BaseLocation
             default:
                 terminal.WriteLine(Loc.Get("ui.invalid_choice"), "gray");
                 break;
+        }
+
+        // v1.1.15: dinner, a walk or the fire with a spouse eases the mind once a day.
+        if (relationType == "spouse" && choice >= 1 && choice <= 3)
+        {
+            int mentalBeforeSpouse = currentPlayer.Mental;
+            MentalUi.ReportGain(terminal, currentPlayer, mentalBeforeSpouse, MentalSystem.TryDailyGain(currentPlayer, MentalDailySource.Spouse, GameConfig.MentalSpouseGain));
         }
 
         await terminal.WaitForKey();

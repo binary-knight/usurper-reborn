@@ -2409,6 +2409,10 @@ public class InnLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("inn.rest_fatigue_reduced", oldFatigue - currentPlayer.Fatigue), "bright_green");
         }
 
+        // v1.1.15: Mental, once a day; more with an NPC friend at the table (InnTable and InnFriend share the day).
+        int mentalBeforeTable = currentPlayer.Mental;
+        MentalUi.ReportGain(terminal, currentPlayer, mentalBeforeTable, MentalSystem.ApplyInnTable(currentPlayer, GetLiveNPCsAtLocation()));
+
         // Check for dreams during rest (nightmares take priority if MurderWeight > 0)
         var dream = DreamSystem.Instance.GetDreamForRest(currentPlayer, 0);
         if (dream != null)
@@ -2551,6 +2555,10 @@ public class InnLocation : BaseLocation
             terminal.WriteLine("");
             DreamSystem.Instance.ExperienceDream(dream.Id);
         }
+
+        // v1.1.15: a night's sleep eases the mind (no daily flag beyond the sleep itself).
+        int mentalBeforeSleep = currentPlayer.Mental;
+        MentalUi.ReportGain(terminal, currentPlayer, mentalBeforeSleep, MentalSystem.Change(currentPlayer, GameConfig.MentalInnSleepGain));
 
         // Advance to morning
         terminal.WriteLine("");
@@ -5483,6 +5491,10 @@ public class InnLocation : BaseLocation
             terminal.SetColor("white");
         }
 
+        // v1.1.15: the room's Mental gain would apply nothing at the cap; say so before charging.
+        if (!MentalSystem.GainAvailable(currentPlayer))
+            terminal.WriteLine(Loc.Get("mental.no_gain_at_cap"), "gray");
+
         // Confirm total cost
         long totalCost = roomCost + totalGuardCost;
         terminal.SetColor("yellow");
@@ -5531,6 +5543,10 @@ public class InnLocation : BaseLocation
         {
             await DailySystemManager.Instance.ForceDailyReset();
         }
+
+        // v1.1.15: a rented room's sleep eases the mind (no daily flag beyond the sleep itself).
+        int mentalBeforeRoom = currentPlayer.Mental;
+        MentalUi.ReportGain(terminal, currentPlayer, mentalBeforeRoom, MentalSystem.Change(currentPlayer, GameConfig.MentalInnSleepGain));
 
         // Save game
         await GameEngine.Instance.SaveCurrentGame();
