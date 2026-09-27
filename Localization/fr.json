@@ -5997,6 +5997,7 @@
   "combat.mental_tag": "(Votre Santé mentale est {0})",
   "mental.band_worse": "La Santé mentale se dégrade : {0}.",
   "mental.band_better": "La Santé mentale s'améliore : {0}.",
+  "mental.gain": "Votre esprit s'apaise. (+{0} Santé mentale)",
   "mental.first_hint": "La Santé mentale mesure la force de votre esprit. Elle baisse avec le stress du combat, la perte et le chagrin, et se rétablit en vous reposant, en priant au Temple ou en consultant le Guérisseur. Si elle s'effondre jusqu'à Brisé, vous ne pourrez pas continuer avant qu'elle ne soit soignée.",
   "combat.slain_ambush": "Vous avez été tué dans l’embuscade!",
   "combat.succumb_wounds": "Vous succombez à vos blessures!",

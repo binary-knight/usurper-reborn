@@ -225,9 +225,6 @@ public class MaintenanceSystem
         // Reset daily parameters (Pascal: "resetting all kinds of daily parameters")
         ResetDailyParameters(player, config);
         
-        // Mental stability recovery (Pascal: random mental stability increase)
-        ProcessMentalStabilityRecovery(player);
-        
         // Healing potion spoilage (Pascal: 50% of overage spoils)
         ProcessHealingSpoilage(player);
         
@@ -414,29 +411,6 @@ public class MaintenanceSystem
         player.LastPrayerRealDate = DateTime.MinValue;
         player.LastInnerSanctumRealDate = DateTime.MinValue;
         player.LastBindingOfSoulsRealDate = DateTime.MinValue;
-    }
-    
-    /// <summary>
-    /// Process mental stability recovery
-    /// Pascal: Mental stability increase chance in MAINT.PAS
-    /// </summary>
-    private void ProcessMentalStabilityRecovery(Character player)
-    {
-        if (player.Mental < GameConfig.MaxMentalStability && 
-            random.Next(GameConfig.DailyMentalStabilityChance) == 0)
-        {
-            // v1.1.15: routed through MentalSystem.Change (stops at the addiction cap, skips NPCs);
-            // the message and mail report what was actually applied. Replaced by ApplyDailyReset later.
-            var increase = MentalSystem.Change(player, random.Next(1, GameConfig.MentalStabilityIncrease + 1));
-            if (increase <= 0) return;
-
-            WriteIfNotSilent($"  {player.Name2}: Mental stability increased by {increase}", "bright_green");
-            
-            // Send mail notification (Pascal: mental stability mail)
-            MailSystem.SendSystemMail(player.Name2, "Mental Stability", 
-                "Your Mental Stability increased!", 
-                $"You feel more stable mentally. (+{increase})");
-        }
     }
     
     /// <summary>

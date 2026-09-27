@@ -6188,6 +6188,7 @@
   "combat.mental_tag": "(Your Mental Health is {0})",
   "mental.band_worse": "Mental Health worsens: {0}.",
   "mental.band_better": "Mental Health improves: {0}.",
+  "mental.gain": "Your mind eases. (+{0} Mental)",
   "mental.first_hint": "Mental Health measures your mind's strength. It drops from combat strain, loss and grief, and recovers by resting, praying at the Temple or seeing the Healer. Let it collapse to Broken and you cannot go on until it is treated.",
   "combat.slain_ambush": "You were slain in the ambush!",
   "combat.succumb_wounds": "You succumb to your wounds!",

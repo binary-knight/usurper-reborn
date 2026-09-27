@@ -185,7 +185,7 @@ public static class MentalSystem
     /// None so tomorrow's once-a-day sources are available again. If Mental is above GetCap(c) it
     /// drops straight to the cap and the daily gain is skipped. Otherwise it gains
     /// GameConfig.MentalDailyReset through Change, which stops at the cap. NPCs are skipped and
-    /// return 0. Not called from anywhere yet; the daily-reset wiring is a later piece.
+    /// return 0. Called once per day from DailySystemManager.RunBasicDailyReset only.
     /// </summary>
     public static int ApplyDailyReset(Character c)
     {

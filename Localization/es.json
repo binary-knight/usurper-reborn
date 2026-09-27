@@ -5997,6 +5997,7 @@
   "combat.mental_tag": "(Tu Salud Mental está {0})",
   "mental.band_worse": "La Salud Mental empeora: {0}.",
   "mental.band_better": "La Salud Mental mejora: {0}.",
+  "mental.gain": "Tu mente se serena. (+{0} Salud Mental)",
   "mental.first_hint": "La Salud Mental mide la fortaleza de tu mente. Baja por el esfuerzo en combate, la pérdida y el duelo, y se recupera descansando, orando en el Templo o visitando al Sanador. Si colapsa hasta Roto, no podrás continuar hasta que sea tratada.",
   "combat.slain_ambush": "¡Fuiste abatido en la emboscada!",
   "combat.succumb_wounds": "¡Sucumbes a tus heridas!",

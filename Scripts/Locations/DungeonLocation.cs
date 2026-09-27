@@ -4724,6 +4724,29 @@ public class DungeonLocation : BaseLocation
     }
 
     /// <summary>
+    /// v1.1.15: Mental recovery for a dungeon rest (camp or Safe Haven), gain Mental up to the cap, on
+    /// the player and on every living grouped human follower resting with them (NPC teammates and
+    /// companions are skipped by MentalSystem). Rides the one-rest-per-floor limit the callers
+    /// already enforce; no daily flag. Each player who gained gets the gain line and the band
+    /// announcement on their own terminal.
+    /// </summary>
+    internal void ApplyRestMentalRecovery(int gain)
+    {
+        var player = GetCurrentPlayer();
+        if (player == null) return;
+        int before = player.Mental;
+        MentalUi.ReportGain(terminal, player, before, MentalSystem.Change(player, gain));
+        foreach (var mate in teammates.ToList())
+        {
+            if (mate == null || !mate.IsGroupedPlayer || !mate.IsAlive || mate.IsNPC || ReferenceEquals(mate, player)) continue;
+            int mateBefore = mate.Mental;
+            int applied = MentalSystem.Change(mate, gain);
+            if (mate.RemoteTerminal != null)
+                MentalUi.ReportGain(mate.RemoteTerminal, mate, mateBefore, applied);
+        }
+    }
+
+    /// <summary>
     /// Move to another room
     /// </summary>
     private async Task MoveToRoom(string targetRoomId)
@@ -7112,6 +7135,8 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine("");
         terminal.SetColor("cyan");
         terminal.WriteLine($"{Loc.Get("combat.bar_hp")}: {player.HP}/{player.MaxHP}  {Loc.Get("combat.bar_mp")}: {player.Mana}/{player.MaxMana}  {Loc.Get("combat.bar_st")}: {player.CurrentCombatStamina}/{player.MaxCombatStamina}");
+
+        ApplyRestMentalRecovery(GameConfig.MentalDungeonCampGain);
 
         MarkRestedOnThisFloor(player);
         // v1.1.12: the camp and a sanctuary share one rest per floor.
@@ -15265,6 +15290,8 @@ public class DungeonLocation : BaseLocation
                 player.PoisonTurns = 0;
                 terminal.WriteLine(Loc.Get("dungeon.sanctuary_cure_poison"), "cyan");
             }
+
+            ApplyRestMentalRecovery(GameConfig.MentalSafeHavenGain);
 
             MarkRestedOnThisFloor(player);
             // v1.1.12: the sanctuary and the [R] camp share one rest per floor.

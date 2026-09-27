@@ -6005,6 +6005,7 @@
   "combat.mental_tag": "(Mentális állapotod {0})",
   "mental.band_worse": "A mentális állapot romlik: {0}.",
   "mental.band_better": "A mentális állapot javul: {0}.",
+  "mental.gain": "Az elméd megnyugszik. (+{0} mentális állapot)",
   "mental.first_hint": "A mentális állapot a tudatod erejét méri. Harci megterheléstől, veszteségtől és gyásztól csökken, és pihenéssel, a Templomban imádkozva vagy a Gyógyítónál gyógyul. Ha Megtörtig zuhan, nem folytathatod, amíg nem kezelik.",
   "combat.slain_ambush": "Elestél a rajtaütésben!",
   "combat.succumb_wounds": "Belehaltál a sebeidbe!",

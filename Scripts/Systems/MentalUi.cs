@@ -21,6 +21,19 @@ public static class MentalUi
     }
 
     /// <summary>
+    /// A recovery source's gain: when applied is above 0 prints one short line with the amount
+    /// ("mental.gain") and then the band announcement. applied 0 (at the cap, or the source was
+    /// already used today) prints nothing. Skips a null terminal or player and NPCs.
+    /// </summary>
+    public static void ReportGain(TerminalEmulator terminal, Character player, int mentalBefore, int applied)
+    {
+        if (terminal == null || player == null || player.IsNPC || applied <= 0) return;
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine(Loc.Get("mental.gain", applied));
+        AnnounceMentalChange(terminal, player, mentalBefore);
+    }
+
+    /// <summary>
     /// Compares mentalBefore's band to the player's current Mental band and, if it changed, prints
     /// a band-change line (worse when Mental moved toward Broken, better when it moved toward
     /// Stable). On the first time Mental is below Stable (MentalHintShown false) also prints a
