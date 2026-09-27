@@ -173,44 +173,76 @@ public class Mental1115Tests
         c.MentalStrainRemainder.Should().Be(0);
     }
 
-    // Class and race multipliers
+    // Race x class multipliers (v1.1.15 piece 4: the revised product table)
 
     [Theory]
-    [InlineData(CharacterClass.Cleric, CharacterRace.Human, 80)]
-    [InlineData(CharacterClass.Paladin, CharacterRace.Human, 80)]
-    [InlineData(CharacterClass.Tidesworn, CharacterRace.Human, 80)]
-    [InlineData(CharacterClass.Sage, CharacterRace.Human, 85)]
-    [InlineData(CharacterClass.Barbarian, CharacterRace.Human, 90)]
-    [InlineData(CharacterClass.Warrior, CharacterRace.Troll, 90)]
-    [InlineData(CharacterClass.Warrior, CharacterRace.Orc, 90)]
-    [InlineData(CharacterClass.Warrior, CharacterRace.Gnoll, 90)]
-    [InlineData(CharacterClass.MysticShaman, CharacterRace.Troll, 90)]
     [InlineData(CharacterClass.Warrior, CharacterRace.Human, 100)]
-    [InlineData(CharacterClass.Magician, CharacterRace.Elf, 100)]
-    public void Each_multiplier_group_scales_strain(CharacterClass cls, CharacterRace race, int pct)
-    {
+    [InlineData(CharacterClass.Warrior, CharacterRace.Troll, 80)]
+    [InlineData(CharacterClass.Warrior, CharacterRace.Orc, 80)]
+    [InlineData(CharacterClass.Warrior, CharacterRace.Gnoll, 80)]
+    [InlineData(CharacterClass.Warrior, CharacterRace.Mutant, 80)]
+    [InlineData(CharacterClass.Warrior, CharacterRace.Elf, 120)]
+    [InlineData(CharacterClass.Warrior, CharacterRace.Hobbit, 120)]
+    [InlineData(CharacterClass.Warrior, CharacterRace.HalfElf, 110)]
+    [InlineData(CharacterClass.Warrior, CharacterRace.Gnome, 110)]
+    [InlineData(CharacterClass.Warrior, CharacterRace.Dwarf, 100)]
+    [InlineData(CharacterClass.Assassin, CharacterRace.Human, 85)]
+    [InlineData(CharacterClass.Abysswarden, CharacterRace.Human, 85)]
+    [InlineData(CharacterClass.Voidreaver, CharacterRace.Human, 85)]
+    [InlineData(CharacterClass.Barbarian, CharacterRace.Human, 90)]
+    [InlineData(CharacterClass.Cleric, CharacterRace.Human, 90)]
+    [InlineData(CharacterClass.Paladin, CharacterRace.Human, 90)]
+    [InlineData(CharacterClass.Tidesworn, CharacterRace.Human, 90)]
+    [InlineData(CharacterClass.Bard, CharacterRace.Human, 110)]
+    [InlineData(CharacterClass.Jester, CharacterRace.Human, 110)]
+    [InlineData(CharacterClass.Sage, CharacterRace.Human, 85)]
+    [InlineData(CharacterClass.Magician, CharacterRace.Human, 100)]
+    [InlineData(CharacterClass.MysticShaman, CharacterRace.Troll, 80)]
+    public void Each_race_and_class_group_has_its_percent(CharacterClass cls, CharacterRace race, int pct) =>
         MentalSystem.GetStrainPct(cls, race).Should().Be(pct);
+
+    [Theory]
+    [InlineData(CharacterClass.Sage, CharacterRace.Troll, 68)]        // 0.8 x 0.85
+    [InlineData(CharacterClass.Bard, CharacterRace.Elf, 132)]         // 1.2 x 1.1
+    [InlineData(CharacterClass.Warrior, CharacterRace.Human, 100)]    // 1.0 x 1.0
+    [InlineData(CharacterClass.Cleric, CharacterRace.Troll, 72)]      // 0.8 x 0.9
+    [InlineData(CharacterClass.Jester, CharacterRace.Hobbit, 132)]    // 1.2 x 1.1
+    public void Race_and_class_multiply(CharacterClass cls, CharacterRace race, int pct) =>
+        MentalSystem.GetStrainPct(cls, race).Should().Be(pct);
+
+    [Theory]
+    [InlineData(CharacterClass.Sage, CharacterRace.HalfElf, 94)]      // 93.5 rounds half up
+    [InlineData(CharacterClass.Assassin, CharacterRace.Gnome, 94)]    // 93.5 rounds half up
+    public void A_half_percent_rounds_up(CharacterClass cls, CharacterRace race, int pct) =>
+        MentalSystem.GetStrainPct(cls, race).Should().Be(pct);
+
+    [Theory]
+    [InlineData(CharacterClass.Sage, CharacterRace.Troll, 68_000)]
+    [InlineData(CharacterClass.Cleric, CharacterRace.Human, 90_000)]
+    public void The_multiplier_scales_strain_units(CharacterClass cls, CharacterRace race, int units)
+    {
         var c = Hero(cls: cls, race: race);
-        MentalSystem.AddStrain(c, 1000, 0).Should().Be(pct == 100 ? 1 : 0);
-        c.MentalStrainRemainder.Should().Be(pct == 100 ? 0 : pct * 1000);
+        MentalSystem.AddStrain(c, 1000, 0).Should().Be(0);
+        c.MentalStrainRemainder.Should().Be(units);
+    }
+
+    [Fact]
+    public void A_sensitive_race_loses_a_point_on_less_than_1000()
+    {
+        var c = Hero(cls: CharacterClass.Bard, race: CharacterRace.Elf);   // 132
+        MentalSystem.AddStrain(c, 1000, 0).Should().Be(1);
+        c.MentalStrainRemainder.Should().Be(32_000);
+        c.Mental.Should().Be(99);
     }
 
     [Fact]
     public void Cleric_loses_a_point_on_the_second_1000()
     {
         var c = Hero(cls: CharacterClass.Cleric);
-        MentalSystem.AddStrain(c, 1000, 0).Should().Be(0);   // 80_000
-        MentalSystem.AddStrain(c, 1000, 0).Should().Be(1);   // 160_000
-        c.MentalStrainRemainder.Should().Be(60_000);
+        MentalSystem.AddStrain(c, 1000, 0).Should().Be(0);   // 90_000
+        MentalSystem.AddStrain(c, 1000, 0).Should().Be(1);   // 180_000
+        c.MentalStrainRemainder.Should().Be(80_000);
     }
-
-    [Theory]
-    [InlineData(CharacterClass.Cleric, CharacterRace.Troll, 80)]
-    [InlineData(CharacterClass.Sage, CharacterRace.Orc, 85)]
-    [InlineData(CharacterClass.Barbarian, CharacterRace.Gnoll, 90)]
-    [InlineData(CharacterClass.Paladin, CharacterRace.Human, 80)]
-    public void Class_and_race_both_qualifying_take_the_lower(CharacterClass cls, CharacterRace race, int pct) =>
-        MentalSystem.GetStrainPct(cls, race).Should().Be(pct);
 
     // Companion cut
 
@@ -231,9 +263,9 @@ public class Mental1115Tests
     [Fact]
     public void Companion_cut_stacks_with_the_class_multiplier()
     {
-        var c = Hero(cls: CharacterClass.Cleric);
+        var c = Hero(cls: CharacterClass.Cleric);   // 90
         MentalSystem.AddStrain(c, 1000, 2).Should().Be(0);
-        c.MentalStrainRemainder.Should().Be(64_000);
+        c.MentalStrainRemainder.Should().Be(72_000);
     }
 
     // NPC

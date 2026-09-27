@@ -862,6 +862,8 @@ public partial class CombatEngine
 
         // Store player reference for combat speed setting
         currentPlayer = player;
+        // v1.1.15: Mental before the fight, so the fight-end announcement covers every loss taken in it
+        int mentalAtFightStart = player.Mental;
 
         // v1.1.11: the Team HQ levels of this moment (a teammate may have upgraded, or the player changed team)
         if (DoorMode.IsOnlineMode)
@@ -2211,6 +2213,11 @@ public partial class CombatEngine
         player.ShamanEnchantPower = 0;
         player.UnmakingCooldown = 0;
         player.DelugeCooldown = 0;
+
+        // v1.1.15: Mental fight-end losses (strain, flee, near death, boss, Old God), one net change and
+        // one announcement per player. Strain only in the dungeon, on the leader's floor.
+        int mentalFloor = player.Location == (int)GameLocation.Dungeons ? Math.Max(1, player.LastDungeonFloor) : 0;
+        ApplyMentalFightEnd(result, mentalFloor, globalEscape, BossContext != null, terminal, mentalAtFightStart);
 
         // v0.60.3: GMCP Char.Combat.End — single return point for PlayerVsMonsters
         // means MUD client scripts get a clean "leaving combat" signal regardless
@@ -22185,6 +22192,39 @@ public partial class CombatEngine
     /// <summary>
     /// Handle player death with resurrection options
     /// </summary>
+    /// <summary>
+    /// v1.1.15: Mental fight-end losses for a monster fight. The leader and every living grouped
+    /// human follower each take one net change (MentalSystem.ApplyFightEnd) and one announcement;
+    /// NPC teammates, companions, echoes and pets are skipped. PvP (a result with an Opponent),
+    /// arrest and exhibition fights are exempt. A leader who died this fight (the death loss is
+    /// taken in HandlePlayerDeath) takes the strain and boss losses but not flee or near death.
+    /// leaderMentalBefore is the leader's Mental at fight start, so the one announcement also
+    /// covers the death loss.
+    /// </summary>
+    internal static void ApplyMentalFightEnd(CombatResult result, int floor, bool fled, bool oldGod,
+        TerminalEmulator? terminal, int leaderMentalBefore)
+    {
+        var leader = result?.Player;
+        if (leader == null || result!.Opponent != null || leader.IsArrestCombat || leader.IsExhibitionCombat) return;
+
+        bool boss = result.Monsters?.Any(m => m != null && (m.IsBoss || m.IsMiniBoss)) == true;
+        oldGod |= result.Monsters?.Any(m => m != null && m.FamilyName == "OldGod") == true;
+        int companions = MentalSystem.CountStoryCompanions(result.Teammates);
+        bool died = result.PlayerActuallyDied;
+
+        MentalSystem.ApplyFightEnd(leader, floor, companions, fled && !died, !died && MentalSystem.IsNearDeath(leader), boss, oldGod);
+        if (terminal != null) MentalUi.AnnounceMentalChange(terminal, leader, leaderMentalBefore);
+
+        if (result.Teammates == null) return;
+        foreach (var mate in result.Teammates.ToList())
+        {
+            if (mate == null || !mate.IsGroupedPlayer || !mate.IsAlive || mate.IsNPC || ReferenceEquals(mate, leader)) continue;
+            int before = mate.Mental;
+            MentalSystem.ApplyFightEnd(mate, floor, companions, fled, MentalSystem.IsNearDeath(mate), boss, oldGod);
+            if (mate.RemoteTerminal != null) MentalUi.AnnounceMentalChange(mate.RemoteTerminal, mate, before);
+        }
+    }
+
     private async Task HandlePlayerDeath(CombatResult result)
     {
         // v0.61.2 Last-Stand cap: every monster / boss / environmental damage
@@ -22279,6 +22319,14 @@ public partial class CombatEngine
             DebugLogger.Instance.LogInfo("EXHIBITION",
                 $"{result.Player.Name} dropped in exhibition combat (no resurrection consumed).");
             return;
+        }
+
+        // v1.1.15: Mental death loss, once per fight, before the save, permadeath and resurrection
+        // paths below. Announced with the other fight-end losses at the end of PlayerVsMonsters.
+        if (!result.MentalDeathApplied)
+        {
+            result.MentalDeathApplied = true;
+            MentalSystem.ApplyDeath(result.Player);
         }
 
         // v0.60.0 beta: track total deaths for stats/analytics. The cap that
@@ -31596,6 +31644,8 @@ public class CombatResult
     // PlayerEscaped so callers don't apply double penalties. PlayerActuallyDied
     // stays true so GMCP / news / telemetry can report the truth.
     public bool PlayerActuallyDied { get; set; }
+    // v1.1.15: the Mental death loss was already taken this fight (applied once)
+    public bool MentalDeathApplied { get; set; }
 }
 
 /// <summary>

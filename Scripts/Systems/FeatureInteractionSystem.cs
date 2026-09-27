@@ -1315,7 +1315,10 @@ public class FeatureInteractionSystem
 
         // The memory system uses enum-based fragments, so just display the thematic text
         // This creates atmosphere without requiring tight integration
-        player.Mental = Math.Min(100, player.Mental + 1); // Slight mental boost from memory recovery
+        // Slight mental boost from memory recovery. v1.1.15: through MentalSystem.Change (capped)
+        int mentalBefore = player.Mental;
+        MentalSystem.Change(player, GameConfig.MentalMemoryRecoveryGain);
+        MentalUi.AnnounceMentalChange(terminal, player, mentalBefore);
 
         terminal.SetColor("bright_cyan");
         terminal.WriteLine(Loc.Get("feature.memory_fades"));

@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace UsurperRemake.Systems;
 
@@ -67,39 +69,47 @@ public static class MentalSystem
         if (c == null || c.IsNPC) return 0;
         int before = c.Mental;
         int after;
+        // The sum is taken in long so an absurd delta (int.MaxValue, int.MinValue) cannot wrap.
         if (delta > 0)
         {
             int cap = GetCap(c);
-            after = before >= cap ? before : Math.Min(before + delta, cap);
+            after = before >= cap ? before : (int)Math.Min((long)before + delta, cap);
         }
         else
         {
-            after = Math.Max(before + delta, 0);
+            after = (int)Math.Max((long)before + delta, 0L);
         }
         c.Mental = after;
         return after - before;
     }
 
     /// <summary>
-    /// Strain percentage for class and race. When both qualify the lower (kinder) value is taken,
-    /// for example a Troll Cleric takes 80. MysticShaman has no class entry; as it is Troll, Orc or
-    /// Gnoll only, it lands on 90 through its race.
+    /// Strain percentage for race and class: the race percent times the class percent, divided by
+    /// 100 and rounded half up to a whole percent, computed as (racePct x classPct + 50) / 100 in
+    /// integer math. Race: Troll, Orc, Gnoll, Mutant 80; Elf, Hobbit 120; HalfElf, Gnome 110;
+    /// others 100. Class: Assassin, Abysswarden, Voidreaver 85; Barbarian 90; Cleric, Paladin,
+    /// Tidesworn 90; Bard, Jester 110; Sage 85; others 100. Examples: Troll Sage 68, Elf Bard 132,
+    /// HalfElf Sage 93.5 rounds to 94.
     /// </summary>
     public static int GetStrainPct(CharacterClass cls, CharacterRace race)
     {
-        int classPct = cls switch
-        {
-            CharacterClass.Cleric or CharacterClass.Paladin or CharacterClass.Tidesworn => GameConfig.MentalStrainPctDevout,
-            CharacterClass.Sage => GameConfig.MentalStrainPctSage,
-            CharacterClass.Barbarian => GameConfig.MentalStrainPctHardy,
-            _ => 100
-        };
         int racePct = race switch
         {
-            CharacterRace.Troll or CharacterRace.Orc or CharacterRace.Gnoll => GameConfig.MentalStrainPctHardy,
+            CharacterRace.Troll or CharacterRace.Orc or CharacterRace.Gnoll or CharacterRace.Mutant => GameConfig.MentalStrainRacePctHardy,
+            CharacterRace.Elf or CharacterRace.Hobbit => GameConfig.MentalStrainRacePctSensitive,
+            CharacterRace.HalfElf or CharacterRace.Gnome => GameConfig.MentalStrainRacePctUneasy,
             _ => 100
         };
-        return Math.Min(classPct, racePct);
+        int classPct = cls switch
+        {
+            CharacterClass.Assassin or CharacterClass.Abysswarden or CharacterClass.Voidreaver => GameConfig.MentalStrainClassPctDark,
+            CharacterClass.Barbarian => GameConfig.MentalStrainClassPctBarbarian,
+            CharacterClass.Cleric or CharacterClass.Paladin or CharacterClass.Tidesworn => GameConfig.MentalStrainClassPctDevout,
+            CharacterClass.Bard or CharacterClass.Jester => GameConfig.MentalStrainClassPctPerformer,
+            CharacterClass.Sage => GameConfig.MentalStrainClassPctSage,
+            _ => 100
+        };
+        return (racePct * classPct + 50) / 100;
     }
 
     /// <summary>Companion cut in percent: 10 per story companion in the party, at most 20.</summary>
@@ -117,14 +127,57 @@ public static class MentalSystem
     /// </summary>
     public static int AddStrain(Character c, int perMille, int storyCompanionsInParty)
     {
-        if (c == null || c.IsNPC || perMille <= 0) return 0;
-        long scaled = (long)perMille * GetStrainPct(c.Class, c.Race) * (100 - GetCompanionCutPct(storyCompanionsInParty)) / 100;
-        long total = c.MentalStrainRemainder + scaled;
-        int points = (int)(total / StrainUnitsPerPoint);
-        c.MentalStrainRemainder = (int)(total % StrainUnitsPerPoint);
+        if (c == null || c.IsNPC) return 0;
+        int points = TakeStrainPoints(c, perMille, storyCompanionsInParty);
         if (points == 0) return 0;
         return -Change(c, -points);
     }
+
+    /// <summary>Scales the strain, updates the remainder and returns the whole points it costs, without applying them.</summary>
+    private static int TakeStrainPoints(Character c, int perMille, int storyCompanionsInParty)
+    {
+        if (perMille <= 0) return 0;
+        long scaled = (long)perMille * GetStrainPct(c.Class, c.Race) * (100 - GetCompanionCutPct(storyCompanionsInParty)) / 100;
+        long total = c.MentalStrainRemainder + scaled;
+        c.MentalStrainRemainder = (int)(total % StrainUnitsPerPoint);
+        return (int)Math.Min(total / StrainUnitsPerPoint, int.MaxValue);
+    }
+
+    /// <summary>Story companions (Lyris, Aldric, Mira, Vex, Melodia) alive in the party; dead ones do not count.</summary>
+    public static int CountStoryCompanions(IEnumerable<Character>? party) =>
+        party?.Count(t => t != null && t.IsAlive && t.IsCompanion && t.CompanionId.HasValue) ?? 0;
+
+    /// <summary>At or below GameConfig.MentalNearDeathHpPct of max HP and still standing.</summary>
+    public static bool IsNearDeath(Character c) =>
+        c != null && c.MaxHP > 0 && c.HP > 0 && c.HP * 100 <= c.MaxHP * GameConfig.MentalNearDeathHpPct;
+
+    /// <summary>Strain for entering a new dungeon room: floor x MentalRoomStrainPerFloor per mille. Returns points lost.</summary>
+    public static int ApplyRoomStrain(Character c, int floor, int storyCompanionsInParty) =>
+        floor <= 0 ? 0 : AddStrain(c, floor * GameConfig.MentalRoomStrainPerFloor, storyCompanionsInParty);
+
+    /// <summary>Flat fight-end losses: flee, near death, and an Old God (which replaces the boss loss) or a boss.</summary>
+    public static int GetFightEndFlatLoss(bool fled, bool nearDeath, bool boss, bool oldGod) =>
+        (fled ? GameConfig.MentalFleeLoss : 0)
+        + (nearDeath ? GameConfig.MentalNearDeathLoss : 0)
+        + (oldGod ? GameConfig.MentalOldGodLoss : boss ? GameConfig.MentalBossLoss : 0);
+
+    /// <summary>
+    /// Monster fight end as one net change: the strain points (floor x MentalFightStrainPerFloor per
+    /// mille, through the race x class multiplier and the companion cut) plus the flat losses, applied
+    /// by a single Change. Floor 0 (outside the dungeon) adds no strain. Returns the change applied
+    /// (0 or negative). NPCs are skipped.
+    /// </summary>
+    public static int ApplyFightEnd(Character c, int floor, int storyCompanionsInParty, bool fled, bool nearDeath, bool boss, bool oldGod)
+    {
+        if (c == null || c.IsNPC) return 0;
+        int points = floor <= 0 ? 0 : TakeStrainPoints(c, floor * GameConfig.MentalFightStrainPerFloor, storyCompanionsInParty);
+        long loss = (long)points + GetFightEndFlatLoss(fled, nearDeath, boss, oldGod);
+        if (loss <= 0) return 0;
+        return Change(c, (int)-Math.Min(loss, int.MaxValue));
+    }
+
+    /// <summary>Death in a monster fight: MentalDeathLoss. Returns the change applied.</summary>
+    public static int ApplyDeath(Character c) => Change(c, -GameConfig.MentalDeathLoss);
 
     /// <summary>
     /// Daily reset and returns the change actually applied. Clears MentalRecoveryUsedToday to

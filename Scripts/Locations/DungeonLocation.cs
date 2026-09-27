@@ -4701,6 +4701,29 @@ public class DungeonLocation : BaseLocation
     }
 
     /// <summary>
+    /// v1.1.15: Mental strain for entering a new room, floor x GameConfig.MentalRoomStrainPerFloor per
+    /// mille, on the player and on every living grouped human follower (NPC teammates and companions
+    /// are skipped by MentalSystem). Living story companions in the party cut the strain. Each player
+    /// whose Mental changed gets the band announcement on their own terminal.
+    /// </summary>
+    internal void ApplyRoomMentalStrain()
+    {
+        var player = GetCurrentPlayer();
+        if (player == null) return;
+        int companions = MentalSystem.CountStoryCompanions(teammates);
+        int before = player.Mental;
+        if (MentalSystem.ApplyRoomStrain(player, currentDungeonLevel, companions) > 0)
+            MentalUi.AnnounceMentalChange(terminal, player, before);
+        foreach (var mate in teammates.ToList())
+        {
+            if (mate == null || !mate.IsGroupedPlayer || !mate.IsAlive || mate.IsNPC || ReferenceEquals(mate, player)) continue;
+            int mateBefore = mate.Mental;
+            if (MentalSystem.ApplyRoomStrain(mate, currentDungeonLevel, companions) > 0 && mate.RemoteTerminal != null)
+                MentalUi.AnnounceMentalChange(mate.RemoteTerminal, mate, mateBefore);
+        }
+    }
+
+    /// <summary>
     /// Move to another room
     /// </summary>
     private async Task MoveToRoom(string targetRoomId)
@@ -4805,6 +4828,8 @@ public class DungeonLocation : BaseLocation
             // Room discovery message
             terminal.SetColor(GetThemeColor(currentFloor.Theme));
             terminal.WriteLine(Loc.Get("dungeon.you_enter_room", targetRoom.Name));
+            // v1.1.15: Mental strain for a new room, both modes, leader and grouped followers
+            ApplyRoomMentalStrain();
             await Task.Delay(500);
 
             // Check for seal discovery on this floor

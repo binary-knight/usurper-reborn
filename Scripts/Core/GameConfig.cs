@@ -1651,11 +1651,27 @@ public static partial class GameConfig
     public const float MentalShakenCombatPenalty = 0.05f;     // Positive magnitude: 5% damage and defence lost when Shaken
     public const float MentalBreakingCombatPenalty = 0.10f;   // Positive magnitude: 10% lost when Breaking or Broken
     public const int MentalStrainPerPoint = 1000;             // Strain is per mille: every full 1000 costs 1 Mental
-    public const int MentalStrainPctDevout = 80;              // Cleric, Paladin, Tidesworn take 80% of dungeon strain
-    public const int MentalStrainPctSage = 85;                // Sage takes 85%
-    public const int MentalStrainPctHardy = 90;               // Barbarian class; Troll, Orc, Gnoll races take 90%
+    // Strain multipliers, race x class, in percent (MentalSystem.GetStrainPct multiplies the two)
+    public const int MentalStrainRacePctHardy = 80;           // Troll, Orc, Gnoll, Mutant
+    public const int MentalStrainRacePctSensitive = 120;      // Elf, Hobbit
+    public const int MentalStrainRacePctUneasy = 110;         // HalfElf, Gnome
+    public const int MentalStrainClassPctDark = 85;           // Assassin, Abysswarden, Voidreaver
+    public const int MentalStrainClassPctBarbarian = 90;      // Barbarian
+    public const int MentalStrainClassPctDevout = 90;         // Cleric, Paladin, Tidesworn
+    public const int MentalStrainClassPctPerformer = 110;     // Bard, Jester
+    public const int MentalStrainClassPctSage = 85;           // Sage
     public const int MentalStrainCompanionCutPct = 10;        // Each story companion in the party cuts strain 10%
     public const int MentalStrainCompanionCutMaxPct = 20;     // Companion cut stops at 20%
+    // Loss sources (piece 4): strain is per mille per floor, the rest are flat Mental points
+    public const int MentalRoomStrainPerFloor = 4;            // New dungeon room: floor x 4 per mille
+    public const int MentalFightStrainPerFloor = 12;          // Monster fight end in the dungeon: floor x 12 per mille
+    public const int MentalFleeLoss = 2;                      // Fled a monster fight
+    public const int MentalNearDeathLoss = 4;                 // Ended a monster fight at or below MentalNearDeathHpPct of max HP
+    public const int MentalNearDeathHpPct = 15;
+    public const int MentalBossLoss = 3;                      // Fought a floor boss or mini-boss
+    public const int MentalOldGodLoss = 8;                    // Fought an Old God (replaces the boss loss, does not stack)
+    public const int MentalDeathLoss = 12;                    // Died in a monster fight
+    public const int MentalMemoryRecoveryGain = 1;            // Recovering a lost memory fragment (FeatureInteractionSystem)
     public const int MentalDailyReset = 10;                   // Daily gain applied by MentalSystem.ApplyDailyReset
     public const int MentalSchemaCurrent = 1;                 // Current Mental save schema; below this, restore resets Mental to full and stamps this
     public const int MaxWillowDraughts = 3;                   // Healer Willow Draught: carryable cap

@@ -86,7 +86,7 @@ public class Character
     public string? PendingGroupDeath { get; set; }
 
     public int GnollP { get; set; }                 // gnoll poison, temporary
-    public int Mental { get; set; }                 // mental health
+    public int Mental { get; set; } = GameConfig.MaxMentalStability; // mental health; v1.1.15: a bare Character starts full, not Broken
     // v1.1.15: 0 means a save written before the Mental schema existed; GameEngine restore resets
     // Mental to full and stamps the current schema for those. A fresh Character starts current.
     public int MentalSchema { get; set; } = GameConfig.MentalSchemaCurrent;

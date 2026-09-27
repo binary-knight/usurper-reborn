@@ -98,10 +98,8 @@ public class DungeonDangerLabel1114Tests
     {
         var output = new MemoryStream();
         var term = new TerminalEmulator(new LineStream(Array.Empty<string>()), output);
-        // Mental = 100 (v1.1.15): a bare Character defaults Mental to 0 (Broken), but every real
-        // character is created or loaded at 100 or higher (CharacterCreationSystem, GameEngine's
-        // schema guard); a plain 0 here is a test-fixture artifact, not a state a real dungeon
-        // test character would ever be in, and it now shows up as an unwanted Broken tag.
+        // Mental = 100 (v1.1.15): a bare Character now defaults Mental to 100 as well; kept
+        // explicit so this fixture never shows a Mental tag whatever the default becomes.
         var hero = new Character { Name1 = "dng", Name2 = "Dng", Class = CharacterClass.Warrior, Level = 12, HP = 390, MaxHP = 390, AI = CharacterAI.Human, Mental = 100 };
         var d = new DungeonLocation();
         typeof(BaseLocation).GetField("terminal", F)!.SetValue(d, term);
