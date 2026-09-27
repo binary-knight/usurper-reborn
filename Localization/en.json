@@ -2289,6 +2289,7 @@
   "healer.willow_price": "Price: {0} gold each. You carry {1} of {2}.",
   "healer.willow_cant_afford": "You cannot afford a Willow Draught.",
   "healer.tax_willow": "Willow Draught",
+  "healer.tax_therapy": "Talk Therapy",
   "healer.willow_confirm": "Buy one Willow Draught (Y/N)? ",
   "healer.willow_bought": "You now carry {0} of {1} Willow Draughts.",
   "healer.tax_mana_potions": "Mana Potions",

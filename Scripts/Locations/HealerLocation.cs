@@ -480,7 +480,7 @@ public class HealerLocation : BaseLocation
         terminal.WriteLine(Loc.Get("healer.menu_decurse", $"{CalculateDiseaseCost(CursedItemBaseCost, player.Level):N0}"));
         long rehabCost = GameConfig.RehabBaseCost + (player.Addict * GameConfig.RehabPerAddictionCost);
         terminal.WriteLine(Loc.Get("healer.menu_addiction", $"{rehabCost:N0}"));
-        terminal.WriteLine(Loc.Get("healer.menu_therapy", $"{MentalSystem.TherapyCost(player):N0}"));
+        terminal.WriteLine(Loc.Get("healer.menu_therapy", $"{CityControlSystem.CalculateHealingTaxedPrice(MentalSystem.TherapyCost(player)).total:N0}"));
         terminal.WriteLine(Loc.Get("healer.menu_willow", $"{CityControlSystem.CalculateHealingTaxedPrice(MentalSystem.WillowDraughtPrice(player.Level)).total:N0}", GameConfig.MentalWillowDraughtGain, GameConfig.MaxWillowDraughts));
         terminal.WriteLine(Loc.Get("healer.menu_status"));
         terminal.WriteLine(Loc.Get("healer.menu_return"));
@@ -1371,8 +1371,9 @@ public class HealerLocation : BaseLocation
 
     /// <summary>
     /// v1.1.15 talk therapy: restores Mental to the maximum, even above the addiction cap, and
-    /// clears the Broken affliction, for MentalSystem.TherapyCost gold (untaxed). Nothing to treat
-    /// charges nothing; short of gold is refused before the confirm.
+    /// clears the Broken affliction, for MentalSystem.TherapyCost gold plus the healing tax, as the
+    /// Healer's other services charge. Nothing to treat charges nothing; short of gold for the
+    /// taxed total is refused before the confirm.
     /// </summary>
     private async Task TalkTherapy()
     {
@@ -1387,13 +1388,15 @@ public class HealerLocation : BaseLocation
         }
 
         long cost = MentalSystem.TherapyCost(player);
+        var (_, _, costWithTax) = CityControlSystem.CalculateHealingTaxedPrice(cost);
         WriteSectionHeader(Loc.Get("healer.therapy_title"), "bright_magenta");
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("healer.therapy_intro", Manager), "cyan");
-        terminal.WriteLine(Loc.Get("healer.therapy_quote", player.Mental, GameConfig.MaxMentalStability, $"{cost:N0}"), "white");
+        terminal.WriteLine(Loc.Get("healer.therapy_quote", player.Mental, GameConfig.MaxMentalStability, $"{costWithTax:N0}"), "white");
+        CityControlSystem.Instance.DisplayTaxBreakdown(terminal, Loc.Get("healer.tax_therapy"), cost);
         terminal.WriteLine("");
 
-        if (player.Gold < cost)
+        if (player.Gold < costWithTax)
         {
             terminal.WriteLine(Loc.Get("healer.therapy_cant_afford", player.Name2), "red");
             await terminal.PressAnyKey();
@@ -1407,8 +1410,9 @@ public class HealerLocation : BaseLocation
             return;
         }
 
-        player.Gold -= cost;
-        player.Statistics.RecordGoldSpent(cost);
+        player.Gold -= costWithTax;
+        player.Statistics.RecordGoldSpent(costWithTax);
+        CityControlSystem.Instance.ProcessSaleTax(cost);
         bool wasBroken = player.MentalBroken;
         int mentalBefore = player.Mental;
         int restored = MentalSystem.RestoreFull(player);
@@ -1418,7 +1422,7 @@ public class HealerLocation : BaseLocation
         MentalUi.ReportGain(terminal, player, mentalBefore, restored);
         if (wasBroken)
             terminal.WriteLine(Loc.Get("mental.broken_cleared"), "bright_green");
-        terminal.WriteLine(Loc.Get("healer.cost_line", $"{cost:N0}"), "yellow");
+        terminal.WriteLine(Loc.Get("healer.cost_line", $"{costWithTax:N0}"), "yellow");
         await terminal.PressAnyKey();
     }
 

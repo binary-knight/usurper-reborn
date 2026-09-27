@@ -2289,6 +2289,7 @@
   "healer.willow_price": "Prix : {0} or l'unité. Vous en portez {1} sur {2}.",
   "healer.willow_cant_afford": "Vous n'avez pas de quoi payer un Élixir de saule.",
   "healer.tax_willow": "Élixir de saule",
+  "healer.tax_therapy": "Thérapie par la parole",
   "healer.willow_confirm": "Acheter un Élixir de saule (Y/N)? ",
   "healer.willow_bought": "Vous portez maintenant {0} Élixirs de saule sur {1}.",
   "healer.tax_mana_potions": "Potions de mana",

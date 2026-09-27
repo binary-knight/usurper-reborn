@@ -2289,6 +2289,7 @@
   "healer.willow_price": "Ár: {0} arany darabja. Nálad van: {1} / {2}.",
   "healer.willow_cant_afford": "Nem telik fűzfa főzetre.",
   "healer.tax_willow": "Fűzfa főzet",
+  "healer.tax_therapy": "Beszélgetős terápia",
   "healer.willow_confirm": "Veszel egy fűzfa főzetet (Y = Igen/N = Nem)? ",
   "healer.willow_bought": "Most {0} / {1} fűzfa főzet van nálad.",
   "healer.tax_mana_potions": "Mana-főzetek",

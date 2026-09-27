@@ -2289,6 +2289,7 @@
   "healer.willow_price": "Precio: {0} de oro cada uno. Llevas {1} de {2}.",
   "healer.willow_cant_afford": "No puedes pagar un Tónico de Sauce.",
   "healer.tax_willow": "Tónico de Sauce",
+  "healer.tax_therapy": "Terapia",
   "healer.willow_confirm": "¿Comprar un Tónico de Sauce (S/N)? ",
   "healer.willow_bought": "Ahora llevas {0} de {1} Tónicos de Sauce.",
   "healer.tax_mana_potions": "Pociones de Maná",

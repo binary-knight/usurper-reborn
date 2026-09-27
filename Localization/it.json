@@ -2289,6 +2289,7 @@
   "healer.willow_price": "Prezzo: {0} oro l'uno. Ne porti {1} su {2}.",
   "healer.willow_cant_afford": "Non puoi permetterti un Infuso di salice.",
   "healer.tax_willow": "Infuso di salice",
+  "healer.tax_therapy": "Terapia della parola",
   "healer.willow_confirm": "Comprare un Infuso di salice (S/N)? ",
   "healer.willow_bought": "Ora porti {0} Infusi di salice su {1}.",
   "healer.tax_mana_potions": "Pozioni di Mana",
