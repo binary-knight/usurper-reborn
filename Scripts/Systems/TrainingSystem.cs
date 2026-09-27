@@ -1149,6 +1149,10 @@ public static class TrainingSystem
             terminal.WriteLine(Loc.Get("training.progress_update", skillName, progress, needed, trainingPointsToSpend), "green");
         }
 
+        // v1.1.15: a training session eases the mind, once a day (shared Learning day)
+        int mentalBeforeTraining = player.Mental;
+        MentalUi.ReportGain(terminal, player, mentalBeforeTraining, MentalSystem.ApplyLearning(player));
+
         // Auto-save after training
         await SaveSystem.Instance.AutoSave(player);
 

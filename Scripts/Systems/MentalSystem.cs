@@ -269,6 +269,25 @@ public static class MentalSystem
     }
 
     /// <summary>
+    /// Talking with an NPC: MentalFriendTalkGain once a day (FriendTalk) when the NPC is a friend
+    /// by IsFriend, the same test the Inn table uses. Anyone else gives 0 and leaves the day unspent.
+    /// Returns the change applied.
+    /// </summary>
+    public static int ApplyFriendTalk(Character player, Character npc) =>
+        IsFriend(player, npc) ? TryDailyGain(player, MentalDailySource.FriendTalk, GameConfig.MentalFriendTalkGain) : 0;
+
+    /// <summary>First wilderness exploration of the day: MentalWildernessGain once a day (Wilderness). Returns the change applied.</summary>
+    public static int ApplyWilderness(Character c) =>
+        TryDailyGain(c, MentalDailySource.Wilderness, GameConfig.MentalWildernessGain);
+
+    /// <summary>
+    /// Learning: a new spell, a training session or Library reading. One Learning bit a day shared
+    /// by all three; the first that applies wins. Returns the change applied.
+    /// </summary>
+    public static int ApplyLearning(Character c) =>
+        TryDailyGain(c, MentalDailySource.Learning, GameConfig.MentalLearningGain);
+
+    /// <summary>
     /// Combat penalty from Mental alone, as a positive fraction of damage and defence lost:
     /// 0 for Stable and Strained, 0.05 for Shaken, 0.10 for Breaking and Broken.
     /// Taking the worse of this and Grief, and the -15% Mental plus Fatigue cap, belong to a later

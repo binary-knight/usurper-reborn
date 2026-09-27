@@ -1136,6 +1136,10 @@ public class SettlementLocation : BaseLocation
         currentPlayer.SettlementBuffCombats = GameConfig.SettlementBuffDuration;
         currentPlayer.SettlementBuffValue = GameConfig.SettlementLibraryXPBonus;
 
+        // v1.1.15: Library reading eases the mind, once a day (shared Learning day)
+        int mentalBeforeReading = currentPlayer.Mental;
+        MentalUi.ReportGain(terminal, currentPlayer, mentalBeforeReading, MentalSystem.ApplyLearning(currentPlayer));
+
         await terminal.PressAnyKey();
     }
 

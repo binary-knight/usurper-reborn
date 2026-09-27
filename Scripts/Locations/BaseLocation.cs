@@ -5823,6 +5823,10 @@ public abstract class BaseLocation
             // Small relationship boost for friendly chat
             RelationshipSystem.UpdateRelationship(currentPlayer, npc, 1, 1, false, false);
 
+            // v1.1.15: talking with a friend eases the mind, once a day
+            int mentalBeforeTalk = currentPlayer.Mental;
+            MentalUi.ReportGain(terminal, currentPlayer, mentalBeforeTalk, MentalSystem.ApplyFriendTalk(currentPlayer, npc));
+
             terminal.WriteLine("");
             await terminal.PressAnyKey();
         }

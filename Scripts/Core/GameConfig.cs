@@ -1684,6 +1684,10 @@ public static partial class GameConfig
     public const int MentalSpouseGain = 8;                    // Quality time with a spouse, once a day
     public const int MentalTemplePrayerGain = 10;             // Temple daily prayer, once a day
     public const int MentalConfessionGain = 5;                // Church confession, once a day
+    // Recovery sources (piece 5b), each once a day through MentalSystem.TryDailyGain
+    public const int MentalFriendTalkGain = 5;                // Talking with an NPC friend (MentalSystem.IsFriend)
+    public const int MentalWildernessGain = 6;                // First wilderness exploration of the day
+    public const int MentalLearningGain = 4;                  // Learning: a new spell, a training session or Library reading, one shared day
     public const int MentalSchemaCurrent = 1;                 // Current Mental save schema; below this, restore resets Mental to full and stamps this
     public const int MaxWillowDraughts = 3;                   // Healer Willow Draught: carryable cap
     // Session XP diminishing returns (v0.54.0) — online mode only
