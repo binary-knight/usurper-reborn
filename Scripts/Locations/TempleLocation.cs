@@ -2574,6 +2574,10 @@ public partial class TempleLocation : BaseLocation
             terminal.WriteLine(Loc.Get("temple.prayers_rise_immortal"));
             await Task.Delay(1000);
 
+            // v1.1.15: prayer eases the mind once a day.
+            int mentalBeforeImmortal = currentPlayer.Mental;
+            MentalUi.ReportGain(terminal, currentPlayer, mentalBeforeImmortal, MentalSystem.TryDailyGain(currentPlayer, MentalDailySource.TemplePrayer, GameConfig.MentalTemplePrayerGain));
+
             // Mark prayer as done for today (set LastPrayerRealDate for online mode)
             if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
                 currentPlayer.LastPrayerRealDate = DateTime.UtcNow;
@@ -2682,6 +2686,10 @@ public partial class TempleLocation : BaseLocation
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("temple.prayers_rise_incense"));
         await Task.Delay(1000);
+
+        // v1.1.15: prayer eases the mind once a day.
+        int mentalBeforePrayer = currentPlayer.Mental;
+        MentalUi.ReportGain(terminal, currentPlayer, mentalBeforePrayer, MentalSystem.TryDailyGain(currentPlayer, MentalDailySource.TemplePrayer, GameConfig.MentalTemplePrayerGain));
 
         // Determine prayer response based on god's alignment
         float alignment = (float)(god.Goodness - god.Darkness) / Math.Max(1, god.Goodness + god.Darkness);

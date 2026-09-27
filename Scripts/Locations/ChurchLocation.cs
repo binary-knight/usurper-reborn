@@ -1167,6 +1167,10 @@ namespace UsurperRemake.Locations
             terminal.WriteLine(Loc.Get("church.confess_penance_cost", penanceCost.ToString("N0"), GameConfig.MoneyType), "yellow");
             terminal.WriteLine("");
 
+            // v1.1.15: confession's Mental gain would apply nothing (cap, or used today); say so before charging.
+            if (!MentalSystem.GainAvailable(currentPlayer, MentalDailySource.Confession))
+                terminal.WriteLine(Loc.Get(MentalSystem.UsedToday(currentPlayer, MentalDailySource.Confession) ? "mental.no_gain_used_today" : "mental.no_gain_at_cap"), "gray");
+
             if (!await terminal.AskYesNoAsync(Loc.Get("church.confess_prompt")))
             {
                 terminal.WriteLine(Loc.Get("church.confess_return"), "gray");
@@ -1205,6 +1209,8 @@ namespace UsurperRemake.Locations
             terminal.WriteLine(Loc.Get("church.confess_chivalry_increase", chivalryGain), "cyan");
             terminal.WriteLine(Loc.Get("church.confess_penance_paid", penanceCost.ToString("N0")), "yellow");
             terminal.WriteLine(Loc.Get("church.confess_cleansed"), "bright_white");
+            int mentalBeforeConfession = currentPlayer.Mental;
+            MentalUi.ReportGain(terminal, currentPlayer, mentalBeforeConfession, MentalSystem.TryDailyGain(currentPlayer, MentalDailySource.Confession, GameConfig.MentalConfessionGain));
 
             await Task.Delay(3000);
 

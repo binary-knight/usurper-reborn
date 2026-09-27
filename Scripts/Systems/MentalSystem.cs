@@ -16,8 +16,8 @@ public enum MentalBand
 
 /// <summary>
 /// v1.1.15: once-a-day Mental recovery sources, saved on Character.MentalRecoveryUsedToday and
-/// cleared by MentalSystem.ApplyDailyReset. The gains each source grants are a later piece; this
-/// only tracks which ones a character has already used today.
+/// cleared by MentalSystem.ApplyDailyReset. MentalSystem.TryDailyGain applies a source's gain and
+/// marks it; InnTable and InnFriend share one daily use.
 /// </summary>
 [Flags]
 public enum MentalDailySource
@@ -210,6 +210,50 @@ public static class MentalSystem
     {
         if (c == null) return;
         c.MentalRecoveryUsedToday |= source;
+    }
+
+    /// <summary>
+    /// A once-a-day recovery source: returns 0 if source (or any bit of sharedWith, a source that
+    /// shares the same daily use) is already used today, else applies amount through Change (stops
+    /// at the cap) and returns the change applied. The source is marked used only when something
+    /// was applied, so a use at the cap is quiet and does not spend the day. NPCs and non-positive
+    /// amounts return 0.
+    /// </summary>
+    public static int TryDailyGain(Character c, MentalDailySource source, int amount, MentalDailySource sharedWith = MentalDailySource.None)
+    {
+        if (c == null || c.IsNPC || amount <= 0) return 0;
+        if (UsedToday(c, source | sharedWith)) return 0;
+        int applied = Change(c, amount);
+        if (applied > 0) MarkUsed(c, source);
+        return applied;
+    }
+
+    /// <summary>
+    /// True if a gain from source would apply now: not used today (with sharedWith) and Mental
+    /// below the cap. Paid sources check this before charging and tell the player when false.
+    /// </summary>
+    public static bool GainAvailable(Character c, MentalDailySource source = MentalDailySource.None, MentalDailySource sharedWith = MentalDailySource.None) =>
+        c != null && !c.IsNPC && c.Mental < GetCap(c) && (source == MentalDailySource.None || !UsedToday(c, source | sharedWith));
+
+    /// <summary>
+    /// An NPC friend for the Inn table: the player's relationship toward them is
+    /// RelationFriendship (40) or better (lower is better), the same test the Inn uses to label a
+    /// patron a close friend: RelationshipSystem.GetRelationshipStatus(player, npc) &lt;= GameConfig.RelationFriendship.
+    /// </summary>
+    public static bool IsFriend(Character player, Character npc) =>
+        player != null && npc != null && !ReferenceEquals(player, npc)
+        && RelationshipSystem.GetRelationshipStatus(player, npc) <= GameConfig.RelationFriendship;
+
+    /// <summary>
+    /// Inn table rest: MentalInnFriendGain when any NPC friend is present, else MentalInnTableGain.
+    /// InnTable and InnFriend share one daily use. Returns the change applied.
+    /// </summary>
+    public static int ApplyInnTable(Character c, IEnumerable<Character>? present)
+    {
+        bool friend = present?.Any(n => n != null && n.IsAlive && IsFriend(c, n)) == true;
+        return friend
+            ? TryDailyGain(c, MentalDailySource.InnFriend, GameConfig.MentalInnFriendGain, MentalDailySource.InnTable)
+            : TryDailyGain(c, MentalDailySource.InnTable, GameConfig.MentalInnTableGain, MentalDailySource.InnFriend);
     }
 
     /// <summary>

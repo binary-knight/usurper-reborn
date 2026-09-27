@@ -1676,6 +1676,14 @@ public static partial class GameConfig
     // Recovery sources (piece 5a). Dungeon rests ride the one-rest-per-floor limit; the town ones are once a day
     public const int MentalDungeonCampGain = 6;               // Dungeon camp ([R] in a cleared room)
     public const int MentalSafeHavenGain = 10;                // Safe Haven rest spot
+    public const int MentalInnTableGain = 5;                  // Inn table rest, once a day (shares the day with the friend variant)
+    public const int MentalInnFriendGain = 8;                 // Inn table rest with an NPC friend present
+    public const int MentalInnSleepGain = 15;                 // Inn sleep (single-player) or rented room (online), no daily flag
+    public const int MentalHomeRestGain = 8;                  // Home rest, once a day, alongside HomeRestsToday
+    public const int MentalHomeSleepGain = 20;                // Home sleep, no daily flag
+    public const int MentalSpouseGain = 8;                    // Quality time with a spouse, once a day
+    public const int MentalTemplePrayerGain = 10;             // Temple daily prayer, once a day
+    public const int MentalConfessionGain = 5;                // Church confession, once a day
     public const int MentalSchemaCurrent = 1;                 // Current Mental save schema; below this, restore resets Mental to full and stamps this
     public const int MaxWillowDraughts = 3;                   // Healer Willow Draught: carryable cap
     // Session XP diminishing returns (v0.54.0) — online mode only
