@@ -1780,6 +1780,19 @@ namespace UsurperRemake.Systems
                 cmd.CommandText = "UPDATE players SET player_data = '{}' WHERE LOWER(username) = LOWER(@username);";
                 cmd.Parameters.AddWithValue("@username", playerName);
                 var affected = cmd.ExecuteNonQuery();
+
+                // v1.1.15: a stat roll left under this key must not resume into the next character's creation
+                try
+                {
+                    using var rollCmd = connection.CreateCommand();
+                    rollCmd.CommandText = "DELETE FROM creation_rolls WHERE LOWER(username) = LOWER(@username);";
+                    rollCmd.Parameters.AddWithValue("@username", playerName);
+                    rollCmd.ExecuteNonQuery();
+                }
+                catch (Exception rollEx)
+                {
+                    DebugLogger.Instance.LogWarning("SAVE", $"creation roll not cleared for '{playerName}': {rollEx.Message}");
+                }
                 return affected > 0;
             }
             catch (Exception ex)
@@ -8894,7 +8907,7 @@ namespace UsurperRemake.Systems
             }
         }
 
-        /// <summary>v1.1.15: drop the stat roll in progress for a save key (the character was accepted).</summary>
+        /// <summary>v1.1.15: drop the stat roll in progress for a save key (the character was first saved).</summary>
         public void ClearCreationRoll(string username)
         {
             try

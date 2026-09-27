@@ -5111,7 +5111,11 @@ public partial class GameEngine
         // Save the new game using the character's actual name (Name1)
         // This is important because playerName may be empty if coming from no-saves path
         string savePlayerName = !string.IsNullOrEmpty(currentPlayer.Name1) ? currentPlayer.Name1 : currentPlayer.Name2;
-        var success = await SaveSystem.Instance.SaveGame(savePlayerName, currentPlayer);
+        // v1.1.15: the stored creation roll is dropped only once this first save succeeded
+        var success = await CharacterCreationSystem.SaveNewCharacter(
+            () => SaveSystem.Instance.SaveGame(savePlayerName, currentPlayer),
+            UsurperRemake.BBS.DoorMode.IsOnlineMode ? SaveSystem.Instance?.Backend as UsurperRemake.Systems.SqlSaveBackend : null,
+            currentPlayer);
         if (success)
         {
             terminal.WriteLine(Loc.Get("engine.new_game_saved"), "green");

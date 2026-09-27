@@ -18,7 +18,7 @@ public class CharacterCreationSystem
     private readonly Random random;
 
     /// <summary>
-    /// v1.1.15: where a stat roll in progress is kept per save key until the character is accepted, so a
+    /// v1.1.15: where a stat roll in progress is kept per save key until the new character is first saved, so a
     /// dropped connection resumes the same roll and rerolls left. Online mode only; null elsewhere.
     /// </summary>
     internal SqlSaveBackend? RollStore { get; set; }
@@ -70,11 +70,16 @@ public class CharacterCreationSystem
             new CreationRoll { Dice = dice, RerollsRemaining = rerollsRemaining }));
     }
 
-    /// <summary>v1.1.15: the character was accepted, so its roll in progress is no longer kept.</summary>
-    private void ClearRoll(Character character)
+    /// <summary>
+    /// v1.1.15: the new character's first save. The roll in progress is dropped only when that save succeeded;
+    /// a failed or interrupted save keeps it, so a reconnect resumes the same roll. Store is null outside online mode.
+    /// </summary>
+    internal static async Task<bool> SaveNewCharacter(Func<Task<bool>> save, SqlSaveBackend? store, Character character)
     {
-        if (RollStore == null || string.IsNullOrEmpty(character.Name1)) return;
-        RollStore.ClearCreationRoll(character.Name1);
+        bool saved = await save();
+        if (saved && store != null && !string.IsNullOrEmpty(character?.Name1))
+            store.ClearCreationRoll(character.Name1);
+        return saved;
     }
     
     /// <summary>
@@ -189,7 +194,6 @@ public class CharacterCreationSystem
                     GameConfig.AutoLook = true;
                 }
 
-                ClearRoll(character); // v1.1.15: the character is accepted
                 terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("creation.created"), "green");
                 terminal.WriteLine(Loc.Get("creation.entering"), "cyan");
@@ -259,7 +263,6 @@ public class CharacterCreationSystem
                     : Loc.Get("creation.autolook_off"), "green");
             }
 
-            ClearRoll(character); // v1.1.15: the character is accepted
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("creation.created"), "green");
             terminal.WriteLine(Loc.Get("creation.entering"), "cyan");
@@ -2416,7 +2419,7 @@ public class CharacterCreationSystem
             {
                 var dice = RollDice();
                 ApplyDice(character, dice);
-                SaveRoll(character, dice, rerollsRemaining); // v1.1.15: kept until the character is accepted
+                SaveRoll(character, dice, rerollsRemaining); // v1.1.15: kept until the character is first saved
                 shouldRoll = false;
             }
 
