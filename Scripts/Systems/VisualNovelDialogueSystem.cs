@@ -1208,6 +1208,13 @@ namespace UsurperRemake.Systems
             state.TopicsDiscussed.Add(topicId ?? "generic");
             state.LastConversationDate = DateTime.Now;
 
+            // v1.1.15: talking with a friend eases the mind, once a day
+            if (player != null)
+            {
+                int mentalBeforeTalk = player.Mental;
+                MentalUi.ReportGain(terminal, player, mentalBeforeTalk, MentalSystem.ApplyFriendTalk(player, npc));
+            }
+
             terminal.WriteLine("");
             await terminal.PressAnyKey();
         }

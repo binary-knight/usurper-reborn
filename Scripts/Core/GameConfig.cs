@@ -1684,6 +1684,16 @@ public static partial class GameConfig
     public const int MentalSpouseGain = 8;                    // Quality time with a spouse, once a day
     public const int MentalTemplePrayerGain = 10;             // Temple daily prayer, once a day
     public const int MentalConfessionGain = 5;                // Church confession, once a day
+    // Recovery sources (piece 5b), each once a day through MentalSystem.TryDailyGain
+    public const int MentalFriendTalkGain = 5;                // Talking with an NPC friend (MentalSystem.IsFriend)
+    public const int MentalWildernessGain = 6;                // First wilderness exploration of the day
+    public const int MentalLearningGain = 4;                  // Learning: a new spell, a training session or Library reading, one shared day
+    // Healer (piece 5b): talk therapy restores to MaxMentalStability; its cost per missing point is TherapyCostBase + TherapyCostPerLevel x Level
+    public const int MentalTherapyCostBase = 10;
+    public const int MentalTherapyCostPerLevel = 2;
+    public const int MentalWillowDraughtGain = 20;            // Willow Draught, drunk in the dungeon, stops at the cap
+    public const int MentalWillowPotionMultiplier = 2;        // Willow Draught price: this many healing potions
+    public const int MentalRehabGain = 15;                    // Healer rehab, after the addiction is cleared
     public const int MentalSchemaCurrent = 1;                 // Current Mental save schema; below this, restore resets Mental to full and stamps this
     public const int MaxWillowDraughts = 3;                   // Healer Willow Draught: carryable cap
     // Session XP diminishing returns (v0.54.0) — online mode only

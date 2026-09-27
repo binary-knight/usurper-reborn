@@ -221,6 +221,10 @@ public class WildernessLocation : BaseLocation
         foreach (var line in WildernessData.GetRegionDescription(region).Split('\n'))
             terminal.WriteLine(line);
         terminal.WriteLine("");
+
+        // v1.1.15: the first expedition of the day eases the mind (before the encounter, so a fight cannot skip it)
+        int mentalBeforeTrip = currentPlayer.Mental;
+        MentalUi.ReportGain(terminal, currentPlayer, mentalBeforeTrip, MentalSystem.ApplyWilderness(currentPlayer));
         await Task.Delay(2000);
 
         // Roll encounter type: 40% combat, 25% foraging, 15% ruins, 10% traveler, 10% shrine

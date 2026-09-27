@@ -269,6 +269,84 @@ public static class MentalSystem
     }
 
     /// <summary>
+    /// Talking with an NPC: MentalFriendTalkGain once a day (FriendTalk) when the NPC is a friend
+    /// by IsFriend, the same test the Inn table uses. Anyone else gives 0 and leaves the day unspent.
+    /// Returns the change applied.
+    /// </summary>
+    public static int ApplyFriendTalk(Character player, Character npc) =>
+        IsFriend(player, npc) ? TryDailyGain(player, MentalDailySource.FriendTalk, GameConfig.MentalFriendTalkGain) : 0;
+
+    /// <summary>First wilderness exploration of the day: MentalWildernessGain once a day (Wilderness). Returns the change applied.</summary>
+    public static int ApplyWilderness(Character c) =>
+        TryDailyGain(c, MentalDailySource.Wilderness, GameConfig.MentalWildernessGain);
+
+    /// <summary>
+    /// Learning: a new spell, a training session or Library reading. One Learning bit a day shared
+    /// by all three; the first that applies wins. Returns the change applied.
+    /// </summary>
+    public static int ApplyLearning(Character c) =>
+        TryDailyGain(c, MentalDailySource.Learning, GameConfig.MentalLearningGain);
+
+    /// <summary>
+    /// Healer talk therapy: sets Mental to GameConfig.MaxMentalStability even above the addiction
+    /// cap (with drug highs, one of only two sources that may pass the cap) and clears the Broken
+    /// affliction. Returns the change applied. NPCs are skipped and return 0.
+    /// </summary>
+    public static int RestoreFull(Character c)
+    {
+        if (c == null || c.IsNPC) return 0;
+        int before = c.Mental;
+        c.Mental = GameConfig.MaxMentalStability;
+        c.MentalBroken = false;
+        return c.Mental - before;
+    }
+
+    /// <summary>True if talk therapy has something to treat: Mental below the maximum, or the Broken affliction.</summary>
+    public static bool NeedsTherapy(Character c) =>
+        c != null && !c.IsNPC && (c.Mental < GameConfig.MaxMentalStability || c.MentalBroken);
+
+    /// <summary>
+    /// Talk therapy price in gold: the missing points (MaxMentalStability minus Mental, never below
+    /// 0) times (MentalTherapyCostBase + MentalTherapyCostPerLevel x Level), in long.
+    /// </summary>
+    public static long TherapyCost(Character c)
+    {
+        if (c == null) return 0;
+        long missing = Math.Max(0L, (long)GameConfig.MaxMentalStability - c.Mental);
+        long perPoint = GameConfig.MentalTherapyCostBase + (long)GameConfig.MentalTherapyCostPerLevel * Math.Max(0, c.Level);
+        return missing * perPoint;
+    }
+
+    /// <summary>Willow Draught base price before the Healer's tax: MentalWillowPotionMultiplier healing potions at this level.</summary>
+    public static long WillowDraughtPrice(int level) =>
+        GameConfig.MentalWillowPotionMultiplier * GameConfig.GetHealingPotionCost(level);
+
+    /// <summary>
+    /// Drinks one Willow Draught: MentalWillowDraughtGain through Change (stops at the cap) and one
+    /// draught used. With none carried, or Mental already at or above the cap, nothing is drunk and
+    /// the count is kept. Returns the change applied. NPCs are skipped and return 0.
+    /// </summary>
+    public static int DrinkWillowDraught(Character c)
+    {
+        if (c == null || c.IsNPC || c.WillowDraughts <= 0) return 0;
+        if (c.Mental >= GetCap(c)) return 0;
+        c.WillowDraughts--;
+        return Change(c, GameConfig.MentalWillowDraughtGain);
+    }
+
+    /// <summary>
+    /// Healer rehab, called after the addiction is cleared (so the cap has already lifted): clears
+    /// the Broken affliction and gains MentalRehabGain through Change. Returns the change applied.
+    /// NPCs are skipped and return 0.
+    /// </summary>
+    public static int ApplyRehab(Character c)
+    {
+        if (c == null || c.IsNPC) return 0;
+        c.MentalBroken = false;
+        return Change(c, GameConfig.MentalRehabGain);
+    }
+
+    /// <summary>
     /// Combat penalty from Mental alone, as a positive fraction of damage and defence lost:
     /// 0 for Stable and Strained, 0.05 for Shaken, 0.10 for Breaking and Broken.
     /// Taking the worse of this and Grief, and the -15% Mental plus Fatigue cap, belong to a later

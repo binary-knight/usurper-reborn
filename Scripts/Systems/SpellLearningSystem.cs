@@ -259,6 +259,9 @@ public static class SpellLearningSystem
                 {
                     terminal.WriteLine(Loc.Get("spell_learning.learned_full", spell.DisplayName), "bright_green");
                 }
+                // v1.1.15: learning something new eases the mind, once a day (shared Learning day)
+                int mentalBeforeSpell = player.Mental;
+                MentalUi.ReportGain(terminal, player, mentalBeforeSpell, MentalSystem.ApplyLearning(player));
                 await SaveSystem.Instance.AutoSave(player);
                 await Task.Delay(1000);
                 continue;
