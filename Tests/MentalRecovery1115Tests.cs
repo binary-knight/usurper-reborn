@@ -166,10 +166,12 @@ public class MentalRecovery1115Tests
     [InlineData(MentalDailySource.Spouse, 8)]
     [InlineData(MentalDailySource.TemplePrayer, 10)]
     [InlineData(MentalDailySource.Confession, 5)]
+    [InlineData(MentalDailySource.HomeSleep, 20)]
     public void A_daily_source_applies_once_then_zero_until_the_daily_reset(MentalDailySource source, int expected)
     {
         int amount = source switch
         {
+            MentalDailySource.HomeSleep => GameConfig.MentalHomeSleepGain,
             MentalDailySource.HomeRest => GameConfig.MentalHomeRestGain,
             MentalDailySource.Spouse => GameConfig.MentalSpouseGain,
             MentalDailySource.TemplePrayer => GameConfig.MentalTemplePrayerGain,
@@ -220,7 +222,7 @@ public class MentalRecovery1115Tests
         MentalSystem.GainAvailable(c).Should().BeTrue();
         MentalSystem.MarkUsed(c, MentalDailySource.Confession);
         MentalSystem.GainAvailable(c, MentalDailySource.Confession).Should().BeFalse();
-        MentalSystem.GainAvailable(c).Should().BeTrue("a sleep has no daily flag");
+        MentalSystem.GainAvailable(c).Should().BeTrue("no source given checks the cap only");
     }
 
     [Fact]
@@ -341,7 +343,31 @@ public class MentalRecovery1115Tests
         var single = Body(Src("Locations", "HomeLocation.cs"), "SleepAtHome");
         At(single, "MentalSystem.Change(currentPlayer, GameConfig.MentalHomeSleepGain)").Should().BeLessThan(At(single, "RestAndAdvanceToMorning"));
         var online = Body(Src("Locations", "HomeLocation.cs"), "SleepAtHomeOnline");
-        At(online, "MentalSystem.Change(currentPlayer, GameConfig.MentalHomeSleepGain)").Should().BeLessThan(At(online, "throw new LocationExitException"));
+        At(online, "MentalSystem.TryDailyGain(currentPlayer, MentalDailySource.HomeSleep, GameConfig.MentalHomeSleepGain)").Should().BeLessThan(At(online, "throw new LocationExitException"));
+        online.Should().NotContain("MentalSystem.Change(", "online home sleep gives its Mental once a day");
+    }
+
+    [Fact]
+    public void HomeSleep_is_appended_as_bit_ten_and_the_earlier_bits_keep_their_values()
+    {
+        // Saves store the flags as an int, so existing bits must never move.
+        ((int)MentalDailySource.InnTable).Should().Be(1 << 0);
+        ((int)MentalDailySource.Wilderness).Should().Be(1 << 6);
+        ((int)MentalDailySource.HomeRest).Should().Be(1 << 9);
+        ((int)MentalDailySource.HomeSleep).Should().Be(1 << 10);
+        Enum.GetValues<MentalDailySource>().Max(v => (int)v).Should().Be(1 << 10);
+    }
+
+    [Fact]
+    public void A_second_online_home_sleep_the_same_day_gives_no_mental_but_the_rented_room_still_does()
+    {
+        var c = Hero(mental: 30);
+        MentalSystem.TryDailyGain(c, MentalDailySource.HomeSleep, GameConfig.MentalHomeSleepGain).Should().Be(20);
+        MentalSystem.TryDailyGain(c, MentalDailySource.HomeSleep, GameConfig.MentalHomeSleepGain).Should().Be(0);
+        c.Mental.Should().Be(50);
+        var room = Body(Src("Locations", "InnLocation.cs"), "RentRoom");
+        room.Should().NotContain("MentalDailySource", "the rented room is paid for and gives its Mental every time");
+        At(room, "MentalSystem.Change(currentPlayer, GameConfig.MentalInnSleepGain)");
     }
 
     [Fact]

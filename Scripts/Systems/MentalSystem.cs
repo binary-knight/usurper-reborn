@@ -17,7 +17,7 @@ public enum MentalBand
 /// <summary>
 /// v1.1.15: once-a-day Mental recovery sources, saved on Character.MentalRecoveryUsedToday and
 /// cleared by MentalSystem.ApplyDailyReset. MentalSystem.TryDailyGain applies a source's gain and
-/// marks it; InnTable and InnFriend share one daily use.
+/// marks it; InnTable and InnFriend share one daily use. HomeSleep covers online home sleep only.
 /// </summary>
 [Flags]
 public enum MentalDailySource
@@ -33,6 +33,7 @@ public enum MentalDailySource
     Learning = 1 << 7,
     WitnessLoss = 1 << 8,
     HomeRest = 1 << 9,
+    HomeSleep = 1 << 10,      // online home sleep behind the reinforced door
 }
 
 /// <summary>

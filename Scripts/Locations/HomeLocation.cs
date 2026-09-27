@@ -827,9 +827,9 @@ public class HomeLocation : BaseLocation
             await backend.RegisterSleepingPlayer(username, "home", "[]", 1);
         }
 
-        // v1.1.15: sleeping at home eases the mind (no daily flag beyond the sleep itself).
+        // v1.1.15: sleeping at home eases the mind once a day (HomeSleep); later sleeps still rest the body.
         int mentalBeforeSleep = currentPlayer.Mental;
-        MentalUi.ReportGain(terminal, currentPlayer, mentalBeforeSleep, MentalSystem.Change(currentPlayer, GameConfig.MentalHomeSleepGain));
+        MentalUi.ReportGain(terminal, currentPlayer, mentalBeforeSleep, MentalSystem.TryDailyGain(currentPlayer, MentalDailySource.HomeSleep, GameConfig.MentalHomeSleepGain));
 
         terminal.SetColor("gray");
         terminal.WriteLine($"\n  {Loc.Get("home.sleep_reinforced")}");
@@ -946,7 +946,7 @@ public class HomeLocation : BaseLocation
             DreamSystem.Instance.ExperienceDream(dream.Id);
         }
 
-        // v1.1.15: a night's sleep at home eases the mind (no daily flag beyond the sleep itself).
+        // v1.1.15: a night's sleep at home eases the mind; the night then runs the daily reset.
         int mentalBeforeSleep = currentPlayer.Mental;
         MentalUi.ReportGain(terminal, currentPlayer, mentalBeforeSleep, MentalSystem.Change(currentPlayer, GameConfig.MentalHomeSleepGain));
 
