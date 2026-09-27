@@ -1695,6 +1695,12 @@ public static partial class GameConfig
     public const int MentalWillowDraughtGain = 20;            // Willow Draught, drunk in the dungeon, stops at the cap
     public const int MentalWillowPotionMultiplier = 2;        // Willow Draught price: this many healing potions
     public const int MentalRehabGain = 15;                    // Healer rehab, after the addiction is cleared
+    // Grief and witnessing (piece 6): losses through MentalSystem.Change, the Acceptance gain stops at the cap
+    public const int MentalCompanionGriefLoss = 10;           // A story companion died (grief begins)
+    public const int MentalNpcGriefLoss = 6;                  // An NPC teammate, spouse or lover died (NPC grief begins)
+    public const int MentalGriefDepressionLoss = 8;           // A grief entered the Depression stage
+    public const int MentalGriefAcceptanceGain = 10;          // A grief reached Acceptance
+    public const int MentalWitnessLoss = 3;                   // Witnessed a town NPC death or a world disaster, once a day (WitnessLoss)
     public const int MentalSchemaCurrent = 1;                 // Current Mental save schema; below this, restore resets Mental to full and stamps this
     public const int MaxWillowDraughts = 3;                   // Healer Willow Draught: carryable cap
     // Session XP diminishing returns (v0.54.0) — online mode only

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using UsurperRemake.Utils;
 
@@ -651,6 +652,16 @@ namespace UsurperRemake.Systems
 
             return (true, null);
         }
+
+        /// <summary>
+        /// v1.1.15: a world disaster for Mental witnessing: plague, cursed land, a bandit raid, a
+        /// monster invasion, a demon portal or a dragon sighting.
+        /// </summary>
+        public static bool IsDisaster(EventType type) => type is EventType.PlagueOutbreak or EventType.CursedLand
+            or EventType.BanditRaid or EventType.MonsterInvasion or EventType.DemonPortal or EventType.DragonSighting;
+
+        /// <summary>v1.1.15: true while any active event is a disaster (IsDisaster).</summary>
+        public bool HasActiveDisaster => _activeEvents.Any(e => IsDisaster(e.Type));
 
         /// <summary>
         /// Check if player should take plague damage

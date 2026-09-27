@@ -1532,6 +1532,13 @@ public class CastleLocation : BaseLocation
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("castle.executed_confirm", name));
             terminal.WriteLine(Loc.Get("castle.darkness_increases"));
+            // v1.1.15: an NPC executed before the king's eyes, the Mental witness loss (once a day)
+            if (npc != null)
+            {
+                int mentalBeforeWitness = currentPlayer.Mental;
+                MentalSystem.ApplyWitnessLoss(currentPlayer);
+                MentalUi.AnnounceMentalChange(terminal, currentPlayer, mentalBeforeWitness);
+            }
             NewsSystem.Instance.Newsy(true, $"{currentKing.GetTitle()} {currentKing.Name} executed {name}!");
 
             // Server-wide broadcast of execution

@@ -349,6 +349,36 @@ public static class MentalSystem
         return Change(c, GameConfig.MentalRehabGain);
     }
 
+    /// <summary>A story companion died and grief began: MentalCompanionGriefLoss. Returns the change applied.</summary>
+    public static int ApplyCompanionGrief(Character c) => Change(c, -GameConfig.MentalCompanionGriefLoss);
+
+    /// <summary>An NPC teammate, spouse or lover died and NPC grief began: MentalNpcGriefLoss. Returns the change applied.</summary>
+    public static int ApplyNpcGrief(Character c) => Change(c, -GameConfig.MentalNpcGriefLoss);
+
+    /// <summary>
+    /// A grief entered a new stage: Depression loses MentalGriefDepressionLoss, Acceptance gains
+    /// MentalGriefAcceptanceGain through Change (stops at the cap). Other stages change nothing.
+    /// Returns the change applied.
+    /// </summary>
+    public static int ApplyGriefStage(Character c, GriefStage stage) => stage switch
+    {
+        GriefStage.Depression => Change(c, -GameConfig.MentalGriefDepressionLoss),
+        GriefStage.Acceptance => Change(c, GameConfig.MentalGriefAcceptanceGain),
+        _ => 0
+    };
+
+    /// <summary>
+    /// Witnessing a town NPC death or a world disaster: MentalWitnessLoss at most once a day
+    /// (WitnessLoss, cleared by ApplyDailyReset). The day is spent on the first witness even at 0.
+    /// Returns the change applied (0 or negative). NPCs are skipped and return 0.
+    /// </summary>
+    public static int ApplyWitnessLoss(Character c)
+    {
+        if (c == null || c.IsNPC || UsedToday(c, MentalDailySource.WitnessLoss)) return 0;
+        MarkUsed(c, MentalDailySource.WitnessLoss);
+        return Change(c, -GameConfig.MentalWitnessLoss);
+    }
+
     /// <summary>
     /// Combat penalty from Mental alone, as a positive fraction of damage and defence lost:
     /// 0 for Stable and Strained, 0.05 for Shaken, 0.10 for Breaking and Broken.
