@@ -192,6 +192,16 @@ public class CreationRollResume1115Tests : IDisposable
     }
 
     [Fact]
+    public void DeletingTheCharacter_DropsALeftoverRoll()
+    {
+        StoreRoll();
+        _db.SaveCreationRoll("someone_else", _db.LoadCreationRoll(Key)!);
+        _db.DeleteGameData("ROLLER");
+        _db.LoadCreationRoll(Key).Should().BeNull("a roll left under a deleted character's key must not resume into the next creation");
+        _db.LoadCreationRoll("someone_else").Should().NotBeNull("only the deleted key's roll goes");
+    }
+
+    [Fact]
     public void OutsideOnlineMode_NoRollIsKept()
     {
         UsurperRemake.BBS.DoorMode.IsOnlineMode.Should().BeFalse();
