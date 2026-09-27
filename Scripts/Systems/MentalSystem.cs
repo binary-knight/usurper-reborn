@@ -13,8 +13,8 @@ public enum MentalBand
 }
 
 /// <summary>
-/// v1.1.15 Mental health core: bands, the addiction cap, clamped changes, dungeon strain and the
-/// combat penalty. Pure logic, no UI. NPCs are skipped by Change and AddStrain.
+/// v1.1.15 Mental health core: bands, the addiction cap, capped gains and uncapped losses, dungeon
+/// strain and the combat penalty. Pure logic, no UI. NPCs are skipped by Change and AddStrain.
 /// </summary>
 public static class MentalSystem
 {
@@ -36,16 +36,25 @@ public static class MentalSystem
 
     /// <summary>
     /// Changes Mental by delta and returns the change actually applied (after minus before).
-    /// The result is clamped to [0, GetCap]. A gain never lowers Mental: if Mental is already above
-    /// the cap (addiction rose later), a gain applies 0. A loss while above the cap lands at or below
-    /// the cap. NPCs are skipped and return 0.
+    /// A loss subtracts from the current value and floors at 0, ignoring the cap: Mental already
+    /// above the cap (addiction rose later) still loses the full amount and can land above the cap.
+    /// A gain stops at the cap and never lowers Mental already above it (a gain then applies 0).
+    /// NPCs are skipped and return 0.
     /// </summary>
     public static int Change(Character c, int delta)
     {
         if (c == null || c.IsNPC) return 0;
         int before = c.Mental;
-        int after = Math.Clamp(before + delta, 0, GetCap(c));
-        if (delta > 0 && after < before) after = before;
+        int after;
+        if (delta > 0)
+        {
+            int cap = GetCap(c);
+            after = before >= cap ? before : Math.Min(before + delta, cap);
+        }
+        else
+        {
+            after = Math.Max(before + delta, 0);
+        }
         c.Mental = after;
         return after - before;
     }
@@ -81,7 +90,9 @@ public static class MentalSystem
     /// Rounding: the strain is scaled to hundredths of a per mille as
     /// perMille x strainPct x (100 - companionCutPct) / 100, floored by integer division, and added
     /// to Character.MentalStrainRemainder. Each full 100_000 units (1000 per mille) costs 1 Mental;
-    /// the rest carries to the next call. Non-positive strain and NPCs do nothing.
+    /// the rest carries to the next call. The loss goes through Change, so it ignores the cap: Mental
+    /// already above the cap loses the full amount and can stay above the cap. Non-positive strain
+    /// and NPCs do nothing.
     /// </summary>
     public static int AddStrain(Character c, int perMille, int storyCompanionsInParty)
     {

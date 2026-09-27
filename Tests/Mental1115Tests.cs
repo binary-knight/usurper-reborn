@@ -89,11 +89,19 @@ public class Mental1115Tests
     }
 
     [Fact]
-    public void Change_loss_above_the_cap_lands_at_the_cap()
+    public void Change_loss_above_the_cap_ignores_the_cap()
     {
-        var c = Hero(90, addict: 40);   // cap 80
-        MentalSystem.Change(c, -3).Should().Be(-10);
-        c.Mental.Should().Be(80);
+        var c = Hero(90, addict: 80);   // cap 60
+        MentalSystem.Change(c, -4).Should().Be(-4);
+        c.Mental.Should().Be(86);
+    }
+
+    [Fact]
+    public void Change_loss_crossing_the_cap_does_not_snap_to_it()
+    {
+        var c = Hero(65, addict: 80);   // cap 60
+        MentalSystem.Change(c, -10).Should().Be(-10);
+        c.Mental.Should().Be(55);
     }
 
     [Fact]
@@ -145,6 +153,14 @@ public class Mental1115Tests
         var c = Hero(0);
         MentalSystem.AddStrain(c, 3000, 0).Should().Be(0);
         c.Mental.Should().Be(0);
+    }
+
+    [Fact]
+    public void Strain_loss_above_the_cap_stays_above_it()
+    {
+        var c = Hero(90, addict: 80);   // cap 60
+        MentalSystem.AddStrain(c, 2000, 0).Should().Be(2);
+        c.Mental.Should().Be(88);
     }
 
     [Fact]
