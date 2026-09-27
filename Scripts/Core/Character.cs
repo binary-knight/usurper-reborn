@@ -87,10 +87,26 @@ public class Character
 
     public int GnollP { get; set; }                 // gnoll poison, temporary
     public int Mental { get; set; }                 // mental health
+    // v1.1.15: 0 means a save written before the Mental schema existed; GameEngine restore resets
+    // Mental to full and stamps the current schema for those. A fresh Character starts current.
+    public int MentalSchema { get; set; } = GameConfig.MentalSchemaCurrent;
+    public int WillowDraughts { get; set; }         // v1.1.15: Willow Draughts carried, 0..GameConfig.MaxWillowDraughts
+    // v1.1.15: today's Mental recovery sources already used; cleared by MentalSystem.ApplyDailyReset
+    public MentalDailySource MentalRecoveryUsedToday { get; set; }
+    public bool MentalBroken { get; set; }          // v1.1.15: Broken collapse affliction; persists until therapy or rehab
+    public bool MentalHintShown { get; set; }       // v1.1.15: the first drop-below-75 Mental hint has been shown
     public int Addict { get; set; }                 // drug addiction level (0-100)
     public int SteroidDays { get; set; }            // days remaining on steroids
     public int DrugEffectDays { get; set; }         // days remaining on drug effects
     public DrugType ActiveDrug { get; set; }        // currently active drug type
+    // v1.1.15: drug tolerance and crash shape (see evidence/v1115-designs/mental-design.md).
+    // MentalDrugBoost is the pending high amount that crashes (at twice the boost) when it wears
+    // off. MentalDrugUses and MentalLastDrugDay (DailySystemManager.CurrentDay of the last use)
+    // together drive the tolerance window: a use within 3 days of the last one gives a smaller
+    // high and a bigger crash. The tolerance math itself is a later piece.
+    public int MentalDrugBoost { get; set; }
+    public int MentalDrugUses { get; set; }
+    public int MentalLastDrugDay { get; set; }
     public bool WellWish { get; set; }              // has visited wishing well
     public int Height { get; set; }                 // height
     public int Weight { get; set; }                 // weight
@@ -596,8 +612,7 @@ public class Character
     [System.Text.Json.Serialization.JsonIgnore]
     public int SessionCombatCount { get; set; }
     /// <summary>v1.1.15: dungeon strain carried toward the next Mental point, in hundredths of a
-    /// per mille (100_000 = 1 point). Transient in this piece; see MentalSystem.AddStrain.</summary>
-    [System.Text.Json.Serialization.JsonIgnore]
+    /// per mille (100_000 = 1 point). Saved through the five sites; see MentalSystem.AddStrain.</summary>
     public int MentalStrainRemainder { get; set; }
 
     // Team HQ upgrade levels (v0.52.8) — cached from DB on login, not serialized

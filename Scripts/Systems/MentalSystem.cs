@@ -13,6 +13,27 @@ public enum MentalBand
 }
 
 /// <summary>
+/// v1.1.15: once-a-day Mental recovery sources, saved on Character.MentalRecoveryUsedToday and
+/// cleared by MentalSystem.ApplyDailyReset. The gains each source grants are a later piece; this
+/// only tracks which ones a character has already used today.
+/// </summary>
+[Flags]
+public enum MentalDailySource
+{
+    None = 0,
+    InnTable = 1 << 0,
+    InnFriend = 1 << 1,        // a friend present at the Inn table, the +8 variant
+    Spouse = 1 << 2,
+    TemplePrayer = 1 << 3,
+    Confession = 1 << 4,
+    FriendTalk = 1 << 5,
+    Wilderness = 1 << 6,
+    Learning = 1 << 7,
+    WitnessLoss = 1 << 8,
+    HomeRest = 1 << 9,
+}
+
+/// <summary>
 /// v1.1.15 Mental health core: bands, the addiction cap, capped gains and uncapped losses, dungeon
 /// strain and the combat penalty. Pure logic, no UI. NPCs are skipped by Change and AddStrain.
 /// </summary>
@@ -106,14 +127,16 @@ public static class MentalSystem
     }
 
     /// <summary>
-    /// Daily reset and returns the change actually applied. If Mental is above GetCap(c) it drops
-    /// straight to the cap and the daily gain is skipped. Otherwise it gains GameConfig.MentalDailyReset
-    /// through Change, which stops at the cap. NPCs are skipped and return 0. Not called from
-    /// anywhere yet; the daily-reset wiring is a later piece.
+    /// Daily reset and returns the change actually applied. Clears MentalRecoveryUsedToday to
+    /// None so tomorrow's once-a-day sources are available again. If Mental is above GetCap(c) it
+    /// drops straight to the cap and the daily gain is skipped. Otherwise it gains
+    /// GameConfig.MentalDailyReset through Change, which stops at the cap. NPCs are skipped and
+    /// return 0. Not called from anywhere yet; the daily-reset wiring is a later piece.
     /// </summary>
     public static int ApplyDailyReset(Character c)
     {
         if (c == null || c.IsNPC) return 0;
+        c.MentalRecoveryUsedToday = MentalDailySource.None;
         int cap = GetCap(c);
         if (c.Mental > cap)
         {
@@ -122,6 +145,17 @@ public static class MentalSystem
             return cap - before;
         }
         return Change(c, GameConfig.MentalDailyReset);
+    }
+
+    /// <summary>True if source's bit is already set in the character's daily recovery-used flags.</summary>
+    public static bool UsedToday(Character c, MentalDailySource source) =>
+        c != null && (c.MentalRecoveryUsedToday & source) != 0;
+
+    /// <summary>Sets source's bit in the character's daily recovery-used flags.</summary>
+    public static void MarkUsed(Character c, MentalDailySource source)
+    {
+        if (c == null) return;
+        c.MentalRecoveryUsedToday |= source;
     }
 
     /// <summary>

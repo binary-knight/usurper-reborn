@@ -5498,7 +5498,19 @@ public partial class GameEngine
             Chivalry = AlignmentSystem.HealOverflowChivalry(playerData.Chivalry, playerData.Darkness),
             Darkness = AlignmentSystem.HealOverflowDarkness(playerData.Chivalry, playerData.Darkness),
             Fame = playerData.Fame,
-            Mental = playerData.Mental,
+            // v1.1.15: schema guard. A save at schema 0 (written before Mental existed, or an
+            // empty/legacy save) never had a real Mental value, so it loads full and is stamped to
+            // the current schema; a save already at or past the current schema keeps its Mental.
+            Mental = playerData.MentalSchema >= GameConfig.MentalSchemaCurrent ? playerData.Mental : GameConfig.DefaultMentalHealth,
+            MentalSchema = GameConfig.MentalSchemaCurrent,
+            MentalStrainRemainder = playerData.MentalStrainRemainder,
+            WillowDraughts = GameConfig.ClampWillowDraughts(playerData.WillowDraughts),
+            MentalRecoveryUsedToday = (MentalDailySource)playerData.MentalRecoveryUsedToday,
+            MentalBroken = playerData.MentalBroken,
+            MentalHintShown = playerData.MentalHintShown,
+            MentalDrugBoost = playerData.MentalDrugBoost,
+            MentalDrugUses = playerData.MentalDrugUses,
+            MentalLastDrugDay = playerData.MentalLastDrugDay,
             Poison = playerData.Poison,
             PoisonTurns = playerData.PoisonTurns,
 

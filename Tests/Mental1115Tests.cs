@@ -304,11 +304,6 @@ public class Mental1115Tests
     public void Combat_penalty_per_band(int mental, float penalty) =>
         MentalSystem.GetCombatPenalty(mental).Should().Be(penalty);
 
-    [Fact]
-    public void Strain_remainder_is_not_serialized()
-    {
-        var prop = typeof(Character).GetProperty(nameof(Character.MentalStrainRemainder))!;
-        prop.GetCustomAttributes(typeof(System.Text.Json.Serialization.JsonIgnoreAttribute), false)
-            .Should().NotBeEmpty();
-    }
+    // v1.1.15 piece 2 (save plumbing): MentalStrainRemainder is now saved through the five sites
+    // instead of ignored. The round trip lives in Tests/MentalSaves1115Tests.cs.
 }

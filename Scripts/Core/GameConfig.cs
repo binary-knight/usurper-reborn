@@ -1125,6 +1125,9 @@ public static partial class GameConfig
         return (int)Math.Round(clamped / (double)AutoCombatHealPercentStep) * AutoCombatHealPercentStep;
     }
 
+    /// <summary>v1.1.15: a saved or edited Willow Draught count, kept in [0, MaxWillowDraughts].</summary>
+    public static int ClampWillowDraughts(int count) => Math.Clamp(count, 0, MaxWillowDraughts);
+
     /// <summary>v1.1.13: the next threshold in the preferences cycle, wrapping from the top to the bottom.</summary>
     public static int NextAutoCombatHealPercent(int percent)
     {
@@ -1654,6 +1657,8 @@ public static partial class GameConfig
     public const int MentalStrainCompanionCutPct = 10;        // Each story companion in the party cuts strain 10%
     public const int MentalStrainCompanionCutMaxPct = 20;     // Companion cut stops at 20%
     public const int MentalDailyReset = 10;                   // Daily gain applied by MentalSystem.ApplyDailyReset
+    public const int MentalSchemaCurrent = 1;                 // Current Mental save schema; below this, restore resets Mental to full and stamps this
+    public const int MaxWillowDraughts = 3;                   // Healer Willow Draught: carryable cap
     // Session XP diminishing returns (v0.54.0) — online mode only
     // Threshold scales with level: max(100000, XP_for_next_level * 8) — allows ~8 full levels per session
     public const long SessionXPDiminishBaseThreshold = 100000;  // Minimum threshold for low-level players

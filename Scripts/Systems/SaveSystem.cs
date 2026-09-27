@@ -681,6 +681,15 @@ namespace UsurperRemake.Systems
                 Darkness = player.Darkness,
                 Fame = player.Fame,
                 Mental = player.Mental,
+                MentalSchema = GameConfig.MentalSchemaCurrent, // v1.1.15: always write the current schema
+                MentalStrainRemainder = player.MentalStrainRemainder,
+                WillowDraughts = player.WillowDraughts,
+                MentalRecoveryUsedToday = (int)player.MentalRecoveryUsedToday,
+                MentalBroken = player.MentalBroken,
+                MentalHintShown = player.MentalHintShown,
+                MentalDrugBoost = player.MentalDrugBoost,
+                MentalDrugUses = player.MentalDrugUses,
+                MentalLastDrugDay = player.MentalLastDrugDay,
                 Poison = player.Poison,
                 PoisonTurns = player.PoisonTurns,
 
