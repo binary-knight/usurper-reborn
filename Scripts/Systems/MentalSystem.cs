@@ -187,20 +187,91 @@ public static class MentalSystem
     /// drops straight to the cap and the daily gain is skipped. Otherwise it gains
     /// GameConfig.MentalDailyReset through Change, which stops at the cap. NPCs are skipped and
     /// return 0. Called once per day from DailySystemManager.RunBasicDailyReset only.
+    /// A pending drug high is kept: while the drug is active (OnDrugs) the surplus drops only to
+    /// the cap plus MentalDrugBoost (at most MaxMentalStability). Order at the daily boundary: this
+    /// reset runs first, then DrugSystem.ProcessDailyDrugEffects (ProcessPlayerDailyEvents or
+    /// ProcessDailyEvents) wears the drug off and applies the crash from the kept high, so a crash
+    /// is never lost to the surplus drop and never doubled by it.
     /// </summary>
     public static int ApplyDailyReset(Character c)
     {
         if (c == null || c.IsNPC) return 0;
         c.MentalRecoveryUsedToday = MentalDailySource.None;
         int cap = GetCap(c);
-        if (c.Mental > cap)
+        int limit = c.OnDrugs && c.MentalDrugBoost > 0
+            ? (int)Math.Min((long)cap + c.MentalDrugBoost, GameConfig.MaxMentalStability)
+            : cap;
+        if (c.Mental > limit)
         {
             int before = c.Mental;
-            c.Mental = cap;
-            return cap - before;
+            c.Mental = limit;
+            return limit - before;
         }
+        if (c.Mental > cap) return 0;
         return Change(c, GameConfig.MentalDailyReset);
     }
+
+    /// <summary>Tolerance: the high's percent after uses counted uses, 100 less MentalDrugHighStepPct per extra use, at least MentalDrugHighMinPct.</summary>
+    public static int GetDrugHighPct(int uses) =>
+        (int)Math.Max(GameConfig.MentalDrugHighMinPct, 100L - (long)GameConfig.MentalDrugHighStepPct * (Math.Max(1, uses) - 1));
+
+    /// <summary>
+    /// The crash for a boost after uses counted uses: boost x (2 + 0.5 x (uses - 1)), rounded half
+    /// up, in integer math as (boost x (CrashBaseHalves + CrashStepHalves x (uses - 1)) + 1) / 2.
+    /// </summary>
+    public static int GetDrugCrash(int boost, int uses)
+    {
+        if (boost <= 0) return 0;
+        long halves = GameConfig.MentalDrugCrashBaseHalves + (long)GameConfig.MentalDrugCrashStepHalves * (Math.Max(1, uses) - 1);
+        return (int)Math.Min(((long)boost * halves + 1) / 2, int.MaxValue);
+    }
+
+    /// <summary>
+    /// A drug high on use. Tolerance first: a use within MentalDrugToleranceWindowDays of
+    /// MentalLastDrugDay adds one to MentalDrugUses, any other use (or a day counter that went
+    /// back) starts over at 1; MentalLastDrugDay becomes currentDay. The high is the base
+    /// (MentalDrugHighStrongGain for DarkEssence and DemonBlood, else MentalDrugHighGain) times
+    /// GetDrugHighPct / 100. It may pass the addiction cap but never MaxMentalStability (the only
+    /// over-cap path besides RestoreFull), and the amount applied is added to MentalDrugBoost for
+    /// the crash. Returns the change applied. NPCs are skipped and return 0.
+    /// </summary>
+    public static int ApplyDrugHigh(Character c, DrugType drug, int currentDay)
+    {
+        if (c == null || c.IsNPC) return 0;
+        long since = (long)currentDay - c.MentalLastDrugDay;
+        c.MentalDrugUses = c.MentalDrugUses > 0 && since >= 0 && since <= GameConfig.MentalDrugToleranceWindowDays
+            ? c.MentalDrugUses + 1
+            : 1;
+        c.MentalLastDrugDay = currentDay;
+        int baseHigh = drug == DrugType.DarkEssence || drug == DrugType.DemonBlood
+            ? GameConfig.MentalDrugHighStrongGain
+            : GameConfig.MentalDrugHighGain;
+        int high = baseHigh * GetDrugHighPct(c.MentalDrugUses) / 100;
+        int applied = Math.Clamp(high, 0, Math.Max(0, GameConfig.MaxMentalStability - c.Mental));
+        c.Mental += applied;
+        c.MentalDrugBoost = (int)Math.Min((long)c.MentalDrugBoost + applied, int.MaxValue);
+        return applied;
+    }
+
+    /// <summary>
+    /// The crash when a drug wears off: GetDrugCrash(MentalDrugBoost, MentalDrugUses) as a loss
+    /// through Change (ignores the cap), then MentalDrugBoost is 0. Returns the change applied.
+    /// NPCs are skipped and return 0.
+    /// </summary>
+    public static int ApplyDrugCrash(Character c)
+    {
+        if (c == null || c.IsNPC) return 0;
+        int crash = GetDrugCrash(c.MentalDrugBoost, c.MentalDrugUses);
+        c.MentalDrugBoost = 0;
+        return crash > 0 ? Change(c, -crash) : 0;
+    }
+
+    /// <summary>Overdose: MentalOverdoseLoss. Returns the change applied.</summary>
+    public static int ApplyOverdose(Character c) => Change(c, -GameConfig.MentalOverdoseLoss);
+
+    /// <summary>A day of withdrawal: MentalWithdrawalLossPerSeverity x severity (Addict / 25). Returns the change applied.</summary>
+    public static int ApplyWithdrawal(Character c, int severity) =>
+        severity <= 0 ? 0 : Change(c, (int)-Math.Min((long)GameConfig.MentalWithdrawalLossPerSeverity * severity, int.MaxValue));
 
     /// <summary>True if source's bit is already set in the character's daily recovery-used flags.</summary>
     public static bool UsedToday(Character c, MentalDailySource source) =>
@@ -347,6 +418,36 @@ public static class MentalSystem
         if (c == null || c.IsNPC) return 0;
         c.MentalBroken = false;
         return Change(c, GameConfig.MentalRehabGain);
+    }
+
+    /// <summary>A story companion died and grief began: MentalCompanionGriefLoss. Returns the change applied.</summary>
+    public static int ApplyCompanionGrief(Character c) => Change(c, -GameConfig.MentalCompanionGriefLoss);
+
+    /// <summary>An NPC teammate, spouse or lover died and NPC grief began: MentalNpcGriefLoss. Returns the change applied.</summary>
+    public static int ApplyNpcGrief(Character c) => Change(c, -GameConfig.MentalNpcGriefLoss);
+
+    /// <summary>
+    /// A grief entered a new stage: Depression loses MentalGriefDepressionLoss, Acceptance gains
+    /// MentalGriefAcceptanceGain through Change (stops at the cap). Other stages change nothing.
+    /// Returns the change applied.
+    /// </summary>
+    public static int ApplyGriefStage(Character c, GriefStage stage) => stage switch
+    {
+        GriefStage.Depression => Change(c, -GameConfig.MentalGriefDepressionLoss),
+        GriefStage.Acceptance => Change(c, GameConfig.MentalGriefAcceptanceGain),
+        _ => 0
+    };
+
+    /// <summary>
+    /// Witnessing a town NPC death or a world disaster: MentalWitnessLoss at most once a day
+    /// (WitnessLoss, cleared by ApplyDailyReset). The day is spent on the first witness even at 0.
+    /// Returns the change applied (0 or negative). NPCs are skipped and return 0.
+    /// </summary>
+    public static int ApplyWitnessLoss(Character c)
+    {
+        if (c == null || c.IsNPC || UsedToday(c, MentalDailySource.WitnessLoss)) return 0;
+        MarkUsed(c, MentalDailySource.WitnessLoss);
+        return Change(c, -GameConfig.MentalWitnessLoss);
     }
 
     /// <summary>

@@ -1091,6 +1091,15 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("");
             }
 
+            // v1.1.15: the Mental grief loss for a companion's death, announced by band only
+            var griefPlayer = GameEngine.Instance?.CurrentPlayer;
+            if (griefPlayer != null)
+            {
+                int mentalBeforeGrief = griefPlayer.Mental;
+                MentalSystem.ApplyCompanionGrief(griefPlayer);
+                if (terminal != null) MentalUi.AnnounceMentalChange(terminal, griefPlayer, mentalBeforeGrief);
+            }
+
             // Trigger Ocean Philosophy awakening
             if (!OceanPhilosophySystem.Instance.ExperiencedMoments.Contains(AwakeningMoment.FirstCompanionDeath))
             {
@@ -1275,6 +1284,16 @@ namespace UsurperRemake.Systems
 
             // Trigger grief system
             GriefSystem.Instance.BeginGrief(companion.Id, companion.Name, DeathType.ChoiceBased);
+
+            // v1.1.15: the Mental grief loss; this path has no terminal parameter, so the engine's terminal shows the band line
+            var griefPlayer = GameEngine.Instance?.CurrentPlayer;
+            if (griefPlayer != null)
+            {
+                int mentalBeforeGrief = griefPlayer.Mental;
+                MentalSystem.ApplyCompanionGrief(griefPlayer);
+                var griefTerminal = GameEngine.Instance?.Terminal;
+                if (griefTerminal != null) MentalUi.AnnounceMentalChange(griefTerminal, griefPlayer, mentalBeforeGrief);
+            }
 
             // Trigger Ocean Philosophy awakening for sacrifice
             OceanPhilosophySystem.Instance.ExperienceMoment(AwakeningMoment.CompanionSacrifice);

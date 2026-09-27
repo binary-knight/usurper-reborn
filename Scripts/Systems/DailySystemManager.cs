@@ -771,7 +771,7 @@ public class DailySystemManager
             if (grief.IsGrieving)
             {
                 var previousStage = grief.CurrentStage;
-                grief.UpdateGrief(currentDay);
+                var griefEntered = grief.UpdateGrief(currentDay);
                 if (grief.CurrentStage != previousStage && terminal != null)
                 {
                     terminal.WriteLine("");
@@ -781,6 +781,7 @@ public class DailySystemManager
                         terminal.WriteLine($"  {effects.Description}", "gray");
                     terminal.WriteLine("");
                 }
+                ApplyGriefStagesToMental(player, terminal, griefEntered);
             }
         }
         catch { /* Grief system not initialized */ }
@@ -788,14 +789,18 @@ public class DailySystemManager
         // Process drug effects
         try
         {
-            if (player != null && (player.OnDrugs || player.IsAddicted))
+            // v1.1.15: runs after MentalSystem.ApplyDailyReset, which keeps a pending high, so the
+            // crash comes off the high once; a boost pending without a drug crashes here too
+            if (player != null && (player.OnDrugs || player.IsAddicted || player.MentalDrugBoost > 0))
             {
+                int mentalBeforeDrugs = player.Mental;
                 string drugMessage = DrugSystem.ProcessDailyDrugEffects(player);
                 if (!string.IsNullOrEmpty(drugMessage) && terminal != null)
                 {
                     terminal.SetColor("bright_magenta");
                     terminal.WriteLine(drugMessage);
                 }
+                if (terminal != null) MentalUi.AnnounceMentalChange(terminal, player, mentalBeforeDrugs);
             }
         }
         catch { /* Drug system error */ }
@@ -862,6 +867,25 @@ public class DailySystemManager
         await Task.CompletedTask;
     }
 
+    /// <summary>
+    /// v1.1.15: the Mental change for each grief stage entered today (MentalSystem.ApplyGriefStage):
+    /// Depression is a loss announced by band only, Acceptance a gain reported with its amount.
+    /// Runs after MentalSystem.ApplyDailyReset, so the loss is never absorbed by the surplus drop.
+    /// </summary>
+    internal static void ApplyGriefStagesToMental(Character? player, TerminalEmulator? terminal, System.Collections.Generic.List<GriefStage> entered)
+    {
+        if (player == null || entered == null) return;
+        foreach (var stage in entered)
+        {
+            int mentalBeforeGrief = player.Mental;
+            int applied = MentalSystem.ApplyGriefStage(player, stage);
+            if (applied > 0)
+                MentalUi.ReportGain(terminal!, player, mentalBeforeGrief, applied);
+            else if (applied < 0 && terminal != null)
+                MentalUi.AnnounceMentalChange(terminal, player, mentalBeforeGrief);
+        }
+    }
+
     private async Task ProcessDailyEvents()
     {
         var terminal = GameEngine.Instance?.Terminal;
@@ -891,7 +915,7 @@ public class DailySystemManager
             if (grief.IsGrieving)
             {
                 var previousStage = grief.CurrentStage;
-                grief.UpdateGrief(currentDay);
+                var griefEntered = grief.UpdateGrief(currentDay);
 
                 // Notify player if grief stage changed
                 if (grief.CurrentStage != previousStage && terminal != null)
@@ -907,6 +931,7 @@ public class DailySystemManager
                     }
                     terminal.WriteLine("");
                 }
+                ApplyGriefStagesToMental(GameEngine.Instance?.CurrentPlayer, terminal, griefEntered);
             }
         }
         catch { /* Grief system not initialized */ }
@@ -915,14 +940,18 @@ public class DailySystemManager
         try
         {
             var drugPlayer = GameEngine.Instance?.CurrentPlayer;
-            if (drugPlayer != null && (drugPlayer.OnDrugs || drugPlayer.IsAddicted))
+            // v1.1.15: runs after MentalSystem.ApplyDailyReset, which keeps a pending high, so the
+            // crash comes off the high once; a boost pending without a drug crashes here too
+            if (drugPlayer != null && (drugPlayer.OnDrugs || drugPlayer.IsAddicted || drugPlayer.MentalDrugBoost > 0))
             {
+                int mentalBeforeDrugs = drugPlayer.Mental;
                 string drugMessage = DrugSystem.ProcessDailyDrugEffects(drugPlayer);
                 if (!string.IsNullOrEmpty(drugMessage) && terminal != null)
                 {
                     terminal.SetColor("bright_magenta");
                     terminal.WriteLine(drugMessage);
                 }
+                if (terminal != null) MentalUi.AnnounceMentalChange(terminal, drugPlayer, mentalBeforeDrugs);
             }
         }
         catch { /* Drug system error */ }

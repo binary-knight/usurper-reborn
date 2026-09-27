@@ -1881,6 +1881,13 @@ public partial class MainStreetLocation : BaseLocation
     {
         terminal.ClearScreen();
         WorldEventSystem.Instance.DisplayWorldStatus(terminal);
+        // v1.1.15: seeing a world disaster on the status screen, the Mental witness loss (once a day)
+        if (WorldEventSystem.Instance.HasActiveDisaster)
+        {
+            int mentalBeforeWitness = currentPlayer.Mental;
+            MentalSystem.ApplyWitnessLoss(currentPlayer);
+            MentalUi.AnnounceMentalChange(terminal, currentPlayer, mentalBeforeWitness);
+        }
         terminal.WriteLine("");
         await terminal.PressAnyKey(Loc.Get("ui.press_enter"));
     }

@@ -21013,7 +21013,7 @@ public partial class CombatEngine
 
         if (isMeaningful && !npc.IsMercenary && wasPermadeath)
         {
-            UsurperRemake.Systems.GriefSystem.Instance.BeginNpcGrief(
+            bool griefBegan = UsurperRemake.Systems.GriefSystem.Instance.BeginNpcGrief(
                 npcId,
                 npc.DisplayName,
                 UsurperRemake.Systems.DeathType.Combat);
@@ -21023,6 +21023,14 @@ public partial class CombatEngine
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("combat.grief_combat_effect"));
             terminal.WriteLine("");
+
+            // v1.1.15: the Mental grief loss, once per death (a duplicate grief begins nothing)
+            if (griefBegan && result.Player != null)
+            {
+                int mentalBeforeGrief = result.Player.Mental;
+                MentalSystem.ApplyNpcGrief(result.Player);
+                MentalUi.AnnounceMentalChange(terminal, result.Player, mentalBeforeGrief);
+            }
             await Task.Delay(1500);
         }
 

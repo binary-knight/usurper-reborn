@@ -737,6 +737,7 @@ namespace UsurperRemake.Locations
             }
 
             currentPlayer.Gold -= finalPrice;
+            int mentalBeforeDrug = currentPlayer.Mental;
             var (success, message) = DrugSystem.UseDrug(currentPlayer, selected.drug);
 
             if (success)
@@ -744,6 +745,8 @@ namespace UsurperRemake.Locations
                 terminal.SetColor("bright_green");
                 terminal.WriteLine("");
                 terminal.WriteLine(message);
+                // v1.1.15: the Mental high, with its amount
+                MentalUi.ReportGain(terminal, currentPlayer, mentalBeforeDrug, currentPlayer.Mental - mentalBeforeDrug);
                 terminal.WriteLine("");
 
                 // Show effects based on drug type
@@ -777,6 +780,7 @@ namespace UsurperRemake.Locations
             {
                 terminal.SetColor("red");
                 terminal.WriteLine(message);
+                MentalUi.AnnounceMentalChange(terminal, currentPlayer, mentalBeforeDrug);   // v1.1.15: the overdose loss
             }
 
             await Task.Delay(2500);

@@ -1548,6 +1548,9 @@ public class HealerLocation : BaseLocation
         // Clear active drug (OnDrugs is computed from ActiveDrug != None)
         player.ActiveDrug = DrugType.None;
         player.DrugEffectDays = 0;
+        // v1.1.15: rehab forgives the pending Mental crash and the tolerance count
+        player.MentalDrugBoost = 0;
+        player.MentalDrugUses = 0;
 
         // Cure addiction
         player.Addict = 0;

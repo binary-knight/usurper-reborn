@@ -136,20 +136,22 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Begin grieving for a fallen NPC teammate (spouse, lover, team member)
+        /// Begin grieving for a fallen NPC teammate (spouse, lover, team member).
+        /// v1.1.15: returns true only when a new grief began (false for no id or a duplicate), so the
+        /// caller applies the Mental grief loss once per death.
         /// </summary>
-        public void BeginNpcGrief(string npcId, string npcName, DeathType deathType)
+        public bool BeginNpcGrief(string npcId, string npcName, DeathType deathType)
         {
             if (string.IsNullOrEmpty(npcId))
             {
-                return;
+                return false;
             }
 
             // Don't duplicate grief for the same NPC
             if (activeNpcGrief.ContainsKey(npcId))
             {
                 // GD.Print($"[Grief] Already grieving for {npcName}");
-                return;
+                return false;
             }
 
             var griefState = new GriefState
@@ -175,13 +177,17 @@ namespace UsurperRemake.Systems
             });
 
             // GD.Print($"[Grief] Began grieving for NPC {npcName}. Stage: Denial");
+            return true;
         }
 
         /// <summary>
-        /// Update grief states based on time passed
+        /// Update grief states based on time passed.
+        /// v1.1.15: returns the stage each advancing grief entered (one entry per grief that moved),
+        /// so the daily reset can apply the Mental change for Depression and Acceptance.
         /// </summary>
-        public void UpdateGrief(int currentDay)
+        public List<GriefStage> UpdateGrief(int currentDay)
         {
+            var entered = new List<GriefStage>();
             // Update companion grief
             foreach (var kvp in activeGrief)
             {
@@ -195,6 +201,7 @@ namespace UsurperRemake.Systems
                 if (daysInStage >= stageDuration)
                 {
                     AdvanceGriefStage(grief, currentDay);
+                    entered.Add(grief.CurrentStage);
                 }
             }
 
@@ -211,8 +218,11 @@ namespace UsurperRemake.Systems
                 if (daysInStage >= stageDuration)
                 {
                     AdvanceNpcGriefStage(grief, kvp.Key, currentDay);
+                    entered.Add(grief.CurrentStage);
                 }
             }
+
+            return entered;
         }
 
         /// <summary>

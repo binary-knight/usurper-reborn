@@ -6224,6 +6224,10 @@ public abstract class BaseLocation
         {
             terminal.SetColor("dark_red");
             terminal.WriteLine("\n  " + Loc.Get("base.attack_killed", npc.Name2));
+            // v1.1.15: a town NPC's death seen up close, the Mental witness loss (once a day)
+            int mentalBeforeWitness = currentPlayer.Mental;
+            MentalSystem.ApplyWitnessLoss(currentPlayer);
+            MentalUi.AnnounceMentalChange(terminal, currentPlayer, mentalBeforeWitness);
 
             if (result.GoldGained > 0)
             {
