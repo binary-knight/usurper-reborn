@@ -3474,6 +3474,15 @@ public class DungeonLocation : BaseLocation
             terminal.Write(fatigueLabel);
         }
 
+        // Mental band tag (v1.1.15), both modes; empty at Stable
+        var (mentalTagLabel, mentalTagColor) = MentalUi.GetMentalTag(player);
+        if (!string.IsNullOrEmpty(mentalTagLabel))
+        {
+            terminal.Write("  ");
+            terminal.SetColor(mentalTagColor);
+            terminal.Write(mentalTagLabel);
+        }
+
         // v0.65.6 compact floor danger tag: persistent room-bar reminder whenever
         // the floor runs above the player's level (all floor-change paths -- entry,
         // stairs, level select -- render through this bar, so no path is missed).

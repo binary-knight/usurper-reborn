@@ -1556,6 +1556,10 @@ public abstract class BaseLocation
         // Breadcrumb navigation
         ShowBreadcrumb();
 
+        // Mental band tag for the header below (v1.1.15): empty at Stable, shown in both modes
+        // (unlike the fatigue tag, which only ever has content in single-player).
+        var (mentalTagLabel, mentalTagColor) = MentalUi.GetMentalTag(currentPlayer);
+
         // Location header (with time-of-day for single-player, non-dungeon locations)
         terminal.SetColor("bright_yellow");
         if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && currentPlayer != null
@@ -1584,6 +1588,17 @@ public abstract class BaseLocation
                 terminal.Write(")");
                 headerLen += 3 + fatigueLabel.Length; // " (" + label + ")"
             }
+            // Mental band tag (both modes; Strained and below)
+            if (!string.IsNullOrEmpty(mentalTagLabel))
+            {
+                terminal.SetColor("gray");
+                terminal.Write(" (");
+                terminal.SetColor(mentalTagColor);
+                terminal.Write(mentalTagLabel);
+                terminal.SetColor("gray");
+                terminal.Write(")");
+                headerLen += 3 + mentalTagLabel.Length;
+            }
             terminal.WriteLine("");
 
             if (!IsScreenReader)
@@ -1605,11 +1620,24 @@ public abstract class BaseLocation
                 terminal.SetColor(fatigueColor);
                 terminal.Write(fatigueLabel);
                 terminal.SetColor("gray");
-                terminal.WriteLine(")");
+                terminal.Write(")");
+                int headerLen = Name.Length + 3 + fatigueLabel.Length;
+                // Mental band tag (both modes; Strained and below)
+                if (!string.IsNullOrEmpty(mentalTagLabel))
+                {
+                    terminal.SetColor("gray");
+                    terminal.Write(" (");
+                    terminal.SetColor(mentalTagColor);
+                    terminal.Write(mentalTagLabel);
+                    terminal.SetColor("gray");
+                    terminal.Write(")");
+                    headerLen += 3 + mentalTagLabel.Length;
+                }
+                terminal.WriteLine("");
                 if (!IsScreenReader)
                 {
                     terminal.SetColor("yellow");
-                    terminal.WriteLine(new string('═', Name.Length + 3 + fatigueLabel.Length));
+                    terminal.WriteLine(new string('═', headerLen));
                 }
             }
             else
@@ -1617,11 +1645,26 @@ public abstract class BaseLocation
                 // Localize the header name for non-dungeon locations (online + single-player);
                 // the Dungeons header keeps its raw Name because it carries the floor number.
                 string hdrName = LocationId == GameLocation.Dungeons ? Name : GetLocationName(LocationId);
-                terminal.WriteLine(hdrName);
+                terminal.Write(hdrName);
+                int headerLen = hdrName.Length;
+                // Mental band tag (both modes; Strained and below): this leaf is reached in
+                // online mode (dungeon and non-dungeon) and in single-player dungeon without
+                // fatigue, so it is the one place the online header actually gets a tag.
+                if (!string.IsNullOrEmpty(mentalTagLabel))
+                {
+                    terminal.SetColor("gray");
+                    terminal.Write(" (");
+                    terminal.SetColor(mentalTagColor);
+                    terminal.Write(mentalTagLabel);
+                    terminal.SetColor("gray");
+                    terminal.Write(")");
+                    headerLen += 3 + mentalTagLabel.Length;
+                }
+                terminal.WriteLine("");
                 if (!IsScreenReader)
                 {
                     terminal.SetColor("yellow");
-                    terminal.WriteLine(new string('═', hdrName.Length));
+                    terminal.WriteLine(new string('═', headerLen));
                 }
             }
         }
@@ -7416,10 +7459,41 @@ public abstract class BaseLocation
         terminal.Write(Loc.Get("base.stat_loyalty"));
         terminal.SetColor("cyan");
         terminal.Write($"{currentPlayer.Loyalty}%");
-        terminal.SetColor("white");
-        terminal.Write(Loc.Get("base.stat_mental"));
-        terminal.SetColor(currentPlayer.Mental >= 50 ? "green" : "red");
-        terminal.WriteLine($"{currentPlayer.Mental}");
+        // Mental Health (v1.1.15): band label and colour from Character.GetMentalTier, in both
+        // modes. A capped character (addiction) gets a cap suffix; a screen-reader session reads
+        // the band before the label so the worst news lands first.
+        int mentalVal = currentPlayer.Mental;
+        int mentalCap = MentalSystem.GetCap(currentPlayer);
+        var (mentalLabel, mentalColor) = currentPlayer.GetMentalTier();
+        string mentalCapText = mentalCap < GameConfig.MaxMentalStability
+            ? Loc.Get("status.mental_cap_suffix", mentalCap)
+            : "";
+        if (IsScreenReader)
+        {
+            terminal.SetColor(mentalColor);
+            string srLine = Loc.Get("status.mental_sr_line", mentalLabel, mentalVal, GameConfig.MaxMentalStability);
+            if (mentalCapText.Length > 0) srLine += ", " + mentalCapText;
+            terminal.WriteLine(srLine);
+        }
+        else
+        {
+            terminal.SetColor("white");
+            terminal.Write(Loc.Get("base.stat_mental"));
+            terminal.SetColor(mentalColor);
+            string capSuffix = mentalCapText.Length > 0 ? $" ({mentalCapText})" : "";
+            terminal.WriteLine($"{mentalVal}/{GameConfig.MaxMentalStability} ({mentalLabel}){capSuffix}");
+        }
+
+        // Afflictions (v1.1.15): shown from Shaken down, percentage read straight off
+        // MentalSystem.GetCombatPenalty so it can never drift from the real combat effect.
+        float mentalPenaltyPct = MentalSystem.GetCombatPenalty(mentalVal) * 100f;
+        if (mentalPenaltyPct > 0f)
+        {
+            terminal.SetColor("white");
+            terminal.Write(Loc.Get("base.mental_afflictions_label"));
+            terminal.SetColor("red");
+            terminal.WriteLine(Loc.Get("base.mental_afflictions_pct", (int)System.Math.Round(mentalPenaltyPct)));
+        }
 
         if (currentPlayer.King)
         {

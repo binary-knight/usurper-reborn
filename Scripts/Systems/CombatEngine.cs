@@ -1165,6 +1165,14 @@ public partial class CombatEngine
                 terminal.WriteLine(Loc.Get("combat.fatigue_dull"));
         }
 
+        // Mental band tag at combat start (v1.1.15), both modes; empty at Stable
+        var (mentalTagLabel, mentalTagColor) = MentalUi.GetMentalTag(player);
+        if (!string.IsNullOrEmpty(mentalTagLabel))
+        {
+            terminal.SetColor(mentalTagColor);
+            terminal.WriteLine(Loc.Get("combat.mental_tag", mentalTagLabel));
+        }
+
         // Show first combat hint for new players
         HintSystem.Instance.TryShowHint(HintSystem.HINT_FIRST_COMBAT, terminal, player.HintsShown);
 

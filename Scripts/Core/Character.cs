@@ -604,6 +604,20 @@ public class Character
         return (Loc.Get("status.fatigue_exhausted"), "bright_red");
     }
 
+    /// <summary>Get Mental band label and color for display (v1.1.15). Unlike GetFatigueTier,
+    /// every band including Stable returns a label, since the status sheet always shows one.</summary>
+    public (string label, string color) GetMentalTier()
+    {
+        return MentalSystem.GetBand(Mental) switch
+        {
+            MentalBand.Stable => (Loc.Get("status.mental_stable"), "bright_green"),
+            MentalBand.Strained => (Loc.Get("status.mental_strained"), "yellow"),
+            MentalBand.Shaken => (Loc.Get("status.mental_shaken"), "bright_yellow"),
+            MentalBand.Breaking => (Loc.Get("status.mental_breaking"), "red"),
+            _ => (Loc.Get("status.mental_broken"), "bright_red"),
+        };
+    }
+
     // Session XP pacing (v0.54.0) — transient, resets on login, NOT serialized
     /// <summary>Total XP earned this session. Used for diminishing returns in online mode.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
