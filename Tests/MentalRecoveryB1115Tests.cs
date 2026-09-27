@@ -25,7 +25,7 @@ public class MentalRecoveryB1115Tests
     }
 
     /// <summary>Index of text in body, failing when it is missing.</summary>
-    private static int At(string body, string text)
+    internal static int At(string body, string text)
     {
         int i = body.IndexOf(text, StringComparison.Ordinal);
         i.Should().BeGreaterOrEqualTo(0, $"expected '{text}'");
@@ -146,7 +146,7 @@ public class MentalRecoveryB1115Tests
     // Healer (commit 2)
 
     /// <summary>The brace-balanced body of the first method named method, any return type (Task&lt;bool&gt; too).</summary>
-    private static string Method(string src, string method)
+    internal static string Method(string src, string method)
     {
         var m = Regex.Match(src, @"\b(?:Task(?:<[^>\n]*>)?|void|int|bool)\s+" + Regex.Escape(method) + @"\s*\(");
         m.Success.Should().BeTrue($"{method} must be defined");
@@ -159,7 +159,7 @@ public class MentalRecoveryB1115Tests
         throw new InvalidOperationException("unbalanced braces");
     }
 
-    private static string Healer() => Src("Locations", "HealerLocation.cs");
+    internal static string Healer() => Src("Locations", "HealerLocation.cs");
     private static string Dungeon() => Src("Locations", "DungeonLocation.cs");
 
     [Fact]
@@ -210,7 +210,7 @@ public class MentalRecoveryB1115Tests
         var body = Method(Healer(), "TalkTherapy");
         int check = At(body, "if (!MentalSystem.NeedsTherapy(player))");
         int nothing = At(body, "Loc.Get(\"healer.therapy_nothing\"");
-        int charge = At(body, "player.Gold -= cost;");
+        int charge = At(body, "player.Gold -= costWithTax;");
         check.Should().BeLessThan(nothing);
         nothing.Should().BeLessThan(charge);
         body.Substring(nothing, charge - nothing).Should().Contain("return;");
@@ -220,7 +220,7 @@ public class MentalRecoveryB1115Tests
     public void Therapy_refuses_short_gold_before_the_confirm()
     {
         var body = Method(Healer(), "TalkTherapy");
-        int shortGold = At(body, "if (player.Gold < cost)");
+        int shortGold = At(body, "if (player.Gold < costWithTax)");
         int refuse = At(body, "Loc.Get(\"healer.therapy_cant_afford\"");
         int confirm = At(body, "await terminal.AskYesNoAsync(Loc.Get(\"healer.therapy_confirm\"))");
         shortGold.Should().BeLessThan(refuse);
@@ -233,7 +233,7 @@ public class MentalRecoveryB1115Tests
     {
         var body = Method(Healer(), "TalkTherapy");
         int confirm = At(body, "if (!await terminal.AskYesNoAsync(Loc.Get(\"healer.therapy_confirm\")))");
-        int charge = At(body, "player.Gold -= cost;");
+        int charge = At(body, "player.Gold -= costWithTax;");
         int restore = At(body, "MentalSystem.RestoreFull(player)");
         confirm.Should().BeLessThan(charge);
         charge.Should().BeLessThan(restore);

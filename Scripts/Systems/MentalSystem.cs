@@ -306,13 +306,16 @@ public static class MentalSystem
         c != null && !c.IsNPC && (c.Mental < GameConfig.MaxMentalStability || c.MentalBroken);
 
     /// <summary>
-    /// Talk therapy price in gold: the missing points (MaxMentalStability minus Mental, never below
-    /// 0) times (MentalTherapyCostBase + MentalTherapyCostPerLevel x Level), in long.
+    /// Talk therapy price in gold before the Healer's tax: the missing points (MaxMentalStability
+    /// minus Mental, never below 0; at least MentalTherapyBrokenMinPoints while Broken) times
+    /// (MentalTherapyCostBase + MentalTherapyCostPerLevel x Level), in long.
     /// </summary>
     public static long TherapyCost(Character c)
     {
         if (c == null) return 0;
         long missing = Math.Max(0L, (long)GameConfig.MaxMentalStability - c.Mental);
+        if (c.MentalBroken)
+            missing = Math.Max(missing, GameConfig.MentalTherapyBrokenMinPoints);
         long perPoint = GameConfig.MentalTherapyCostBase + (long)GameConfig.MentalTherapyCostPerLevel * Math.Max(0, c.Level);
         return missing * perPoint;
     }

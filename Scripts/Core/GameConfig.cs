@@ -1691,6 +1691,7 @@ public static partial class GameConfig
     // Healer (piece 5b): talk therapy restores to MaxMentalStability; its cost per missing point is TherapyCostBase + TherapyCostPerLevel x Level
     public const int MentalTherapyCostBase = 10;
     public const int MentalTherapyCostPerLevel = 2;
+    public const int MentalTherapyBrokenMinPoints = 10;       // Talk therapy for a Broken character bills at least this many points, even at full Mental
     public const int MentalWillowDraughtGain = 20;            // Willow Draught, drunk in the dungeon, stops at the cap
     public const int MentalWillowPotionMultiplier = 2;        // Willow Draught price: this many healing potions
     public const int MentalRehabGain = 15;                    // Healer rehab, after the addiction is cleared
