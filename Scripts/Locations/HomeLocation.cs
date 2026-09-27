@@ -2377,8 +2377,8 @@ public class HomeLocation : BaseLocation
                 break;
         }
 
-        // v1.1.15: dinner, a walk or the fire with a spouse eases the mind once a day.
-        if (relationType == "spouse" && choice >= 1 && choice <= 3)
+        // v1.1.15: dinner, a walk or the fire with a spouse or a lover eases the mind once a day (one Spouse bit).
+        if (choice >= 1 && choice <= 3 && MentalSystem.IsPartner(partner.ID))
         {
             int mentalBeforeSpouse = currentPlayer.Mental;
             MentalUi.ReportGain(terminal, currentPlayer, mentalBeforeSpouse, MentalSystem.TryDailyGain(currentPlayer, MentalDailySource.Spouse, GameConfig.MentalSpouseGain));

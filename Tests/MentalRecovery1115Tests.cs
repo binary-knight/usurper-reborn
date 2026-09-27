@@ -374,8 +374,40 @@ public class MentalRecovery1115Tests
     public void Spouse_time_applies_the_spouse_source_for_dinner_walk_and_fire()
     {
         var body = Body(Src("Locations", "HomeLocation.cs"), "SpendQualityTime");
-        int guard = At(body, "if (relationType == \"spouse\" && choice >= 1 && choice <= 3)");
+        int guard = At(body, "if (choice >= 1 && choice <= 3 && MentalSystem.IsPartner(partner.ID))");
         At(body, "MentalSystem.TryDailyGain(currentPlayer, MentalDailySource.Spouse, GameConfig.MentalSpouseGain)").Should().BeGreaterThan(guard);
+    }
+
+    [Fact]
+    public void Partner_time_counts_for_a_spouse_and_a_lover_but_not_others()
+    {
+        var romance = RomanceTracker.Instance;
+        romance.Reset();
+        try
+        {
+            romance.Spouses.Add(new Spouse { NPCId = "npc_wed", NPCName = "Wed" });
+            romance.CurrentLovers.Add(new Lover { NPCId = "npc_love", NPCName = "Love" });
+            romance.FriendsWithBenefits.Add("npc_fwb");
+            romance.Exes.Add("npc_ex");
+            MentalSystem.IsPartner("npc_wed").Should().BeTrue();
+            MentalSystem.IsPartner("npc_love").Should().BeTrue("the user chose spouse and lovers");
+            MentalSystem.IsPartner("npc_fwb").Should().BeFalse();
+            MentalSystem.IsPartner("npc_ex").Should().BeFalse();
+            MentalSystem.IsPartner("npc_stranger").Should().BeFalse();
+            MentalSystem.IsPartner(null).Should().BeFalse();
+        }
+        finally { romance.Reset(); }
+    }
+
+    [Fact]
+    public void A_spouse_and_a_lover_share_one_partner_gain_a_day()
+    {
+        var c = Hero(mental: 40);
+        MentalSystem.TryDailyGain(c, MentalDailySource.Spouse, GameConfig.MentalSpouseGain).Should().Be(8);
+        MentalSystem.TryDailyGain(c, MentalDailySource.Spouse, GameConfig.MentalSpouseGain).Should().Be(0);
+        var body = Body(Src("Locations", "HomeLocation.cs"), "SpendQualityTime");
+        Regex.Matches(body, @"MentalSystem\.TryDailyGain\(").Count.Should().Be(1, "one call, one Spouse bit, whoever the partner is");
+        body.Should().NotContain("relationType == \"spouse\" && choice");
     }
 
     [Fact]

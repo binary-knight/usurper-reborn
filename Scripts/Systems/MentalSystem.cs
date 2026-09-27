@@ -246,6 +246,17 @@ public static class MentalSystem
         && RelationshipSystem.GetRelationshipStatus(player, npc) <= GameConfig.RelationFriendship;
 
     /// <summary>
+    /// Partner time at Home counts for a spouse or a current lover (not friends with benefits or
+    /// exes): RomanceTracker.GetRelationType(npcId) is Spouse or Lover. Both share the Spouse bit.
+    /// </summary>
+    public static bool IsPartner(string? npcId)
+    {
+        if (string.IsNullOrEmpty(npcId)) return false;
+        var type = RomanceTracker.Instance.GetRelationType(npcId);
+        return type == RomanceRelationType.Spouse || type == RomanceRelationType.Lover;
+    }
+
+    /// <summary>
     /// Inn table rest: MentalInnFriendGain when any NPC friend is present, else MentalInnTableGain.
     /// InnTable and InnFriend share one daily use. Returns the change applied.
     /// </summary>
