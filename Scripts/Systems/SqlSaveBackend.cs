@@ -8894,7 +8894,7 @@ namespace UsurperRemake.Systems
             }
         }
 
-        /// <summary>v1.1.15: drop the stat roll in progress for a save key (the character was accepted).</summary>
+        /// <summary>v1.1.15: drop the stat roll in progress for a save key (the character was first saved).</summary>
         public void ClearCreationRoll(string username)
         {
             try

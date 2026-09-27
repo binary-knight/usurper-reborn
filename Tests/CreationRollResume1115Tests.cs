@@ -13,7 +13,7 @@ using Xunit;
 namespace UsurperReborn.Tests;
 
 /// <summary>
-/// v1.1.15: a character creation stat roll is kept per save key (online mode) until the character is accepted,
+/// v1.1.15: a character creation stat roll is kept per save key (online mode) until the new character is first saved,
 /// so a player who drops at the roll and reconnects resumes the same roll with the same rerolls left instead of
 /// getting a fresh roll and a fresh count.
 /// </summary>
@@ -140,7 +140,7 @@ public class CreationRollResume1115Tests : IDisposable
     }
 
     [Fact]
-    public async Task QuickStart_UsesTheStoredRoll_AndAcceptingClearsIt()
+    public async Task QuickStart_UsesTheStoredRoll_AndAcceptingKeepsItUntilTheFirstSave()
     {
         var dice = new[] { 10, 11, 12, 13, 14, 15, 16, 17, 7 };
         _db.SaveCreationRoll(Key, JsonSerializer.Serialize(new CharacterCreationSystem.CreationRoll { Dice = dice, RerollsRemaining = 4 }));
@@ -150,27 +150,45 @@ public class CreationRollResume1115Tests : IDisposable
         made.Should().NotBeNull();
         var cls = GameConfig.ClassStartingAttributes[CharacterClass.Warrior];
         made!.Agility.Should().Be(dice[2] + cls.Agility, "Quick Start after a drop uses the stored roll, not a fresh one");
-        _db.LoadCreationRoll(Key).Should().BeNull("the character was accepted");
+        _db.LoadCreationRoll(Key).Should().NotBeNull("accepted but not yet saved: a drop now must resume the same roll");
+    }
+
+    private void StoreRoll() =>
+        _db.SaveCreationRoll(Key, JsonSerializer.Serialize(new CharacterCreationSystem.CreationRoll
+            { Dice = new[] { 10, 11, 12, 13, 14, 15, 16, 17, 7 }, RerollsRemaining = 4 }));
+
+    [Fact]
+    public async Task ASuccessfulFirstSave_ClearsTheRoll()
+    {
+        StoreRoll();
+        (await CharacterCreationSystem.SaveNewCharacter(() => Task.FromResult(true), _db, Hero())).Should().BeTrue();
+        _db.LoadCreationRoll(Key).Should().BeNull("the character is saved, so the roll is done with");
     }
 
     [Fact]
-    public void EveryAcceptedCharacter_ClearsTheRoll()
+    public async Task AFailedFirstSave_KeepsTheRoll()
     {
-        // The custom path is not driven here (ten screens); in source, each return of the finished character
-        // in CreateNewCharacter clears the roll, and nothing else does.
-        var src = File.ReadAllText(Path.Combine(FloorAndStun1113Tests.RepoRoot(), "Scripts/Systems/CharacterCreationSystem.cs"));
+        StoreRoll();
+        (await CharacterCreationSystem.SaveNewCharacter(() => Task.FromResult(false), _db, Hero())).Should().BeFalse();
+        _db.LoadCreationRoll(Key).Should().NotBeNull("nothing was saved; a reconnect must resume the same roll");
+    }
+
+    [Fact]
+    public void OnlyTheFirstSave_ClearsTheRoll()
+    {
+        // The custom path is not driven here (ten screens); in source, creation itself never clears the roll,
+        // and the new character's first save in GameEngine goes through SaveNewCharacter, the one place that does.
+        var root = FloorAndStun1113Tests.RepoRoot();
+        var src = File.ReadAllText(Path.Combine(root, "Scripts/Systems/CharacterCreationSystem.cs"));
+        Regex.Matches(src, @"ClearCreationRoll\(").Count.Should().Be(1, "only SaveNewCharacter clears the roll");
         int start = src.IndexOf("public async Task<Character> CreateNewCharacter(", StringComparison.Ordinal);
         int end = src.IndexOf("private async Task<bool> TryQuickStart(", StringComparison.Ordinal);
-        var body = src.Substring(start, end - start);
-        var returns = Regex.Matches(body, @"return character;");
-        returns.Count.Should().Be(2, "Quick Start and the custom path");
-        foreach (Match r in returns)
-        {
-            var before = body.Substring(0, r.Index);
-            before.Substring(before.LastIndexOf("return ", StringComparison.Ordinal))
-                .Should().Contain("ClearRoll(character);", "the roll is cleared between the last way out and the return of the character");
-        }
-        Regex.Matches(src, @"ClearRoll\(character\);").Count.Should().Be(2, "only an accepted character clears the roll");
+        src.Substring(start, end - start).Should().NotContain("ClearCreationRoll", "accepting is not saving");
+
+        var engine = File.ReadAllText(Path.Combine(root, "Scripts/Core/GameEngine.cs"));
+        Regex.IsMatch(engine, @"var success = await CharacterCreationSystem\.SaveNewCharacter\(\s*\(\) => SaveSystem\.Instance\.SaveGame\(savePlayerName, currentPlayer\)")
+            .Should().BeTrue("the new character's first save clears the roll only when it succeeds");
+        Regex.Matches(engine, @"ClearCreationRoll\(").Count.Should().Be(0);
     }
 
     [Fact]
