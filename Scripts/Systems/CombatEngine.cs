@@ -4328,7 +4328,7 @@ public partial class CombatEngine
             long healAmount = 30 + player.Level * 5 + random.Next(10, 30);
             healAmount = DifficultySystem.ApplyHealingMultiplier(healAmount);
             // v1.1.11: the owner's Potion Mastery and Team HQ Infirmary, the last modifiers before the cap
-            healAmount = PotionBonus.ApplyOwnerBonuses(player, healAmount);
+            healAmount = PotionBonus.ApplyOwnerBonuses(player, healAmount, result.Monsters);
             healAmount = Math.Min(healAmount, player.MaxHP - player.HP);
             player.HP += healAmount;
             player.Statistics?.RecordPotionUsed(healAmount);
@@ -4345,7 +4345,7 @@ public partial class CombatEngine
             // Regular heal - ask how many potions to use for full control
             long missingHP = player.MaxHP - player.HP;
             long avgHealPerPotion = 50 + player.Level * 5;  // Average heal: 30 + level*5 + avg(10-30)
-            avgHealPerPotion = PotionBonus.ApplyOwnerBonuses(player, avgHealPerPotion); // v1.1.11: Infirmary
+            avgHealPerPotion = PotionBonus.ApplyOwnerBonuses(player, avgHealPerPotion, result.Monsters); // v1.1.11: Infirmary
             int potionsToFullHeal = (int)Math.Ceiling((double)missingHP / avgHealPerPotion);
             potionsToFullHeal = Math.Min(potionsToFullHeal, (int)player.Healing);
 
@@ -4371,7 +4371,7 @@ public partial class CombatEngine
                 long healAmount = 30 + player.Level * 5 + random.Next(10, 30);
                 healAmount = DifficultySystem.ApplyHealingMultiplier(healAmount);
                 // v1.1.11: the owner's Potion Mastery and Team HQ Infirmary, the last modifiers before the cap
-                healAmount = PotionBonus.ApplyOwnerBonuses(player, healAmount);
+                healAmount = PotionBonus.ApplyOwnerBonuses(player, healAmount, result.Monsters);
                 healAmount = Math.Min(healAmount, player.MaxHP - player.HP);
                 player.HP += healAmount;
                 totalHeal += healAmount;
@@ -4428,7 +4428,7 @@ public partial class CombatEngine
         string input = (await terminal.ReadLineAsync())?.Trim() ?? "";
         if (int.TryParse(input, out int sel) && sel >= 1 && sel <= options.Count)
         {
-            await HomeLocation.ApplyHerbEffect(player, options[sel - 1], terminal);
+            await HomeLocation.ApplyHerbEffect(player, options[sel - 1], terminal, result.Monsters);
         }
         else
         {
@@ -7855,7 +7855,7 @@ public partial class CombatEngine
 
         // v0.56.0: healer spec bonus applies to party song heals (Minstrel Bard)
         if (abilityResult.Healing > 0)
-            abilityResult.Healing = ApplyHealerSpecBonus(bard, abilityResult.Healing);
+            abilityResult.Healing = ApplyHealerSpecBonus(bard, abilityResult.Healing, result.Monsters);
 
         terminal.SetColor("bright_magenta");
         terminal.WriteLine(isPlayer
@@ -15199,7 +15199,7 @@ public partial class CombatEngine
         if (abilityResult.Healing > 0)
         {
             // Healer spec heal bonus (v0.56.0): +20% for healer-role NPC specs
-            abilityResult.Healing = ApplyHealerSpecBonus(player, abilityResult.Healing);
+            abilityResult.Healing = ApplyHealerSpecBonus(player, abilityResult.Healing, monsters);
 
             Character healTarget = player;
             bool healedAlly = false;
@@ -16536,7 +16536,7 @@ public partial class CombatEngine
                 {
                     foreach (var tm in result.Teammates.Where(t => t.IsAlive))
                     {
-                        tm.HP = Math.Min(tm.MaxHP, tm.HP + 200);
+                        tm.HP = Math.Min(tm.MaxHP, tm.HP + GodBoonSystem.HealAgainstUndead(player, 200, result.Monsters)); // 1.2.0: Solarius
                         terminal.WriteLine(Loc.Get("combat.ability_tidal_harmony_ally", tm.Name), "cyan");
                     }
                 }
@@ -17577,7 +17577,7 @@ public partial class CombatEngine
             {
                 if (spellResult.Healing > 0)
                 {
-                    spellResult.Healing = ApplyHealerSpecBonus(player, spellResult.Healing);
+                    spellResult.Healing = ApplyHealerSpecBonus(player, spellResult.Healing, monsters);
                     long oldHP = tgt.HP;
                     tgt.HP = Math.Min(tgt.MaxHP, tgt.HP + spellResult.Healing);
                     long actualHeal = tgt.HP - oldHP;
@@ -17592,7 +17592,7 @@ public partial class CombatEngine
             }
             void ApplyBuffTo(Character tgt)
             {
-                ApplySpellEffects(tgt, null, spellResult);
+                ApplySpellEffects(tgt, null, spellResult, monsters: monsters, healer: player);
                 result.CombatLog.Add($"{player.DisplayName} casts {spellInfo.Name} on {tgt.DisplayName}.");
             }
 
@@ -17605,7 +17605,7 @@ public partial class CombatEngine
                 if (!overrideTgt.IsAlive || overrideTgt == player)
                 {
                     // Dead target or self -> apply to caster (matches the dead-ally fallback).
-                    ApplySpellEffects(player, null, spellResult);
+                    ApplySpellEffects(player, null, spellResult, monsters: monsters);
                     result.CombatLog.Add($"{player.DisplayName} casts {spellInfo.Name}.");
                 }
                 else if (spellInfo.SpellType == "Heal") ApplyHealTo(overrideTgt);
@@ -17621,7 +17621,7 @@ public partial class CombatEngine
             else if (spellInfo.IsMultiTarget && spellInfo.SpellType == "Buff")
             {
                 // Apply buffs to caster
-                ApplySpellEffects(player, null, spellResult);
+                ApplySpellEffects(player, null, spellResult, monsters: monsters);
 
                 // Apply buffs to all living teammates
                 if (currentTeammates != null)
@@ -17680,7 +17680,7 @@ public partial class CombatEngine
             else if (spellInfo.IsMultiTarget && spellInfo.SpellType == "Heal" && spellResult.Healing > 0)
             {
                 // v0.56.0 healer spec bonus applies to spell heals too
-                spellResult.Healing = ApplyHealerSpecBonus(player, spellResult.Healing);
+                spellResult.Healing = ApplyHealerSpecBonus(player, spellResult.Healing, monsters);
                 // Heal the caster
                 long oldPlayerHP = player.HP;
                 player.HP = Math.Min(player.MaxHP, player.HP + spellResult.Healing);
@@ -17741,7 +17741,7 @@ public partial class CombatEngine
                 if (!allyTarget.IsAlive)
                 {
                     // Ally died between selection and execution — fall back to self
-                    ApplySpellEffects(player, null, spellResult);
+                    ApplySpellEffects(player, null, spellResult, monsters: monsters);
                     result.CombatLog.Add($"{player.DisplayName} casts {spellInfo.Name}.");
                 }
                 else if (spellInfo.SpellType == "Heal") ApplyHealTo(allyTarget);
@@ -17750,7 +17750,7 @@ public partial class CombatEngine
             else
             {
                 // Self-targeting (no ally selected, or invalid index)
-                ApplySpellEffects(player, null, spellResult);
+                ApplySpellEffects(player, null, spellResult, monsters: monsters);
                 result.CombatLog.Add($"{player.DisplayName} casts {spellInfo.Name}.");
             }
         }
@@ -17777,7 +17777,7 @@ public partial class CombatEngine
             if (spellResult.Healing > 0)
             {
                 // v0.56.0 healer spec bonus
-                spellResult.Healing = ApplyHealerSpecBonus(player, spellResult.Healing);
+                spellResult.Healing = ApplyHealerSpecBonus(player, spellResult.Healing, monsters);
                 long oldHP = player.HP;
                 player.HP = Math.Min(player.MaxHP, player.HP + spellResult.Healing);
                 long actualHeal = player.HP - oldHP;
@@ -17842,7 +17842,7 @@ public partial class CombatEngine
                 if (spellResult.Healing > 0)
                 {
                     // v0.56.0 healer spec bonus
-                    spellResult.Healing = ApplyHealerSpecBonus(player, spellResult.Healing);
+                    spellResult.Healing = ApplyHealerSpecBonus(player, spellResult.Healing, monsters);
                     long oldHP = player.HP;
                     player.HP = Math.Min(player.MaxHP, player.HP + spellResult.Healing);
                     long actualHeal = player.HP - oldHP;
@@ -18589,7 +18589,7 @@ public partial class CombatEngine
             // Calculate how much HP is missing
             long missingHP = targetAlly.MaxHP - targetAlly.HP;
             int healPerPotion = 30 + player.Level * 5 + 20; // Average heal per potion
-            healPerPotion = (int)PotionBonus.ApplyOwnerBonuses(player, healPerPotion); // v1.1.11: the giver's Infirmary
+            healPerPotion = (int)PotionBonus.ApplyOwnerBonuses(player, healPerPotion, monsters); // v1.1.11: the giver's Infirmary
 
             // Ask if player wants to fully heal or use 1 potion
             int potionsNeeded = (int)Math.Ceiling((double)missingHP / healPerPotion);
@@ -18639,7 +18639,7 @@ public partial class CombatEngine
             {
                 player.Healing--;
                 int healAmount = 30 + player.Level * 5 + random.Next(10, 30);
-                healAmount = (int)PotionBonus.ApplyOwnerBonuses(player, healAmount); // v1.1.11: the giver's Infirmary
+                healAmount = (int)PotionBonus.ApplyOwnerBonuses(player, healAmount, monsters); // v1.1.11: the giver's Infirmary
                 targetAlly.HP = Math.Min(targetAlly.MaxHP, targetAlly.HP + healAmount);
             }
 
@@ -18697,7 +18697,7 @@ public partial class CombatEngine
             if (spellResult.Success && spellResult.Healing > 0)
             {
                 // v0.56.0 healer spec bonus on ally heal-spell
-                spellResult.Healing = ApplyHealerSpecBonus(player, spellResult.Healing);
+                spellResult.Healing = ApplyHealerSpecBonus(player, spellResult.Healing, monsters);
                 long oldHP = targetAlly.HP;
                 targetAlly.HP = Math.Min(targetAlly.MaxHP, targetAlly.HP + spellResult.Healing);
                 long actualHeal = targetAlly.HP - oldHP;
@@ -19190,6 +19190,8 @@ public partial class CombatEngine
 
         if (spellResult.Success && spellResult.Healing > 0)
         {
+            // 1.2.0: Solarius's boon on a teammate's heal while fighting undead or demons
+            spellResult.Healing = (int)Math.Min(GodBoonSystem.HealAgainstUndead(teammate, spellResult.Healing, result.Monsters), int.MaxValue);
             // Multi-target heal (e.g. Mass Cure) — heal entire party
             if (healSpell.IsMultiTarget)
             {
@@ -19294,7 +19296,7 @@ public partial class CombatEngine
 
         // Potion heals a fixed amount plus some randomness (same formula as player potions)
         int healAmount = 30 + teammate.Level * 5 + random.Next(10, 30);
-        healAmount = (int)PotionBonus.ApplyOwnerBonuses(potionOwner, healAmount); // v1.1.11: the potion owner's Infirmary
+        healAmount = (int)PotionBonus.ApplyOwnerBonuses(potionOwner, healAmount, result.Monsters); // v1.1.11: the potion owner's Infirmary
         long oldHP = target.HP;
         target.HP = Math.Min(target.MaxHP, target.HP + healAmount);
         long actualHeal = target.HP - oldHP;
@@ -23451,7 +23453,7 @@ public partial class CombatEngine
 
         long hpNeeded = player.MaxHP - player.HP;
         int healPerPotion = 30 + player.Level * 5 + random.Next(10, 30);
-        healPerPotion = (int)PotionBonus.ApplyOwnerBonuses(player, healPerPotion); // v1.1.11: Infirmary, so potionsNeeded shrinks too
+        healPerPotion = (int)PotionBonus.ApplyOwnerBonuses(player, healPerPotion, result.Monsters); // v1.1.11: Infirmary, so potionsNeeded shrinks too
         int potionsNeeded = (int)Math.Ceiling((double)hpNeeded / healPerPotion);
         potionsNeeded = Math.Min(potionsNeeded, (int)player.Healing);
         long actualHealing = Math.Min((long)potionsNeeded * healPerPotion, hpNeeded);
@@ -23913,7 +23915,7 @@ public partial class CombatEngine
         if (abilityResult.Healing > 0)
         {
             // Healer spec heal bonus (v0.56.0): +20% for healer-role NPC specs
-            abilityResult.Healing = ApplyHealerSpecBonus(player, abilityResult.Healing);
+            abilityResult.Healing = ApplyHealerSpecBonus(player, abilityResult.Healing, monster != null ? new[] { monster } : null);
             long actualHealing = Math.Min(abilityResult.Healing, player.MaxHP - player.HP);
             player.HP += actualHealing;
 
@@ -25040,7 +25042,7 @@ public partial class CombatEngine
                 {
                     foreach (var tm in result.Teammates.Where(t => t.IsAlive))
                     {
-                        tm.HP = Math.Min(tm.MaxHP, tm.HP + 200);
+                        tm.HP = Math.Min(tm.MaxHP, tm.HP + GodBoonSystem.HealAgainstUndead(player, 200, result.Monsters)); // 1.2.0: Solarius
                         terminal.WriteLine(Loc.Get("combat.ability_tidal_harmony_ally", tm.Name), "cyan");
                     }
                 }
@@ -27458,7 +27460,7 @@ public partial class CombatEngine
             }
 
             // Apply spell effects
-            ApplySpellEffects(player, monster, spellResult, result);
+            ApplySpellEffects(player, monster, spellResult, result, monster != null ? new[] { monster } : null);
 
             // Display training improvement message if spell proficiency increased
             if (spellResult.SkillImproved && !string.IsNullOrEmpty(spellResult.NewProficiencyLevel))
@@ -27479,11 +27481,14 @@ public partial class CombatEngine
     /// <summary>
     /// Apply spell effects to combat
     /// </summary>
-    private void ApplySpellEffects(Character caster, Monster target, SpellSystem.SpellResult spellResult, CombatResult result = null)
+    private void ApplySpellEffects(Character caster, Monster target, SpellSystem.SpellResult spellResult, CombatResult result = null, IEnumerable<Monster>? monsters = null, Character? healer = null)
     {
         // Apply healing to caster
         if (spellResult.Healing > 0)
         {
+            // 1.2.0: Solarius's boon on the heal while fighting undead or demons, from the one who
+            // cast it (healer: a buff cast on an ally lands here with the ally as caster)
+            spellResult.Healing = (int)Math.Min(GodBoonSystem.HealAgainstUndead(healer ?? caster, spellResult.Healing, monsters), int.MaxValue);
             long oldHP = caster.HP;
             caster.HP = Math.Min(caster.HP + spellResult.Healing, caster.MaxHP);
             long actualHealing = caster.HP - oldHP;
@@ -30254,14 +30259,18 @@ public partial class CombatEngine
 
     /// <summary>
     /// Apply the healer spec's +20% healing bonus, if the character has a healer specialization.
-    /// Used on ability healing and spell healing paths (v0.56.0).
+    /// Used on ability healing and spell healing paths (v0.56.0). The monsters list is the fight
+    /// the caster is in now, for Solarius's boon (null when not a monster fight); pass it whenever
+    /// it is in scope.
     /// </summary>
-    private static int ApplyHealerSpecBonus(Character caster, int baseHealing)
+    private static int ApplyHealerSpecBonus(Character caster, int baseHealing, IEnumerable<Monster>? monsters = null)
     {
         // v0.65.4: works for players too (Specialization moved to Character), not just NPC healers.
         if (baseHealing <= 0 || caster == null) return baseHealing;
         // 1.2.0 Temple gods piece 2: Amara's boon on the heals a follower casts
         int healing = (int)Math.Min(GodBoonSystem.PartyHeal(caster, baseHealing), int.MaxValue);
+        // 1.2.0: Solarius's boon on the heals a follower casts while fighting undead or demons
+        healing = (int)Math.Min(GodBoonSystem.HealAgainstUndead(caster, healing, monsters), int.MaxValue);
         if (!UsurperRemake.Data.SpecializationData.IsHealerSpec(caster.Specialization)) return healing;
         return (int)(healing * (1.0 + GameConfig.HealerSpecHealBonus));
     }

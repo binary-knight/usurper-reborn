@@ -8674,7 +8674,7 @@
   "god.boon_line": "Don: {0} ({1}% de fuerza)",
   "god.ward_line": "Protección mental (desde Devoto): {0}",
   "god.ward_line_active": "Protección mental: {0}",
-  "god.boon.light": "+{0}% de daño contra no muertos y demonios",
+  "god.boon.light": "+{0}% de daño contra no muertos y demonios, +{1}% de curación en esos combates",
   "god.boon.war": "+{0}% de daño con menos de la mitad de PV",
   "god.boon.love": "+{0}% a tus curaciones y a las protecciones de grupo que lanzas",
   "god.boon.law": "+{0}% de defensa contra monstruos, +{1}% en recompensas de caza",

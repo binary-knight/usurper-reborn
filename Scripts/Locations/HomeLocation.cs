@@ -1129,9 +1129,10 @@ public class HomeLocation : BaseLocation
     }
 
     /// <summary>
-    /// Apply an herb's effect to the player. Consumes 1 herb from inventory.
+    /// Apply an herb's effect to the player. Consumes 1 herb from inventory. The monsters are the
+    /// fight the player is in (null outside combat), for Solarius's boon on the healing herb.
     /// </summary>
-    public static async Task ApplyHerbEffect(Character player, HerbType type, TerminalEmulator terminal)
+    public static async Task ApplyHerbEffect(Character player, HerbType type, TerminalEmulator terminal, IEnumerable<Monster>? monsters = null)
     {
         if (!player.ConsumeHerb(type)) return;
 
@@ -1145,6 +1146,7 @@ public class HomeLocation : BaseLocation
                 if (player.Class == CharacterClass.Alchemist)
                     herbHealPct *= (1.0f + GameConfig.AlchemistPotionMasteryBonus);
                 long healAmount = (long)(player.MaxHP * herbHealPct);
+                healAmount = GodBoonSystem.HealAgainstUndead(player, healAmount, monsters); // 1.2.0: Solarius, in combat only
                 healAmount = Math.Min(healAmount, player.MaxHP - player.HP);
                 player.HP += healAmount;
                 terminal.WriteLine(Loc.Get("home.herb_healing_use", herbName, healAmount, player.HP, player.MaxHP));

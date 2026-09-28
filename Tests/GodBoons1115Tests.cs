@@ -191,8 +191,220 @@ public class GodBoons1115Tests
     {
         var method = typeof(CombatEngine).GetMethod("ApplyHealerSpecBonus", BindingFlags.NonPublic | BindingFlags.Static)!;
         var c = Hero("GbAmaHeal");
-        ((int)method.Invoke(null, new object[] { c, 1000 })!).Should().Be(1000);
-        WithSingletonGod(c, "Amara", 60, () => (int)method.Invoke(null, new object[] { c, 1000 })!).Should().Be(1150);
+        ((int)method.Invoke(null, new object?[] { c, 1000, null })!).Should().Be(1000);
+        WithSingletonGod(c, "Amara", 60, () => (int)method.Invoke(null, new object?[] { c, 1000, null })!).Should().Be(1150);
+    }
+
+    // ---------------- Solarius healing (1.2.0 follow-up) ----------------
+
+    [Fact]
+    public void Solarius_HealAgainstUndead_ScalesByTier_OnlyWhileFightingOne()
+    {
+        var (z, zGods) = Follower("GbSolHealZ", "Solarius", 60);
+        var undead = new[] { Foe("Skeleton Knight") };
+        var demon = new[] { Foe("Pit Lord", MonsterClass.Demon) };
+        var living = new[] { Foe("Goblin") };
+        GodBoonSystem.HealAgainstUndead(z, 1000, undead, zGods).Should().Be(1150);
+        GodBoonSystem.HealAgainstUndead(z, 1000, demon, zGods).Should().Be(1150);
+        GodBoonSystem.HealAgainstUndead(z, 1000, living, zGods).Should().Be(1000, "no undead or demon in the fight");
+        GodBoonSystem.HealAgainstUndead(z, 1000, null, zGods).Should().Be(1000, "not in a monster fight");
+
+        var (f, fGods) = Follower("GbSolHealF", "Solarius", 0);
+        GodBoonSystem.HealAgainstUndead(f, 1000, undead, fGods).Should().Be(1050, "a Follower gets a third: 15 x 33% = 4.95%, rounds to 50");
+        var (d, dGods) = Follower("GbSolHealD", "Solarius", 25);
+        GodBoonSystem.HealAgainstUndead(d, 1000, undead, dGods).Should().Be(1101, "a Devout gets two thirds: 15 x 67% = 10.05%, rounds to 101");
+
+        var godless = Hero("GbSolHealNone");
+        GodBoonSystem.HealAgainstUndead(godless, 1000, undead, new GodSystem()).Should().Be(1000, "a non-worshipper gets nothing");
+
+        var (o, oGods) = Follower("GbSolHealO", "Amara", 60);
+        GodBoonSystem.HealAgainstUndead(o, 1000, undead, oGods).Should().Be(1000, "Amara's domain is not Light");
+    }
+
+    [Fact]
+    public void Solarius_HealAgainstUndead_IgnoresADeadUndeadMonster()
+    {
+        var (c, gods) = Follower("GbSolHealDead", "Solarius", 60);
+        var deadSkeleton = Foe("Skeleton Knight");
+        deadSkeleton.HP = 0;
+        GodBoonSystem.HealAgainstUndead(c, 1000, new[] { deadSkeleton }, gods).Should().Be(1000, "not fighting it once it is dead");
+        var stillOnlyDead = new[] { deadSkeleton, Foe("Goblin") };
+        GodBoonSystem.HealAgainstUndead(c, 1000, stillOnlyDead, gods).Should().Be(1000, "the only undead in the fight is dead");
+        var oneStillAlive = new[] { deadSkeleton, Foe("Skeleton Knight") };
+        GodBoonSystem.HealAgainstUndead(c, 1000, oneStillAlive, gods).Should().Be(1150, "the second skeleton is alive");
+    }
+
+    [Fact]
+    public void Solarius_BoostsTheHealsCastInCombat_ThroughApplyHealerSpecBonus()
+    {
+        var method = typeof(CombatEngine).GetMethod("ApplyHealerSpecBonus", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var c = Hero("GbSolSpec");
+        var undead = new Monster[] { Foe("Zombie") };
+        WithSingletonGod(c, "Solarius", 60, () => (int)method.Invoke(null, new object?[] { c, 1000, undead })!).Should().Be(1150);
+        WithSingletonGod(c, "Solarius", 60, () => (int)method.Invoke(null, new object?[] { c, 1000, null })!).Should().Be(1000, "not fighting a monster");
+    }
+
+    [Fact]
+    public void Solarius_BoostsPotionHeals_ThroughPotionBonus()
+    {
+        var c = Hero("GbSolPotion");
+        var undead = new Monster[] { Foe("Zombie") };
+        PotionBonus.ApplyOwnerBonuses(c, 1000).Should().Be(1000, "no monsters passed, no domain worshipped either");
+        WithSingletonGod(c, "Solarius", 60, () => PotionBonus.ApplyOwnerBonuses(c, 1000, undead)).Should().Be(1150);
+        WithSingletonGod(c, "Solarius", 60, () => PotionBonus.ApplyOwnerBonuses(c, 1000, null)).Should().Be(1000, "not in a monster fight");
+        WithSingletonGod(c, "Solarius", 60, () => PotionBonus.ApplyOwnerBonuses(c, 1000, new[] { Foe("Goblin") })).Should().Be(1000, "no undead or demon in the fight");
+    }
+
+    [Fact]
+    public void Solarius_HealBoon_DescribedWithBothDamageAndHealing()
+    {
+        GodBoonSystem.DescribeBoon(GodDomain.Light, 100).Should().Be("+15% damage against undead and demons, +15% healing in those fights");
+        // At Follower strength (33%) the two numbers are still equal to each other (same full
+        // pct, same tier), which a stray "{1}" placeholder or a dropped second At(...) would break.
+        GodBoonSystem.DescribeBoon(GodDomain.Light, 33).Should().Be("+5% damage against undead and demons, +5% healing in those fights");
+        GodBoonSystem.DescribeBoon(GodDomain.Light, 100).Should().NotContain("{1}");
+    }
+
+    [Fact]
+    public void Solarius_AllyHeal_UsesTheCastersGod_NotTheAllys()
+    {
+        var method = typeof(CombatEngine).GetMethod("ApplySpellEffects", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var engine = new CombatEngine(new TerminalEmulator(new MemoryStream(), new MemoryStream()));
+        var undead = new Monster[] { Foe("Zombie") };
+        var caster = Hero("GbSolAllyCaster");
+        var ally = Hero("GbSolAllyTarget");
+
+        // A Solarius caster heals a non-worshipper ally: boosted.
+        ally.MaxHP = 1000; ally.HP = 10;
+        WithSingletonGod(caster, "Solarius", 60, () =>
+        {
+            method.Invoke(engine, new object?[] { ally, null, new SpellSystem.SpellResult { Success = true, Healing = 100 }, null, undead, caster });
+            return 0;
+        });
+        ally.HP.Should().Be(125, "the caster follows Solarius: 100 x 1.15 = 115");
+
+        // A non-worshipper caster heals a Solarius ally: not boosted.
+        ally.HP = 10;
+        WithSingletonGod(ally, "Solarius", 60, () =>
+        {
+            method.Invoke(engine, new object?[] { ally, null, new SpellSystem.SpellResult { Success = true, Healing = 100 }, null, undead, caster });
+            return 0;
+        });
+        ally.HP.Should().Be(110, "the boon is the caster's, and the caster follows no god");
+    }
+
+    [Fact]
+    public void Solarius_SelfCastHealBoosted_WardStaysFlat()
+    {
+        // A self-cast spell that both heals and wards, by a Solarius Zealot fighting a zombie:
+        // the heal gets +15%, the ward (ProtectionBonus) stays as cast.
+        var output = new MemoryStream();
+        var engine = new CombatEngine(new TerminalEmulator(new MemoryStream(), output));
+        var c = Hero("GbSolWard");
+        c.MaxHP = 1000; c.HP = 10;
+        var spell = new SpellSystem.SpellResult { Success = true, Healing = 100, ProtectionBonus = 40, Duration = 999 };
+        var undead = new Monster[] { Foe("Zombie") };
+        WithSingletonGod(c, "Solarius", 60, () =>
+        {
+            typeof(CombatEngine).GetMethod("ApplySpellEffects", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .Invoke(engine, new object?[] { c, null, spell, null, undead, null });
+            return 0;
+        });
+        c.HP.Should().Be(125, "the heal is boosted: 100 x 1.15 = 115");
+        c.MagicACBonus.Should().Be(40, "a ward is not boosted by Solarius");
+
+        var (z, zGods) = Follower("GbSolWardZ", "Solarius", 60);
+        GodBoonSystem.PartyWard(z, 100, zGods).Should().Be(100, "the party ward is Amara's, not Solarius's");
+    }
+
+    /// <summary>The comma count of a call's top-level arguments (parens after the callee name), so a
+    /// nested expression (a ternary, a method call) in one argument does not fool the count.</summary>
+    private static int CallArgCount(string line, string calleeWithOpenParen)
+    {
+        int start = line.IndexOf(calleeWithOpenParen, StringComparison.Ordinal);
+        start.Should().BeGreaterThanOrEqualTo(0, $"{calleeWithOpenParen} must be present in: {line}");
+        int depth = 1;
+        int commas = 0;
+        for (int i = start + calleeWithOpenParen.Length; i < line.Length && depth > 0; i++)
+        {
+            char ch = line[i];
+            if (ch == '(') depth++;
+            else if (ch == ')') depth--;
+            else if (ch == ',' && depth == 1) commas++;
+        }
+        return commas + 1;
+    }
+
+    [Fact]
+    public void Solarius_EveryCombatHealPath_GoesThroughTheHelper()
+    {
+        var src = Source("Scripts/Systems/CombatEngine.cs");
+
+        // Every ApplyHealerSpecBonus call (not its own definition) passes the monsters context, so
+        // Solarius's boon can see the fight. A 2-arg call is the hole this test exists to catch.
+        var healerCalls = src.Split('\n')
+            .Where(l => l.Contains("ApplyHealerSpecBonus(") && !l.Contains("private static int ApplyHealerSpecBonus"))
+            .Select(l => l.Trim())
+            .ToList();
+        healerCalls.Should().NotBeEmpty();
+        foreach (var line in healerCalls)
+            CallArgCount(line, "ApplyHealerSpecBonus(").Should().Be(3, $"missing the monsters argument: {line}");
+
+        // Potion heals: every combat apply passes monsters, except the two post-combat AutoHealWithPotions
+        // calls (the fight is already over) and the PvP AI heal (no monster fight to check).
+        var potionAllowlist = new[]
+        {
+            "avgPotionHeal = PotionBonus.ApplyOwnerBonuses(player, avgPotionHeal); // v1.1.11: Infirmary",
+            "healAmount = PotionBonus.ApplyOwnerBonuses(player, healAmount); // v1.1.11: Infirmary, before the cap",
+            "heal = PotionBonus.ApplyOwnerBonuses(computer, heal); // v1.1.11: the defender's own Infirmary",
+        };
+        var potionCalls = src.Split('\n')
+            .Where(l => l.Contains("PotionBonus.ApplyOwnerBonuses("))
+            .Select(l => l.Trim())
+            .ToList();
+        potionCalls.Should().NotBeEmpty();
+        foreach (var line in potionCalls)
+        {
+            if (CallArgCount(line, "PotionBonus.ApplyOwnerBonuses(") < 3)
+                potionAllowlist.Should().Contain(line, $"a combat potion heal without the helper must be allowlisted: {line}");
+        }
+        foreach (var a in potionAllowlist) src.Should().Contain(a, "the allowlist entry has drifted from the source");
+
+        // Spell self-heals: ApplySpellEffects's own healing block, called from every combat spell
+        // path except the PvP AI (Character-vs-Character, no monsters to test).
+        var spellAllowlist = new[] { "ApplySpellEffects(computer, null, spellResult);" };
+        var spellCalls = src.Split('\n')
+            .Where(l => l.Contains("ApplySpellEffects(") && !l.Contains("private void ApplySpellEffects"))
+            .Select(l => l.Trim())
+            .ToList();
+        spellCalls.Should().NotBeEmpty();
+        foreach (var line in spellCalls)
+        {
+            bool passesMonsters = line.Contains("monsters:") || CallArgCount(line, "ApplySpellEffects(") >= 5;
+            if (!passesMonsters)
+                spellAllowlist.Should().Contain(line, $"a combat spell self-heal without the monsters context must be allowlisted: {line}");
+        }
+        foreach (var a in spellAllowlist) src.Should().Contain(a, "the allowlist entry has drifted from the source");
+
+        // The two paths that call the helper directly: a self-cast spell heal and a teammate's heal spell.
+        Body("Scripts/Systems/CombatEngine.cs", "private void ApplySpellEffects(")
+            .Should().Contain("GodBoonSystem.HealAgainstUndead(healer ?? caster, spellResult.Healing, monsters)");
+        // A buff with a heal part cast on an ally: the boon is the caster's, not the ally's.
+        src.Should().Contain("ApplySpellEffects(tgt, null, spellResult, monsters: monsters, healer: player);");
+        Body("Scripts/Systems/CombatEngine.cs", "private async Task<bool> TeammateHealWithSpell(")
+            .Should().Contain("GodBoonSystem.HealAgainstUndead(teammate, spellResult.Healing, result.Monsters)");
+        // The helper wrappers: every spell and ability heal (ApplyHealerSpecBonus) and every potion (PotionBonus).
+        Body("Scripts/Systems/CombatEngine.cs", "private static int ApplyHealerSpecBonus(")
+            .Should().Contain("GodBoonSystem.HealAgainstUndead(caster, healing, monsters)");
+        Source("Scripts/Systems/PotionBonus.cs").Should().Contain("GodBoonSystem.HealAgainstUndead(owner, heal, monsters)");
+        // Tidal Harmony's flat ally heal, in both ability paths (no flat "tm.HP + 200" left).
+        src.Should().NotContain("tm.HP + 200)");
+        System.Text.RegularExpressions.Regex.Matches(src, @"GodBoonSystem\.HealAgainstUndead\(player, 200, result\.Monsters\)").Count.Should().Be(2);
+        // The healing herb, used from the combat herb pouch.
+        Body("Scripts/Systems/CombatEngine.cs", "private async Task ExecuteUseHerb(")
+            .Should().Contain("HomeLocation.ApplyHerbEffect(player, options[sel - 1], terminal, result.Monsters)");
+        Body("Scripts/Locations/HomeLocation.cs", "public static async Task ApplyHerbEffect(")
+            .Should().Contain("GodBoonSystem.HealAgainstUndead(player, healAmount, monsters)");
     }
 
     [Fact]

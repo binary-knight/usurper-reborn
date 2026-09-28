@@ -1744,6 +1744,7 @@ public static partial class GameConfig
     public const int GodBoonZealotStrengthPct = 100;          // Zealot: full
     public const int GodBoonChosenStrengthPct = 100;          // Chosen: full
     public const int GodBoonSolariusUndeadDamagePct = 15;     // Solarius: damage against undead and demons
+    public const int GodBoonSolariusHealPct = 15;              // Solarius: heals cast while fighting undead or demons
     public const int GodBoonValorianLowHpDamagePct = 10;      // Valorian: damage while below the HP threshold
     public const int GodBoonValorianHpThresholdPct = 50;      // Valorian: "below half HP"
     public const int GodBoonAmaraHealPct = 15;                // Amara: heals the follower casts and the party wards they raise

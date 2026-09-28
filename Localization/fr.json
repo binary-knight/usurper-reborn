@@ -8674,7 +8674,7 @@
   "god.boon_line": "Bienfait : {0} (puissance {1} %)",
   "god.ward_line": "Garde mentale (dès Dévot) : {0}",
   "god.ward_line_active": "Garde mentale : {0}",
-  "god.boon.light": "+{0} % de dégâts contre les morts-vivants et les démons",
+  "god.boon.light": "+{0} % de dégâts contre les morts-vivants et les démons, +{1} % de soins dans ces combats",
   "god.boon.war": "+{0} % de dégâts sous la moitié des PV",
   "god.boon.love": "+{0} % à vos soins et aux protections de groupe que vous lancez",
   "god.boon.law": "+{0} % de défense contre les monstres, +{1} % aux primes",
