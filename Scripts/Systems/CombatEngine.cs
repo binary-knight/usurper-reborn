@@ -497,16 +497,32 @@ public partial class CombatEngine
     private readonly HashSet<Monster> _discordStruck = new();
 
     /// <summary>
-    /// 1.2.0 Temple gods piece 2: Discordia's boon at the start of a monster fight. Each foe's first
-    /// action fails with GodBoonSystem.DiscordiaFirstActionFailPct (engine RNG). Others: none.
+    /// 1.2.0 Temple gods piece 2: Discordia's boon at the start of a monster fight, rolled per follower
+    /// (v1.1.15 leftover): the leader and every living grouped human follower who has the boon (their
+    /// own GodBoonSystem.DiscordiaFirstActionFailPct, from their own worship and Favor) each roll
+    /// against each living foe (engine RNG). A foe struck by any of those rolls is added once and
+    /// fails its first action once, never twice. NPC teammates, companions and pets never roll.
     /// </summary>
-    internal void RollDiscordiaFirstActionFail(Character player, IEnumerable<Monster>? monsters)
+    internal void RollDiscordiaFirstActionFail(Character player, IEnumerable<Monster>? monsters, IEnumerable<Character>? teammates = null)
     {
         _discordStruck.Clear();
-        double pct = GodBoonSystem.DiscordiaFirstActionFailPct(player);
-        if (pct <= 0 || monsters == null) return;
-        foreach (var m in monsters)
-            if (m != null && m.IsAlive && random.NextDouble() * 100 < pct)
+        if (monsters == null) return;
+        var foes = monsters.Where(m => m != null && m.IsAlive).ToList();
+        if (foes.Count == 0) return;
+        RollDiscordiaAgainst(player, foes);
+        if (teammates == null) return;
+        foreach (var mate in teammates.ToList())
+            if (mate != null && mate.IsGroupedPlayer && mate.IsAlive && !ReferenceEquals(mate, player))
+                RollDiscordiaAgainst(mate, foes);
+    }
+
+    /// <summary>One roller's Discordia boon against each foe; a hit adds the foe to _discordStruck.</summary>
+    private void RollDiscordiaAgainst(Character roller, List<Monster> foes)
+    {
+        double pct = GodBoonSystem.DiscordiaFirstActionFailPct(roller);
+        if (pct <= 0) return;
+        foreach (var m in foes)
+            if (random.NextDouble() * 100 < pct)
                 _discordStruck.Add(m);
     }
 
@@ -1259,8 +1275,8 @@ public partial class CombatEngine
         }
         // v1.1.15: Mental fear at combat start, the leader and grouped followers each from their own Mental
         RollMentalFear(player, result.Teammates);
-        // 1.2.0 Temple gods piece 2: Discordia's boon, a chance each foe's first action fails
-        RollDiscordiaFirstActionFail(player, monsters);
+        // 1.2.0 Temple gods piece 2: Discordia's boon, a chance each foe's first action fails, per roller
+        RollDiscordiaFirstActionFail(player, monsters, result.Teammates);
 
         // Show first combat hint for new players
         HintSystem.Instance.TryShowHint(HintSystem.HINT_FIRST_COMBAT, terminal, player.HintsShown);
