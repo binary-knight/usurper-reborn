@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -212,6 +213,20 @@ public class GodBoonRecalcFix1115Tests
     }
 
     [Fact]
+    public void Wiring_TheTempleAndPantheonLoopsApplyThePendingUpdate()
+    {
+        string temple = File.ReadAllText(Path.Combine(RepoRoot(), "Scripts/Locations/TempleLocation.cs"));
+        Regex.IsMatch(Body(temple, "public async Task<string> ProcessLocation("),
+                @"while \(!exitLocation\)[^\n]*\n\s*\{\s*(//[^\n]*\n\s*)*GodBoonSystem\.ApplyPendingBoonRecalc\(currentPlayer\);")
+            .Should().BeTrue("the top of every Temple loop pass, since the Temple never reaches BaseLocation.LocationLoop");
+
+        string pantheon = File.ReadAllText(Path.Combine(RepoRoot(), "Scripts/Locations/PantheonLocation.cs"));
+        Regex.IsMatch(Body(pantheon, "private async Task RunPantheonLoop("),
+                @"while \(!exitLoop\)[^\n]*\n\s*\{\s*(//[^\n]*\n\s*)*GodBoonSystem\.ApplyPendingBoonRecalc\(currentPlayer\);")
+            .Should().BeTrue("the top of every Pantheon loop pass, since the Pantheon never reaches BaseLocation.LocationLoop");
+    }
+
+    [Fact]
     public async Task AFight_AppliesThePendingUpdate_AtItsEnd()
     {
         var c = Fresh("GbfFight");
@@ -230,6 +245,33 @@ public class GodBoonRecalcFix1115Tests
             catch (Exception ex) { error = ex; }
             error.Should().BeNull();
             c.GodBoonRecalcPending.Should().BeFalse("the fight's end applied the pending update");
+        }
+        finally { GodRegistry.SetWorshippedGod(c, null); }
+    }
+
+    [Fact]
+    public async Task Pantheon_AppliesThePendingUpdate_AtTheTopOfItsLoop()
+    {
+        var c = Fresh("GbfPantheon");
+        long plain = c.MaxHP;
+        try
+        {
+            GodRegistry.SetWorshippedGod(c, "Terran", otherSession: true).Should().BeTrue();
+            c.GodBoonRecalcPending.Should().BeTrue();
+
+            var pantheon = new PantheonLocation();
+            var output = new MemoryStream();
+            var term = new TerminalEmulator(new LineStream(new[] { "Q" }), output);
+            const BindingFlags F = BindingFlags.NonPublic | BindingFlags.Instance;
+            typeof(BaseLocation).GetField("terminal", F)!.SetValue(pantheon, term);
+            typeof(BaseLocation).GetField("currentPlayer", F)!.SetValue(pantheon, c);
+
+            var loop = typeof(PantheonLocation).GetMethod("RunPantheonLoop", F)!;
+            var ex = await Assert.ThrowsAsync<LocationExitException>(() => (Task)loop.Invoke(pantheon, null)!);
+            ex.DestinationLocation.Should().Be(GameLocation.NoWhere);
+
+            c.GodBoonRecalcPending.Should().BeFalse("the top of the Pantheon loop applied it before Q was read");
+            c.MaxHP.Should().Be(TerranAt(plain, GameConfig.GodBoonFollowerStrengthPct));
         }
         finally { GodRegistry.SetWorshippedGod(c, null); }
     }

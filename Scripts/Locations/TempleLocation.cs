@@ -99,6 +99,9 @@ public partial class TempleLocation : BaseLocation
         
         while (!exitLocation)
         {
+            // 1.2.0: a god boon update another session left pending (a player-god's reconfig,
+            // domain or recruit) is applied here, in this player's own session
+            GodBoonSystem.ApplyPendingBoonRecalc(currentPlayer);
             try
             {
                 await DisplayMenu(refreshMenu);
