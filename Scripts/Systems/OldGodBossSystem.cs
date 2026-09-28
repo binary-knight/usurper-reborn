@@ -1415,7 +1415,9 @@ namespace UsurperRemake.Systems
                 AttacksPerRound = 1,
                 CanSave = false,
             };
-            var result = await combatEngine.PlayerVsMonsters(player, new List<Monster> { noctura }, teammates);
+            // v1.1.15: a story fight, fought even at Mental 0 (Manwe's fight can end there): a refusal
+            // would be recorded for good as Noctura escaping. The collapse follows it, from the location loop.
+            var result = await combatEngine.PlayerVsMonsters(player, new List<Monster> { noctura }, teammates, storyFight: true);
             combatEngine.BossContext = null;
 
             if (result.Outcome == CombatOutcome.Victory)

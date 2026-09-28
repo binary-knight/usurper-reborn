@@ -342,10 +342,10 @@ public partial class CombatEngine
     /// Redirects to new PlayerVsMonsters method with single-monster list
     /// Based on Player_vs_Monsters procedure from PLVSMON.PAS
     /// </summary>
-    public async Task<CombatResult> PlayerVsMonster(Character player, Monster monster, List<Character>? teammates = null, bool offerMonkEncounter = true)
+    public async Task<CombatResult> PlayerVsMonster(Character player, Monster monster, List<Character>? teammates = null, bool offerMonkEncounter = true, bool storyFight = false)
     {
         // Redirect to new multi-monster method with single monster
-        return await PlayerVsMonsters(player, new List<Monster> { monster }, teammates, offerMonkEncounter);
+        return await PlayerVsMonsters(player, new List<Monster> { monster }, teammates, offerMonkEncounter, storyFight: storyFight);
     }
     
     /// <summary>
@@ -890,13 +890,17 @@ public partial class CombatEngine
         List<Monster> monsters,
         List<Character>? teammates = null,
         bool offerMonkEncounter = true,
-        bool isAmbush = false)
+        bool isAmbush = false,
+        bool storyFight = false)
     {
         // v1.1.15: collapse happens after combat. A fight that ended at Mental 0 is the last one: an
         // action that chains fights (gauntlet waves, a save quest then an ambush) gets this empty
         // result for the next fight, which is not entered, and the location loop carries out the
         // collapse once (BaseLocation.HandleMentalCollapse, the floor rule unchanged).
-        if (MentalSystem.CollapseDue(player))
+        // storyFight: a one-time story fight whose refusal would be recorded for good (the Noctura
+        // betrayal after Manwe) is fought even at Mental 0; the collapse still follows it, once,
+        // from the location loop (MentalCollapsePending is set at the fight end as for any fight).
+        if (!storyFight && MentalSystem.CollapseDue(player))
             return new CombatResult
             {
                 Player = player,
