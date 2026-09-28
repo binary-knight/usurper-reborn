@@ -975,6 +975,8 @@ namespace UsurperRemake.Systems
             state.RoundCap = WorldBossMath.RoundCap(boss.MaxHP);
             state.BossId = boss.Id;
             state.BossMaxHP = boss.MaxHP;
+            // 1.2.0: Discordia's boon, rolled once for this session's fighter (a world boss fight is solo)
+            state.DiscordStruck = GodBoonSystem.DiscordiaStrikes(player, rng);
             bossData.ScaledStrength = Math.Max(1, (long)Math.Round(bossData.ScaledStrength * state.Ratio));
             bossData.ScaledDefence = Math.Max(0, (long)Math.Round(bossData.ScaledDefence * state.Ratio));
             bossData.CurrentPhase = Math.Max(1, boss.Phase);
@@ -2017,6 +2019,13 @@ namespace UsurperRemake.Systems
         private void ProcessBossActions(WorldBossDefinition bossDef, WorldBossRuntimeData bossData,
             Character player, TerminalEmulator terminal, Random rng, WorldBossCombatState state, bool focused)
         {
+            // 1.2.0: Discordia's boon, the boss's first action against this fighter fails once
+            if (state.DiscordStruck)
+            {
+                state.DiscordStruck = false;
+                terminal.WriteLine($"  {Loc.Get("combat.discordia_first_action_fails", bossDef.Name)}", "magenta");
+                return;
+            }
             int defendingRounds = state.DefendingRounds;
             int attacks = bossData.CurrentPhase >= 3 ? 2 : 1;
             double mult = focused ? GameConfig.WorldBossFocusMultiplier : GameConfig.WorldBossOffFocusMultiplier;
@@ -2160,6 +2169,7 @@ namespace UsurperRemake.Systems
         public int DefendingRounds { get; set; }
         // v1.1.4
         public bool Killed { get; set; }
+        public bool DiscordStruck { get; set; }
         public double Ratio { get; set; } = 1.0;
         public long RoundCap { get; set; } = long.MaxValue;
         public int BossId { get; set; }

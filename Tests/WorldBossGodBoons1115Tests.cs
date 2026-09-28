@@ -158,6 +158,40 @@ public class WorldBossGodBoons1115Tests
         WithGod(c, "Amara", 60, () => BossHitLoss(c)).Should().Be(plain, "another god's follower");
     }
 
+    // ---------------- Discordia's first action fail ----------------
+
+    private sealed class ZeroDouble : Random { public override double NextDouble() => 0.0; }
+
+    [Fact]
+    public void Discordia_TheBossSkipsItsFirstActionOnce_ForAFollower_Only()
+    {
+        var c = Hero("WbDisc");
+        WithGod(c, "Discordia", 60, () => GodBoonSystem.DiscordiaStrikes(c, new ZeroDouble())).Should().BeTrue("a forced roll");
+        WithGod(c, null, 0, () => GodBoonSystem.DiscordiaStrikes(c, new ZeroDouble())).Should().BeFalse("a non-worshipper");
+
+        c.HP = c.MaxHP; c.Defence = 0; c.ArmPow = 0;
+        var data = new WorldBossRuntimeData { CurrentPhase = 1, ScaledStrength = 500 };
+        var output = new MemoryStream();
+        var term = new TerminalEmulator(new ScriptedStream(""), output);
+        var m = typeof(WorldBossSystem).GetMethod("ProcessBossActions", F)!;
+        var state = new WorldBossCombatState { DiscordStruck = true };
+        m.Invoke(new WorldBossSystem(), new object[] { Leviathan, data, c, term, new FixedRandom(99), state, false });
+        c.HP.Should().Be(c.MaxHP, "the first action fails");
+        term.StreamWriterInternal!.Flush();
+        Encoding.UTF8.GetString(output.ToArray()).Should().Contain(Loc.Get("combat.discordia_first_action_fails", Leviathan.Name));
+        m.Invoke(new WorldBossSystem(), new object[] { Leviathan, data, c, term, new FixedRandom(99), state, false });
+        c.HP.Should().BeLessThan(c.MaxHP, "only once");
+    }
+
+    [Fact]
+    public void Discordia_IsRolledAtTheStartOfTheWorldBossFight()
+    {
+        var dir = AppContext.BaseDirectory;
+        while (dir != null && !File.Exists(Path.Combine(dir, "UsurperReborn.sln"))) dir = Path.GetDirectoryName(dir);
+        File.ReadAllText(Path.Combine(dir!, "Scripts/Systems/WorldBossSystem.cs"))
+            .Should().Contain("state.DiscordStruck = GodBoonSystem.DiscordiaStrikes(player, rng);");
+    }
+
     // ---------------- Potions ----------------
 
     private static async Task<long> DrinkOne(Character c, WorldBossDefinition def)
