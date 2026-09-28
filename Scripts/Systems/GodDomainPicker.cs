@@ -49,6 +49,7 @@ public static class GodDomainPicker
             if (!await terminal.AskYesNoAsync(Loc.Get("god.domain_pick_confirm", GodBoonSystem.DomainName(chosen))))
                 continue;
             immortal.DivineDomain = chosen.ToString();
+            await GodBoonSystem.ApplyDomainChangeAsync(immortal);   // followers playing now get the boon at once
             terminal.WriteLine(Loc.Get("god.domain_pick_done", immortal.DivineName, GodBoonSystem.DomainName(chosen)), "bright_yellow");
             return true;
         }

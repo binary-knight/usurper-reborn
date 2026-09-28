@@ -760,6 +760,7 @@ public partial class TempleLocation : BaseLocation
             {
                 string oldGod = currentPlayer.WorshippedGod;
                 currentPlayer.WorshippedGod = "";
+                GodBoonSystem.RecalculateForBoon(currentPlayer);   // 1.2.0: a god boon on max HP goes with the god
 
                 // Persist to DB
                 if (DoorMode.IsOnlineMode)
@@ -816,7 +817,7 @@ public partial class TempleLocation : BaseLocation
                 }
 
                 // Remove from god system
-                godSystem.SetPlayerGod(currentPlayer.Name2, "");
+                SetCanonWorship("");
 
                 // In Pascal, this would send mail to the god and news
                 terminal.WriteLine("");
@@ -850,7 +851,7 @@ public partial class TempleLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("temple.now_believer", selectedGod.Name), "yellow");
 
                 // Set in god system
-                godSystem.SetPlayerGod(currentPlayer.Name2, selectedGod.Name);
+                SetCanonWorship(selectedGod.Name);
 
                 // Clear any immortal player-god worship (can only follow one type)
                 if (!string.IsNullOrEmpty(currentPlayer.WorshippedGod))
@@ -1741,6 +1742,16 @@ public partial class TempleLocation : BaseLocation
     }
 
     /// <summary>
+    /// 1.2.0: sets or clears the player's canon god, then recalculates the stats so a god boon on
+    /// max HP follows the change (HP is only clamped, never raised).
+    /// </summary>
+    private void SetCanonWorship(string god)
+    {
+        godSystem.SetPlayerGod(currentPlayer.Name2, god);
+        GodBoonSystem.RecalculateForBoon(currentPlayer);
+    }
+
+    /// <summary>
     /// Verify player's god still exists (Pascal TEMPLE.PAS)
     /// </summary>
     private async Task VerifyPlayerGodExists()
@@ -1752,7 +1763,7 @@ public partial class TempleLocation : BaseLocation
             {
                 terminal.WriteLine(Loc.Get("temple.god_no_longer_exists", playerGod), "red");
                 terminal.WriteLine(Loc.Get("temple.faith_shaken"), "gray");
-                godSystem.SetPlayerGod(currentPlayer.Name2, "");
+                SetCanonWorship("");
                 await Task.Delay(2000);
             }
         }
@@ -3467,7 +3478,7 @@ public partial class TempleLocation : BaseLocation
             // v1.1.15: yesno-convert-a, strict (Y/N)
             if (!await terminal.AskYesNoAsync(Loc.Get("temple.abandon_elder_prompt", oldNpcGod))) return;
 
-            godSystem.SetPlayerGod(currentPlayer.Name2, "");
+            SetCanonWorship("");
             terminal.WriteLine("");
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("temple.renounce_elder", oldNpcGod));
@@ -3679,6 +3690,7 @@ public partial class TempleLocation : BaseLocation
         if (!await terminal.AskYesNoAsync(Loc.Get("temple.abandon_faith_prompt", godName))) return;
 
         currentPlayer.WorshippedGod = "";
+        GodBoonSystem.RecalculateForBoon(currentPlayer);   // 1.2.0: a god boon on max HP goes with the god
         terminal.WriteLine("");
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("temple.turn_away", godName));

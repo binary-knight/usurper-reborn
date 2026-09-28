@@ -170,6 +170,7 @@ public class GodBoons1115Tests
     {
         var method = typeof(SpellSystem).GetMethod("ScaleSpellEffect", BindingFlags.NonPublic | BindingFlags.Static)!;
         var c = Hero("GbArcSpell");
+        c.RecalculateStats();   // worship recalculates the stats, so the plain cast starts from them too
         int plain = (int)method.Invoke(null, new object[] { 1000, c, new Random(7), 1.0f })!;
         int blessed = WithSingletonGod(c, "Arcanus", 60, () => (int)method.Invoke(null, new object[] { 1000, c, new Random(7), 1.0f })!);
         blessed.Should().Be((int)(plain + GodBoonSystem.Bonus(plain, 10)));
