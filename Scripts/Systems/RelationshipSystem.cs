@@ -164,6 +164,7 @@ public partial class RelationshipSystem
         {
             // A new friendship was formed - track for achievements
             character1.Statistics?.RecordFriendMade();
+            GodDeedSystem.Record(character1, GodAct.FriendMade);   // 1.2.0 Temple gods: Love deed (NPCs are skipped)
         }
 
         relation.LastUpdated = DateTime.Now;
@@ -471,6 +472,8 @@ public partial class RelationshipSystem
         character2.IsMarried = true;
         character2.SpouseName = character1.Name2;
         character2.MarriedTimes++;
+        GodDeedSystem.Record(character1, GodAct.Marriage);   // 1.2.0 Temple gods: Love deed, Chaos taboo (NPCs are skipped)
+        GodDeedSystem.Record(character2, GodAct.Marriage);
         
         SaveRelationship(relation);
 

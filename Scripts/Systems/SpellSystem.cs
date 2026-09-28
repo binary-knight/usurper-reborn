@@ -643,6 +643,7 @@ public static class SpellSystem
         // forever but no code ever incremented it -- entire alpha cohort
         // showed totalSpellsCast=0 including Lv.100 wizards.
         caster.Statistics?.RecordSpellCast();
+        GodDeedSystem.MarkSpellCast(caster);   // 1.2.0 Temple gods: the Magic week-without-casting count starts over
 
         // Check for spell failure
         // Spells don't auto-fail on natural 1 (unlike melee attacks) — only the flat fumble

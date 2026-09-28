@@ -7776,6 +7776,7 @@ public class DungeonLocation : BaseLocation
                     // Create undead monster
                     var undead = CreateUndeadMonster();
                     terminal.WriteLine(Loc.Get("dungeon.scroll_summoned_undead", undead.Name));
+                    GodDeedSystem.Record(player, GodAct.UndeadRaised, terminal);   // 1.2.0 Temple gods: Death taboo
                     
                     // Fight the undead
                     var combatEngine = new CombatEngine(terminal);

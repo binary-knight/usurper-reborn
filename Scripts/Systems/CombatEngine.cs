@@ -2326,6 +2326,7 @@ public partial class CombatEngine
         // one announcement per player. Strain only in the dungeon, on the leader's floor.
         int mentalFloor = MentalFightFloor(player);
         ApplyMentalFightEnd(result, mentalFloor, globalEscape, BossContext != null, terminal, mentalAtFightStart);
+        if (globalEscape && !result.PlayerActuallyDied) GodDeedSystem.Record(player, GodAct.Fled, terminal);   // 1.2.0 Temple gods: War taboo
         // v1.1.15: checked right after the fight; the next fight in a chain is not entered (see the top)
         result.MentalCollapsePending = MentalSystem.CollapseDue(player);
 
@@ -14389,6 +14390,7 @@ public partial class CombatEngine
             terminal.WriteLine(Loc.Get("combat.critical_backstab", backstabDamage));
 
             await ApplySingleMonsterDamage(target, backstabDamage, result, "backstab", player);
+            if (!target.IsAlive) GodDeedSystem.Record(player, GodAct.StealthKill, terminal);   // 1.2.0 Temple gods: Shadow deed
         }
         else
         {
@@ -18659,6 +18661,7 @@ public partial class CombatEngine
                 terminal.WriteLine(Loc.Get("combat.aid_give_heal_potions", potionsToUse, targetAlly.DisplayName));
             }
             terminal.WriteLine(Loc.Get("combat.aid_recover_hp", targetAlly.DisplayName, totalHeal), "green");
+            if (totalHeal > 0) GodDeedSystem.Record(player, GodAct.AllyHealed, terminal);   // 1.2.0 Temple gods: Love deed
 
             if (targetAlly.HP >= targetAlly.MaxHP)
             {
@@ -18704,6 +18707,7 @@ public partial class CombatEngine
 
                 terminal.SetColor("bright_green");
                 terminal.WriteLine(Loc.Get("combat.aid_recover_hp", targetAlly.DisplayName, actualHeal));
+                if (actualHeal > 0) GodDeedSystem.Record(player, GodAct.AllyHealed, terminal);   // 1.2.0 Temple gods: Love deed
 
                 // Sync companion HP if this is a companion
                 if (targetAlly.IsCompanion && targetAlly.CompanionId.HasValue)
@@ -21140,6 +21144,7 @@ public partial class CombatEngine
                 int mentalBeforeGrief = result.Player.Mental;
                 MentalSystem.ApplyNpcGrief(result.Player);
                 MentalUi.AnnounceMentalChange(terminal, result.Player, mentalBeforeGrief);
+                GodDeedSystem.Record(result.Player, GodAct.DeathWitnessed, terminal);   // 1.2.0 Temple gods: Death deed
             }
             await Task.Delay(1500);
         }
@@ -21358,6 +21363,7 @@ public partial class CombatEngine
                 result.Player.Fame += 2;
             }
         }
+        GodDeedSystem.RecordVictory(result.Player, result.DefeatedMonsters, terminal);   // 1.2.0 Temple gods: Light and War deeds
 
         // Apply world event modifiers
         long adjustedExp = WorldEventSystem.Instance.GetAdjustedXP(totalExp);

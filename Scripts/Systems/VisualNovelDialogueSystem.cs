@@ -2714,6 +2714,7 @@ namespace UsurperRemake.Systems
             player.Married = true;
             player.SpouseName = npc.Name2;
             player.MarriedTimes++;
+            GodDeedSystem.Record(player, GodAct.Marriage, terminal);   // 1.2.0 Temple gods: Love deed, Chaos taboo
 
             // Update NPC married status
             npc.IsMarried = true;

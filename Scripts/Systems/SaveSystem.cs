@@ -784,6 +784,7 @@ namespace UsurperRemake.Systems
                 GodFavorSchema = player.GodFavorSchema, // 1.2.0: the character's own schema, so a load that skipped the migration repeats it
                 GodFavorDayGains = new Dictionary<string, int>(player.GodFavorDayGains ?? new Dictionary<string, int>()),
                 DaysSinceDevotion = player.DaysSinceDevotion,
+                DaysSinceSpellCast = player.DaysSinceSpellCast,
                 DivineDomain = player.DivineDomain ?? "",
                 DivineBlessingCombats = player.DivineBlessingCombats,
                 DivineBlessingBonus = player.DivineBlessingBonus,

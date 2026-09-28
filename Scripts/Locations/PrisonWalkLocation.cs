@@ -648,6 +648,7 @@ public partial class PrisonWalkLocation : BaseLocation
 
         // Player gets imprisoned
         player.DaysInPrison = (byte)totalSentence;
+        GodDeedSystem.Record(player, GodAct.Imprisoned, terminal);   // 1.2.0 Temple gods: Law taboo
         player.PrisonEscapes = 1; // Start with 1 escape attempt
         player.CellDoorOpen = false;
         player.RescuedBy = "";

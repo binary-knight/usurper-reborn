@@ -1098,6 +1098,7 @@ namespace UsurperRemake.Systems
                 int mentalBeforeGrief = griefPlayer.Mental;
                 MentalSystem.ApplyCompanionGrief(griefPlayer);
                 if (terminal != null) MentalUi.AnnounceMentalChange(terminal, griefPlayer, mentalBeforeGrief);
+                GodDeedSystem.Record(griefPlayer, GodAct.DeathWitnessed, terminal);   // 1.2.0 Temple gods: Death deed
             }
 
             // Trigger Ocean Philosophy awakening
@@ -1293,6 +1294,7 @@ namespace UsurperRemake.Systems
                 MentalSystem.ApplyCompanionGrief(griefPlayer);
                 var griefTerminal = GameEngine.Instance?.Terminal;
                 if (griefTerminal != null) MentalUi.AnnounceMentalChange(griefTerminal, griefPlayer, mentalBeforeGrief);
+                GodDeedSystem.Record(griefPlayer, GodAct.DeathWitnessed, griefTerminal);   // 1.2.0 Temple gods: Death deed
             }
 
             // Trigger Ocean Philosophy awakening for sacrifice

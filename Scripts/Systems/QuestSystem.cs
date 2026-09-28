@@ -1609,6 +1609,7 @@ public partial class QuestSystem
             StatisticsManager.Current?.RecordBountyComplete();
             NewsSystem.Instance?.Newsy(true, Loc.Get("quest.bounty_collected_news", winner.Name2, bounty.TargetNPCName, reward));
         }
+        if (claimed.Count > 0) GodDeedSystem.Record(winner, GodAct.BountyCollected);   // 1.2.0 Temple gods: Law deed
         return claimed;
     }
 
@@ -1765,6 +1766,7 @@ public partial class QuestSystem
 
             // GD.Print($"[QuestSystem] Auto-completed bounty on {npcName} for {player.Name2}, reward: {reward} gold");
         }
+        if (matchingBounties.Count > 0) GodDeedSystem.Record(player, GodAct.BountyCollected);   // 1.2.0 Temple gods: Law deed
 
         return totalReward;
     }

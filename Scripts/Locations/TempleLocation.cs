@@ -1002,6 +1002,7 @@ public partial class TempleLocation : BaseLocation
         currentPlayer.ConfessionsToday++;
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("temple.confess_success", amount, cost), "bright_yellow");
+        GodDeedSystem.Record(currentPlayer, GodAct.Confession, terminal);   // 1.2.0 Temple gods: Shadow taboo
         terminal.SetColor("gray");
         terminal.WriteLine(Loc.Get("temple.confess_flavor"));
         await terminal.PressAnyKey();
@@ -1656,6 +1657,9 @@ public partial class TempleLocation : BaseLocation
 
         // Grant temporary blessing from sacrifice (if worshipping this god)
         string playerGod = godSystem.GetPlayerGod(currentPlayer.Name2);
+        // 1.2.0 Temple gods piece 3: gold given to your own god is Favor (capped per day)
+        if (!wrongGod && playerGod == god.Name)
+            FavorUi.ReportGain(terminal, currentPlayer, FavorSystem.GoldSacrifice(currentPlayer, goldAmount, godSystem), godSystem);
         if (!wrongGod && playerGod == god.Name && goldAmount >= 100)
         {
             var tempBlessing = UsurperRemake.Systems.DivineBlessingSystem.Instance.GrantSacrificeBlessing(
@@ -2167,15 +2171,18 @@ public partial class TempleLocation : BaseLocation
         WriteSectionHeader(Loc.Get("temple.item_sacrifice"), "cyan");
         terminal.WriteLine("");
 
-        string currentGod = godSystem.GetPlayerGod(currentPlayer.Name2);
+        // 1.2.0 Temple gods piece 3: any god, canon or player-god (one god system)
+        var worshipped = GodRegistry.GetWorshippedGod(currentPlayer, godSystem);
 
-        if (string.IsNullOrEmpty(currentGod))
+        if (worshipped == null)
         {
             terminal.WriteLine(Loc.Get("temple.must_worship_first"), "red");
             terminal.WriteLine(Loc.Get("temple.visit_worship"), "gray");
             await Task.Delay(2000);
             return;
         }
+        string currentGod = worshipped.Value.Name;
+        bool isCanon = worshipped.Value.IsCanon;
 
         terminal.WriteLine(Loc.Get("temple.kneel_before", currentGod), "white");
         terminal.WriteLine("", "white");
@@ -2192,13 +2199,13 @@ public partial class TempleLocation : BaseLocation
         switch (choice.ToUpper())
         {
             case "W":
-                await SacrificeWeapon(currentGod);
+                await SacrificeEquippedItem(currentGod, isCanon, EquipmentSlot.MainHand);
                 break;
             case "A":
-                await SacrificeArmor(currentGod);
+                await SacrificeEquippedItem(currentGod, isCanon, EquipmentSlot.Body);
                 break;
             case "H":
-                await SacrificePotions(currentGod);
+                await SacrificePotions(currentGod, isCanon);
                 break;
             case "R":
                 return;
@@ -2206,86 +2213,58 @@ public partial class TempleLocation : BaseLocation
     }
 
     /// <summary>
-    /// Sacrifice weapon to god
+    /// 1.2.0 Temple gods piece 3: sacrifice the weapon in hand (MainHand) or the body armor worn
+    /// (Body). The item is really given up (FavorSystem.SacrificeEquipped unequips and drops it and
+    /// recalculates the stats) and the god's Favor comes by its value. A cursed or unique item is
+    /// refused. A canon god's power grows as before; a player-god has no such power here.
     /// </summary>
-    private async Task SacrificeWeapon(string godName)
+    private async Task SacrificeEquippedItem(string godName, bool isCanon, EquipmentSlot slot)
     {
-        if (currentPlayer.WeapPow <= 0)
+        bool weapon = slot == EquipmentSlot.MainHand;
+        var item = currentPlayer.GetEquipment(slot);
+        if (item == null)
         {
-            terminal.WriteLine(Loc.Get("temple.no_weapon"), "red");
+            terminal.WriteLine(Loc.Get(weapon ? "temple.no_weapon" : "temple.no_armor"), "red");
+            await Task.Delay(1500);
+            return;
+        }
+        if (item.IsCursed || item.IsUnique)
+        {
+            terminal.WriteLine(Loc.Get("temple.sacrifice_refused_item", item.Name, godName), "red");
             await Task.Delay(1500);
             return;
         }
 
+        int power = weapon ? item.WeaponPower : item.ArmorClass;
         // v1.1.15: yesno-convert-a, strict (Y/N)
-        if (!await terminal.AskYesNoAsync(Loc.Get("temple.confirm_sacrifice_weapon", currentPlayer.WeapPow, godName))) return;
+        if (!await terminal.AskYesNoAsync(Loc.Get(weapon ? "temple.confirm_sacrifice_weapon" : "temple.confirm_sacrifice_armor", power, godName))) return;
 
-        long powerGained = currentPlayer.WeapPow * 2;
-        godSystem.ProcessGoldSacrifice(godName, powerGained * 100, currentPlayer.Name2); // Convert to equivalent gold power
-
-        terminal.WriteLine("");
-        terminal.WriteLine(Loc.Get("temple.dissolves_divine_light"), "bright_yellow");
-        terminal.WriteLine(Loc.Get("temple.god_accepts", godName), "cyan");
-        terminal.WriteLine(Loc.Get("temple.divine_power_increased", powerGained), "bright_cyan");
-
-        // Chance for divine blessing based on weapon power
-        if (random.NextDouble() < 0.3 + (currentPlayer.WeapPow / 500.0))
+        var (outcome, _, favor) = FavorSystem.SacrificeEquipped(currentPlayer, slot, godSystem);
+        if (outcome != ItemSacrificeOutcome.Done)
         {
-            int blessingBonus = random.Next(2, 6);
-            currentPlayer.Strength += blessingBonus;
-            terminal.WriteLine(Loc.Get("temple.blessing_strength", godName, blessingBonus), "bright_green");
+            terminal.WriteLine(Loc.Get("temple.sacrifice_refused_item", item.Name, godName), "red");
+            await Task.Delay(1500);
+            return;
         }
 
-        currentPlayer.WeapPow = 0;
-        // Note: WeaponName is derived from equipment slots
+        long powerGained = Math.Max(1, power) * 2L;
+        if (isCanon)
+            godSystem.ProcessGoldSacrifice(godName, powerGained * 100, currentPlayer.Name2); // Convert to equivalent gold power
+
+        terminal.WriteLine("");
+        terminal.WriteLine(Loc.Get(weapon ? "temple.dissolves_divine_light" : "temple.armor_dissolves"), "bright_yellow");
+        terminal.WriteLine(Loc.Get("temple.god_accepts", godName), "cyan");
+        if (isCanon)
+            terminal.WriteLine(Loc.Get("temple.divine_power_increased", powerGained), "bright_cyan");
+        FavorUi.ReportGain(terminal, currentPlayer, favor, godSystem);
 
         // Apply faction effects based on god alignment
         ApplyFactionEffectForSacrifice(godName, (int)Math.Max(1, powerGained / 10));
 
         // Generate news
-        NewsSystem.Instance.Newsy(false, $"{currentPlayer.Name2} sacrificed their weapon to {godName} at the Temple.");
-
-        await Task.Delay(2500);
-    }
-
-    /// <summary>
-    /// Sacrifice armor to god
-    /// </summary>
-    private async Task SacrificeArmor(string godName)
-    {
-        if (currentPlayer.ArmPow <= 0)
-        {
-            terminal.WriteLine(Loc.Get("temple.no_armor"), "red");
-            await Task.Delay(1500);
-            return;
-        }
-
-        // v1.1.15: yesno-convert-a, strict (Y/N)
-        if (!await terminal.AskYesNoAsync(Loc.Get("temple.confirm_sacrifice_armor", currentPlayer.ArmPow, godName))) return;
-
-        long powerGained = currentPlayer.ArmPow * 2;
-        godSystem.ProcessGoldSacrifice(godName, powerGained * 100, currentPlayer.Name2);
-
-        terminal.WriteLine("");
-        terminal.WriteLine(Loc.Get("temple.armor_dissolves"), "bright_yellow");
-        terminal.WriteLine(Loc.Get("temple.god_accepts", godName), "cyan");
-        terminal.WriteLine(Loc.Get("temple.divine_power_increased", powerGained), "bright_cyan");
-
-        // Chance for divine blessing
-        if (random.NextDouble() < 0.3 + (currentPlayer.ArmPow / 500.0))
-        {
-            int blessingBonus = random.Next(2, 6);
-            currentPlayer.Defence += blessingBonus;
-            terminal.WriteLine(Loc.Get("temple.blessing_defence", godName, blessingBonus), "bright_green");
-        }
-
-        currentPlayer.ArmPow = 0;
-        // Note: ArmorName is derived from equipment slots
-
-        // Apply faction effects based on god alignment
-        ApplyFactionEffectForSacrifice(godName, (int)Math.Max(1, powerGained / 10));
-
-        NewsSystem.Instance.Newsy(false, $"{currentPlayer.Name2} sacrificed their armor to {godName} at the Temple.");
+        NewsSystem.Instance.Newsy(false, weapon
+            ? $"{currentPlayer.Name2} sacrificed their weapon to {godName} at the Temple."
+            : $"{currentPlayer.Name2} sacrificed their armor to {godName} at the Temple.");
 
         await Task.Delay(2500);
     }
@@ -2293,7 +2272,7 @@ public partial class TempleLocation : BaseLocation
     /// <summary>
     /// Sacrifice healing potions to god
     /// </summary>
-    private async Task SacrificePotions(string godName)
+    private async Task SacrificePotions(string godName, bool isCanon)
     {
         if (currentPlayer.Healing <= 0)
         {
@@ -2323,14 +2302,19 @@ public partial class TempleLocation : BaseLocation
         if (!await terminal.AskYesNoAsync(Loc.Get("temple.confirm_sacrifice_potions", amount, godName))) return;
 
         long powerGained = amount * 5; // Each potion gives 5 power
-        godSystem.ProcessGoldSacrifice(godName, powerGained * 50, currentPlayer.Name2);
+        if (isCanon)
+            godSystem.ProcessGoldSacrifice(godName, powerGained * 50, currentPlayer.Name2);
 
         currentPlayer.Healing -= amount;
+        // 1.2.0 Temple gods piece 3: potions are items too, valued at the shop price
+        int favor = FavorSystem.ItemSacrifice(currentPlayer, GameConfig.GetHealingPotionCost(currentPlayer.Level) * amount, godSystem);
 
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("temple.potions_evaporate"), "bright_yellow");
         terminal.WriteLine(Loc.Get("temple.god_accepts", godName), "cyan");
-        terminal.WriteLine(Loc.Get("temple.divine_power_increased", powerGained), "bright_cyan");
+        if (isCanon)
+            terminal.WriteLine(Loc.Get("temple.divine_power_increased", powerGained), "bright_cyan");
+        FavorUi.ReportGain(terminal, currentPlayer, favor, godSystem);
 
         // Chance for divine healing
         if (amount >= 3 && random.NextDouble() < 0.5)
@@ -2414,6 +2398,7 @@ public partial class TempleLocation : BaseLocation
         currentPlayer.Experience += xpGain;
         currentPlayer.DarkNr--;
         currentPlayer.DesecrationsToday++;
+        GodDeedSystem.Record(currentPlayer, GodAct.Desecration, terminal);   // 1.2.0 Temple gods: Earth taboo
 
         terminal.WriteLine("", "white");
         terminal.WriteLine(Loc.Get("temple.darkness_flows", darknessGain), "dark_red");
@@ -2588,6 +2573,8 @@ public partial class TempleLocation : BaseLocation
 
         // 1.2.0 Temple gods: a prayer is devotion, so the neglect count starts over (either kind of god)
         FavorSystem.MarkDevotion(currentPlayer);
+        // 1.2.0 Temple gods piece 3: prayer gives Favor once a day (the cap is saved, so a reload cannot repeat it)
+        int prayerFavor = FavorSystem.Prayer(currentPlayer, godSystem);
 
         // === Prayer to an immortal player-god ===
         if (!string.IsNullOrEmpty(worshippedImmortal))
@@ -2605,6 +2592,7 @@ public partial class TempleLocation : BaseLocation
             // v1.1.15: prayer eases the mind once a day.
             int mentalBeforeImmortal = currentPlayer.Mental;
             MentalUi.ReportGain(terminal, currentPlayer, mentalBeforeImmortal, MentalSystem.TryDailyGain(currentPlayer, MentalDailySource.TemplePrayer, GameConfig.MentalTemplePrayerGain));
+            FavorUi.ReportGain(terminal, currentPlayer, prayerFavor, godSystem);
 
             // Mark prayer as done for today (set LastPrayerRealDate for online mode)
             if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
@@ -2719,6 +2707,7 @@ public partial class TempleLocation : BaseLocation
         // v1.1.15: prayer eases the mind once a day.
         int mentalBeforePrayer = currentPlayer.Mental;
         MentalUi.ReportGain(terminal, currentPlayer, mentalBeforePrayer, MentalSystem.TryDailyGain(currentPlayer, MentalDailySource.TemplePrayer, GameConfig.MentalTemplePrayerGain));
+        FavorUi.ReportGain(terminal, currentPlayer, prayerFavor, godSystem);
 
         // Determine prayer response based on god's alignment
         float alignment = (float)(god.Goodness - god.Darkness) / Math.Max(1, god.Goodness + god.Darkness);
@@ -3642,6 +3631,8 @@ public partial class TempleLocation : BaseLocation
         terminal.WriteLine(Loc.Get("temple.gold_upon_altar", amount.ToString("N0"), currentPlayer.WorshippedGod));
         terminal.SetColor("bright_cyan");
         terminal.WriteLine(Loc.Get("temple.offering_burns", power));
+        // 1.2.0 Temple gods piece 3: the same Favor for gold as a canon god (one god system)
+        FavorUi.ReportGain(terminal, currentPlayer, FavorSystem.GoldSacrifice(currentPlayer, amount, godSystem), godSystem);
 
         // v0.61.3: player report — "when you are affiliated with a player god,
         // sacrificing gold to your deity doesn't make faith standing go higher."

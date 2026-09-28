@@ -288,6 +288,7 @@ internal static class PlayerSaveEditor
         p.DivineDomain = PromptDivineDomain(p.DivineDomain);
         if (EditorIO.PromptBool("Clear today's Favor gains per source", false))
             p.GodFavorDayGains = new Dictionary<string, int>();
+        p.DaysSinceSpellCast = EditorIO.PromptInt("Daily resets since the last spell cast (Arcanus taboo at 7)", p.DaysSinceSpellCast, min: 0);
 
         EditorIO.Info("— Difficulty —");
         p.Difficulty = EditorIO.PromptEnum("Difficulty", p.Difficulty);

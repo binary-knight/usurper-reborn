@@ -1211,6 +1211,7 @@ namespace UsurperRemake.Locations
             terminal.WriteLine(Loc.Get("church.confess_cleansed"), "bright_white");
             int mentalBeforeConfession = currentPlayer.Mental;
             MentalUi.ReportGain(terminal, currentPlayer, mentalBeforeConfession, MentalSystem.TryDailyGain(currentPlayer, MentalDailySource.Confession, GameConfig.MentalConfessionGain));
+            GodDeedSystem.Record(currentPlayer, GodAct.Confession, terminal);   // 1.2.0 Temple gods: Shadow taboo
 
             await Task.Delay(3000);
 

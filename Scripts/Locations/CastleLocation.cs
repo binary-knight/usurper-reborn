@@ -1380,6 +1380,7 @@ public class CastleLocation : BaseLocation
 
         terminal.SetColor("bright_green");
         terminal.WriteLine(Loc.Get("castle.imprisoned_confirm", target.Name, sentence));
+        GodDeedSystem.Record(currentPlayer, GodAct.ArrestOrdered, terminal);   // 1.2.0 Temple gods: Law deed
         NewsSystem.Instance.Newsy(true, $"{currentKing.GetTitle()} {currentKing.Name} imprisoned {target.Name} for {crime}!");
 
         // Track daily imprisonment limits
@@ -1538,6 +1539,7 @@ public class CastleLocation : BaseLocation
                 int mentalBeforeWitness = currentPlayer.Mental;
                 MentalSystem.ApplyWitnessLoss(currentPlayer);
                 MentalUi.AnnounceMentalChange(terminal, currentPlayer, mentalBeforeWitness);
+                GodDeedSystem.Record(currentPlayer, GodAct.DeathWitnessed, terminal);   // 1.2.0 Temple gods: Death deed
             }
             NewsSystem.Instance.Newsy(true, $"{currentKing.GetTitle()} {currentKing.Name} executed {name}!");
 

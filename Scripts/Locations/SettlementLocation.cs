@@ -414,6 +414,7 @@ public class SettlementLocation : BaseLocation
 
         currentPlayer.Gold -= amount;
         SettlementSystem.Instance.ContributeGold(currentPlayer.Name, amount);
+        GodDeedSystem.Record(currentPlayer, GodAct.SettlementWork, terminal);   // 1.2.0 Temple gods: Earth deed
 
         terminal.SetColor("bright_green");
         terminal.WriteLine(Loc.Get("settlement.contribute_success", $"{amount:N0}"));
@@ -1140,6 +1141,7 @@ public class SettlementLocation : BaseLocation
         // v1.1.15: Library reading eases the mind, once a day (shared Learning day)
         int mentalBeforeReading = currentPlayer.Mental;
         MentalUi.ReportGain(terminal, currentPlayer, mentalBeforeReading, MentalSystem.ApplyLearning(currentPlayer));
+        GodDeedSystem.Record(currentPlayer, GodAct.LibraryRead, terminal);   // 1.2.0 Temple gods: Magic deed
 
         await terminal.PressAnyKey();
     }

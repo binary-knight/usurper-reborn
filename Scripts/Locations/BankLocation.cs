@@ -1457,6 +1457,7 @@ public class BankLocation : BaseLocation
                 long goldBeforeRob = currentPlayer.Gold;
                 currentPlayer.Gold = SafeAddGold(currentPlayer.Gold, stolenGold);
                 DebugLogger.Instance.LogInfo("GOLD", $"BANK ROBBERY: {currentPlayer.DisplayName} stole {stolenGold:N0}g (gold {goldBeforeRob:N0}->{currentPlayer.Gold:N0})");
+                GodDeedSystem.Record(currentPlayer, GodAct.Theft, terminal);   // 1.2.0 Temple gods: Shadow deed, Law taboo
 
                 terminal.WriteLine("");
                 WriteBoxHeader(Loc.Get("bank.rob_success", stolenGold.ToString("N0")), "bright_green");

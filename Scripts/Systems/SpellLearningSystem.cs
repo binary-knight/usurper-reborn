@@ -262,6 +262,7 @@ public static class SpellLearningSystem
                 // v1.1.15: learning something new eases the mind, once a day (shared Learning day)
                 int mentalBeforeSpell = player.Mental;
                 MentalUi.ReportGain(terminal, player, mentalBeforeSpell, MentalSystem.ApplyLearning(player));
+                GodDeedSystem.Record(player, GodAct.SpellLearned, terminal);   // 1.2.0 Temple gods: Magic deed
                 await SaveSystem.Instance.AutoSave(player);
                 await Task.Delay(1000);
                 continue;

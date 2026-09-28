@@ -225,6 +225,7 @@ public class WildernessLocation : BaseLocation
         // v1.1.15: the first expedition of the day eases the mind (before the encounter, so a fight cannot skip it)
         int mentalBeforeTrip = currentPlayer.Mental;
         MentalUi.ReportGain(terminal, currentPlayer, mentalBeforeTrip, MentalSystem.ApplyWilderness(currentPlayer));
+        GodDeedSystem.Record(currentPlayer, GodAct.WildernessExplored, terminal);   // 1.2.0 Temple gods: Nature deed
         await Task.Delay(2000);
 
         // Roll encounter type: 40% combat, 25% foraging, 15% ruins, 10% traveler, 10% shrine
