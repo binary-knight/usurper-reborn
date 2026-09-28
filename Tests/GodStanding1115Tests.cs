@@ -181,6 +181,14 @@ public class GodStanding1115Tests : IDisposable
     }
 
     [Fact]
+    public void Online_AnImmortalIsNotAFollower()
+    {
+        InsertRaw("acct_god", "{\"player\":{\"name2\":\"Ivor\",\"isImmortal\":true,\"worshippedGod\":\"Zephyrine\",\"godFavorSchema\":1}}");
+        InsertRaw("acct_mortal", "{\"player\":{\"name2\":\"Mael\",\"isImmortal\":false,\"worshippedGod\":\"Zephyrine\",\"godFavorSchema\":1}}");
+        _db.GetGodStandings()["Zephyrine"].Followers.Should().Be(1, "a player-god is not counted as anyone's follower");
+    }
+
+    [Fact]
     public void Online_OldGodFavorTableIsDropped()
     {
         using (var conn = new SqliteConnection($"Data Source={_path}"))
