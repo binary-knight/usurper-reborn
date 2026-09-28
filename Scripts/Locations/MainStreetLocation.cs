@@ -1816,6 +1816,10 @@ public partial class MainStreetLocation : BaseLocation
             {
                 terminal.WriteLine(Loc.Get("main_street.combat_test_victory"), "green");
             }
+            else if (result.MentalCollapseNotFought)
+            {
+                terminal.WriteLine(Loc.Get("mental.collapse_before_fight"), "gray"); // v1.1.15: not entered, not fled
+            }
             else if (result.Outcome == CombatOutcome.PlayerEscaped)
             {
                 terminal.WriteLine(Loc.Get("main_street.combat_test_escaped"), "yellow");

@@ -1500,6 +1500,13 @@ public class BankLocation : BaseLocation
 
             NewsSystem.Instance.Newsy(true, $"{currentPlayer.DisplayName} attempted to rob the Ironvault Bank but was defeated by guards!");
         }
+        else if (result.MentalCollapseNotFought)
+        {
+            // v1.1.15: not entered (Mental 0), not fled: no flee line, no flee news
+            terminal.SetColor("gray");
+            terminal.WriteLine("");
+            terminal.WriteLine(Loc.Get("mental.collapse_before_fight"));
+        }
         else
         {
             // Fled — still take consequences but no gold stolen

@@ -2109,6 +2109,8 @@ public partial class TempleLocation : BaseLocation
                         case BossOutcome.Allied:
                             NewsSystem.Instance.Newsy(true, $"{currentPlayer.Name2} has allied with Aurelion, the Fading Light!");
                             break;
+                        case BossOutcome.NotFought:
+                            break; // v1.1.15: not entered for a Mental collapse, no news
                     }
                 }
             }

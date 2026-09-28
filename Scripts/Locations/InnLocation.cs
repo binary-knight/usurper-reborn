@@ -1024,6 +1024,13 @@ public class InnLocation : BaseLocation
                 currentPlayer.PDefeats++;
                 break;
 
+            case CombatOutcome.PlayerEscaped when result.MentalCollapseNotFought:
+                // v1.1.15: not entered (Mental 0), not fled
+                terminal.SetColor("gray");
+                terminal.WriteLine("");
+                terminal.WriteLine(Loc.Get("mental.collapse_before_fight"));
+                break;
+
             case CombatOutcome.PlayerEscaped:
                 terminal.SetColor("yellow");
                 terminal.WriteLine("");

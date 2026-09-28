@@ -1080,7 +1080,18 @@ namespace UsurperRemake.Systems
         private async Task<BossEncounterResult> ConvertToBossResult(
             CombatResult combatResult, OldGodBossData boss, bool wasSaved, TerminalEmulator terminal)
         {
-            if (wasSaved)
+            if (combatResult.MentalCollapseNotFought)
+            {
+                // v1.1.15: the fight was not entered (Mental 0): not fought, not fled; the room stays as it was
+                terminal.WriteLine(Loc.Get("mental.collapse_before_fight"), "gray");
+                return new BossEncounterResult
+                {
+                    Success = false,
+                    Outcome = BossOutcome.NotFought,
+                    God = boss.Type
+                };
+            }
+            else if (wasSaved)
             {
                 return await HandleBossSaved(combatResult.Player, boss, terminal, inCombat: true);
             }
@@ -1724,7 +1735,8 @@ namespace UsurperRemake.Systems
         Allied,
         Spared,
         PlayerDefeated,
-        Fled
+        Fled,
+        NotFought // v1.1.15: the fight was not entered for a Mental collapse; counts like no encounter
     }
 
     public class BossEncounterResult

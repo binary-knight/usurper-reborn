@@ -904,6 +904,7 @@ public partial class CombatEngine
                 Teammates = teammates != null ? new List<Character>(teammates) : new List<Character>(),
                 Outcome = CombatOutcome.PlayerEscaped,
                 MentalCollapsePending = true,
+                MentalCollapseNotFought = true,
             };
 
         // Wizard godmode: save HP/Mana before combat to restore after
@@ -31816,6 +31817,10 @@ public class CombatResult
     // v1.1.15: the leader ended this fight at Mental 0, or a fight was not entered for it; the location
     // loop carries out the collapse (BaseLocation.HandleMentalCollapse)
     public bool MentalCollapsePending { get; set; }
+    // v1.1.15: this fight was not entered for a Mental collapse (set only by the gate at the top of
+    // PlayerVsMonsters). The Outcome reads PlayerEscaped, but nothing was fled: callers skip their flee
+    // branch. A real flee that ends at Mental 0 has MentalCollapsePending alone.
+    public bool MentalCollapseNotFought { get; set; }
     // v1.1.15: grouped followers who already took their Mental death loss this fight (applied once each)
     public HashSet<Character> MentalDeadFollowers { get; } = new HashSet<Character>(ReferenceEqualityComparer.Instance);
 }

@@ -2002,6 +2002,12 @@ namespace UsurperRemake.Systems
                         if (player.HP <= 0)
                             player.HP = 1;
                     }
+                    else if (result.MentalCollapseNotFought)
+                    {
+                        // v1.1.15: not entered (Mental 0), not fled
+                        terminal.SetColor("gray");
+                        terminal.WriteLine(Loc.Get("mental.collapse_before_fight"));
+                    }
                     else
                     {
                         terminal.SetColor("gray");

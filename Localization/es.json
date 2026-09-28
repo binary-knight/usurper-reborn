@@ -6053,6 +6053,7 @@
   "mental.descend_refused": "Tu mente está rota. No te atreves a bajar más hasta que la traten.",
   "mental.portal_confirm_1": "El portal tira de ti hacia abajo y te tiemblan las manos. ¿Cruzarlo de todos modos?",
   "mental.portal_turned_back": "Te apartas del portal antes de que te lleve más abajo.",
+  "mental.collapse_before_fight": "Tu mente cede antes del siguiente combate.",
   "mental.collapse_rescue": "Tu mente cede y te desplomas. Unos rescatadores te encuentran y te llevan al Sanador. Estás Quebrado hasta que la terapia o la rehabilitación te curen.",
   "mental.collapse_fee": "Los rescatadores se quedan {0} de oro por las molestias.",
   "mental.collapse_death": "Tu mente cede a esta profundidad de la mazmorra y no hay nadie que te saque.",
