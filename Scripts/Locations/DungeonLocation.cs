@@ -6098,9 +6098,11 @@ public class DungeonLocation : BaseLocation
     {
         // v1.1.13: the chest and the shrine are spent by the player's choice (SpendRoomEvent), not before
         // the prompt, so a typo does not use them up. The other events are spent up front as before.
+        // v1.1.15: the secret boss is spent only by a win (SecretBossEncounter), so a flee, a loss, a
+        // death or a fight not entered at Mental 0 leaves it to try again.
         bool spentByChoice = room.EventType is DungeonEventType.TreasureChest or DungeonEventType.Shrine;
         if (spentByChoice) _roomEventAwaitingChoice = room;
-        else room.EventCompleted = true;
+        else if (room.EventType != DungeonEventType.SecretBoss) room.EventCompleted = true;
         try
         {
             await RunRoomEvent(room);
@@ -6216,7 +6218,7 @@ public class DungeonLocation : BaseLocation
                 await MemoryFragmentEncounter();
                 break;
             case DungeonEventType.SecretBoss:
-                await SecretBossEncounter();
+                await SecretBossEncounter(room);
                 break;
             case DungeonEventType.Settlement:
                 await SettlementEncounter(room);
@@ -16046,18 +16048,29 @@ public class DungeonLocation : BaseLocation
     }
 
     /// <summary>
-    /// Secret Boss encounter - epic hidden bosses with deep lore
+    /// Secret Boss encounter - epic hidden bosses with deep lore.
+    /// v1.1.15: only a win spends the room (FinishSecretBoss); a flee, a loss, a death or a fight not
+    /// entered at Mental 0 leaves the boss to try again, and nothing is granted at the fight start.
     /// </summary>
-    private async Task SecretBossEncounter()
+    private async Task SecretBossEncounter(DungeonRoom room)
     {
         var player = GetCurrentPlayer();
         var bossMgr = SecretBossManager.Instance;
+
+        // v1.1.15: a boss already beaten here is not fought (or paid) again
+        if (room.SecretBossDefeated)
+        {
+            room.EventCompleted = true;
+            return;
+        }
 
         // Check if there's a secret boss for this floor
         var bossType = bossMgr.GetBossForFloor(currentDungeonLevel);
 
         if (bossType == null)
         {
+            room.EventCompleted = true;   // nothing to fight: the chamber is spent by the visit
+
             // No boss for this floor - give atmospheric message instead
             terminal.ClearScreen();
             terminal.SetColor("dark_magenta");
@@ -16080,21 +16093,38 @@ public class DungeonLocation : BaseLocation
             return;
         }
 
-        // Finding a secret boss chamber counts as discovering a secret
-        player.Statistics.RecordSecretFound();
-
         // Encounter the secret boss (displays intro and dialogue)
         var encounterResult = await bossMgr.EncounterBoss(bossType.Value, player, terminal);
 
         if (!encounterResult.Encountered)
             return;
 
-        // Create the boss monster for actual combat
-        var bossMonster = bossMgr.CreateBossMonster(bossType.Value, player.Level);
+        // Create the boss monster for actual combat (a wrong pre-fight choice hits harder this fight)
+        var bossMonster = bossMgr.CreateBossMonster(bossType.Value, player.Level, encounterResult.WrongChoice ? 1.5 : 1.0);
 
         // Engage in combat with the secret boss
         var combatEngine = new CombatEngine(terminal);
         var combatResult = await combatEngine.PlayerVsMonster(player, bossMonster, teammates);
+
+        await FinishSecretBoss(room, bossType.Value, player, bossMonster, combatResult);
+    }
+
+    /// <summary>
+    /// v1.1.15: the end of a secret boss fight. A win marks the room spent and the boss defeated before
+    /// the rewards, so a dropped connection during the victory text cannot pay the win twice; any other
+    /// end leaves the room as it was.
+    /// </summary>
+    private async Task FinishSecretBoss(DungeonRoom room, SecretBossType bossType, Character player, Monster bossMonster, CombatResult combatResult)
+    {
+        var bossMgr = SecretBossManager.Instance;
+
+        if (combatResult.MentalCollapseNotFought)
+        {
+            terminal.WriteLine(Loc.Get("mental.collapse_before_fight"), "gray");
+            terminal.WriteLine(Loc.Get("dungeon.secret_boss_remains"), "gray");
+            await terminal.PressAnyKey();
+            return;
+        }
 
         // Check if player should return to temple after resurrection
         if (combatResult.ShouldReturnToTemple)
@@ -16109,11 +16139,17 @@ public class DungeonLocation : BaseLocation
         // Check if player won (player is still alive and boss is dead)
         if (player.HP > 0 && bossMonster.HP <= 0)
         {
+            room.EventCompleted = true;
+            room.SecretBossDefeated = true;
+
+            // Finding and beating a secret boss chamber counts as discovering a secret
+            player.Statistics.RecordSecretFound();
+
             // Player won - handle victory through the SecretBossManager
-            await bossMgr.HandleVictory(bossType.Value, player, terminal);
+            await bossMgr.HandleVictory(bossType, player, terminal);
 
             // Additional memory trigger for secret boss defeat
-            var bossData = bossMgr.GetBoss(bossType.Value);
+            var bossData = bossMgr.GetBoss(bossType);
             if (bossData?.TriggersMemoryFlash == true)
             {
                 await Task.Delay(1000);
@@ -16123,7 +16159,11 @@ public class DungeonLocation : BaseLocation
                 await Task.Delay(1500);
                 AmnesiaSystem.Instance.CheckMemoryTrigger(TriggerType.SecretBossDefeated, player);
             }
+            return;
         }
+
+        terminal.WriteLine(Loc.Get("dungeon.secret_boss_remains"), "gray");
+        await terminal.PressAnyKey();
     }
 
     private async Task QuitToDungeon()
