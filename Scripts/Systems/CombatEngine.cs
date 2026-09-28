@@ -17599,7 +17599,7 @@ public partial class CombatEngine
                 ApplySagePartyWard(player, spellResult, result);
                 result.CombatLog.Add($"{player.DisplayName} casts {spellInfo.Name} on the whole party.");
             }
-            // Multi-target buff (e.g. Covenant of the Deep, Symphony of the Depths) — buff caster AND all teammates
+            // Multi-target buff (e.g. Covenant of the Deep, Symphony of the Depths): buff caster AND all teammates
             else if (spellInfo.IsMultiTarget && spellInfo.SpellType == "Buff")
             {
                 // Apply buffs to caster
