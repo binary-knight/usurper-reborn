@@ -324,14 +324,14 @@ public class SageCompanion1115Tests
     }
 
     [Fact]
-    public void ASageTeammate_GetsNoSealBonus()
+    public void ASageTeammate_UsesTheLeadersSeals()
     {
         var (engine, _, ally, result) = PlayerSage(7);
         try
         {
             var teammate = Sage(60);
             engine.ApplySagePartyWard(teammate, Ward(100, 999), result);
-            ally.MagicACBonus.Should().Be(100, "the seals are the player's story, not the teammate's");
+            ally.MagicACBonus.Should().Be(135, "a Sage teammate's ward takes the leader's seals");
         }
         finally { StoryProgressionSystem.Instance.CollectedSeals.Clear(); }
     }

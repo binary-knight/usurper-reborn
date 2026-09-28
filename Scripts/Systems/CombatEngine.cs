@@ -8801,15 +8801,16 @@ public partial class CombatEngine
     /// highest ward winning on each. Shared by the player's cast and a teammate's.
     /// </summary>
     internal void WardPartyFromHeal(Character caster, SpellSystem.SpellResult spellResult, CombatResult? result)
-        => WardPartyFromHeal(LivingPartyOf(caster, result), spellResult);
+        => WardPartyFromHeal(caster, LivingPartyOf(caster, result), spellResult);
 
-    /// <summary>v1.1.15: the same ward on a party list the caller already healed.</summary>
-    private void WardPartyFromHeal(List<Character> party, SpellSystem.SpellResult spellResult)
+    /// <summary>v1.1.15: the same ward on a party list the caller already healed; a Sage's takes the seal bonus.</summary>
+    private void WardPartyFromHeal(Character caster, List<Character> party, SpellSystem.SpellResult spellResult)
     {
         if (spellResult.ProtectionBonus <= 0) return;
+        int bonus = SageWardStrength(caster, spellResult.ProtectionBonus);
         int dur = spellResult.Duration > 0 ? spellResult.Duration : 999;
         foreach (var ally in party)
-            WardAlly(ally, spellResult.ProtectionBonus, dur);
+            WardAlly(ally, bonus, dur);
     }
 
     /// <summary>v1.1.15: the caster, every living teammate, and the leader when a follower casts.</summary>
@@ -8829,14 +8830,48 @@ public partial class CombatEngine
         Math.Clamp(seals * GameConfig.SageSealWardPercentPerSeal, 0, GameConfig.SageSealWardMaxPercent);
 
     /// <summary>
-    /// v1.1.15: how much the seals the player has collected strengthen this Sage's wards. Only the
-    /// player whose story it is: a Sage teammate or a follower gets none.
+    /// v1.1.15: the seals a grouped online player holds in their own session's story. A static so
+    /// tests can stand in for the live session lookup.
     /// </summary>
-    internal int SageSealWardPercent(Character caster)
+    internal static Func<Character, int> GroupedPlayerSealCount = c =>
     {
-        if (caster == null || caster.Class != CharacterClass.Sage || caster != currentPlayer) return 0;
-        if (caster is NPC || caster.IsCompanion) return 0;
-        return SageSealWardPercentFor(StoryProgressionSystem.Instance?.CollectedSeals?.Count ?? 0);
+        var session = string.IsNullOrEmpty(c.GroupPlayerUsername) ? null : GroupSystem.GetSession(c.GroupPlayerUsername);
+        return session?.Context?.Story?.CollectedSeals?.Count ?? 0;
+    };
+
+    /// <summary>
+    /// v1.1.15: whose seals strengthen this caster's Sage wards. A grouped online player: their own.
+    /// Everyone else (the player who leads, a companion, an NPC teammate, an echo): the story of the
+    /// session running the fight, which is the leader's. Grouped is checked first, because during a
+    /// follower's turn currentPlayer is the follower while the session story is still the leader's.
+    /// </summary>
+    internal static int SageSealCountOf(Character caster)
+    {
+        if (caster == null) return 0;
+        if (caster.IsGroupedPlayer) return GroupedPlayerSealCount(caster);
+        return StoryProgressionSystem.Instance?.CollectedSeals?.Count ?? 0;
+    }
+
+    /// <summary>
+    /// v1.1.15: the one place a Sage's ward strength takes the seal bonus. Every Sage ward path goes
+    /// through here: the party wards (ApplySagePartyWard), Veloura's Embrace (WardPartyFromHeal), the
+    /// PvP spell and the world boss spell. Not a Sage, or no ward: the strength is unchanged.
+    /// </summary>
+    internal static int SageWardWithSeals(Character caster, int bonus, out int percent)
+    {
+        percent = 0;
+        if (caster == null || bonus <= 0 || caster.Class != CharacterClass.Sage) return bonus;
+        percent = SageSealWardPercentFor(SageSealCountOf(caster));
+        return bonus + bonus * percent / 100;
+    }
+
+    /// <summary>v1.1.15: SageWardWithSeals, saying so once per cast when the seals add anything.</summary>
+    internal int SageWardStrength(Character caster, int bonus)
+    {
+        int strength = SageWardWithSeals(caster, bonus, out int percent);
+        if (percent > 0)
+            terminal.WriteLine(Loc.Get("combat.sage_seal_ward", caster.DisplayName, percent), "bright_cyan");
+        return strength;
     }
 
     /// <summary>
@@ -8870,13 +8905,7 @@ public partial class CombatEngine
     {
         int dur = spellResult.Duration > 0 ? spellResult.Duration : 999;
         string effect = (spellResult.SpecialEffect ?? "").ToLowerInvariant();
-        int bonus = spellResult.ProtectionBonus;
-        int sealPercent = SageSealWardPercent(caster);
-        if (bonus > 0 && sealPercent > 0)
-        {
-            bonus += bonus * sealPercent / 100;
-            terminal.WriteLine(Loc.Get("combat.sage_seal_ward", caster.DisplayName, sealPercent), "bright_cyan");
-        }
+        int bonus = SageWardStrength(caster, spellResult.ProtectionBonus);
         foreach (var ally in LivingPartyOf(caster, result))
         {
             if (bonus > 0) WardAlly(ally, bonus, dur);
@@ -19157,7 +19186,7 @@ public partial class CombatEngine
                 }
 
                 // v1.1.15: a party heal that carries a ward (Veloura's Embrace) wards the same party
-                WardPartyFromHeal(party, spellResult);
+                WardPartyFromHeal(teammate, party, spellResult);
 
                 result.CombatLog.Add($"{teammate.DisplayName} casts {healSpell.Name} on the whole party.");
             }
@@ -26464,10 +26493,11 @@ public partial class CombatEngine
             if (spellResult.ProtectionBonus > 0)
             {
                 int dur = spellResult.Duration > 0 ? spellResult.Duration : 999;
-                attacker.MagicACBonus = spellResult.ProtectionBonus;
+                int ward = SageWardStrength(attacker, spellResult.ProtectionBonus); // v1.1.15: a Sage's seals
+                attacker.MagicACBonus = ward;
                 attacker.ApplyStatus(StatusEffect.Blessed, dur);
                 string durText = dur >= 999 ? Loc.Get("combat.whole_fight") : Loc.Get("combat.n_rounds", dur);
-                terminal.WriteLine(Loc.Get("combat.magically_protected", spellResult.ProtectionBonus, durText), "blue");
+                terminal.WriteLine(Loc.Get("combat.magically_protected", ward, durText), "blue");
             }
             if (spellResult.AttackBonus > 0)
             {
