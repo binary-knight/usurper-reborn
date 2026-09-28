@@ -348,6 +348,12 @@ public static partial class MailSystem
     /// Process birthday mail with gift selection
     /// Pascal: Birthday gift processing
     /// </summary>
+    /// <summary>1.2.0: the birthday Love gift, a lasting Charisma grant of GameConfig.BirthdayLoveGift.</summary>
+    internal static void GiveBirthdayLoveGift(Character player)
+    {
+        player.GrantPermanentStat(StatKind.Charisma, GameConfig.BirthdayLoveGift);
+    }
+
     private static async Task ProcessBirthdayMail(MailRecord mail, TerminalUI terminal)
     {
         terminal.WriteLine(Loc.Get("mail.birthday_choose"), "bright_yellow");
@@ -370,7 +376,7 @@ public static partial class MailSystem
                 break;
 
             case "L":
-                player.Charisma += GameConfig.BirthdayLoveGift;
+                GiveBirthdayLoveGift(player);
                 terminal.WriteLine(Loc.Get("mail.birthday_gained_cha", GameConfig.BirthdayLoveGift), "bright_green");
                 break;
 

@@ -5374,6 +5374,13 @@ public partial class GameEngine
                 DebugLogger.Instance.LogInfo("MIGRATION", $"Artifact stats restored for {player.Name2} ({story?.CollectedArtifacts?.Count ?? 0} artifact(s))");
         }
         catch (Exception ex) { DebugLogger.Instance.LogWarning("MIGRATION", $"Artifact stat restore failed: {ex.Message}"); }
+        try
+        {
+            int cycleBonus = CycleSystem.BackfillCycleStatBonus(player, story?.CurrentCycle ?? 1);
+            if (cycleBonus > 0)
+                DebugLogger.Instance.LogInfo("MIGRATION", $"NG+ cycle bonus backfilled for {player.Name2}: +{cycleBonus} Strength, Defence, Stamina");
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogWarning("MIGRATION", $"NG+ cycle bonus backfill failed: {ex.Message}"); }
     }
 
     private Character RestorePlayerFromSaveData(PlayerData playerData)
@@ -6179,6 +6186,7 @@ public partial class GameEngine
         player.GroggoShadowBlessingDex = playerData.GroggoShadowBlessingDex;
         player.TimedStatBuffs = TimedStatBuffData.ToBuffs(playerData.TimedStatBuffs);   // 1.2.0: before the load recalc
         player.ArtifactStatsApplied = playerData.ArtifactStatsApplied;   // 1.2.0: false in older saves
+        player.CycleStatBonusApplied = playerData.CycleStatBonusApplied;   // 1.2.0: false in older saves
         player.SteroidShopPurchases = playerData.SteroidShopPurchases;
         player.AlchemistINTBoosts = playerData.AlchemistINTBoosts;
         player.GamblingRoundsToday = playerData.GamblingRoundsToday;

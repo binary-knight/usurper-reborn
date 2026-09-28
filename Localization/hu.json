@@ -20496,7 +20496,7 @@
   "mail.birthday_adopt": "(Ö)rökbefogadás",
   "mail.birthday_skip": "(K)ihagyás",
   "mail.birthday_gained_xp": "{0} tapasztalati pontot szereztél!",
-  "mail.birthday_gained_cha": "A karizmád {0}-val nőtt!",
+  "mail.birthday_gained_cha": "A karizmád {0} ponttal nőtt!",
   "mail.birthday_adopted": "Egy gyermeket bíztak a gondodra!",
   "mail.birthday_declined": "Udvariasan visszautasítottad az ajándékokat.",
   "mail.birthday_invalid": "Érvénytelen választás. Az ajándékok visszautasítva.",

@@ -22799,6 +22799,29 @@ public partial class CombatEngine
     /// <summary>
     /// Present resurrection choices to the player
     /// </summary>
+    /// <summary>
+    /// 1.2.0: the dark bargain resurrection's price, a lasting loss (a negative GrantPermanentStat)
+    /// that the next recalculation keeps. <paramref name="roll"/> (0 to 5) picks the stat; the Max HP
+    /// case costs five times <paramref name="statLoss"/>, which is updated for the summary line. The
+    /// helper's floors (1, and 10 for Max HP) replace the old Math.Max floors. Returns the stat's name.
+    /// </summary>
+    internal static string ApplyDarkBargainStatLoss(Character player, int roll, ref int statLoss)
+    {
+        switch (roll)
+        {
+            case 0: player.GrantPermanentStat(StatKind.Strength, -statLoss); return "Strength";
+            case 1: player.GrantPermanentStat(StatKind.Defence, -statLoss); return "Defence";
+            case 2: player.GrantPermanentStat(StatKind.Stamina, -statLoss); return "Stamina";
+            case 3: player.GrantPermanentStat(StatKind.Agility, -statLoss); return "Agility";
+            case 4: player.GrantPermanentStat(StatKind.Charisma, -statLoss); return "Charisma";
+            default:
+                player.GrantPermanentStat(StatKind.MaxHP, -(statLoss * 5));
+                string name = $"Max HP (-{statLoss * 5})";
+                statLoss *= 5;
+                return name;
+        }
+    }
+
     private async Task<ResurrectionResult> PresentResurrectionChoices(CombatResult result)
     {
         var player = result.Player;
@@ -23082,16 +23105,7 @@ public partial class CombatEngine
             int statLoss = 2 + random.Next(4);
 
             // Reduce a random stat permanently
-            string lostStatName;
-            switch (random.Next(6))
-            {
-                case 0: player.Strength = Math.Max(1, player.Strength - statLoss); lostStatName = "Strength"; break;
-                case 1: player.Defence = Math.Max(1, player.Defence - statLoss); lostStatName = "Defence"; break;
-                case 2: player.Stamina = Math.Max(1, player.Stamina - statLoss); lostStatName = "Stamina"; break;
-                case 3: player.Agility = Math.Max(1, player.Agility - statLoss); lostStatName = "Agility"; break;
-                case 4: player.Charisma = Math.Max(1, player.Charisma - statLoss); lostStatName = "Charisma"; break;
-                default: player.MaxHP = Math.Max(10, player.MaxHP - (statLoss * 5)); lostStatName = $"Max HP (-{statLoss * 5})"; statLoss = statLoss * 5; break;
-            }
+            string lostStatName = ApplyDarkBargainStatLoss(player, random.Next(6), ref statLoss);
 
             terminal.SetColor("magenta");
             terminal.WriteLine(Loc.Get("combat.cold_presence"));

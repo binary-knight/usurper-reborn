@@ -1296,6 +1296,7 @@ internal static class PlayerSaveEditor
                 "Clear murder weight / perma-kill log",
                 $"Timed stat buffs ({p.TimedStatBuffs?.Count ?? 0} active, Groggo DEX={p.GroggoShadowBlessingDex}): list and clear",
                 $"Artifact stats restored at login (ArtifactStatsApplied={p.ArtifactStatsApplied}): toggle",
+                $"NG+ cycle stat bonus backfilled at login (CycleStatBonusApplied={p.CycleStatBonusApplied}): toggle",
             });
             if (choice == 0) return;
             switch (choice)
@@ -1349,6 +1350,12 @@ internal static class PlayerSaveEditor
                     // 1.2.0: false makes the next login add the stats of every collected artifact once
                     p.ArtifactStatsApplied = !p.ArtifactStatsApplied;
                     EditorIO.Success($"ArtifactStatsApplied = {p.ArtifactStatsApplied}.");
+                    EditorIO.Pause();
+                    break;
+                case 11:
+                    // 1.2.0: false makes the next login grant the NG+ cycle stat bonus once from the cycle number
+                    p.CycleStatBonusApplied = !p.CycleStatBonusApplied;
+                    EditorIO.Success($"CycleStatBonusApplied = {p.CycleStatBonusApplied}.");
                     EditorIO.Pause();
                     break;
             }

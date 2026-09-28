@@ -57,6 +57,7 @@ public static class PlayerCharacterLoader
             TimedStatBuffs = TimedStatBuffData.ToBuffs(playerData.TimedStatBuffs),
             GroggoShadowBlessingDex = playerData.GroggoShadowBlessingDex,
             ArtifactStatsApplied = playerData.ArtifactStatsApplied,
+            CycleStatBonusApplied = playerData.CycleStatBonusApplied,
             AI = CharacterAI.Computer,
             IsEcho = isEcho,
             IsLoadedPlayer = !isEcho,   // v1.1.11: a player's own save, so a bounty on them can be paid

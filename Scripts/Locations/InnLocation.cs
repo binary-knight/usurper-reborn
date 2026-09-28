@@ -5538,10 +5538,9 @@ public class InnLocation : BaseLocation
             terminal.WriteLine(Loc.Get("inn.rent_shadow_fades"), "gray");
         currentPlayer.OnRest();   // 1.2.0: a rest ends the rest buffs
 
-        // Restore HP/Mana/Stamina
+        // Restore HP/Mana
         currentPlayer.HP = currentPlayer.MaxHP;
         currentPlayer.Mana = currentPlayer.MaxMana;
-        currentPlayer.Stamina = Math.Max(currentPlayer.Stamina, currentPlayer.Constitution * 2);
 
         if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
         {

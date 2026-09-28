@@ -808,6 +808,8 @@ public class Character
     // 1.2.0: the one-time login restore of artifact stats has run (or was never needed). True for every
     // character made on this version; only an older save, which lacks the field, loads it as false.
     public bool ArtifactStatsApplied { get; set; } = true;
+    // 1.2.0: the one-time login backfill of the NG+ cycle stat bonus has run (or was never needed); as above.
+    public bool CycleStatBonusApplied { get; set; } = true;
     public int SteroidShopPurchases { get; set; } = 0;          // Lifetime steroid purchases (cap 3)
     public int AlchemistINTBoosts { get; set; } = 0;            // Lifetime alchemist INT boosts (cap 3)
     public int GamblingRoundsToday { get; set; } = 0;           // Daily gambling counter (max 10)

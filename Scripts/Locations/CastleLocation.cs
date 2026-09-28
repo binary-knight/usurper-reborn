@@ -2303,7 +2303,6 @@ public class CastleLocation : BaseLocation
         // Full heal
         currentPlayer.HP = currentPlayer.MaxHP;
         currentPlayer.Mana = currentPlayer.MaxMana;
-        currentPlayer.Stamina = Math.Max(currentPlayer.Stamina, currentPlayer.Constitution * 2);
 
         if (DoorMode.IsOnlineMode)
         {
