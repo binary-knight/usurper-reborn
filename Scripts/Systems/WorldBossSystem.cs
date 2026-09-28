@@ -28,6 +28,56 @@ namespace UsurperRemake.Systems
         internal static int BoostCastHeal(Character player, int healing) =>
             (int)Math.Min(GodBoonSystem.CastHeal(player, healing, null), int.MaxValue);
 
+        /// <summary>
+        /// 1.2.0: the boss as a foe for the gods' monster checks. The boss is not a Monster; its
+        /// Element maps to MonsterClass (Undead, Demon) and FamilyName, so
+        /// DivineBlessingSystem.IsUndeadOrDemon sees Lich King Vareth as undead.
+        /// </summary>
+        internal static Monster AsFoe(WorldBossDefinition bossDef) => new Monster
+        {
+            Name = bossDef.Name,
+            FamilyName = bossDef.Element,
+            HP = 1,
+            MaxHP = 1,
+            IsActive = true,
+            MonsterClass = bossDef.Element switch
+            {
+                "Undead" => MonsterClass.Undead,
+                "Demon" => MonsterClass.Demon,
+                _ => MonsterClass.Normal,
+            },
+        };
+
+        /// <summary>
+        /// 1.2.0: the gods' damage boons on a world boss hit, as CombatEngine.ExecuteSingleAttack
+        /// applies them after the crit multiplier: DivineBlessingSystem.CalculateBonusDamage
+        /// (Solarius against undead and demons, Valorian when wounded, the prayer blessing), then
+        /// Umbrath's extra critical chance when the hit is not already a crit.
+        /// </summary>
+        internal static long ApplyDivineAttack(Character player, WorldBossDefinition bossDef, long damage,
+            bool mayCrit, Random rng, TerminalEmulator? terminal)
+        {
+            damage += DivineBlessingSystem.Instance.CalculateBonusDamage(player, AsFoe(bossDef), (int)Math.Min(damage, int.MaxValue));
+            int divineCrit = DivineBlessingSystem.Instance.GetCriticalHitBonus(player);
+            if (mayCrit && divineCrit > 0 && rng.Next(100) < divineCrit)
+            {
+                damage = (long)(damage * 1.5);
+                terminal?.WriteLine($"  {Loc.Get("combat.divine_fury")}", "bright_magenta");
+            }
+            return damage;
+        }
+
+        /// <summary>
+        /// 1.2.0: a boss basic hit after Judicar's defence (DivineBlessingSystem.CalculateDamageReduction,
+        /// as CombatEngine.ProcessMonsterAction) and then the Team HQ Barracks. The 20%-of-STR minimum
+        /// holds where it held before.
+        /// </summary>
+        internal static long BossHitAfterDefences(Character player, WorldBossRuntimeData bossData, long beforeBarracks, out int divineCut)
+        {
+            divineCut = DivineBlessingSystem.Instance.CalculateDamageReduction(player, (int)Math.Min(beforeBarracks, int.MaxValue));
+            return Math.Max(Math.Min(beforeBarracks, BossMinimumDamage(bossData)), TeamHQBonus.ApplyDefense(player, beforeBarracks - divineCut));
+        }
+
         private readonly Random _rng = new();
 
         // v1.1.4: cooldowns and re-entry live on the player's world_boss_damage row, never in memory.
@@ -1481,7 +1531,7 @@ namespace UsurperRemake.Systems
             switch (input)
             {
                 case "A": // Standard attack
-                    damage = CalculatePlayerDamage(player, bossDef, bossData, rng);
+                    damage = CalculatePlayerDamage(player, bossDef, bossData, rng, terminal: terminal);
                     terminal.SetColor("bright_green");
                     terminal.WriteLine($"  {Loc.Get("world_boss.you_strike", bossDef.Name, $"{damage:N0}")}");
                     break;
@@ -1497,7 +1547,7 @@ namespace UsurperRemake.Systems
                     break;
 
                 case "I": // Use item (potion)
-                    await ProcessUseItem(player, terminal);
+                    await ProcessUseItem(player, terminal, bossDef);
                     break;
 
                 case "P": // Power attack (high damage, lower accuracy)
@@ -1525,7 +1575,7 @@ namespace UsurperRemake.Systems
                     break;
 
                 default:
-                    damage = CalculatePlayerDamage(player, bossDef, bossData, rng);
+                    damage = CalculatePlayerDamage(player, bossDef, bossData, rng, terminal: terminal);
                     terminal.SetColor("bright_green");
                     terminal.WriteLine($"  {Loc.Get("world_boss.you_strike", bossDef.Name, $"{damage:N0}")}");
                     break;
@@ -1535,7 +1585,7 @@ namespace UsurperRemake.Systems
         }
 
         private long CalculatePlayerDamage(Character player, WorldBossDefinition bossDef,
-            WorldBossRuntimeData bossData, Random rng, bool allowCrit = true)
+            WorldBossRuntimeData bossData, Random rng, bool allowCrit = true, TerminalEmulator? terminal = null)
         {
             // Active attack buff (Battle Cry / Focus / spell buffs) — only while its duration holds.
             long atkBonus = player.TempAttackBonusDuration > 0 ? player.TempAttackBonus : 0;
@@ -1552,8 +1602,12 @@ namespace UsurperRemake.Systems
             // Real critical-hit chance (DEX + equipment crit bonus), matching the main combat engine
             // so gear and DEX investment actually pay off here instead of the old flat 5-50% curve.
             int critChance = StatEffectsSystem.GetCriticalHitChance(player.Dexterity, player.GetEquipmentCritChanceBonus());
-            if (allowCrit && rng.Next(100) < critChance)
+            bool crit = allowCrit && rng.Next(100) < critChance;
+            if (crit)
                 damage = (long)(damage * 1.5);
+
+            // 1.2.0: the gods' damage boons, as in a monster fight
+            damage = ApplyDivineAttack(player, bossDef, damage, allowCrit && !crit, rng, terminal);
 
             // BossSlayer bonus: +10% damage if any equipped item has BossSlayer effect
             if (HasSpecialEffect(player, LootGenerator.SpecialEffect.BossSlayer))
@@ -1573,7 +1627,7 @@ namespace UsurperRemake.Systems
                 return 0;
             }
 
-            long damage = (long)(CalculatePlayerDamage(player, bossDef, bossData, rng) * 1.5);
+            long damage = (long)(CalculatePlayerDamage(player, bossDef, bossData, rng, terminal: terminal) * 1.5);
             terminal.SetColor("bright_yellow");
             terminal.WriteLine($"  {Loc.Get("world_boss.power_attack_hit", bossDef.Name, $"{damage:N0}")}");
             return damage;
@@ -1584,7 +1638,7 @@ namespace UsurperRemake.Systems
         {
             // Always hits, higher crit chance (double normal), but 80% base damage.
             // v1.1.4: one crit roll, the doubled one below; the base used to roll the ordinary crit too.
-            long baseDamage = (long)(CalculatePlayerDamage(player, bossDef, bossData, rng, allowCrit: false) * 0.8);
+            long baseDamage = (long)(CalculatePlayerDamage(player, bossDef, bossData, rng, allowCrit: false, terminal: terminal) * 0.8);
 
             // Extra crit check — double the real DEX/equipment crit chance, capped at 95%
             int critChance = Math.Min(95, StatEffectsSystem.GetCriticalHitChance(player.Dexterity, player.GetEquipmentCritChanceBonus()) * 2);
@@ -1716,7 +1770,7 @@ namespace UsurperRemake.Systems
             return 0;
         }
 
-        private async Task ProcessUseItem(Character player, TerminalEmulator terminal)
+        private async Task ProcessUseItem(Character player, TerminalEmulator terminal, WorldBossDefinition bossDef)
         {
             bool hasHealing = player.Healing > 0 && player.HP < player.MaxHP;
             bool hasMana = player.ManaPotions > 0 && player.Mana < player.MaxMana;
@@ -1747,7 +1801,7 @@ namespace UsurperRemake.Systems
             if (useMana)
                 await DrinkManaPotions(player, terminal);
             else
-                await DrinkHealingPotions(player, terminal);
+                await DrinkHealingPotions(player, terminal, bossDef);
         }
 
         /// <summary>
@@ -1755,7 +1809,7 @@ namespace UsurperRemake.Systems
         /// in a single action. The old loop drank exactly one per turn and handed the boss a free round
         /// for every sip — this is the "can only use 1 potion" report.
         /// </summary>
-        private async Task DrinkHealingPotions(Character player, TerminalEmulator terminal)
+        private async Task DrinkHealingPotions(Character player, TerminalEmulator terminal, WorldBossDefinition bossDef)
         {
             int available = (int)Math.Min(player.Healing, int.MaxValue);
             terminal.SetColor("white");
@@ -1770,7 +1824,8 @@ namespace UsurperRemake.Systems
             qty = Math.Min(qty, available);
 
             long perPotion = (long)(player.MaxHP * 0.3);
-            perPotion = PotionBonus.ApplyOwnerBonuses(player, perPotion); // v1.1.11: Infirmary, before the cap
+            // v1.1.11: Infirmary, before the cap; 1.2.0: the boss as the foe, so Solarius's potion boon sees an undead boss
+            perPotion = PotionBonus.ApplyOwnerBonuses(player, perPotion, new[] { AsFoe(bossDef) });
             long totalHealed = 0;
             int drank = 0;
             for (int i = 0; i < qty && player.Healing > 0 && player.HP < player.MaxHP; i++)
@@ -1979,8 +2034,13 @@ namespace UsurperRemake.Systems
             for (int i = 0; i < attacks && player.HP > 0; i++)
             {
                 long beforeBarracks = Math.Max(1, (long)(CalculateBossBasicDamage(bossData, player, rng, defendingRounds) * mult));
-                // v1.1.11: Team HQ Barracks last; the 20%-of-STR minimum holds where it held before.
-                long bossDmg = Math.Max(Math.Min(beforeBarracks, BossMinimumDamage(bossData)), TeamHQBonus.ApplyDefense(player, beforeBarracks));
+                // v1.1.11: Team HQ Barracks last; 1.2.0: Judicar's defence before it
+                long bossDmg = BossHitAfterDefences(player, bossData, beforeBarracks, out int divineCut);
+                if (divineCut > 0)
+                {
+                    terminal.SetColor("bright_cyan");
+                    terminal.WriteLine($"  {Loc.Get("combat.divine_protection_absorbs", divineCut)}");
+                }
                 player.HP = Math.Max(0, player.HP - bossDmg);
                 terminal.SetColor("bright_red");
                 terminal.WriteLine($"  {Loc.Get(focused ? "world_boss.boss_strikes_focused" : "world_boss.boss_strikes", bossDef.Name, $"{bossDmg:N0}", player.HP, player.MaxHP)}");
