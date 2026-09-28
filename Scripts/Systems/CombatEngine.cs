@@ -7835,9 +7835,9 @@ public partial class CombatEngine
         var teammates = result.Teammates?.Where(t => t.IsAlive).ToList();
         if (teammates == null || teammates.Count == 0) return;
 
-        // v0.56.0: healer spec bonus applies to party song heals (Minstrel Bard)
-        if (abilityResult.Healing > 0)
-            abilityResult.Healing = ApplyHealerSpecBonus(bard, abilityResult.Healing, result.Monsters);
+        // 1.2.0: abilityResult.Healing already carries the healer spec bonus and the gods' boons:
+        // both ability paths run ApplyHealerSpecBonus on it before the party_song effect, so a
+        // second call here gave the party every bonus twice.
 
         terminal.SetColor("bright_magenta");
         terminal.WriteLine(isPlayer
@@ -16518,7 +16518,7 @@ public partial class CombatEngine
                 {
                     foreach (var tm in result.Teammates.Where(t => t.IsAlive))
                     {
-                        tm.HP = Math.Min(tm.MaxHP, tm.HP + GodBoonSystem.HealAgainstUndead(player, 200, result.Monsters)); // 1.2.0: Solarius
+                        tm.HP = Math.Min(tm.MaxHP, tm.HP + GodBoonSystem.CastHeal(player, 200, result.Monsters)); // 1.2.0: Amara and Solarius
                         terminal.WriteLine(Loc.Get("combat.ability_tidal_harmony_ally", tm.Name), "cyan");
                     }
                 }
@@ -19172,8 +19172,8 @@ public partial class CombatEngine
 
         if (spellResult.Success && spellResult.Healing > 0)
         {
-            // 1.2.0: Solarius's boon on a teammate's heal while fighting undead or demons
-            spellResult.Healing = (int)Math.Min(GodBoonSystem.HealAgainstUndead(teammate, spellResult.Healing, result.Monsters), int.MaxValue);
+            // 1.2.0: the healer spec bonus (an NPC healer's heal spell) and the gods' boons
+            spellResult.Healing = ApplyHealerSpecBonus(teammate, spellResult.Healing, result.Monsters);
             // Multi-target heal (e.g. Mass Cure) — heal entire party
             if (healSpell.IsMultiTarget)
             {
@@ -25024,7 +25024,7 @@ public partial class CombatEngine
                 {
                     foreach (var tm in result.Teammates.Where(t => t.IsAlive))
                     {
-                        tm.HP = Math.Min(tm.MaxHP, tm.HP + GodBoonSystem.HealAgainstUndead(player, 200, result.Monsters)); // 1.2.0: Solarius
+                        tm.HP = Math.Min(tm.MaxHP, tm.HP + GodBoonSystem.CastHeal(player, 200, result.Monsters)); // 1.2.0: Amara and Solarius
                         terminal.WriteLine(Loc.Get("combat.ability_tidal_harmony_ally", tm.Name), "cyan");
                     }
                 }
@@ -27468,9 +27468,9 @@ public partial class CombatEngine
         // Apply healing to caster
         if (spellResult.Healing > 0)
         {
-            // 1.2.0: Solarius's boon on the heal while fighting undead or demons, from the one who
-            // cast it (healer: a buff cast on an ally lands here with the ally as caster)
-            spellResult.Healing = (int)Math.Min(GodBoonSystem.HealAgainstUndead(healer ?? caster, spellResult.Healing, monsters), int.MaxValue);
+            // 1.2.0: Amara's and Solarius's boons on the heal, from the one who cast it (healer: a
+            // buff cast on an ally lands here with the ally as caster). No healer spec bonus here.
+            spellResult.Healing = (int)Math.Min(GodBoonSystem.CastHeal(healer ?? caster, spellResult.Healing, monsters), int.MaxValue);
             long oldHP = caster.HP;
             caster.HP = Math.Min(caster.HP + spellResult.Healing, caster.MaxHP);
             long actualHealing = caster.HP - oldHP;
@@ -30249,10 +30249,8 @@ public partial class CombatEngine
     {
         // v0.65.4: works for players too (Specialization moved to Character), not just NPC healers.
         if (baseHealing <= 0 || caster == null) return baseHealing;
-        // 1.2.0 Temple gods piece 2: Amara's boon on the heals a follower casts
-        int healing = (int)Math.Min(GodBoonSystem.PartyHeal(caster, baseHealing), int.MaxValue);
-        // 1.2.0: Solarius's boon on the heals a follower casts while fighting undead or demons
-        healing = (int)Math.Min(GodBoonSystem.HealAgainstUndead(caster, healing, monsters), int.MaxValue);
+        // 1.2.0: Amara's and Solarius's boons on the heals a follower casts, through the one helper
+        int healing = (int)Math.Min(GodBoonSystem.CastHeal(caster, baseHealing, monsters), int.MaxValue);
         if (!UsurperRemake.Data.SpecializationData.IsHealerSpec(caster.Specialization)) return healing;
         return (int)(healing * (1.0 + GameConfig.HealerSpecHealBonus));
     }
