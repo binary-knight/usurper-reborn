@@ -2563,6 +2563,9 @@ public partial class TempleLocation : BaseLocation
             return;
         }
 
+        // 1.2.0 Temple gods: a prayer is devotion, so the neglect count starts over (either kind of god)
+        FavorSystem.MarkDevotion(currentPlayer);
+
         // === Prayer to an immortal player-god ===
         if (!string.IsNullOrEmpty(worshippedImmortal))
         {

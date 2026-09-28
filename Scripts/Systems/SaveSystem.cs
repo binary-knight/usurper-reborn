@@ -779,6 +779,11 @@ namespace UsurperRemake.Systems
                 GodAlignment = player.GodAlignment,
                 AscensionDate = player.AscensionDate,
                 WorshippedGod = player.WorshippedGod,
+                GodFavor = player.GodFavor,
+                GodFavorGod = player.GodFavorGod ?? "",
+                GodFavorSchema = player.GodFavorSchema, // 1.2.0: the character's own schema, so a load that skipped the migration repeats it
+                GodFavorDayGains = new Dictionary<string, int>(player.GodFavorDayGains ?? new Dictionary<string, int>()),
+                DaysSinceDevotion = player.DaysSinceDevotion,
                 DivineBlessingCombats = player.DivineBlessingCombats,
                 DivineBlessingBonus = player.DivineBlessingBonus,
                 DivineBoonConfig = player.DivineBoonConfig ?? "",

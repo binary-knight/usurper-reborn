@@ -1728,6 +1728,19 @@ public static partial class GameConfig
     public const int MentalBrokenPenaltyPct = 25;             // Broken affliction: damage, defence and XP gained; replaces the band penalty, exempt from the Fatigue cap
     public const int MentalSchemaCurrent = 1;                // Current Mental save schema; below this, restore resets Mental to full and stamps this
     public const int MaxWillowDraughts = 3;                   // Healer Willow Draught: carryable cap
+    // Temple gods piece 1 (1.2.0 design, decided 2026-09-28): Favor with the god a character worships
+    public const int GodFavorMin = 0;
+    public const int GodFavorMax = 100;
+    public const int GodFavorTierDevoutMin = 25;              // Follower 0-24, Devout 25-49
+    public const int GodFavorTierZealotMin = 50;              // Zealot 50-74
+    public const int GodFavorTierChosenMin = 75;              // Chosen 75-100
+    public const int GodFavorLegacyStart = 10;                // A save from before Favor: Favor with its current god on first load
+    public const int GodNeglectGraceDays = 3;                 // Days without devotion before neglect starts
+    public const int GodNeglectDailyLoss = 1;                 // Favor lost at each daily reset past the grace days
+    public const int GodFavorSchemaCurrent = 1;               // Below this, the load gives Favor GodFavorLegacyStart with the current god
+    /// <summary>The ten canon gods, in Temple order. Manwe (SupremeCreatorName) is never one of them.</summary>
+    public static readonly string[] CanonGodNames =
+        { "Solarius", "Valorian", "Amara", "Judicar", "Umbrath", "Terran", "Mortis", "Arcanus", "Sylvana", "Discordia" };
     // Session XP diminishing returns (v0.54.0) — online mode only
     // Threshold scales with level: max(100000, XP_for_next_level * 8) — allows ~8 full levels per session
     public const long SessionXPDiminishBaseThreshold = 100000;  // Minimum threshold for low-level players

@@ -455,6 +455,7 @@ public class CharacterCreationSystem
             GnollP = 0,
             Mental = GameConfig.DefaultMentalHealth,
             MentalSchema = GameConfig.MentalSchemaCurrent, // v1.1.15: new characters start current, never legacy
+            GodFavorSchema = GameConfig.GodFavorSchemaCurrent, // 1.2.0: new characters start current, never legacy
             Addict = 0,
             WeapPow = 0,
             ArmPow = 0,

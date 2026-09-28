@@ -2108,6 +2108,16 @@ public class Character
     // Mortal worship field — which immortal player-god this character follows
     public string WorshippedGod { get; set; } = "";                            // DivineName of their chosen immortal god
 
+    // 1.2.0 Temple gods piece 1: Favor 0..100 with the worshipped god (canon or player-god, see
+    // GodRegistry and FavorSystem). GodFavorGod names the god the Favor belongs to, so a switch by
+    // any path starts the new god at 0. GodFavorSchema 0 is a save from before Favor; the load
+    // (GodRegistry.ApplyLoad) gives it GameConfig.GodFavorLegacyStart with its current god.
+    public int GodFavor { get; set; }
+    public string GodFavorGod { get; set; } = "";
+    public int GodFavorSchema { get; set; } = GameConfig.GodFavorSchemaCurrent;
+    public Dictionary<string, int> GodFavorDayGains { get; set; } = new();       // FavorSource name -> Favor gained today; cleared at the daily reset
+    public int DaysSinceDevotion { get; set; }                                   // Daily resets since the last prayer or fitting deed (neglect)
+
     // Divine Blessing buff (granted by an immortal god's Bless deed)
     public int DivineBlessingCombats { get; set; }                             // Combats remaining with blessing
     public float DivineBlessingBonus { get; set; }                             // Damage/defense % bonus (0.10 = 10%)

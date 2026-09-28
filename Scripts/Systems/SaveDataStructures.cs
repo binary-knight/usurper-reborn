@@ -778,6 +778,11 @@ namespace UsurperRemake.Systems
         public DateTime AscensionDate { get; set; }
         public bool HasEarnedAltSlot { get; set; }  // Account has earned the alt character slot
         public string WorshippedGod { get; set; } = "";  // Mortal worship: DivineName of an immortal player-god
+        public int GodFavor { get; set; }  // 1.2.0: Favor 0..100 with the worshipped god
+        public string GodFavorGod { get; set; } = "";  // 1.2.0: the god GodFavor belongs to
+        public int GodFavorSchema { get; set; }  // 1.2.0: 0 = a save from before Favor; old saves read 0
+        public Dictionary<string, int> GodFavorDayGains { get; set; } = new();  // 1.2.0: FavorSource name -> Favor gained today
+        public int DaysSinceDevotion { get; set; }  // 1.2.0: daily resets since the last devotion
         public int DivineBlessingCombats { get; set; }
         public float DivineBlessingBonus { get; set; }
         public string DivineBoonConfig { get; set; } = "";  // Gods: comma-separated "boonId:tier" boon configuration
