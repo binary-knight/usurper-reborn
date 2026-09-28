@@ -1635,9 +1635,9 @@ namespace UsurperRemake.Systems
                     terminal.SetColor("bright_green");
                     terminal.WriteLine(Loc.Get("encounter.timewarp.young_1"));
                     terminal.WriteLine(Loc.Get("encounter.timewarp.young_2"));
-                    player.HP = player.MaxHP;
-                    player.Mana = player.MaxMana;
                     player.GrantPermanentStat(StatKind.Constitution, 3);
+                    player.HP = player.MaxHP;       // after the grant, so the CON bonus to MaxHP is healed too
+                    player.Mana = player.MaxMana;
                     terminal.WriteLine(Loc.Get("encounter.timewarp.young_reward"));
                     break;
 
@@ -2722,8 +2722,8 @@ namespace UsurperRemake.Systems
 
             if (random.NextDouble() < 0.6)
             {
-                player.Mana = player.MaxMana;
                 player.GrantPermanentStat(StatKind.Intelligence, 3);
+                player.Mana = player.MaxMana;   // after the grant, so the INT bonus to MaxMana is filled too
                 terminal.SetColor("green");
                 terminal.WriteLine(Loc.Get("encounter.crystal.good_1"));
                 terminal.WriteLine(Loc.Get("encounter.crystal.good_2"));
@@ -3047,9 +3047,9 @@ namespace UsurperRemake.Systems
             terminal.WriteLine(Loc.Get("encounter.aurora.desc_1"), "white");
             terminal.WriteLine(Loc.Get("encounter.aurora.desc_2"));
 
-            player.HP = player.MaxHP;
-            player.Mana = player.MaxMana;
             player.GrantPermanentStat(StatKind.Wisdom, 3);
+            player.HP = player.MaxHP;       // after the grant, so the pools end full at the new maximum
+            player.Mana = player.MaxMana;
             terminal.SetColor("bright_cyan");
             terminal.WriteLine(Loc.Get("encounter.aurora.reward"));
             await terminal.PressAnyKey();
