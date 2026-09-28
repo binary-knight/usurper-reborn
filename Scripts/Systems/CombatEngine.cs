@@ -610,6 +610,7 @@ public partial class CombatEngine
         _pvpControl.Clear();
         _pvpTurnTakenThisRound.Clear();
         ConsumeCombatBuffs(attacker);
+        GodBoonSystem.ApplyPendingBoonRecalc(attacker);   // 1.2.0: the acting player only, never the defender
         ScrubTransientCombatState(attacker);
         ScrubTransientCombatState(defender);
     }
@@ -2351,6 +2352,7 @@ public partial class CombatEngine
         finally
         {
             ConsumeCombatBuffs(player);
+            GodBoonSystem.ApplyPendingBoonRecalc(player);   // 1.2.0: the fight's player only, never a teammate (their own session applies theirs)
         }
 
         return result;

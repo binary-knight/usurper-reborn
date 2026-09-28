@@ -266,7 +266,7 @@ public class GodStanding1115Tests : IDisposable
     public void PantheonOnlineRecruit_GoesThroughTheGodRegistry()
     {
         var body = SourceBody("PantheonLocation.cs", "private async Task ApplyRecruitToPlayer", "#endregion");
-        body.Should().Contain("GodRegistry.SetWorshippedGod(player, godName)");
+        body.Should().Contain("GodRegistry.SetWorshippedGod(player, godName, otherSession: true)");
         body.Should().NotContain("player.WorshippedGod = godName");
     }
 

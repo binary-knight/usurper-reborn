@@ -526,7 +526,7 @@ public class PantheonLocation : BaseLocation
             var player = session.Context?.Engine?.CurrentPlayer;
             if (player != null && player.WorshippedGod == divineName && !player.IsImmortal)
             {
-                GodBoonSystem.SetConfiguredBoons(player, newConfig);   // 1.2.0: max HP and mana follow at once
+                GodBoonSystem.SetConfiguredBoons(player, newConfig);   // 1.2.0: max HP and mana follow at the follower's next safe point
                 session.EnqueueMessage(
                     $"\u001b[1;33m  ✦ Your patron {divineName} has reconfigured their divine favors! ✦\u001b[0m");
             }
@@ -1654,7 +1654,7 @@ public class PantheonLocation : BaseLocation
             var player = session.Context?.Engine?.CurrentPlayer;
             if (player != null)
             {
-                GodRegistry.SetWorshippedGod(player, godName); // 1.2.0: one god, so a canon choice is cleared
+                GodRegistry.SetWorshippedGod(player, godName, otherSession: true); // 1.2.0: one god, so a canon choice is cleared
                 await GodBoonSystem.ApplyRecruitAsync(currentPlayer, player);   // 1.2.0: the god's boons and domain at once
                 session.EnqueueMessage(
                     $"\u001b[1;33m  ✦ A divine presence fills your soul... You now worship {godName}! ✦\u001b[0m");

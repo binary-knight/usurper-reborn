@@ -679,6 +679,9 @@ public abstract class BaseLocation
 
         while (!exitLocation && currentPlayer.IsAlive) // No turn limit - continuous gameplay
         {
+            // 1.2.0: a god boon update another session left pending (a player-god's reconfig,
+            // domain or recruit) is applied here, in this player's own session
+            GodBoonSystem.ApplyPendingBoonRecalc(currentPlayer);
             // v0.57.21: GMCP — push current vitals on every loop iteration. Bridge
             // checks SessionContext.GmcpEnabled internally, so this is a single
             // boolean check + early return for non-GMCP clients (web, SSH, BBS).
