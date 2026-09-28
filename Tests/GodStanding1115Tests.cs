@@ -270,6 +270,55 @@ public class GodStanding1115Tests : IDisposable
         body.Should().NotContain("player.WorshippedGod = godName");
     }
 
+    // ---------------- One standings read per listing, not one per god ----------------
+
+    [Fact]
+    public void PantheonRankingLoop_ReadsStandingsOnce_NotPerGod()
+    {
+        var body = SourceBody("PantheonLocation.cs", "private async Task ShowImmortalRankings()", "#region News");
+        int readIdx = body.IndexOf("ReadStandingsOnce()", StringComparison.Ordinal);
+        int loopIdx = body.IndexOf("foreach (var god in gods.OrderByDescending", StringComparison.Ordinal);
+        readIdx.Should().BeGreaterThan(-1, "the ranking reads standings once");
+        loopIdx.Should().BeGreaterThan(-1);
+        readIdx.Should().BeLessThan(loopIdx, "the standings read happens once, before the per-god loop");
+
+        var loopBody = body.Substring(loopIdx);
+        loopBody.Should().NotContain("GetGodStandings", "no full standings read inside the per-god loop");
+        loopBody.Should().NotContain("backend.CountPlayerBelievers", "no per-god database read inside the loop");
+        loopBody.Should().Contain("CountBelievers(god.DivineName, standings)", "each god looks itself up in the standings read once");
+    }
+
+    [Fact]
+    public void TempleImmortalsLoop_ReadsStandingsOnce_NotPerGod()
+    {
+        var body = SourceBody("TempleLocation.cs", "private async Task<List<ImmortalGodInfo>> GetImmortalGodsAsync()", "private async Task WorshipImmortalGod()");
+        int readIdx = body.IndexOf("backend.GetGodStandings()", StringComparison.Ordinal);
+        int loopIdx = body.IndexOf("foreach (var god in immortals)", StringComparison.Ordinal);
+        readIdx.Should().BeGreaterThan(-1, "the immortals listing reads standings once");
+        loopIdx.Should().BeGreaterThan(-1);
+        readIdx.Should().BeLessThan(loopIdx, "the standings read happens once, before the per-god loop");
+
+        var loopBody = body.Substring(loopIdx);
+        loopBody.Should().NotContain("GetGodStandings", "no full standings read inside the per-god loop");
+        loopBody.Should().NotContain("backend.CountPlayerBelievers", "no per-god database read inside the loop");
+        loopBody.Should().Contain("PantheonLocation.CountBelievers(god.DivineName, standings)", "each god looks itself up in the standings read once");
+    }
+
+    [Fact]
+    public async Task PantheonCountBelievers_TwoArgOverload_MatchesTheSingleCallCount()
+    {
+        await Save("acct_a", Player("Arla", "Zephyrine", 40, "Zephyrine"));
+        await Save("acct_b", Player("Brom", "zephyrine", 10, "zephyrine"));
+        var standings = _db.GetGodStandings();
+        int npcCount = GodRegistry.CountNpcFollowers("Zephyrine");
+
+        PantheonLocation.CountBelievers("Zephyrine", standings).Should().Be(npcCount + standings["Zephyrine"].Followers,
+            "the precomputed lookup gives the same number the per-call backend query would");
+        PantheonLocation.CountBelievers("Nobody", standings).Should().Be(GodRegistry.CountNpcFollowers("Nobody"));
+        PantheonLocation.CountBelievers("Zephyrine", (Dictionary<string, GodStanding>)null).Should().Be(npcCount,
+            "null standings (single player, or the DB unavailable) counts NPCs only");
+    }
+
     private static string SourceBody(string file, string startMarker, string endMarker)
     {
         var dir = new DirectoryInfo(Directory.GetCurrentDirectory());

@@ -996,12 +996,13 @@ public class PantheonLocation : BaseLocation
                 terminal.WriteLine("  " + new string('─', 72));
             }
 
+            var standings = ReadStandingsOnce();
             int rank = 1;
             foreach (var god in gods.OrderByDescending(g => g.GodExperience))
             {
                 bool isYou = god.DivineName == currentPlayer.DivineName;
                 string title = GetGodTitle(god.GodLevel);
-                int believers = CountBelievers(god.DivineName);
+                int believers = CountBelievers(god.DivineName, standings);
                 string status = isYou ? Loc.Get("pantheon.ranking_you") : (god.IsOnline ? Loc.Get("pantheon.ranking_online") : Loc.Get("pantheon.ranking_offline"));
 
                 terminal.SetColor(isYou ? "bright_yellow" : "white");
@@ -1324,6 +1325,31 @@ public class PantheonLocation : BaseLocation
         }
 
         return npcCount;
+    }
+
+    /// <summary>
+    /// Count believers using standings already read once for the whole listing, so a ranking
+    /// over N gods does one GetGodStandings read instead of N. Pass null standings (single
+    /// player, or the DB unavailable) to count NPCs only.
+    /// </summary>
+    public static int CountBelievers(string divineName, Dictionary<string, GodStanding> standings)
+    {
+        if (string.IsNullOrEmpty(divineName)) return 0;
+        int npcCount = GodRegistry.CountNpcFollowers(divineName);
+        if (standings != null && standings.TryGetValue(divineName.Trim(), out var s))
+            npcCount += s.Followers;
+        return npcCount;
+    }
+
+    /// <summary>The GetGodStandings read for one listing, or null when unavailable (single player or DB error).</summary>
+    private static Dictionary<string, GodStanding> ReadStandingsOnce()
+    {
+        if (!DoorMode.IsOnlineMode) return null;
+        try
+        {
+            return (SaveSystem.Instance?.Backend as SqlSaveBackend)?.GetGodStandings();
+        }
+        catch { return null; }
     }
 
     /// <summary>Get list of believer info for display (async, includes players in MUD mode)</summary>
