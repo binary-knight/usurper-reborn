@@ -191,7 +191,7 @@ public class MentalCollapseGaps1115Tests
     public void The_fight_gate_comes_first_and_the_fight_end_flags_a_collapse()
     {
         var fight = MentalBands1115Tests.Method(Src("Systems", "CombatEngine.cs"), "PlayerVsMonsters");
-        int gate = At(fight, "if (MentalSystem.CollapseDue(player))");
+        int gate = At(fight, "if (!storyFight && MentalSystem.CollapseDue(player))");
         gate.Should().BeLessThan(At(fight, "bool isGodMode"));
         At(fight, "MentalCollapsePending = true,").Should().BeGreaterThan(gate);
         At(fight, "result.MentalCollapsePending = MentalSystem.CollapseDue(player);")
