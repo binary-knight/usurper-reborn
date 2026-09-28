@@ -26,9 +26,13 @@ public class GodHealAmara1115Tests
         var c = new Character
         {
             Name1 = name, Name2 = name, AI = CharacterAI.Human, Class = cls, Level = 40,
-            HP = 10, MaxHP = 100_000, Mana = 100_000, MaxMana = 100_000, Wisdom = 50, Intelligence = 50,
             CombatSpeed = CombatSpeed.Instant,
         };
+        // One full stat rebuild first, as load and creation do for every real character. After it
+        // a worship change only moves the boon's share of MaxHP and MaxMana
+        // (Character.RecalculateBoonShare), so the hand-set values below survive SetWorshippedGod.
+        c.RecalculateStats();
+        c.HP = 10; c.MaxHP = 100_000; c.Mana = 100_000; c.MaxMana = 100_000; c.Wisdom = 50; c.Intelligence = 50;
         // Spell proficiency at the top from the start, so it cannot grow during a many-cast
         // comparison (growth is random and would swamp the 15% or 20% being measured).
         for (int lvl = 1; lvl <= 25; lvl++)
