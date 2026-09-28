@@ -91,29 +91,31 @@ public static class GodDeedSystem
     /// <summary>
     /// Applies an act to the character's Favor with their god: a deed of the god's domain gains up
     /// to its worth (never past the daily deed cap) and counts as devotion; a taboo loses its worth.
-    /// NPCs and characters with no god or no domain get 0. Returns the Favor change applied.
+    /// NPCs and characters with no god or no domain get 0. deferBoonRecalc (a character played in
+    /// another session) leaves a tier crossing's stat update to that session (FavorSystem.Change).
+    /// Returns the Favor change applied.
     /// </summary>
-    public static int Apply(Character c, GodAct act, GodSystem? gods = null)
+    public static int Apply(Character c, GodAct act, GodSystem? gods = null, bool deferBoonRecalc = false)
     {
         if (c == null || c.IsNPC) return 0;
         int worth = Worth(act, GodBoonSystem.GetDomain(c, gods));
         if (worth > 0)
         {
             FavorSystem.MarkDevotion(c);
-            return FavorSystem.GainCapped(c, FavorSource.Deed, worth, GameConfig.GodFavorDeedDailyCap, gods);
+            return FavorSystem.GainCapped(c, FavorSource.Deed, worth, GameConfig.GodFavorDeedDailyCap, gods, deferBoonRecalc);
         }
-        return worth < 0 ? FavorSystem.Change(c, worth, gods) : 0;
+        return worth < 0 ? FavorSystem.Change(c, worth, gods, deferBoonRecalc) : 0;
     }
 
     /// <summary>
     /// The hook each call site uses: Apply, then the Favor line (FavorUi.ReportChange) on the given
     /// terminal, or on the session's own terminal when the character is the session's player.
-    /// Returns the Favor change applied.
+    /// Returns the Favor change applied. deferBoonRecalc as in Apply.
     /// </summary>
-    public static int Record(Character? c, GodAct act, TerminalEmulator? terminal = null, GodSystem? gods = null)
+    public static int Record(Character? c, GodAct act, TerminalEmulator? terminal = null, GodSystem? gods = null, bool deferBoonRecalc = false)
     {
         if (c == null || c.IsNPC) return 0;
-        int applied = Apply(c, act, gods);
+        int applied = Apply(c, act, gods, deferBoonRecalc);
         if (applied != 0)
         {
             var engine = GameEngine.Instance;
@@ -126,14 +128,33 @@ public static class GodDeedSystem
     /// <summary>
     /// A monster fight won: UndeadSlain when an undead or demon was among the slain
     /// (DivineBlessingSystem.IsUndeadOrDemon), StrongerFoeBeaten when one was above the player's
-    /// level. Each at most once per fight. Called from CombatEngine.HandleVictoryMultiMonster.
+    /// level. Each at most once per fight. deferBoonRecalc as in Apply. Called through
+    /// RecordGroupVictory from CombatEngine.HandleVictoryMultiMonster.
     /// </summary>
-    public static void RecordVictory(Character? player, IEnumerable<Monster>? defeated, TerminalEmulator? terminal = null, GodSystem? gods = null)
+    public static void RecordVictory(Character? player, IEnumerable<Monster>? defeated, TerminalEmulator? terminal = null, GodSystem? gods = null, bool deferBoonRecalc = false)
     {
         if (player == null || player.IsNPC || defeated == null) return;
         var slain = defeated.Where(m => m != null).ToList();
-        if (slain.Any(DivineBlessingSystem.IsUndeadOrDemon)) Record(player, GodAct.UndeadSlain, terminal, gods);
-        if (slain.Any(m => m.Level > player.Level)) Record(player, GodAct.StrongerFoeBeaten, terminal, gods);
+        if (slain.Any(DivineBlessingSystem.IsUndeadOrDemon)) Record(player, GodAct.UndeadSlain, terminal, gods, deferBoonRecalc);
+        if (slain.Any(m => m.Level > player.Level)) Record(player, GodAct.StrongerFoeBeaten, terminal, gods, deferBoonRecalc);
+    }
+
+    /// <summary>
+    /// A monster fight won by a group: the leader's victory deeds (RecordVictory on the leader's
+    /// terminal), then once for each living grouped human follower (IsGroupedPlayer, not the
+    /// leader; the same set as CombatEngine.RollMentalFear), by their own god, their own level and
+    /// their own daily cap, with the Favor line on their own terminal. A follower is played in
+    /// another session, so a tier crossing's stat update is left to that session (deferBoonRecalc).
+    /// NPC teammates, companions and pets never record.
+    /// </summary>
+    public static void RecordGroupVictory(Character? player, IEnumerable<Monster>? defeated, IEnumerable<Character>? teammates, TerminalEmulator? terminal = null, GodSystem? gods = null)
+    {
+        RecordVictory(player, defeated, terminal, gods);
+        if (teammates == null) return;
+        var done = new HashSet<Character>(ReferenceEqualityComparer.Instance);
+        foreach (var mate in teammates.ToList())
+            if (mate != null && mate.IsGroupedPlayer && mate.IsAlive && !ReferenceEquals(mate, player) && done.Add(mate))
+                RecordVictory(mate, defeated, mate.RemoteTerminal, gods, deferBoonRecalc: true);
     }
 
     /// <summary>A spell cast: the Magic taboo count starts over. Called from SpellSystem.CastSpell.</summary>

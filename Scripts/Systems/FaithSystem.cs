@@ -324,9 +324,11 @@ public static class FavorSystem
     /// <summary>
     /// Changes Favor with the current god by delta, clamped to 0..100. NPCs and characters with no
     /// god get 0. A change that crosses a tier recalculates the stats (a boon's strength follows the
-    /// tier). Returns the change applied.
+    /// tier). With deferBoonRecalc (a character played in another session, such as a grouped
+    /// follower in the leader's fight) the recalculation is left to that character's own session
+    /// (GodBoonSystem.RequestRecalcForBoon). Returns the change applied.
     /// </summary>
-    public static int Change(Character c, int delta, GodSystem? gods = null)
+    public static int Change(Character c, int delta, GodSystem? gods = null, bool deferBoonRecalc = false)
     {
         if (c == null || c.IsNPC) return 0;
         var tierBefore = GetTier(GetFavor(c, gods));
@@ -335,7 +337,11 @@ public static class FavorSystem
         int before = c.GodFavor;
         int after = (int)Math.Clamp((long)before + delta, GameConfig.GodFavorMin, GameConfig.GodFavorMax);
         c.GodFavor = after;
-        if (GetTier(after) != tierBefore) GodBoonSystem.RecalculateForBoon(c, gods);
+        if (GetTier(after) != tierBefore)
+        {
+            if (deferBoonRecalc) GodBoonSystem.RequestRecalcForBoon(c);
+            else GodBoonSystem.RecalculateForBoon(c, gods);
+        }
         return after - before;
     }
 
@@ -346,13 +352,14 @@ public static class FavorSystem
     /// <summary>
     /// Gains up to amount from a source, never past dailyCap for that source today, and counts it
     /// toward today's total. Returns the Favor actually gained (0 for NPCs, no god, or a spent cap).
+    /// deferBoonRecalc as in Change.
     /// </summary>
-    public static int GainCapped(Character c, FavorSource source, int amount, int dailyCap, GodSystem? gods = null)
+    public static int GainCapped(Character c, FavorSource source, int amount, int dailyCap, GodSystem? gods = null, bool deferBoonRecalc = false)
     {
         if (c == null || c.IsNPC || amount <= 0) return 0;
         int room = dailyCap - GainedToday(c, source);
         if (room <= 0) return 0;
-        int applied = Change(c, Math.Min(amount, room), gods);
+        int applied = Change(c, Math.Min(amount, room), gods, deferBoonRecalc);
         if (applied > 0)
             c.GodFavorDayGains[source.ToString()] = GainedToday(c, source) + applied;
         return applied;
