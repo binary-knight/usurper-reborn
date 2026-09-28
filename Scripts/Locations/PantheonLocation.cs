@@ -48,6 +48,9 @@ public class PantheonLocation : BaseLocation
         bool exitLoop = false;
         while (!exitLoop)
         {
+            // 1.2.0: a god boon update another session left pending (a player-god's reconfig,
+            // domain or recruit) is applied here, in this player's own session
+            GodBoonSystem.ApplyPendingBoonRecalc(currentPlayer);
             // Phase 5: Electron mode emits Pantheon (divine realm) menu state.
             if (GameConfig.ElectronMode)
             {
