@@ -21369,7 +21369,7 @@ public partial class CombatEngine
                 result.Player.Fame += 2;
             }
         }
-        GodDeedSystem.RecordVictory(result.Player, result.DefeatedMonsters, terminal);   // 1.2.0 Temple gods: Light and War deeds
+        GodDeedSystem.RecordGroupVictory(result.Player, result.DefeatedMonsters, result.Teammates, terminal);   // 1.2.0 Temple gods: Light and War deeds, leader and grouped followers
 
         // Apply world event modifiers
         long adjustedExp = WorldEventSystem.Instance.GetAdjustedXP(totalExp);
