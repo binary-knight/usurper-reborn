@@ -1861,6 +1861,92 @@ public class Character
     }
 
     /// <summary>
+    /// 1.2.0: a lasting stat change (a shrine, a purchase, a story reward, a penalty). Adds
+    /// <paramref name="amount"/> (may be negative) to the matching Base* field, which is what
+    /// RecalculateStats rebuilds from, so the change survives the fight-start recalc, equipment
+    /// changes, level-ups and a save round trip. The derived stat is never written directly.
+    /// Floors: 1 for the nine attributes, 10 for MaxHP, 0 for MaxMana. <paramref name="cap"/>,
+    /// when given, limits the Base field; a positive grant never lowers a Base already above the
+    /// cap, it only adds nothing. <paramref name="raisePool"/> adds the amount to HP (MaxHP) or
+    /// Mana (MaxMana) after the recalc, clamped to the new maximum. Side effects of the normal
+    /// pipeline apply: a Constitution grant also raises MaxHP through the CON bonus, and a MaxHP
+    /// grant is scaled by the King, boon and awakening percentages. Works on NPCs unchanged.
+    /// </summary>
+    public void GrantPermanentStat(StatKind stat, long amount, long? cap = null, bool raisePool = false)
+    {
+        ApplyPermanentToBase(stat, amount, cap);
+        RecalculateStats();
+        if (raisePool) RaisePoolAfterGrant(stat, amount);
+    }
+
+    /// <summary>1.2.0: several lasting stat changes with a single recalc (for example STR and STA together).</summary>
+    public void GrantPermanentStats(params (StatKind stat, long amount)[] grants)
+    {
+        foreach (var (stat, amount) in grants) ApplyPermanentToBase(stat, amount, null);
+        RecalculateStats();
+    }
+
+    /// <summary>1.2.0: the lowest value each Base field may reach through GrantPermanentStat.</summary>
+    public static long PermanentStatFloor(StatKind stat) => stat switch
+    {
+        StatKind.MaxHP => 10,
+        StatKind.MaxMana => 0,
+        _ => 1
+    };
+
+    private void ApplyPermanentToBase(StatKind stat, long amount, long? cap)
+    {
+        long old = GetBaseStat(stat);
+        long next = old + amount;
+        if (cap.HasValue) next = Math.Min(next, Math.Max(cap.Value, old));
+        next = Math.Max(PermanentStatFloor(stat), next);
+        SetBaseStat(stat, next);
+    }
+
+    private void RaisePoolAfterGrant(StatKind stat, long amount)
+    {
+        if (amount <= 0) return;
+        if (stat == StatKind.MaxHP) HP = Math.Min(MaxHP, HP + amount);
+        else if (stat == StatKind.MaxMana) Mana = Math.Min(MaxMana, Mana + amount);
+    }
+
+    /// <summary>1.2.0: the Base* field behind a StatKind.</summary>
+    public long GetBaseStat(StatKind stat) => stat switch
+    {
+        StatKind.Strength => BaseStrength,
+        StatKind.Dexterity => BaseDexterity,
+        StatKind.Constitution => BaseConstitution,
+        StatKind.Intelligence => BaseIntelligence,
+        StatKind.Wisdom => BaseWisdom,
+        StatKind.Charisma => BaseCharisma,
+        StatKind.Defence => BaseDefence,
+        StatKind.Stamina => BaseStamina,
+        StatKind.Agility => BaseAgility,
+        StatKind.MaxHP => BaseMaxHP,
+        StatKind.MaxMana => BaseMaxMana,
+        _ => throw new ArgumentOutOfRangeException(nameof(stat))
+    };
+
+    private void SetBaseStat(StatKind stat, long value)
+    {
+        switch (stat)
+        {
+            case StatKind.Strength: BaseStrength = value; break;
+            case StatKind.Dexterity: BaseDexterity = value; break;
+            case StatKind.Constitution: BaseConstitution = value; break;
+            case StatKind.Intelligence: BaseIntelligence = value; break;
+            case StatKind.Wisdom: BaseWisdom = value; break;
+            case StatKind.Charisma: BaseCharisma = value; break;
+            case StatKind.Defence: BaseDefence = value; break;
+            case StatKind.Stamina: BaseStamina = value; break;
+            case StatKind.Agility: BaseAgility = value; break;
+            case StatKind.MaxHP: BaseMaxHP = value; break;
+            case StatKind.MaxMana: BaseMaxMana = value; break;
+            default: throw new ArgumentOutOfRangeException(nameof(stat));
+        }
+    }
+
+    /// <summary>
     /// Initialize base stats from current values (call when creating character or loading old save)
     /// </summary>
     public void InitializeBaseStats()
@@ -2778,6 +2864,13 @@ public class Character
             _ => new CombatModifiers()
         };
     }
+}
+
+/// <summary>1.2.0: the stats a lasting grant can change (Character.GrantPermanentStat).</summary>
+public enum StatKind
+{
+    Strength, Dexterity, Constitution, Intelligence, Wisdom,
+    Charisma, Defence, Stamina, Agility, MaxHP, MaxMana
 }
 
 /// <summary>
