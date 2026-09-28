@@ -300,6 +300,26 @@ public class GodBoons1115Tests
     }
 
     [Fact]
+    public void Discordia_UngroupedTeammateNeverRolls_EvenWhenWorshipping()
+    {
+        // A companion or pet (CompanionSystem's Character wrapper) is not IsNPC, only ungrouped
+        // (no RemoteTerminal): this is the gate that must exclude it, the same one RollMentalFear uses.
+        var engine = new CombatEngine();
+        var leader = Hero("GbDisLeadCompanionTest");
+        var companion = Hero("GbDisCompanionMate");
+        var foe = Foe("Goblin");
+        WithSingletonGod(companion, "Discordia", 60, () =>
+        {
+            for (int i = 0; i < 200; i++)
+            {
+                engine.RollDiscordiaFirstActionFail(leader, new[] { foe }, new List<Character> { companion });
+                engine.ConsumeDiscordiaFail(foe).Should().BeFalse("an ungrouped teammate (companion or pet) never rolls Discordia, and the leader here worships nothing");
+            }
+            return 0;
+        });
+    }
+
+    [Fact]
     public void Discordia_FoeStruckByTwoMembers_FailsOnlyOnce()
     {
         var engine = new CombatEngine();
