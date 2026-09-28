@@ -167,8 +167,8 @@ public class MentalCollapse1115Tests
     {
         var src = Src("Locations", "BaseLocation.cs");
         var loop = MentalBands1115Tests.Method(src, "LocationLoop");
-        At(loop, "if (MentalSystem.NeedsCollapse(currentPlayer)").Should().BeGreaterThan(At(loop, "await NavigateToLocation(GameLocation.Prison);"));
-        At(loop, "await HandleMentalCollapse();").Should().BeGreaterThan(At(loop, "if (MentalSystem.NeedsCollapse(currentPlayer)"));
+        At(loop, "if (MentalSystem.CollapseDue(currentPlayer))").Should().BeGreaterThan(At(loop, "await NavigateToLocation(GameLocation.Prison);"));
+        At(loop, "await HandleMentalCollapse();").Should().BeGreaterThan(At(loop, "if (MentalSystem.CollapseDue(currentPlayer))"));
         var collapse = MentalBands1115Tests.Method(src, "HandleMentalCollapse");
         int deathGate = At(collapse, "if (MentalSystem.IsCollapseDeath(floor))");
         At(collapse, "await new CombatEngine(terminal).HandleMentalCollapseDeath(player)").Should().BeGreaterThan(deathGate);

@@ -614,6 +614,14 @@ public static class MentalSystem
     public static bool NeedsCollapse(Character c) =>
         c != null && !c.IsNPC && c.IsAlive && c.Mental <= 0;
 
+    /// <summary>
+    /// A collapse is carried out now: NeedsCollapse, and not while jailed or locked to the Pantheon.
+    /// The one rule for the location loop (which applies it) and for the start of a monster fight
+    /// (which is not entered, so a chain of fights stops at the first one that ends at Mental 0).
+    /// </summary>
+    public static bool CollapseDue(Character c) =>
+        NeedsCollapse(c) && c.DaysInPrison <= 0 && !c.IsImmortal;
+
     /// <summary>A collapse on this dungeon floor (0 outside the dungeon) is a real death: MentalCollapseDeathFloor or deeper.</summary>
     public static bool IsCollapseDeath(int dungeonFloor) => dungeonFloor >= GameConfig.MentalCollapseDeathFloor;
 

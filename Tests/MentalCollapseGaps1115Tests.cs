@@ -16,7 +16,9 @@ namespace UsurperReborn.Tests;
 /// <summary>
 /// v1.1.15 Mental piece 7 follow-ups: the Exhausted XP penalty is a cut (it was a 10% bonus), and
 /// every path that moves the player to a deeper floor goes through the one Mental gate
-/// (DungeonLocation.ConfirmMentalDescent): Broken refuses, Breaking asks twice.
+/// (DungeonLocation.ConfirmMentalDescent): Broken refuses, Breaking asks twice. A fight that ends at
+/// Mental 0 is the last one: the next fight in a chain is not entered and the location loop carries
+/// out the collapse once.
 /// </summary>
 [Collection("SharedGameSingletons")]
 public class MentalCollapseGaps1115Tests
@@ -152,6 +154,75 @@ public class MentalCollapseGaps1115Tests
         var (floor, shown) = await EnterPortal(Hero("Steady", 80));
         floor.Should().Be(15);
         shown.Should().NotContain(Loc.Get("mental.portal_confirm_1"));
+    }
+
+    // Collapse after every fight
+
+    [Fact]
+    public void A_collapse_is_due_at_zero_but_not_in_jail_or_the_Pantheon()
+    {
+        MentalSystem.CollapseDue(Hero("Zero", 0)).Should().BeTrue();
+        MentalSystem.CollapseDue(Hero("One", 1)).Should().BeFalse();
+        var jailed = Hero("Jailed", 0); jailed.DaysInPrison = 2;
+        MentalSystem.CollapseDue(jailed).Should().BeFalse("never while jailed");
+        var god = Hero("Ascended", 0); god.IsImmortal = true;
+        MentalSystem.CollapseDue(god).Should().BeFalse("never while locked to the Pantheon, or no fight could start");
+    }
+
+    [Fact]
+    public async Task A_fight_is_not_entered_at_Mental_zero()
+    {
+        var hero = Hero("Spent", 0);
+        var rat = new Monster { Name = "Rat", Level = 1, HP = 10, MaxHP = 10 };
+        var output = new MemoryStream();
+        var engine = new CombatEngine(new TerminalEmulator(new LineStream(Array.Empty<string>()), output));
+        var fight = engine.PlayerVsMonsters(hero, new System.Collections.Generic.List<Monster> { rat });
+        (await Task.WhenAny(fight, Task.Delay(15000))).Should().BeSameAs(fight, "the fight must return at once");
+        var result = await fight;
+        result.Outcome.Should().Be(CombatOutcome.PlayerEscaped);
+        result.MentalCollapsePending.Should().BeTrue();
+        result.DefeatedMonsters.Should().BeEmpty();
+        rat.HP.Should().Be(10, "no blow was struck");
+        hero.Mental.Should().Be(0, "the collapse itself is left to the location loop, once");
+        hero.MentalBroken.Should().BeFalse();
+    }
+
+    [Fact]
+    public void The_fight_gate_comes_first_and_the_fight_end_flags_a_collapse()
+    {
+        var fight = MentalBands1115Tests.Method(Src("Systems", "CombatEngine.cs"), "PlayerVsMonsters");
+        int gate = At(fight, "if (MentalSystem.CollapseDue(player))");
+        gate.Should().BeLessThan(At(fight, "bool isGodMode"));
+        At(fight, "MentalCollapsePending = true,").Should().BeGreaterThan(gate);
+        At(fight, "result.MentalCollapsePending = MentalSystem.CollapseDue(player);")
+            .Should().BeGreaterThan(At(fight, "ApplyMentalFightEnd(result, mentalFloor, globalEscape, BossContext != null, terminal, mentalAtFightStart);"));
+    }
+
+    [Fact]
+    public void A_collapse_is_carried_out_once()
+    {
+        var shallow = Hero("Shallow", 0);
+        shallow.Gold = 1000;
+        MentalSystem.ApplyCollapseRescue(shallow).Should().Be(50);
+        MentalSystem.CollapseDue(shallow).Should().BeFalse("the loop does not collapse the player again, or take a second fee");
+        var deep = Hero("Deep", 0);
+        MentalSystem.ApplyCollapseDeathAftermath(deep);
+        MentalSystem.CollapseDue(deep).Should().BeFalse();
+    }
+
+    [Fact]
+    public void A_deep_collapse_death_still_leaves_the_player_Broken_at_twenty()
+    {
+        MentalSystem.IsCollapseDeath(26).Should().BeTrue();
+        MentalSystem.IsCollapseDeath(25).Should().BeFalse();
+        var c = Hero("Fallen", 0);
+        MentalSystem.ApplyCollapseDeathAftermath(c);
+        c.MentalBroken.Should().BeTrue();
+        c.Mental.Should().Be(20);
+        var collapse = MentalBands1115Tests.Method(Src("Locations", "BaseLocation.cs"), "HandleMentalCollapse");
+        At(collapse, "MentalSystem.ApplyCollapseDeathAftermath(player);")
+            .Should().BeGreaterThan(At(collapse, "await new CombatEngine(terminal).HandleMentalCollapseDeath(player)"))
+            .And.BeLessThan(At(collapse, "long fee = MentalSystem.ApplyCollapseRescue(player);"));
     }
 
     [Fact]

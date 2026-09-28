@@ -892,6 +892,20 @@ public partial class CombatEngine
         bool offerMonkEncounter = true,
         bool isAmbush = false)
     {
+        // v1.1.15: collapse happens after combat. A fight that ended at Mental 0 is the last one: an
+        // action that chains fights (gauntlet waves, a save quest then an ambush) gets this empty
+        // result for the next fight, which is not entered, and the location loop carries out the
+        // collapse once (BaseLocation.HandleMentalCollapse, the floor rule unchanged).
+        if (MentalSystem.CollapseDue(player))
+            return new CombatResult
+            {
+                Player = player,
+                Monsters = new List<Monster>(monsters),
+                Teammates = teammates != null ? new List<Character>(teammates) : new List<Character>(),
+                Outcome = CombatOutcome.PlayerEscaped,
+                MentalCollapsePending = true,
+            };
+
         // Wizard godmode: save HP/Mana before combat to restore after
         bool isGodMode = UsurperRemake.Server.SessionContext.IsActive
             && (UsurperRemake.Server.SessionContext.Current?.WizardGodMode ?? false);
@@ -2263,6 +2277,8 @@ public partial class CombatEngine
         // one announcement per player. Strain only in the dungeon, on the leader's floor.
         int mentalFloor = MentalFightFloor(player);
         ApplyMentalFightEnd(result, mentalFloor, globalEscape, BossContext != null, terminal, mentalAtFightStart);
+        // v1.1.15: checked right after the fight; the next fight in a chain is not entered (see the top)
+        result.MentalCollapsePending = MentalSystem.CollapseDue(player);
 
         // v0.60.3: GMCP Char.Combat.End — single return point for PlayerVsMonsters
         // means MUD client scripts get a clean "leaving combat" signal regardless
@@ -31797,6 +31813,9 @@ public class CombatResult
     public bool MentalDeathApplied { get; set; }
     // v1.1.15: this death is a Mental collapse (CombatEngine.HandleMentalCollapseDeath), no Last Stand
     public bool MentalCollapseDeath { get; set; }
+    // v1.1.15: the leader ended this fight at Mental 0, or a fight was not entered for it; the location
+    // loop carries out the collapse (BaseLocation.HandleMentalCollapse)
+    public bool MentalCollapsePending { get; set; }
     // v1.1.15: grouped followers who already took their Mental death loss this fight (applied once each)
     public HashSet<Character> MentalDeadFollowers { get; } = new HashSet<Character>(ReferenceEqualityComparer.Instance);
 }

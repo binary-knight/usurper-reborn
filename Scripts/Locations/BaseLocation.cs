@@ -699,7 +699,7 @@ public abstract class BaseLocation
 
             // v1.1.15: Mental collapse at 0, checked between actions, so after the fight or event
             // that caused it and never mid-round. Not while jailed or locked to the Pantheon.
-            if (MentalSystem.NeedsCollapse(currentPlayer) && currentPlayer.DaysInPrison <= 0 && !currentPlayer.IsImmortal)
+            if (MentalSystem.CollapseDue(currentPlayer))
             {
                 await HandleMentalCollapse();
                 if (!currentPlayer.IsAlive || GameEngine.Instance.IsPermadeath) return;
