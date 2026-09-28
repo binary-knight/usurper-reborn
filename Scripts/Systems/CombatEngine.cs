@@ -433,6 +433,7 @@ public partial class CombatEngine
                 }
             }
         }
+        c.TickTimedStatBuffsAfterCombat();   // 1.2.0: stat buffs that last a number of fights
     }
 
     /// <summary>

@@ -816,8 +816,7 @@ namespace UsurperRemake.Locations
             }
 
             currentPlayer.Gold -= price;
-            currentPlayer.Strength += 5;
-            currentPlayer.Stamina += 3;
+            currentPlayer.GrantPermanentStats((StatKind.Strength, 5), (StatKind.Stamina, 3)); // 1.2.0: lasting, written to Base
             AlignmentSystem.Instance.ChangeAlignment(currentPlayer, 3, isGood: false, "dark_alley.steroids"); // v0.57.12: paired movement
             currentPlayer.Fame = Math.Max(0, currentPlayer.Fame - 2); // Infamy
             currentPlayer.SteroidShopPurchases++;
@@ -921,7 +920,7 @@ namespace UsurperRemake.Locations
                         break;
                     }
                     currentPlayer.GroggoShadowBlessingDex = 3;
-                    currentPlayer.Dexterity += 3;
+                    currentPlayer.RecalculateStats();   // 1.2.0: applied in RecalculateStats until the next rest
                     terminal.WriteLine("");
                     terminal.WriteLine(Loc.Get("dark_alley.groggo_traces"), "bright_magenta");
                     terminal.WriteLine(Loc.Get("dark_alley.groggo_shadows_wrap"), "white");
@@ -1003,7 +1002,7 @@ namespace UsurperRemake.Locations
                     }
                     else
                     {
-                        currentPlayer.Intelligence += 2;
+                        currentPlayer.GrantPermanentStat(StatKind.Intelligence, 2); // 1.2.0: lasting, written to Base
                         currentPlayer.AlchemistINTBoosts++;
                         terminal.WriteLine(Loc.Get("dark_alley.alchemist_int_boost", GameConfig.MaxAlchemistINTBoosts - currentPlayer.AlchemistINTBoosts), "bright_green");
                     }
@@ -3317,17 +3316,17 @@ namespace UsurperRemake.Locations
                         switch (stat)
                         {
                             case 1:
-                                player.Strength += 1;
+                                player.GrantPermanentStat(StatKind.Strength, 1); // 1.2.0: lasting, written to Base
                                 term.SetColor("bright_green");
                                 term.WriteLine(Loc.Get("dark_alley.enc_merchant_str"));
                                 break;
                             case 2:
-                                player.Dexterity += 1;
+                                player.GrantPermanentStat(StatKind.Dexterity, 1);
                                 term.SetColor("bright_green");
                                 term.WriteLine(Loc.Get("dark_alley.enc_merchant_dex"));
                                 break;
                             default:
-                                player.Constitution += 1;
+                                player.GrantPermanentStat(StatKind.Constitution, 1);
                                 term.SetColor("bright_green");
                                 term.WriteLine(Loc.Get("dark_alley.enc_merchant_con"));
                                 break;

@@ -1295,6 +1295,7 @@ internal static class PlayerSaveEditor
                 "Release from prison",
                 "Clear wanted level",
                 "Clear murder weight / perma-kill log",
+                $"Timed stat buffs ({p.TimedStatBuffs?.Count ?? 0} active, Groggo DEX={p.GroggoShadowBlessingDex}): list and clear",
             });
             if (choice == 0) return;
             switch (choice)
@@ -1341,8 +1342,31 @@ internal static class PlayerSaveEditor
                     EditorIO.Success("Murder weight cleared.");
                     EditorIO.Pause();
                     break;
+                case 9:
+                    EditTimedStatBuffs(p);
+                    break;
             }
         }
+    }
+
+    /// <summary>1.2.0: lists the temporary stat buffs and Groggo's Dexterity, and clears them on request.</summary>
+    private static void EditTimedStatBuffs(PlayerData p)
+    {
+        var buffs = TimedStatBuffData.ToBuffs(p.TimedStatBuffs);
+        if (buffs.Count == 0) EditorIO.Info("No timed stat buffs.");
+        foreach (var b in buffs)
+        {
+            string end = b.EndsOn == StatBuffEnd.Combats ? $"{b.CombatsLeft} fight(s) left" : "until next rest";
+            EditorIO.Info($"  {b.Source}: {b.Stat} {(b.Amount >= 0 ? "+" : "")}{b.Amount} ({end})");
+        }
+        EditorIO.Info($"  Groggo's Shadow Blessing: Dexterity +{p.GroggoShadowBlessingDex}");
+        if (EditorIO.Confirm("Clear all timed stat buffs and Groggo's blessing?"))
+        {
+            p.TimedStatBuffs = new List<TimedStatBuffData>();
+            p.GroggoShadowBlessingDex = 0;
+            EditorIO.Success("Timed stat buffs cleared.");
+        }
+        EditorIO.Pause();
     }
 
     private static void ResetDailyCounters(PlayerData p)

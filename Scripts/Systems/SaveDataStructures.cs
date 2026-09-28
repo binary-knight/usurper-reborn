@@ -675,6 +675,7 @@ namespace UsurperRemake.Systems
 
         // Dark Alley Overhaul (v0.41.0)
         public int GroggoShadowBlessingDex { get; set; }
+        public List<TimedStatBuffData> TimedStatBuffs { get; set; } = new();   // 1.2.0
         public int SteroidShopPurchases { get; set; }
         public int AlchemistINTBoosts { get; set; }
         public int GamblingRoundsToday { get; set; }
@@ -798,6 +799,41 @@ namespace UsurperRemake.Systems
         public int ExecuteLeft { get; set; }
         public int QuestsLeft { get; set; }
         public int PrisonActivitiesToday { get; set; }
+    }
+
+    /// <summary>
+    /// 1.2.0: a saved temporary stat buff (Character.TimedStatBuffs). Stat and EndsOn are the enum
+    /// values as ints; a row with an unknown value is dropped on load.
+    /// </summary>
+    public class TimedStatBuffData
+    {
+        public string Source { get; set; } = "";
+        public int Stat { get; set; }
+        public int Amount { get; set; }
+        public int EndsOn { get; set; }
+        public int CombatsLeft { get; set; }
+
+        public static List<TimedStatBuffData> FromBuffs(IEnumerable<TimedStatBuff>? buffs) =>
+            (buffs ?? Enumerable.Empty<TimedStatBuff>()).Select(b => new TimedStatBuffData
+            {
+                Source = b.Source,
+                Stat = (int)b.Stat,
+                Amount = b.Amount,
+                EndsOn = (int)b.EndsOn,
+                CombatsLeft = b.CombatsLeft
+            }).ToList();
+
+        public static List<TimedStatBuff> ToBuffs(IEnumerable<TimedStatBuffData>? rows) =>
+            (rows ?? Enumerable.Empty<TimedStatBuffData>())
+                .Where(r => r != null && Enum.IsDefined(typeof(StatKind), r.Stat) && Enum.IsDefined(typeof(StatBuffEnd), r.EndsOn))
+                .Select(r => new TimedStatBuff
+                {
+                    Source = r.Source ?? "",
+                    Stat = (StatKind)r.Stat,
+                    Amount = r.Amount,
+                    EndsOn = (StatBuffEnd)r.EndsOn,
+                    CombatsLeft = r.CombatsLeft
+                }).ToList();
     }
 
     /// <summary>

@@ -921,7 +921,7 @@ public class StreetEncounterSystem
             {
                 terminal.SetColor("green");
                 terminal.WriteLine(Loc.Get("street_encounter.romance.wonderful_conversation"));
-                player.Charisma = Math.Min(player.Charisma + 1, 30);
+                player.GrantPermanentStat(StatKind.Charisma, 1, cap: 30); // 1.2.0: lasting; the cap of 30 applies to BaseCharisma, not gear
                 result.Message = Loc.Get("street_encounter.romance.msg_connection");
             }
             else if (outcome < 80)

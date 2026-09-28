@@ -771,17 +771,17 @@ public class WildernessLocation : BaseLocation
                 terminal.SetColor("bright_cyan");
                 if (stat == 0)
                 {
-                    currentPlayer.Strength += 1;
+                    currentPlayer.GrantPermanentStat(StatKind.Strength, 1); // 1.2.0: lasting, written to Base
                     terminal.WriteLine(Loc.Get("wilderness.shrine_str"));
                 }
                 else if (stat == 1)
                 {
-                    currentPlayer.Dexterity += 1;
+                    currentPlayer.GrantPermanentStat(StatKind.Dexterity, 1);
                     terminal.WriteLine(Loc.Get("wilderness.shrine_dex"));
                 }
                 else
                 {
-                    currentPlayer.Wisdom += 1;
+                    currentPlayer.GrantPermanentStat(StatKind.Wisdom, 1);
                     terminal.WriteLine(Loc.Get("wilderness.shrine_wis"));
                 }
             }

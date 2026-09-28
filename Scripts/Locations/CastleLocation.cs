@@ -2297,18 +2297,15 @@ public class CastleLocation : BaseLocation
 
         await Task.Delay(1500);
 
+        // Groggo's Shadow Blessing fades on rest; 1.2.0: OnRest clears it and recalculates
+        if (currentPlayer.GroggoShadowBlessingDex > 0)
+            terminal.WriteLine(Loc.Get("castle.shadow_blessing_fades"), "gray");
+        currentPlayer.OnRest();   // 1.2.0: a rest ends the rest buffs
+
         // Full heal
         currentPlayer.HP = currentPlayer.MaxHP;
         currentPlayer.Mana = currentPlayer.MaxMana;
         currentPlayer.Stamina = Math.Max(currentPlayer.Stamina, currentPlayer.Constitution * 2);
-
-        // Remove Groggo's Shadow Blessing on rest
-        if (currentPlayer.GroggoShadowBlessingDex > 0)
-        {
-            currentPlayer.Dexterity = Math.Max(1, currentPlayer.Dexterity - currentPlayer.GroggoShadowBlessingDex);
-            terminal.WriteLine(Loc.Get("castle.shadow_blessing_fades"), "gray");
-            currentPlayer.GroggoShadowBlessingDex = 0;
-        }
 
         if (DoorMode.IsOnlineMode)
         {

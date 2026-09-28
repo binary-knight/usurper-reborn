@@ -112,7 +112,7 @@ public class PrisonActivitySystem
     private string PerformPushups(Character prisoner)
     {
         int gain = 1;
-        prisoner.Strength += gain;
+        prisoner.GrantPermanentStat(StatKind.Strength, gain); // 1.2.0: lasting, written to Base
 
         return $"You do pushups until your arms burn. Strength +{gain}!";
     }
@@ -122,8 +122,7 @@ public class PrisonActivitySystem
         int dexGain = 1;
         int agiGain = random.Next(0, 2);
 
-        prisoner.Dexterity += dexGain;
-        prisoner.Agility += agiGain;
+        prisoner.GrantPermanentStats((StatKind.Dexterity, dexGain), (StatKind.Agility, agiGain));
 
         string result = $"You practice yoga poses. Dexterity +{dexGain}";
         if (agiGain > 0)
@@ -137,7 +136,7 @@ public class PrisonActivitySystem
     {
         int intGain = 1;
 
-        prisoner.Intelligence += intGain;
+        prisoner.GrantPermanentStat(StatKind.Intelligence, intGain);
         prisoner.Mana = Math.Min(prisoner.Mana + 5, prisoner.MaxMana);
 
         return $"You read whatever materials you can find. Intelligence +{intGain}, Mana restored!";
@@ -147,7 +146,7 @@ public class PrisonActivitySystem
     {
         long healAmount = prisoner.MaxHP / 10;
 
-        prisoner.Wisdom += 1;
+        prisoner.GrantPermanentStat(StatKind.Wisdom, 1);
         prisoner.HP = Math.Min(prisoner.HP + healAmount, prisoner.MaxHP);
 
         return $"You meditate peacefully. Wisdom +1, HP +{healAmount}!";
@@ -166,7 +165,7 @@ public class PrisonActivitySystem
         int stamGain = 1;
         long healAmount = prisoner.MaxHP / 20;
 
-        prisoner.Stamina += stamGain;
+        prisoner.GrantPermanentStat(StatKind.Stamina, stamGain);
         prisoner.HP = Math.Min(prisoner.HP + healAmount, prisoner.MaxHP);
 
         return $"You stretch and build endurance. Stamina +{stamGain}, HP +{healAmount}!";
@@ -174,7 +173,7 @@ public class PrisonActivitySystem
 
     private string PerformPlanning(Character prisoner)
     {
-        prisoner.Charisma += 1;
+        prisoner.GrantPermanentStat(StatKind.Charisma, 1);
 
         return "You plan your future carefully. Charisma +1!";
     }

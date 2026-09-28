@@ -1462,6 +1462,7 @@ public partial class MainStreetLocation : BaseLocation
             if (choice == "H" && currentPlayer.HasReinforcedDoor)
             {
                 // Sleep at home — safe behind reinforced door
+                currentPlayer.OnRest();   // 1.2.0: a rest ends the rest buffs
                 currentPlayer.HP = currentPlayer.MaxHP;
                 currentPlayer.Mana = currentPlayer.MaxMana;
                 currentPlayer.Stamina = Math.Max(currentPlayer.Stamina, currentPlayer.Constitution * 2);
@@ -1497,6 +1498,7 @@ public partial class MainStreetLocation : BaseLocation
                 isBroke = true;
             }
 
+            currentPlayer.OnRest();   // 1.2.0: a rest ends the rest buffs
             currentPlayer.HP = currentPlayer.MaxHP;
             currentPlayer.Mana = currentPlayer.MaxMana;
             currentPlayer.Stamina = Math.Max(currentPlayer.Stamina, currentPlayer.Constitution * 2);

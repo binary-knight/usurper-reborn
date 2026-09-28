@@ -674,7 +674,7 @@ namespace UsurperRemake.Systems
                     terminal.WriteLine(Loc.Get("alignment.event_dark_energy"));
                     terminal.SetColor("red");
                     terminal.WriteLine(Loc.Get("alignment.event_wickedness_empowers"));
-                    player.Strength += 1;
+                    player.AddTimedStatBuff("alignment_evil", StatKind.Strength, 1, StatBuffEnd.Rest);   // 1.2.0: until the next rest
                     terminal.WriteLine(Loc.Get("alignment.event_str_temp"));
                     await Task.Delay(2000);
                     return true;

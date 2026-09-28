@@ -802,6 +802,9 @@ public class Character
 
     // Dark Alley Overhaul (v0.41.0)
     public int GroggoShadowBlessingDex { get; set; } = 0;      // Active Groggo DEX buff (removed on rest)
+    // 1.2.0: temporary stat buffs (Inn ale, the evil alignment event, the settlement lockpick and smoke
+    // bomb). Applied inside RecalculateStats, ended by OnRest or by the combat countdown. Empty for NPCs.
+    public List<TimedStatBuff> TimedStatBuffs { get; set; } = new();
     public int SteroidShopPurchases { get; set; } = 0;          // Lifetime steroid purchases (cap 3)
     public int AlchemistINTBoosts { get; set; } = 0;            // Lifetime alchemist INT boosts (cap 3)
     public int GamblingRoundsToday { get; set; } = 0;           // Daily gambling counter (max 10)
@@ -1719,6 +1722,11 @@ public class Character
         // 2026-09-03). Placed before the CON-to-HP line so a set CON bonus flows into MaxHP.
         UsurperRemake.Systems.GearSetRegistry.Apply(this);
 
+        // 1.2.0: temporary stat buffs, after gear so a buff flows into HP and mana the way gear does.
+        // Groggo's Shadow Blessing keeps its own saved field and is added here; a rest clears it.
+        if (GroggoShadowBlessingDex > 0) Dexterity += GroggoShadowBlessingDex;
+        ApplyTimedStatBuffs();
+
         // v1.1.12: the awakening's Wisdom, added like gear Wisdom so it flows into mana; never stored
         int awakeningStage = UsurperRemake.Systems.AwakeningBonus.StageOf(this);
         Wisdom += UsurperRemake.Systems.AwakeningBonus.WisdomAt(awakeningStage);
@@ -1839,7 +1847,7 @@ public class Character
     /// player-god's domain or scale), updates only the boons' share of MaxHP and MaxMana: the
     /// segment is recomputed from the pre-boon values the last RecalculateStats recorded, in the
     /// same order, and the difference is applied. Every other stat is left alone, so gains written
-    /// straight into the derived stats (Temple blessings, Sanctum, Groggo) are kept. HP and mana
+    /// straight into the derived stats are kept. HP and mana
     /// are only clamped down. A character never recalculated has no record and gets a full
     /// RecalculateStats (production players always have one: the load recalculates).
     /// </summary>
@@ -1858,6 +1866,171 @@ public class Character
         _boonOutMaxMana = mana;
         HP = Math.Min(HP, MaxHP);
         Mana = Math.Min(Mana, MaxMana);
+    }
+
+    /// <summary>
+    /// 1.2.0: a lasting stat change (a shrine, a purchase, a story reward, a penalty). Adds
+    /// <paramref name="amount"/> (may be negative) to the matching Base* field, which is what
+    /// RecalculateStats rebuilds from, so the change survives the fight-start recalc, equipment
+    /// changes, level-ups and a save round trip. The derived stat is never written directly.
+    /// Floors: 1 for the nine attributes, 10 for MaxHP, 0 for MaxMana. <paramref name="cap"/>,
+    /// when given, limits the Base field; a positive grant never lowers a Base already above the
+    /// cap, it only adds nothing. <paramref name="raisePool"/> adds the amount to HP (MaxHP) or
+    /// Mana (MaxMana) after the recalc, clamped to the new maximum. Side effects of the normal
+    /// pipeline apply: a Constitution grant also raises MaxHP through the CON bonus, and a MaxHP
+    /// grant is scaled by the King, boon and awakening percentages. Works on NPCs unchanged.
+    /// </summary>
+    public void GrantPermanentStat(StatKind stat, long amount, long? cap = null, bool raisePool = false)
+    {
+        ApplyPermanentToBase(stat, amount, cap);
+        RecalculateStats();
+        if (raisePool) RaisePoolAfterGrant(stat, amount);
+    }
+
+    /// <summary>1.2.0: several lasting stat changes with a single recalc (for example STR and STA together).</summary>
+    public void GrantPermanentStats(params (StatKind stat, long amount)[] grants)
+    {
+        foreach (var (stat, amount) in grants) ApplyPermanentToBase(stat, amount, null);
+        RecalculateStats();
+    }
+
+    /// <summary>
+    /// 1.2.0: a temporary stat buff. A buff with the same source and stat is replaced (refreshed),
+    /// never stacked. <paramref name="endsOn"/> Rest ends it at the next rest (OnRest); Combats ends
+    /// it after <paramref name="combats"/> fights (at least 1), counted down at the end of each fight.
+    /// The buff is applied inside RecalculateStats, so it survives the fight-start recalc and a save.
+    /// </summary>
+    public void AddTimedStatBuff(string source, StatKind stat, int amount, StatBuffEnd endsOn, int combats = 0)
+    {
+        TimedStatBuffs.RemoveAll(b => b.Source == source && b.Stat == stat);
+        TimedStatBuffs.Add(new TimedStatBuff
+        {
+            Source = source,
+            Stat = stat,
+            Amount = amount,
+            EndsOn = endsOn,
+            CombatsLeft = endsOn == StatBuffEnd.Combats ? Math.Max(1, combats) : 0
+        });
+        RecalculateStats();
+    }
+
+    /// <summary>
+    /// 1.2.0: a rest ends every Rest buff and Groggo's Shadow Blessing. Called from every rest entry
+    /// point (the night's sleep through DailySystemManager.RestAndAdvanceToMorning). Does nothing
+    /// when no buff ends, so a second call in the same rest is harmless. A pool that was full
+    /// before stays full.
+    /// </summary>
+    public void OnRest()
+    {
+        bool changed = TimedStatBuffs.RemoveAll(b => b.EndsOn == StatBuffEnd.Rest) > 0;
+        if (GroggoShadowBlessingDex != 0)
+        {
+            GroggoShadowBlessingDex = 0;
+            changed = true;
+        }
+        if (!changed) return;
+        RecalculateKeepingFullPools();
+    }
+
+    /// <summary>1.2.0: the end of a fight counts down every Combats buff; one at 0 ends.</summary>
+    public void TickTimedStatBuffsAfterCombat()
+    {
+        foreach (var b in TimedStatBuffs)
+            if (b.EndsOn == StatBuffEnd.Combats) b.CombatsLeft--;
+        bool changed = TimedStatBuffs.RemoveAll(b => b.EndsOn == StatBuffEnd.Combats && b.CombatsLeft <= 0) > 0;
+        if (changed) RecalculateStats();
+    }
+
+    private void RecalculateKeepingFullPools()
+    {
+        bool hpFull = HP >= MaxHP;
+        bool manaFull = Mana >= MaxMana;
+        RecalculateStats();
+        if (hpFull) HP = MaxHP;
+        if (manaFull) Mana = MaxMana;
+    }
+
+    private void ApplyTimedStatBuffs()
+    {
+        if (TimedStatBuffs == null || TimedStatBuffs.Count == 0) return;
+        foreach (var b in TimedStatBuffs)
+        {
+            long floor = PermanentStatFloor(b.Stat);
+            switch (b.Stat)
+            {
+                case StatKind.Strength: Strength = Math.Max(floor, Strength + b.Amount); break;
+                case StatKind.Dexterity: Dexterity = Math.Max(floor, Dexterity + b.Amount); break;
+                case StatKind.Constitution: Constitution = Math.Max(floor, Constitution + b.Amount); break;
+                case StatKind.Intelligence: Intelligence = Math.Max(floor, Intelligence + b.Amount); break;
+                case StatKind.Wisdom: Wisdom = Math.Max(floor, Wisdom + b.Amount); break;
+                case StatKind.Charisma: Charisma = Math.Max(floor, Charisma + b.Amount); break;
+                case StatKind.Defence: Defence = Math.Max(floor, Defence + b.Amount); break;
+                case StatKind.Stamina: Stamina = Math.Max(floor, Stamina + b.Amount); break;
+                case StatKind.Agility: Agility = Math.Max(floor, Agility + b.Amount); break;
+                case StatKind.MaxHP: MaxHP = Math.Max(floor, MaxHP + b.Amount); break;
+                case StatKind.MaxMana: MaxMana = Math.Max(floor, MaxMana + b.Amount); break;
+            }
+        }
+    }
+
+    /// <summary>1.2.0: the lowest value each Base field may reach through GrantPermanentStat.</summary>
+    public static long PermanentStatFloor(StatKind stat) => stat switch
+    {
+        StatKind.MaxHP => 10,
+        StatKind.MaxMana => 0,
+        _ => 1
+    };
+
+    private void ApplyPermanentToBase(StatKind stat, long amount, long? cap)
+    {
+        long old = GetBaseStat(stat);
+        long next = old + amount;
+        if (cap.HasValue) next = Math.Min(next, Math.Max(cap.Value, old));
+        next = Math.Max(PermanentStatFloor(stat), next);
+        SetBaseStat(stat, next);
+    }
+
+    private void RaisePoolAfterGrant(StatKind stat, long amount)
+    {
+        if (amount <= 0) return;
+        if (stat == StatKind.MaxHP) HP = Math.Min(MaxHP, HP + amount);
+        else if (stat == StatKind.MaxMana) Mana = Math.Min(MaxMana, Mana + amount);
+    }
+
+    /// <summary>1.2.0: the Base* field behind a StatKind.</summary>
+    public long GetBaseStat(StatKind stat) => stat switch
+    {
+        StatKind.Strength => BaseStrength,
+        StatKind.Dexterity => BaseDexterity,
+        StatKind.Constitution => BaseConstitution,
+        StatKind.Intelligence => BaseIntelligence,
+        StatKind.Wisdom => BaseWisdom,
+        StatKind.Charisma => BaseCharisma,
+        StatKind.Defence => BaseDefence,
+        StatKind.Stamina => BaseStamina,
+        StatKind.Agility => BaseAgility,
+        StatKind.MaxHP => BaseMaxHP,
+        StatKind.MaxMana => BaseMaxMana,
+        _ => throw new ArgumentOutOfRangeException(nameof(stat))
+    };
+
+    private void SetBaseStat(StatKind stat, long value)
+    {
+        switch (stat)
+        {
+            case StatKind.Strength: BaseStrength = value; break;
+            case StatKind.Dexterity: BaseDexterity = value; break;
+            case StatKind.Constitution: BaseConstitution = value; break;
+            case StatKind.Intelligence: BaseIntelligence = value; break;
+            case StatKind.Wisdom: BaseWisdom = value; break;
+            case StatKind.Charisma: BaseCharisma = value; break;
+            case StatKind.Defence: BaseDefence = value; break;
+            case StatKind.Stamina: BaseStamina = value; break;
+            case StatKind.Agility: BaseAgility = value; break;
+            case StatKind.MaxHP: BaseMaxHP = value; break;
+            case StatKind.MaxMana: BaseMaxMana = value; break;
+            default: throw new ArgumentOutOfRangeException(nameof(stat));
+        }
     }
 
     /// <summary>
@@ -2779,6 +2952,29 @@ public class Character
             _ => new CombatModifiers()
         };
     }
+}
+
+/// <summary>1.2.0: the stats a lasting grant can change (Character.GrantPermanentStat).</summary>
+public enum StatKind
+{
+    Strength, Dexterity, Constitution, Intelligence, Wisdom,
+    Charisma, Defence, Stamina, Agility, MaxHP, MaxMana
+}
+
+/// <summary>1.2.0: what ends a temporary stat buff: the next rest, or a number of fights.</summary>
+public enum StatBuffEnd
+{
+    Rest, Combats
+}
+
+/// <summary>1.2.0: a temporary stat buff (Character.AddTimedStatBuff), applied in RecalculateStats.</summary>
+public class TimedStatBuff
+{
+    public string Source { get; set; } = "";
+    public StatKind Stat { get; set; }
+    public int Amount { get; set; }
+    public StatBuffEnd EndsOn { get; set; }
+    public int CombatsLeft { get; set; }
 }
 
 /// <summary>

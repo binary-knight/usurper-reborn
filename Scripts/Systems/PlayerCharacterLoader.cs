@@ -53,6 +53,9 @@ public static class PlayerCharacterLoader
             BonusMaxHP = playerData.BonusMaxHP,
             BonusWeapPow = playerData.BonusWeapPow,
             BonusArmPow = playerData.BonusArmPow,
+            // 1.2.0: the owner's temporary stat buffs, applied by the recalculation below
+            TimedStatBuffs = TimedStatBuffData.ToBuffs(playerData.TimedStatBuffs),
+            GroggoShadowBlessingDex = playerData.GroggoShadowBlessingDex,
             AI = CharacterAI.Computer,
             IsEcho = isEcho,
             IsLoadedPlayer = !isEcho,   // v1.1.11: a player's own save, so a bounty on them can be paid
