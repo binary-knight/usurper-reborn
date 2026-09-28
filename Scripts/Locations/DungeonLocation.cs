@@ -2013,7 +2013,8 @@ public class DungeonLocation : BaseLocation
                 if (artifactType.HasValue)
                 {
                     term.WriteLine(Loc.Get("dungeon.obtained_artifact", artifactType.Value), "bright_magenta");
-                    StoryProgressionSystem.Instance.CollectedArtifacts.Add(artifactType.Value);
+                    // 1.2.0: the artifact's stats too, unless the defeat already collected it
+                    ArtifactSystem.Instance.GrantArtifactIfMissing(player, artifactType.Value);
                 }
 
                 // v1.1.11: the XP and gold were paid by OldGodBossSystem.HandleBossDefeated; adding

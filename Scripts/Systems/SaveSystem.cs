@@ -1020,6 +1020,8 @@ namespace UsurperRemake.Systems
                 // Dark Alley Overhaul (v0.41.0)
                 GroggoShadowBlessingDex = player.GroggoShadowBlessingDex,
                 TimedStatBuffs = TimedStatBuffData.FromBuffs(player.TimedStatBuffs),   // 1.2.0
+                ArtifactStatsApplied = player.ArtifactStatsApplied,   // 1.2.0
+                CycleStatBonusApplied = player.CycleStatBonusApplied,   // 1.2.0
                 SteroidShopPurchases = player.SteroidShopPurchases,
                 AlchemistINTBoosts = player.AlchemistINTBoosts,
                 GamblingRoundsToday = player.GamblingRoundsToday,

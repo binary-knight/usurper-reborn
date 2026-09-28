@@ -347,52 +347,29 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Apply artifact stat bonuses to player
+        /// Apply artifact stat bonuses to player. 1.2.0: the stats are lasting grants to the Base
+        /// fields (GrantPermanentStats), so they survive the fight-start recalc, equipment changes,
+        /// level-ups and a save. Weapon power, Chivalry and Darkness were always kept.
         /// </summary>
         private void ApplyArtifactBonuses(Character player, ArtifactData artifact)
         {
             // Artifact Hunter NG+ perk: +50% artifact stat bonuses
             float artifactMult = MetaProgressionSystem.Instance.GetArtifactMultiplier();
 
+            var grants = ArtifactStatGrants(artifact, artifactMult);
+            if (grants.Length > 0) player.GrantPermanentStats(grants);
+            // The Max HP and Max Mana an artifact grants also fill the pools by the same amount
+            foreach (var (stat, amount) in grants)
+            {
+                if (stat == StatKind.MaxHP) player.HP = Math.Min(player.MaxHP, player.HP + amount);
+                else if (stat == StatKind.MaxMana) player.Mana = Math.Min(player.MaxMana, player.Mana + amount);
+            }
+
             foreach (var bonus in artifact.StatBonuses)
             {
                 int scaledValue = (int)(bonus.Value * artifactMult);
                 switch (bonus.Key.ToLower())
                 {
-                    case "strength":
-                        player.Strength += scaledValue;
-                        break;
-                    case "defence":
-                        player.Defence += scaledValue;
-                        break;
-                    case "stamina":
-                        player.Stamina += scaledValue;
-                        break;
-                    case "agility":
-                        player.Agility += scaledValue;
-                        break;
-                    case "charisma":
-                        player.Charisma += scaledValue;
-                        break;
-                    case "dexterity":
-                        player.Dexterity += scaledValue;
-                        break;
-                    case "wisdom":
-                        player.Wisdom += scaledValue;
-                        break;
-                    case "intelligence":
-                        // Map to an appropriate stat
-                        player.Wisdom += scaledValue / 2;
-                        player.Dexterity += scaledValue / 2;
-                        break;
-                    case "maxhp":
-                        player.MaxHP += scaledValue;
-                        player.HP += scaledValue;
-                        break;
-                    case "maxmana":
-                        player.MaxMana += scaledValue;
-                        player.Mana += scaledValue;
-                        break;
                     case "weappow":
                         player.BonusWeapPow += scaledValue;
                         break;
@@ -402,19 +379,91 @@ namespace UsurperRemake.Systems
                     case "darkness":
                         player.Darkness += scaledValue;
                         break;
-                    case "allstats":
-                        player.Strength += scaledValue;
-                        player.Defence += scaledValue;
-                        player.Stamina += scaledValue;
-                        player.Agility += scaledValue;
-                        player.Charisma += scaledValue;
-                        player.Dexterity += scaledValue;
-                        player.Wisdom += scaledValue;
-                        break;
                 }
             }
 
             player.RecalculateStats();
+        }
+
+        /// <summary>
+        /// 1.2.0: the stat part of an artifact's bonuses as lasting grants, scaled by
+        /// <paramref name="mult"/>. Intelligence is split into Wisdom and Dexterity halves and
+        /// AllStats covers seven attributes, as the collection code always intended. Weapon power,
+        /// Chivalry and Darkness are not stats here; they are saved fields that were never lost.
+        /// </summary>
+        internal static (StatKind stat, long amount)[] ArtifactStatGrants(ArtifactData artifact, float mult)
+        {
+            var grants = new List<(StatKind, long)>();
+            foreach (var bonus in artifact.StatBonuses)
+            {
+                int v = (int)(bonus.Value * mult);
+                switch (bonus.Key.ToLower())
+                {
+                    case "strength": grants.Add((StatKind.Strength, v)); break;
+                    case "defence": grants.Add((StatKind.Defence, v)); break;
+                    case "stamina": grants.Add((StatKind.Stamina, v)); break;
+                    case "agility": grants.Add((StatKind.Agility, v)); break;
+                    case "charisma": grants.Add((StatKind.Charisma, v)); break;
+                    case "dexterity": grants.Add((StatKind.Dexterity, v)); break;
+                    case "wisdom": grants.Add((StatKind.Wisdom, v)); break;
+                    case "intelligence":
+                        grants.Add((StatKind.Wisdom, v / 2));
+                        grants.Add((StatKind.Dexterity, v / 2));
+                        break;
+                    case "maxhp": grants.Add((StatKind.MaxHP, v)); break;
+                    case "maxmana": grants.Add((StatKind.MaxMana, v)); break;
+                    case "allstats":
+                        foreach (var s in new[] { StatKind.Strength, StatKind.Defence, StatKind.Stamina, StatKind.Agility,
+                                                  StatKind.Charisma, StatKind.Dexterity, StatKind.Wisdom })
+                            grants.Add((s, v));
+                        break;
+                }
+            }
+            return grants.ToArray();
+        }
+
+        /// <summary>
+        /// 1.2.0: collects an artifact without the collection screen (the Old God defeat result) and
+        /// grants its bonuses the same way as every other way of collecting. Nothing happens when the
+        /// artifact is already held, so a second call never grants twice.
+        /// </summary>
+        public bool GrantArtifactIfMissing(Character player, ArtifactType type)
+        {
+            if (!artifacts.TryGetValue(type, out var artifact)) return false;
+            var story = StoryProgressionSystem.Instance;
+            if (story.CollectedArtifacts.Contains(type)) return false;
+            story.CollectArtifact(type);
+            ApplyArtifactBonuses(player, artifact);
+            OnArtifactCollected?.Invoke(type);
+            return true;
+        }
+
+        /// <summary>
+        /// 1.2.0 one-time login restore. Before 1.2.0 an artifact's stats were wiped by the
+        /// recalculation at the end of ApplyArtifactBonuses, so no save holds them. For a character
+        /// loaded from such a save (ArtifactStatsApplied false) this grants the stats of every artifact
+        /// in the saved collected list once, then sets the flag. Weapon power, Chivalry, Darkness and
+        /// the pools are not touched: those were kept at collection. Returns true when it ran.
+        /// </summary>
+        public static bool RestoreMissingArtifactStats(Character player, IEnumerable<int>? savedCollected, float? multOverride = null)
+        {
+            if (player == null || player.ArtifactStatsApplied) return false;
+            float mult = multOverride ?? MetaProgressionSystem.Instance.GetArtifactMultiplier();
+            var grants = new List<(StatKind, long)>();
+            foreach (var type in (savedCollected ?? Enumerable.Empty<int>()).Distinct().Select(i => (ArtifactType)i))
+            {
+                var artifact = Instance.GetArtifact(type);
+                if (artifact != null) grants.AddRange(ArtifactStatGrants(artifact, mult));
+            }
+            if (grants.Count > 0)
+            {
+                long hp = player.HP, mana = player.Mana;
+                player.GrantPermanentStats(grants.ToArray());
+                player.HP = Math.Min(hp, player.MaxHP);
+                player.Mana = Math.Min(mana, player.MaxMana);
+            }
+            player.ArtifactStatsApplied = true;
+            return true;
         }
 
         /// <summary>

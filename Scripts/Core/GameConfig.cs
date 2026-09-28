@@ -3136,7 +3136,7 @@ Mystic Shaman - Tribal caster who summons totems and enchants weapons. Troll/Orc
     
     // Birthday Gift Types (Pascal birthday system)
     public const int BirthdayExperienceGift = 1000;       // Experience gift amount
-    public const int BirthdayLoveGift = 500;              // Love/charisma gift amount
+    public const int BirthdayLoveGift = 5;                // Love gift: a lasting Charisma grant (1.2.0: was 500, lost at the next fight)
     public const int BirthdayChildGift = 1;               // Adoption gift
     
     // Blood Moon Event (v0.52.0)

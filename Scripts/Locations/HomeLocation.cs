@@ -821,7 +821,6 @@ public class HomeLocation : BaseLocation
         currentPlayer.OnRest();   // 1.2.0: a rest ends the rest buffs
         currentPlayer.HP = currentPlayer.MaxHP;
         currentPlayer.Mana = currentPlayer.MaxMana;
-        currentPlayer.Stamina = Math.Max(currentPlayer.Stamina, currentPlayer.Constitution * 2);
 
         var backend = SaveSystem.Instance.Backend as UsurperRemake.Systems.SqlSaveBackend;
         if (backend != null)
