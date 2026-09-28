@@ -6159,6 +6159,7 @@ public partial class GameEngine
 
         // Dark Alley Overhaul (v0.41.0)
         player.GroggoShadowBlessingDex = playerData.GroggoShadowBlessingDex;
+        player.TimedStatBuffs = TimedStatBuffData.ToBuffs(playerData.TimedStatBuffs);   // 1.2.0: before the load recalc
         player.SteroidShopPurchases = playerData.SteroidShopPurchases;
         player.AlchemistINTBoosts = playerData.AlchemistINTBoosts;
         player.GamblingRoundsToday = playerData.GamblingRoundsToday;

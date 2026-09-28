@@ -2295,6 +2295,8 @@ public class CastleLocation : BaseLocation
 
         await Task.Delay(1500);
 
+        currentPlayer.OnRest();   // 1.2.0: a rest ends the rest buffs
+
         // Full heal
         currentPlayer.HP = currentPlayer.MaxHP;
         currentPlayer.Mana = currentPlayer.MaxMana;

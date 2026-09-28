@@ -7179,6 +7179,8 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine("");
         await Task.Delay(1500);
 
+        player.OnRest();   // 1.2.0: a rest ends the rest buffs
+
         // Blood Price rest penalty — dark memories reduce rest effectiveness
         float restEfficiency = 1.0f;
         if (player.MurderWeight >= 6f) restEfficiency = 0.50f;

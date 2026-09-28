@@ -684,6 +684,8 @@ public class HomeLocation : BaseLocation
         }
         await Task.Delay(1500);
 
+        currentPlayer.OnRest();   // 1.2.0: a rest ends the rest buffs
+
         // Blood Price rest penalty — dark memories reduce rest effectiveness (multiplicative)
         float restEfficiency = recoveryPercent;
         if (currentPlayer.MurderWeight >= 6f) restEfficiency *= 0.50f;
@@ -816,6 +818,7 @@ public class HomeLocation : BaseLocation
     {
         if (currentPlayer == null) return;
 
+        currentPlayer.OnRest();   // 1.2.0: a rest ends the rest buffs
         currentPlayer.HP = currentPlayer.MaxHP;
         currentPlayer.Mana = currentPlayer.MaxMana;
         currentPlayer.Stamina = Math.Max(currentPlayer.Stamina, currentPlayer.Constitution * 2);

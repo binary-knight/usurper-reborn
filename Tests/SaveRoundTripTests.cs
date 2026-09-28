@@ -717,6 +717,41 @@ public class SaveRoundTripTests
     }
 
     [Fact]
+    public void PlayerData_RoundTrip_PreservesTimedStatBuffs()
+    {
+        var original = new PlayerData
+        {
+            GroggoShadowBlessingDex = 3,
+            TimedStatBuffs = new List<TimedStatBuffData>
+            {
+                new() { Source = "inn_ale", Stat = (int)StatKind.Wisdom, Amount = -1, EndsOn = (int)StatBuffEnd.Rest, CombatsLeft = 0 },
+                new() { Source = "settlement_lockpick", Stat = (int)StatKind.Dexterity, Amount = 2, EndsOn = (int)StatBuffEnd.Combats, CombatsLeft = 1 }
+            }
+        };
+
+        var json = JsonSerializer.Serialize(original, _jsonOptions);
+        var restored = JsonSerializer.Deserialize<PlayerData>(json, _jsonOptions);
+
+        restored.Should().NotBeNull();
+        restored!.GroggoShadowBlessingDex.Should().Be(3);
+        restored.TimedStatBuffs.Should().HaveCount(2);
+        restored.TimedStatBuffs[0].Source.Should().Be("inn_ale");
+        restored.TimedStatBuffs[0].Stat.Should().Be((int)StatKind.Wisdom);
+        restored.TimedStatBuffs[0].Amount.Should().Be(-1);
+        restored.TimedStatBuffs[0].EndsOn.Should().Be((int)StatBuffEnd.Rest);
+        restored.TimedStatBuffs[1].Source.Should().Be("settlement_lockpick");
+        restored.TimedStatBuffs[1].EndsOn.Should().Be((int)StatBuffEnd.Combats);
+        restored.TimedStatBuffs[1].CombatsLeft.Should().Be(1);
+    }
+
+    [Fact]
+    public void PlayerData_WithoutTimedStatBuffs_LoadsAnEmptyList()
+    {
+        var restored = JsonSerializer.Deserialize<PlayerData>("{}", _jsonOptions);
+        restored!.TimedStatBuffs.Should().NotBeNull().And.BeEmpty("an old save has no timed buffs");
+    }
+
+    [Fact]
     public void PlayerData_RoundTrip_PreservesFactionConsumables()
     {
         var original = new PlayerData

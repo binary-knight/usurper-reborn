@@ -2372,6 +2372,7 @@ public class InnLocation : BaseLocation
             terminal.WriteLine(Loc.Get("inn.rest_shadow_fades"), "gray");
             currentPlayer.GroggoShadowBlessingDex = 0;
         }
+        currentPlayer.OnRest();   // 1.2.0: a rest ends the rest buffs
 
         // Blood Price rest penalty — dark memories reduce rest effectiveness
         float restEfficiency = 1.0f;
@@ -5540,6 +5541,7 @@ public class InnLocation : BaseLocation
             terminal.WriteLine(Loc.Get("inn.rent_shadow_fades"), "gray");
             currentPlayer.GroggoShadowBlessingDex = 0;
         }
+        currentPlayer.OnRest();   // 1.2.0: a rest ends the rest buffs
 
         // Restore HP/Mana/Stamina
         currentPlayer.HP = currentPlayer.MaxHP;

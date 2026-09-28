@@ -1414,6 +1414,8 @@ public class DailySystemManager
     /// </summary>
     public async Task RestAndAdvanceToMorning(Character player)
     {
+        // 1.2.0: the night's sleep ends the rest buffs (SleepAtInn, SleepAtHome and the dungeon sanctuary night come through here)
+        player?.OnRest();
         if (DoorMode.IsOnlineMode) return;
 
         int currentMinutes = player.GameTimeMinutes;

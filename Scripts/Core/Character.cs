@@ -802,6 +802,9 @@ public class Character
 
     // Dark Alley Overhaul (v0.41.0)
     public int GroggoShadowBlessingDex { get; set; } = 0;      // Active Groggo DEX buff (removed on rest)
+    // 1.2.0: temporary stat buffs (Inn ale, the evil alignment event, the settlement lockpick and smoke
+    // bomb). Applied inside RecalculateStats, ended by OnRest or by the combat countdown. Empty for NPCs.
+    public List<TimedStatBuff> TimedStatBuffs { get; set; } = new();
     public int SteroidShopPurchases { get; set; } = 0;          // Lifetime steroid purchases (cap 3)
     public int AlchemistINTBoosts { get; set; } = 0;            // Lifetime alchemist INT boosts (cap 3)
     public int GamblingRoundsToday { get; set; } = 0;           // Daily gambling counter (max 10)
@@ -1719,6 +1722,9 @@ public class Character
         // 2026-09-03). Placed before the CON-to-HP line so a set CON bonus flows into MaxHP.
         UsurperRemake.Systems.GearSetRegistry.Apply(this);
 
+        // 1.2.0: temporary stat buffs, after gear so a buff flows into HP and mana the way gear does
+        ApplyTimedStatBuffs();
+
         // v1.1.12: the awakening's Wisdom, added like gear Wisdom so it flows into mana; never stored
         int awakeningStage = UsurperRemake.Systems.AwakeningBonus.StageOf(this);
         Wisdom += UsurperRemake.Systems.AwakeningBonus.WisdomAt(awakeningStage);
@@ -1884,6 +1890,79 @@ public class Character
     {
         foreach (var (stat, amount) in grants) ApplyPermanentToBase(stat, amount, null);
         RecalculateStats();
+    }
+
+    /// <summary>
+    /// 1.2.0: a temporary stat buff. A buff with the same source and stat is replaced (refreshed),
+    /// never stacked. <paramref name="endsOn"/> Rest ends it at the next rest (OnRest); Combats ends
+    /// it after <paramref name="combats"/> fights (at least 1), counted down at the end of each fight.
+    /// The buff is applied inside RecalculateStats, so it survives the fight-start recalc and a save.
+    /// </summary>
+    public void AddTimedStatBuff(string source, StatKind stat, int amount, StatBuffEnd endsOn, int combats = 0)
+    {
+        TimedStatBuffs.RemoveAll(b => b.Source == source && b.Stat == stat);
+        TimedStatBuffs.Add(new TimedStatBuff
+        {
+            Source = source,
+            Stat = stat,
+            Amount = amount,
+            EndsOn = endsOn,
+            CombatsLeft = endsOn == StatBuffEnd.Combats ? Math.Max(1, combats) : 0
+        });
+        RecalculateStats();
+    }
+
+    /// <summary>
+    /// 1.2.0: a rest ends every Rest buff. Called from every rest entry point (the night's sleep
+    /// through DailySystemManager.RestAndAdvanceToMorning). Does nothing when no buff ends, so a
+    /// second call in the same rest is harmless. A pool that was full before stays full.
+    /// </summary>
+    public void OnRest()
+    {
+        bool changed = TimedStatBuffs.RemoveAll(b => b.EndsOn == StatBuffEnd.Rest) > 0;
+        if (!changed) return;
+        RecalculateKeepingFullPools();
+    }
+
+    /// <summary>1.2.0: the end of a fight counts down every Combats buff; one at 0 ends.</summary>
+    public void TickTimedStatBuffsAfterCombat()
+    {
+        foreach (var b in TimedStatBuffs)
+            if (b.EndsOn == StatBuffEnd.Combats) b.CombatsLeft--;
+        bool changed = TimedStatBuffs.RemoveAll(b => b.EndsOn == StatBuffEnd.Combats && b.CombatsLeft <= 0) > 0;
+        if (changed) RecalculateStats();
+    }
+
+    private void RecalculateKeepingFullPools()
+    {
+        bool hpFull = HP >= MaxHP;
+        bool manaFull = Mana >= MaxMana;
+        RecalculateStats();
+        if (hpFull) HP = MaxHP;
+        if (manaFull) Mana = MaxMana;
+    }
+
+    private void ApplyTimedStatBuffs()
+    {
+        if (TimedStatBuffs == null || TimedStatBuffs.Count == 0) return;
+        foreach (var b in TimedStatBuffs)
+        {
+            long floor = PermanentStatFloor(b.Stat);
+            switch (b.Stat)
+            {
+                case StatKind.Strength: Strength = Math.Max(floor, Strength + b.Amount); break;
+                case StatKind.Dexterity: Dexterity = Math.Max(floor, Dexterity + b.Amount); break;
+                case StatKind.Constitution: Constitution = Math.Max(floor, Constitution + b.Amount); break;
+                case StatKind.Intelligence: Intelligence = Math.Max(floor, Intelligence + b.Amount); break;
+                case StatKind.Wisdom: Wisdom = Math.Max(floor, Wisdom + b.Amount); break;
+                case StatKind.Charisma: Charisma = Math.Max(floor, Charisma + b.Amount); break;
+                case StatKind.Defence: Defence = Math.Max(floor, Defence + b.Amount); break;
+                case StatKind.Stamina: Stamina = Math.Max(floor, Stamina + b.Amount); break;
+                case StatKind.Agility: Agility = Math.Max(floor, Agility + b.Amount); break;
+                case StatKind.MaxHP: MaxHP = Math.Max(floor, MaxHP + b.Amount); break;
+                case StatKind.MaxMana: MaxMana = Math.Max(floor, MaxMana + b.Amount); break;
+            }
+        }
     }
 
     /// <summary>1.2.0: the lowest value each Base field may reach through GrantPermanentStat.</summary>
@@ -2871,6 +2950,22 @@ public enum StatKind
 {
     Strength, Dexterity, Constitution, Intelligence, Wisdom,
     Charisma, Defence, Stamina, Agility, MaxHP, MaxMana
+}
+
+/// <summary>1.2.0: what ends a temporary stat buff: the next rest, or a number of fights.</summary>
+public enum StatBuffEnd
+{
+    Rest, Combats
+}
+
+/// <summary>1.2.0: a temporary stat buff (Character.AddTimedStatBuff), applied in RecalculateStats.</summary>
+public class TimedStatBuff
+{
+    public string Source { get; set; } = "";
+    public StatKind Stat { get; set; }
+    public int Amount { get; set; }
+    public StatBuffEnd EndsOn { get; set; }
+    public int CombatsLeft { get; set; }
 }
 
 /// <summary>
