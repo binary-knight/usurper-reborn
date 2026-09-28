@@ -116,7 +116,144 @@ public class StatRewardsSystems1115Tests
         await ShouldLast(c, StatKind.Intelligence, 1, "a penalty floored at 1");
     }
 
+    // ---------------- Betrayal ----------------
+
+    [Fact]
+    public async Task Betrayal_TheHeartBrokenWisdom_Lasts()
+    {
+        var c = StatRewards1115Tests.Fresh("SrsBetray");
+        var sys = new BetrayalSystem();
+        var m = typeof(BetrayalSystem).GetMethod("ApplyBetrayalEffects", F)!;
+        m.Invoke(sys, new object[] { new BetrayalProfile { NPCId = "srs", BetrayalType = BetrayalType.HeartBroken }, c });
+        await ShouldLast(c, StatKind.Wisdom, 23, "the heartbreak Wisdom");
+    }
+
+    // ---------------- Moral paradox ----------------
+
+    [Fact]
+    public async Task MoralParadox_AWisdomGain_Lasts()
+    {
+        var c = StatRewards1115Tests.Fresh("SrsParadoxUp");
+        MoralParadoxSystem.Instance.ApplyChoiceEffects(new ParadoxOption { Id = "srs", WisdomChange = 5 }, c);
+        await ShouldLast(c, StatKind.Wisdom, 25, "the paradox Wisdom gain");
+    }
+
+    [Fact]
+    public async Task MoralParadox_AWisdomLoss_Lasts_AndStopsAtTheFloor()
+    {
+        var c = StatRewards1115Tests.Fresh("SrsParadoxDown");
+        MoralParadoxSystem.Instance.ApplyChoiceEffects(new ParadoxOption { Id = "srs", WisdomChange = -10 }, c);
+        await ShouldLast(c, StatKind.Wisdom, 10, "the paradox Wisdom loss");
+        MoralParadoxSystem.Instance.ApplyChoiceEffects(new ParadoxOption { Id = "srs", WisdomChange = -10 }, c);
+        MoralParadoxSystem.Instance.ApplyChoiceEffects(new ParadoxOption { Id = "srs", WisdomChange = -10 }, c);
+        c.BaseWisdom.Should().Be(1, "a loss is floored at 1");
+    }
+
+    // ---------------- Street romance ----------------
+
+    private static async Task Romance(Character c)
+    {
+        var sys = StreetEncounterSystem.Instance;
+        var field = typeof(StreetEncounterSystem).GetField("_random", F)!;
+        var old = field.GetValue(sys);
+        field.SetValue(sys, new FixedRandom(0.0));   // Next(100) is 0: the wonderful conversation
+        try
+        {
+            var m = typeof(StreetEncounterSystem).GetMethod("ProcessRomanticEncounter", F)!;
+            try { await (Task)m.Invoke(sys, new object[] { c, new EncounterResult(), Term("Y\n") })!; }
+            catch (TargetInvocationException ex) when (ex.InnerException != null) { throw ex.InnerException; }
+        }
+        finally { field.SetValue(sys, old); }
+    }
+
+    [Fact]
+    public async Task StreetRomance_TheCharisma_Lasts()
+    {
+        var c = StatRewards1115Tests.Fresh("SrsRomance");
+        await Romance(c);
+        await ShouldLast(c, StatKind.Charisma, 11, "the romance Charisma");
+    }
+
+    [Fact]
+    public async Task StreetRomance_TheCapOf30_HoldsAgainstBase_NotGear()
+    {
+        var c = StatRewards1115Tests.Fresh("SrsRomanceCap");
+        c.GrantPermanentStat(StatKind.Charisma, 19);   // Base 29
+        c.Charisma = 45;                               // gear-inflated live value above the cap
+        await Romance(c);
+        c.BaseCharisma.Should().Be(30, "Base below the cap still gains");
+        await Romance(c);
+        c.BaseCharisma.Should().Be(30, "the cap of 30 holds on BaseCharisma");
+        await ShouldLast(c, StatKind.Charisma, 30, "the capped romance Charisma");
+
+        var high = StatRewards1115Tests.Fresh("SrsRomanceHigh");
+        high.GrantPermanentStat(StatKind.Charisma, 25);   // Base 35, above the cap
+        await Romance(high);
+        high.BaseCharisma.Should().Be(35, "a Base above the cap is neither raised nor lowered");
+    }
+
+    // ---------------- Player prison activities ----------------
+
+    [Theory]
+    [InlineData(PrisonActivitySystem.PrisonActivity.Pushups, StatKind.Strength, 11)]
+    [InlineData(PrisonActivitySystem.PrisonActivity.Yoga, StatKind.Dexterity, 11)]
+    [InlineData(PrisonActivitySystem.PrisonActivity.Reading, StatKind.Intelligence, 21)]
+    [InlineData(PrisonActivitySystem.PrisonActivity.Meditation, StatKind.Wisdom, 21)]
+    [InlineData(PrisonActivitySystem.PrisonActivity.Stretching, StatKind.Stamina, 11)]
+    [InlineData(PrisonActivitySystem.PrisonActivity.Planning, StatKind.Charisma, 11)]
+    public async Task PrisonActivity_TheStat_Lasts(PrisonActivitySystem.PrisonActivity activity, StatKind stat, long expectedBase)
+    {
+        var c = StatRewards1115Tests.Fresh("SrsPrison" + activity);
+        var sys = new PrisonActivitySystem();
+        typeof(PrisonActivitySystem).GetField("random", F)!.SetValue(sys, new FixedRandom(0.0));
+        await sys.PerformActivity(c, activity);
+        await ShouldLast(c, stat, expectedBase, $"the prison {activity} stat");
+    }
+
+    [Fact]
+    public async Task PrisonActivity_YogaAgility_Lasts()
+    {
+        var c = StatRewards1115Tests.Fresh("SrsPrisonAgi");
+        var sys = new PrisonActivitySystem();
+        typeof(PrisonActivitySystem).GetField("random", F)!.SetValue(sys, new MaxRandom());
+        await sys.PerformActivity(c, PrisonActivitySystem.PrisonActivity.Yoga);
+        await ShouldLast(c, StatKind.Agility, 11, "the prison yoga Agility");
+        await ShouldLast(c, StatKind.Dexterity, 11, "the prison yoga Dexterity");
+    }
+
+    /// <summary>Next(min, max) returns max - 1: the yoga Agility roll comes up.</summary>
+    private sealed class MaxRandom : Random
+    {
+        public override int Next(int minValue, int maxValue) => maxValue - 1;
+    }
+
     // ---------------- source scan ----------------
+
+    [Theory]
+    [InlineData("Scripts/Systems/BetrayalSystem.cs", "private void ApplyBetrayalEffects(")]
+    [InlineData("Scripts/Systems/MoralParadoxSystem.cs", "internal void ApplyChoiceEffects(")]
+    [InlineData("Scripts/Systems/StreetEncounterSystem.cs", "private async Task ProcessRomanticEncounter(")]
+    [InlineData("Scripts/Systems/PrisonActivitySystem.cs", "private string PerformPushups(")]
+    [InlineData("Scripts/Systems/PrisonActivitySystem.cs", "private string PerformYoga(")]
+    [InlineData("Scripts/Systems/PrisonActivitySystem.cs", "private string PerformReading(")]
+    [InlineData("Scripts/Systems/PrisonActivitySystem.cs", "private string PerformMeditation(")]
+    [InlineData("Scripts/Systems/PrisonActivitySystem.cs", "private string PerformStretching(")]
+    [InlineData("Scripts/Systems/PrisonActivitySystem.cs", "private string PerformPlanning(")]
+    public void EveryConvertedSystemsReward_UsesTheHelper_AndWritesNoDerivedStat(string file, string signature)
+    {
+        string body = Body(File.ReadAllText(Path.Combine(RepoRoot(), file)), signature);
+        body.Should().Contain("GrantPermanentStat", $"{signature} grants through the helper");
+        DerivedWrite.Matches(body).Select(m => m.Value).Should().BeEmpty($"{signature} must not write a derived stat");
+    }
+
+    [Fact]
+    public void StreetRomance_PassesTheCap()
+    {
+        string body = Body(File.ReadAllText(Path.Combine(RepoRoot(), "Scripts/Systems/StreetEncounterSystem.cs")), "private async Task ProcessRomanticEncounter(");
+        body.Should().Contain("player.GrantPermanentStat(StatKind.Charisma, 1, cap: 30);");
+    }
+
+    // ---------------- source scan (RareEncounters) ----------------
 
     private static readonly Regex DerivedWrite = new(
         @"\b(player|prisoner)\.(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma|Defence|Stamina|Agility|MaxHP|MaxMana)\s*(\+=|-=|\+\+|--|=\s*Math\.(Max|Min)\()");
