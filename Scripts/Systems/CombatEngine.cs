@@ -17574,7 +17574,7 @@ public partial class CombatEngine
             }
             void ApplyBuffTo(Character tgt)
             {
-                ApplySpellEffects(tgt, null, spellResult, monsters: monsters);
+                ApplySpellEffects(tgt, null, spellResult, monsters: monsters, healer: player);
                 result.CombatLog.Add($"{player.DisplayName} casts {spellInfo.Name} on {tgt.DisplayName}.");
             }
 
@@ -27463,13 +27463,14 @@ public partial class CombatEngine
     /// <summary>
     /// Apply spell effects to combat
     /// </summary>
-    private void ApplySpellEffects(Character caster, Monster target, SpellSystem.SpellResult spellResult, CombatResult result = null, IEnumerable<Monster>? monsters = null)
+    private void ApplySpellEffects(Character caster, Monster target, SpellSystem.SpellResult spellResult, CombatResult result = null, IEnumerable<Monster>? monsters = null, Character? healer = null)
     {
         // Apply healing to caster
         if (spellResult.Healing > 0)
         {
-            // 1.2.0: Solarius's boon on a self-cast heal while fighting undead or demons
-            spellResult.Healing = (int)Math.Min(GodBoonSystem.HealAgainstUndead(caster, spellResult.Healing, monsters), int.MaxValue);
+            // 1.2.0: Solarius's boon on the heal while fighting undead or demons, from the one who
+            // cast it (healer: a buff cast on an ally lands here with the ally as caster)
+            spellResult.Healing = (int)Math.Min(GodBoonSystem.HealAgainstUndead(healer ?? caster, spellResult.Healing, monsters), int.MaxValue);
             long oldHP = caster.HP;
             caster.HP = Math.Min(caster.HP + spellResult.Healing, caster.MaxHP);
             long actualHealing = caster.HP - oldHP;

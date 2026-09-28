@@ -265,6 +265,34 @@ public class GodBoons1115Tests
     }
 
     [Fact]
+    public void Solarius_AllyHeal_UsesTheCastersGod_NotTheAllys()
+    {
+        var method = typeof(CombatEngine).GetMethod("ApplySpellEffects", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var engine = new CombatEngine(new TerminalEmulator(new MemoryStream(), new MemoryStream()));
+        var undead = new Monster[] { Foe("Zombie") };
+        var caster = Hero("GbSolAllyCaster");
+        var ally = Hero("GbSolAllyTarget");
+
+        // A Solarius caster heals a non-worshipper ally: boosted.
+        ally.MaxHP = 1000; ally.HP = 10;
+        WithSingletonGod(caster, "Solarius", 60, () =>
+        {
+            method.Invoke(engine, new object?[] { ally, null, new SpellSystem.SpellResult { Success = true, Healing = 100 }, null, undead, caster });
+            return 0;
+        });
+        ally.HP.Should().Be(125, "the caster follows Solarius: 100 x 1.15 = 115");
+
+        // A non-worshipper caster heals a Solarius ally: not boosted.
+        ally.HP = 10;
+        WithSingletonGod(ally, "Solarius", 60, () =>
+        {
+            method.Invoke(engine, new object?[] { ally, null, new SpellSystem.SpellResult { Success = true, Healing = 100 }, null, undead, caster });
+            return 0;
+        });
+        ally.HP.Should().Be(110, "the boon is the caster's, and the caster follows no god");
+    }
+
+    [Fact]
     public void Solarius_SelfCastHealBoosted_WardStaysFlat()
     {
         // A self-cast spell that both heals and wards, by a Solarius Zealot fighting a zombie:
@@ -278,7 +306,7 @@ public class GodBoons1115Tests
         WithSingletonGod(c, "Solarius", 60, () =>
         {
             typeof(CombatEngine).GetMethod("ApplySpellEffects", BindingFlags.NonPublic | BindingFlags.Instance)!
-                .Invoke(engine, new object?[] { c, null, spell, null, undead });
+                .Invoke(engine, new object?[] { c, null, spell, null, undead, null });
             return 0;
         });
         c.HP.Should().Be(125, "the heal is boosted: 100 x 1.15 = 115");
@@ -359,7 +387,9 @@ public class GodBoons1115Tests
 
         // The two paths that call the helper directly: a self-cast spell heal and a teammate's heal spell.
         Body("Scripts/Systems/CombatEngine.cs", "private void ApplySpellEffects(")
-            .Should().Contain("GodBoonSystem.HealAgainstUndead(caster, spellResult.Healing, monsters)");
+            .Should().Contain("GodBoonSystem.HealAgainstUndead(healer ?? caster, spellResult.Healing, monsters)");
+        // A buff with a heal part cast on an ally: the boon is the caster's, not the ally's.
+        src.Should().Contain("ApplySpellEffects(tgt, null, spellResult, monsters: monsters, healer: player);");
         Body("Scripts/Systems/CombatEngine.cs", "private async Task<bool> TeammateHealWithSpell(")
             .Should().Contain("GodBoonSystem.HealAgainstUndead(teammate, spellResult.Healing, result.Monsters)");
         // The helper wrappers: every spell and ability heal (ApplyHealerSpecBonus) and every potion (PotionBonus).
