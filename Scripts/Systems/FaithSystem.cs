@@ -27,6 +27,14 @@ public enum FavorSource
     Deed,
 }
 
+/// <summary>Temple gods piece 3: how an item sacrifice went (FavorSystem.SacrificeEquipped).</summary>
+public enum ItemSacrificeOutcome
+{
+    Done,
+    NoItem,
+    Refused,
+}
+
 /// <summary>The god a character worships: a canon god or an ascended player-god.</summary>
 public readonly record struct WorshippedGod(string Name, bool IsCanon);
 
@@ -338,6 +346,62 @@ public static class FavorSystem
         if (applied > 0)
             c.GodFavorDayGains[source.ToString()] = GainedToday(c, source) + applied;
         return applied;
+    }
+
+    /// <summary>Temple gods piece 3: daily prayer, GodFavorPrayerGain once a day. Returns the Favor gained.</summary>
+    public static int Prayer(Character c, GodSystem? gods = null) =>
+        GainCapped(c, FavorSource.Prayer, GameConfig.GodFavorPrayerGain, GameConfig.GodFavorPrayerGain, gods);
+
+    /// <summary>Favor a gold sacrifice is worth before the daily cap: +1 per (Level x GodFavorGoldPerLevel) gold.</summary>
+    public static int GoldSacrificeFavor(long gold, int level)
+    {
+        if (gold <= 0) return 0;
+        long unit = (long)Math.Max(1, level) * GameConfig.GodFavorGoldPerLevel;
+        return (int)Math.Min(gold / unit, int.MaxValue);
+    }
+
+    /// <summary>A gold sacrifice to the character's own god (devotion): GoldSacrificeFavor, at most GodFavorGoldDailyCap a day. Returns the Favor gained.</summary>
+    public static int GoldSacrifice(Character c, long gold, GodSystem? gods = null)
+    {
+        if (c == null) return 0;
+        MarkDevotion(c);
+        return GainCapped(c, FavorSource.GoldSacrifice, GoldSacrificeFavor(gold, c.Level), GameConfig.GodFavorGoldDailyCap, gods);
+    }
+
+    /// <summary>
+    /// Favor an item sacrifice is worth before the daily cap: the item's resale value (half its
+    /// price) at the gold sacrifice rate, from GodFavorItemMin to GodFavorItemMax. 0 for a worthless item.
+    /// </summary>
+    public static int ItemSacrificeFavor(long value, int level)
+    {
+        if (value <= 0) return 0;
+        return Math.Clamp(GoldSacrificeFavor(value / 2, level), GameConfig.GodFavorItemMin, GameConfig.GodFavorItemMax);
+    }
+
+    /// <summary>An item sacrifice to the character's own god (devotion): ItemSacrificeFavor, at most GodFavorItemDailyCap a day. Returns the Favor gained.</summary>
+    public static int ItemSacrifice(Character c, long value, GodSystem? gods = null)
+    {
+        if (c == null) return 0;
+        MarkDevotion(c);
+        return GainCapped(c, FavorSource.ItemSacrifice, ItemSacrificeFavor(value, c.Level), GameConfig.GodFavorItemDailyCap, gods);
+    }
+
+    /// <summary>
+    /// Temple gods piece 3: offers the item worn in a slot to the character's god. The item is
+    /// unequipped and dropped (nothing keeps it: the save writes only equipped and carried items),
+    /// the stats are recalculated without it, and ItemSacrifice Favor is gained; the offering is
+    /// devotion. A cursed or unique item is refused and stays worn. Returns the outcome, the item
+    /// (null when the slot is empty) and the Favor gained.
+    /// </summary>
+    public static (ItemSacrificeOutcome Outcome, Equipment? Item, int Favor) SacrificeEquipped(Character c, EquipmentSlot slot, GodSystem? gods = null)
+    {
+        var item = c?.GetEquipment(slot);
+        if (c == null || item == null) return (ItemSacrificeOutcome.NoItem, null, 0);
+        if (item.IsCursed || item.IsUnique) return (ItemSacrificeOutcome.Refused, item, 0);
+        if (c.UnequipSlot(slot) == null) return (ItemSacrificeOutcome.Refused, item, 0);
+        c.RecalculateStats();
+        int favor = ItemSacrifice(c, item.Value, gods);
+        return (ItemSacrificeOutcome.Done, item, favor);
     }
 
     /// <summary>A devotion today (prayer, later a fitting deed): the neglect count starts over.</summary>

@@ -1738,6 +1738,13 @@ public static partial class GameConfig
     public const int GodNeglectGraceDays = 3;                 // Days without devotion before neglect starts
     public const int GodNeglectDailyLoss = 1;                 // Favor lost at each daily reset past the grace days
     public const int GodFavorSchemaCurrent = 1;               // Below this, the load gives Favor GodFavorLegacyStart with the current god
+    // Temple gods piece 3: devotion at the Temple (each source capped per day, FavorSystem.GainCapped)
+    public const int GodFavorPrayerGain = 3;                  // Daily prayer
+    public const int GodFavorGoldPerLevel = 100;              // Gold sacrifice: +1 Favor per (Level x this) gold
+    public const int GodFavorGoldDailyCap = 5;                // Gold sacrifice: at most this much Favor a day
+    public const int GodFavorItemMin = 1;                     // Item sacrifice: Favor for any item worth offering
+    public const int GodFavorItemMax = 4;                     // Item sacrifice: Favor for the most valuable item
+    public const int GodFavorItemDailyCap = 4;                // Item sacrifice: at most this much Favor a day
     // Temple gods piece 2: each god's boon, scaled by the follower's tier (percent of the full boon)
     public const int GodBoonFollowerStrengthPct = 33;         // Follower: 1/3 of the full boon
     public const int GodBoonDevoutStrengthPct = 67;           // Devout: 2/3
