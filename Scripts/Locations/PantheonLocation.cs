@@ -1308,8 +1308,8 @@ public class PantheonLocation : BaseLocation
     public static int CountBelievers(string divineName)
     {
         if (string.IsNullOrEmpty(divineName)) return 0;
-        int npcCount = NPCSpawnSystem.Instance?.ActiveNPCs?
-            .Count(n => !n.IsDead && n.WorshippedGod == divineName) ?? 0;
+        // 1.2.0: the same NPC and player counts the Temple ranking and altars show
+        int npcCount = GodRegistry.CountNpcFollowers(divineName);
 
         // In MUD mode, also count player believers
         if (DoorMode.IsOnlineMode)
@@ -1610,7 +1610,7 @@ public class PantheonLocation : BaseLocation
             var player = session.Context?.Engine?.CurrentPlayer;
             if (player != null)
             {
-                player.WorshippedGod = godName;
+                GodRegistry.SetWorshippedGod(player, godName); // 1.2.0: one god, so a canon choice is cleared
                 session.EnqueueMessage(
                     $"\u001b[1;33m  ✦ A divine presence fills your soul... You now worship {godName}! ✦\u001b[0m");
                 return;
