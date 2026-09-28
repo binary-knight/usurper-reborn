@@ -3364,6 +3364,17 @@ namespace UsurperRemake.Locations
             var combatEngine = new CombatEngine(term);
             var result = await combatEngine.PlayerVsMonster(player, enforcer, null, false);
 
+            // v1.2.0: a fight not entered for a Mental collapse (a save resumed here at Mental 0) is neither a
+            // beating nor a win: the loan, the gold and the HP stay as they are, and the location loop collapses.
+            if (result.MentalCollapseNotFought)
+            {
+                term.SetColor("gray");
+                term.WriteLine(Loc.Get("mental.collapse_before_fight"));
+                term.WriteLine("");
+                await Task.Delay(1500);
+                return;
+            }
+
             if (result.Outcome == CombatOutcome.Victory)
             {
                 // Loan forgiven

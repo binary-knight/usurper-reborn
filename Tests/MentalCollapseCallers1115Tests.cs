@@ -92,6 +92,7 @@ public class MentalCollapseCallers1115Tests
         new object[] { "Locations/CastleLocation.cs", "Loc.Get(\"castle.royal_guards_overwhelm\")" },
         new object[] { "Locations/MainStreetLocation.cs", "Loc.Get(\"main_street.combat_test_escaped\")" },
         new object[] { "Systems/OldGodBossSystem.cs", "Outcome = BossOutcome.Fled,\n" },
+        new object[] { "Locations/DarkAlleyLocation.cs", "Loc.Get(\"dark_alley.enforcer_beaten\")" },
     };
 
     [Theory]
