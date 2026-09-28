@@ -299,7 +299,10 @@ public class GodDeeds1115Tests
     [InlineData("Scripts/Systems/StreetEncounterSystem.cs", "GodDeedSystem.Record(player, GodAct.StreetBrawl, terminal);", 1)]
     [InlineData("Scripts/Locations/PrisonWalkLocation.cs", "GodDeedSystem.Record(player, GodAct.Imprisoned, terminal);", 1)]
     [InlineData("Scripts/Locations/BaseLocation.cs", "GodDeedSystem.Record(p, GodAct.Imprisoned, terminal);", 1)]
-    [InlineData("Scripts/Locations/BaseLocation.cs", "GodDeedSystem.Record(currentPlayer, GodAct.Murder, terminal);", 1)]
+    [InlineData("Scripts/Locations/BaseLocation.cs", "GodDeedSystem.Record(player, GodAct.Murder, terminal);", 1)]
+    [InlineData("Scripts/Locations/BaseLocation.cs", "GodDeedSystem.Record(currentPlayer, GodAct.Murder, terminal);", 0)]
+    [InlineData("Scripts/Systems/CombatEngine.cs", "if (actualHeal > 0 && tgt != player) GodDeedSystem.Record(player, GodAct.AllyHealed, terminal);", 1)]
+    [InlineData("Scripts/Systems/CombatEngine.cs", "if (partyAllyHealed) GodDeedSystem.Record(player, GodAct.AllyHealed, terminal);", 1)]
     [InlineData("Scripts/Locations/BaseLocation.cs", "GodDeedSystem.Record(currentPlayer, GodAct.DeathWitnessed, terminal);", 1)]
     [InlineData("Scripts/Locations/ChurchLocation.cs", "GodDeedSystem.Record(currentPlayer, GodAct.Confession, terminal);", 1)]
     [InlineData("Scripts/Locations/TempleLocation.cs", "GodDeedSystem.Record(currentPlayer, GodAct.Confession, terminal);", 1)]
@@ -323,9 +326,10 @@ public class GodDeeds1115Tests
     public void CallSite_MurderIsRecordedBeforeTheConsequencesThatCanEndTheSession()
     {
         string src = Source("Scripts/Locations/BaseLocation.cs");
-        int hook = src.IndexOf("GodDeedSystem.Record(currentPlayer, GodAct.Murder, terminal);", StringComparison.Ordinal);
-        int consequences = src.IndexOf("await ApplyMurderConsequences(currentPlayer, npc);", StringComparison.Ordinal);
-        hook.Should().BeGreaterThan(0);
-        hook.Should().BeLessThan(consequences);
+        int method = src.IndexOf("internal async Task ApplyMurderConsequences(Character player, NPC victim)", StringComparison.Ordinal);
+        int hook = src.IndexOf("GodDeedSystem.Record(player, GodAct.Murder, terminal);", StringComparison.Ordinal);
+        method.Should().BeGreaterThan(0);
+        int firstAwait = src.IndexOf("await ", method, StringComparison.Ordinal);
+        hook.Should().BeInRange(method, firstAwait, "recorded first in ApplyMurderConsequences, before capture, execution or the prison exit");
     }
 }

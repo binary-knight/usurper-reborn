@@ -17585,6 +17585,7 @@ public partial class CombatEngine
                     long actualHeal = tgt.HP - oldHP;
                     terminal.SetColor("bright_green");
                     terminal.WriteLine(Loc.Get("combat.aid_recover_hp", tgt.DisplayName, actualHeal));
+                    if (actualHeal > 0 && tgt != player) GodDeedSystem.Record(player, GodAct.AllyHealed, terminal);   // 1.2.0 Temple gods: Love deed
                     if (tgt.IsCompanion && tgt.CompanionId.HasValue)
                         CompanionSystem.Instance.SyncCompanionHP(tgt);
                 }
@@ -17694,6 +17695,7 @@ public partial class CombatEngine
                 }
 
                 // Heal all living teammates
+                bool partyAllyHealed = false;   // 1.2.0 Temple gods: Amara's deed, once per cast
                 if (currentTeammates != null)
                 {
                     foreach (var tm in currentTeammates.Where(t => t.IsAlive))
@@ -17703,6 +17705,7 @@ public partial class CombatEngine
                         long actualHeal = tm.HP - oldHP;
                         if (actualHeal > 0)
                         {
+                            if (tm != player) partyAllyHealed = true;
                             terminal.SetColor("bright_green");
                             terminal.WriteLine(Loc.Get("combat.aid_recover_hp", tm.DisplayName, actualHeal));
 
@@ -17725,10 +17728,12 @@ public partial class CombatEngine
                     long leaderHeal = result.Player.HP - oldLeaderHP;
                     if (leaderHeal > 0)
                     {
+                        partyAllyHealed = true;
                         terminal.SetColor("bright_green");
                         terminal.WriteLine(Loc.Get("combat.aid_recover_hp", result.Player.DisplayName, leaderHeal));
                     }
                 }
+                if (partyAllyHealed) GodDeedSystem.Record(player, GodAct.AllyHealed, terminal);   // 1.2.0 Temple gods: Love deed
 
                 // Apply any protection/buff bonus from the spell to entire party
                 WardPartyFromHeal(player, spellResult, result);
