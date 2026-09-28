@@ -166,7 +166,8 @@ public class MentalCollapse1115Tests
     public void The_location_loop_checks_for_a_collapse_between_actions()
     {
         var src = Src("Locations", "BaseLocation.cs");
-        var loop = MentalBands1115Tests.Method(src, "LocationLoop");
+        var entryAndLoop = MentalBands1115Tests.Method(src, "LocationLoop");
+        var loop = entryAndLoop.Substring(At(entryAndLoop, "while (!exitLocation"));   // the entry check is CollapseBeforeEncounters1115Tests
         At(loop, "if (MentalSystem.CollapseDue(currentPlayer))").Should().BeGreaterThan(At(loop, "await NavigateToLocation(GameLocation.Prison);"));
         At(loop, "await HandleMentalCollapse();").Should().BeGreaterThan(At(loop, "if (MentalSystem.CollapseDue(currentPlayer))"));
         var collapse = MentalBands1115Tests.Method(src, "HandleMentalCollapse");

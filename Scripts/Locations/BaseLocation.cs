@@ -632,6 +632,15 @@ public abstract class BaseLocation
     {
         bool exitLocation = false;
 
+        // v1.2.0: a collapse already due on entry (a resumed save, a login after a fight that ended at
+        // Mental 0) is carried out before the entry encounters, so no encounter fight is refused and then
+        // scored as a loss. Afterwards Mental is 20 and nothing below can be refused.
+        if (MentalSystem.CollapseDue(currentPlayer))
+        {
+            await HandleMentalCollapse();
+            if (!currentPlayer.IsAlive || GameEngine.Instance.IsPermadeath) return;
+        }
+
         // Check for encounters when first entering location
         if (ShouldCheckForEncounters())
         {
@@ -6424,7 +6433,16 @@ public abstract class BaseLocation
             // after the player killed all 5 guards — they'd fall through to
             // "arrested" and still go to prison. Fixed by checking Outcome.
             bool playerWon = result.Outcome == CombatOutcome.Victory;
-            if (playerWon)
+            if (result.MentalCollapseNotFought)
+            {
+                // v1.2.0: the witness loss after the murder (or the murder fight itself) left Mental at 0,
+                // so the guards' fight is not entered. The player is taken as on a surrender, with one line
+                // in place of the overpowered text; the collapse is left to the location loop.
+                terminal.SetColor("gray");
+                terminal.WriteLine(Loc.Get("mental.collapse_before_fight"));
+                captured = true;
+            }
+            else if (playerWon)
             {
                 AlignmentSystem.Instance.ChangeAlignment(player, 100, isGood: false, reason: "murder");
                 terminal.SetColor("red");
