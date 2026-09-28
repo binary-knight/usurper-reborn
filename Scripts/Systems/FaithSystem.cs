@@ -144,6 +144,7 @@ public static class GodRegistry
             c.WorshippedGod = name.Trim();
         }
         FavorSystem.Bind(c, godSystem);
+        GodBoonSystem.RecalculateForBoon(c, gods);   // 1.2.0: a god boon on max HP follows the new god
         return true;
     }
 
@@ -309,15 +310,21 @@ public static class FavorSystem
         c.GodFavor = Math.Clamp(c.GodFavor, GameConfig.GodFavorMin, GameConfig.GodFavorMax);
     }
 
-    /// <summary>Changes Favor with the current god by delta, clamped to 0..100. NPCs and characters with no god get 0. Returns the change applied.</summary>
+    /// <summary>
+    /// Changes Favor with the current god by delta, clamped to 0..100. NPCs and characters with no
+    /// god get 0. A change that crosses a tier recalculates the stats (a boon's strength follows the
+    /// tier). Returns the change applied.
+    /// </summary>
     public static int Change(Character c, int delta, GodSystem? gods = null)
     {
         if (c == null || c.IsNPC) return 0;
+        var tierBefore = GetTier(GetFavor(c, gods));
         Bind(c, gods);
         if (string.IsNullOrEmpty(c.GodFavorGod)) return 0;
         int before = c.GodFavor;
         int after = (int)Math.Clamp((long)before + delta, GameConfig.GodFavorMin, GameConfig.GodFavorMax);
         c.GodFavor = after;
+        if (GetTier(after) != tierBefore) GodBoonSystem.RecalculateForBoon(c, gods);
         return after - before;
     }
 

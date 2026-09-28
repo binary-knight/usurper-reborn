@@ -347,7 +347,8 @@ public static class GodBoonSystem
     /// Refreshes the cached player-god boon of a character (at login and at the Temple). A canon
     /// worshipper, the godless and NPCs clear it. Online it reads the saved world
     /// (PlayerGodBoonAsync). Single-player, a player-god's followers are NPCs, so no player boon.
-    /// A read that fails keeps the previous cache.
+    /// A read that fails keeps the previous cache. The stats are recalculated after, so the boon's
+    /// max HP follows the refreshed god, domain and scale.
     /// </summary>
     public static async Task RefreshPlayerGodBoonAsync(Character c)
     {
@@ -357,16 +358,131 @@ public static class GodBoonSystem
             || SaveSystem.Instance?.Backend is not SqlSaveBackend backend)
         {
             SetPlayerGodBoon(c, "", GodDomain.None, 0);
-            return;
         }
+        else
+        {
+            try
+            {
+                var (domain, scale) = await PlayerGodBoonAsync(god.Value.Name, backend, DateTime.UtcNow);
+                SetPlayerGodBoon(c, god.Value.Name, domain, scale);
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogWarning("FAITH", $"Player-god boon unavailable for {c.Name2}: {ex.Message}");
+            }
+        }
+        RecalculateForBoon(c);
+    }
+
+    /// <summary>
+    /// Recalculates a player's stats after an input of a god boon changed (the god, the Favor tier,
+    /// a player-god's domain or scale), so Terran's max HP follows at once. HP is only clamped to
+    /// the new max, never raised. NPCs are skipped, and so is a GodSystem other than the shared one,
+    /// since RecalculateStats reads the shared registry. A player who follows no player-god loses
+    /// the configured boons (CachedBoonEffects) first, so their max HP and mana go with the god.
+    /// </summary>
+    public static void RecalculateForBoon(Character c, GodSystem? gods = null)
+    {
+        if (c == null || c.IsNPC) return;
+        if (string.IsNullOrWhiteSpace(c.WorshippedGod)) c.CachedBoonEffects = null;
+        if (gods != null && !ReferenceEquals(gods, UsurperRemake.GodSystemSingleton.Instance)) return;
+        c.RecalculateStats();
+    }
+
+    /// <summary>
+    /// A player-god's configured boons (Pantheon) reach a follower: the cache is set from the
+    /// config and the stats are recalculated, so the boons on max HP and mana follow at once.
+    /// </summary>
+    public static void SetConfiguredBoons(Character c, string config)
+    {
+        if (c == null || c.IsNPC) return;
+        c.CachedBoonEffects = DivineBoonRegistry.CalculateEffects(config);
+        RecalculateForBoon(c);
+    }
+
+    /// <summary>
+    /// A player was recruited by an immortal (Pantheon): the follower takes the god's configured
+    /// boons and the god's domain at the given scale, and the stats are recalculated. With no scale
+    /// (the standings could not be read) the domain cache is kept, as RefreshPlayerGodBoonAsync
+    /// keeps it when its read fails; a cache for another god gives no boon (PlayerGodCacheFits).
+    /// </summary>
+    public static void ApplyRecruit(Character immortal, Character follower, int? scalePct)
+    {
+        if (immortal == null || follower == null || follower.IsNPC || string.IsNullOrWhiteSpace(immortal.DivineName)) return;
+        SetConfiguredBoons(follower, immortal.DivineBoonConfig);
+        if (scalePct is not int scale) return;
+        ApplyDomainChange(immortal.DivineName, ParseDomain(immortal.DivineDomain), scale, new[] { follower });
+    }
+
+    /// <summary>
+    /// Online: a player recruited by an immortal gets the god's boons at once, at the god's current
+    /// scale (the immortal is online, so no idle decay). The domain comes from the immortal in
+    /// memory, like ApplyDomainChangeAsync. A standings read that fails keeps the domain cache, as
+    /// the login refresh does, until the next refresh (login or Temple).
+    /// </summary>
+    public static async Task ApplyRecruitAsync(Character immortal, Character follower)
+    {
+        if (immortal == null || follower == null || string.IsNullOrWhiteSpace(immortal.DivineName)) return;
+        int? scale = null;
+        if (UsurperRemake.BBS.DoorMode.IsOnlineMode && SaveSystem.Instance?.Backend is SqlSaveBackend backend)
+        {
+            try
+            {
+                var standings = await Task.Run(() => backend.GetGodStandings());
+                scale = PlayerGodScalePct(StandingOf(standings, immortal.DivineName), StrongestCanon(standings), 0);
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogWarning("FAITH", $"Player-god scale unavailable for the recruit of {immortal.DivineName}: {ex.Message}");
+            }
+        }
+        ApplyRecruit(immortal, follower, scale);
+    }
+
+    /// <summary>
+    /// A player-god's domain was chosen: each follower of that god (players only) caches the new
+    /// domain at the given scale, and their stats are recalculated.
+    /// </summary>
+    public static void ApplyDomainChange(string god, GodDomain domain, int scalePct, IEnumerable<Character> followers)
+    {
+        if (string.IsNullOrWhiteSpace(god) || followers == null) return;
+        foreach (var f in followers)
+        {
+            if (f == null || f.IsNPC) continue;
+            var worshipped = GodRegistry.GetWorshippedGod(f);
+            if (worshipped == null || worshipped.Value.IsCanon
+                || !worshipped.Value.Name.Equals(god, StringComparison.OrdinalIgnoreCase)) continue;
+            SetPlayerGodBoon(f, worshipped.Value.Name, domain, scalePct);
+            RecalculateForBoon(f);
+        }
+    }
+
+    /// <summary>
+    /// Online: after an immortal picks their domain, the followers playing now get the domain boon
+    /// at once, at the god's current scale (the immortal is online, so no idle decay). The domain is
+    /// not saved yet, so PlayerGodBoonAsync cannot read it. Single-player has no player followers.
+    /// </summary>
+    public static async Task ApplyDomainChangeAsync(Character immortal)
+    {
+        if (immortal == null || string.IsNullOrWhiteSpace(immortal.DivineName)) return;
+        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode || SaveSystem.Instance?.Backend is not SqlSaveBackend backend) return;
+        var server = UsurperRemake.Server.MudServer.Instance;
+        if (server == null) return;
         try
         {
-            var (domain, scale) = await PlayerGodBoonAsync(god.Value.Name, backend, DateTime.UtcNow);
-            SetPlayerGodBoon(c, god.Value.Name, domain, scale);
+            string god = immortal.DivineName;
+            var standings = await Task.Run(() => backend.GetGodStandings());
+            int scale = PlayerGodScalePct(StandingOf(standings, god), StrongestCanon(standings), 0);
+            var followers = server.ActiveSessions.Values
+                .Select(s => s.Context?.Engine?.CurrentPlayer)
+                .Where(p => p != null && !ReferenceEquals(p, immortal))
+                .Cast<Character>()
+                .ToList();
+            ApplyDomainChange(god, ParseDomain(immortal.DivineDomain), scale, followers);
         }
         catch (Exception ex)
         {
-            DebugLogger.Instance.LogWarning("FAITH", $"Player-god boon unavailable for {c.Name2}: {ex.Message}");
+            DebugLogger.Instance.LogWarning("FAITH", $"Player-god domain change not applied to followers of {immortal.DivineName}: {ex.Message}");
         }
     }
 }

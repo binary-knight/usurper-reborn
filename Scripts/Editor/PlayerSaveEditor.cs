@@ -285,13 +285,32 @@ internal static class PlayerSaveEditor
         p.GodFavor = EditorIO.PromptInt($"Favor with the worshipped god ({GameConfig.GodFavorMin}-{GameConfig.GodFavorMax})", p.GodFavor, min: GameConfig.GodFavorMin, max: GameConfig.GodFavorMax);
         p.GodFavorGod = EditorIO.PromptString("God the Favor belongs to (must match the worshipped god, else Favor reads 0)", p.GodFavorGod ?? "");
         p.DaysSinceDevotion = EditorIO.PromptInt("Daily resets since the last devotion (neglect)", p.DaysSinceDevotion, min: 0);
-        p.DivineDomain = EditorIO.PromptString("Immortal's god domain (Light, War, Love, Law, Shadow, Earth, Death, Magic, Nature, Chaos; blank = not chosen)", p.DivineDomain ?? "");
+        p.DivineDomain = PromptDivineDomain(p.DivineDomain);
         if (EditorIO.PromptBool("Clear today's Favor gains per source", false))
             p.GodFavorDayGains = new Dictionary<string, int>();
 
         EditorIO.Info("— Difficulty —");
         p.Difficulty = EditorIO.PromptEnum("Difficulty", p.Difficulty);
     }
+
+    /// <summary>
+    /// 1.2.0: the immortal's god domain, asked again until the input is one of the ten names (the
+    /// load would silently drop any other text). The current value is shown as the load reads it.
+    /// </summary>
+    private static string PromptDivineDomain(string? current)
+    {
+        string shown = GodBoonSystem.StoredDomain(current);
+        while (true)
+        {
+            string input = EditorIO.PromptString("Immortal's god domain (Light, War, Love, Law, Shadow, Earth, Death, Magic, Nature, Chaos; blank = not chosen)", shown);
+            if (IsValidDomainInput(input)) return input;
+            EditorIO.Warn($"Unknown domain \"{input}\". Enter one of Light, War, Love, Law, Shadow, Earth, Death, Magic, Nature, Chaos.");
+        }
+    }
+
+    /// <summary>True for blank (not chosen) or one of the ten domain names (GodBoonSystem.ParseDomain).</summary>
+    internal static bool IsValidDomainInput(string? input) =>
+        string.IsNullOrWhiteSpace(input) || GodBoonSystem.ParseDomain(input) != GodDomain.None;
 
     #endregion
 
