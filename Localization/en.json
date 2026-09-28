@@ -6242,6 +6242,8 @@
   "mental.descend_confirm_2": "Your mind is close to breaking. Are you certain you want to go deeper?",
   "mental.descend_turned_back": "You step back from the stairs.",
   "mental.descend_refused": "Your mind is broken. You cannot bring yourself to go any deeper until it is treated.",
+  "mental.portal_confirm_1": "The portal pulls you downward and your hands shake. Step through anyway?",
+  "mental.portal_turned_back": "You pull back from the portal before it can take you deeper.",
   "mental.collapse_rescue": "Your mind gives way and you collapse. Rescuers find you and carry you to the Healer. You are Broken until talk therapy or rehab mends you.",
   "mental.collapse_fee": "The rescuers take {0} gold for their trouble.",
   "mental.collapse_death": "Your mind gives way this deep in the dungeon, and there is no one to carry you out.",

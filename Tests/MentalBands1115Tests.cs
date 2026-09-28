@@ -212,7 +212,7 @@ public class MentalBands1115Tests
             .Should().BeLessThan(At(jump, "var floorResult = GenerateOrRestoreFloor(player, targetLevel);"));
         var confirm = Method(src, "ConfirmMentalDescent");
         At(confirm, "await terminal.AskYesNoAsync(Loc.Get(\"mental.descend_confirm_2\"))")
-            .Should().BeGreaterThan(At(confirm, "await terminal.AskYesNoAsync(Loc.Get(\"mental.descend_confirm_1\"))"));
+            .Should().BeGreaterThan(At(confirm, "await terminal.AskYesNoAsync(Loc.Get(portal ? \"mental.portal_confirm_1\" : \"mental.descend_confirm_1\"))"));
     }
 
     [Fact]

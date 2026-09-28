@@ -597,9 +597,30 @@ public static class MentalSystem
         return xp - cut;
     }
 
+    /// <summary>
+    /// XP gained while Exhausted (single-player only): the size of FatigueExhaustedXPPenalty less, in
+    /// overflow-safe long math. The constant is stored negative like the other fatigue penalties, so
+    /// its size is taken here and the result is always a cut. Online, or below Exhausted, unchanged.
+    /// </summary>
+    public static long ApplyFatigueXp(Character c, long xp, bool online)
+    {
+        if (online || c == null || xp <= 0 || c.Fatigue < GameConfig.FatigueExhaustedThreshold) return xp;
+        long pct = (long)Math.Round(Math.Abs(GameConfig.FatigueExhaustedXPPenalty) * 100);
+        long cut = xp / 100 * pct + xp % 100 * pct / 100;
+        return xp - cut;
+    }
+
     /// <summary>A collapse is due: a living human character at Mental 0.</summary>
     public static bool NeedsCollapse(Character c) =>
         c != null && !c.IsNPC && c.IsAlive && c.Mental <= 0;
+
+    /// <summary>
+    /// A collapse is carried out now: NeedsCollapse, and not while jailed or locked to the Pantheon.
+    /// The one rule for the location loop (which applies it) and for the start of a monster fight
+    /// (which is not entered, so a chain of fights stops at the first one that ends at Mental 0).
+    /// </summary>
+    public static bool CollapseDue(Character c) =>
+        NeedsCollapse(c) && c.DaysInPrison <= 0 && !c.IsImmortal;
 
     /// <summary>A collapse on this dungeon floor (0 outside the dungeon) is a real death: MentalCollapseDeathFloor or deeper.</summary>
     public static bool IsCollapseDeath(int dungeonFloor) => dungeonFloor >= GameConfig.MentalCollapseDeathFloor;
