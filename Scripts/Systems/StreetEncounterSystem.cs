@@ -2511,6 +2511,8 @@ public class StreetEncounterSystem
 
             var choice = await terminal.GetInput(Loc.Get("street_encounter.grudge.your_response"));
 
+            // v1.2.0: a clean escape is no fight, so neither the victory nor the defeat branch applies
+            bool fought = false;
             if (choice.Trim().ToUpper() == "R")
             {
                 int fleeChance = Math.Min(50, 20 + (int)(player.Dexterity * 1.5)); // Harder to flee murder revenge
@@ -2524,15 +2526,17 @@ public class StreetEncounterSystem
                     terminal.SetColor("bright_red");
                     terminal.WriteLine(Loc.Get("street_encounter.grudge.cuts_off_escape", grudgeNpc.Name2));
                     await FightNPC(player, grudgeNpc, result, terminal);
+                    fought = true;
                 }
             }
             else
             {
                 // Fight (default for any input)
                 await FightNPC(player, grudgeNpc, result, terminal);
+                fought = true;
             }
 
-            if (result.Victory)
+            if (fought && result.Victory)
             {
                 terminal.SetColor("bright_green");
                 terminal.WriteLine(Loc.Get("street_encounter.grudge.murder_goes_down", grudgeNpc.Name2));
@@ -2546,7 +2550,7 @@ public class StreetEncounterSystem
                 });
                 NewsSystem.Instance?.Newsy($"{player.Name2} defeated {grudgeNpc.Name2}'s murder revenge attempt!");
             }
-            else
+            else if (fought)
             {
                 long goldTaken = player.Gold / 5; // Take 20% for murder revenge (more severe)
                 player.Gold -= goldTaken;
