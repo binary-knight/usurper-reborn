@@ -12,8 +12,8 @@ namespace UsurperReborn.Tests;
 
 /// <summary>
 /// 1.2.0 Temple gods piece 1: god standing is the sum of the followers' Favor, one ranking for
-/// canon gods and player-gods. Single-player reads the save; online keeps each save key's god and
-/// Favor in god_favor, written with every save, and sums it per god.
+/// canon gods and player-gods. Single-player reads the current character; online reads every saved
+/// character's god and Favor from player_data when the standing is asked for, and sums it per god.
 /// </summary>
 [Collection("SharedGameSingletons")]
 public class GodStanding1115Tests : IDisposable
@@ -133,36 +133,161 @@ public class GodStanding1115Tests : IDisposable
 
         await _db.BanPlayer("acct_b", "test");
         _db.PurgePlayerWorldState("acct_c");
+        _db.DeleteGameData("acct_c", bypassArchive: true);
 
         _db.GetGodStandings()["Solarius"].Should().Be(new GodStanding("Solarius", 30, 1));
     }
 
+    private void InsertRaw(string username, string playerDataJson)
+    {
+        using var conn = new SqliteConnection($"Data Source={_path}");
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "INSERT INTO players (username, display_name, player_data) VALUES (@u, @u, @d);";
+        cmd.Parameters.AddWithValue("@u", username);
+        cmd.Parameters.AddWithValue("@d", playerDataJson);
+        cmd.ExecuteNonQuery();
+    }
+
+    private object? Scalar(string sql)
+    {
+        using var conn = new SqliteConnection($"Data Source={_path}");
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = sql;
+        return cmd.ExecuteScalar();
+    }
+
     [Fact]
-    public void Online_UpsertClampsFavor()
+    public void Online_SavedFavorOutOfRange_CountsClamped()
+    {
+        InsertRaw("acct_z", "{\"player\":{\"name2\":\"Zed\",\"worshippedGod\":\"Arcanus\",\"godFavor\":500,\"godFavorGod\":\"Arcanus\",\"godFavorSchema\":1}}");
+        InsertRaw("acct_y", "{\"player\":{\"name2\":\"Yan\",\"worshippedGod\":\"Arcanus\",\"godFavor\":-40,\"godFavorGod\":\"Arcanus\",\"godFavorSchema\":1}}");
+        _db.GetGodStandings()["Arcanus"].Should().Be(new GodStanding("Arcanus", GameConfig.GodFavorMax, 2));
+    }
+
+    // ---------------- Characters never saved since the upgrade ----------------
+
+    [Fact]
+    public void Online_LegacyRowWithNoFavorFields_CountsLegacyStart()
+    {
+        // A character last saved before Favor: no godFavor, godFavorGod or godFavorSchema at all
+        InsertRaw("acct_old", "{\"player\":{\"name2\":\"Olwen\",\"level\":9,\"worshippedGod\":\"Zephyrine\"}}");
+        InsertRaw("acct_oldc", "{\"player\":{\"name2\":\"Orrin\",\"level\":9},\"storySystems\":{\"playerGods\":{\"Orrin\":\"Solarius\",\"Olwen\":\"Mortis\"}}}");
+        var s = _db.GetGodStandings();
+        s["Zephyrine"].Should().Be(new GodStanding("Zephyrine", GameConfig.GodFavorLegacyStart, 1));
+        s["Solarius"].Should().Be(new GodStanding("Solarius", GameConfig.GodFavorLegacyStart, 1), "the canon god under the character's own key");
+        s.ContainsKey("Mortis").Should().BeFalse("another character's entry in the save is not this character's god");
+    }
+
+    [Fact]
+    public void Online_OldGodFavorTableIsDropped()
     {
         using (var conn = new SqliteConnection($"Data Source={_path}"))
         {
             conn.Open();
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = "INSERT INTO players (username, display_name, player_data) VALUES ('acct_z', 'Zed', '{\"player\":{\"name2\":\"Zed\"}}');";
+            cmd.CommandText = "CREATE TABLE IF NOT EXISTS god_favor (username TEXT PRIMARY KEY, god_name TEXT NOT NULL, favor INTEGER NOT NULL DEFAULT 0);";
             cmd.ExecuteNonQuery();
         }
-        _db.UpsertGodFavor("acct_z", "Arcanus", 500);
-        _db.GetGodStandings()["Arcanus"].Standing.Should().Be(GameConfig.GodFavorMax);
-        StoredFavor("acct_z").Should().Be(GameConfig.GodFavorMax, "the stored row itself is clamped, not only the sum");
-
-        _db.UpsertGodFavor("acct_z", "Arcanus", -40);
-        StoredFavor("acct_z").Should().Be(GameConfig.GodFavorMin);
+        SqliteConnection.ClearAllPools();
+        _ = new SqlSaveBackend(_path);
+        Convert.ToInt64(Scalar("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'god_favor';")).Should().Be(0);
     }
 
-    private long StoredFavor(string username)
+    // ---------------- Writes that are not saves ----------------
+
+    [Fact]
+    public async Task Online_OfflineRecruitOfAPlayerGodFollower_MovesTheFollower()
     {
-        using var conn = new SqliteConnection($"Data Source={_path}");
-        conn.Open();
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT favor FROM god_favor WHERE username = LOWER(@u);";
-        cmd.Parameters.AddWithValue("@u", username);
-        return Convert.ToInt64(cmd.ExecuteScalar());
+        await Save("acct_a", Player("Arla", "Zephyrine", 40, "Zephyrine"));
+        await _db.SetPlayerWorshippedGod("acct_a", "Korvessa");
+        var s = _db.GetGodStandings();
+        s.ContainsKey("Zephyrine").Should().BeFalse();
+        s["Korvessa"].Should().Be(new GodStanding("Korvessa", 0, 1), "a new god starts at Favor 0");
+    }
+
+    [Fact]
+    public async Task Online_OfflineRecruitOfACanonFollower_MovesTheFollower()
+    {
+        await Save("acct_a", Player("Arla", "", 30, "Solarius"), new Dictionary<string, string> { ["ARLA"] = "Solarius", ["Brom"] = "Mortis" });
+        await _db.SetPlayerWorshippedGod("acct_a", "Korvessa");
+        var s = _db.GetGodStandings();
+        s.ContainsKey("Solarius").Should().BeFalse("the recruit ends the canon worship");
+        s["Korvessa"].Followers.Should().Be(1);
+        Scalar("SELECT json_extract(player_data, '$.storySystems.playerGods.Brom') FROM players WHERE username = 'acct_a';")
+            .Should().Be("Mortis", "another character's entry is left alone");
+    }
+
+    [Fact]
+    public async Task Online_TempleLeavingAPlayerGod_WithoutASave_Counts()
+    {
+        await Save("acct_a", Player("Arla", "Zephyrine", 40, "Zephyrine"));
+        await _db.SetPlayerWorshippedGod("acct_a", "");
+        _db.GetGodStandings().Should().BeEmpty();
+    }
+
+    // ---------------- Temple and Pantheon agree ----------------
+
+    [Fact]
+    public async Task Online_PantheonBelieverCount_IsTheTempleFollowerCount()
+    {
+        await Save("acct_a", Player("Arla", "Zephyrine", 40, "Zephyrine"));
+        await Save("acct_b", Player("Brom", "zephyrine", 10, "zephyrine"));
+        // A row where the player-god field and the canon entry disagree: the canon god wins in both
+        InsertRaw("acct_c", "{\"player\":{\"name2\":\"Cyra\",\"worshippedGod\":\"Zephyrine\",\"godFavorSchema\":1},\"storySystems\":{\"playerGods\":{\"Cyra\":\"Amara\"}}}");
+        InsertRaw("acct_d", "{\"player\":{\"name2\":\"Dova\",\"worshippedGod\":\"Zephyrine\"}}");
+        await _db.BanPlayer("acct_d", "test");
+
+        var s = _db.GetGodStandings();
+        s["Zephyrine"].Followers.Should().Be(2);
+        (await _db.CountPlayerBelievers("Zephyrine")).Should().Be(s["Zephyrine"].Followers);
+        (await _db.CountPlayerBelievers("Amara")).Should().Be(s["Amara"].Followers);
+        (await _db.CountPlayerBelievers("Nobody")).Should().Be(0);
+    }
+
+    [Fact]
+    public void PantheonCountBelievers_UsesTheTempleCounts()
+    {
+        var body = SourceBody("PantheonLocation.cs", "public static int CountBelievers(string divineName)", "private async Task<List<BelieverInfo>> GetBelieverListAsync");
+        body.Should().Contain("GodRegistry.CountNpcFollowers(divineName)");
+        body.Should().Contain("backend.CountPlayerBelievers(divineName)");
+    }
+
+    [Fact]
+    public void PantheonOnlineRecruit_GoesThroughTheGodRegistry()
+    {
+        var body = SourceBody("PantheonLocation.cs", "private async Task ApplyRecruitToPlayer", "#endregion");
+        body.Should().Contain("GodRegistry.SetWorshippedGod(player, godName)");
+        body.Should().NotContain("player.WorshippedGod = godName");
+    }
+
+    private static string SourceBody(string file, string startMarker, string endMarker)
+    {
+        var dir = new DirectoryInfo(Directory.GetCurrentDirectory());
+        while (dir != null && !File.Exists(Path.Combine(dir.FullName, "usurper-reloaded.csproj")))
+            dir = dir.Parent;
+        var src = File.ReadAllText(Path.Combine(dir!.FullName, "Scripts", "Locations", file));
+        int start = src.IndexOf(startMarker, StringComparison.Ordinal);
+        int end = src.IndexOf(endMarker, start, StringComparison.Ordinal);
+        return src.Substring(start, end - start);
+    }
+
+    // ---------------- Single-player ----------------
+
+    [Fact]
+    public async Task SinglePlayer_GetStandingsAsync_IsThePlayersOwn()
+    {
+        var c = new Character { Name1 = "GsSolo2", Name2 = "GsSolo2", AI = CharacterAI.Human };
+        var gods = UsurperRemake.GodSystemSingleton.Instance;
+        GodRegistry.SetWorshippedGod(c, "Arcanus", gods);
+        FavorSystem.Change(c, 19, gods);
+        try
+        {
+            (await GodRegistry.GetStandingsAsync(c)).Should().ContainSingle()
+                .Which.Value.Should().Be(new GodStanding("Arcanus", 19, 1));
+        }
+        finally { GodRegistry.SetWorshippedGod(c, "", gods); }
     }
 
     // ---------------- Temple ranking (source) ----------------
