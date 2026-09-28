@@ -828,7 +828,9 @@ public static class SpellSystem
         // Calculate final effect including proficiency bonus
         double scaledEffect = baseEffect * levelMultiplier * statBonus * variance * proficiencyMult * drugSpellMult * herbSpellMult * foodSpellMult;
 
-        return Math.Max(1, (int)scaledEffect);
+        // 1.2.0 Temple gods piece 2: Arcanus's boon on spell damage
+        int spellDamage = Math.Max(1, (int)scaledEffect);
+        return (int)Math.Min(UsurperRemake.Systems.GodBoonSystem.SpellDamage(caster, spellDamage), int.MaxValue);
     }
 
     /// <summary>

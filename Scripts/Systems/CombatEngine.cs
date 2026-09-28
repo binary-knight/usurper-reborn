@@ -493,6 +493,31 @@ public partial class CombatEngine
                 _mentalFeared.Add(mate);
     }
 
+    // 1.2.0 Temple gods piece 2: the monsters whose first action fails to Discordia's boon
+    private readonly HashSet<Monster> _discordStruck = new();
+
+    /// <summary>
+    /// 1.2.0 Temple gods piece 2: Discordia's boon at the start of a monster fight. Each foe's first
+    /// action fails with GodBoonSystem.DiscordiaFirstActionFailPct (engine RNG). Others: none.
+    /// </summary>
+    internal void RollDiscordiaFirstActionFail(Character player, IEnumerable<Monster>? monsters)
+    {
+        _discordStruck.Clear();
+        double pct = GodBoonSystem.DiscordiaFirstActionFailPct(player);
+        if (pct <= 0 || monsters == null) return;
+        foreach (var m in monsters)
+            if (m != null && m.IsAlive && random.NextDouble() * 100 < pct)
+                _discordStruck.Add(m);
+    }
+
+    /// <summary>1.2.0 Temple gods piece 2: true once for a monster struck by Discordia's boon; prints the line.</summary>
+    internal bool ConsumeDiscordiaFail(Monster monster)
+    {
+        if (monster == null || !_discordStruck.Remove(monster)) return false;
+        terminal?.WriteLine(Loc.Get("combat.discordia_first_action_fails", monster.Name), "magenta");
+        return true;
+    }
+
     /// <summary>
     /// v1.1.15: true once for a player who rolled fear at combat start: prints a fear line on
     /// their own terminal (and a third-person line on the leader's when a follower) and clears it,
@@ -1233,6 +1258,8 @@ public partial class CombatEngine
         }
         // v1.1.15: Mental fear at combat start, the leader and grouped followers each from their own Mental
         RollMentalFear(player, result.Teammates);
+        // 1.2.0 Temple gods piece 2: Discordia's boon, a chance each foe's first action fails
+        RollDiscordiaFirstActionFail(player, monsters);
 
         // Show first combat hint for new players
         HintSystem.Instance.TryShowHint(HintSystem.HINT_FIRST_COMBAT, terminal, player.HintsShown);
@@ -5006,6 +5033,13 @@ public partial class CombatEngine
             return;
         }
 
+        // 1.2.0 Temple gods piece 2: Discordia's boon, this foe's first action fails (after its ticks)
+        if (ConsumeDiscordiaFail(monster))
+        {
+            await Task.Delay(GetCombatDelay(600));
+            return;
+        }
+
         // Check if monster is stunned (modern stun from spells, distinct from legacy Stunned)
         if (monster.IsStunned)
         {
@@ -5605,16 +5639,9 @@ public partial class CombatEngine
             return;
         }
 
-        // Check for divine intervention (save from lethal hit)
+        // 1.2.0 Temple gods piece 2: the old alignment table's divine save is gone with the table
+        // (Mortis cheating death is a Chosen Miracle, a later piece).
         bool wouldDie = player.HP - actualDamage <= 0;
-        if (wouldDie && DivineBlessingSystem.Instance.CheckDivineIntervention(player, (int)actualDamage))
-        {
-            var blessing = DivineBlessingSystem.Instance.GetBlessings(player);
-            terminal.WriteLine(Loc.Get("combat.god_intervenes", blessing.GodName), "bright_magenta");
-            terminal.WriteLine(Loc.Get("combat.divine_light_turns_death"), "bright_white");
-            actualDamage = player.HP - 1; // Survive with 1 HP
-            wouldDie = false;
-        }
 
         // Check for companion sacrifice (if player would still die)
         if (wouldDie && result.Teammates != null)
@@ -8401,21 +8428,6 @@ public partial class CombatEngine
             return applied;
         }
 
-        // Divine lifesteal
-        int lifesteal = DivineBlessingSystem.Instance.CalculateLifesteal(attacker, (int)damage);
-        if (lifesteal > 0)
-        {
-            long applied = ApplyLifestealSlice(lifesteal);
-            if (applied > 0)
-            {
-                attacker.HP = Math.Min(attacker.MaxHP, attacker.HP + applied);
-                if (isPlayer)
-                    terminal.WriteLine(Loc.Get("combat.dark_power_drain", applied), "dark_magenta");
-                else
-                    terminal.WriteLine(Loc.Get("combat.tm_dark_drain", attackerName, applied), "dark_magenta");
-            }
-        }
-
         // Equipment lifesteal (Lifedrinker enchant), gear-wide, skip for spells.
         // v0.60.0, issue #91: demons have no mortal life force; Lifedrinker can't
         // pull anything from them. GetEffectiveLifeStealPercent sums Lifedrinker across
@@ -8807,7 +8819,8 @@ public partial class CombatEngine
     private void WardPartyFromHeal(Character caster, List<Character> party, SpellSystem.SpellResult spellResult)
     {
         if (spellResult.ProtectionBonus <= 0) return;
-        int bonus = SageWardStrength(caster, spellResult.ProtectionBonus);
+        // 1.2.0 Temple gods piece 2: Amara's boon on the party ward a follower raises
+        int bonus = (int)Math.Min(GodBoonSystem.PartyWard(caster, SageWardStrength(caster, spellResult.ProtectionBonus)), int.MaxValue);
         int dur = spellResult.Duration > 0 ? spellResult.Duration : 999;
         foreach (var ally in party)
             WardAlly(ally, bonus, dur);
@@ -22928,7 +22941,7 @@ public partial class CombatEngine
             }
 
             // Lose 75% gold
-            long goldLost = (long)(player.Gold * 0.75);
+            long goldLost = GodBoonSystem.DeathGoldLoss(player, (long)(player.Gold * 0.75));   // 1.2.0 Temple gods piece 2: Mortis's boon
             player.Gold -= goldLost;
 
             // Lose a random equipped item
@@ -23136,6 +23149,7 @@ public partial class CombatEngine
         float taxExemption = FactionSystem.Instance?.GetTaxExemptionRate() ?? 0f;
         if (taxExemption > 0) goldLossRate *= (1.0 - taxExemption);
         long goldLoss = (long)(player.Gold * goldLossRate * penaltyMultiplier);
+        goldLoss = GodBoonSystem.DeathGoldLoss(player, goldLoss);   // 1.2.0 Temple gods piece 2: Mortis's boon
         player.Gold = Math.Max(0, player.Gold - goldLoss);
         if (goldLoss > 0)
         {
@@ -25770,7 +25784,8 @@ public partial class CombatEngine
         // Regenerate mana for spellcasters each round
         if (SpellSystem.HasSpells(player) && player.Mana < player.MaxMana)
         {
-            int manaRegen = StatEffectsSystem.GetManaRegenPerRound(player.Wisdom);
+            // 1.2.0 Temple gods piece 2: Arcanus's boon on mana regeneration
+            int manaRegen = (int)Math.Min(GodBoonSystem.ManaRegen(player, StatEffectsSystem.GetManaRegenPerRound(player.Wisdom)), int.MaxValue);
             player.Mana = Math.Min(player.MaxMana, player.Mana + manaRegen);
             terminal.SetColor("bright_magenta");
             terminal.WriteLine(Loc.Get("combat.recover_mana", manaRegen, player.Mana, player.MaxMana));
@@ -26341,6 +26356,9 @@ public partial class CombatEngine
         // off-hand multiplier the PvE path uses.
         double damageModifier = GetWeaponConfigDamageModifier(attacker, isOffHand);
         attackPower = (long)(attackPower * damageModifier);
+
+        // 1.2.0 Temple gods piece 2: Discordia's boon on PvP damage
+        attackPower = GodBoonSystem.PvpDamage(attacker, attackPower);
 
         // Check for critical hit
         bool isCritical = random.Next(100) < 5 + (attacker.Dexterity / 10);
@@ -27105,7 +27123,7 @@ public partial class CombatEngine
             // v1.1.11: a Crown bounty on a player is paid to the duel's winner, lethal or not (a duel won).
             // Only a player loaded from a save; a hired guard or an echo may carry a player's name.
             var paid = QuestSystem.CollectBountiesOnPlayer(result.Player, result.Opponent);
-            bounty = paid.Sum(QuestSystem.BountyReward);
+            bounty = paid.Sum(q => GodBoonSystem.BountyReward(result.Player, QuestSystem.BountyReward(q)));   // as paid, with Judicar's boon
             if (paid.Count > 0 && UsurperRemake.BBS.DoorMode.IsOnlineMode && OnlineStateManager.IsActive)
             {
                 // v1.1.11: matched by claim key, so one id-less bounty does not take the other id-less quests with it
@@ -30224,8 +30242,10 @@ public partial class CombatEngine
     {
         // v0.65.4: works for players too (Specialization moved to Character), not just NPC healers.
         if (baseHealing <= 0 || caster == null) return baseHealing;
-        if (!UsurperRemake.Data.SpecializationData.IsHealerSpec(caster.Specialization)) return baseHealing;
-        return (int)(baseHealing * (1.0 + GameConfig.HealerSpecHealBonus));
+        // 1.2.0 Temple gods piece 2: Amara's boon on the heals a follower casts
+        int healing = (int)Math.Min(GodBoonSystem.PartyHeal(caster, baseHealing), int.MaxValue);
+        if (!UsurperRemake.Data.SpecializationData.IsHealerSpec(caster.Specialization)) return healing;
+        return (int)(healing * (1.0 + GameConfig.HealerSpecHealBonus));
     }
 
     /// <summary>

@@ -771,6 +771,7 @@ public class SettlementLocation : BaseLocation
         }
 
         state.CommunalTreasury -= share;
+        share = GodBoonSystem.EarthYield(currentPlayer, share);   // 1.2.0 Temple gods piece 2: Terran's boon (the treasury pays only the base share)
         currentPlayer.Gold += share;
         currentPlayer.SettlementGoldClaimedToday = true;
 

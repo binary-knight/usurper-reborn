@@ -35,6 +35,11 @@ public class PantheonLocation : BaseLocation
         if (OnlineStateManager.IsActive)
             OnlineStateManager.Instance!.UpdateLocation("The Divine Realm");
 
+        // 1.2.0 Temple gods piece 2: an immortal without a domain (ascended before domains, or who
+        // left it for later) is asked once on arrival until one is chosen
+        if (player.IsImmortal && GodBoonSystem.ParseDomain(player.DivineDomain) == GodDomain.None)
+            await GodDomainPicker.PickAsync(player, term);
+
         await RunPantheonLoop();
     }
 
@@ -192,6 +197,20 @@ public class PantheonLocation : BaseLocation
         terminal.Write(Loc.Get("pantheon.alignment_label"));
         terminal.SetColor("white");
         terminal.WriteLine($"{currentPlayer.GodAlignment}");
+
+        // 1.2.0 Temple gods piece 2: the god's domain and its boon's current scale for followers
+        var ownDomain = GodBoonSystem.ParseDomain(currentPlayer.DivineDomain);
+        int ownScale = 0;
+        if (ownDomain != GodDomain.None && DoorMode.IsOnlineMode && SaveSystem.Instance?.Backend is SqlSaveBackend domainBackend)
+        {
+            try { ownScale = (await GodBoonSystem.PlayerGodBoonAsync(currentPlayer.DivineName, domainBackend, DateTime.UtcNow)).ScalePct; }
+            catch { /* DB unavailable: shown at the floor */ }
+        }
+        if (ownDomain != GodDomain.None && ownScale <= 0) ownScale = GameConfig.GodPlayerBoonFloorPct;
+        terminal.SetColor("cyan");
+        terminal.WriteLine(ownDomain == GodDomain.None
+            ? Loc.Get("god.player_domain_none")
+            : Loc.Get("god.player_domain_line", GodBoonSystem.DomainName(ownDomain), ownScale));
 
         terminal.SetColor("cyan");
         terminal.Write(Loc.Get("pantheon.god_rank_label"));

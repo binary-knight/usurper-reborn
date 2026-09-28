@@ -147,6 +147,7 @@ public static class MentalSystem
     {
         if (perMille <= 0) return 0;
         long scaled = (long)perMille * GetStrainPct(c.Class, c.Race) * (100 - GetCompanionCutPct(storyCompanionsInParty)) / 100;
+        scaled = GodBoonSystem.Warded(c, MentalWard.Strain, scaled);   // 1.2.0 Temple gods piece 2: Sylvana's ward
         long total = c.MentalStrainRemainder + scaled;
         c.MentalStrainRemainder = (int)(total % StrainUnitsPerPoint);
         return (int)Math.Min(total / StrainUnitsPerPoint, int.MaxValue);
@@ -171,6 +172,16 @@ public static class MentalSystem
         + (oldGod ? GameConfig.MentalOldGodLoss : boss ? GameConfig.MentalBossLoss : 0);
 
     /// <summary>
+    /// 1.2.0 Temple gods piece 2: the flat fight-end losses for a character, each through the
+    /// god's ward: flee (Umbrath), near death (Valorian), Old God (Arcanus), boss (Solarius).
+    /// </summary>
+    public static long GetFightEndFlatLoss(Character c, bool fled, bool nearDeath, bool boss, bool oldGod) =>
+        (fled ? GodBoonSystem.Warded(c, MentalWard.Flee, GameConfig.MentalFleeLoss) : 0)
+        + (nearDeath ? GodBoonSystem.Warded(c, MentalWard.NearDeath, GameConfig.MentalNearDeathLoss) : 0)
+        + (oldGod ? GodBoonSystem.Warded(c, MentalWard.OldGod, GameConfig.MentalOldGodLoss)
+           : boss ? GodBoonSystem.Warded(c, MentalWard.Boss, GameConfig.MentalBossLoss) : 0);
+
+    /// <summary>
     /// Monster fight end as one net change: the strain points (floor x MentalFightStrainPerFloor per
     /// mille, through the race x class multiplier and the companion cut) plus the flat losses, applied
     /// by a single Change. Floor 0 (outside the dungeon) adds no strain. Returns the change applied
@@ -181,13 +192,13 @@ public static class MentalSystem
     {
         if (c == null || c.IsNPC) return 0;
         int points = floor <= 0 ? 0 : TakeStrainPoints(c, floor * GameConfig.MentalFightStrainPerFloor, storyCompanionsInParty);
-        long loss = (long)points + (died ? GameConfig.MentalDeathLoss + GetFightEndFlatLoss(false, false, boss, oldGod) : GetFightEndFlatLoss(fled, nearDeath, boss, oldGod));
+        long loss = (long)points + (died ? GodBoonSystem.Warded(c, MentalWard.Death, GameConfig.MentalDeathLoss) + GetFightEndFlatLoss(c, false, false, boss, oldGod) : GetFightEndFlatLoss(c, fled, nearDeath, boss, oldGod));
         if (loss <= 0) return 0;
         return Change(c, (int)-Math.Min(loss, int.MaxValue));
     }
 
     /// <summary>Death in a monster fight: MentalDeathLoss. Returns the change applied.</summary>
-    public static int ApplyDeath(Character c) => Change(c, -GameConfig.MentalDeathLoss);
+    public static int ApplyDeath(Character c) => Change(c, (int)-GodBoonSystem.Warded(c, MentalWard.Death, GameConfig.MentalDeathLoss));
 
     /// <summary>
     /// Daily reset and returns the change actually applied. Clears MentalRecoveryUsedToday to
@@ -271,15 +282,16 @@ public static class MentalSystem
         if (c == null || c.IsNPC) return 0;
         int crash = GetDrugCrash(c.MentalDrugBoost, c.MentalDrugUses);
         c.MentalDrugBoost = 0;
+        crash = (int)GodBoonSystem.Warded(c, MentalWard.DrugCrash, crash);   // 1.2.0 Temple gods piece 2: Terran's ward
         return crash > 0 ? Change(c, -crash) : 0;
     }
 
     /// <summary>Overdose: MentalOverdoseLoss. Returns the change applied.</summary>
-    public static int ApplyOverdose(Character c) => Change(c, -GameConfig.MentalOverdoseLoss);
+    public static int ApplyOverdose(Character c) => Change(c, (int)-GodBoonSystem.Warded(c, MentalWard.DrugCrash, GameConfig.MentalOverdoseLoss));
 
     /// <summary>A day of withdrawal: MentalWithdrawalLossPerSeverity x severity (Addict / 25). Returns the change applied.</summary>
     public static int ApplyWithdrawal(Character c, int severity) =>
-        severity <= 0 ? 0 : Change(c, (int)-Math.Min((long)GameConfig.MentalWithdrawalLossPerSeverity * severity, int.MaxValue));
+        severity <= 0 ? 0 : Change(c, (int)-Math.Min(GodBoonSystem.Warded(c, MentalWard.Withdrawal, (long)GameConfig.MentalWithdrawalLossPerSeverity * severity), int.MaxValue));
 
     /// <summary>True if source's bit is already set in the character's daily recovery-used flags.</summary>
     public static bool UsedToday(Character c, MentalDailySource source) =>
@@ -429,10 +441,10 @@ public static class MentalSystem
     }
 
     /// <summary>A story companion died and grief began: MentalCompanionGriefLoss. Returns the change applied.</summary>
-    public static int ApplyCompanionGrief(Character c) => Change(c, -GameConfig.MentalCompanionGriefLoss);
+    public static int ApplyCompanionGrief(Character c) => Change(c, (int)-GodBoonSystem.Warded(c, MentalWard.Grief, GameConfig.MentalCompanionGriefLoss));
 
     /// <summary>An NPC teammate, spouse or lover died and NPC grief began: MentalNpcGriefLoss. Returns the change applied.</summary>
-    public static int ApplyNpcGrief(Character c) => Change(c, -GameConfig.MentalNpcGriefLoss);
+    public static int ApplyNpcGrief(Character c) => Change(c, (int)-GodBoonSystem.Warded(c, MentalWard.Grief, GameConfig.MentalNpcGriefLoss));
 
     /// <summary>
     /// A grief entered a new stage: Depression loses MentalGriefDepressionLoss, Acceptance gains
@@ -441,7 +453,7 @@ public static class MentalSystem
     /// </summary>
     public static int ApplyGriefStage(Character c, GriefStage stage) => stage switch
     {
-        GriefStage.Depression => Change(c, -GameConfig.MentalGriefDepressionLoss),
+        GriefStage.Depression => Change(c, (int)-GodBoonSystem.Warded(c, MentalWard.Grief, GameConfig.MentalGriefDepressionLoss)),
         GriefStage.Acceptance => Change(c, GameConfig.MentalGriefAcceptanceGain),
         _ => 0
     };
@@ -455,7 +467,7 @@ public static class MentalSystem
     {
         if (c == null || c.IsNPC || UsedToday(c, MentalDailySource.WitnessLoss)) return 0;
         MarkUsed(c, MentalDailySource.WitnessLoss);
-        return Change(c, -GameConfig.MentalWitnessLoss);
+        return Change(c, (int)-GodBoonSystem.Warded(c, MentalWard.Witness, GameConfig.MentalWitnessLoss));
     }
 
     /// <summary>
@@ -552,7 +564,7 @@ public static class MentalSystem
     public static bool RollFear(Character c, Random rng)
     {
         if (c == null || c.IsNPC || rng == null) return false;
-        int pct = GetFearChancePct(c.Mental);
+        int pct = (int)GodBoonSystem.Warded(c, MentalWard.Fear, GetFearChancePct(c.Mental));   // 1.2.0 Temple gods piece 2: Discordia's ward
         return pct > 0 && rng.Next(100) < pct;
     }
 

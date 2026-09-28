@@ -4,13 +4,10 @@ using System.Collections.Generic;
 namespace UsurperRemake.Systems
 {
     /// <summary>
-    /// Divine Blessing System - Provides gameplay benefits for worshipping gods
-    /// Benefits scale with: god's power (Experience), god's nature (Goodness vs Darkness),
-    /// and the player's sacrifices/devotion.
-    ///
-    /// GOOD GODS (high Goodness): Defensive bonuses, healing, protection
-    /// DARK GODS (high Darkness): Offensive bonuses, critical hits, lifesteal
-    /// BALANCED GODS: Mix of both, unique effects
+    /// Divine Blessing System: the combat side of worship. 1.2.0 Temple gods piece 2: the flat
+    /// alignment table is replaced by each god's distinct boon (GodBoonSystem), scaled by the
+    /// follower's Favor tier. The temporary prayer and sacrifice blessings stay, and at Zealot and up
+    /// the daily prayer blessing lasts GodPrayerBlessingZealotMultiplier times as long.
     /// </summary>
     public class DivineBlessingSystem
     {
@@ -32,67 +29,22 @@ namespace UsurperRemake.Systems
         private Dictionary<string, DateTime> lastPrayerTime = new();
         private Dictionary<string, int> lastPrayerDay = new(); // Single-player: in-game day number
 
-        private Random random = new();
-
         /// <summary>
-        /// Get the divine blessings for a character based on their worshipped god
+        /// The blessing a character holds now: the god worshipped (canon or player-god), the boon's
+        /// domain and strength, and any temporary prayer or sacrifice blessing. NPCs get none.
         /// </summary>
-        public DivineBlessing GetBlessings(Character character)
+        public DivineBlessing GetBlessings(Character character, GodSystem? gods = null)
         {
             var blessing = new DivineBlessing();
+            if (character == null || character.IsNPC) return blessing;
 
-            // Get the god system and check if player has a god
-            var godSystem = GodSystemSingleton.Instance;
-            string godName = godSystem.GetPlayerGod(character.Name2);
-
-            if (string.IsNullOrEmpty(godName))
+            var god = GodRegistry.GetWorshippedGod(character, gods);
+            if (god == null)
                 return blessing; // No god = no blessings
 
-            var god = godSystem.GetGod(godName);
-            if (god == null || !god.IsActive())
-                return blessing; // God doesn't exist or inactive
-
-            // Calculate god's alignment (-1 to 1, where -1 is pure dark, 1 is pure good)
-            float alignment = CalculateAlignment(god);
-
-            // Calculate blessing power based on god's experience/level (0.1 to 1.0)
-            float godPower = CalculateGodPower(god);
-
-            // Base blessing strength (1-10% based on god power)
-            float baseStrength = 0.01f + (godPower * 0.09f);
-
-            // Apply alignment-based bonuses
-            if (alignment > 0.3f) // Good-aligned god
-            {
-                // Defensive/healing bonuses
-                blessing.DamageReduction = (int)(alignment * godPower * 15); // Up to 15% damage reduction
-                blessing.HealingBonus = (int)(alignment * godPower * 20); // Up to 20% healing bonus
-                blessing.UndeadDamageBonus = (int)(alignment * godPower * 25); // Up to 25% vs undead
-                blessing.DivineSaveChance = (int)(alignment * godPower * 10); // Up to 10% chance to survive lethal hit
-                blessing.BlessingType = BlessingType.Holy;
-            }
-            else if (alignment < -0.3f) // Dark-aligned god
-            {
-                // Offensive bonuses
-                float darkPower = Math.Abs(alignment);
-                blessing.CriticalHitBonus = (int)(darkPower * godPower * 15); // Up to 15% crit bonus
-                blessing.LifestealPercent = (int)(darkPower * godPower * 10); // Up to 10% lifesteal
-                blessing.DarkDamageBonus = (int)(darkPower * godPower * 20); // Up to 20% bonus dark damage
-                blessing.FearAura = (int)(darkPower * godPower * 15); // Up to 15% chance to frighten
-                blessing.BlessingType = BlessingType.Dark;
-            }
-            else // Balanced god
-            {
-                // Mixed bonuses (smaller but versatile)
-                blessing.DamageReduction = (int)(godPower * 8); // Up to 8%
-                blessing.CriticalHitBonus = (int)(godPower * 8); // Up to 8%
-                blessing.AllStatsBonus = (int)(godPower * 3); // Up to +3 all stats
-                blessing.LuckBonus = (int)(godPower * 10); // Up to +10% luck (rare drops, etc)
-                blessing.BlessingType = BlessingType.Balanced;
-            }
-
-            // Apply god-specific bonuses based on god name
-            ApplyGodSpecificBonuses(god, blessing, godPower);
+            blessing.GodName = god.Value.Name;
+            blessing.Domain = GodBoonSystem.GetDomain(character, gods);
+            blessing.StrengthPct = GodBoonSystem.GetStrengthPct(character, gods);
 
             // Add temporary blessing bonuses (from recent sacrifices/prayers)
             if (temporaryBlessings.TryGetValue(character.Name2, out var tempBlessing))
@@ -112,9 +64,7 @@ namespace UsurperRemake.Systems
                 }
             }
 
-            blessing.GodName = godName;
             blessing.IsActive = true;
-
             return blessing;
         }
 
@@ -137,77 +87,8 @@ namespace UsurperRemake.Systems
         {
             // God levels 1-9, experience ranges from 1 to millions
             // Use log scale for smoother progression
-            float power = (float)Math.Log10(Math.Max(1, god.Experience)) / 7f; // Log10(10M) ≈ 7
+            float power = (float)Math.Log10(Math.Max(1, god.Experience)) / 7f; // Log10(10M) is about 7
             return Math.Clamp(power, 0.1f, 1.0f);
-        }
-
-        /// <summary>
-        /// Apply bonuses specific to each pantheon god
-        /// </summary>
-        private void ApplyGodSpecificBonuses(God god, DivineBlessing blessing, float godPower)
-        {
-            switch (god.Name)
-            {
-                case "Solarius": // Light/Truth god
-                    blessing.BlindImmunity = true;
-                    blessing.UndeadDamageBonus += (int)(godPower * 15);
-                    blessing.SpecialAbility = "Radiant Strike: Attacks occasionally burst with holy light";
-                    break;
-
-                case "Valorian": // War/Honor god
-                    blessing.StrengthBonus = (int)(godPower * 5);
-                    blessing.CriticalHitBonus += (int)(godPower * 10);
-                    blessing.SpecialAbility = "Battle Fury: Damage increases as HP decreases";
-                    break;
-
-                case "Amara": // Love/Passion god
-                    blessing.CharismaBonus = (int)(godPower * 5);
-                    blessing.HealingBonus += (int)(godPower * 15);
-                    blessing.SpecialAbility = "Lover's Protection: Bonus when fighting alongside allies";
-                    break;
-
-                case "Judicar": // Law/Justice god
-                    blessing.DamageReduction += (int)(godPower * 10);
-                    blessing.CounterattackChance = (int)(godPower * 15);
-                    blessing.SpecialAbility = "Righteous Judgment: Bonus damage vs criminals";
-                    break;
-
-                case "Umbrath": // Shadow/Secrets god
-                    blessing.CriticalHitBonus += (int)(godPower * 15);
-                    blessing.EvadeChance = (int)(godPower * 10);
-                    blessing.SpecialAbility = "Shadow Step: Chance to avoid first attack in combat";
-                    break;
-
-                case "Terran": // Earth/Endurance god
-                    blessing.DamageReduction += (int)(godPower * 15);
-                    blessing.MaxHPBonus = (int)(godPower * 50);
-                    blessing.SpecialAbility = "Stone Skin: Occasional attacks deal reduced damage";
-                    break;
-
-                case "Mortis": // Death god
-                    blessing.LifestealPercent += (int)(godPower * 15);
-                    blessing.DivineSaveChance += (int)(godPower * 5); // Death respects its followers
-                    blessing.SpecialAbility = "Death's Touch: Attacks can instantly kill weakened foes";
-                    break;
-
-                case "Arcanus": // Magic/Knowledge god
-                    blessing.IntelligenceBonus = (int)(godPower * 5);
-                    blessing.SpellPowerBonus = (int)(godPower * 20);
-                    blessing.SpecialAbility = "Arcane Insight: Bonus XP from magical enemies";
-                    break;
-
-                case "Sylvana": // Nature/Wild god
-                    blessing.HealingBonus += (int)(godPower * 10);
-                    blessing.PoisonImmunity = true;
-                    blessing.SpecialAbility = "Nature's Blessing: Regenerate HP over time";
-                    break;
-
-                case "Discordia": // Chaos/Change god
-                    blessing.LuckBonus += (int)(godPower * 20);
-                    blessing.CriticalHitBonus += (int)(godPower * 10);
-                    blessing.SpecialAbility = "Chaos Surge: Random powerful effects in combat";
-                    break;
-            }
         }
 
         /// <summary>
@@ -263,9 +144,29 @@ namespace UsurperRemake.Systems
 
             temporaryBlessings[character.Name2] = blessing;
 
-            // GD.Print($"[Divine] {character.Name2} received {blessing.Name} for {durationMinutes} minutes");
-
             return blessing;
+        }
+
+        /// <summary>
+        /// Prayer blessing length in minutes: 120 base, times the Faith's duration multiplier, and
+        /// times GodPrayerBlessingZealotMultiplier at Zealot and up.
+        /// </summary>
+        public static int PrayerBlessingMinutes(GodFavorTier tier, float factionMultiplier)
+        {
+            float minutes = 120 * factionMultiplier;
+            if (tier >= GodFavorTier.Zealot) minutes *= GameConfig.GodPrayerBlessingZealotMultiplier;
+            return (int)minutes;
+        }
+
+        /// <summary>
+        /// A player-god prayer blessing's length in combats: GodPrayerBlessingCombats, times
+        /// GodPrayerBlessingZealotMultiplier at Zealot and up (one rule for both kinds of god).
+        /// </summary>
+        public static int PrayerBlessingCombats(GodFavorTier tier)
+        {
+            float combats = GameConfig.GodPrayerBlessingCombats;
+            if (tier >= GodFavorTier.Zealot) combats *= GameConfig.GodPrayerBlessingZealotMultiplier;
+            return (int)combats;
         }
 
         /// <summary>
@@ -297,12 +198,11 @@ namespace UsurperRemake.Systems
             var god = godSystem.GetGod(godName);
             if (god == null) return null;
 
-            float alignment = CalculateAlignment(god);
             float godPower = CalculateGodPower(god);
 
-            // Prayer blessing lasts for 2 hours (in-game session), longer for Faith members
+            // Prayer blessing lasts for 2 hours (in-game session), longer for Faith members, twice as long at Zealot and up
             float prayerMultiplier = FactionSystem.Instance?.GetBlessingDurationMultiplier() ?? 1.0f;
-            int prayerMinutes = (int)(120 * prayerMultiplier);
+            int prayerMinutes = PrayerBlessingMinutes(FavorSystem.GetTier(FavorSystem.GetFavor(character)), prayerMultiplier);
 
             var blessing = new TemporaryBlessing
             {
@@ -346,122 +246,59 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Check for divine intervention (save from death)
-        /// Returns true if the god saves the player
+        /// Bonus damage from divine blessings against a monster: the temporary blessing, Solarius
+        /// against undead and demons, Valorian while below GodBoonValorianHpThresholdPct of max HP.
         /// </summary>
-        public bool CheckDivineIntervention(Character character, int damageReceived)
+        public int CalculateBonusDamage(Character attacker, Monster defender, int baseDamage, GodSystem? gods = null)
         {
-            var blessing = GetBlessings(character);
+            var blessing = GetBlessings(attacker, gods);
 
-            if (!blessing.IsActive || blessing.DivineSaveChance <= 0)
-                return false;
-
-            // Only triggers on lethal damage
-            if (character.HP - damageReceived > 0)
-                return false;
-
-            // Roll for divine intervention
-            if (random.Next(100) < blessing.DivineSaveChance)
-            {
-                // GD.Print($"[Divine] {blessing.GodName} intervened to save {character.Name2}!");
-                return true;
-            }
-
-            return false;
-        }
-
-        /// <summary>
-        /// Calculate bonus damage from divine blessings (against monsters)
-        /// </summary>
-        public int CalculateBonusDamage(Character attacker, Monster defender, int baseDamage)
-        {
-            var blessing = GetBlessings(attacker);
-
-            if (!blessing.IsActive)
+            if (!blessing.IsActive || baseDamage <= 0)
                 return 0;
 
-            int bonusDamage = 0;
-
-            // Dark damage bonus (flat % increase)
-            if (blessing.DarkDamageBonus > 0)
-            {
-                bonusDamage += (int)(baseDamage * blessing.DarkDamageBonus / 100f);
-            }
-
-            // Undead bonus (if defender is undead-type)
-            if (blessing.UndeadDamageBonus > 0 && IsUndeadMonster(defender))
-            {
-                bonusDamage += (int)(baseDamage * blessing.UndeadDamageBonus / 100f);
-            }
+            long bonusDamage = 0;
 
             // Temporary damage bonus
             if (blessing.TemporaryDamageBonus > 0)
-            {
                 bonusDamage += (int)(baseDamage * blessing.TemporaryDamageBonus / 100f);
-            }
 
-            // Strength bonus adds to damage
-            if (blessing.StrengthBonus > 0)
-            {
-                bonusDamage += blessing.StrengthBonus;
-            }
+            // Solarius: against undead and demons
+            if (IsUndeadOrDemon(defender))
+                bonusDamage += GodBoonSystem.Bonus(baseDamage, GodBoonSystem.Pct(attacker, GodDomain.Light, GameConfig.GodBoonSolariusUndeadDamagePct, gods));
 
-            return bonusDamage;
+            // Valorian: below the HP threshold
+            if (attacker.MaxHP > 0 && attacker.HP * 100 < attacker.MaxHP * GameConfig.GodBoonValorianHpThresholdPct)
+                bonusDamage += GodBoonSystem.Bonus(baseDamage, GodBoonSystem.Pct(attacker, GodDomain.War, GameConfig.GodBoonValorianLowHpDamagePct, gods));
+
+            return (int)Math.Min(bonusDamage, int.MaxValue);
         }
 
         /// <summary>
-        /// Calculate damage reduction from divine blessings
+        /// Damage reduction from divine blessings: the temporary blessing and Judicar's defence.
+        /// Always leaves at least 1 damage.
         /// </summary>
-        public int CalculateDamageReduction(Character defender, int incomingDamage)
+        public int CalculateDamageReduction(Character defender, int incomingDamage, GodSystem? gods = null)
         {
-            var blessing = GetBlessings(defender);
+            var blessing = GetBlessings(defender, gods);
 
-            if (!blessing.IsActive)
+            if (!blessing.IsActive || incomingDamage <= 1)
                 return 0;
 
-            int reduction = 0;
-
-            // Base damage reduction
-            if (blessing.DamageReduction > 0)
-            {
-                reduction += (int)(incomingDamage * blessing.DamageReduction / 100f);
-            }
+            long reduction = 0;
 
             // Temporary defense bonus
             if (blessing.TemporaryDefenseBonus > 0)
-            {
                 reduction += (int)(incomingDamage * blessing.TemporaryDefenseBonus / 100f);
-            }
 
-            return Math.Min(reduction, incomingDamage - 1); // Always take at least 1 damage
+            // Judicar: defence
+            reduction += GodBoonSystem.Bonus(incomingDamage, GodBoonSystem.Pct(defender, GodDomain.Law, GameConfig.GodBoonJudicarDefencePct, gods));
+
+            return (int)Math.Min(reduction, incomingDamage - 1); // Always take at least 1 damage
         }
 
-        /// <summary>
-        /// Calculate lifesteal from divine blessings.
-        /// Only active while the player has a prayer buff (daily prayer at the temple).
-        /// </summary>
-        public int CalculateLifesteal(Character attacker, int damageDealt)
-        {
-            var blessing = GetBlessings(attacker);
-
-            if (!blessing.IsActive || blessing.LifestealPercent <= 0)
-                return 0;
-
-            // Lifesteal requires an active prayer — resets on daily reset
-            if (!blessing.HasTemporaryBlessing)
-                return 0;
-
-            return (int)(damageDealt * blessing.LifestealPercent / 100f);
-        }
-
-        /// <summary>
-        /// Calculate critical hit bonus from divine blessings
-        /// </summary>
-        public int GetCriticalHitBonus(Character attacker)
-        {
-            var blessing = GetBlessings(attacker);
-            return blessing.IsActive ? blessing.CriticalHitBonus : 0;
-        }
+        /// <summary>Critical hit bonus (percentage points) from Umbrath's boon, rounded half up.</summary>
+        public int GetCriticalHitBonus(Character attacker, GodSystem? gods = null) =>
+            (int)Math.Floor(GodBoonSystem.Pct(attacker, GodDomain.Shadow, GameConfig.GodBoonUmbrathCritPct, gods) + 0.5);
 
         /// <summary>
         /// Calculate XP bonus from divine blessings
@@ -477,122 +314,36 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Check if a monster is undead-type
+        /// Undead or demon, for Solarius: MonsterClass Undead or Demon, the Undead family, or an
+        /// undead or demon name.
         /// </summary>
-        private bool IsUndeadMonster(Monster monster)
+        public static bool IsUndeadOrDemon(Monster monster)
         {
             if (monster == null) return false;
+            if (monster.MonsterClass == MonsterClass.Undead || monster.MonsterClass == MonsterClass.Demon) return true;
+            if (string.Equals(monster.FamilyName, "Undead", StringComparison.OrdinalIgnoreCase)) return true;
 
             string name = monster.Name?.ToLower() ?? "";
             return name.Contains("skeleton") || name.Contains("zombie") ||
                    name.Contains("ghost") || name.Contains("wraith") ||
                    name.Contains("vampire") || name.Contains("lich") ||
                    name.Contains("undead") || name.Contains("specter") ||
-                   name.Contains("mummy") || name.Contains("banshee");
-        }
-
-        /// <summary>
-        /// Get blessing description for display
-        /// </summary>
-        public string GetBlessingDescription(Character character)
-        {
-            var blessing = GetBlessings(character);
-
-            if (!blessing.IsActive)
-                return "You have no divine blessing.";
-
-            var lines = new List<string>
-            {
-                $"Blessed by {blessing.GodName}"
-            };
-
-            switch (blessing.BlessingType)
-            {
-                case BlessingType.Holy:
-                    lines.Add($"  Damage Reduction: {blessing.DamageReduction}%");
-                    lines.Add($"  Healing Bonus: {blessing.HealingBonus}%");
-                    if (blessing.UndeadDamageBonus > 0)
-                        lines.Add($"  Bonus vs Undead: {blessing.UndeadDamageBonus}%");
-                    if (blessing.DivineSaveChance > 0)
-                        lines.Add($"  Divine Save: {blessing.DivineSaveChance}% chance to survive lethal hit");
-                    break;
-
-                case BlessingType.Dark:
-                    if (blessing.CriticalHitBonus > 0)
-                        lines.Add($"  Critical Hit Bonus: +{blessing.CriticalHitBonus}%");
-                    if (blessing.LifestealPercent > 0)
-                        lines.Add($"  Lifesteal: {blessing.LifestealPercent}%");
-                    if (blessing.DarkDamageBonus > 0)
-                        lines.Add($"  Dark Damage: +{blessing.DarkDamageBonus}%");
-                    if (blessing.FearAura > 0)
-                        lines.Add($"  Fear Aura: {blessing.FearAura}% chance to frighten");
-                    break;
-
-                case BlessingType.Balanced:
-                    if (blessing.DamageReduction > 0)
-                        lines.Add($"  Damage Reduction: {blessing.DamageReduction}%");
-                    if (blessing.CriticalHitBonus > 0)
-                        lines.Add($"  Critical Hit Bonus: +{blessing.CriticalHitBonus}%");
-                    if (blessing.AllStatsBonus > 0)
-                        lines.Add($"  All Stats: +{blessing.AllStatsBonus}");
-                    if (blessing.LuckBonus > 0)
-                        lines.Add($"  Luck: +{blessing.LuckBonus}%");
-                    break;
-            }
-
-            if (!string.IsNullOrEmpty(blessing.SpecialAbility))
-                lines.Add($"  Special: {blessing.SpecialAbility}");
-
-            if (blessing.HasTemporaryBlessing)
-            {
-                var remaining = blessing.TemporaryBlessingExpires - DateTime.Now;
-                lines.Add($"  Active: {blessing.TemporaryBlessingName} ({remaining.TotalMinutes:F0} min remaining)");
-            }
-
-            return string.Join("\n", lines);
+                   name.Contains("mummy") || name.Contains("banshee") ||
+                   name.Contains("demon") || name.Contains("devil") ||
+                   name.Contains("archfiend") || name.Contains("hellspawn") || name.Contains("fiend");
         }
     }
 
     /// <summary>
-    /// Represents active divine blessings for a character
+    /// The divine blessing a character holds: the god, the boon's domain and strength (percent of
+    /// the full canon boon), and the temporary prayer or sacrifice blessing.
     /// </summary>
     public class DivineBlessing
     {
         public bool IsActive { get; set; }
         public string GodName { get; set; } = "";
-        public BlessingType BlessingType { get; set; } = BlessingType.None;
-
-        // Defensive bonuses (Good gods)
-        public int DamageReduction { get; set; }
-        public int HealingBonus { get; set; }
-        public int UndeadDamageBonus { get; set; }
-        public int DivineSaveChance { get; set; } // % chance to survive lethal hit
-
-        // Offensive bonuses (Dark gods)
-        public int CriticalHitBonus { get; set; }
-        public int LifestealPercent { get; set; }
-        public int DarkDamageBonus { get; set; }
-        public int FearAura { get; set; } // % chance to frighten enemies
-
-        // Balanced bonuses
-        public int AllStatsBonus { get; set; }
-        public int LuckBonus { get; set; }
-
-        // Stat bonuses (god-specific)
-        public int StrengthBonus { get; set; }
-        public int IntelligenceBonus { get; set; }
-        public int CharismaBonus { get; set; }
-        public int MaxHPBonus { get; set; }
-        public int SpellPowerBonus { get; set; }
-        public int EvadeChance { get; set; }
-        public int CounterattackChance { get; set; }
-
-        // Immunities
-        public bool BlindImmunity { get; set; }
-        public bool PoisonImmunity { get; set; }
-
-        // Special ability description
-        public string SpecialAbility { get; set; } = "";
+        public GodDomain Domain { get; set; } = GodDomain.None;
+        public int StrengthPct { get; set; }
 
         // Temporary bonuses (from sacrifices/prayers)
         public int TemporaryDamageBonus { get; set; }
@@ -617,13 +368,5 @@ namespace UsurperRemake.Systems
         public int DamageBonus { get; set; }
         public int DefenseBonus { get; set; }
         public int XPBonus { get; set; }
-    }
-
-    public enum BlessingType
-    {
-        None,
-        Holy,
-        Dark,
-        Balanced
     }
 }

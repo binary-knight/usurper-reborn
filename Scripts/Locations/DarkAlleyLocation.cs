@@ -2304,8 +2304,10 @@ namespace UsurperRemake.Locations
             await Task.Delay(1500);
 
             // DEX check
-            float chance = Math.Min(0.75f, 0.40f + currentPlayer.Dexterity * 0.005f +
-                (currentPlayer.Class == CharacterClass.Assassin ? 0.15f : 0f));
+            // 1.2.0 Temple gods piece 2: Umbrath's boon adds to the chance and raises its cap the same
+            float umbrath = (float)(GodBoonSystem.TheftChanceBonusPct(currentPlayer) / 100.0);
+            float chance = Math.Min(0.75f + umbrath, 0.40f + currentPlayer.Dexterity * 0.005f +
+                (currentPlayer.Class == CharacterClass.Assassin ? 0.15f : 0f) + umbrath);
 
             float roll = (float)Random.Shared.NextDouble();
 
