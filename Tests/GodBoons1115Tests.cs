@@ -391,18 +391,18 @@ public class GodBoons1115Tests
 
         // The two paths that call the helper directly: a self-cast spell heal and a teammate's heal spell.
         Body("Scripts/Systems/CombatEngine.cs", "private void ApplySpellEffects(")
-            .Should().Contain("GodBoonSystem.HealAgainstUndead(healer ?? caster, spellResult.Healing, monsters)");
+            .Should().Contain("GodBoonSystem.CastHeal(healer ?? caster, spellResult.Healing, monsters)");
         // A buff with a heal part cast on an ally: the boon is the caster's, not the ally's.
         src.Should().Contain("ApplySpellEffects(tgt, null, spellResult, monsters: monsters, healer: player);");
         Body("Scripts/Systems/CombatEngine.cs", "private async Task<bool> TeammateHealWithSpell(")
-            .Should().Contain("GodBoonSystem.HealAgainstUndead(teammate, spellResult.Healing, result.Monsters)");
+            .Should().Contain("ApplyHealerSpecBonus(teammate, spellResult.Healing, result.Monsters)");
         // The helper wrappers: every spell and ability heal (ApplyHealerSpecBonus) and every potion (PotionBonus).
         Body("Scripts/Systems/CombatEngine.cs", "private static int ApplyHealerSpecBonus(")
-            .Should().Contain("GodBoonSystem.HealAgainstUndead(caster, healing, monsters)");
+            .Should().Contain("GodBoonSystem.CastHeal(caster, baseHealing, monsters)");
         Source("Scripts/Systems/PotionBonus.cs").Should().Contain("GodBoonSystem.HealAgainstUndead(owner, heal, monsters)");
         // Tidal Harmony's flat ally heal, in both ability paths (no flat "tm.HP + 200" left).
         src.Should().NotContain("tm.HP + 200)");
-        System.Text.RegularExpressions.Regex.Matches(src, @"GodBoonSystem\.HealAgainstUndead\(player, 200, result\.Monsters\)").Count.Should().Be(2);
+        System.Text.RegularExpressions.Regex.Matches(src, @"GodBoonSystem\.CastHeal\(player, 200, result\.Monsters\)").Count.Should().Be(2);
         // The healing herb, used from the combat herb pouch.
         Body("Scripts/Systems/CombatEngine.cs", "private async Task ExecuteUseHerb(")
             .Should().Contain("HomeLocation.ApplyHerbEffect(player, options[sel - 1], terminal, result.Monsters)");

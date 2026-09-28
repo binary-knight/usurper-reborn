@@ -219,7 +219,10 @@ public static class GodBoonSystem
     public static long ManaRegen(Character c, long regen, GodSystem? gods = null) =>
         Apply(c, GodDomain.Magic, GameConfig.GodBoonArcanusManaRegenPct, regen, gods);
 
-    /// <summary>Amara: a heal the follower casts (spells and abilities, on anyone in the party).</summary>
+    /// <summary>
+    /// Amara: a heal the follower casts (spells, abilities and songs, on self or anyone in the party).
+    /// Called only from CastHeal, so no heal takes it twice.
+    /// </summary>
     public static long PartyHeal(Character caster, long heal, GodSystem? gods = null) =>
         Apply(caster, GodDomain.Love, GameConfig.GodBoonAmaraHealPct, heal, gods);
 
@@ -237,6 +240,15 @@ public static class GodBoonSystem
         if (!fightingUndeadOrDemon) return heal;
         return Apply(caster, GodDomain.Light, GameConfig.GodBoonSolariusHealPct, heal, gods);
     }
+
+    /// <summary>
+    /// The one helper for a combat heal someone casts (a spell, an ability or a song, on self or
+    /// an ally): Amara's boon, then Solarius's, both from the caster's god. Every cast heal path
+    /// calls this once, directly or through CombatEngine.ApplyHealerSpecBonus. Potions and the
+    /// healing herb are not casts and call HealAgainstUndead alone.
+    /// </summary>
+    public static long CastHeal(Character caster, long heal, IEnumerable<Monster>? monsters, GodSystem? gods = null) =>
+        HealAgainstUndead(caster, PartyHeal(caster, heal, gods), monsters, gods);
 
     /// <summary>Amara: the strength of a party ward the follower raises.</summary>
     public static long PartyWard(Character caster, long ward, GodSystem? gods = null) =>

@@ -20,6 +20,14 @@ namespace UsurperRemake.Systems
         private static WorldBossSystem? _instance;
         public static WorldBossSystem Instance => _instance ??= new WorldBossSystem();
 
+        /// <summary>
+        /// 1.2.0: a heal the player casts in a world boss fight (a spell or an ability) through the
+        /// gods' cast-heal helper. Amara's boon applies; the boss is not a Monster, so Solarius's
+        /// undead check never fires here.
+        /// </summary>
+        internal static int BoostCastHeal(Character player, int healing) =>
+            (int)Math.Min(GodBoonSystem.CastHeal(player, healing, null), int.MaxValue);
+
         private readonly Random _rng = new();
 
         // v1.1.4: cooldowns and re-entry live on the player's world_boss_damage row, never in memory.
@@ -1663,6 +1671,7 @@ namespace UsurperRemake.Systems
                     // Healing spells heal the player instead
                     if (result.Healing > 0)
                     {
+                        result.Healing = BoostCastHeal(player, result.Healing); // 1.2.0: Amara
                         player.HP = Math.Min(player.MaxHP, player.HP + result.Healing);
                         terminal.SetColor("bright_green");
                         terminal.WriteLine($"  {Loc.Get("world_boss.healed_for", result.Healing, player.HP, player.MaxHP)}");
@@ -1882,6 +1891,7 @@ namespace UsurperRemake.Systems
                         // Healing
                         if (result.Healing > 0)
                         {
+                            result.Healing = BoostCastHeal(player, result.Healing); // 1.2.0: Amara
                             player.HP = Math.Min(player.MaxHP, player.HP + result.Healing);
                             terminal.SetColor("bright_green");
                             terminal.WriteLine($"  {Loc.Get("world_boss.healed_for", result.Healing, player.HP, player.MaxHP)}");
