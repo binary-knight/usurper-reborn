@@ -3319,6 +3319,8 @@ public partial class TempleLocation : BaseLocation
             try
             {
                 var immortals = await backend.GetImmortalPlayers();
+                // 1.2.0: one standings read for the whole listing, not one per immortal.
+                var standings = await Task.Run(() => backend.GetGodStandings());
                 foreach (var god in immortals)
                 {
                     // Don't show the player's own god entry if they ARE the immortal.
@@ -3332,7 +3334,7 @@ public partial class TempleLocation : BaseLocation
                         DivineName = god.DivineName,
                         GodLevel = god.GodLevel,
                         GodAlignment = god.GodAlignment,
-                        Believers = PantheonLocation.CountBelievers(god.DivineName),
+                        Believers = PantheonLocation.CountBelievers(god.DivineName, standings),
                         IsOnline = god.IsOnline,
                         Username = god.Username,
                         DivineBoonConfig = god.DivineBoonConfig ?? ""
