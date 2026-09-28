@@ -286,6 +286,16 @@ public static class GodBoonSystem
     public static double DiscordiaFirstActionFailPct(Character c, GodSystem? gods = null) =>
         Pct(c, GodDomain.Chaos, GameConfig.GodBoonDiscordiaFirstActionFailPct, gods);
 
+    /// <summary>
+    /// Discordia: one roll of the roller's own first-action-fail chance against one foe. No boon:
+    /// false without touching the RNG. Shared by monster fights and the world boss fight.
+    /// </summary>
+    public static bool DiscordiaStrikes(Character roller, Random rng, GodSystem? gods = null)
+    {
+        double pct = DiscordiaFirstActionFailPct(roller, gods);
+        return pct > 0 && rng.NextDouble() * 100 < pct;
+    }
+
     /// <summary>True when the character's god gives this ward and the character is Devout or higher.</summary>
     public static bool HasWard(Character c, MentalWard ward, GodSystem? gods = null)
     {

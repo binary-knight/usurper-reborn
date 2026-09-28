@@ -520,10 +520,8 @@ public partial class CombatEngine
     /// <summary>One roller's Discordia boon against each foe; a hit adds the foe to _discordStruck.</summary>
     private void RollDiscordiaAgainst(Character roller, List<Monster> foes)
     {
-        double pct = GodBoonSystem.DiscordiaFirstActionFailPct(roller);
-        if (pct <= 0) return;
         foreach (var m in foes)
-            if (random.NextDouble() * 100 < pct)
+            if (GodBoonSystem.DiscordiaStrikes(roller, random))
                 _discordStruck.Add(m);
     }
 
