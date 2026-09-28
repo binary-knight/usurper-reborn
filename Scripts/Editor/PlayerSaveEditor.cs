@@ -1295,6 +1295,7 @@ internal static class PlayerSaveEditor
                 "Clear wanted level",
                 "Clear murder weight / perma-kill log",
                 $"Timed stat buffs ({p.TimedStatBuffs?.Count ?? 0} active, Groggo DEX={p.GroggoShadowBlessingDex}): list and clear",
+                $"Artifact stats restored at login (ArtifactStatsApplied={p.ArtifactStatsApplied}): toggle",
             });
             if (choice == 0) return;
             switch (choice)
@@ -1343,6 +1344,12 @@ internal static class PlayerSaveEditor
                     break;
                 case 9:
                     EditTimedStatBuffs(p);
+                    break;
+                case 10:
+                    // 1.2.0: false makes the next login add the stats of every collected artifact once
+                    p.ArtifactStatsApplied = !p.ArtifactStatsApplied;
+                    EditorIO.Success($"ArtifactStatsApplied = {p.ArtifactStatsApplied}.");
+                    EditorIO.Pause();
                     break;
             }
         }

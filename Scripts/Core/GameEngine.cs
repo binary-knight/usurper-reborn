@@ -2861,6 +2861,7 @@ public partial class GameEngine
             SaveSystem.Instance.RestoreStorySystems(saveData.StorySystems, godRestoreFilter);
             GodRegistry.ApplyLoad(currentPlayer); // 1.2.0: one god, then the Favor schema guard
             AwakeningBonus.RecalculateAfterRestore(currentPlayer, saveData.Player?.HP ?? 0, saveData.Player?.Mana ?? 0); // v1.1.12
+            RunStatRewardMigrations(currentPlayer, saveData.StorySystems); // 1.2.0: once per character
 
             // Migration: sync RelationshipSystem with RomanceTracker for saves affected by
             // the bidirectional key bug (pre-v0.42.4). If RomanceTracker says Lover/Spouse/FWB
@@ -4749,6 +4750,7 @@ public partial class GameEngine
         SaveSystem.Instance.RestoreStorySystems(saveData.StorySystems, godFilter);
         GodRegistry.ApplyLoad(currentPlayer); // 1.2.0: one god, then the Favor schema guard
         AwakeningBonus.RecalculateAfterRestore(currentPlayer, saveData.Player?.HP ?? 0, saveData.Player?.Mana ?? 0); // v1.1.12
+        RunStatRewardMigrations(currentPlayer, saveData.StorySystems); // 1.2.0: once per character
 
         // In online mode, override royal court, children, and marriages with world_state
         // (authoritative source). RestoreStorySystems loaded stale data from the player's
@@ -5358,6 +5360,22 @@ public partial class GameEngine
     /// <summary>
     /// Restore player from save data
     /// </summary>
+    /// <summary>
+    /// 1.2.0: one-time login restores of lasting stats that older versions lost, read from the save
+    /// being loaded (not the live story singleton, which can hold another character's state). Each is
+    /// guarded by its own saved flag, so it runs once per character and a second login changes nothing.
+    /// </summary>
+    internal static void RunStatRewardMigrations(Character? player, StorySystemsData? story)
+    {
+        if (player == null) return;
+        try
+        {
+            if (ArtifactSystem.RestoreMissingArtifactStats(player, story?.CollectedArtifacts))
+                DebugLogger.Instance.LogInfo("MIGRATION", $"Artifact stats restored for {player.Name2} ({story?.CollectedArtifacts?.Count ?? 0} artifact(s))");
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogWarning("MIGRATION", $"Artifact stat restore failed: {ex.Message}"); }
+    }
+
     private Character RestorePlayerFromSaveData(PlayerData playerData)
     {
         // v1.1.7: any item clamped while this save is restored is logged under this account's name
@@ -6160,6 +6178,7 @@ public partial class GameEngine
         // Dark Alley Overhaul (v0.41.0)
         player.GroggoShadowBlessingDex = playerData.GroggoShadowBlessingDex;
         player.TimedStatBuffs = TimedStatBuffData.ToBuffs(playerData.TimedStatBuffs);   // 1.2.0: before the load recalc
+        player.ArtifactStatsApplied = playerData.ArtifactStatsApplied;   // 1.2.0: false in older saves
         player.SteroidShopPurchases = playerData.SteroidShopPurchases;
         player.AlchemistINTBoosts = playerData.AlchemistINTBoosts;
         player.GamblingRoundsToday = playerData.GamblingRoundsToday;

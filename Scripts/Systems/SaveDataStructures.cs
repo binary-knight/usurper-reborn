@@ -676,6 +676,7 @@ namespace UsurperRemake.Systems
         // Dark Alley Overhaul (v0.41.0)
         public int GroggoShadowBlessingDex { get; set; }
         public List<TimedStatBuffData> TimedStatBuffs { get; set; } = new();   // 1.2.0
+        public bool ArtifactStatsApplied { get; set; }   // 1.2.0: false in older saves, so the login restore runs once
         public int SteroidShopPurchases { get; set; }
         public int AlchemistINTBoosts { get; set; }
         public int GamblingRoundsToday { get; set; }

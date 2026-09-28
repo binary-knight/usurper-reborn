@@ -56,6 +56,7 @@ public static class PlayerCharacterLoader
             // 1.2.0: the owner's temporary stat buffs, applied by the recalculation below
             TimedStatBuffs = TimedStatBuffData.ToBuffs(playerData.TimedStatBuffs),
             GroggoShadowBlessingDex = playerData.GroggoShadowBlessingDex,
+            ArtifactStatsApplied = playerData.ArtifactStatsApplied,
             AI = CharacterAI.Computer,
             IsEcho = isEcho,
             IsLoadedPlayer = !isEcho,   // v1.1.11: a player's own save, so a bounty on them can be paid
