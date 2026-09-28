@@ -26504,6 +26504,8 @@ public partial class CombatEngine
             // Apply healing to self
             if (spellResult.Healing > 0)
             {
+                // 1.2.0: Amara's boon on a heal the attacker casts (no monsters, so Solarius's never fires)
+                spellResult.Healing = (int)Math.Min(GodBoonSystem.CastHeal(attacker, spellResult.Healing, null), int.MaxValue);
                 attacker.HP = Math.Min(attacker.MaxHP, attacker.HP + spellResult.Healing);
                 terminal.SetColor("bright_green");
                 terminal.WriteLine(Loc.Get("combat.you_recover_hp", spellResult.Healing));
@@ -26751,6 +26753,8 @@ public partial class CombatEngine
         // Apply healing effects (self-heals)
         if (abilityResult.Healing > 0)
         {
+            // 1.2.0: Amara's boon on a heal the attacker casts (no monsters, so Solarius's never fires)
+            abilityResult.Healing = (int)Math.Min(GodBoonSystem.CastHeal(attacker, abilityResult.Healing, null), int.MaxValue);
             attacker.HP = Math.Min(attacker.MaxHP, attacker.HP + abilityResult.Healing);
             terminal.SetColor("bright_green");
             terminal.WriteLine(Loc.Get("combat.you_recover_hp", abilityResult.Healing));
@@ -26906,6 +26910,8 @@ public partial class CombatEngine
                 }
                 if (abilityResult.Healing > 0)
                 {
+                    // 1.2.0: the gods' cast-heal boons (none for an NPC)
+                    abilityResult.Healing = (int)Math.Min(GodBoonSystem.CastHeal(computer, abilityResult.Healing, null), int.MaxValue);
                     computer.HP = Math.Min(computer.MaxHP, computer.HP + abilityResult.Healing);
                     terminal.WriteLine(Loc.Get("combat.ally_recovers_hp", computer.DisplayName, abilityResult.Healing), "green");
                 }
