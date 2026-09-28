@@ -206,7 +206,11 @@ public class GodBoonRecalc1115Tests
             GodBoonSystem.ApplyDomainChange("GbrDomGod", GodDomain.Earth, 100, new[] { f, other });
             f.PlayerGodBoonDomain.Should().Be(GodDomain.Earth);
             f.PlayerGodBoonScalePct.Should().Be(100);
-            f.MaxHP.Should().Be(TerranAt(plain, 100), "the follower's max HP follows the chosen domain at once");
+            f.GodBoonRecalcPending.Should().BeTrue("the follower plays in another session");
+            f.MaxHP.Should().Be(plain, "the domain change does not write the follower's stats");
+            GodBoonSystem.ApplyPendingBoonRecalc(f);
+            f.MaxHP.Should().Be(TerranAt(plain, 100), "the follower's max HP follows the chosen domain at their next safe point");
+            other.GodBoonRecalcPending.Should().BeFalse();
             other.PlayerGodBoonGod.Should().BeEmpty("a follower of another god is untouched");
             other.MaxHP.Should().Be(12345);
         }
@@ -249,6 +253,7 @@ public class GodBoonRecalc1115Tests
         {
             GodRegistry.SetWorshippedGod(c, "GbrLeaveGod").Should().BeTrue();
             GodBoonSystem.SetConfiguredBoons(c, "divine_vitality:3,mana_well:3");
+            GodBoonSystem.ApplyPendingBoonRecalc(c);
             c.MaxHP.Should().BeGreaterThan(plain);
             c.MaxMana.Should().BeGreaterThan(plainMana);
             c.HP = c.MaxHP; c.Mana = c.MaxMana;
@@ -273,13 +278,17 @@ public class GodBoonRecalc1115Tests
         {
             GodRegistry.SetWorshippedGod(c, "GbrReconfigGod").Should().BeTrue();
             GodBoonSystem.SetConfiguredBoons(c, "divine_vitality:3");
+            c.GodBoonRecalcPending.Should().BeTrue("the follower plays in another session");
+            c.MaxHP.Should().Be(plain, "the reconfig does not write the follower's stats");
+            GodBoonSystem.ApplyPendingBoonRecalc(c);
             var effects = DivineBoonRegistry.CalculateEffects("divine_vitality:3");
-            c.MaxHP.Should().Be(plain + (long)(plain * effects.MaxHPPercent), "the new boons are on max HP at once");
+            c.MaxHP.Should().Be(plain + (long)(plain * effects.MaxHPPercent), "the new boons are on max HP at the next safe point");
             c.MaxMana.Should().Be(plainMana);
             c.HP = c.MaxHP;
 
             GodBoonSystem.SetConfiguredBoons(c, "");
-            c.MaxHP.Should().Be(plain, "a boon taken away is off max HP at once");
+            GodBoonSystem.ApplyPendingBoonRecalc(c);
+            c.MaxHP.Should().Be(plain, "a boon taken away is off max HP at the next safe point");
             c.HP.Should().Be(plain, "HP is clamped to the lower max");
         }
         finally { GodRegistry.SetWorshippedGod(c, null); }
@@ -303,10 +312,14 @@ public class GodBoonRecalc1115Tests
         {
             GodRegistry.SetWorshippedGod(f, "GbrOldGod").Should().BeTrue();
             GodBoonSystem.SetConfiguredBoons(f, "divine_vitality:3");
-            GodRegistry.SetWorshippedGod(f, "GbrRecruitGod").Should().BeTrue();
+            GodBoonSystem.ApplyPendingBoonRecalc(f);
+            GodRegistry.SetWorshippedGod(f, "GbrRecruitGod", otherSession: true).Should().BeTrue();
+            f.GodBoonRecalcPending.Should().BeTrue("the recruit plays in another session");
             f.GodFavor = GameConfig.GodFavorTierZealotMin;
 
             GodBoonSystem.ApplyRecruit(god, f, 100);
+            f.GodBoonRecalcPending.Should().BeTrue();
+            GodBoonSystem.ApplyPendingBoonRecalc(f);
             f.PlayerGodBoonGod.Should().Be("GbrRecruitGod");
             f.PlayerGodBoonDomain.Should().Be(GodDomain.Earth, "the new god's domain is cached at once");
             f.PlayerGodBoonScalePct.Should().Be(100);
@@ -316,7 +329,7 @@ public class GodBoonRecalc1115Tests
         finally { GodRegistry.SetWorshippedGod(f, null); }
 
         Regex.IsMatch(Body("Scripts/Locations/PantheonLocation.cs", "private async Task ApplyRecruitToPlayer("),
-                @"GodRegistry\.SetWorshippedGod\(player, godName\);[^\n]*\n\s*await GodBoonSystem\.ApplyRecruitAsync\(currentPlayer, player\);")
+                @"GodRegistry\.SetWorshippedGod\(player, godName, otherSession: true\);[^\n]*\n\s*await GodBoonSystem\.ApplyRecruitAsync\(currentPlayer, player\);")
             .Should().BeTrue();
     }
 
@@ -340,6 +353,7 @@ public class GodBoonRecalc1115Tests
             GodBoonSystem.ApplyRecruit(god, f, null);
             f.PlayerGodBoonGod.Should().Be("GbrNoScaleOld", "a failed standings read keeps the cache, as the login refresh does");
             f.PlayerGodBoonScalePct.Should().Be(100);
+            GodBoonSystem.ApplyPendingBoonRecalc(f);
             f.MaxHP.Should().Be(plain, "a cache for another god gives no boon");
         }
         finally { GodRegistry.SetWorshippedGod(f, null); }

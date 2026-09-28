@@ -120,9 +120,11 @@ public static class GodRegistry
     /// <summary>
     /// Worship a god from the unified list, or none (null or blank). A canon god goes to the
     /// GodSystem store and clears the player-god; a player-god clears the canon entry. A different
-    /// god starts at Favor 0. Manwe is refused. Returns false only when refused.
+    /// god starts at Favor 0. Manwe is refused. Returns false only when refused. The boons' max HP
+    /// and mana follow at once; for a character played in another session (otherSession) its own
+    /// session applies them at its next safe point (GodBoonSystem.RequestRecalcForBoon).
     /// </summary>
-    public static bool SetWorshippedGod(Character c, string? name, GodSystem? gods = null)
+    public static bool SetWorshippedGod(Character c, string? name, GodSystem? gods = null, bool otherSession = false)
     {
         if (c == null || IsManwe(name)) return false;
         var godSystem = Gods(gods);
@@ -144,7 +146,8 @@ public static class GodRegistry
             c.WorshippedGod = name.Trim();
         }
         FavorSystem.Bind(c, godSystem);
-        GodBoonSystem.RecalculateForBoon(c, gods);   // 1.2.0: a god boon on max HP follows the new god
+        if (otherSession) GodBoonSystem.RequestRecalcForBoon(c);   // 1.2.0: its own session updates it
+        else GodBoonSystem.RecalculateForBoon(c, gods);   // 1.2.0: a god boon on max HP follows the new god
         return true;
     }
 

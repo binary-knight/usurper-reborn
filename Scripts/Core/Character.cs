@@ -88,6 +88,11 @@ public class Character
     // rescue is already applied, their own session leaves the group and goes to the Healer. Not saved.
     [System.Text.Json.Serialization.JsonIgnore]
     public bool PendingMentalRescue { get; set; }
+    // 1.2.0: another session changed this player's god boon caches (a player-god's reconfig, domain
+    // or recruit); this player's own session applies the boon update at its next safe point (the
+    // location loop, the end of a fight). Not saved: the load recalculates and refreshes the boon.
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool GodBoonRecalcPending { get; set; }
 
     public int GnollP { get; set; }                 // gnoll poison, temporary
     public int Mental { get; set; } = GameConfig.MaxMentalStability; // mental health; v1.1.15: a bare Character starts full, not Broken
@@ -1748,26 +1753,21 @@ public class Character
             MaxHP = (long)(MaxHP * GameConfig.KingCombatHPBonus);
         }
 
-        // Apply divine boon MaxHP bonus (from worshipped player-god's configured boons)
-        if (CachedBoonEffects?.MaxHPPercent > 0)
-        {
-            MaxHP += (long)(MaxHP * CachedBoonEffects.MaxHPPercent);
-        }
-
-        // Apply divine boon MaxMana bonus
-        if (CachedBoonEffects?.MaxManaPercent > 0 && MaxMana > 0)
-        {
-            MaxMana += (long)(MaxMana * CachedBoonEffects.MaxManaPercent);
-        }
-
-        // v1.1.12: the awakening's max HP and max mana percentages, beside the divine boons
+        // The divine boons (the player-god's configured MaxHP and MaxMana percent), the awakening's
+        // max HP and max mana percent (v1.1.12) and Terran's max HP boon (1.2.0), in that order.
+        // 1.2.0: the segment's input and output are recorded, so a god boon change can update
+        // MaxHP and MaxMana alone (RecalculateBoonShare) without resetting the other stats.
         double awakeningHP = UsurperRemake.Systems.AwakeningBonus.HPAt(awakeningStage);
-        if (awakeningHP > 0) MaxHP += (long)(MaxHP * awakeningHP);
         double awakeningMana = UsurperRemake.Systems.AwakeningBonus.ManaAt(awakeningStage);
-        if (awakeningMana > 0 && MaxMana > 0) MaxMana += (long)(MaxMana * awakeningMana);
-
-        // 1.2.0 Temple gods piece 2: Terran's boon on max HP (players only; NPCs never reach the registry)
-        if (!IsNPC) MaxHP += UsurperRemake.Systems.GodBoonSystem.MaxHpBonus(this, MaxHP);
+        _boonPreMaxHP = MaxHP;
+        _boonPreMaxMana = MaxMana;
+        _boonAwakeningHP = awakeningHP;
+        _boonAwakeningMana = awakeningMana;
+        MaxHP = BoonSegmentMaxHP(_boonPreMaxHP, awakeningHP);
+        MaxMana = BoonSegmentMaxMana(_boonPreMaxMana, awakeningMana);
+        _boonOutMaxHP = MaxHP;
+        _boonOutMaxMana = MaxMana;
+        _boonRecorded = true;
 
         // Apply Fountain of Vitality bonus HP
         if (BonusMaxHP > 0)
@@ -1804,6 +1804,59 @@ public class Character
         {
             UsurperRemake.Systems.DebugLogger.Instance.LogDebug("STATS", $"HP clamped: {hpBefore} -> {HP} (MaxHP={MaxHP}, BaseMaxHP={BaseMaxHP})");
         }
+        Mana = Math.Min(Mana, MaxMana);
+    }
+
+    // 1.2.0: what the last RecalculateStats put in and got out of the god boon segment. Runtime
+    // only (fields, so never serialized): every load runs RecalculateStats, which records them again.
+    private long _boonPreMaxHP, _boonPreMaxMana, _boonOutMaxHP, _boonOutMaxMana;
+    private double _boonAwakeningHP, _boonAwakeningMana;
+    private bool _boonRecorded;
+
+    /// <summary>1.2.0: max HP after the configured boon, the awakening and Terran, from the pre-boon max HP.</summary>
+    private long BoonSegmentMaxHP(long pre, double awakeningHP)
+    {
+        long hp = pre;
+        // Apply divine boon MaxHP bonus (from worshipped player-god's configured boons)
+        if (CachedBoonEffects?.MaxHPPercent > 0) hp += (long)(hp * CachedBoonEffects.MaxHPPercent);
+        if (awakeningHP > 0) hp += (long)(hp * awakeningHP);
+        // 1.2.0 Temple gods piece 2: Terran's boon on max HP (players only; NPCs never reach the registry)
+        if (!IsNPC) hp += UsurperRemake.Systems.GodBoonSystem.MaxHpBonus(this, hp);
+        return hp;
+    }
+
+    /// <summary>1.2.0: max mana after the configured boon and the awakening, from the pre-boon max mana.</summary>
+    private long BoonSegmentMaxMana(long pre, double awakeningMana)
+    {
+        long mana = pre;
+        if (CachedBoonEffects?.MaxManaPercent > 0 && mana > 0) mana += (long)(mana * CachedBoonEffects.MaxManaPercent);
+        if (awakeningMana > 0 && mana > 0) mana += (long)(mana * awakeningMana);
+        return mana;
+    }
+
+    /// <summary>
+    /// 1.2.0: after a god boon's input changed (the god, the Favor tier, the configured boons, a
+    /// player-god's domain or scale), updates only the boons' share of MaxHP and MaxMana: the
+    /// segment is recomputed from the pre-boon values the last RecalculateStats recorded, in the
+    /// same order, and the difference is applied. Every other stat is left alone, so gains written
+    /// straight into the derived stats (Temple blessings, Sanctum, Groggo) are kept. HP and mana
+    /// are only clamped down. A character never recalculated has no record and gets a full
+    /// RecalculateStats (production players always have one: the load recalculates).
+    /// </summary>
+    public void RecalculateBoonShare()
+    {
+        if (!_boonRecorded)
+        {
+            RecalculateStats();
+            return;
+        }
+        long hp = BoonSegmentMaxHP(_boonPreMaxHP, _boonAwakeningHP);
+        long mana = BoonSegmentMaxMana(_boonPreMaxMana, _boonAwakeningMana);
+        MaxHP = Math.Max(1, MaxHP + hp - _boonOutMaxHP);
+        MaxMana = Math.Max(0, MaxMana + mana - _boonOutMaxMana);
+        _boonOutMaxHP = hp;
+        _boonOutMaxMana = mana;
+        HP = Math.Min(HP, MaxHP);
         Mana = Math.Min(Mana, MaxMana);
     }
 

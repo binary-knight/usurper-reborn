@@ -375,34 +375,63 @@ public static class GodBoonSystem
     }
 
     /// <summary>
-    /// Recalculates a player's stats after an input of a god boon changed (the god, the Favor tier,
-    /// a player-god's domain or scale), so Terran's max HP follows at once. HP is only clamped to
-    /// the new max, never raised. NPCs are skipped, and so is a GodSystem other than the shared one,
-    /// since RecalculateStats reads the shared registry. A player who follows no player-god loses
-    /// the configured boons (CachedBoonEffects) first, so their max HP and mana go with the god.
+    /// Updates a player's max HP and max mana after an input of a god boon changed (the god, the
+    /// Favor tier, a player-god's domain, scale or configured boons), so the boons follow at once.
+    /// Only the boons' share of MaxHP and MaxMana is updated (Character.RecalculateBoonShare); every
+    /// other stat is left alone. HP and mana are only clamped to the new max, never raised. NPCs are
+    /// skipped, and so is a GodSystem other than the shared one, since the stats read the shared
+    /// registry. A player who follows no player-god loses the configured boons (CachedBoonEffects)
+    /// first, so their max HP and mana go with the god. For the acting session's own character only;
+    /// another session's character gets RequestRecalcForBoon.
     /// </summary>
     public static void RecalculateForBoon(Character c, GodSystem? gods = null)
     {
         if (c == null || c.IsNPC) return;
         if (string.IsNullOrWhiteSpace(c.WorshippedGod)) c.CachedBoonEffects = null;
         if (gods != null && !ReferenceEquals(gods, UsurperRemake.GodSystemSingleton.Instance)) return;
-        c.RecalculateStats();
+        c.RecalculateBoonShare();
     }
 
     /// <summary>
-    /// A player-god's configured boons (Pantheon) reach a follower: the cache is set from the
-    /// config and the stats are recalculated, so the boons on max HP and mana follow at once.
+    /// A character played in another session had its god boon caches changed by this session: the
+    /// update is left to its own session (GodBoonRecalcPending), which applies it at its next safe
+    /// point (ApplyPendingBoonRecalc), so a hit or a heal written there at the same moment is not
+    /// lost. The caller writes the caches first, then this sets the flag.
+    /// </summary>
+    public static void RequestRecalcForBoon(Character c)
+    {
+        if (c == null || c.IsNPC) return;
+        c.GodBoonRecalcPending = true;
+    }
+
+    /// <summary>
+    /// The session's own character, at a safe point (the top of the location loop, the end of a
+    /// fight): applies a boon update another session left pending. The flag is cleared before the
+    /// update, so caches written during it stay pending for the next safe point.
+    /// </summary>
+    public static void ApplyPendingBoonRecalc(Character c)
+    {
+        if (c == null || !c.GodBoonRecalcPending) return;
+        c.GodBoonRecalcPending = false;
+        RecalculateForBoon(c);
+    }
+
+    /// <summary>
+    /// A player-god's configured boons (Pantheon) reach a follower in another session: the cache is
+    /// set from the config and the follower's own session updates max HP and mana at its next safe
+    /// point (RequestRecalcForBoon).
     /// </summary>
     public static void SetConfiguredBoons(Character c, string config)
     {
         if (c == null || c.IsNPC) return;
         c.CachedBoonEffects = DivineBoonRegistry.CalculateEffects(config);
-        RecalculateForBoon(c);
+        RequestRecalcForBoon(c);
     }
 
     /// <summary>
-    /// A player was recruited by an immortal (Pantheon): the follower takes the god's configured
-    /// boons and the god's domain at the given scale, and the stats are recalculated. With no scale
+    /// A player in another session was recruited by an immortal (Pantheon): the follower takes the
+    /// god's configured boons and the god's domain at the given scale, and the follower's own
+    /// session updates the stats at its next safe point. With no scale
     /// (the standings could not be read) the domain cache is kept, as RefreshPlayerGodBoonAsync
     /// keeps it when its read fails; a cache for another god gives no boon (PlayerGodCacheFits).
     /// </summary>
@@ -415,7 +444,8 @@ public static class GodBoonSystem
     }
 
     /// <summary>
-    /// Online: a player recruited by an immortal gets the god's boons at once, at the god's current
+    /// Online: a player recruited by an immortal gets the god's boons at their own session's next
+    /// safe point (ApplyRecruit leaves the update pending), at the god's current
     /// scale (the immortal is online, so no idle decay). The domain comes from the immortal in
     /// memory, like ApplyDomainChangeAsync. A standings read that fails keeps the domain cache, as
     /// the login refresh does, until the next refresh (login or Temple).
@@ -440,8 +470,9 @@ public static class GodBoonSystem
     }
 
     /// <summary>
-    /// A player-god's domain was chosen: each follower of that god (players only) caches the new
-    /// domain at the given scale, and their stats are recalculated.
+    /// A player-god's domain was chosen: each follower of that god (players only, played in other
+    /// sessions) caches the new domain at the given scale, and each follower's own session updates
+    /// the stats at its next safe point.
     /// </summary>
     public static void ApplyDomainChange(string god, GodDomain domain, int scalePct, IEnumerable<Character> followers)
     {
@@ -453,7 +484,7 @@ public static class GodBoonSystem
             if (worshipped == null || worshipped.Value.IsCanon
                 || !worshipped.Value.Name.Equals(god, StringComparison.OrdinalIgnoreCase)) continue;
             SetPlayerGodBoon(f, worshipped.Value.Name, domain, scalePct);
-            RecalculateForBoon(f);
+            RequestRecalcForBoon(f);
         }
     }
 
