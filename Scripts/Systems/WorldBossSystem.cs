@@ -67,17 +67,6 @@ namespace UsurperRemake.Systems
             return damage;
         }
 
-        /// <summary>
-        /// 1.2.0: a boss basic hit after Judicar's defence (DivineBlessingSystem.CalculateDamageReduction,
-        /// as CombatEngine.ProcessMonsterAction) and then the Team HQ Barracks. The 20%-of-STR minimum
-        /// holds where it held before.
-        /// </summary>
-        internal static long BossHitAfterDefences(Character player, WorldBossRuntimeData bossData, long beforeBarracks, out int divineCut)
-        {
-            divineCut = DivineBlessingSystem.Instance.CalculateDamageReduction(player, (int)Math.Min(beforeBarracks, int.MaxValue));
-            return Math.Max(Math.Min(beforeBarracks, BossMinimumDamage(bossData)), TeamHQBonus.ApplyDefense(player, beforeBarracks - divineCut));
-        }
-
         private readonly Random _rng = new();
 
         // v1.1.4: cooldowns and re-entry live on the player's world_boss_damage row, never in memory.
@@ -2034,8 +2023,10 @@ namespace UsurperRemake.Systems
             for (int i = 0; i < attacks && player.HP > 0; i++)
             {
                 long beforeBarracks = Math.Max(1, (long)(CalculateBossBasicDamage(bossData, player, rng, defendingRounds) * mult));
-                // v1.1.11: Team HQ Barracks last; 1.2.0: Judicar's defence before it
-                long bossDmg = BossHitAfterDefences(player, bossData, beforeBarracks, out int divineCut);
+                // 1.2.0: Judicar's defence, as CombatEngine.ProcessMonsterAction applies it to a basic hit
+                int divineCut = DivineBlessingSystem.Instance.CalculateDamageReduction(player, (int)Math.Min(beforeBarracks, int.MaxValue));
+                // v1.1.11: Team HQ Barracks last; the 20%-of-STR minimum holds where it held before.
+                long bossDmg = Math.Max(Math.Min(beforeBarracks, BossMinimumDamage(bossData)), TeamHQBonus.ApplyDefense(player, beforeBarracks - divineCut));
                 if (divineCut > 0)
                 {
                     terminal.SetColor("bright_cyan");

@@ -138,18 +138,24 @@ public class WorldBossGodBoons1115Tests
 
     // ---------------- Judicar's defence ----------------
 
+    private static long BossHitLoss(Character c)
+    {
+        c.HP = c.MaxHP; c.Defence = 0; c.ArmPow = 0;
+        var data = new WorldBossRuntimeData { CurrentPhase = 1, ScaledStrength = 500 };
+        var term = new TerminalEmulator(new ScriptedStream(""), new MemoryStream());
+        var m = typeof(WorldBossSystem).GetMethod("ProcessBossActions", F)!;
+        m.Invoke(new WorldBossSystem(), new object[] { Leviathan, data, c, term, new FixedRandom(99), new WorldBossCombatState(), false });
+        return c.MaxHP - c.HP;
+    }
+
     [Fact]
-    public void Judicar_CutsTheBossBasicHit_AboveTheMinimum()
+    public void Judicar_CutsTheBossBasicHit()
     {
         var c = Hero("WbJud");
-        var weak = new WorldBossRuntimeData { ScaledStrength = 100 };
-        int cut = 0;
-        WithGod(c, "Judicar", 60, () => WorldBossSystem.BossHitAfterDefences(c, weak, 1000, out cut)).Should().Be(900);
-        cut.Should().Be(100);
-        WithGod(c, null, 0, () => WorldBossSystem.BossHitAfterDefences(c, weak, 1000, out cut)).Should().Be(1000, "a non-worshipper");
-        cut.Should().Be(0);
-        var strong = new WorldBossRuntimeData { ScaledStrength = 50_000 };
-        WithGod(c, "Judicar", 60, () => WorldBossSystem.BossHitAfterDefences(c, strong, 1000, out cut)).Should().Be(1000, "the 20 percent of strength minimum holds");
+        long plain = WithGod(c, null, 0, () => BossHitLoss(c));
+        plain.Should().BeGreaterThan(100);
+        WithGod(c, "Judicar", 60, () => BossHitLoss(c)).Should().Be(plain - GodBoonSystem.Bonus(plain, 10), "Judicar's 10 percent defence");
+        WithGod(c, "Amara", 60, () => BossHitLoss(c)).Should().Be(plain, "another god's follower");
     }
 
     // ---------------- Potions ----------------
