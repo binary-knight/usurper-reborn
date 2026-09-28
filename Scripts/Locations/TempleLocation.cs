@@ -1216,6 +1216,7 @@ public partial class TempleLocation : BaseLocation
         terminal.WriteLine("");
         
         var activeGods = godSystem.GetActiveGods();
+        var standings = await GodRegistry.GetStandingsAsync(currentPlayer); // 1.2.0: real followers, not invented ones
         if (activeGods.Count == 0)
         {
             terminal.WriteLine(Loc.Get("temple.no_gods_exist"), "gray");
@@ -1224,8 +1225,9 @@ public partial class TempleLocation : BaseLocation
         {
             foreach (var god in activeGods.OrderByDescending(g => g.Experience))
             {
+                standings.TryGetValue(god.Name, out var standing);
                 terminal.WriteLine(Loc.Get("temple.altar_of", god.Name, god.GetTitle()), "yellow");
-                terminal.WriteLine(Loc.Get("temple.believers_count", god.Believers), "white");
+                terminal.WriteLine(Loc.Get("temple.believers_count", standing.Followers + GodRegistry.CountNpcFollowers(god.Name)), "white");
                 terminal.WriteLine(Loc.Get("temple.power_count", god.Experience), "cyan");
                 terminal.WriteLine("");
             }
@@ -1242,33 +1244,32 @@ public partial class TempleLocation : BaseLocation
         terminal.WriteLine("");
         terminal.WriteLine("");
 
-        var rankedGods = godSystem.ListGods(true);
-
-        // Build a unified ranking list: (name, title, followers, isPlayer)
-        var ranking = new List<(string Name, string Title, int Followers, bool IsPlayer)>();
-
-        foreach (var god in rankedGods)
-            ranking.Add((god.Name, god.GetTitle(), god.Believers, false));
-
-        // Add player immortals
+        // 1.2.0 Temple gods: one ranking of the unified god list (canon ten plus player-gods, never
+        // Manwe) by standing, the sum of the followers' Favor; followers are the saved characters
+        // worshipping the god plus living NPC followers
         var playerImmortals = await GetImmortalGodsAsync();
-        foreach (var ig in playerImmortals)
+        var godNames = playerImmortals.Select(ig => ig.DivineName).ToList();
+        if (currentPlayer.IsImmortal && !string.IsNullOrEmpty(currentPlayer.DivineName))
+            godNames.Add(currentPlayer.DivineName);
+        var standings = await GodRegistry.GetStandingsAsync(currentPlayer);
+
+        var ranking = new List<(string Name, string Title, int Followers, long Standing, bool IsPlayer)>();
+        foreach (var entry in GodRegistry.AllGods(godNames))
         {
-            int titleIdx = Math.Clamp(ig.GodLevel - 1, 0, GameConfig.GodTitles.Length - 1);
-            ranking.Add((ig.DivineName, GameConfig.GodTitles[titleIdx], ig.Believers, true));
+            string title;
+            if (entry.IsCanon)
+                title = godSystem.GetGod(entry.Name)?.GetTitle() ?? "";
+            else
+            {
+                var ig = playerImmortals.FirstOrDefault(i => i.DivineName.Equals(entry.Name, StringComparison.OrdinalIgnoreCase));
+                int level = ig?.GodLevel ?? currentPlayer.GodLevel;
+                title = GameConfig.GodTitles[Math.Clamp(level - 1, 0, GameConfig.GodTitles.Length - 1)];
+            }
+            standings.TryGetValue(entry.Name, out var standing);
+            ranking.Add((entry.Name, title, standing.Followers + GodRegistry.CountNpcFollowers(entry.Name), standing.Standing, !entry.IsCanon));
         }
 
-        // Also include current player if they're an immortal and not already listed
-        if (currentPlayer.IsImmortal && !string.IsNullOrEmpty(currentPlayer.DivineName)
-            && !ranking.Any(r => r.Name.Equals(currentPlayer.DivineName, StringComparison.OrdinalIgnoreCase)))
-        {
-            int titleIdx = Math.Clamp(currentPlayer.GodLevel - 1, 0, GameConfig.GodTitles.Length - 1);
-            int believers = PantheonLocation.CountBelievers(currentPlayer.DivineName);
-            ranking.Add((currentPlayer.DivineName, GameConfig.GodTitles[titleIdx], believers, true));
-        }
-
-        // Sort by followers descending
-        ranking = ranking.OrderByDescending(r => r.Followers).ToList();
+        ranking = ranking.OrderByDescending(r => r.Standing).ThenByDescending(r => r.Followers).ToList();
 
         if (ranking.Count == 0)
         {
@@ -1277,12 +1278,12 @@ public partial class TempleLocation : BaseLocation
         else
         {
             terminal.WriteLine(Loc.Get("temple.god_ranking_header"), "white");
-            WriteThickDivider(59, "magenta");
+            WriteThickDivider(71, "magenta");
 
             for (int i = 0; i < ranking.Count; i++)
             {
                 var entry = ranking[i];
-                string line = $"{(i + 1).ToString().PadLeft(3)}. {entry.Name.PadRight(25)} {entry.Title.PadRight(20)} {entry.Followers.ToString().PadLeft(10)}";
+                string line = $"{(i + 1).ToString().PadLeft(3)}. {entry.Name.PadRight(25)} {entry.Title.PadRight(20)} {entry.Followers.ToString().PadLeft(10)} {entry.Standing.ToString().PadLeft(8)}";
                 terminal.WriteLine(line, entry.IsPlayer ? "bright_cyan" : "yellow");
             }
         }
@@ -2562,6 +2563,9 @@ public partial class TempleLocation : BaseLocation
             await Task.Delay(1500);
             return;
         }
+
+        // 1.2.0 Temple gods: a prayer is devotion, so the neglect count starts over (either kind of god)
+        FavorSystem.MarkDevotion(currentPlayer);
 
         // === Prayer to an immortal player-god ===
         if (!string.IsNullOrEmpty(worshippedImmortal))

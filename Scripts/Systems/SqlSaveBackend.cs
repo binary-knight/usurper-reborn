@@ -1031,6 +1031,15 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex) { DebugLogger.Instance.LogWarning("SQL", $"creation_rolls not ensured: {ex.Message}"); }
 
+            // 1.2.0 Temple gods: each save key's god and Favor; a god's standing is the sum over its rows
+            try
+            {
+                using var migCmd = connection.CreateCommand();
+                migCmd.CommandText = "CREATE TABLE IF NOT EXISTS god_favor (username TEXT PRIMARY KEY, god_name TEXT NOT NULL, favor INTEGER NOT NULL DEFAULT 0, updated_at TEXT DEFAULT (datetime('now')));";
+                migCmd.ExecuteNonQuery();
+            }
+            catch (Exception ex) { DebugLogger.Instance.LogWarning("SQL", $"god_favor not ensured: {ex.Message}"); }
+
             // v1.1.14: one-time claims on an NPC's gear, so two processes cannot both take the same piece
             try
             {
@@ -1341,6 +1350,9 @@ namespace UsurperRemake.Systems
                 }
                 tx?.Commit();
                 DebugLogger.Instance.LogDebug("SQL", $"Saved game data for '{playerName}'");
+                // 1.2.0 Temple gods: the saved god and Favor feed god standing (a failure is logged, the save stands)
+                var (standingGod, standingFavor) = GodRegistry.StandingEntryFrom(data.Player, data.StorySystems?.PlayerGods);
+                UpsertGodFavor(normalizedUsername, standingGod, standingFavor);
                 return true;
             }
             catch (Exception ex)
@@ -1528,6 +1540,7 @@ namespace UsurperRemake.Systems
                 ExecPurge(connection, tx, "online_players",    "LOWER(username) = LOWER(@u)", username);
                 ExecPurge(connection, tx, "sleeping_players",  "LOWER(username) = LOWER(@u)", username);
                 ExecPurge(connection, tx, "creation_rolls",    "LOWER(username) = LOWER(@u)", username); // v1.1.15
+                ExecPurge(connection, tx, "god_favor",         "LOWER(username) = LOWER(@u)", username); // 1.2.0
                 // v1.1.14: wizard_flags (frozen, muted) are the account's, keyed by its login name; they are kept
                 // through a delete, so deleting and recreating a character no longer sheds them
 
@@ -4452,6 +4465,7 @@ namespace UsurperRemake.Systems
                         DELETE FROM wizard_flags;
                         DELETE FROM sleeping_players;
                         DELETE FROM creation_rolls;
+                        DELETE FROM god_favor;
                     ";
                     await cmd.ExecuteNonQueryAsync();
                 }
@@ -8905,6 +8919,68 @@ namespace UsurperRemake.Systems
             {
                 DebugLogger.Instance.LogError("SQL", $"Failed to save creation roll for {username}: {ex.Message}");
             }
+        }
+
+        // =====================================================================
+        // 1.2.0 Temple gods: god standing (one row per save key: its god and Favor)
+        // =====================================================================
+
+        /// <summary>
+        /// 1.2.0: record a save key's god and Favor for god standing, replacing its earlier row; a blank
+        /// god removes the row. Written with every save (WriteGameDataCore), so every god switch and
+        /// Favor change that is saved, by any path, is counted.
+        /// </summary>
+        public void UpsertGodFavor(string username, string? god, int favor)
+        {
+            if (string.IsNullOrWhiteSpace(username)) return;
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                if (string.IsNullOrWhiteSpace(god))
+                {
+                    cmd.CommandText = "DELETE FROM god_favor WHERE username = LOWER(@username);";
+                }
+                else
+                {
+                    cmd.CommandText = "INSERT OR REPLACE INTO god_favor (username, god_name, favor, updated_at) VALUES (LOWER(@username), @god, @favor, datetime('now'));";
+                    cmd.Parameters.AddWithValue("@god", god.Trim());
+                    cmd.Parameters.AddWithValue("@favor", Math.Clamp(favor, GameConfig.GodFavorMin, GameConfig.GodFavorMax));
+                }
+                cmd.Parameters.AddWithValue("@username", username);
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to record god Favor for {username}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 1.2.0: every god's standing (sum of its followers' Favor) and follower count, from the saved
+        /// rows of characters that are not banned. Canon names come back in their canon spelling.
+        /// </summary>
+        public Dictionary<string, GodStanding> GetGodStandings()
+        {
+            var rows = new List<(string God, int Favor)>();
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT g.god_name, g.favor FROM god_favor g
+                    JOIN players p ON LOWER(p.username) = g.username
+                    WHERE p.is_banned = 0 AND p.username NOT LIKE 'emergency_%'
+                      AND p.player_data != '{}' AND LENGTH(p.player_data) > 2;";
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                    rows.Add((reader.GetString(0), reader.GetInt32(1)));
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to read god standings: {ex.Message}");
+            }
+            return GodRegistry.ComputeStandings(rows);
         }
 
         /// <summary>v1.1.15: drop the stat roll in progress for a save key (the character was first saved).</summary>

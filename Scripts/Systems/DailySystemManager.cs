@@ -410,6 +410,9 @@ public class DailySystemManager
         MentalSystem.ApplyDailyReset(player);
         if (terminal != null) MentalUi.AnnounceMentalChange(terminal, player, mentalBefore);
 
+        // 1.2.0 Temple gods: clears today's Favor gains per source and applies neglect. The only production caller.
+        FavorSystem.ApplyDailyReset(player);
+
         // Weekly rankings update (every Monday) — only in online mode
         // Must use Eastern time for day-of-week check since daily reset fires at 7 PM Eastern
         if (UsurperRemake.BBS.DoorMode.IsOnlineMode)

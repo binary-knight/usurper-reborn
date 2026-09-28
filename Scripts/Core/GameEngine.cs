@@ -2859,6 +2859,7 @@ public partial class GameEngine
             // entry for a deleted same-name character was restored with any save.
             string? godRestoreFilter = GodRestoreFilterFor(currentPlayer);
             SaveSystem.Instance.RestoreStorySystems(saveData.StorySystems, godRestoreFilter);
+            GodRegistry.ApplyLoad(currentPlayer); // 1.2.0: one god, then the Favor schema guard
             AwakeningBonus.RecalculateAfterRestore(currentPlayer, saveData.Player?.HP ?? 0, saveData.Player?.Mana ?? 0); // v1.1.12
 
             // Migration: sync RelationshipSystem with RomanceTracker for saves affected by
@@ -3085,25 +3086,9 @@ public partial class GameEngine
 
             // Manwe worship cleanup: Manwe (Supreme Creator / final boss) is not a valid
             // worship target — players could select it at the temple due to missing filter.
+            // Dual-worship cleanup: one god only, the canon god wins (1.2.0: GodRegistry, also run at restore)
             if (currentPlayer != null)
-            {
-                var godSystem = UsurperRemake.GodSystemSingleton.Instance;
-                var elderGod = godSystem?.GetPlayerGod(currentPlayer.Name2);
-                if (elderGod == GameConfig.SupremeCreatorName)
-                {
-                    DebugLogger.Instance.LogWarning("WORSHIP", $"Cleaned up invalid Manwe worship for {currentPlayer.Name2}");
-                    godSystem?.SetPlayerGod(currentPlayer.Name2, "");
-                    elderGod = "";
-                }
-
-                // Dual-worship cleanup: player can't worship both an elder god and a player-god
-                if (!string.IsNullOrEmpty(currentPlayer.WorshippedGod) && !string.IsNullOrEmpty(elderGod))
-                {
-                    // Elder god takes priority — clear the player-god worship
-                    DebugLogger.Instance.LogWarning("WORSHIP", $"Dual worship detected for {currentPlayer.Name2}: elder god '{elderGod}' + immortal '{currentPlayer.WorshippedGod}'. Clearing immortal.");
-                    currentPlayer.WorshippedGod = "";
-                }
-            }
+                GodRegistry.EnforceSingleGod(currentPlayer);
 
             // Marriage cleanup: verify spouse NPC still exists and is alive
             if (currentPlayer != null && currentPlayer.IsMarried && !string.IsNullOrEmpty(currentPlayer.SpouseName))
@@ -4758,6 +4743,7 @@ public partial class GameEngine
         // snapshots would overwrite their current worship choices in the shared GodSystem.
         string? godFilter = GodRestoreFilterFor(currentPlayer); // v1.1.11: single-player too
         SaveSystem.Instance.RestoreStorySystems(saveData.StorySystems, godFilter);
+        GodRegistry.ApplyLoad(currentPlayer); // 1.2.0: one god, then the Favor schema guard
         AwakeningBonus.RecalculateAfterRestore(currentPlayer, saveData.Player?.HP ?? 0, saveData.Player?.Mana ?? 0); // v1.1.12
 
         // In online mode, override royal court, children, and marriages with world_state
@@ -5599,6 +5585,13 @@ public partial class GameEngine
             GodAlignment = playerData.GodAlignment ?? "",
             AscensionDate = playerData.AscensionDate,
             WorshippedGod = playerData.WorshippedGod ?? "",
+            // 1.2.0: Favor as saved; the schema guard and the bind to the god run in
+            // GodRegistry.ApplyLoad once the save's worship entry is restored
+            GodFavor = Math.Clamp(playerData.GodFavor, GameConfig.GodFavorMin, GameConfig.GodFavorMax),
+            GodFavorGod = playerData.GodFavorGod ?? "",
+            GodFavorSchema = playerData.GodFavorSchema,
+            GodFavorDayGains = playerData.GodFavorDayGains != null ? new Dictionary<string, int>(playerData.GodFavorDayGains) : new Dictionary<string, int>(),
+            DaysSinceDevotion = Math.Max(0, playerData.DaysSinceDevotion),
             DivineBlessingCombats = playerData.DivineBlessingCombats,
             DivineBlessingBonus = playerData.DivineBlessingBonus,
             DivineBoonConfig = playerData.DivineBoonConfig ?? "",

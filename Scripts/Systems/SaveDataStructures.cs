@@ -778,6 +778,11 @@ namespace UsurperRemake.Systems
         public DateTime AscensionDate { get; set; }
         public bool HasEarnedAltSlot { get; set; }  // Account has earned the alt character slot
         public string WorshippedGod { get; set; } = "";  // Mortal worship: DivineName of an immortal player-god
+        public int GodFavor { get; set; }  // 1.2.0: Favor 0..100 with the worshipped god
+        public string GodFavorGod { get; set; } = "";  // 1.2.0: the god GodFavor belongs to
+        public int GodFavorSchema { get; set; }  // 1.2.0: 0 = a save from before Favor; old saves read 0
+        public Dictionary<string, int> GodFavorDayGains { get; set; } = new();  // 1.2.0: FavorSource name -> Favor gained today
+        public int DaysSinceDevotion { get; set; }  // 1.2.0: daily resets since the last devotion
         public int DivineBlessingCombats { get; set; }
         public float DivineBlessingBonus { get; set; }
         public string DivineBoonConfig { get; set; } = "";  // Gods: comma-separated "boonId:tier" boon configuration
@@ -1286,9 +1291,6 @@ namespace UsurperRemake.Systems
         // News and history
         public List<NewsEntryData> RecentNews { get; set; } = new();
 
-        // God system state
-        public Dictionary<string, GodStateData> GodStates { get; set; } = new();
-
         // Marketplace listings
         public List<MarketListingData> MarketplaceListings { get; set; } = new();
 
@@ -1557,19 +1559,6 @@ namespace UsurperRemake.Systems
         public DateTime Timestamp { get; set; }
         public string Author { get; set; } = "";
         public List<string> Tags { get; set; } = new();
-    }
-
-    /// <summary>
-    /// God state data
-    /// </summary>
-    public class GodStateData
-    {
-        public string GodId { get; set; } = "";
-        public string Name { get; set; } = "";
-        public long Power { get; set; }
-        public int Followers { get; set; }
-        public DateTime LastActivity { get; set; }
-        public Dictionary<string, object> Attributes { get; set; } = new();
     }
 
     /// <summary>

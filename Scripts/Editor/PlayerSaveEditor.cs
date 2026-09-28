@@ -280,6 +280,14 @@ internal static class PlayerSaveEditor
         p.MentalDrugUses = EditorIO.PromptInt("Drug uses within the tolerance window", p.MentalDrugUses, min: 0);
         p.MentalLastDrugDay = EditorIO.PromptInt("Game day of the last drug use", p.MentalLastDrugDay, min: 0);
 
+        EditorIO.Info("-- God Favor (1.2.0) --");
+        p.GodFavorSchema = EditorIO.PromptInt("God Favor schema (0 = legacy, sets Favor 10 with the current god on load; 1 = current)", p.GodFavorSchema, min: 0, max: GameConfig.GodFavorSchemaCurrent);
+        p.GodFavor = EditorIO.PromptInt($"Favor with the worshipped god ({GameConfig.GodFavorMin}-{GameConfig.GodFavorMax})", p.GodFavor, min: GameConfig.GodFavorMin, max: GameConfig.GodFavorMax);
+        p.GodFavorGod = EditorIO.PromptString("God the Favor belongs to (must match the worshipped god, else Favor reads 0)", p.GodFavorGod ?? "");
+        p.DaysSinceDevotion = EditorIO.PromptInt("Daily resets since the last devotion (neglect)", p.DaysSinceDevotion, min: 0);
+        if (EditorIO.PromptBool("Clear today's Favor gains per source", false))
+            p.GodFavorDayGains = new Dictionary<string, int>();
+
         EditorIO.Info("— Difficulty —");
         p.Difficulty = EditorIO.PromptEnum("Difficulty", p.Difficulty);
     }

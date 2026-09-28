@@ -8626,7 +8626,7 @@
   "temple.altar_of": "Autel de {0} le {1}",
   "temple.believers_count": "  Croyants : {0}",
   "temple.power_count": "  Puissance : {0}",
-  "temple.god_ranking_header": "   Immortels               Rang                Fidèles",
+  "temple.god_ranking_header": "     Dieux                     Rang                    Fidèles   Faveur",
   "temple.gods_watch": "Les dieux veillent sur le royaume...",
   "temple.divine_interventions": "Les interventions divines façonnent le destin des mortels...",
   "temple.prayers_reach": "Les prières et les sacrifices parviennent aux cieux...",
