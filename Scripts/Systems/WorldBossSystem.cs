@@ -1674,10 +1674,17 @@ namespace UsurperRemake.Systems
                     int spellDur = result.Duration > 0 ? result.Duration : 3;
                     if (result.ProtectionBonus > 0)
                     {
-                        player.TempDefenseBonus = Math.Max(player.TempDefenseBonus, result.ProtectionBonus);
+                        // v1.1.15: a Sage's ward takes the seal bonus, the same helper as in the dungeon
+                        int ward = CombatEngine.SageWardWithSeals(player, result.ProtectionBonus, out int sealPercent);
+                        if (sealPercent > 0)
+                        {
+                            terminal.SetColor("bright_cyan");
+                            terminal.WriteLine($"  {Loc.Get("combat.sage_seal_ward", player.DisplayName, sealPercent)}");
+                        }
+                        player.TempDefenseBonus = Math.Max(player.TempDefenseBonus, ward);
                         player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, spellDur);
                         terminal.SetColor("cyan");
-                        terminal.WriteLine($"  {Loc.Get("world_boss.protection_increased", result.ProtectionBonus)}");
+                        terminal.WriteLine($"  {Loc.Get("world_boss.protection_increased", ward)}");
                     }
                     if (result.AttackBonus > 0)
                     {
