@@ -22536,6 +22536,7 @@
   "secretboss.press_begin": "Appuie sur Entrée pour commencer le combat...",
   "secretboss.reward_xp": "(+{0} Expérience)",
   "secretboss.reward_gold": "(+{0} Or)",
+  "secretboss.group_share": "{0} est vaincu. Votre part : +{1} d'expérience, +{2} pièces d'or. La chambre est aussi dégagée pour vous.",
   "secretboss.speaks_label": "[{0} parle...]",
   "dream.dream_drowning.title": "Se noyer dans la lumière",
   "dream.dream_drowning.content.0": "Tu rêves que tu te noies.",

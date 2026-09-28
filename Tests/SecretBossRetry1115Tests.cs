@@ -44,7 +44,7 @@ public class SecretBossRetry1115Tests
 
     private static Task Finish(DungeonLocation d, DungeonRoom room, Character hero, Monster boss, CombatResult r) =>
         (Task)typeof(DungeonLocation).GetMethod("FinishSecretBoss", F)!
-            .Invoke(d, new object[] { room, SecretBossType.EchoOfSelf, hero, boss, r })!;
+            .Invoke(d, new object[] { room, SecretBossType.EchoOfSelf, hero, boss, r, new List<Character>() })!;
 
     private static string[] Keys(int n) => Enumerable.Repeat("", n).ToArray();
 

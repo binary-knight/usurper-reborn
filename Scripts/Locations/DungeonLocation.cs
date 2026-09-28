@@ -16102,11 +16102,17 @@ public class DungeonLocation : BaseLocation
         // Create the boss monster for actual combat (a wrong pre-fight choice hits harder this fight)
         var bossMonster = bossMgr.CreateBossMonster(bossType.Value, player.Level, encounterResult.WrongChoice ? 1.5 : 1.0);
 
+        // v1.1.15: the grouped players in the party when the fight starts (a follower who dies or
+        // leaves is removed from teammates during the fight)
+        List<Character> groupedAtStart;
+        lock (teammates)
+            groupedAtStart = teammates.Where(t => t != null && t.IsGroupedPlayer).ToList();
+
         // Engage in combat with the secret boss
         var combatEngine = new CombatEngine(terminal);
         var combatResult = await combatEngine.PlayerVsMonster(player, bossMonster, teammates);
 
-        await FinishSecretBoss(room, bossType.Value, player, bossMonster, combatResult);
+        await FinishSecretBoss(room, bossType.Value, player, bossMonster, combatResult, groupedAtStart);
     }
 
     /// <summary>
@@ -16114,7 +16120,7 @@ public class DungeonLocation : BaseLocation
     /// the rewards, so a dropped connection during the victory text cannot pay the win twice; any other
     /// end leaves the room as it was.
     /// </summary>
-    private async Task FinishSecretBoss(DungeonRoom room, SecretBossType bossType, Character player, Monster bossMonster, CombatResult combatResult)
+    private async Task FinishSecretBoss(DungeonRoom room, SecretBossType bossType, Character player, Monster bossMonster, CombatResult combatResult, List<Character> groupedAtStart)
     {
         var bossMgr = SecretBossManager.Instance;
 
@@ -16145,6 +16151,12 @@ public class DungeonLocation : BaseLocation
             // Finding and beating a secret boss chamber counts as discovering a secret
             player.Statistics.RecordSecretFound();
 
+            // v1.1.15: every grouped player who fought and is standing at the end gets the chamber
+            // cleared in their own floor state and the victory reward once (the boss monster pays
+            // nothing on the kill)
+            foreach (var mate in groupedAtStart.Where(m => m != null && m.IsAlive && !ReferenceEquals(m, player)))
+                RewardSecretBossParticipant(mate, bossType, room.Id);
+
             // Player won - handle victory through the SecretBossManager
             await bossMgr.HandleVictory(bossType, player, terminal);
 
@@ -16164,6 +16176,65 @@ public class DungeonLocation : BaseLocation
 
         terminal.WriteLine(Loc.Get("dungeon.secret_boss_remains"), "gray");
         await terminal.PressAnyKey();
+    }
+
+    /// <summary>
+    /// v1.1.15: a grouped player's part of a secret boss win: the chamber marked in their own floor
+    /// state (and in their own cached floor, so a later save of that floor does not undo it), the
+    /// secret counted, and RewardXP and RewardGold paid once, as the leader's victory screen pays them.
+    /// </summary>
+    private void RewardSecretBossParticipant(Character mate, SecretBossType bossType, string roomId)
+    {
+        var session = GroupSystem.GetSession(mate.GroupPlayerUsername ?? "");
+        var theirDungeon = session?.Context?.LocationManager?.GetLocation(GameLocation.Dungeons) as DungeonLocation;
+        MarkSecretBossWon(mate, theirDungeon, currentDungeonLevel, roomId);
+        mate.Statistics.RecordSecretFound();
+
+        var boss = SecretBossManager.Instance.GetBoss(bossType);
+        if (boss == null) return;
+        long xp = TeamHQBonus.ApplyXP(mate, boss.RewardXP);
+        mate.Experience += xp;
+        mate.Gold += boss.RewardGold;
+        if (mate.AutoLevelUp)
+            LevelMasterLocation.CheckAutoLevelUp(mate);
+
+        session?.EnqueueMessage($"\u001b[1;33m  {Loc.Get("secretboss.group_share", boss.Name, xp, boss.RewardGold)}\u001b[0m");
+    }
+
+    /// <summary>
+    /// v1.1.15: mark a won secret boss chamber in one player's saved floor state, and in that player's
+    /// own cached floor when it is the same floor.
+    /// </summary>
+    private static void MarkSecretBossWon(Character who, DungeonLocation? theirDungeon, int floorLevel, string roomId)
+    {
+        if (!who.DungeonFloorStates.TryGetValue(floorLevel, out var floorState))
+        {
+            floorState = new DungeonFloorState
+            {
+                FloorLevel = floorLevel,
+                LastVisitedAt = DateTime.Now,
+                RoomStates = new Dictionary<string, DungeonRoomState>()
+            };
+            who.DungeonFloorStates[floorLevel] = floorState;
+        }
+        if (!floorState.RoomStates.TryGetValue(roomId, out var roomState))
+        {
+            roomState = new DungeonRoomState { RoomId = roomId };
+            floorState.RoomStates[roomId] = roomState;
+        }
+        roomState.EventCompleted = true;
+        roomState.SecretBossDefeated = true;
+
+        var cached = theirDungeon?.currentFloor;
+        if (cached != null && cached.Level == floorLevel)
+        {
+            var cachedRoom = cached.Rooms.FirstOrDefault(r => r.Id == roomId);
+            if (cachedRoom != null)
+            {
+                cachedRoom.EventCompleted = true;
+                cachedRoom.SecretBossDefeated = true;
+            }
+        }
     }
 
     private async Task QuitToDungeon()

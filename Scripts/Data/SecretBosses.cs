@@ -624,8 +624,10 @@ namespace UsurperRemake.Data
                 Defence = boss.Stats.Defense + effectiveLevel,          // Defence (Pascal spelling)
                 Punch = attack + (effectiveLevel * 2),       // Punch used in combat
                 MagicLevel = (byte)Math.Min(255, boss.Stats.MagicPower / 10),
-                Gold = boss.RewardGold,
-                Experience = boss.RewardXP,
+                // v1.1.15: the kill pays nothing of its own; HandleVictory (leader) and
+                // DungeonLocation.FinishSecretBoss (grouped players) pay RewardXP and RewardGold once
+                Gold = 0,
+                Experience = 0,
                 IsBoss = true,
                 Phrase = $"\"{boss.LocBattleCry()}\""
             };

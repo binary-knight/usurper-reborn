@@ -22536,6 +22536,7 @@
   "secretboss.press_begin": "Premi Invio per cominciare la battaglia...",
   "secretboss.reward_xp": "(+{0} Esperienza)",
   "secretboss.reward_gold": "(+{0} Oro)",
+  "secretboss.group_share": "{0} è sconfitto. La tua parte: +{1} esperienza, +{2} oro. La camera è liberata anche per te.",
   "secretboss.speaks_label": "[{0} parla...]",
   "dream.dream_drowning.title": "Annegare nella Luce",
   "dream.dream_drowning.content.0": "Sogni di annegare.",

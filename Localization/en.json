@@ -22979,6 +22979,7 @@
   "secretboss.press_begin": "Press Enter to begin the battle...",
   "secretboss.reward_xp": "(+{0} Experience)",
   "secretboss.reward_gold": "(+{0} Gold)",
+  "secretboss.group_share": "{0} is defeated. Your share: +{1} Experience, +{2} Gold. The chamber is cleared for you as well.",
   "secretboss.speaks_label": "[{0} speaks...]",
   "dream.dream_drowning.title": "Drowning in Light",
   "dream.dream_drowning.content.0": "You dream of drowning.",
