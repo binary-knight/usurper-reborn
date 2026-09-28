@@ -859,6 +859,7 @@ public partial class TempleLocation : BaseLocation
                     terminal.SetColor("yellow");
                     terminal.WriteLine(Loc.Get("temple.bond_severed", currentPlayer.WorshippedGod));
                     currentPlayer.WorshippedGod = "";
+                    GodBoonSystem.RecalculateForBoon(currentPlayer);   // 1.2.0: the player-god's boons go with the god
                     if (DoorMode.IsOnlineMode)
                     {
                         try

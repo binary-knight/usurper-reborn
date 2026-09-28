@@ -378,13 +378,62 @@ public static class GodBoonSystem
     /// Recalculates a player's stats after an input of a god boon changed (the god, the Favor tier,
     /// a player-god's domain or scale), so Terran's max HP follows at once. HP is only clamped to
     /// the new max, never raised. NPCs are skipped, and so is a GodSystem other than the shared one,
-    /// since RecalculateStats reads the shared registry.
+    /// since RecalculateStats reads the shared registry. A player who follows no player-god loses
+    /// the configured boons (CachedBoonEffects) first, so their max HP and mana go with the god.
     /// </summary>
     public static void RecalculateForBoon(Character c, GodSystem? gods = null)
     {
         if (c == null || c.IsNPC) return;
+        if (string.IsNullOrWhiteSpace(c.WorshippedGod)) c.CachedBoonEffects = null;
         if (gods != null && !ReferenceEquals(gods, UsurperRemake.GodSystemSingleton.Instance)) return;
         c.RecalculateStats();
+    }
+
+    /// <summary>
+    /// A player-god's configured boons (Pantheon) reach a follower: the cache is set from the
+    /// config and the stats are recalculated, so the boons on max HP and mana follow at once.
+    /// </summary>
+    public static void SetConfiguredBoons(Character c, string config)
+    {
+        if (c == null || c.IsNPC) return;
+        c.CachedBoonEffects = DivineBoonRegistry.CalculateEffects(config);
+        RecalculateForBoon(c);
+    }
+
+    /// <summary>
+    /// A player was recruited by an immortal (Pantheon): the follower takes the god's configured
+    /// boons and the god's domain at the given scale, and the stats are recalculated.
+    /// </summary>
+    public static void ApplyRecruit(Character immortal, Character follower, int scalePct)
+    {
+        if (immortal == null || follower == null || follower.IsNPC || string.IsNullOrWhiteSpace(immortal.DivineName)) return;
+        SetConfiguredBoons(follower, immortal.DivineBoonConfig);
+        ApplyDomainChange(immortal.DivineName, ParseDomain(immortal.DivineDomain), scalePct, new[] { follower });
+    }
+
+    /// <summary>
+    /// Online: a player recruited by an immortal gets the god's boons at once, at the god's current
+    /// scale (the immortal is online, so no idle decay). The domain comes from the immortal in
+    /// memory, like ApplyDomainChangeAsync. A standings read that fails applies scale 0 until the
+    /// next refresh (login or Temple).
+    /// </summary>
+    public static async Task ApplyRecruitAsync(Character immortal, Character follower)
+    {
+        if (immortal == null || follower == null || string.IsNullOrWhiteSpace(immortal.DivineName)) return;
+        int scale = 0;
+        if (UsurperRemake.BBS.DoorMode.IsOnlineMode && SaveSystem.Instance?.Backend is SqlSaveBackend backend)
+        {
+            try
+            {
+                var standings = await Task.Run(() => backend.GetGodStandings());
+                scale = PlayerGodScalePct(StandingOf(standings, immortal.DivineName), StrongestCanon(standings), 0);
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogWarning("FAITH", $"Player-god scale unavailable for the recruit of {immortal.DivineName}: {ex.Message}");
+            }
+        }
+        ApplyRecruit(immortal, follower, scale);
     }
 
     /// <summary>

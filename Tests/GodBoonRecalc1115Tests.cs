@@ -227,4 +227,96 @@ public class GodBoonRecalc1115Tests
             .Should().Contain("int scale = PlayerGodScalePct(StandingOf(standings, god), StrongestCanon(standings), 0);")
             .And.Contain("ApplyDomainChange(god, ParseDomain(immortal.DivineDomain), scale, followers);");
     }
+
+    // ---------------- A player-god's configured boons (Pantheon) ----------------
+
+    private static Character Caster(string name)
+    {
+        var c = Hero(name);
+        c.Class = CharacterClass.Magician;
+        c.BaseMaxMana = 100; c.MaxMana = 100; c.Mana = 100;
+        return c;
+    }
+
+    [Fact]
+    public void Leaving_APlayerGod_ClearsTheConfiguredBoons_AndClampsHpAndMana()
+    {
+        var c = Caster("GbrLeave");
+        long plain = PlainMaxHp(c);
+        long plainMana = c.MaxMana;
+        plainMana.Should().BeGreaterThan(0);
+        try
+        {
+            GodRegistry.SetWorshippedGod(c, "GbrLeaveGod").Should().BeTrue();
+            GodBoonSystem.SetConfiguredBoons(c, "divine_vitality:3,mana_well:3");
+            c.MaxHP.Should().BeGreaterThan(plain);
+            c.MaxMana.Should().BeGreaterThan(plainMana);
+            c.HP = c.MaxHP; c.Mana = c.MaxMana;
+
+            GodRegistry.SetWorshippedGod(c, null);
+            c.CachedBoonEffects.Should().BeNull("the configured boons go with the god");
+            c.MaxHP.Should().Be(plain);
+            c.MaxMana.Should().Be(plainMana);
+            c.HP.Should().Be(plain, "HP is clamped to the lower max");
+            c.Mana.Should().Be(plainMana, "mana is clamped to the lower max");
+        }
+        finally { GodRegistry.SetWorshippedGod(c, null); }
+    }
+
+    [Fact]
+    public void Reconfig_TheFollowersTakeTheNewBoons_AndRecalculate()
+    {
+        var c = Caster("GbrReconfig");
+        long plain = PlainMaxHp(c);
+        long plainMana = c.MaxMana;
+        try
+        {
+            GodRegistry.SetWorshippedGod(c, "GbrReconfigGod").Should().BeTrue();
+            GodBoonSystem.SetConfiguredBoons(c, "divine_vitality:3");
+            var effects = DivineBoonRegistry.CalculateEffects("divine_vitality:3");
+            c.MaxHP.Should().Be(plain + (long)(plain * effects.MaxHPPercent), "the new boons are on max HP at once");
+            c.MaxMana.Should().Be(plainMana);
+            c.HP = c.MaxHP;
+
+            GodBoonSystem.SetConfiguredBoons(c, "");
+            c.MaxHP.Should().Be(plain, "a boon taken away is off max HP at once");
+            c.HP.Should().Be(plain, "HP is clamped to the lower max");
+        }
+        finally { GodRegistry.SetWorshippedGod(c, null); }
+
+        Body("Scripts/Locations/PantheonLocation.cs", "private static void NotifyOnlineFollowers(")
+            .Should().Contain("GodBoonSystem.SetConfiguredBoons(player, newConfig);")
+            .And.NotContain("CachedBoonEffects =");
+    }
+
+    [Fact]
+    public void Recruit_TheFollowerTakesTheGodsDomainAndBoons_AtOnce()
+    {
+        var f = Hero("GbrRecruit");
+        long plain = PlainMaxHp(f);
+        var god = new Character
+        {
+            Name1 = "GbrRecruitImm", Name2 = "GbrRecruitImm", AI = CharacterAI.Human, IsImmortal = true,
+            DivineName = "GbrRecruitGod", DivineDomain = "Earth", DivineBoonConfig = "divine_vitality:1"
+        };
+        try
+        {
+            GodRegistry.SetWorshippedGod(f, "GbrOldGod").Should().BeTrue();
+            GodBoonSystem.SetConfiguredBoons(f, "divine_vitality:3");
+            GodRegistry.SetWorshippedGod(f, "GbrRecruitGod").Should().BeTrue();
+            f.GodFavor = GameConfig.GodFavorTierZealotMin;
+
+            GodBoonSystem.ApplyRecruit(god, f, 100);
+            f.PlayerGodBoonGod.Should().Be("GbrRecruitGod");
+            f.PlayerGodBoonDomain.Should().Be(GodDomain.Earth, "the new god's domain is cached at once");
+            f.PlayerGodBoonScalePct.Should().Be(100);
+            long withVitality = plain + (long)(plain * DivineBoonRegistry.CalculateEffects("divine_vitality:1").MaxHPPercent);
+            f.MaxHP.Should().Be(TerranAt(withVitality, 100), "the new god's boons replace the old god's");
+        }
+        finally { GodRegistry.SetWorshippedGod(f, null); }
+
+        Regex.IsMatch(Body("Scripts/Locations/PantheonLocation.cs", "private async Task ApplyRecruitToPlayer("),
+                @"GodRegistry\.SetWorshippedGod\(player, godName\);[^\n]*\n\s*await GodBoonSystem\.ApplyRecruitAsync\(currentPlayer, player\);")
+            .Should().BeTrue();
+    }
 }
