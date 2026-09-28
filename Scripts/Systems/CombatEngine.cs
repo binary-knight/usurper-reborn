@@ -7360,11 +7360,8 @@ public partial class CombatEngine
                 expReward = (long)(expReward * guildMult);
         }
 
-        // Fatigue XP penalty — Exhausted tier only (single-player only)
-        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && result.Player.Fatigue >= GameConfig.FatigueExhaustedThreshold)
-        {
-            expReward -= (long)(expReward * GameConfig.FatigueExhaustedXPPenalty);
-        }
+        // Fatigue XP penalty, Exhausted tier only (single-player only). v1.1.15: a cut, not a bonus
+        expReward = MentalSystem.ApplyFatigueXp(result.Player, expReward, UsurperRemake.BBS.DoorMode.IsOnlineMode);
 
         // v1.1.15: the Broken affliction costs 25% of XP gained
         expReward = MentalSystem.ApplyBrokenXp(result.Player, expReward);
@@ -21426,11 +21423,9 @@ public partial class CombatEngine
                 adjustedExp = xpMods.Note(adjustedExp, (long)(adjustedExp * guildMultMM), "guild");
         }
 
-        // Fatigue XP penalty — Exhausted tier only (single-player only)
+        // Fatigue XP penalty, Exhausted tier only (single-player only). v1.1.15: a cut, not a bonus
         if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && result.Player.Fatigue >= GameConfig.FatigueExhaustedThreshold)
-        {
-            adjustedExp = xpMods.Note(adjustedExp, adjustedExp - (long)(adjustedExp * GameConfig.FatigueExhaustedXPPenalty), "fatigue");
-        }
+            adjustedExp = xpMods.Note(adjustedExp, MentalSystem.ApplyFatigueXp(result.Player, adjustedExp, false), "fatigue");
 
         // v1.1.15: the Broken affliction costs 25% of XP gained
         if (result.Player.MentalBroken)

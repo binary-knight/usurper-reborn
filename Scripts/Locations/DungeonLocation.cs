@@ -4771,11 +4771,13 @@ public class DungeonLocation : BaseLocation
     }
 
     /// <summary>
-    /// v1.1.15: the Mental check before going deeper (the stairs, or a jump to a deeper floor).
-    /// The Broken affliction refuses it outright. Breaking asks two yes/no questions (AskYesNoAsync)
-    /// and either no turns the player back. Returns true when the descent may go ahead.
+    /// v1.1.15: the Mental check before going deeper, shared by every path that moves the player to a
+    /// deeper floor (the stairs, a jump to a deeper floor, the portal). The Broken affliction refuses
+    /// it outright. Breaking asks two yes/no questions (AskYesNoAsync) and either no turns the player
+    /// back. portal picks the portal wording. Returns true when the descent may go ahead.
+    /// DungeonMentalDescentGate1115Tests fails when a floor change in this file is not preceded by it.
     /// </summary>
-    internal async Task<bool> ConfirmMentalDescent(Character? player)
+    internal async Task<bool> ConfirmMentalDescent(Character? player, bool portal = false)
     {
         if (player == null) return true;
         var rule = MentalSystem.GetDescentRule(player);
@@ -4788,10 +4790,10 @@ public class DungeonLocation : BaseLocation
         }
         if (rule != MentalDescent.AskTwice) return true;
         terminal.WriteLine("");
-        if (await terminal.AskYesNoAsync(Loc.Get("mental.descend_confirm_1"))
+        if (await terminal.AskYesNoAsync(Loc.Get(portal ? "mental.portal_confirm_1" : "mental.descend_confirm_1"))
             && await terminal.AskYesNoAsync(Loc.Get("mental.descend_confirm_2")))
             return true;
-        terminal.WriteLine(Loc.Get("mental.descend_turned_back"), "gray");
+        terminal.WriteLine(Loc.Get(portal ? "mental.portal_turned_back" : "mental.descend_turned_back"), "gray");
         await Task.Delay(1000);
         return false;
     }
@@ -8104,6 +8106,9 @@ public class DungeonLocation : BaseLocation
                 // Teleport deeper (5-10 floors)
                 int floorsDown = dungeonRandom.Next(5, 11);
                 int newFloor = Math.Min(currentDungeonLevel + floorsDown, GameConfig.MaxDungeonLevel);
+                // v1.1.15: Mental before the portal takes the player deeper (Broken refuses, Breaking asks twice)
+                if (newFloor > currentDungeonLevel && !await ConfirmMentalDescent(currentPlayer, portal: true))
+                    return;
                 terminal.SetColor("cyan");
                 terminal.WriteLine(Loc.Get("dungeon.portal_whisks_deeper"));
                 terminal.WriteLine(Loc.Get("dungeon.portal_emerge_floor", newFloor));
@@ -10459,6 +10464,9 @@ public class DungeonLocation : BaseLocation
         }
         else if (currentDungeonLevel < maxDungeonLevel)
         {
+            // v1.1.15: Mental before going deeper
+            if (!await ConfirmMentalDescent(player))
+                return;
             int nextLevel = currentDungeonLevel + 1;
             var floorResult = GenerateOrRestoreFloor(player, nextLevel);
             currentFloor = floorResult.Floor;
@@ -16164,6 +16172,9 @@ public class DungeonLocation : BaseLocation
         }
         else
         {
+            // v1.1.15: Mental before the jump deeper
+            if (!await ConfirmMentalDescent(GetCurrentPlayer()))
+                return;
             currentDungeonLevel = targetLevel;
             if (currentPlayer != null) { currentPlayer.CurrentLocation = $"Dungeon Floor {currentDungeonLevel}"; currentPlayer.LastDungeonFloor = currentDungeonLevel; }
             terminal.WriteLine(Loc.Get("dungeon.steel_nerves", currentDungeonLevel), "magenta");

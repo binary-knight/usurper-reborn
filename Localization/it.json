@@ -6051,6 +6051,8 @@
   "mental.descend_confirm_2": "La tua mente è sul punto di spezzarsi. Sei sicuro di voler scendere più in profondità?",
   "mental.descend_turned_back": "Ti allontani dalle scale.",
   "mental.descend_refused": "La tua mente è spezzata. Non riesci a scendere più in profondità finché non viene curata.",
+  "mental.portal_confirm_1": "Il portale ti trascina verso il basso e ti tremano le mani. Attraversarlo comunque?",
+  "mental.portal_turned_back": "Ti ritrai dal portale prima che possa portarti più in profondità.",
   "mental.collapse_rescue": "La tua mente cede e crolli. Dei soccorritori ti trovano e ti portano dal Guaritore. Sei Spezzato finché la terapia o la riabilitazione non ti rimettono in sesto.",
   "mental.collapse_fee": "I soccorritori prendono {0} monete d'oro per il disturbo.",
   "mental.collapse_death": "La tua mente cede a questa profondità del dungeon e non c'è nessuno a portarti fuori.",

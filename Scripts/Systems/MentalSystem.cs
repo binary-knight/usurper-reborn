@@ -597,6 +597,19 @@ public static class MentalSystem
         return xp - cut;
     }
 
+    /// <summary>
+    /// XP gained while Exhausted (single-player only): the size of FatigueExhaustedXPPenalty less, in
+    /// overflow-safe long math. The constant is stored negative like the other fatigue penalties, so
+    /// its size is taken here and the result is always a cut. Online, or below Exhausted, unchanged.
+    /// </summary>
+    public static long ApplyFatigueXp(Character c, long xp, bool online)
+    {
+        if (online || c == null || xp <= 0 || c.Fatigue < GameConfig.FatigueExhaustedThreshold) return xp;
+        long pct = (long)Math.Round(Math.Abs(GameConfig.FatigueExhaustedXPPenalty) * 100);
+        long cut = xp / 100 * pct + xp % 100 * pct / 100;
+        return xp - cut;
+    }
+
     /// <summary>A collapse is due: a living human character at Mental 0.</summary>
     public static bool NeedsCollapse(Character c) =>
         c != null && !c.IsNPC && c.IsAlive && c.Mental <= 0;
