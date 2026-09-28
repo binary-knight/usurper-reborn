@@ -220,7 +220,7 @@ public class GodBoons1115Tests
         var (o, oGods) = Follower("GbDisFirstO", "Mortis", 60);
         GodBoonSystem.DiscordiaFirstActionFailPct(o, oGods).Should().Be(0);
         Body("Scripts/Systems/CombatEngine.cs", "public async Task<CombatResult> PlayerVsMonsters(")
-            .Should().Contain("RollDiscordiaFirstActionFail(player, monsters);");
+            .Should().Contain("RollDiscordiaFirstActionFail(player, monsters, result.Teammates);");
         Body("Scripts/Systems/CombatEngine.cs", "private async Task ProcessMonsterAction(")
             .Should().Contain("if (ConsumeDiscordiaFail(monster))");
     }
@@ -248,6 +248,75 @@ public class GodBoons1115Tests
             engine.RollDiscordiaFirstActionFail(hero, new[] { foe });
             engine.ConsumeDiscordiaFail(foe).Should().BeFalse("no Discordia, no roll");
         }
+    }
+
+    /// <summary>A Random whose NextDouble always returns value, so a percent roll always hits (0) or never (1).</summary>
+    private sealed class FixedDoubleRandom : Random
+    {
+        private readonly double _value;
+        public FixedDoubleRandom(double value) { _value = value; }
+        public override double NextDouble() => _value;
+    }
+
+    [Fact]
+    public void Discordia_GroupedFollowerRolls_WithTheirOwnWorship_LeaderGodless()
+    {
+        var engine = new CombatEngine();
+        var leader = Hero("GbDisLeadPlain");
+        var follower = Hero("GbDisFollowStrike");
+        follower.RemoteTerminal = new TerminalEmulator();
+        var foe = Foe("Goblin");
+        WithSingletonGod(follower, "Discordia", 60, () =>
+        {
+            bool struck = false;
+            for (int i = 0; i < 200 && !struck; i++)
+            {
+                engine.RollDiscordiaFirstActionFail(leader, new[] { foe }, new List<Character> { follower });
+                struck = engine.ConsumeDiscordiaFail(foe);
+            }
+            struck.Should().BeTrue("15% a roll over 200 rolls, from the follower's own worship even though the leader worships nothing");
+            return 0;
+        });
+    }
+
+    [Fact]
+    public void Discordia_NpcTeammateNeverRolls_EvenWhenWorshipping()
+    {
+        var engine = new CombatEngine();
+        var leader = Hero("GbDisLeadNpcTest");
+        var npc = Hero("GbDisNpcMate");
+        npc.AI = CharacterAI.Computer;
+        // no RemoteTerminal: IsGroupedPlayer is false, same gate RollMentalFear uses for NPC teammates
+        var foe = Foe("Goblin");
+        WithSingletonGod(npc, "Discordia", 60, () =>
+        {
+            for (int i = 0; i < 200; i++)
+            {
+                engine.RollDiscordiaFirstActionFail(leader, new[] { foe }, new List<Character> { npc });
+                engine.ConsumeDiscordiaFail(foe).Should().BeFalse("an NPC teammate never rolls Discordia, and the leader here worships nothing");
+            }
+            return 0;
+        });
+    }
+
+    [Fact]
+    public void Discordia_FoeStruckByTwoMembers_FailsOnlyOnce()
+    {
+        var engine = new CombatEngine();
+        typeof(CombatEngine).GetField("random", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .SetValue(engine, new FixedDoubleRandom(0));
+        var leader = Hero("GbDisLeadDouble");
+        var follower = Hero("GbDisFollowDouble");
+        follower.RemoteTerminal = new TerminalEmulator();
+        var foe = Foe("Goblin");
+        WithSingletonGod(leader, "Discordia", 60, () =>
+            WithSingletonGod(follower, "Discordia", 60, () =>
+            {
+                engine.RollDiscordiaFirstActionFail(leader, new[] { foe }, new List<Character> { follower });
+                engine.ConsumeDiscordiaFail(foe).Should().BeTrue("both the leader and the follower struck it");
+                engine.ConsumeDiscordiaFail(foe).Should().BeFalse("only the first action, even though two members struck it");
+                return 0;
+            }));
     }
 
     // ---------------- Boons outside combat ----------------
