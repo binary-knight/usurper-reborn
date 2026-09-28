@@ -2062,7 +2062,7 @@ public class DungeonLocation : BaseLocation
                 term.WriteLine(Loc.Get("dungeon.forged_alliance"), "white");
 
                 AlignmentSystem.Instance.ChangeAlignment(player, 50, isGood: true, "dungeon.old_god_allied"); // v0.57.12: paired movement
-                player.Wisdom += 2;
+                player.GrantPermanentStat(StatKind.Wisdom, 2); // 1.2.0: lasting, written to Base
                 break;
 
             case BossOutcome.Spared:
@@ -9108,7 +9108,7 @@ public class DungeonLocation : BaseLocation
                     break;
                 case 1:
                     var strBonus = dungeonRandom.Next(5) + 1;
-                    currentPlayer.Strength += strBonus;
+                    currentPlayer.GrantPermanentStat(StatKind.Strength, strBonus); // 1.2.0: lasting, written to Base
                     terminal.WriteLine(Loc.Get("dungeon.shrine_stronger", strBonus), "green");
                     BroadcastDungeonEvent($"\u001b[32m  {currentPlayer.Name2} prays at a shrine and gains +{strBonus} Strength!\u001b[0m");
                     break;

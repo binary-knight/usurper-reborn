@@ -1839,7 +1839,7 @@ public class Character
     /// player-god's domain or scale), updates only the boons' share of MaxHP and MaxMana: the
     /// segment is recomputed from the pre-boon values the last RecalculateStats recorded, in the
     /// same order, and the difference is applied. Every other stat is left alone, so gains written
-    /// straight into the derived stats (Temple blessings, Sanctum, Groggo) are kept. HP and mana
+    /// straight into the derived stats (Groggo's Dexterity) are kept. HP and mana
     /// are only clamped down. A character never recalculated has no record and gets a full
     /// RecalculateStats (production players always have one: the load recalculates).
     /// </summary>

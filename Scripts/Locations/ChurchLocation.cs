@@ -1064,7 +1064,7 @@ namespace UsurperRemake.Locations
 
             // Marriage bonuses — v0.57.12: paired movement
             AlignmentSystem.Instance.ChangeAlignment(currentPlayer, 10, isGood: true, "church.wedding");
-            currentPlayer.Charisma += 5;
+            currentPlayer.GrantPermanentStat(StatKind.Charisma, 5); // 1.2.0: lasting, written to Base
 
             terminal.WriteLine(Loc.Get("church.wedding_chivalry"), "cyan");
             terminal.WriteLine(Loc.Get("church.wedding_charm"), "cyan");

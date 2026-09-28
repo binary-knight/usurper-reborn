@@ -1444,12 +1444,12 @@ public abstract class BaseLocation
             }
             if (stage.Reward.Wisdom > 0)
             {
-                currentPlayer.Wisdom += stage.Reward.Wisdom;
+                currentPlayer.GrantPermanentStat(StatKind.Wisdom, stage.Reward.Wisdom); // 1.2.0: lasting, written to Base
                 terminal.WriteLine(Loc.Get("base.reward_wisdom", stage.Reward.Wisdom));
             }
             if (stage.Reward.Dexterity > 0)
             {
-                currentPlayer.Dexterity += stage.Reward.Dexterity;
+                currentPlayer.GrantPermanentStat(StatKind.Dexterity, stage.Reward.Dexterity);
                 terminal.WriteLine(Loc.Get("base.reward_dexterity", stage.Reward.Dexterity));
             }
             if (stage.Reward.WaveFragment.HasValue)

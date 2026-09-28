@@ -2232,7 +2232,7 @@ public partial class TempleLocation : BaseLocation
         if (random.NextDouble() < 0.3 + (currentPlayer.WeapPow / 500.0))
         {
             int blessingBonus = random.Next(2, 6);
-            currentPlayer.Strength += blessingBonus;
+            currentPlayer.GrantPermanentStat(StatKind.Strength, blessingBonus); // 1.2.0: lasting, written to Base
             terminal.WriteLine(Loc.Get("temple.blessing_strength", godName, blessingBonus), "bright_green");
         }
 
@@ -2275,7 +2275,7 @@ public partial class TempleLocation : BaseLocation
         if (random.NextDouble() < 0.3 + (currentPlayer.ArmPow / 500.0))
         {
             int blessingBonus = random.Next(2, 6);
-            currentPlayer.Defence += blessingBonus;
+            currentPlayer.GrantPermanentStat(StatKind.Defence, blessingBonus); // 1.2.0: lasting, written to Base
             terminal.WriteLine(Loc.Get("temple.blessing_defence", godName, blessingBonus), "bright_green");
         }
 
@@ -3303,19 +3303,22 @@ public partial class TempleLocation : BaseLocation
         // Grant +1 to a random stat
         var rng = Random.Shared;
         string statName;
+        // 1.2.0: the +1 is written to the Base field through GrantPermanentStat, so it lasts
+        StatKind sanctumStat;
         switch (rng.Next(9))
         {
-            case 0: currentPlayer.Strength += 1; statName = "Strength"; break;
-            case 1: currentPlayer.Defence += 1; statName = "Defence"; break;
-            case 2: currentPlayer.Stamina += 1; statName = "Stamina"; break;
-            case 3: currentPlayer.Agility += 1; statName = "Agility"; break;
-            case 4: currentPlayer.Charisma += 1; statName = "Charisma"; break;
-            case 5: currentPlayer.Dexterity += 1; statName = "Dexterity"; break;
-            case 6: currentPlayer.Wisdom += 1; statName = "Wisdom"; break;
-            case 7: currentPlayer.Intelligence += 1; statName = "Intelligence"; break;
-            case 8: currentPlayer.Constitution += 1; statName = "Constitution"; break;
-            default: currentPlayer.Strength += 1; statName = "Strength"; break;
+            case 0: sanctumStat = StatKind.Strength; statName = "Strength"; break;
+            case 1: sanctumStat = StatKind.Defence; statName = "Defence"; break;
+            case 2: sanctumStat = StatKind.Stamina; statName = "Stamina"; break;
+            case 3: sanctumStat = StatKind.Agility; statName = "Agility"; break;
+            case 4: sanctumStat = StatKind.Charisma; statName = "Charisma"; break;
+            case 5: sanctumStat = StatKind.Dexterity; statName = "Dexterity"; break;
+            case 6: sanctumStat = StatKind.Wisdom; statName = "Wisdom"; break;
+            case 7: sanctumStat = StatKind.Intelligence; statName = "Intelligence"; break;
+            case 8: sanctumStat = StatKind.Constitution; statName = "Constitution"; break;
+            default: sanctumStat = StatKind.Strength; statName = "Strength"; break;
         }
+        currentPlayer.GrantPermanentStat(sanctumStat, 1);
 
         terminal.SetColor("bright_green");
         terminal.WriteLine("\n" + Loc.Get("temple.sanctum_stat_gain", statName));
