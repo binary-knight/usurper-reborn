@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace UsurperRemake.Systems;
 
@@ -74,9 +75,20 @@ public static class GodBoonSystem
     }
 
     /// <summary>A saved domain name read back: one of the ten, or None for blank or unknown text.</summary>
-    public static GodDomain ParseDomain(string? saved) =>
-        !string.IsNullOrWhiteSpace(saved) && Enum.TryParse<GodDomain>(saved.Trim(), true, out var d)
-            && d != GodDomain.None && Enum.IsDefined(typeof(GodDomain), d) ? d : GodDomain.None;
+    public static GodDomain ParseDomain(string? saved)
+    {
+        if (string.IsNullOrWhiteSpace(saved)) return GodDomain.None;
+        string s = saved.Trim();
+        if (!char.IsLetter(s[0])) return GodDomain.None;   // Enum.TryParse would take "3"
+        return Enum.TryParse<GodDomain>(s, true, out var d) && Enum.IsDefined(typeof(GodDomain), d) ? d : GodDomain.None;
+    }
+
+    /// <summary>The schema guard for the saved domain: one of the ten names, or "" (not chosen).</summary>
+    public static string StoredDomain(string? saved)
+    {
+        var d = ParseDomain(saved);
+        return d == GodDomain.None ? "" : d.ToString();
+    }
 
     /// <summary>The ward of each domain.</summary>
     public static MentalWard[] WardsOf(GodDomain d) => d switch
@@ -112,15 +124,21 @@ public static class GodBoonSystem
         if (c == null || c.IsNPC) return GodDomain.None;
         var god = GodRegistry.GetWorshippedGod(c, gods);
         if (god == null) return GodDomain.None;
-        return god.Value.IsCanon ? DomainOfCanon(god.Value.Name) : GodDomain.None;
+        if (god.Value.IsCanon) return DomainOfCanon(god.Value.Name);
+        return PlayerGodCacheFits(c, god.Value.Name) ? c.PlayerGodBoonDomain : GodDomain.None;
     }
 
-    /// <summary>The god's scale of its boon: 100 for a canon god.</summary>
+    private static bool PlayerGodCacheFits(Character c, string god) =>
+        !string.IsNullOrEmpty(c.PlayerGodBoonGod) && c.PlayerGodBoonGod.Equals(god, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>The god's scale of its boon: 100 for a canon god (fixed), the cached standing scale for a player-god.</summary>
     public static int GetScalePct(Character c, GodSystem? gods = null)
     {
         if (c == null || c.IsNPC) return 0;
         var god = GodRegistry.GetWorshippedGod(c, gods);
-        return god != null && god.Value.IsCanon ? 100 : 0;
+        if (god == null) return 0;
+        if (god.Value.IsCanon) return 100;
+        return PlayerGodCacheFits(c, god.Value.Name) ? Math.Max(0, c.PlayerGodBoonScalePct) : 0;
     }
 
     /// <summary>Percent of the full canon boon the character gets now: tier strength times the god's scale.</summary>
@@ -259,5 +277,96 @@ public static class GodBoonSystem
     {
         if (loss <= 0 || !HasWard(c, ward, gods)) return loss;
         return loss - loss * WardCutPct(ward) / 100;
+    }
+
+    // ---------------- Player-gods ----------------
+
+    /// <summary>
+    /// A player-god's boon scale in percent of the canon boon at the same tier: its standing over
+    /// the strongest canon god's, clamped to GodPlayerBoonFloorPct..GodPlayerBoonCapPct. With no canon
+    /// standing, a god with followers' Favor is at the cap and one without at the floor. An immortal
+    /// away more than GodPlayerInactiveDays loses GodPlayerInactiveDecayPctPerDay a day past that,
+    /// never below the floor.
+    /// </summary>
+    public static int PlayerGodScalePct(long standing, long strongestCanon, int daysInactive)
+    {
+        int floor = GameConfig.GodPlayerBoonFloorPct, cap = GameConfig.GodPlayerBoonCapPct;
+        long ratio = strongestCanon > 0 ? Math.Max(0, standing) * 100 / strongestCanon : (standing > 0 ? cap : floor);
+        int scale = (int)Math.Clamp(ratio, floor, cap);
+        if (daysInactive > GameConfig.GodPlayerInactiveDays)
+        {
+            long decay = (long)(daysInactive - GameConfig.GodPlayerInactiveDays) * GameConfig.GodPlayerInactiveDecayPctPerDay;
+            scale = (int)Math.Max(floor, scale - decay);
+        }
+        return scale;
+    }
+
+    /// <summary>Whole days since the immortal's last login; 0 while online or with no record.</summary>
+    public static int DaysInactive(bool isOnline, DateTime? lastLoginUtc, DateTime nowUtc)
+    {
+        if (isOnline || lastLoginUtc == null) return 0;
+        double days = (nowUtc - lastLoginUtc.Value).TotalDays;
+        return days <= 0 ? 0 : (int)Math.Min(Math.Floor(days), int.MaxValue);
+    }
+
+    /// <summary>The highest standing among the ten canon gods (0 when none has followers).</summary>
+    public static long StrongestCanon(IReadOnlyDictionary<string, GodStanding> standings) =>
+        standings == null ? 0 : standings.Where(kv => GodRegistry.IsCanon(kv.Key)).Select(kv => kv.Value.Standing).DefaultIfEmpty(0).Max();
+
+    private static long StandingOf(IReadOnlyDictionary<string, GodStanding> standings, string god) =>
+        standings?.FirstOrDefault(kv => kv.Key.Equals(god, StringComparison.OrdinalIgnoreCase)).Value.Standing ?? 0;
+
+    /// <summary>
+    /// Online: a player-god's domain and boon scale from the saved world, the immortal's row (domain,
+    /// last login, online now) and every saved character's standing. (None, 0) for an unknown god or
+    /// an immortal who has not chosen a domain.
+    /// </summary>
+    public static async Task<(GodDomain Domain, int ScalePct)> PlayerGodBoonAsync(string god, SqlSaveBackend backend, DateTime nowUtc)
+    {
+        if (string.IsNullOrWhiteSpace(god) || backend == null) return (GodDomain.None, 0);
+        var info = (await backend.GetImmortalPlayers())
+            .FirstOrDefault(i => string.Equals(i.DivineName, god, StringComparison.OrdinalIgnoreCase));
+        if (info == null) return (GodDomain.None, 0);
+        var domain = ParseDomain(info.DivineDomain);
+        if (domain == GodDomain.None) return (GodDomain.None, 0);
+        var standings = await Task.Run(() => backend.GetGodStandings());
+        int scale = PlayerGodScalePct(StandingOf(standings, god), StrongestCanon(standings), DaysInactive(info.IsOnline, info.LastLogin, nowUtc));
+        return (domain, scale);
+    }
+
+    /// <summary>Caches a player-god's boon on a follower (runtime only).</summary>
+    public static void SetPlayerGodBoon(Character c, string god, GodDomain domain, int scalePct)
+    {
+        if (c == null) return;
+        c.PlayerGodBoonGod = god ?? "";
+        c.PlayerGodBoonDomain = domain;
+        c.PlayerGodBoonScalePct = Math.Max(0, scalePct);
+    }
+
+    /// <summary>
+    /// Refreshes the cached player-god boon of a character (at login and at the Temple). A canon
+    /// worshipper, the godless and NPCs clear it. Online it reads the saved world
+    /// (PlayerGodBoonAsync). Single-player, a player-god's followers are NPCs, so no player boon.
+    /// A read that fails keeps the previous cache.
+    /// </summary>
+    public static async Task RefreshPlayerGodBoonAsync(Character c)
+    {
+        if (c == null) return;
+        var god = c.IsNPC ? null : GodRegistry.GetWorshippedGod(c);
+        if (god == null || god.Value.IsCanon || !UsurperRemake.BBS.DoorMode.IsOnlineMode
+            || SaveSystem.Instance?.Backend is not SqlSaveBackend backend)
+        {
+            SetPlayerGodBoon(c, "", GodDomain.None, 0);
+            return;
+        }
+        try
+        {
+            var (domain, scale) = await PlayerGodBoonAsync(god.Value.Name, backend, DateTime.UtcNow);
+            SetPlayerGodBoon(c, god.Value.Name, domain, scale);
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogWarning("FAITH", $"Player-god boon unavailable for {c.Name2}: {ex.Message}");
+        }
     }
 }

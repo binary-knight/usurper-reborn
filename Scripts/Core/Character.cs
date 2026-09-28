@@ -2121,6 +2121,15 @@ public class Character
     public Dictionary<string, int> GodFavorDayGains { get; set; } = new();       // FavorSource name -> Favor gained today; cleared at the daily reset
     public int DaysSinceDevotion { get; set; }                                   // Daily resets since the last prayer or fitting deed (neglect)
 
+    // 1.2.0 Temple gods piece 2: an immortal's god domain (a GodDomain name, "" until chosen; saved).
+    public string DivineDomain { get; set; } = "";
+    // Runtime only (not saved): the boon of the player-god this character follows, cached at login
+    // and at the Temple by GodBoonSystem.RefreshPlayerGodBoonAsync. It counts only while it names
+    // the god worshipped now.
+    public string PlayerGodBoonGod { get; set; } = "";
+    public UsurperRemake.Systems.GodDomain PlayerGodBoonDomain { get; set; }
+    public int PlayerGodBoonScalePct { get; set; }
+
     // Divine Blessing buff (granted by an immortal god's Bless deed)
     public int DivineBlessingCombats { get; set; }                             // Combats remaining with blessing
     public float DivineBlessingBonus { get; set; }                             // Damage/defense % bonus (0.10 = 10%)

@@ -3782,7 +3782,9 @@ namespace UsurperRemake.Systems
                         json_extract(p.player_data, '$.player.godExperience') as god_exp,
                         json_extract(p.player_data, '$.player.godAlignment') as god_align,
                         CASE WHEN op.username IS NOT NULL THEN 1 ELSE 0 END as is_online,
-                        json_extract(p.player_data, '$.player.divineBoonConfig') as boon_config
+                        json_extract(p.player_data, '$.player.divineBoonConfig') as boon_config,
+                        json_extract(p.player_data, '$.player.divineDomain') as divine_domain,
+                        p.last_login
                     FROM players p
                     LEFT JOIN online_players op ON LOWER(p.username) = LOWER(op.username)
                         AND op.last_heartbeat >= datetime('now', '-300 seconds')
@@ -3804,7 +3806,9 @@ namespace UsurperRemake.Systems
                         GodExperience = reader.IsDBNull(4) ? 0 : Convert.ToInt64(reader.GetValue(4)),
                         GodAlignment = reader.IsDBNull(5) ? "" : reader.GetString(5),
                         IsOnline = reader.GetInt32(6) == 1,
-                        DivineBoonConfig = reader.IsDBNull(7) ? "" : reader.GetString(7)
+                        DivineBoonConfig = reader.IsDBNull(7) ? "" : reader.GetString(7),
+                        DivineDomain = reader.IsDBNull(8) ? "" : reader.GetString(8),
+                        LastLogin = reader.IsDBNull(9) ? null : ParseSqliteUtc(reader.GetString(9))
                     });
                 }
             }
@@ -3814,6 +3818,12 @@ namespace UsurperRemake.Systems
             }
             return immortals;
         }
+
+        /// <summary>1.2.0 Temple gods piece 2: a SQLite datetime('now') text (UTC) as a UTC DateTime, or null.</summary>
+        internal static DateTime? ParseSqliteUtc(string? text) =>
+            DateTime.TryParse(text, System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal, out var utc)
+                ? utc : null;
 
         public async Task<List<MortalPlayerInfo>> GetMortalPlayers(int limit = 30)
         {

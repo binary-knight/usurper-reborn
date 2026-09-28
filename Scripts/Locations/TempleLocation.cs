@@ -91,6 +91,8 @@ public partial class TempleLocation : BaseLocation
         
         await DisplayWelcomeMessage();
         await VerifyPlayerGodExists();
+        // 1.2.0 Temple gods piece 2: a player-god follower's boon follows the god's current standing
+        await GodBoonSystem.RefreshPlayerGodBoonAsync(currentPlayer);
         
         bool exitLocation = false;
         refreshMenu = true;
@@ -3328,6 +3330,9 @@ public partial class TempleLocation : BaseLocation
             try
             {
                 var immortals = await backend.GetImmortalPlayers();
+                // 1.2.0 Temple gods piece 2: each god's domain boon scale, from one standings read
+                var domainStandings = await Task.Run(() => backend.GetGodStandings());
+                long strongestCanon = GodBoonSystem.StrongestCanon(domainStandings);
                 foreach (var god in immortals)
                 {
                     // Don't show the player's own god entry if they ARE the immortal.
@@ -3344,7 +3349,11 @@ public partial class TempleLocation : BaseLocation
                         Believers = PantheonLocation.CountBelievers(god.DivineName),
                         IsOnline = god.IsOnline,
                         Username = god.Username,
-                        DivineBoonConfig = god.DivineBoonConfig ?? ""
+                        DivineBoonConfig = god.DivineBoonConfig ?? "",
+                        Domain = GodBoonSystem.ParseDomain(god.DivineDomain),
+                        BoonScalePct = GodBoonSystem.PlayerGodScalePct(
+                            domainStandings.TryGetValue(god.DivineName, out var st) ? st.Standing : 0, strongestCanon,
+                            GodBoonSystem.DaysInactive(god.IsOnline, god.LastLogin, DateTime.UtcNow))
                     });
                 }
             }
@@ -3398,6 +3407,19 @@ public partial class TempleLocation : BaseLocation
             terminal.Write(god.IsOnline ? "[ONLINE]" : "[OFFLINE]");
             terminal.SetColor("white");
             terminal.WriteLine($"  ({god.GodAlignment}, {god.Believers} believers)");
+
+            // 1.2.0 Temple gods piece 2: the god's domain, its boon at the god's current scale, and its ward
+            terminal.SetColor("cyan");
+            if (god.Domain == GodDomain.None)
+                terminal.WriteLine($"     {Loc.Get("god.player_domain_none")}");
+            else
+            {
+                terminal.WriteLine($"     {Loc.Get("god.player_domain_line", GodBoonSystem.DomainName(god.Domain), god.BoonScalePct)}");
+                terminal.SetColor("gray");
+                terminal.WriteLine($"     {Loc.Get("god.boon_line", GodBoonSystem.DescribeBoon(god.Domain, god.BoonScalePct), god.BoonScalePct)}");
+                terminal.SetColor("darkgray");
+                terminal.WriteLine($"     {Loc.Get("god.ward_line", GodBoonSystem.DescribeWard(god.Domain))}");
+            }
 
             // Show boon description
             string desc = DivineBoonRegistry.GenerateDescription(god.DivineBoonConfig, god.GodAlignment);
@@ -3474,6 +3496,7 @@ public partial class TempleLocation : BaseLocation
 
         // Cache boon effects from the chosen god
         currentPlayer.CachedBoonEffects = DivineBoonRegistry.CalculateEffects(chosen.DivineBoonConfig);
+        await GodBoonSystem.RefreshPlayerGodBoonAsync(currentPlayer);   // 1.2.0 Temple gods piece 2: the domain boon
 
         terminal.WriteLine("");
         terminal.SetColor("bright_cyan");
@@ -3688,6 +3711,8 @@ public partial class TempleLocation : BaseLocation
         public bool IsOnline { get; set; }
         public string Username { get; set; } = "";
         public string DivineBoonConfig { get; set; } = "";
+        public GodDomain Domain { get; set; } = GodDomain.None;     // 1.2.0 Temple gods piece 2
+        public int BoonScalePct { get; set; }                       // percent of a canon god's boon
     }
 
     #endregion

@@ -1764,6 +1764,12 @@ public static partial class GameConfig
     // Temple gods piece 2: Mental wards (Devout and up), applied inside MentalSystem
     public const int GodWardLossCutPct = 50;                  // A ward halves its losses (and Discordia's fear chance)
     public const int GodWardSylvanaStrainCutPct = 10;         // Sylvana: dungeon strain reduced by this percent
+    // Temple gods piece 2: a player-god's boon, in percent of the canon boon at the same tier, from its
+    // standing against the strongest canon god's
+    public const int GodPlayerBoonFloorPct = 50;              // Lowest scale (no standing, or long inactive)
+    public const int GodPlayerBoonCapPct = 120;               // Highest scale: a rising player-god out-blesses a canon god
+    public const int GodPlayerInactiveDays = 7;               // Days without a login before the scale decays
+    public const int GodPlayerInactiveDecayPctPerDay = 10;    // Scale lost per day past that, never below the floor
     /// <summary>The ten canon gods, in Temple order. Manwe (SupremeCreatorName) is never one of them.</summary>
     public static readonly string[] CanonGodNames =
         { "Solarius", "Valorian", "Amara", "Judicar", "Umbrath", "Terran", "Mortis", "Arcanus", "Sylvana", "Discordia" };

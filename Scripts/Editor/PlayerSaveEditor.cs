@@ -285,6 +285,7 @@ internal static class PlayerSaveEditor
         p.GodFavor = EditorIO.PromptInt($"Favor with the worshipped god ({GameConfig.GodFavorMin}-{GameConfig.GodFavorMax})", p.GodFavor, min: GameConfig.GodFavorMin, max: GameConfig.GodFavorMax);
         p.GodFavorGod = EditorIO.PromptString("God the Favor belongs to (must match the worshipped god, else Favor reads 0)", p.GodFavorGod ?? "");
         p.DaysSinceDevotion = EditorIO.PromptInt("Daily resets since the last devotion (neglect)", p.DaysSinceDevotion, min: 0);
+        p.DivineDomain = EditorIO.PromptString("Immortal's god domain (Light, War, Love, Law, Shadow, Earth, Death, Magic, Nature, Chaos; blank = not chosen)", p.DivineDomain ?? "");
         if (EditorIO.PromptBool("Clear today's Favor gains per source", false))
             p.GodFavorDayGains = new Dictionary<string, int>();
 

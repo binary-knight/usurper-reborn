@@ -783,6 +783,7 @@ namespace UsurperRemake.Systems
         public int GodFavorSchema { get; set; }  // 1.2.0: 0 = a save from before Favor; old saves read 0
         public Dictionary<string, int> GodFavorDayGains { get; set; } = new();  // 1.2.0: FavorSource name -> Favor gained today
         public int DaysSinceDevotion { get; set; }  // 1.2.0: daily resets since the last devotion
+        public string DivineDomain { get; set; } = "";  // 1.2.0: an immortal's god domain (GodDomain name); old saves read ""
         public int DivineBlessingCombats { get; set; }
         public float DivineBlessingBonus { get; set; }
         public string DivineBoonConfig { get; set; } = "";  // Gods: comma-separated "boonId:tier" boon configuration

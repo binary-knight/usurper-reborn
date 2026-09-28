@@ -3127,6 +3127,10 @@ public partial class GameEngine
                 }
             }
 
+            // 1.2.0 Temple gods piece 2: a player-god follower's domain boon, scaled by the god's standing
+            if (currentPlayer != null)
+                await GodBoonSystem.RefreshPlayerGodBoonAsync(currentPlayer);
+
             // Failsafe: if player beat Manwe but the ending sequence didn't complete (whether
             // they disconnected mid-sequence OR something downstream crashed before the ending
             // could fire), re-trigger the ending sequence on login.
@@ -5592,6 +5596,9 @@ public partial class GameEngine
             GodFavorSchema = playerData.GodFavorSchema,
             GodFavorDayGains = playerData.GodFavorDayGains != null ? new Dictionary<string, int>(playerData.GodFavorDayGains) : new Dictionary<string, int>(),
             DaysSinceDevotion = Math.Max(0, playerData.DaysSinceDevotion),
+            // 1.2.0 Temple gods piece 2 schema guard: a missing (old save) or unknown domain reads as
+            // not chosen, and the Pantheon asks the immortal on the next visit
+            DivineDomain = GodBoonSystem.StoredDomain(playerData.DivineDomain),
             DivineBlessingCombats = playerData.DivineBlessingCombats,
             DivineBlessingBonus = playerData.DivineBlessingBonus,
             DivineBoonConfig = playerData.DivineBoonConfig ?? "",

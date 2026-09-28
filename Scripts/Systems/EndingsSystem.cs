@@ -1503,6 +1503,9 @@ namespace UsurperRemake.Systems
 
             await Task.Delay(1000);
 
+            // 1.2.0 Temple gods piece 2: the new god picks its domain (Enter leaves it for the Pantheon)
+            await GodDomainPicker.PickAsync(player, terminal);
+
             // Write news
             NewsSystem.Instance?.Newsy(true,
                 $"[DIVINE] {player.Name2} has ascended to godhood as {divineName}!");
