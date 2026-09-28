@@ -6312,7 +6312,6 @@ public abstract class BaseLocation
                 // skip any post-call work. Counter should reflect the
                 // murder regardless of what the crown does next.
                 currentPlayer.MurdersToday++;
-                GodDeedSystem.Record(currentPlayer, GodAct.Murder, terminal);   // 1.2.0 Temple gods: Love and Law taboo
                 await ApplyMurderConsequences(currentPlayer, npc);
             }
         }
@@ -6346,6 +6345,11 @@ public abstract class BaseLocation
     /// </summary>
     internal async Task ApplyMurderConsequences(Character player, NPC victim)
     {
+        // 1.2.0 Temple gods: Love and Law taboo, once for every murder that reaches the crown
+        // (street murder and the Magic Shop death spell). First, before capture, execution or the
+        // prison exit can end the session.
+        GodDeedSystem.Record(player, GodAct.Murder, terminal);
+
         await Task.Delay(1500);
 
         terminal.SetColor("bright_red");
