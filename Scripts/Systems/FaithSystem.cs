@@ -196,6 +196,68 @@ public static class GodRegistry
     /// <summary>The worship dictionary key for a character (as GameEngine.GodRestoreFilterFor).</summary>
     private static string KeyOf(Character c) =>
         !string.IsNullOrEmpty(c.Name2) ? c.Name2 : (c.Name1 ?? "");
+
+    /// <summary>Sum of Favor and follower count per god, from (god, Favor) entries. Blank gods and Manwe are skipped.</summary>
+    public static Dictionary<string, GodStanding> ComputeStandings(IEnumerable<(string God, int Favor)> entries)
+    {
+        var result = new Dictionary<string, GodStanding>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (god, favor) in entries ?? Enumerable.Empty<(string, int)>())
+        {
+            if (string.IsNullOrWhiteSpace(god) || IsManwe(god)) continue;
+            string name = CanonName(god) ?? god.Trim();
+            result.TryGetValue(name, out var s);
+            result[name] = new GodStanding(name, s.Standing + Math.Clamp(favor, GameConfig.GodFavorMin, GameConfig.GodFavorMax), s.Followers + 1);
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// A save's (god, Favor) entry for god standing, read from the saved data alone: the canon god
+    /// from the worship dictionary under the character's key, else the player-god. A save from
+    /// before Favor counts GodFavorLegacyStart, as its first load will give it. ("", 0) with no god.
+    /// </summary>
+    public static (string God, int Favor) StandingEntryFrom(PlayerData? p, Dictionary<string, string>? playerGods)
+    {
+        if (p == null) return ("", 0);
+        string key = !string.IsNullOrEmpty(p.Name2) ? p.Name2 : (p.Name1 ?? "");
+        string canon = "";
+        if (playerGods != null && !string.IsNullOrEmpty(key))
+            canon = playerGods.FirstOrDefault(kv => kv.Key.Equals(key, StringComparison.OrdinalIgnoreCase)).Value ?? "";
+        string god = !string.IsNullOrWhiteSpace(canon) && !IsManwe(canon) ? (CanonName(canon) ?? canon.Trim())
+            : !string.IsNullOrWhiteSpace(p.WorshippedGod) && !IsManwe(p.WorshippedGod) ? p.WorshippedGod.Trim() : "";
+        if (god.Length == 0) return ("", 0);
+        if (p.GodFavorSchema < GameConfig.GodFavorSchemaCurrent) return (god, GameConfig.GodFavorLegacyStart);
+        int favor = god.Equals(p.GodFavorGod ?? "", StringComparison.OrdinalIgnoreCase)
+            ? Math.Clamp(p.GodFavor, GameConfig.GodFavorMin, GameConfig.GodFavorMax) : 0;
+        return (god, favor);
+    }
+
+    /// <summary>
+    /// Every god's standing. Online: the saved rows of every character (SqlSaveBackend.GetGodStandings).
+    /// Single-player: the current character (NPC worshippers join in a later piece).
+    /// </summary>
+    public static async Task<Dictionary<string, GodStanding>> GetStandingsAsync(Character? current)
+    {
+        if (UsurperRemake.BBS.DoorMode.IsOnlineMode && SaveSystem.Instance?.Backend is SqlSaveBackend backend)
+            return await Task.Run(() => backend.GetGodStandings());
+        return SinglePlayerStandings(current);
+    }
+
+    /// <summary>Single-player standing: the character's own god and Favor.</summary>
+    public static Dictionary<string, GodStanding> SinglePlayerStandings(Character? c, GodSystem? gods = null)
+    {
+        var god = c == null ? null : GetWorshippedGod(c, gods);
+        var entries = god == null ? Array.Empty<(string, int)>() : new[] { (god.Value.Name, FavorSystem.GetFavor(c!, gods)) };
+        return ComputeStandings(entries);
+    }
+
+    /// <summary>Living NPCs following a god (today only player-gods have NPC followers).</summary>
+    public static int CountNpcFollowers(string god)
+    {
+        if (string.IsNullOrWhiteSpace(god)) return 0;
+        return NPCSpawnSystem.Instance?.ActiveNPCs?
+            .Count(n => !n.IsDead && string.Equals(n.WorshippedGod, god, StringComparison.OrdinalIgnoreCase)) ?? 0;
+    }
 }
 
 /// <summary>

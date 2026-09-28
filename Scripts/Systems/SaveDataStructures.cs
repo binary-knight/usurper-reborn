@@ -1291,9 +1291,6 @@ namespace UsurperRemake.Systems
         // News and history
         public List<NewsEntryData> RecentNews { get; set; } = new();
 
-        // God system state
-        public Dictionary<string, GodStateData> GodStates { get; set; } = new();
-
         // Marketplace listings
         public List<MarketListingData> MarketplaceListings { get; set; } = new();
 
@@ -1562,19 +1559,6 @@ namespace UsurperRemake.Systems
         public DateTime Timestamp { get; set; }
         public string Author { get; set; } = "";
         public List<string> Tags { get; set; } = new();
-    }
-
-    /// <summary>
-    /// God state data
-    /// </summary>
-    public class GodStateData
-    {
-        public string GodId { get; set; } = "";
-        public string Name { get; set; } = "";
-        public long Power { get; set; }
-        public int Followers { get; set; }
-        public DateTime LastActivity { get; set; }
-        public Dictionary<string, object> Attributes { get; set; } = new();
     }
 
     /// <summary>

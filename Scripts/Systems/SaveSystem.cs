@@ -1538,9 +1538,6 @@ namespace UsurperRemake.Systems
                 // News and history
                 RecentNews = SerializeRecentNews(),
 
-                // God system state
-                GodStates = SerializeGodStates(),
-
                 // Marketplace listings
                 MarketplaceListings = MarketplaceSystem.Instance.ToSaveData(),
 
@@ -1895,12 +1892,6 @@ namespace UsurperRemake.Systems
         {
             // This would serialize recent news
             return new List<NewsEntryData>();
-        }
-        
-        private Dictionary<string, GodStateData> SerializeGodStates()
-        {
-            // This would serialize god states
-            return new Dictionary<string, GodStateData>();
         }
         
         /// <summary>

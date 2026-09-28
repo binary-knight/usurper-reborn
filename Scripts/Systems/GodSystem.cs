@@ -143,7 +143,8 @@ public class GodSystem
         {
             if (!godsByName.ContainsKey(name))
             {
-                int npcBelievers = random.Next(5, 50);
+                // 1.2.0 Temple gods: no invented worshippers; standing comes from real followers' Favor
+                int npcBelievers = 0;
                 var god = new God
                 {
                     Name = name,

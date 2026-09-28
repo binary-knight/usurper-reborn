@@ -8811,7 +8811,7 @@
   "temple.altar_of": "Altar of {0} the {1}",
   "temple.believers_count": "  Believers: {0}",
   "temple.power_count": "  Power: {0}",
-  "temple.god_ranking_header": "   Immortals                Rank                Followers",
+  "temple.god_ranking_header": "     Gods                      Rank                  Followers    Favor",
   "temple.gods_watch": "The gods watch over the realm...",
   "temple.divine_interventions": "Divine interventions shape the fate of mortals...",
   "temple.prayers_reach": "Prayers and sacrifices reach the heavens...",
