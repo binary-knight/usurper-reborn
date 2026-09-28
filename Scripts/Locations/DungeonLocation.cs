@@ -4772,13 +4772,21 @@ public class DungeonLocation : BaseLocation
 
     /// <summary>
     /// v1.1.15: the Mental check before going deeper (the stairs, or a jump to a deeper floor).
-    /// Breaking asks two yes/no questions (AskYesNoAsync) and either no turns the player back.
-    /// Returns true when the descent may go ahead.
+    /// The Broken affliction refuses it outright. Breaking asks two yes/no questions (AskYesNoAsync)
+    /// and either no turns the player back. Returns true when the descent may go ahead.
     /// </summary>
     internal async Task<bool> ConfirmMentalDescent(Character? player)
     {
         if (player == null) return true;
-        if (MentalSystem.GetDescentRule(player) != MentalDescent.AskTwice) return true;
+        var rule = MentalSystem.GetDescentRule(player);
+        if (rule == MentalDescent.Refused)
+        {
+            terminal.WriteLine("");
+            terminal.WriteLine(Loc.Get("mental.descend_refused"), "bright_red");
+            await Task.Delay(1500);
+            return false;
+        }
+        if (rule != MentalDescent.AskTwice) return true;
         terminal.WriteLine("");
         if (await terminal.AskYesNoAsync(Loc.Get("mental.descend_confirm_1"))
             && await terminal.AskYesNoAsync(Loc.Get("mental.descend_confirm_2")))
@@ -18427,6 +18435,13 @@ public class DungeonLocation : BaseLocation
             if (!alive) throw new GameExitException();
             throw new LocationExitException(GameLocation.Temple);
         }
+        // v1.1.15: the follower collapsed on a shallow floor in the leader's fight; the rescue is
+        // applied (CombatEngine.ApplyFollowerCollapse), now carry them to the Healer
+        if (player.PendingMentalRescue)
+        {
+            player.PendingMentalRescue = false;
+            throw new LocationExitException(GameLocation.Healer);
+        }
     }
 
     /// <summary>
@@ -18448,7 +18463,7 @@ public class DungeonLocation : BaseLocation
                 // Active read from follower's own terminal — message pump is active,
                 // so EnqueueMessage broadcasts appear at the prompt
                 string? input;
-                if (player.PendingGroupDeath != null) break; // v1.2: died in the leader's fight
+                if (player.PendingGroupDeath != null || player.PendingMentalRescue) break; // v1.2: died in the leader's fight; v1.1.15: or collapsed
                 try
                 {
                     input = await term.GetInput("");
@@ -18473,7 +18488,7 @@ public class DungeonLocation : BaseLocation
                 }
 
                 if (input == null) break; // disconnect
-                if (player.PendingGroupDeath != null) break; // v1.2: died while this read was pending
+                if (player.PendingGroupDeath != null || player.PendingMentalRescue) break; // v1.2: died (v1.1.15: or collapsed) while this read was pending
 
                 var trimmed = input.Trim();
 

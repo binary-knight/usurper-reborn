@@ -19,6 +19,7 @@ public enum MentalDescent
 {
     Allowed,
     AskTwice,   // Breaking: two yes/no questions, either no turns back
+    Refused,    // the Broken affliction: cannot go deeper until therapy or rehab clears it
 }
 
 /// <summary>
@@ -469,9 +470,16 @@ public static class MentalSystem
         _ => 0f
     };
 
-    /// <summary>The Mental share of the combat penalty for a character: GetCombatPenalty of their Mental; NPCs 0.</summary>
-    public static float GetMentalPenalty(Character c) =>
-        c == null || c.IsNPC ? 0f : GetCombatPenalty(c.Mental);
+    /// <summary>
+    /// The Mental share of the combat penalty for a character: the Broken affliction's
+    /// MentalBrokenPenaltyPct while MentalBroken (it replaces the band penalty, never added to it),
+    /// else GetCombatPenalty of their Mental; NPCs 0.
+    /// </summary>
+    public static float GetMentalPenalty(Character c)
+    {
+        if (c == null || c.IsNPC) return 0f;
+        return c.MentalBroken ? GameConfig.MentalBrokenPenaltyPct / 100f : GetCombatPenalty(c.Mental);
+    }
 
     /// <summary>
     /// The Fatigue share of the combat penalty as a positive fraction: single-player only (0 online),
@@ -508,13 +516,15 @@ public static class MentalSystem
     /// griefModifier is the signed Grief total the combat engine already reads (damage: Damage +
     /// Combat + AllStat; defence: Defense + AllStat). A positive total is a bonus and is kept as
     /// before; a negative total is the Grief penalty that CombinePenalties weighs against Mental.
-    /// Returns (1 + grief bonus) x (1 - combined penalty).
+    /// Returns (1 + grief bonus) x (1 - combined penalty). The Broken affliction is exempt from the
+    /// Mental plus Fatigue cap (its 25% plus Fatigue applies in full).
     /// </summary>
     public static float GetCombatMultiplier(Character c, float griefModifier, bool online, bool defence)
     {
         float griefBonus = Math.Max(0f, griefModifier);
         float griefPenalty = Math.Max(0f, -griefModifier);
-        float total = CombinePenalties(GetMentalPenalty(c), griefPenalty, GetFatiguePenalty(c, online, defence), !online);
+        bool cap = !online && !(c != null && !c.IsNPC && c.MentalBroken);
+        float total = CombinePenalties(GetMentalPenalty(c), griefPenalty, GetFatiguePenalty(c, online, defence), cap);
         return (1f + griefBonus) * (1f - total);
     }
 
@@ -567,12 +577,65 @@ public static class MentalSystem
     }
 
     /// <summary>
-    /// Going one or more floors deeper: Allowed, or AskTwice while Breaking (1 to 24; the stairs
-    /// ask two yes/no questions and either no turns the player back).
+    /// Going one or more floors deeper: Refused while the Broken affliction holds, AskTwice while
+    /// Breaking (1 to 24; the stairs ask two yes/no questions and either no turns the player back),
+    /// else Allowed.
     /// </summary>
     public static MentalDescent GetDescentRule(Character c)
     {
         if (c == null || c.IsNPC) return MentalDescent.Allowed;
+        if (c.MentalBroken) return MentalDescent.Refused;
         return GetBand(c.Mental) is MentalBand.Breaking or MentalBand.Broken ? MentalDescent.AskTwice : MentalDescent.Allowed;
+    }
+
+    /// <summary>XP gained while Broken: MentalBrokenPenaltyPct less, in overflow-safe long math. Others unchanged.</summary>
+    public static long ApplyBrokenXp(Character c, long xp)
+    {
+        if (c == null || c.IsNPC || !c.MentalBroken || xp <= 0) return xp;
+        long pct = GameConfig.MentalBrokenPenaltyPct;
+        long cut = xp / 100 * pct + xp % 100 * pct / 100;
+        return xp - cut;
+    }
+
+    /// <summary>A collapse is due: a living human character at Mental 0.</summary>
+    public static bool NeedsCollapse(Character c) =>
+        c != null && !c.IsNPC && c.IsAlive && c.Mental <= 0;
+
+    /// <summary>A collapse on this dungeon floor (0 outside the dungeon) is a real death: MentalCollapseDeathFloor or deeper.</summary>
+    public static bool IsCollapseDeath(int dungeonFloor) => dungeonFloor >= GameConfig.MentalCollapseDeathFloor;
+
+    /// <summary>The rescuers' fee: MentalCollapseGoldFeePct of gold on hand, rounded down, in overflow-safe long math.</summary>
+    public static long CollapseFee(long gold)
+    {
+        if (gold <= 0) return 0;
+        long pct = GameConfig.MentalCollapseGoldFeePct;
+        return gold / 100 * pct + gold % 100 * pct / 100;
+    }
+
+    /// <summary>
+    /// A collapse on a shallow floor or in town: the Broken affliction, Mental set to
+    /// MentalCollapseRescueMental and the fee taken from gold on hand. No death, no XP or floor
+    /// loss. The caller moves the character to the Healer. Returns the fee. NPCs are skipped.
+    /// </summary>
+    public static long ApplyCollapseRescue(Character c)
+    {
+        if (c == null || c.IsNPC) return 0;
+        long fee = CollapseFee(c.Gold);
+        c.Gold -= fee;
+        c.MentalBroken = true;
+        c.Mental = GameConfig.MentalCollapseRescueMental;
+        return fee;
+    }
+
+    /// <summary>
+    /// After a collapse death (DEFAULT): the character returns under the normal death rules with
+    /// the Broken affliction and Mental at MentalCollapseRescueMental, so the collapse does not repeat
+    /// at once. NPCs are skipped.
+    /// </summary>
+    public static void ApplyCollapseDeathAftermath(Character c)
+    {
+        if (c == null || c.IsNPC) return;
+        c.MentalBroken = true;
+        c.Mental = Math.Max(c.Mental, GameConfig.MentalCollapseRescueMental);
     }
 }

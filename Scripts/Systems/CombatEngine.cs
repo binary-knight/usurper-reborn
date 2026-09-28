@@ -7366,6 +7366,9 @@ public partial class CombatEngine
             expReward -= (long)(expReward * GameConfig.FatigueExhaustedXPPenalty);
         }
 
+        // v1.1.15: the Broken affliction costs 25% of XP gained
+        expReward = MentalSystem.ApplyBrokenXp(result.Player, expReward);
+
         // v0.64.1 early-game XP multiplier. Telemetry showed Lv 1->10 takes
         // ~200 combats (engaged players hitting the wall and quitting before
         // breakthrough). Compress the onboarding grind; transparent at Lv 21+.
@@ -21429,6 +21432,10 @@ public partial class CombatEngine
             adjustedExp = xpMods.Note(adjustedExp, adjustedExp - (long)(adjustedExp * GameConfig.FatigueExhaustedXPPenalty), "fatigue");
         }
 
+        // v1.1.15: the Broken affliction costs 25% of XP gained
+        if (result.Player.MentalBroken)
+            adjustedExp = xpMods.Note(adjustedExp, MentalSystem.ApplyBrokenXp(result.Player, adjustedExp), "mental_broken");
+
         // v0.64.1 early-game XP multiplier (multi-monster path). See
         // HandleVictory for the rationale; transparent at Lv 21+.
         double earlyGameMultMM = GameConfig.GetEarlyGameXPMultiplier((int)result.Player.Level);
@@ -22260,7 +22267,73 @@ public partial class CombatEngine
             int before = mate.Mental;
             MentalSystem.ApplyFightEnd(mate, floor, companions, fled, MentalSystem.IsNearDeath(mate), boss, oldGod);
             if (mate.RemoteTerminal != null) MentalUi.AnnounceMentalChange(mate.RemoteTerminal, mate, before);
+            ApplyFollowerCollapse(mate, floor, terminal);
         }
+    }
+
+    /// <summary>
+    /// v1.1.15: a grouped human follower whose Mental is 0 after the leader's fight collapses, the
+    /// same rules as a solo player (BaseLocation.HandleMentalCollapse). On the collapse death floor
+    /// or deeper it is a real death through the existing follower death path (GroupFollowerDeath.Mark,
+    /// resolved on their own session), with the Broken affliction and Mental 20 after. Shallower, the
+    /// rescue applies (Broken, Mental 20, the gold fee) and their session leaves the group for the
+    /// Healer (PendingMentalRescue). Each line goes to the follower's own terminal and a short line to
+    /// the leader's. Anyone else, or Mental above 0, does nothing.
+    /// </summary>
+    internal static void ApplyFollowerCollapse(Character follower, int floor, TerminalEmulator? leaderTerminal)
+    {
+        if (follower == null || !follower.IsGroupedPlayer || !MentalSystem.NeedsCollapse(follower)) return;
+        var own = follower.RemoteTerminal;
+        if (MentalSystem.IsCollapseDeath(floor))
+        {
+            follower.HP = 0;
+            if (own != null) { own.SetColor("bright_red"); own.WriteLine(Loc.Get("mental.collapse_death")); }
+            // the collapse is the Mental cost itself, so no death loss; Broken and 20 for after the death
+            MentalSystem.ApplyCollapseDeathAftermath(follower);
+            UsurperRemake.Server.GroupFollowerDeath.Mark(follower, Loc.Get("mental.collapse_killer"));
+        }
+        else
+        {
+            long fee = MentalSystem.ApplyCollapseRescue(follower);
+            if (own != null)
+            {
+                own.SetColor("bright_magenta");
+                own.WriteLine(Loc.Get("mental.collapse_rescue"));
+                if (fee > 0) own.WriteLine(Loc.Get("mental.collapse_fee", fee.ToString("N0")));
+            }
+            follower.PendingMentalRescue = true;
+            follower.IsAwaitingCombatInput = false;
+            var session = string.IsNullOrEmpty(follower.GroupPlayerUsername) ? null : GroupSystem.GetSession(follower.GroupPlayerUsername);
+            if (session != null) session.IsGroupFollower = false;   // GroupFollowerLoop leaves on its next read
+        }
+        if (leaderTerminal != null)
+        {
+            leaderTerminal.SetColor("magenta");
+            leaderTerminal.WriteLine(Loc.Get("mental.collapse_other", follower.DisplayName));
+        }
+    }
+
+    /// <summary>
+    /// v1.1.15: a Mental collapse on the collapse death floor or deeper is a real death under the
+    /// normal death rules: this runs the existing HandlePlayerDeath (permadeath, resurrection,
+    /// penalties, save) with no monster, skipping only the Last Stand rescue and the Mental death
+    /// loss (MentalCollapseDeath). Returns the result so the caller can follow ShouldReturnToTemple
+    /// and IsPermadeath as after any fight.
+    /// </summary>
+    internal async Task<CombatResult> HandleMentalCollapseDeath(Character player, List<Character>? teammates = null)
+    {
+        currentPlayer = player;
+        var result = new CombatResult
+        {
+            Player = player,
+            Teammates = teammates ?? new List<Character>(),
+            Outcome = CombatOutcome.PlayerDied,
+            MentalCollapseDeath = true,
+            MentalDeathApplied = true,
+        };
+        player.HP = 0;
+        await HandlePlayerDeath(result);
+        return result;
     }
 
     /// <summary>
@@ -22307,7 +22380,8 @@ public partial class CombatEngine
         // 1 HP (the Outcome rewrite below).
         // Bypassed for Nightmare difficulty. PvP combat doesn't route through
         // this method (it has its own death path), so PvP is naturally excluded.
-        if (result.Player.LastStandCheckAndApply(isPvP: false))
+        // v1.1.15: a Mental collapse death is not a blow that Last Stand can turn aside
+        if (!result.MentalCollapseDeath && result.Player.LastStandCheckAndApply(isPvP: false))
         {
             // Render the flavor line in the player's local terminal. Group
             // followers see the broadcast version a few lines below.
@@ -31429,6 +31503,8 @@ public partial class CombatEngine
 
             // v1.1.11: Team HQ Training last, with the follower's own levels.
             playerExp = TeamHQBonus.ApplyXP(groupedPlayer, playerExp);
+            // v1.1.15: the follower's own Broken affliction costs 25% of XP gained
+            playerExp = MentalSystem.ApplyBrokenXp(groupedPlayer, playerExp);
 
             // Session XP diminishing returns removed in v0.54.7.
             groupedPlayer.SessionCombatCount++;
@@ -31724,6 +31800,8 @@ public class CombatResult
     public bool PlayerActuallyDied { get; set; }
     // v1.1.15: the Mental death loss was already taken this fight (applied once)
     public bool MentalDeathApplied { get; set; }
+    // v1.1.15: this death is a Mental collapse (CombatEngine.HandleMentalCollapseDeath), no Last Stand
+    public bool MentalCollapseDeath { get; set; }
     // v1.1.15: grouped followers who already took their Mental death loss this fight (applied once each)
     public HashSet<Character> MentalDeadFollowers { get; } = new HashSet<Character>(ReferenceEqualityComparer.Instance);
 }

@@ -1721,6 +1721,11 @@ public static partial class GameConfig
     public const int MentalHallucinationLineCount = 5;        // Loc pool mental.hallucination_1..5
     public const int MentalUneasyLineCount = 3;               // Loc pool mental.uneasy_1..3
     public const int MentalFearLineCount = 3;                 // Loc pool mental.fear_1..3
+    // Collapse at Mental 0 (piece 7, user decisions 2026-09-27)
+    public const int MentalCollapseDeathFloor = 26;           // A collapse on this dungeon floor or deeper is a real death
+    public const int MentalCollapseRescueMental = 20;         // Carried to the Healer: Mental set to this
+    public const int MentalCollapseGoldFeePct = 5;            // Carried to the Healer: this percent of gold on hand to the rescuers
+    public const int MentalBrokenPenaltyPct = 25;             // Broken affliction: damage, defence and XP gained; replaces the band penalty, exempt from the Fatigue cap
     public const int MentalSchemaCurrent = 1;                // Current Mental save schema; below this, restore resets Mental to full and stamps this
     public const int MaxWillowDraughts = 3;                   // Healer Willow Draught: carryable cap
     // Session XP diminishing returns (v0.54.0) — online mode only

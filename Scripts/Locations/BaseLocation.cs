@@ -697,6 +697,15 @@ public abstract class BaseLocation
                 return;
             }
 
+            // v1.1.15: Mental collapse at 0, checked between actions, so after the fight or event
+            // that caused it and never mid-round. Not while jailed or locked to the Pantheon.
+            if (MentalSystem.NeedsCollapse(currentPlayer) && currentPlayer.DaysInPrison <= 0 && !currentPlayer.IsImmortal)
+            {
+                await HandleMentalCollapse();
+                if (!currentPlayer.IsAlive || GameEngine.Instance.IsPermadeath) return;
+                continue;
+            }
+
             // Auto-level-up check — catches ALL XP sources (combat, quests, seals, events, etc.)
             if (currentPlayer != null && currentPlayer.AI == CharacterAI.Human && currentPlayer.AutoLevelUp)
             {
@@ -4222,6 +4231,42 @@ public abstract class BaseLocation
     }
 
     /// <summary>
+    /// v1.1.15: Mental collapse at 0 (user decisions 2026-09-27). In the dungeon on
+    /// GameConfig.MentalCollapseDeathFloor or deeper it is a real death through the existing death
+    /// path (CombatEngine.HandleMentalCollapseDeath), then the Broken affliction and Mental 20; the
+    /// player goes to the Temple when that path says so. Anywhere else (shallower floors, town)
+    /// the player is carried to the Healer: Broken, Mental 20, the rescuers' gold fee, no death and
+    /// no XP or floor loss.
+    /// </summary>
+    protected async Task HandleMentalCollapse()
+    {
+        var player = currentPlayer;
+        if (!MentalSystem.NeedsCollapse(player)) return;
+        int floor = LocationId == GameLocation.Dungeons ? Math.Max(1, player.LastDungeonFloor) : 0;
+        terminal.WriteLine("");
+        if (MentalSystem.IsCollapseDeath(floor))
+        {
+            terminal.SetColor("bright_red");
+            terminal.WriteLine(Loc.Get("mental.collapse_death"));
+            await Task.Delay(1500);
+            var result = await new CombatEngine(terminal).HandleMentalCollapseDeath(player);
+            if (result.IsPermadeath || GameEngine.Instance.IsPermadeath) return;
+            MentalSystem.ApplyCollapseDeathAftermath(player);
+            if (result.ShouldReturnToTemple && LocationId != GameLocation.Temple)
+                await NavigateToLocation(GameLocation.Temple);
+            return;
+        }
+        long fee = MentalSystem.ApplyCollapseRescue(player);
+        terminal.SetColor("bright_magenta");
+        terminal.WriteLine(Loc.Get("mental.collapse_rescue"));
+        if (fee > 0) terminal.WriteLine(Loc.Get("mental.collapse_fee", fee.ToString("N0")));
+        terminal.WriteLine("");
+        await terminal.PressAnyKey();
+        if (LocationId != GameLocation.Healer)
+            await NavigateToLocation(GameLocation.Healer);
+    }
+
+    /// <summary>
     /// Show the inventory screen for managing equipment
     /// </summary>
     protected virtual async Task ShowInventory()
@@ -7500,7 +7545,15 @@ public abstract class BaseLocation
         // Afflictions (v1.1.15): shown from Shaken down, percentage read straight off
         // MentalSystem.GetCombatPenalty so it can never drift from the real combat effect.
         float mentalPenaltyPct = MentalSystem.GetCombatPenalty(mentalVal) * 100f;
-        if (mentalPenaltyPct > 0f)
+        if (currentPlayer.MentalBroken)
+        {
+            // v1.1.15: the Broken affliction replaces the band's penalty (MentalSystem.GetMentalPenalty)
+            terminal.SetColor("white");
+            terminal.Write(Loc.Get("base.mental_afflictions_label"));
+            terminal.SetColor("bright_red");
+            terminal.WriteLine(Loc.Get("base.mental_afflictions_broken", GameConfig.MentalBrokenPenaltyPct));
+        }
+        else if (mentalPenaltyPct > 0f)
         {
             terminal.SetColor("white");
             terminal.Write(Loc.Get("base.mental_afflictions_label"));
