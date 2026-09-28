@@ -1722,7 +1722,9 @@ public class Character
         // 2026-09-03). Placed before the CON-to-HP line so a set CON bonus flows into MaxHP.
         UsurperRemake.Systems.GearSetRegistry.Apply(this);
 
-        // 1.2.0: temporary stat buffs, after gear so a buff flows into HP and mana the way gear does
+        // 1.2.0: temporary stat buffs, after gear so a buff flows into HP and mana the way gear does.
+        // Groggo's Shadow Blessing keeps its own saved field and is added here; a rest clears it.
+        if (GroggoShadowBlessingDex > 0) Dexterity += GroggoShadowBlessingDex;
         ApplyTimedStatBuffs();
 
         // v1.1.12: the awakening's Wisdom, added like gear Wisdom so it flows into mana; never stored
@@ -1845,7 +1847,7 @@ public class Character
     /// player-god's domain or scale), updates only the boons' share of MaxHP and MaxMana: the
     /// segment is recomputed from the pre-boon values the last RecalculateStats recorded, in the
     /// same order, and the difference is applied. Every other stat is left alone, so gains written
-    /// straight into the derived stats (Groggo's Dexterity) are kept. HP and mana
+    /// straight into the derived stats are kept. HP and mana
     /// are only clamped down. A character never recalculated has no record and gets a full
     /// RecalculateStats (production players always have one: the load recalculates).
     /// </summary>
@@ -1913,13 +1915,19 @@ public class Character
     }
 
     /// <summary>
-    /// 1.2.0: a rest ends every Rest buff. Called from every rest entry point (the night's sleep
-    /// through DailySystemManager.RestAndAdvanceToMorning). Does nothing when no buff ends, so a
-    /// second call in the same rest is harmless. A pool that was full before stays full.
+    /// 1.2.0: a rest ends every Rest buff and Groggo's Shadow Blessing. Called from every rest entry
+    /// point (the night's sleep through DailySystemManager.RestAndAdvanceToMorning). Does nothing
+    /// when no buff ends, so a second call in the same rest is harmless. A pool that was full
+    /// before stays full.
     /// </summary>
     public void OnRest()
     {
         bool changed = TimedStatBuffs.RemoveAll(b => b.EndsOn == StatBuffEnd.Rest) > 0;
+        if (GroggoShadowBlessingDex != 0)
+        {
+            GroggoShadowBlessingDex = 0;
+            changed = true;
+        }
         if (!changed) return;
         RecalculateKeepingFullPools();
     }

@@ -29,8 +29,10 @@ public class TimedStatBuffs1115Tests
 {
     private const BindingFlags F = BindingFlags.NonPublic | BindingFlags.Instance;
 
-    internal static TerminalEmulator Term(string script) =>
-        new TerminalEmulator(new ScriptedStream(script + string.Concat(Enumerable.Repeat("\n", 40)), null), new MemoryStream());
+    internal static TerminalEmulator Term(string script) => Term(script, new MemoryStream());
+
+    internal static TerminalEmulator Term(string script, MemoryStream output) =>
+        new TerminalEmulator(new ScriptedStream(script + string.Concat(Enumerable.Repeat("\n", 40)), null), output);
 
     internal static T At<T>(T loc, Character p, TerminalEmulator term) where T : BaseLocation
     {

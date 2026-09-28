@@ -15309,12 +15309,12 @@ public class DungeonLocation : BaseLocation
                 player.HP = Math.Min(player.MaxHP, player.HP + 10);
                 break;
             case "lockpick":
-                // Lockpick: +5 Dexterity temporarily (until next combat)
-                player.Dexterity += 2;
+                // Lockpick: +2 Dexterity through the next fight (1.2.0: a timed buff, applied in RecalculateStats)
+                player.AddTimedStatBuff("settlement_lockpick", StatKind.Dexterity, 2, StatBuffEnd.Combats, 1);
                 break;
             case "smoke_bomb":
-                // Smoke bomb: small agility boost
-                player.Agility += 2;
+                // Smoke bomb: +2 Agility through the next fight
+                player.AddTimedStatBuff("settlement_smoke_bomb", StatKind.Agility, 2, StatBuffEnd.Combats, 1);
                 break;
         }
     }

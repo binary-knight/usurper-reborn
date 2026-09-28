@@ -759,6 +759,9 @@ public class InnLocation : BaseLocation
     /// <summary>
     /// Buy a drink at the inn
     /// </summary>
+    /// <summary>1.2.0: the source of the ale's temporary stat buffs (one per stat, refreshed by a repeat).</summary>
+    internal const string AleBuffSource = "inn_ale";
+
     private async Task BuyDrink()
     {
         long drinkBasePrice = 5;
@@ -788,15 +791,15 @@ public class InnLocation : BaseLocation
         {
             case 1:
                 terminal.WriteLine(Loc.Get("inn.drink_effect_charisma"));
-                currentPlayer.Charisma += 2;
+                currentPlayer.AddTimedStatBuff(AleBuffSource, StatKind.Charisma, 2, StatBuffEnd.Rest);   // 1.2.0: until the next rest; a repeat refreshes
                 break;
             case 2:
                 terminal.WriteLine(Loc.Get("inn.drink_effect_strength"));
-                currentPlayer.Strength += 1;
+                currentPlayer.AddTimedStatBuff(AleBuffSource, StatKind.Strength, 1, StatBuffEnd.Rest);
                 break;
             case 3:
                 terminal.WriteLine(Loc.Get("inn.drink_effect_wisdom"));
-                currentPlayer.Wisdom = Math.Max(1, currentPlayer.Wisdom - 1);
+                currentPlayer.AddTimedStatBuff(AleBuffSource, StatKind.Wisdom, -1, StatBuffEnd.Rest);
                 break;
             case 4:
                 terminal.WriteLine(Loc.Get("inn.drink_effect_hp"));
@@ -2365,13 +2368,9 @@ public class InnLocation : BaseLocation
         terminal.WriteLine(Loc.Get("inn.rest_quiet_corner"), "green");
         await Task.Delay(2000);
 
-        // Remove Groggo's Shadow Blessing on rest (v0.41.0)
+        // Groggo's Shadow Blessing fades on rest (v0.41.0); 1.2.0: OnRest clears it and recalculates
         if (currentPlayer.GroggoShadowBlessingDex > 0)
-        {
-            currentPlayer.Dexterity = Math.Max(1, currentPlayer.Dexterity - currentPlayer.GroggoShadowBlessingDex);
             terminal.WriteLine(Loc.Get("inn.rest_shadow_fades"), "gray");
-            currentPlayer.GroggoShadowBlessingDex = 0;
-        }
         currentPlayer.OnRest();   // 1.2.0: a rest ends the rest buffs
 
         // Blood Price rest penalty — dark memories reduce rest effectiveness
@@ -5534,13 +5533,9 @@ public class InnLocation : BaseLocation
             terminal.WriteLine(Loc.Get("inn.rent_bank_withdraw", shortfall.ToString("N0")), "gray");
         }
 
-        // Remove Groggo's Shadow Blessing on rest (v0.41.0)
+        // Groggo's Shadow Blessing fades on rest (v0.41.0); 1.2.0: OnRest clears it and recalculates
         if (currentPlayer.GroggoShadowBlessingDex > 0)
-        {
-            currentPlayer.Dexterity = Math.Max(1, currentPlayer.Dexterity - currentPlayer.GroggoShadowBlessingDex);
             terminal.WriteLine(Loc.Get("inn.rent_shadow_fades"), "gray");
-            currentPlayer.GroggoShadowBlessingDex = 0;
-        }
         currentPlayer.OnRest();   // 1.2.0: a rest ends the rest buffs
 
         // Restore HP/Mana/Stamina

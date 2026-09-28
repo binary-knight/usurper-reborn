@@ -920,7 +920,7 @@ namespace UsurperRemake.Locations
                         break;
                     }
                     currentPlayer.GroggoShadowBlessingDex = 3;
-                    currentPlayer.Dexterity += 3;
+                    currentPlayer.RecalculateStats();   // 1.2.0: applied in RecalculateStats until the next rest
                     terminal.WriteLine("");
                     terminal.WriteLine(Loc.Get("dark_alley.groggo_traces"), "bright_magenta");
                     terminal.WriteLine(Loc.Get("dark_alley.groggo_shadows_wrap"), "white");
