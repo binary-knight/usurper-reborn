@@ -284,9 +284,11 @@ public class GodBoons1115Tests
         ally.HP.Should().Be(125, "the caster follows Solarius: 100 x 1.15 = 115");
 
         // A non-worshipper caster heals a Solarius ally: not boosted.
-        ally.HP = 10;
         WithSingletonGod(ally, "Solarius", 60, () =>
         {
+            // Set after the worship change: a character with no recorded stat rebuild gets a full
+            // RecalculateStats from SetWorshippedGod, which would reset a hand-set MaxHP.
+            ally.MaxHP = 1000; ally.HP = 10;
             method.Invoke(engine, new object?[] { ally, null, new SpellSystem.SpellResult { Success = true, Healing = 100 }, null, undead, caster });
             return 0;
         });
@@ -301,11 +303,12 @@ public class GodBoons1115Tests
         var output = new MemoryStream();
         var engine = new CombatEngine(new TerminalEmulator(new MemoryStream(), output));
         var c = Hero("GbSolWard");
-        c.MaxHP = 1000; c.HP = 10;
         var spell = new SpellSystem.SpellResult { Success = true, Healing = 100, ProtectionBonus = 40, Duration = 999 };
         var undead = new Monster[] { Foe("Zombie") };
         WithSingletonGod(c, "Solarius", 60, () =>
         {
+            // Set after the worship change (see Solarius_AllyHeal_UsesTheCastersGod_NotTheAllys).
+            c.MaxHP = 1000; c.HP = 10;
             typeof(CombatEngine).GetMethod("ApplySpellEffects", BindingFlags.NonPublic | BindingFlags.Instance)!
                 .Invoke(engine, new object?[] { c, null, spell, null, undead, null });
             return 0;
