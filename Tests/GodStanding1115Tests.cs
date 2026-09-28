@@ -149,6 +149,20 @@ public class GodStanding1115Tests : IDisposable
         }
         _db.UpsertGodFavor("acct_z", "Arcanus", 500);
         _db.GetGodStandings()["Arcanus"].Standing.Should().Be(GameConfig.GodFavorMax);
+        StoredFavor("acct_z").Should().Be(GameConfig.GodFavorMax, "the stored row itself is clamped, not only the sum");
+
+        _db.UpsertGodFavor("acct_z", "Arcanus", -40);
+        StoredFavor("acct_z").Should().Be(GameConfig.GodFavorMin);
+    }
+
+    private long StoredFavor(string username)
+    {
+        using var conn = new SqliteConnection($"Data Source={_path}");
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT favor FROM god_favor WHERE username = LOWER(@u);";
+        cmd.Parameters.AddWithValue("@u", username);
+        return Convert.ToInt64(cmd.ExecuteScalar());
     }
 
     // ---------------- Temple ranking (source) ----------------
