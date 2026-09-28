@@ -22547,6 +22547,7 @@
   "secretboss.press_begin": "Pulsa Intro para comenzar la batalla...",
   "secretboss.reward_xp": "(+{0} de Experiencia)",
   "secretboss.reward_gold": "(+{0} de Oro)",
+  "secretboss.group_share": "{0} ha sido derrotado. Tu parte: +{1} de experiencia, +{2} de oro. La cámara también queda despejada para ti.",
   "secretboss.speaks_label": "[{0} habla...]",
   "dream.dream_drowning.title": "Ahogarse en la Luz",
   "dream.dream_drowning.content.0": "Sueñas que te ahogas.",

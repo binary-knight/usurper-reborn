@@ -22840,6 +22840,7 @@
   "secretboss.press_begin": "Nyomd meg az Entert a csata megkezdéséhez...",
   "secretboss.reward_xp": "(+{0} Tapasztalat)",
   "secretboss.reward_gold": "(+{0} Arany)",
+  "secretboss.group_share": "{0} legyőzve. A részed: +{1} tapasztalat, +{2} arany. A kamra számodra is megtisztult.",
   "secretboss.speaks_label": "[{0} szól...]",
   "dream.dream_drowning.title": "Fuldoklás a fényben",
   "dream.dream_drowning.content.0": "Azt álmodod, hogy fuldokolsz.",
