@@ -6379,6 +6379,7 @@ public abstract class BaseLocation
         }
 
         bool captured;
+        bool skipExecutionRoll = false;
 
         if (choice == "S")
         {
@@ -6437,10 +6438,13 @@ public abstract class BaseLocation
             {
                 // v1.2.0: the witness loss after the murder (or the murder fight itself) left Mental at 0,
                 // so the guards' fight is not entered. The player is taken as on a surrender, with one line
-                // in place of the overpowered text; the collapse is left to the location loop.
+                // in place of the overpowered text; the collapse is left to the location loop. A refused
+                // arrest is not a choice to face the Crown's justice, so the execution roll is skipped;
+                // capture and the prison sentence still follow.
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("mental.collapse_before_fight"));
                 captured = true;
+                skipExecutionRoll = true;
             }
             else if (playerWon)
             {
@@ -6463,8 +6467,8 @@ public abstract class BaseLocation
             }
         }
 
-        // 50% execution, 50% prison
-        bool isExecuted = Random.Shared.Next(100) < 50;
+        // 50% execution, 50% prison. A refused arrest fight (Mental collapse) skips the roll.
+        bool isExecuted = !skipExecutionRoll && Random.Shared.Next(100) < 50;
 
         if (isExecuted && captured)
         {
