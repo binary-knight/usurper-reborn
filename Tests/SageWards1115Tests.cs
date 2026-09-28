@@ -184,7 +184,7 @@ public class SageWards1115Tests
         engine.ApplySagePartyWard(sage, veil, result);
         // the Cleric casts a weaker ward on herself, through the caster path
         var armor = new SpellSystem.SpellResult { Success = true, ProtectionBonus = 28, Duration = 999 };
-        typeof(CombatEngine).GetMethod("ApplySpellEffects", F)!.Invoke(engine, new object?[] { b, null, armor, null });
+        typeof(CombatEngine).GetMethod("ApplySpellEffects", F)!.Invoke(engine, new object?[] { b, null, armor, null, null });
         b.MagicACBonus.Should().Be(veil.ProtectionBonus);
     }
 

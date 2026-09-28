@@ -8682,7 +8682,7 @@
   "god.boon_line": "Áldás: {0} ({1}% erősség)",
   "god.ward_line": "Lelki védelem (Hívőtől felfelé): {0}",
   "god.ward_line_active": "Lelki védelem: {0}",
-  "god.boon.light": "+{0}% sebzés élőhalottak és démonok ellen",
+  "god.boon.light": "+{0}% sebzés élőhalottak és démonok ellen, +{1}% gyógyítás azokban a harcokban",
   "god.boon.war": "+{0}% sebzés fél életerő alatt",
   "god.boon.love": "+{0}% a gyógyításaidra és az általad emelt csapatvédelmekre",
   "god.boon.law": "+{0}% védelem szörnyek ellen, +{1}% vérdíj jutalom",

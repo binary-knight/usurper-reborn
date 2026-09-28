@@ -8859,7 +8859,7 @@
   "god.boon_line": "Boon: {0} ({1}% strength)",
   "god.ward_line": "Mental ward (Devout and up): {0}",
   "god.ward_line_active": "Mental ward: {0}",
-  "god.boon.light": "+{0}% damage against undead and demons",
+  "god.boon.light": "+{0}% damage against undead and demons, +{1}% healing in those fights",
   "god.boon.war": "+{0}% damage while below half HP",
   "god.boon.love": "+{0}% to the heals you cast and the party wards you raise",
   "god.boon.law": "+{0}% defence against monsters, +{1}% bounty rewards",

@@ -184,7 +184,7 @@ public static class GodBoonSystem
     /// <summary>The boon of a domain at a strength (percent of the full canon boon), in the player's language.</summary>
     public static string DescribeBoon(GodDomain d, int strengthPct) => d switch
     {
-        GodDomain.Light => Loc.Get("god.boon.light", At(GameConfig.GodBoonSolariusUndeadDamagePct, strengthPct)),
+        GodDomain.Light => Loc.Get("god.boon.light", At(GameConfig.GodBoonSolariusUndeadDamagePct, strengthPct), At(GameConfig.GodBoonSolariusHealPct, strengthPct)),
         GodDomain.War => Loc.Get("god.boon.war", At(GameConfig.GodBoonValorianLowHpDamagePct, strengthPct)),
         GodDomain.Love => Loc.Get("god.boon.love", At(GameConfig.GodBoonAmaraHealPct, strengthPct)),
         GodDomain.Law => Loc.Get("god.boon.law", At(GameConfig.GodBoonJudicarDefencePct, strengthPct), At(GameConfig.GodBoonJudicarBountyPct, strengthPct)),
@@ -222,6 +222,21 @@ public static class GodBoonSystem
     /// <summary>Amara: a heal the follower casts (spells and abilities, on anyone in the party).</summary>
     public static long PartyHeal(Character caster, long heal, GodSystem? gods = null) =>
         Apply(caster, GodDomain.Love, GameConfig.GodBoonAmaraHealPct, heal, gods);
+
+    /// <summary>
+    /// Solarius: a heal the follower casts or uses (spells, abilities, potions and the healing herb,
+    /// on anyone), while at least one living monster they are fighting is undead or a demon
+    /// (DivineBlessingSystem's own test for the damage boon). No monster list (not in a monster
+    /// fight) or no living undead or demon: the heal is unchanged. Wards are not heals and never
+    /// pass through here. The one helper every combat heal path calls.
+    /// </summary>
+    public static long HealAgainstUndead(Character caster, long heal, IEnumerable<Monster>? monsters, GodSystem? gods = null)
+    {
+        if (monsters == null) return heal;
+        bool fightingUndeadOrDemon = monsters.Any(m => m != null && m.IsAlive && DivineBlessingSystem.IsUndeadOrDemon(m));
+        if (!fightingUndeadOrDemon) return heal;
+        return Apply(caster, GodDomain.Light, GameConfig.GodBoonSolariusHealPct, heal, gods);
+    }
 
     /// <summary>Amara: the strength of a party ward the follower raises.</summary>
     public static long PartyWard(Character caster, long ward, GodSystem? gods = null) =>

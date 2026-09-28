@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace UsurperRemake.Systems
 {
@@ -7,14 +8,17 @@ namespace UsurperRemake.Systems
     /// other modifier of the heal and before the cap to missing HP: the Alchemist's Potion Mastery, then the
     /// team's Infirmary. Potion Mastery was applied only by the combat quick-heal, so every other potion (the
     /// item key, auto-heal, potions given to allies, town, Home, the dungeon, the world boss) missed it.
+    /// 1.2.0: last, Solarius's boon while fighting undead or demons (the monsters parameter is the fight the
+    /// owner is in now; null outside a monster fight, so the boon never applies there).
     /// </summary>
     public static class PotionBonus
     {
-        public static long ApplyOwnerBonuses(Character owner, long heal)
+        public static long ApplyOwnerBonuses(Character owner, long heal, IEnumerable<Monster>? monsters = null)
         {
             if (owner.Class == CharacterClass.Alchemist)
                 heal = (long)Math.Round(heal * (1.0 + GameConfig.AlchemistPotionMasteryBonus));
-            return TeamHQBonus.ApplyPotionHeal(owner, heal);
+            heal = TeamHQBonus.ApplyPotionHeal(owner, heal);
+            return GodBoonSystem.HealAgainstUndead(owner, heal, monsters);
         }
     }
 }

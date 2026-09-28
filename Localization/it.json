@@ -8674,7 +8674,7 @@
   "god.boon_line": "Dono: {0} (forza {1}%)",
   "god.ward_line": "Protezione mentale (da Devoto in su): {0}",
   "god.ward_line_active": "Protezione mentale: {0}",
-  "god.boon.light": "+{0}% di danno contro non morti e demoni",
+  "god.boon.light": "+{0}% di danno contro non morti e demoni, +{1}% di cura in quegli scontri",
   "god.boon.war": "+{0}% di danno sotto metà PF",
   "god.boon.love": "+{0}% alle tue cure e alle protezioni di gruppo che lanci",
   "god.boon.law": "+{0}% di difesa contro i mostri, +{1}% alle taglie",
