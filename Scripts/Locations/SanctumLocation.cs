@@ -644,7 +644,12 @@ namespace UsurperRemake.Locations
                     // (combat-reviewer LOW finding: same message read wrong for fleeing players).
                     terminal.WriteLine("");
                     terminal.SetColor("red");
-                    if (result.Outcome == CombatOutcome.PlayerEscaped)
+                    if (result.MentalCollapseNotFought)
+                    {
+                        // v1.1.15: the wave was not fought (Mental 0); the location loop collapses the player
+                        terminal.WriteLine($"  {Loc.Get("mental.collapse_before_fight")}");
+                    }
+                    else if (result.Outcome == CombatOutcome.PlayerEscaped)
                     {
                         terminal.WriteLine($"  {Loc.Get("tournament.flee", championData.LocName())}");
                     }

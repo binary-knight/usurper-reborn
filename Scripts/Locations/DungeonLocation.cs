@@ -2088,6 +2088,10 @@ public class DungeonLocation : BaseLocation
                 term.WriteLine(Loc.Get("dungeon.god_fled_retreat"), "gray");
                 term.WriteLine(Loc.Get("dungeon.god_fled_wait"), "dark_gray");
                 break;
+
+            case BossOutcome.NotFought:
+                // v1.1.15: the fight was not entered (Mental 0); nothing to resolve, the loop collapses the player
+                break;
         }
 
         await Task.Delay(3000);
@@ -2095,6 +2099,7 @@ public class DungeonLocation : BaseLocation
         // Auto-return to town with reaction scene for resolved encounters (not Manwe — has own ending)
         if (result.God != OldGodType.Manwe &&
             result.Outcome != BossOutcome.Fled &&
+            result.Outcome != BossOutcome.NotFought &&
             result.Outcome != BossOutcome.PlayerDefeated)
         {
             // Grant God Slayer buff — temporary divine power surge (v0.49.3)
@@ -5951,7 +5956,7 @@ public class DungeonLocation : BaseLocation
             await HandleGodEncounterResult(result, player, terminal);
 
             // Mark room as cleared if defeated or alternate outcome achieved
-            if (result.Outcome != BossOutcome.Fled && result.Outcome != BossOutcome.PlayerDefeated)
+            if (result.Outcome != BossOutcome.Fled && result.Outcome != BossOutcome.NotFought && result.Outcome != BossOutcome.PlayerDefeated)
             {
                 room.IsCleared = true;
                 currentFloor.BossDefeated = true;

@@ -6061,6 +6061,7 @@
   "mental.descend_refused": "Az elméd megtört. Nem tudod rávenni magad, hogy lejjebb menj, amíg nem kezelik.",
   "mental.portal_confirm_1": "A portál lefelé húz, és remeg a kezed. Mégis átlépsz rajta?",
   "mental.portal_turned_back": "Elhúzódsz a portáltól, mielőtt mélyebbre vihetne.",
+  "mental.collapse_before_fight": "Az elméd felmondja a szolgálatot a következő harc előtt.",
   "mental.collapse_rescue": "Az elméd feladja, és összeesel. Megmentők találnak rád, és a Gyógyítóhoz visznek. Megtört maradsz, amíg a beszélgetős terápia vagy az elvonókúra helyre nem hoz.",
   "mental.collapse_fee": "A megmentők {0} aranyat kérnek a fáradságukért.",
   "mental.collapse_death": "Az elméd ilyen mélyen a kazamatában adja fel, és nincs, aki kivigyen.",

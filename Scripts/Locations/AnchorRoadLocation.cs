@@ -1188,7 +1188,13 @@ public class AnchorRoadLocation : BaseLocation
                 terminal.SetColor("red");
                 terminal.WriteLine("");
 
-                if (result.Outcome == CombatOutcome.PlayerEscaped)
+                if (result.MentalCollapseNotFought)
+                {
+                    // v1.1.15: the wave was not fought (Mental 0). No flee, no penalty; the
+                    // location loop carries out the collapse.
+                    terminal.WriteLine(Loc.Get("mental.collapse_before_fight"));
+                }
+                else if (result.Outcome == CombatOutcome.PlayerEscaped)
                 {
                     // Flee. No real death, no drag-out penalty -- the flee itself
                     // already cost them the entry fee + daily fight slot.

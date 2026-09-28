@@ -6115,7 +6115,8 @@ public class CastleLocation : BaseLocation
             if (result.Outcome != CombatOutcome.Victory)
             {
                 terminal.SetColor("red");
-                terminal.WriteLine(Loc.Get("castle.monster_guards_overwhelm"));
+                // v1.1.15: a fight not entered for a Mental collapse is not a defeat by the guards
+                terminal.WriteLine(result.MentalCollapseNotFought ? Loc.Get("mental.collapse_before_fight") : Loc.Get("castle.monster_guards_overwhelm"));
                 currentPlayer.HP = Math.Max(1, currentPlayer.HP);
                 terminal.WriteLine(Loc.Get("castle.challenge_failed"));
                 await Task.Delay(2500);
@@ -6227,7 +6228,8 @@ public class CastleLocation : BaseLocation
                 if (result.Outcome != CombatOutcome.Victory)
                 {
                     terminal.SetColor("red");
-                    terminal.WriteLine(Loc.Get("castle.royal_guards_overwhelm"));
+                    // v1.1.15: a fight not entered for a Mental collapse is not a defeat by the guards
+                    terminal.WriteLine(result.MentalCollapseNotFought ? Loc.Get("mental.collapse_before_fight") : Loc.Get("castle.royal_guards_overwhelm"));
                     currentPlayer.HP = Math.Max(1, currentPlayer.HP);
                     terminal.WriteLine(Loc.Get("castle.challenge_failed"));
                     await RecordDefenceLossesAsync(losses);
