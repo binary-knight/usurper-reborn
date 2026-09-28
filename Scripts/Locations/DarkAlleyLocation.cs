@@ -2322,6 +2322,7 @@ namespace UsurperRemake.Locations
                 terminal.WriteLine(Loc.Get("dark_alley.pick_prison"));
                 terminal.WriteLine("");
                 currentPlayer.DaysInPrison = 1;
+                GodDeedSystem.Record(currentPlayer, GodAct.Imprisoned, terminal);   // 1.2.0 Temple gods: Law taboo
                 currentPlayer.Statistics?.RecordPickpocketAttempt(false);
                 await Task.Delay(2500);
                 throw new LocationExitException(GameLocation.Prison);
@@ -2334,6 +2335,7 @@ namespace UsurperRemake.Locations
                 target.Gold -= stolen;
                 currentPlayer.Gold += stolen;
                 AlignmentSystem.Instance.ChangeAlignment(currentPlayer, 3, isGood: false, "dark_alley.pickpocket"); // v0.57.12: paired movement
+                GodDeedSystem.Record(currentPlayer, GodAct.Theft, terminal);   // 1.2.0 Temple gods: Shadow deed, Law taboo
                 currentPlayer.DarkAlleyReputation = Math.Min(1000, currentPlayer.DarkAlleyReputation + 2);
 
                 terminal.SetColor("bright_green");
@@ -3243,6 +3245,7 @@ namespace UsurperRemake.Locations
                         term.SetColor("bright_red");
                         term.WriteLine(Loc.Get("dark_alley.enc_guard_prison"));
                         player.DaysInPrison = 1;
+                        GodDeedSystem.Record(player, GodAct.Imprisoned, term);   // 1.2.0 Temple gods: Law taboo
                         await Task.Delay(2500);
                         throw new LocationExitException(GameLocation.Prison);
                     }

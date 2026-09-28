@@ -6224,6 +6224,7 @@
   "mental.band_better": "Mental Health improves: {0}.",
   "mental.gain": "Your mind eases. (+{0} Mental)",
   "favor.gain": "{0} is pleased. (+{1} Favor, now {2})",
+  "favor.loss": "{0} is displeased. (-{1} Favor, now {2})",
   "mental.no_gain_at_cap": "Your mind is as settled as it can be; this will not ease it further.",
   "mental.no_gain_used_today": "You have already found this comfort today; it will not ease your mind again until tomorrow.",
   "mental.broken_cleared": "The collapse no longer holds you. Your mind is your own again.",

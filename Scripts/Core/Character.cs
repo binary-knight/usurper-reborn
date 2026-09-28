@@ -2120,6 +2120,7 @@ public class Character
     public int GodFavorSchema { get; set; } = GameConfig.GodFavorSchemaCurrent;
     public Dictionary<string, int> GodFavorDayGains { get; set; } = new();       // FavorSource name -> Favor gained today; cleared at the daily reset
     public int DaysSinceDevotion { get; set; }                                   // Daily resets since the last prayer or fitting deed (neglect)
+    public int DaysSinceSpellCast { get; set; }                                  // 1.2.0 Temple gods: daily resets since the last spell cast (Arcanus taboo)
 
     // 1.2.0 Temple gods piece 2: an immortal's god domain (a GodDomain name, "" until chosen; saved).
     public string DivineDomain { get; set; } = "";
@@ -2984,6 +2985,7 @@ public static class DrugSystem
 
         // v1.1.15: the Mental high (may pass the addiction cap until the drug wears off)
         MentalSystem.ApplyDrugHigh(character, drug, DailySystemManager.Instance.CurrentDay);
+        GodDeedSystem.Record(character, GodAct.DrugUse);   // 1.2.0 Temple gods: Light taboo
 
         return (true, Loc.Get("drugs.taken", GetDrugName(drug)));
     }

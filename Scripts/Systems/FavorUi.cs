@@ -18,4 +18,24 @@ public static class FavorUi
         terminal.SetColor("bright_yellow");
         terminal.WriteLine(Loc.Get("favor.gain", god, applied, FavorSystem.GetFavor(player, gods)));
     }
+
+    /// <summary>
+    /// Temple gods piece 3: a Favor loss (a taboo). When applied is below 0 prints one short line
+    /// naming the god, the loss and the Favor now ("favor.loss"). 0 or above prints nothing. Skips a
+    /// null terminal or player and NPCs.
+    /// </summary>
+    public static void ReportLoss(TerminalEmulator? terminal, Character? player, int applied, GodSystem? gods = null)
+    {
+        if (terminal == null || player == null || player.IsNPC || applied >= 0) return;
+        string god = GodRegistry.GetWorshippedGod(player, gods)?.Name ?? player.GodFavorGod;
+        terminal.SetColor("dark_red");
+        terminal.WriteLine(Loc.Get("favor.loss", god, -applied, FavorSystem.GetFavor(player, gods)));
+    }
+
+    /// <summary>A Favor change of either sign: ReportGain above 0, ReportLoss below 0, nothing at 0.</summary>
+    public static void ReportChange(TerminalEmulator? terminal, Character? player, int applied, GodSystem? gods = null)
+    {
+        if (applied > 0) ReportGain(terminal, player, applied, gods);
+        else if (applied < 0) ReportLoss(terminal, player, applied, gods);
+    }
 }

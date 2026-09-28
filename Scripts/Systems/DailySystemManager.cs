@@ -412,6 +412,7 @@ public class DailySystemManager
 
         // 1.2.0 Temple gods: clears today's Favor gains per source and applies neglect. The only production caller.
         FavorSystem.ApplyDailyReset(player);
+        GodDeedSystem.ApplyDailyReset(player, terminal);   // 1.2.0 Temple gods: a spellcaster's week without casting (Magic taboo)
 
         // Weekly rankings update (every Monday) — only in online mode
         // Must use Eastern time for day-of-week check since daily reset fires at 7 PM Eastern

@@ -428,6 +428,8 @@ public class ArenaLocation : BaseLocation
 
             // Fame from PvP victory
             currentPlayer.Fame += 10;
+            GodDeedSystem.Record(currentPlayer, GodAct.PvpWin, terminal);   // 1.2.0 Temple gods: Chaos deed
+            if (bountyReward > 0) GodDeedSystem.Record(currentPlayer, GodAct.BountyCollected, terminal);   // 1.2.0 Temple gods: Law deed
 
             // Display victory
             terminal.WriteLine("");

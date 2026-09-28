@@ -1211,6 +1211,7 @@ public class StreetEncounterSystem
                 await Task.Delay(2000);
 
                 player.DaysInPrison = (byte)Math.Min(255, sentence);
+                GodDeedSystem.Record(player, GodAct.Imprisoned, terminal);   // 1.2.0 Temple gods: Law taboo
                 result.Message = Loc.Get("street_encounter.guard.msg_arrested");
                 throw new LocationExitException(GameLocation.Prison);
             }
@@ -1240,6 +1241,7 @@ public class StreetEncounterSystem
                     await Task.Delay(2000);
 
                     player.DaysInPrison = (byte)Math.Min(255, sentence);
+                    GodDeedSystem.Record(player, GodAct.Imprisoned, terminal);   // 1.2.0 Temple gods: Law taboo
                     result.Message = Loc.Get("street_encounter.guard.msg_defeated_arrested");
                     throw new LocationExitException(GameLocation.Prison);
                 }
@@ -1275,6 +1277,7 @@ public class StreetEncounterSystem
                     await Task.Delay(2000);
 
                     player.DaysInPrison = (byte)Math.Min(255, sentence);
+                    GodDeedSystem.Record(player, GodAct.Imprisoned, terminal);   // 1.2.0 Temple gods: Law taboo
                     result.Message = Loc.Get("street_encounter.guard.msg_caught");
                     throw new LocationExitException(GameLocation.Prison);
                 }
@@ -1639,6 +1642,7 @@ public class StreetEncounterSystem
             }
             else if (isBrawl)
             {
+                GodDeedSystem.Record(player, GodAct.StreetBrawl, terminal);   // 1.2.0 Temple gods: Chaos deed
                 result.Message = Loc.Get("street.fight.brawl_victory", expGain.ToString());
             }
             else

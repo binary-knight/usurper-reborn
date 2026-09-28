@@ -6033,6 +6033,7 @@
   "mental.band_better": "La Santé mentale s'améliore : {0}.",
   "mental.gain": "Votre esprit s'apaise. (+{0} Santé mentale)",
   "favor.gain": "{0} est satisfait. (+{1} Faveur, maintenant {2})",
+  "favor.loss": "{0} est mécontent. (-{1} Faveur, maintenant {2})",
   "mental.no_gain_at_cap": "Votre esprit est aussi apaisé qu'il peut l'être ; ceci ne l'apaisera pas davantage.",
   "mental.no_gain_used_today": "Vous avez déjà trouvé ce réconfort aujourd'hui ; il n'apaisera plus votre esprit avant demain.",
   "mental.broken_cleared": "L'effondrement ne vous tient plus. Votre esprit vous appartient de nouveau.",

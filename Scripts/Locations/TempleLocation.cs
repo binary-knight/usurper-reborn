@@ -1000,6 +1000,7 @@ public partial class TempleLocation : BaseLocation
         currentPlayer.ConfessionsToday++;
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("temple.confess_success", amount, cost), "bright_yellow");
+        GodDeedSystem.Record(currentPlayer, GodAct.Confession, terminal);   // 1.2.0 Temple gods: Shadow taboo
         terminal.SetColor("gray");
         terminal.WriteLine(Loc.Get("temple.confess_flavor"));
         await terminal.PressAnyKey();
@@ -2385,6 +2386,7 @@ public partial class TempleLocation : BaseLocation
         currentPlayer.Experience += xpGain;
         currentPlayer.DarkNr--;
         currentPlayer.DesecrationsToday++;
+        GodDeedSystem.Record(currentPlayer, GodAct.Desecration, terminal);   // 1.2.0 Temple gods: Earth taboo
 
         terminal.WriteLine("", "white");
         terminal.WriteLine(Loc.Get("temple.darkness_flows", darknessGain), "dark_red");

@@ -1745,6 +1745,14 @@ public static partial class GameConfig
     public const int GodFavorItemMin = 1;                     // Item sacrifice: Favor for any item worth offering
     public const int GodFavorItemMax = 4;                     // Item sacrifice: Favor for the most valuable item
     public const int GodFavorItemDailyCap = 4;                // Item sacrifice: at most this much Favor a day
+    // Temple gods piece 3: deeds and taboos of the worshipped god's domain (GodDeedSystem)
+    public const int GodFavorDeedDailyCap = 4;                // Deeds: at most this much Favor a day
+    public const int GodDeedMinor = 1;                        // A common fitting deed (a kill, a heal, a theft)
+    public const int GodDeedMajor = 2;                        // A rarer fitting deed (a bounty, a spell learned, a marriage)
+    public const int GodTabooMinor = 3;                       // Drug use, fleeing, a theft against Law
+    public const int GodTabooMajor = 5;                       // Prison, confession, raising undead, a week without casting, marriage for Chaos, murder for Law
+    public const int GodTabooGrave = 10;                      // Murder for Love, desecration for Earth
+    public const int GodTabooNoCastDays = 7;                  // Magic: daily resets without a spell cast before the taboo
     // Temple gods piece 2: each god's boon, scaled by the follower's tier (percent of the full boon)
     public const int GodBoonFollowerStrengthPct = 33;         // Follower: 1/3 of the full boon
     public const int GodBoonDevoutStrengthPct = 67;           // Devout: 2/3

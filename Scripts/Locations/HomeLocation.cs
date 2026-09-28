@@ -1040,6 +1040,7 @@ public class HomeLocation : BaseLocation
 
                 currentPlayer.AddHerb(herbType);
                 currentPlayer.HerbsGatheredToday++;
+                GodDeedSystem.Record(currentPlayer, GodAct.HerbGathered, terminal);   // 1.2.0 Temple gods: Earth deed
                 herbsLeft--;
 
                 terminal.SetColor(HerbData.GetColor(herbType));

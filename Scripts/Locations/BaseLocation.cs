@@ -6282,6 +6282,7 @@ public abstract class BaseLocation
             int mentalBeforeWitness = currentPlayer.Mental;
             MentalSystem.ApplyWitnessLoss(currentPlayer);
             MentalUi.AnnounceMentalChange(terminal, currentPlayer, mentalBeforeWitness);
+            GodDeedSystem.Record(currentPlayer, GodAct.DeathWitnessed, terminal);   // 1.2.0 Temple gods: Death deed
 
             if (result.GoldGained > 0)
             {
@@ -6308,6 +6309,7 @@ public abstract class BaseLocation
                 // skip any post-call work. Counter should reflect the
                 // murder regardless of what the crown does next.
                 currentPlayer.MurdersToday++;
+                GodDeedSystem.Record(currentPlayer, GodAct.Murder, terminal);   // 1.2.0 Temple gods: Love and Law taboo
                 await ApplyMurderConsequences(currentPlayer, npc);
             }
         }
@@ -6566,6 +6568,7 @@ public abstract class BaseLocation
 
                 // Prison for 2 real days — maximum security, no escape
                 p.DaysInPrison = 2;
+                GodDeedSystem.Record(p, GodAct.Imprisoned, terminal);   // 1.2.0 Temple gods: Law taboo
                 p.IsMurderConvict = true;
                 p.PrisonEscapes = 0;
                 p.CellDoorOpen = false;

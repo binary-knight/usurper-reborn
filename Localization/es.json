@@ -6033,6 +6033,7 @@
   "mental.band_better": "La Salud Mental mejora: {0}.",
   "mental.gain": "Tu mente se serena. (+{0} Salud Mental)",
   "favor.gain": "{0} está complacido. (+{1} de Favor, ahora {2})",
+  "favor.loss": "{0} está disgustado. (-{1} de Favor, ahora {2})",
   "mental.no_gain_at_cap": "Tu mente está tan serena como puede estar; esto no la aliviará más.",
   "mental.no_gain_used_today": "Ya has encontrado este consuelo hoy; no aliviará tu mente de nuevo hasta mañana.",
   "mental.broken_cleared": "El colapso ya no te domina. Tu mente vuelve a ser tuya.",
