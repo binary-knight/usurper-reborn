@@ -84,6 +84,10 @@ public class Character
     // v1.2 (design item B): killer's name when this grouped follower died in the leader's fight
     // and their own session has not yet resolved the death. Persisted so a disconnect cannot lose it.
     public string? PendingGroupDeath { get; set; }
+    // v1.1.15: this grouped follower collapsed (Mental 0) in the leader's fight on a shallow floor; the
+    // rescue is already applied, their own session leaves the group and goes to the Healer. Not saved.
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool PendingMentalRescue { get; set; }
 
     public int GnollP { get; set; }                 // gnoll poison, temporary
     public int Mental { get; set; } = GameConfig.MaxMentalStability; // mental health; v1.1.15: a bare Character starts full, not Broken

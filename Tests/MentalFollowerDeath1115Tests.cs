@@ -173,8 +173,12 @@ public class MentalFollowerDeath1115Tests
     {
         var lines = File.ReadAllLines(Path.Combine(RepoRoot(), "Scripts", "Systems", "CombatEngine.cs"));
         var sites = Enumerable.Range(0, lines.Length).Where(i => lines[i].Contains("GroupFollowerDeath.Mark(")).ToList();
-        sites.Should().HaveCount(3);
+        // v1.1.15 piece 7: the fourth site is a Mental collapse death (ApplyFollowerCollapse); the
+        // collapse is the Mental cost, so it sets the Broken aftermath there instead of the death loss
+        sites.Should().HaveCount(4);
         foreach (var i in sites)
-            lines[i - 1].Should().Contain("ApplyMentalFollowerDeath(", $"line {i + 1}");
+            (lines[i - 1].Contains("ApplyMentalFollowerDeath(") || lines[i - 1].Contains("MentalSystem.ApplyCollapseDeathAftermath(follower);"))
+                .Should().BeTrue($"line {i + 1}");
+        sites.Count(i => lines[i - 1].Contains("ApplyCollapseDeathAftermath(")).Should().Be(1);
     }
 }
