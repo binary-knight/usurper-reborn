@@ -6388,6 +6388,14 @@ public abstract class BaseLocation
             terminal.WriteLine("");
 
             captured = true;
+
+            // v1.2.0: a Surrender at Mental 0 is the same non-choice as a refused fight at
+            // Mental 0 (CollapseDue), so it skips the execution roll for the same reason.
+            // A Surrender above Mental 0 still rolls.
+            if (MentalSystem.CollapseDue(currentPlayer))
+            {
+                skipExecutionRoll = true;
+            }
         }
         else
         {
@@ -6439,8 +6447,9 @@ public abstract class BaseLocation
                 // v1.2.0: the witness loss after the murder (or the murder fight itself) left Mental at 0,
                 // so the guards' fight is not entered. The player is taken as on a surrender, with one line
                 // in place of the overpowered text; the collapse is left to the location loop. A refused
-                // arrest is not a choice to face the Crown's justice, so the execution roll is skipped;
-                // capture and the prison sentence still follow.
+                // arrest is not a choice to face the Crown's justice, so the execution roll is skipped
+                // (see the same CollapseDue check on the Surrender branch above); capture and the prison
+                // sentence still follow.
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("mental.collapse_before_fight"));
                 captured = true;
@@ -6467,7 +6476,9 @@ public abstract class BaseLocation
             }
         }
 
-        // 50% execution, 50% prison. A refused arrest fight (Mental collapse) skips the roll.
+        // 50% execution, 50% prison. A refused arrest fight (Mental collapse) or a Surrender at
+        // Mental 0 (CollapseDue) skips the roll; a voluntary Surrender above Mental 0 and a real
+        // defeat still roll.
         bool isExecuted = !skipExecutionRoll && Random.Shared.Next(100) < 50;
 
         if (isExecuted && captured)

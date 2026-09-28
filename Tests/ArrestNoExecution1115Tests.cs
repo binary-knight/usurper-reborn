@@ -11,11 +11,11 @@ using static UsurperReborn.Tests.MentalRecoveryB1115Tests;
 namespace UsurperReborn.Tests;
 
 /// <summary>
-/// v1.2.0: BaseLocation.ApplyMurderConsequences rolled a 50% execution for every capture, including a
-/// murder arrest fight refused at Mental 0 (result.MentalCollapseNotFought), which is taken as a
-/// surrender. A refused arrest is not a choice to face the Crown, so that roll is now skipped; the
-/// player is still captured and sentenced to prison exactly as before. A voluntary Surrender and a real
-/// defeat (lost the guard fight) still roll as before.
+/// v1.2.0: BaseLocation.ApplyMurderConsequences rolled a 50% execution for every capture, including
+/// a murder arrest fight refused at Mental 0 (result.MentalCollapseNotFought) and a voluntary Surrender
+/// chosen at Mental 0. Both are the same non-choice under MentalSystem.CollapseDue, so neither rolls
+/// now; the player is still captured and sentenced to prison exactly as before. A Surrender above
+/// Mental 0 and a real defeat (lost the guard fight) still roll as before.
 /// </summary>
 [Collection("SharedGameSingletons")]
 public class ArrestNoExecution1115Tests
@@ -58,32 +58,79 @@ public class ArrestNoExecution1115Tests
         Text(output).Should().NotContain(Loc.Get("base.death_sentence"));
     }
 
-    // Source: the skip is wired to the collapse-not-fought branch only. A voluntary Surrender
-    // (choice == "S") and a real defeat (the else / lost-the-fight branch) never set it, so the roll
-    // in those branches is unchanged.
+    // Behaviour: choosing Surrender directly (not a refused fight) at Mental 0 is the same non-choice,
+    // so it also skips the roll: captured, sentenced to prison, alive, no death sentence text.
     [Fact]
-    public void Only_the_collapse_not_fought_branch_skips_the_execution_roll()
+    public async Task A_surrender_at_mental_zero_is_captured_and_sentenced_without_the_execution_roll()
+    {
+        var street = new MainStreetLocation();
+        var output = new MemoryStream();
+        var term = new TerminalEmulator(new LineStream(new[] { "S", "", "", "" }), output);
+        typeof(BaseLocation).GetField("terminal", F)!.SetValue(street, term);
+        var hero = HeroPlayer("Spent", 0); // Mental 0: MentalSystem.CollapseDue is true
+        typeof(BaseLocation).GetField("currentPlayer", F)!.SetValue(street, hero);
+        var victim = new NPC { Name1 = "Victim", Name2 = "Victim", Level = 5, HP = 50, MaxHP = 50 };
+
+        var task = RunApplyMurderConsequences(street, hero, victim);
+        var exit = await Assert.ThrowsAsync<LocationExitException>(() => task);
+
+        exit.DestinationLocation.Should().Be(GameLocation.Prison, "a Surrender is still a capture");
+        hero.DaysInPrison.Should().Be(2, "the prison sentence is applied as on any capture");
+        hero.IsMurderConvict.Should().BeTrue();
+        hero.IsAlive.Should().BeTrue("the execution roll is skipped for a Surrender at Mental 0");
+        term.StreamWriterInternal?.Flush();
+        Text(output).Should().NotContain(Loc.Get("base.death_sentence"));
+    }
+
+    // Source: a Surrender above Mental 0 is not CollapseDue, so the Surrender branch falls through to
+    // the same roll as before. Random.Shared makes a direct behaviour assertion flaky at 50%, so this
+    // checks the guard in source: the Surrender branch sets skipExecutionRoll only inside the
+    // CollapseDue check, and that check is not the unconditional default.
+    [Fact]
+    public void A_surrender_above_mental_zero_still_reaches_the_execution_roll()
+    {
+        var body = Body(Src("Locations", "BaseLocation.cs"), "ApplyMurderConsequences");
+
+        int surrender = At(body, "if (choice == \"S\")");
+        int collapseGuard = At(body, "if (MentalSystem.CollapseDue(currentPlayer))");
+        int fightBranch = At(body, "var guards = new Monster[5];");
+
+        collapseGuard.Should().BeInRange(surrender, fightBranch, "the Surrender skip sits inside the Surrender branch");
+
+        var surrenderBranch = body.Substring(surrender, fightBranch - surrender);
+        System.Text.RegularExpressions.Regex.Matches(surrenderBranch, "skipExecutionRoll = true;").Count
+            .Should().Be(1, "the Surrender branch sets the skip exactly once, guarded by CollapseDue");
+
+        int guardIndex = surrenderBranch.IndexOf("if (MentalSystem.CollapseDue(currentPlayer))", StringComparison.Ordinal);
+        int skipIndex = surrenderBranch.IndexOf("skipExecutionRoll = true;", StringComparison.Ordinal);
+        skipIndex.Should().BeGreaterThan(guardIndex,
+            "the skip is set only after the CollapseDue check, so a Surrender above Mental 0 falls through to the roll");
+    }
+
+    // Source: the skip is wired to the guarded Surrender branch and the collapse-not-fought branch
+    // only. A real defeat (the lost-the-fight branch, reached when playerWon is false and the fight
+    // was not refused) never sets it, so the roll there is unchanged.
+    [Fact]
+    public void Only_the_surrender_and_collapse_not_fought_branches_skip_the_execution_roll()
     {
         var body = Body(Src("Locations", "BaseLocation.cs"), "ApplyMurderConsequences");
 
         int declared = At(body, "bool skipExecutionRoll = false;");
         int surrender = At(body, "if (choice == \"S\")");
         int collapseCheck = At(body, "if (result.MentalCollapseNotFought)");
-        int skipSet = At(body, "skipExecutionRoll = true;");
         int playerWon = At(body, "else if (playerWon)");
         int roll = At(body, "bool isExecuted =");
 
         declared.Should().BeLessThan(surrender, "the flag defaults to false before either branch runs");
-        skipSet.Should().BeInRange(collapseCheck, playerWon, "the skip is set inside the collapse-not-fought branch only");
-        roll.Should().BeGreaterThan(skipSet, "the flag is set before the roll reads it");
+        roll.Should().BeGreaterThan(collapseCheck, "the flag is set before the roll reads it");
 
-        var surrenderBranch = body.Substring(surrender, collapseCheck - surrender);
-        surrenderBranch.Should().NotContain("skipExecutionRoll = true", "a voluntary Surrender still rolls");
+        var lostFightBranch = body.Substring(playerWon, roll - playerWon);
+        lostFightBranch.Should().NotContain("skipExecutionRoll = true", "a real defeat still rolls");
 
         var rollLine = body.Substring(roll, body.IndexOf('\n', roll) - roll);
         rollLine.Should().Contain("skipExecutionRoll").And.Contain("Random.Shared.Next(100) < 50");
 
         System.Text.RegularExpressions.Regex.Matches(body, "skipExecutionRoll = true;").Count
-            .Should().Be(1, "only the collapse-not-fought branch skips the roll");
+            .Should().Be(2, "the Surrender branch and the collapse-not-fought branch each skip the roll once");
     }
 }
