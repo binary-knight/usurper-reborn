@@ -319,4 +319,37 @@ public class GodBoonRecalc1115Tests
                 @"GodRegistry\.SetWorshippedGod\(player, godName\);[^\n]*\n\s*await GodBoonSystem\.ApplyRecruitAsync\(currentPlayer, player\);")
             .Should().BeTrue();
     }
+
+    [Fact]
+    public void Recruit_WithNoScale_KeepsTheDomainCache_LikeTheLoginRefresh()
+    {
+        var f = Hero("GbrRecruitNoScale");
+        long plain = PlainMaxHp(f);
+        var god = new Character
+        {
+            Name1 = "GbrNoScaleImm", Name2 = "GbrNoScaleImm", AI = CharacterAI.Human, IsImmortal = true,
+            DivineName = "GbrNoScaleGod", DivineDomain = "Earth", DivineBoonConfig = ""
+        };
+        try
+        {
+            GodRegistry.SetWorshippedGod(f, "GbrNoScaleOld").Should().BeTrue();
+            GodBoonSystem.SetPlayerGodBoon(f, "GbrNoScaleOld", GodDomain.Earth, 100);
+            GodRegistry.SetWorshippedGod(f, "GbrNoScaleGod").Should().BeTrue();
+            f.GodFavor = GameConfig.GodFavorTierZealotMin;
+
+            GodBoonSystem.ApplyRecruit(god, f, null);
+            f.PlayerGodBoonGod.Should().Be("GbrNoScaleOld", "a failed standings read keeps the cache, as the login refresh does");
+            f.PlayerGodBoonScalePct.Should().Be(100);
+            f.MaxHP.Should().Be(plain, "a cache for another god gives no boon");
+        }
+        finally { GodRegistry.SetWorshippedGod(f, null); }
+    }
+
+    [Fact]
+    public void Temple_TheCanonChoice_RecalculatesAfterItClearsThePlayerGod()
+    {
+        Regex.IsMatch(Body("Scripts/Locations/TempleLocation.cs", "private async Task ProcessWorship("),
+                @"temple\.bond_severed""[^\n]*\n\s*currentPlayer\.WorshippedGod = """";\s*GodBoonSystem\.RecalculateForBoon\(currentPlayer\);")
+            .Should().BeTrue("choosing a canon god clears the player-god and its boons after SetCanonWorship ran");
+    }
 }

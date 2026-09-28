@@ -402,25 +402,28 @@ public static class GodBoonSystem
 
     /// <summary>
     /// A player was recruited by an immortal (Pantheon): the follower takes the god's configured
-    /// boons and the god's domain at the given scale, and the stats are recalculated.
+    /// boons and the god's domain at the given scale, and the stats are recalculated. With no scale
+    /// (the standings could not be read) the domain cache is kept, as RefreshPlayerGodBoonAsync
+    /// keeps it when its read fails; a cache for another god gives no boon (PlayerGodCacheFits).
     /// </summary>
-    public static void ApplyRecruit(Character immortal, Character follower, int scalePct)
+    public static void ApplyRecruit(Character immortal, Character follower, int? scalePct)
     {
         if (immortal == null || follower == null || follower.IsNPC || string.IsNullOrWhiteSpace(immortal.DivineName)) return;
         SetConfiguredBoons(follower, immortal.DivineBoonConfig);
-        ApplyDomainChange(immortal.DivineName, ParseDomain(immortal.DivineDomain), scalePct, new[] { follower });
+        if (scalePct is not int scale) return;
+        ApplyDomainChange(immortal.DivineName, ParseDomain(immortal.DivineDomain), scale, new[] { follower });
     }
 
     /// <summary>
     /// Online: a player recruited by an immortal gets the god's boons at once, at the god's current
     /// scale (the immortal is online, so no idle decay). The domain comes from the immortal in
-    /// memory, like ApplyDomainChangeAsync. A standings read that fails applies scale 0 until the
-    /// next refresh (login or Temple).
+    /// memory, like ApplyDomainChangeAsync. A standings read that fails keeps the domain cache, as
+    /// the login refresh does, until the next refresh (login or Temple).
     /// </summary>
     public static async Task ApplyRecruitAsync(Character immortal, Character follower)
     {
         if (immortal == null || follower == null || string.IsNullOrWhiteSpace(immortal.DivineName)) return;
-        int scale = 0;
+        int? scale = null;
         if (UsurperRemake.BBS.DoorMode.IsOnlineMode && SaveSystem.Instance?.Backend is SqlSaveBackend backend)
         {
             try
