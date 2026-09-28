@@ -1738,6 +1738,32 @@ public static partial class GameConfig
     public const int GodNeglectGraceDays = 3;                 // Days without devotion before neglect starts
     public const int GodNeglectDailyLoss = 1;                 // Favor lost at each daily reset past the grace days
     public const int GodFavorSchemaCurrent = 1;               // Below this, the load gives Favor GodFavorLegacyStart with the current god
+    // Temple gods piece 2: each god's boon, scaled by the follower's tier (percent of the full boon)
+    public const int GodBoonFollowerStrengthPct = 33;         // Follower: 1/3 of the full boon
+    public const int GodBoonDevoutStrengthPct = 67;           // Devout: 2/3
+    public const int GodBoonZealotStrengthPct = 100;          // Zealot: full
+    public const int GodBoonChosenStrengthPct = 100;          // Chosen: full
+    public const int GodBoonSolariusUndeadDamagePct = 15;     // Solarius: damage against undead and demons
+    public const int GodBoonValorianLowHpDamagePct = 10;      // Valorian: damage while below the HP threshold
+    public const int GodBoonValorianHpThresholdPct = 50;      // Valorian: "below half HP"
+    public const int GodBoonAmaraHealPct = 15;                // Amara: heals the follower casts and the party wards they raise
+    public const int GodBoonJudicarDefencePct = 10;           // Judicar: damage taken from monsters reduced by this percent
+    public const int GodBoonJudicarBountyPct = 20;            // Judicar: bounty rewards
+    public const int GodBoonUmbrathCritPct = 10;              // Umbrath: extra critical chance (percentage points)
+    public const int GodBoonUmbrathTheftPct = 10;             // Umbrath: Dark Alley pickpocket success (percentage points, cap raised the same)
+    public const int GodBoonTerranMaxHpPct = 10;              // Terran: max HP, applied in RecalculateStats
+    public const int GodBoonTerranYieldPct = 20;              // Terran: garden herbs a day and the settlement council share
+    public const int GodBoonMortisDeathGoldCutPct = 25;       // Mortis: gold lost to the death penalty reduced by this percent
+    public const int GodBoonArcanusSpellPct = 10;             // Arcanus: spell damage
+    public const int GodBoonArcanusManaRegenPct = 10;         // Arcanus: mana regenerated each combat round
+    public const int GodBoonSylvanaWildernessPct = 100;       // Sylvana: wilderness gold and XP (100 = doubled)
+    public const int GodBoonDiscordiaPvpDamagePct = 10;       // Discordia: damage in PvP
+    public const int GodBoonDiscordiaFirstActionFailPct = 15; // Discordia: chance per monster that its first action fails
+    public const float GodPrayerBlessingZealotMultiplier = 2.0f; // Zealot and up: the daily prayer blessing lasts this many times as long
+    public const int GodPrayerBlessingCombats = 20;           // A player-god prayer blessing lasts this many combats (about 2 hours of play)
+    // Temple gods piece 2: Mental wards (Devout and up), applied inside MentalSystem
+    public const int GodWardLossCutPct = 50;                  // A ward halves its losses (and Discordia's fear chance)
+    public const int GodWardSylvanaStrainCutPct = 10;         // Sylvana: dungeon strain reduced by this percent
     /// <summary>The ten canon gods, in Temple order. Manwe (SupremeCreatorName) is never one of them.</summary>
     public static readonly string[] CanonGodNames =
         { "Solarius", "Valorian", "Amara", "Judicar", "Umbrath", "Terran", "Mortis", "Arcanus", "Sylvana", "Discordia" };

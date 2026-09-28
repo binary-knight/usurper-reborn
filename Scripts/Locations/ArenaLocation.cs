@@ -424,6 +424,7 @@ public class ArenaLocation : BaseLocation
 
             // Claim any bounties on the defeated player
             long bountyReward = await backend.ClaimBounties(defenderUsername, myUsername);
+            bountyReward = GodBoonSystem.BountyReward(currentPlayer, bountyReward);   // 1.2.0 Temple gods piece 2: Judicar's boon
 
             // Fame from PvP victory
             currentPlayer.Fame += 10;

@@ -1766,6 +1766,9 @@ public class Character
         double awakeningMana = UsurperRemake.Systems.AwakeningBonus.ManaAt(awakeningStage);
         if (awakeningMana > 0 && MaxMana > 0) MaxMana += (long)(MaxMana * awakeningMana);
 
+        // 1.2.0 Temple gods piece 2: Terran's boon on max HP (players only; NPCs never reach the registry)
+        if (!IsNPC) MaxHP += UsurperRemake.Systems.GodBoonSystem.MaxHpBonus(this, MaxHP);
+
         // Apply Fountain of Vitality bonus HP
         if (BonusMaxHP > 0)
         {

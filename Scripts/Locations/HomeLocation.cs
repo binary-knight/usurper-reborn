@@ -966,7 +966,8 @@ public class HomeLocation : BaseLocation
     private async Task GatherHerbs()
     {
         int gardenLevel = Math.Clamp(currentPlayer.GardenLevel, 0, 5);
-        int maxHerbs = GameConfig.HerbsPerDay[gardenLevel];
+        // 1.2.0 Temple gods piece 2: Terran's boon on the garden's herbs a day
+        int maxHerbs = (int)GodBoonSystem.EarthYield(currentPlayer, GameConfig.HerbsPerDay[gardenLevel]);
 
         if (gardenLevel <= 0)
         {

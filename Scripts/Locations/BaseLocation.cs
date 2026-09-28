@@ -7825,6 +7825,18 @@ public abstract class BaseLocation
             bool isEvilGod = godInfo != null && godInfo.Darkness > godInfo.Goodness;
             terminal.SetColor(isEvilGod ? "red" : "bright_cyan");
             terminal.WriteLine(worshippedGod);
+
+            // 1.2.0 Temple gods piece 2: the boon at the character's current strength, and the ward
+            var boonDomain = GodBoonSystem.GetDomain(currentPlayer);
+            if (boonDomain != GodDomain.None)
+            {
+                int strength = GodBoonSystem.GetStrengthPct(currentPlayer);
+                terminal.SetColor("gray");
+                terminal.WriteLine($"  {Loc.Get("god.boon_line", GodBoonSystem.DescribeBoon(boonDomain, strength), strength)}");
+                bool warded = FavorSystem.GetTier(FavorSystem.GetFavor(currentPlayer)) >= GodFavorTier.Devout;
+                terminal.SetColor(warded ? "gray" : "darkgray");
+                terminal.WriteLine($"  {Loc.Get(warded ? "god.ward_line_active" : "god.ward_line", GodBoonSystem.DescribeWard(boonDomain))}");
+            }
         }
         else
         {

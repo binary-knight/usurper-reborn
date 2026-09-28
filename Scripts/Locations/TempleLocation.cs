@@ -1451,6 +1451,14 @@ public partial class TempleLocation : BaseLocation
             }
 
             terminal.WriteLine($"  {alignmentMarker} {god.Name} - {domain}", color);
+
+            // 1.2.0 Temple gods piece 2: the god's boon (canon boons are fixed, full strength) and ward
+            var boonDomain = GodBoonSystem.DomainOfCanon(god.Name);
+            if (boonDomain != GodDomain.None)
+            {
+                terminal.WriteLine($"      {Loc.Get("god.boon_line", GodBoonSystem.DescribeBoon(boonDomain, 100), 100)}", "gray");
+                terminal.WriteLine($"      {Loc.Get("god.ward_line", GodBoonSystem.DescribeWard(boonDomain))}", "darkgray");
+            }
         }
 
         terminal.WriteLine("");
@@ -2596,7 +2604,8 @@ public partial class TempleLocation : BaseLocation
 
                 // Apply as temporary DivineBlessingCombats/Bonus using the strongest buff
                 // The prayer buff lasts for a time-based duration simulated as combat count
-                int prayerCombats = 20; // ~20 combats ≈ 2 hours of active play
+                // 1.2.0 Temple gods piece 2: twice as long at Zealot and up
+                int prayerCombats = DivineBlessingSystem.PrayerBlessingCombats(FavorSystem.GetTier(FavorSystem.GetFavor(currentPlayer)));
                 float prayerBonus = Math.Max(boosted.DamagePercent, boosted.DefensePercent);
                 if (prayerBonus > 0)
                 {
