@@ -173,7 +173,8 @@ public class GodBoonRecalc1115Tests
         Count(worship, "await SwitchGodAsync(null);").Should().Be(2, "leaving a player-god, leaving a canon god");
         Count(worship, "await SwitchGodAsync(selectedGod.Name);").Should().Be(1, "choosing a canon god");
         Count(Body("Scripts/Locations/TempleLocation.cs", "private async Task WorshipImmortalGod("), "await SwitchGodAsync(chosen.DivineName);").Should().Be(1);
-        Count(Body("Scripts/Locations/TempleLocation.cs", "private async Task LeaveImmortalFaith("), "await SwitchGodAsync(null);").Should().Be(1);
+        // 1.2.0 Temple gods piece 7: the old L (leaving a player-god) is W's first step, counted above
+        Source("Scripts/Locations/TempleLocation.cs").Should().NotContain("LeaveImmortalFaith");
         Count(Body("Scripts/Locations/TempleLocation.cs", "private async Task VerifyPlayerGodExists("), "GodSwitchSystem.Switch(currentPlayer, null, GodChangeBy.Other);").Should().Be(1);
     }
 

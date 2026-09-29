@@ -147,8 +147,9 @@ namespace UsurperRemake.Systems
 
             switch (location)
             {
+                // 1.2.0 Temple gods piece 7: the Temple is open to all (its dark altars are served
+                // in the Undercroft); only the Church keeps its ward
                 case GameLocation.Church:
-                case GameLocation.Temple:
                     if (alignment == AlignmentType.Evil)
                         return (false, Loc.Get("alignment.wards_repel"));
                     if (alignment == AlignmentType.Dark && character.Darkness > 600)

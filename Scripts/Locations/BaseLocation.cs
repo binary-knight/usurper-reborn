@@ -7528,8 +7528,8 @@ public abstract class BaseLocation
 
             if (currentPlayer.Darkness > 100)
                 terminal.WriteLine($"    {Loc.Get("reputation.wanted")}");
-            var (templeOk, _) = AlignmentSystem.Instance.CanAccessLocation(currentPlayer, GameLocation.Temple);
-            if (!templeOk)
+            var (churchOk, _) = AlignmentSystem.Instance.CanAccessLocation(currentPlayer, GameLocation.Church);   // 1.2.0: the Temple is open to all
+            if (!churchOk)
                 terminal.WriteLine($"    {Loc.Get("reputation.holy_barred")}");
 
             var faction = FactionSystem.Instance;

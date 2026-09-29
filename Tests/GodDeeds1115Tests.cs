@@ -305,7 +305,7 @@ public class GodDeeds1115Tests
     [InlineData("Scripts/Systems/CombatEngine.cs", "if (partyAllyHealed) GodDeedSystem.Record(player, GodAct.AllyHealed, terminal);", 1)]
     [InlineData("Scripts/Locations/BaseLocation.cs", "GodDeedSystem.Record(currentPlayer, GodAct.DeathWitnessed, terminal);", 1)]
     [InlineData("Scripts/Locations/ChurchLocation.cs", "GodDeedSystem.Record(currentPlayer, GodAct.Confession, terminal);", 1)]
-    [InlineData("Scripts/Locations/TempleLocation.cs", "GodDeedSystem.Record(currentPlayer, GodAct.Confession, terminal);", 1)]
+    [InlineData("Scripts/Locations/TempleLocation.cs", "GodDeedSystem.Record(currentPlayer, GodAct.Confession, terminal);", 0)]   // 1.2.0 piece 7: the Temple Confession is gone; the Church records it
     [InlineData("Scripts/Locations/TempleLocation.cs", "GodDeedSystem.Record(currentPlayer, GodAct.Desecration, terminal);", 1)]
     [InlineData("Scripts/Locations/HomeLocation.cs", "GodDeedSystem.Record(currentPlayer, GodAct.HerbGathered, terminal);", 1)]
     [InlineData("Scripts/Locations/SettlementLocation.cs", "GodDeedSystem.Record(currentPlayer, GodAct.SettlementWork, terminal);", 1)]
