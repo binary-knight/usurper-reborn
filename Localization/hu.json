@@ -8683,7 +8683,7 @@
   "god.domain_pick_confirm": "{0} legyen végleg a birodalmad? ",
   "god.domain_pick_done": "{0} mostantól a(z) {1} birodalmáért felel.",
   "god.domain_pick_later": "A döntés a következő Pantheon-látogatásodig vár.",
-  "god.player_domain_line": "Birodalom: {0}, az áldás egy kánoni isten áldásának {1}%-a",
+  "god.player_domain_line": "Birodalom: {0}, az áldás egy templomi isten áldásának {1}%-a",
   "god.player_domain_none": "Birodalom: még nincs kiválasztva",
   "god.switch_cost_favor": "{0} elhagyása minden kegyedbe kerül nála ({1}).",
   "god.switch_cost_no_favor": "Nincs kegyed {0} előtt; az elhagyása nem kerül kegybe.",

@@ -15,8 +15,8 @@
   always have. One-key menus are one setting away.
 - **The gods matter now.** Every character has Favor with their god, earned
   by prayer, offerings and deeds that fit the god. Favor unlocks the god's
-  boon, a shield for your mind, and at the top a daily Miracle. Canon gods
-  and player-gods share one list and compete for followers, and the Temple
+  boon, a shield for your mind, and at the top a daily Miracle. The Temple's
+  gods and player-gods share one list and compete for followers, and the Temple
   is rebuilt as rooms. The full guide is below.
 - **Stat rewards now last.** Many permanent stat rewards were lost at the
   next fight, level-up or login. They now stay.
@@ -447,7 +447,7 @@ spells use the old slots and level requirements.
 ## The gods
 
 The gods of the Temple used to give a small edge and little else. In 1.2.0
-your god is a relationship you build. The ten canon gods (Solarius, Valorian,
+your god is a relationship you build. The ten gods of the Temple (Solarius, Valorian,
 Amara, Judicar, Umbrath, Terran, Mortis, Arcanus, Sylvana and Discordia) and
 every player-god are one list: you worship exactly one of them, and they all
 compete for followers.
@@ -541,7 +541,7 @@ Chosen); a Follower gets one third and a Devout two thirds.
 
 **Player-gods.** An immortal chooses one of the ten domains for their god.
 Their followers get that domain's boon, scaled by the god's standing against
-the strongest canon god (up to 120% of a canon god's boon). It fades if the
+the strongest Temple god (up to 120% of a Temple god's boon). It fades if the
 immortal stops playing. It comes on top of the boons the immortal
 configures.
 
@@ -591,7 +591,7 @@ as Mortis's Miracle. Prayer lifesteal is gone too.
 Leaving your god costs all your Favor with it; your new god starts at 0. The
 Temple shows the cost and asks before anything changes.
 
-- **Leaving a canon god** by choice brings its Divine Wrath, by the Favor you
+- **Leaving a Temple god** by choice brings its Divine Wrath, by the Favor you
   lose: level 1 below 25, level 2 from 25, level 3 from 50. Wrath can strike
   before dungeon fights until it passes.
 - **Leaving a player-god** by choice brings its lightning at once: 10% to 25%
@@ -602,7 +602,7 @@ Temple shows the cost and asks before anything changes.
 ### Standing and the god of the week
 
 A god's standing is the sum of its followers' Favor, plus 5 for every
-townsperson who follows it. The Temple ranks canon gods and player-gods
+townsperson who follows it. The Temple ranks its own gods and player-gods
 together by standing, with real follower counts.
 
 - **Desecrating an altar** lowers that god's standing by 5 until the next
@@ -630,7 +630,9 @@ and class.
 
 ### The Old Gods
 
-Seven gods echo an Old God: Solarius (Aurelion), Valorian (Maelketh), Amara
+The gods of the Temple are the new gods mortals made after the Old Gods were
+sealed away, pale echoes of the divine; the Old Gods themselves are the ones
+you face in the dungeon. Seven Temple gods echo an Old God: Solarius (Aurelion), Valorian (Maelketh), Amara
 (Veloura), Judicar (Thorgrim), Umbrath (Noctura), Terran (Terravok) and
 Arcanus (Manwe). A player-god echoes through its domain. At Zealot and up you
 hear an extra line before that fight and deal 10% more damage to that Old
@@ -658,7 +660,7 @@ gods, sharing its halls with the Faith, on stones older than the Temple.
 
 | Key | Room | What is there |
 |---|---|---|
-| A | Nave of the Gods | Every altar (canon and player-gods). **W** worship or switch, **Y** pray, **O** offer gold or items, **A** the Altars screen (your Favor, tier, boon, ward, Miracle, the rankings and this week's god). |
+| A | Nave of the Gods | Every altar (the Temple's gods and player-gods). **W** worship or switch, **Y** pray, **O** offer gold or items, **A** the Altars screen (your Favor, tier, boon, ward, Miracle, the rankings and this week's god). |
 | U | Undercroft | The altars of Umbrath, Mortis, Discordia and dark player-gods. Worship, offerings, prayer for dark gods, and **D** desecrate. |
 | F | The Faith | Mirael and the oath, and the Cloister (formerly the Inner Sanctum). |
 | P | Old Stones | Prophecies and visions, and the foundation stones. |
@@ -671,7 +673,7 @@ gods, sharing its halls with the Faith, on stones older than the Temple.
   their offerings to good gods other than their own and send them to the
   Undercroft, where they are welcome. The Church keeps its ward.
 - **Temple Confession is removed.** Confession is at the Church.
-- **Gold offerings** can go to any canon altar (with a warning when it is
+- **Gold offerings** can go to any Temple god's altar (with a warning when it is
   not your god) or to your own player-god; items only to your own god.
 - **An old Temple key** (for example C, I, $, J, L, S, G) prints where that
   action moved.
