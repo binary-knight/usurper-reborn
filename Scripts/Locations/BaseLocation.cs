@@ -199,7 +199,7 @@ public abstract class BaseLocation
         if (UsurperRemake.Server.SessionContext.IsActive && UsurperRemake.Server.RoomRegistry.Instance != null
             && LocationId != GameLocation.Dungeons)
         {
-            var otherPlayers = UsurperRemake.Server.RoomRegistry.Instance.GetPlayerNamesAt(LocationId, player.DisplayName);
+            var otherPlayers = UsurperRemake.Server.RoomRegistry.Instance.GetPlayerNamesAt(LocationId, UsurperRemake.Server.SessionContext.Current?.Username);
             if (otherPlayers.Count > 0)
             {
                 term.SetColor("cyan");
@@ -10375,7 +10375,7 @@ public abstract class BaseLocation
             // Global announcement
             UsurperRemake.Server.MudServer.Instance?.BroadcastToAll(
                 $"\u001b[93m  [Auction] {currentPlayer.DisplayName} just listed {item.Name} for {price:N0} gold! ({chosenLabel})\u001b[0m",
-                excludeUsername: currentPlayer.DisplayName);
+                excludeUsername: UsurperRemake.Server.SessionContext.Current?.Username);
         }
         else
         {
