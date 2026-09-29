@@ -183,12 +183,12 @@ public class GodBlessChastise1115Tests : IDisposable
             StorySystems = new StorySystemsData { PlayerGods = canon ?? new Dictionary<string, string>() }
         });
 
-    private Task<(BlessOutcome Outcome, string Lang)?> BlessOffline(string key) =>
-        Db.UpdateFollowerSaveOffline<(BlessOutcome Outcome, string Lang)?>(key, (p, gods) =>
+    private async Task<(BlessOutcome Outcome, string Lang)?> BlessOffline(string key) =>
+        (await Db.UpdateFollowerSaveOffline<(BlessOutcome Outcome, string Lang)?>(key, (p, gods) =>
         {
             var o = ImmortalDeedSystem.BlessSaved(p, gods, God);
             return (!o.Refused, (o, p.Language));
-        });
+        })).Result;
 
     private object? Scalar(string sql)
     {

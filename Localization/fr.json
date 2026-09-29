@@ -5207,6 +5207,7 @@
   "pantheon.bless_title": "BÉNIR UN FIDÈLE",
   "pantheon.bless_prompt": "Bénir n°",
   "pantheon.not_your_follower": "  {0} ne vous suit pas.",
+  "pantheon.deed_no_answer": "  Les cieux n'ont pas répondu. Réessayez.",
   "pantheon.bless_favor": "  {0} gagne {1} Faveur auprès de vous (maintenant {2}).",
   "pantheon.bless_favor_capped": "  {0} a déjà reçu aujourd'hui toute la Faveur que vos bénédictions peuvent donner.",
   "pantheon.bless_news": "[DIVIN] {0} a béni {1} !",

@@ -150,8 +150,9 @@ public class GodBlessOffline1115Tests : IDisposable
             var o = ImmortalDeedSystem.BlessSaved(p, gods, God, now);
             return (!o.Refused, o);
         });
-        r.Should().NotBeNull();
-        return r!.Value;
+        r.Failed.Should().BeFalse();
+        r.Result.Should().NotBeNull();
+        return r.Result!.Value;
     }
 
     [Fact]

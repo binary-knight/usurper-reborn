@@ -5207,6 +5207,7 @@
   "pantheon.bless_title": "BENDECIR SEGUIDOR",
   "pantheon.bless_prompt": "Bendecir #",
   "pantheon.not_your_follower": "  {0} no te sigue.",
+  "pantheon.deed_no_answer": "  Los cielos no respondieron. Inténtalo de nuevo.",
   "pantheon.bless_favor": "  {0} gana {1} de Favor contigo (ahora {2}).",
   "pantheon.bless_favor_capped": "  {0} ya recibió hoy todo el Favor que tus bendiciones pueden dar.",
   "pantheon.bless_news": "[DIVINO] ¡{0} bendijo a {1}!",

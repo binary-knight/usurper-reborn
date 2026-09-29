@@ -11,6 +11,13 @@ using UsurperRemake.Server;
 namespace UsurperRemake.Systems
 {
     /// <summary>
+    /// 1.2.0 Temple gods piece 5b: what SqlSaveBackend.UpdateFollowerSaveOffline did. Failed is true
+    /// when the database could not be read or written (nothing was written); else Result is the
+    /// change's result, or default when there is no save.
+    /// </summary>
+    public readonly record struct FollowerSaveUpdate<T>(bool Failed, T? Result);
+
+    /// <summary>
     /// Tolerant JSON converter that handles empty arrays [] for Dictionary types.
     /// This prevents deserialization crashes when an empty Dictionary was serialized as [].
     /// </summary>
@@ -3934,9 +3941,11 @@ namespace UsurperRemake.Systems
         /// dictionary (it returns whether to write, and a result), and only the Favor and blessing
         /// fields are written back: godFavor, godFavorGod, godFavorSchema, godFavorDayGains,
         /// daysSinceDevotion, divineBlessingCombats, divineBlessingBonus. Every other part of the save
-        /// is left as it is. Returns default when there is no save (or the read fails).
+        /// is left as it is. Result is default when there is no save; Failed is true, with nothing
+        /// written, when the database could not be read or written (busy or failing), so a caller
+        /// can tell it from a refusal.
         /// </summary>
-        public async Task<T?> UpdateFollowerSaveOffline<T>(string username, Func<PlayerData, Dictionary<string, string>?, (bool Write, T Result)> change)
+        public async Task<FollowerSaveUpdate<T>> UpdateFollowerSaveOffline<T>(string username, Func<PlayerData, Dictionary<string, string>?, (bool Write, T Result)> change)
         {
             if (string.IsNullOrWhiteSpace(username) || change == null) return default;
             try
@@ -3954,14 +3963,14 @@ namespace UsurperRemake.Systems
                         ORDER BY (username = LOWER(@username)) DESC, LENGTH(player_data) DESC LIMIT 1;";
                     read.Parameters.AddWithValue("@username", username);
                     using var reader = await Task.Run(() => read.ExecuteReader());
-                    if (!reader.Read()) return default;
+                    if (!reader.Read()) return default;  // no save
                     key = reader.GetString(0);
                     json = reader.GetString(1);
                 }
                 var save = JsonSerializer.Deserialize<SaveGameData>(json, jsonOptions);
                 if (save?.Player == null) return default;
                 var (write, result) = change(save.Player, save.StorySystems?.PlayerGods);
-                if (!write) return result;
+                if (!write) return new FollowerSaveUpdate<T>(false, result);
                 var p = save.Player;
                 using (var cmd = connection.CreateCommand())
                 {
@@ -3987,12 +3996,12 @@ namespace UsurperRemake.Systems
                     await Task.Run(() => cmd.ExecuteNonQuery());
                 }
                 tx.Commit();
-                return result;
+                return new FollowerSaveUpdate<T>(false, result);
             }
             catch (Exception ex)
             {
                 DebugLogger.Instance.LogError("SQL", $"Failed to update the saved follower {username}: {ex.Message}");
-                return default;
+                return new FollowerSaveUpdate<T>(true, default);
             }
         }
 

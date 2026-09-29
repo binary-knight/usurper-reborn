@@ -5398,6 +5398,7 @@
   "pantheon.bless_title": "BLESS FOLLOWER",
   "pantheon.bless_prompt": "Bless #",
   "pantheon.not_your_follower": "  {0} does not follow you.",
+  "pantheon.deed_no_answer": "  The heavens did not answer. Try again.",
   "pantheon.bless_favor": "  {0} gains {1} Favor with you (now {2}).",
   "pantheon.bless_favor_capped": "  {0} has had all the Favor your blessings can give today.",
   "pantheon.bless_news": "[DIVINE] {0} blessed {1}!",

@@ -5,15 +5,17 @@ namespace UsurperRemake.Systems;
 
 /// <summary>
 /// 1.2.0 Temple gods piece 5b: what a player-god's bless did. Refused is true when the target no
-/// longer follows the god (nothing changed). FavorGained is 0 when the day's cap is spent.
+/// longer follows the god (nothing changed). FavorGained is 0 when the day's cap is spent. Failed is
+/// true (with Refused) when the saved follower could not be read or written (nothing changed).
 /// </summary>
-public readonly record struct BlessOutcome(bool Refused, int FavorGained, int FavorNow, float Bonus, int Combats);
+public readonly record struct BlessOutcome(bool Refused, int FavorGained, int FavorNow, float Bonus, int Combats, bool Failed = false);
 
 /// <summary>
 /// 1.2.0 Temple gods piece 5b: what a chastise did. Refused is true when the target no longer
-/// follows the god (nothing changed). FavorLost is the Favor taken (0 at Favor 0).
+/// follows the god (nothing changed). FavorLost is the Favor taken (0 at Favor 0). Failed is true
+/// (with Refused) when the saved follower could not be read or written (nothing changed).
 /// </summary>
-public readonly record struct ChastiseOutcome(bool Refused, int FavorLost, int FavorNow);
+public readonly record struct ChastiseOutcome(bool Refused, int FavorLost, int FavorNow, bool Failed = false);
 
 /// <summary>
 /// 1.2.0 Temple gods piece 5b: the rules of an immortal's deeds on followers (Pantheon, Divine
