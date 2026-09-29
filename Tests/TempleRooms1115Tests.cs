@@ -379,7 +379,9 @@ public class TempleRooms1115Tests
         Invoke(w.Temple, "DrawRoom", TempleLocation.TempleRoom.Undercroft, await Items(w, TempleLocation.TempleRoom.Undercroft));
         w.Text().Should().Contain(Loc.Get("temple.undercroft.welcome_dark"));
         Invoke(w.Temple, "DrawRoom", TempleLocation.TempleRoom.Nave, await Items(w, TempleLocation.TempleRoom.Nave));
-        w.Text().Should().Contain(Loc.Get("temple.nave.evil_unwelcome"));
+        // The line may wrap at 80 columns; compare with runs of whitespace collapsed.
+        static string Flat(string t) => System.Text.RegularExpressions.Regex.Replace(t, @"\s+", " ");
+        Flat(w.Text()).Should().Contain(Flat(Loc.Get("temple.nave.evil_unwelcome")));
     }
 
     [Fact]
