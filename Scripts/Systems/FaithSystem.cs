@@ -549,6 +549,22 @@ public static class GodSwitchSystem
 
     /// <summary>Today's game day (DailySystemManager).</summary>
     public static int Today() => DailySystemManager.Instance.CurrentDay;
+
+    /// <summary>
+    /// Temple W: a god chosen right after leaving one in the same run. The leave recorded its wrath
+    /// with no god it was for; this names the chosen god in BetrayedForGodName. The wrath level is
+    /// not changed. Nothing when the leave recorded no wrath, the recorded wrath is from another god,
+    /// it already names a god, or the chosen god is the angered one.
+    /// </summary>
+    public static void NameBetrayedFor(Character c, GodSwitchCost? leave, string? chosenGod)
+    {
+        if (c == null || leave is not { } l || l.WrathLevel <= 0 || string.IsNullOrWhiteSpace(chosenGod)) return;
+        string chosen = chosenGod.Trim();
+        if (string.IsNullOrEmpty(c.AngeredGodName) || !string.IsNullOrEmpty(c.BetrayedForGodName)) return;
+        if (!c.AngeredGodName.Equals(l.OldGod, StringComparison.OrdinalIgnoreCase)) return;
+        if (c.AngeredGodName.Equals(chosen, StringComparison.OrdinalIgnoreCase)) return;
+        c.BetrayedForGodName = chosen;
+    }
 }
 
 /// <summary>
