@@ -1318,7 +1318,7 @@ public class DailySystemManager
         {
             god.GodLevel = newLevel;
             int titleIdx = Math.Clamp(newLevel - 1, 0, GameConfig.GodTitles.Length - 1);
-            terminal?.WriteLine(Loc.Get("daily.divine_power_grows", GameConfig.GodTitles[titleIdx]), "bright_cyan");
+            terminal?.WriteLine(Loc.Get("daily.divine_power_grows", GodText.Title(newLevel)), "bright_cyan");
             NewsSystem.Instance?.Newsy(true, $"{god.DivineName} has ascended to the rank of {GameConfig.GodTitles[titleIdx]}!");
         }
 

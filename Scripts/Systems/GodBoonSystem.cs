@@ -346,12 +346,16 @@ public static class GodBoonSystem
         return days <= 0 ? 0 : (int)Math.Min(Math.Floor(days), int.MaxValue);
     }
 
-    /// <summary>The highest standing among the ten canon gods (0 when none has followers).</summary>
+    /// <summary>
+    /// The highest player standing among the ten canon gods (0 when none has player followers). The
+    /// boon scale compares players only: NPC followers are left out (GodStanding.PlayerStanding).
+    /// </summary>
     public static long StrongestCanon(IReadOnlyDictionary<string, GodStanding> standings) =>
-        standings == null ? 0 : standings.Where(kv => GodRegistry.IsCanon(kv.Key)).Select(kv => kv.Value.Standing).DefaultIfEmpty(0).Max();
+        standings == null ? 0 : standings.Where(kv => GodRegistry.IsCanon(kv.Key)).Select(kv => kv.Value.PlayerStanding).DefaultIfEmpty(0).Max();
 
-    private static long StandingOf(IReadOnlyDictionary<string, GodStanding> standings, string god) =>
-        standings?.FirstOrDefault(kv => kv.Key.Equals(god, StringComparison.OrdinalIgnoreCase)).Value.Standing ?? 0;
+    /// <summary>A god's player standing for the boon scale (GodStanding.PlayerStanding; 0 when it has none).</summary>
+    public static long StandingOf(IReadOnlyDictionary<string, GodStanding> standings, string god) =>
+        standings?.FirstOrDefault(kv => kv.Key.Equals(god, StringComparison.OrdinalIgnoreCase)).Value.PlayerStanding ?? 0;
 
     /// <summary>
     /// Online: a player-god's domain and boon scale from the saved world, the immortal's row (domain,

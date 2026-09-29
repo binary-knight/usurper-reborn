@@ -598,8 +598,15 @@ public class PantheonLocation : BaseLocation
 
         foreach (var npc in npcs)
         {
-            string status = string.IsNullOrEmpty(npc.WorshippedGod) ? Loc.Get("pantheon.pagan") : Loc.Get("pantheon.follows", npc.WorshippedGod);
-            targets.Add(new DeedTarget { Name = npc.DisplayName, Level = npc.Level, Status = status, NpcRef = npc });
+            // 1.2.0: a loosely devout NPC (recruits like a pagan) is marked wavering (user ruling 2026-09-29)
+            string status = string.IsNullOrEmpty(npc.WorshippedGod) ? Loc.Get("pantheon.pagan")
+                : RecruitsLikePagan(npc) ? Loc.Get("pantheon.follows_wavering", npc.WorshippedGod)
+                : Loc.Get("pantheon.follows", npc.WorshippedGod);
+            targets.Add(new DeedTarget
+            {
+                Name = npc.DisplayName, Level = npc.Level, Status = status, NpcRef = npc,
+                RecruitsLikePagan = RecruitsLikePagan(npc), OldGod = npc.WorshippedGod ?? ""
+            });
         }
 
         // Player targets (MUD mode)
@@ -617,7 +624,8 @@ public class PantheonLocation : BaseLocation
                     targets.Add(new DeedTarget
                     {
                         Name = m.DisplayName, Level = m.Level, Status = status + onTag,
-                        IsPlayer = true, Username = m.Username, IsOnline = m.IsOnline
+                        IsPlayer = true, Username = m.Username, IsOnline = m.IsOnline,
+                        RecruitsLikePagan = string.IsNullOrEmpty(m.WorshippedGod), OldGod = m.WorshippedGod ?? ""
                     });
                 }
             }
@@ -633,7 +641,8 @@ public class PantheonLocation : BaseLocation
 
         var target = await PickTarget(targets, "RECRUIT BELIEVER", "bright_yellow", "Target #");
         if (target == null) return;
-        bool isPagan = target.Status.Contains("Pagan");
+        // 1.2.0 Temple gods: a pagan, or an NPC loosely devout to its canon god, is recruited as a pagan
+        bool isPagan = target.RecruitsLikePagan;
         var rng = Random.Shared;
 
         currentPlayer.DeedsLeft--;
@@ -682,7 +691,7 @@ public class PantheonLocation : BaseLocation
                 int expGain = GameConfig.GodRecruitStealExp;
                 if (target.IsPlayer) expGain = (int)(expGain * GameConfig.GodRecruitPlayerExpMultiplier);
 
-                string oldGod = target.Status.Replace(" [ONLINE]", "").Replace("Follows ", "");
+                string oldGod = target.OldGod;
 
                 if (target.IsPlayer)
                     await ApplyRecruitToPlayer(target, currentPlayer.DivineName);
@@ -1042,7 +1051,7 @@ public class PantheonLocation : BaseLocation
         currentPlayer.GodExperience += GameConfig.GodProclamationExp;
 
         // Broadcast via news system
-        string godTitle = GetGodTitle(currentPlayer.GodLevel);
+        string godTitle = GetGodTitleShared(currentPlayer.GodLevel);   // shared news and broadcast: English
         string newsEntry = $"[DIVINE] {currentPlayer.DivineName} the {godTitle} proclaims: \"{message}\"";
 
         // Broadcast to all online players
@@ -1173,7 +1182,7 @@ public class PantheonLocation : BaseLocation
 
         if (message.Length > 120) message = message.Substring(0, 120);
 
-        string godTitle = GetGodTitle(currentPlayer.GodLevel);
+        string godTitle = GetGodTitleShared(currentPlayer.GodLevel);   // shared news: English
         string newsEntry = $"{currentPlayer.DivineName} the {godTitle} speaks: \"{message}\"";
 
         NewsSystem.Instance?.Newsy(true,newsEntry);
@@ -1238,7 +1247,7 @@ public class PantheonLocation : BaseLocation
 
                 // News
                 NewsSystem.Instance?.Newsy(true,
-                    $"[DIVINE] {currentPlayer.DivineName} has ascended to {newTitle}!");
+                    $"[DIVINE] {currentPlayer.DivineName} has ascended to {GetGodTitleShared(currentPlayer.GodLevel)}!");
             }
             else
             {
@@ -1376,12 +1385,19 @@ public class PantheonLocation : BaseLocation
 
     #region Helper Methods
 
+    /// <summary>
+    /// 1.2.0 Temple gods: an NPC the recruit deed takes as a pagan (GodRecruitPaganChance and
+    /// GodRecruitPaganExp): one with no god, or one loosely devout to its canon god
+    /// (NpcFaithSystem.IsLooselyDevout). Any other NPC is a steal.
+    /// </summary>
+    public static bool RecruitsLikePagan(NPC npc) =>
+        npc != null && (NpcFaithSystem.GodOf(npc).Length == 0 || NpcFaithSystem.IsLooselyDevout(npc));
+
     /// <summary>Get the title for a god level (1-9)</summary>
-    public static string GetGodTitle(int level)
-    {
-        int idx = Math.Clamp(level, 1, GameConfig.GodMaxLevel) - 1;
-        return GameConfig.GodTitles[idx];
-    }
+    public static string GetGodTitle(int level) => GodText.Title(Math.Clamp(level, 1, GameConfig.GodMaxLevel));
+
+    /// <summary>The English title for a god level (1-9), for news and broadcasts every player shares.</summary>
+    public static string GetGodTitleShared(int level) => GameConfig.GodTitles[Math.Clamp(level, 1, GameConfig.GodMaxLevel) - 1];
 
     /// <summary>Get deeds per day for a god level</summary>
     public static int GetDeedsPerDay(int level)
@@ -1844,6 +1860,10 @@ public class PantheonLocation : BaseLocation
         public bool IsOnline { get; set; }
         public string Username { get; set; } = "";
         public NPC? NpcRef { get; set; }
+        /// <summary>Recruit: true for a pagan, or an NPC loosely devout to its god (RecruitsLikePagan).</summary>
+        public bool RecruitsLikePagan { get; set; }
+        /// <summary>Recruit: the god the target follows now ("" for a pagan).</summary>
+        public string OldGod { get; set; } = "";
         public long HP { get; set; }
         public long MaxHP { get; set; }
     }

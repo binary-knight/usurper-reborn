@@ -13269,6 +13269,11 @@ public partial class CombatEngine
             };
             long damagePerMonster = Math.Max(1, (long)(totalDamage * diminish));
 
+            // 1.2.0 Temple gods: the player's own area spell (spell damage with a null attacker, from
+            // ExecuteSpellMultiMonster) deals the Old God echo bonus to the echoed Old God, per target
+            if (isSpellDamage && attacker == null && currentPlayer != null)
+                damagePerMonster += OldGodEchoSystem.BonusDamage(currentPlayer, monster, damagePerMonster);
+
             // v0.65.5: boss phase-immunity + divine-armor reduction, matching ApplySingleMonsterDamage.
             // Pre-fix ApplyAoEDamage applied NEITHER, so AoE spells/abilities (Fireball, Chain Lightning,
             // Maelstrom) full-damaged Old Gods during immune phases and ignored divine armor, while the
@@ -18040,6 +18045,7 @@ public partial class CombatEngine
                 if (damage > 0)
                 {
                     damage = DifficultySystem.ApplyPlayerDamageMultiplier(damage);
+                    damage += OldGodEchoSystem.BonusDamage(player, target, damage);   // 1.2.0 Temple gods: the Old God echo, once per spell
                     await ApplySingleMonsterDamage(target, damage, result, spellInfo.Name, player, isSpellDamage: true);
                 }
 
