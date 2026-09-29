@@ -41,6 +41,9 @@ logs/
 # Runtime game data (news, history files)
 SCORES/
 
+# Generated wiki export (built again from game code for each release)
+/wiki-data/
+
 # Exported game builds
 *.exe
 *.pck

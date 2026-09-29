@@ -91,6 +91,18 @@ namespace UsurperConsole
             // Initialize localization system (loads language JSON files)
             UsurperRemake.Systems.Loc.Initialize();
 
+            // Export built-in wiki facts before GameDataLoader can apply local mods.
+            var wikiFlag = Array.IndexOf(args, "--export-wiki");
+            if (wikiFlag >= 0)
+            {
+                if (wikiFlag + 1 >= args.Length || args[wikiFlag + 1].StartsWith("--"))
+                    throw new ArgumentException("--export-wiki requires an output directory");
+                var outputDir = System.IO.Path.GetFullPath(args[wikiFlag + 1]);
+                UsurperRemake.Systems.WikiDataExporter.Export(outputDir);
+                Console.WriteLine($"Wiki data exported to: {outputDir}");
+                return;
+            }
+
             // Initialize moddable game data loader (loads GameData/ JSON overrides if present)
             UsurperRemake.Systems.GameDataLoader.Initialize();
 
@@ -934,4 +946,4 @@ namespace UsurperConsole
             }
         }
     }
-} 
+}

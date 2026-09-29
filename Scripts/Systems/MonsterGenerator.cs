@@ -332,6 +332,14 @@ public static class MonsterGenerator
         };
     }
 
+    /// <summary>Normal, non-boss monster stats from the combat generator for a wiki level sample.</summary>
+    internal static (long HP, long Strength, long Defence, long Punch, long WeaponPower, long ArmorPower)
+        GetWikiStats(int level, float powerMultiplier)
+    {
+        var stats = CalculateMonsterStats(level, powerMultiplier, false);
+        return (stats.HP, stats.Strength, stats.Defence, stats.Punch, stats.WeaponPower, stats.ArmorPower);
+    }
+
     /// <summary>
     /// Get weapon for monster based on level
     /// </summary>
