@@ -13231,7 +13231,7 @@ public partial class CombatEngine
         _ => 0.25 // 25% floor for 4th+ targets
     };
 
-    private async Task ApplyAoEDamage(List<Monster> monsters, long totalDamage, CombatResult result, string damageSource = "AoE attack", bool isSpellDamage = false, Character? attacker = null)
+    private async Task ApplyAoEDamage(List<Monster> monsters, long totalDamage, CombatResult result, string damageSource = "AoE attack", bool isSpellDamage = false, Character? attacker = null, Character? spellCaster = null)
     {
         var livingMonsters = monsters.Where(m => m.IsAlive).ToList();
         if (livingMonsters.Count == 0) return;
@@ -13270,9 +13270,11 @@ public partial class CombatEngine
             long damagePerMonster = Math.Max(1, (long)(totalDamage * diminish));
 
             // 1.2.0 Temple gods: the player's own area spell (spell damage with a null attacker, from
-            // ExecuteSpellMultiMonster) deals the Old God echo bonus to the echoed Old God, per target
-            if (isSpellDamage && attacker == null && currentPlayer != null)
-                damagePerMonster += OldGodEchoSystem.BonusDamage(currentPlayer, monster, damagePerMonster);
+            // ExecuteSpellMultiMonster) deals the Old God echo bonus to the echoed Old God, per target.
+            // The caster's god decides (a grouped follower's spell passes spellCaster; else the fight's player).
+            var echoCaster = spellCaster ?? currentPlayer;
+            if (isSpellDamage && attacker == null && echoCaster != null)
+                damagePerMonster += OldGodEchoSystem.BonusDamage(echoCaster, monster, damagePerMonster);
 
             // v0.65.5: boss phase-immunity + divine-armor reduction, matching ApplySingleMonsterDamage.
             // Pre-fix ApplyAoEDamage applied NEITHER, so AoE spells/abilities (Fireball, Chain Lightning,
@@ -17980,7 +17982,7 @@ public partial class CombatEngine
                     totalDamage = spellInfo.Level * 50 + (player.Intelligence / 2);
                 }
                 totalDamage = DifficultySystem.ApplyPlayerDamageMultiplier(totalDamage);
-                await ApplyAoEDamage(monsters, totalDamage, result, spellInfo.DisplayName, isSpellDamage: true);
+                await ApplyAoEDamage(monsters, totalDamage, result, spellInfo.DisplayName, isSpellDamage: true, spellCaster: player);
             }
 
             // Apply self-healing from attack spells (e.g. Deluge of Sanctity)

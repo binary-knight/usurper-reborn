@@ -217,13 +217,13 @@ public class GodFaithFixes1115Tests : IDisposable
         Name = oldGod?.ToString() ?? "Stone Dummy", Level = 1, HP = 1_000_000, MaxHP = 1_000_000, ArmPow = 0, IsActive = true, OldGod = oldGod
     };
 
-    private static async Task<long> AoE(Character caster, Monster target, bool isSpell, Character? attacker)
+    private static async Task<long> AoE(Character caster, Monster target, bool isSpell, Character? attacker, Character? spellCaster = null)
     {
         var engine = new CombatEngine(new TerminalEmulator(new MemoryStream(), new MemoryStream()));
         typeof(CombatEngine).GetField("currentPlayer", F)!.SetValue(engine, caster);
         long before = target.HP;
         await (Task)typeof(CombatEngine).GetMethod("ApplyAoEDamage", F)!
-            .Invoke(engine, new object?[] { new List<Monster> { target }, 1000L, new CombatResult(), "spell", isSpell, attacker })!;
+            .Invoke(engine, new object?[] { new List<Monster> { target }, 1000L, new CombatResult(), "spell", isSpell, attacker, spellCaster })!;
         return before - target.HP;
     }
 
@@ -427,5 +427,30 @@ public class GodFaithFixes1115Tests : IDisposable
             root.TryGetProperty("pantheon.follows_wavering", out var v).Should().BeTrue(lang);
             v.GetString().Should().Contain("{0}", lang);
         }
+    }
+
+    [Fact]
+    public async Task AreaSpell_OfAGroupedFollower_TakesTheCastersEcho_NotTheLeaders()
+    {
+        var gods = UsurperRemake.GodSystemSingleton.Instance;
+        var leader = new Character { Name1 = "FfLeadG", Name2 = "FfLeadG", AI = CharacterAI.Human, Class = CharacterClass.Warrior, Level = 10, HP = 500, MaxHP = 500 };
+        var follower = new Character { Name1 = "FfFolZ", Name2 = "FfFolZ", AI = CharacterAI.Human, Class = CharacterClass.Magician, Level = 10, HP = 500, MaxHP = 500 };
+        GodRegistry.SetWorshippedGod(follower, "Solarius", gods);
+        FavorSystem.Change(follower, GameConfig.GodFavorTierZealotMin, gods);
+        try
+        {
+            long plain = await AoE(leader, Target(OldGodType.Aurelion), true, null);
+            plain.Should().Be(1000, "a godless leader's own area spell has no echo");
+            (await AoE(leader, Target(OldGodType.Aurelion), true, null, follower))
+                .Should().Be(plain + plain * GameConfig.GodEchoDamagePct / 100, "the Zealot follower cast it");
+        }
+        finally { GodRegistry.SetWorshippedGod(follower, "", gods); }
+    }
+
+    [Fact]
+    public void AreaSpell_PassesItsCaster_ToTheAreaDamage()
+    {
+        string src = Source("Systems", "CombatEngine.cs");
+        src.Should().Contain("await ApplyAoEDamage(monsters, totalDamage, result, spellInfo.DisplayName, isSpellDamage: true, spellCaster: player);");
     }
 }
