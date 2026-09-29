@@ -753,6 +753,7 @@ public partial class TempleLocation : BaseLocation
         
         string currentGod = godSystem.GetPlayerGod(currentPlayer.Name2);
         bool goAhead = true;
+        GodSwitchCost? leftFaith = null;   // a god left in this run (its wrath names the god chosen next)
 
         // Also check if following an immortal player-god
         if (string.IsNullOrEmpty(currentGod) && !string.IsNullOrEmpty(currentPlayer.WorshippedGod))
@@ -808,7 +809,7 @@ public partial class TempleLocation : BaseLocation
                 }
 
                 // Remove from god system (1.2.0: all Favor and the god's wrath go with it)
-                await SwitchGodAsync(null);
+                leftFaith = await SwitchGodAsync(null);
 
                 // In Pascal, this would send mail to the god and news
                 terminal.WriteLine("");
@@ -844,6 +845,7 @@ public partial class TempleLocation : BaseLocation
                 // Set in god system (1.2.0: one god, and the new god starts at Favor 0; a god
                 // left above was already left, so this costs nothing more)
                 await SwitchGodAsync(selectedGod.Name);
+                GodSwitchSystem.NameBetrayedFor(currentPlayer, leftFaith, selectedGod.Name);
 
                 // In Pascal, this would send mail to god and news
                 terminal.WriteLine("");

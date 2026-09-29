@@ -549,12 +549,29 @@ public static class GodSwitchSystem
 
     /// <summary>Today's game day (DailySystemManager).</summary>
     public static int Today() => DailySystemManager.Instance.CurrentDay;
+
+    /// <summary>
+    /// Temple W: a god chosen right after leaving one in the same run. The leave recorded its wrath
+    /// with no god it was for; this names the chosen god in BetrayedForGodName. The wrath level is
+    /// not changed. Nothing when the leave recorded no wrath, the recorded wrath is from another god,
+    /// it already names a god, or the chosen god is the angered one.
+    /// </summary>
+    public static void NameBetrayedFor(Character c, GodSwitchCost? leave, string? chosenGod)
+    {
+        if (c == null || leave is not { } l || l.WrathLevel <= 0 || string.IsNullOrWhiteSpace(chosenGod)) return;
+        string chosen = chosenGod.Trim();
+        if (string.IsNullOrEmpty(c.AngeredGodName) || !string.IsNullOrEmpty(c.BetrayedForGodName)) return;
+        if (!c.AngeredGodName.Equals(l.OldGod, StringComparison.OrdinalIgnoreCase)) return;
+        if (c.AngeredGodName.Equals(chosen, StringComparison.OrdinalIgnoreCase)) return;
+        c.BetrayedForGodName = chosen;
+    }
 }
 
 /// <summary>
 /// Temple gods piece 4: a desecrated altar lowers that god's standing by
-/// GodDesecrationStandingPenalty until the next weekly reset (week = game day /
-/// GodStandingWeekDays, DailySystemManager.CurrentDay). The penalty is stored, not a change to any
+/// GodDesecrationStandingPenalty until the next weekly reset (CurrentWeek: online the world week,
+/// DailySystemManager.WorldWeek, the same for every session; single-player game day /
+/// GodStandingWeekDays). The penalty is stored, not a change to any
 /// follower's Favor, and it is applied where the standing is read: online in SQL
 /// (SqlSaveBackend.AddGodStandingPenalty, read inside GetGodStandings), single-player in the save
 /// (Character.GodStandingPenalties). A penalty from an earlier week no longer counts. Standing
@@ -565,8 +582,17 @@ public static class GodStandingPenalty
     /// <summary>The week a game day belongs to.</summary>
     public static int WeekOf(int day) => Math.Max(0, day) / GameConfig.GodStandingWeekDays;
 
-    /// <summary>This week (DailySystemManager.CurrentDay).</summary>
-    public static int CurrentWeek() => WeekOf(DailySystemManager.Instance.CurrentDay);
+    /// <summary>This week: online the world week, single-player the game day's week.</summary>
+    public static int CurrentWeek() =>
+        CurrentWeek(UsurperRemake.BBS.DoorMode.IsOnlineMode, DailySystemManager.Instance.CurrentDay, DateTime.UtcNow);
+
+    /// <summary>
+    /// The week for a mode, game day and time. Online it is DailySystemManager.WorldWeekAt(utcNow),
+    /// because online the game day is whichever save loaded last and differs between sessions.
+    /// Single-player it is WeekOf(gameDay), the one clock there is.
+    /// </summary>
+    public static int CurrentWeek(bool online, int gameDay, DateTime utcNow) =>
+        online ? DailySystemManager.WorldWeekAt(utcNow) : WeekOf(gameDay);
 
     /// <summary>Standings less the penalties (any letter case), never below 0. Gods without standing stay out.</summary>
     public static Dictionary<string, GodStanding> Apply(Dictionary<string, GodStanding> standings, IReadOnlyDictionary<string, int>? penalties)
