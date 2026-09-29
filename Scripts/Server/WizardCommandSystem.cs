@@ -1307,6 +1307,34 @@ public static class WizardCommandSystem
         return true;
     }
 
+    /// <summary>
+    /// 1.2.1: /set on an offline player's saved data. A stat is written to the Base field as well,
+    /// because the load rebuilds the stats from Base when it is above 0. Returns false for an unknown
+    /// field. <paramref name="oldValue"/> is the stat the player saw.
+    /// </summary>
+    internal static bool ApplyOfflineSet(UsurperRemake.Systems.PlayerData pd, string field, long value, out string oldValue)
+    {
+        switch (field)
+        {
+            case "level": oldValue = pd.Level.ToString(); pd.Level = (int)value; break;
+            case "gold": oldValue = pd.Gold.ToString(); pd.Gold = value; break;
+            case "hp": oldValue = pd.HP.ToString(); pd.HP = (int)value; break;
+            case "mana": oldValue = pd.Mana.ToString(); pd.Mana = (int)value; break;
+            case "xp" or "exp" or "experience": oldValue = pd.Experience.ToString(); pd.Experience = value; break;
+            case "str" or "strength": oldValue = pd.Strength.ToString(); pd.BaseStrength = (int)value; pd.Strength = (int)value; break;
+            case "def" or "defence" or "defense": oldValue = pd.Defence.ToString(); pd.BaseDefence = (int)value; pd.Defence = (int)value; break;
+            case "sta" or "stamina": oldValue = pd.Stamina.ToString(); pd.BaseStamina = (int)value; pd.Stamina = (int)value; break;
+            case "agi" or "agility": oldValue = pd.Agility.ToString(); pd.BaseAgility = (int)value; pd.Agility = (int)value; break;
+            case "cha" or "charisma": oldValue = pd.Charisma.ToString(); pd.BaseCharisma = (int)value; pd.Charisma = (int)value; break;
+            case "dex" or "dexterity": oldValue = pd.Dexterity.ToString(); pd.BaseDexterity = (int)value; pd.Dexterity = (int)value; break;
+            case "wis" or "wisdom": oldValue = pd.Wisdom.ToString(); pd.BaseWisdom = (int)value; pd.Wisdom = (int)value; break;
+            case "int" or "intelligence": oldValue = pd.Intelligence.ToString(); pd.BaseIntelligence = (int)value; pd.Intelligence = (int)value; break;
+            case "con" or "constitution": oldValue = pd.Constitution.ToString(); pd.BaseConstitution = (int)value; pd.Constitution = (int)value; break;
+            default: oldValue = ""; return false;
+        }
+        return true;
+    }
+
     private static async Task<bool> HandleSet(string username, string args, TerminalEmulator terminal)
     {
         // v0.60.0 beta: greedy multi-word resolver. /set <player> <field> <value>
@@ -1390,27 +1418,12 @@ public static class WizardCommandSystem
         {
             // Modify offline PlayerData and save back to DB
             var pd = offlineSaveData.Player;
-            switch (field)
+            if (!ApplyOfflineSet(pd, field, value, out oldValue))
             {
-                case "level": oldValue = pd.Level.ToString(); pd.Level = (int)value; break;
-                case "gold": oldValue = pd.Gold.ToString(); pd.Gold = value; break;
-                case "hp": oldValue = pd.HP.ToString(); pd.HP = (int)value; break;
-                case "mana": oldValue = pd.Mana.ToString(); pd.Mana = (int)value; break;
-                case "xp" or "exp" or "experience": oldValue = pd.Experience.ToString(); pd.Experience = value; break;
-                case "str" or "strength": oldValue = pd.Strength.ToString(); pd.Strength = (int)value; break;
-                case "def" or "defence" or "defense": oldValue = pd.Defence.ToString(); pd.Defence = (int)value; break;
-                case "sta" or "stamina": oldValue = pd.Stamina.ToString(); pd.Stamina = (int)value; break;
-                case "agi" or "agility": oldValue = pd.Agility.ToString(); pd.Agility = (int)value; break;
-                case "cha" or "charisma": oldValue = pd.Charisma.ToString(); pd.Charisma = (int)value; break;
-                case "dex" or "dexterity": oldValue = pd.Dexterity.ToString(); pd.Dexterity = (int)value; break;
-                case "wis" or "wisdom": oldValue = pd.Wisdom.ToString(); pd.Wisdom = (int)value; break;
-                case "int" or "intelligence": oldValue = pd.Intelligence.ToString(); pd.Intelligence = (int)value; break;
-                case "con" or "constitution": oldValue = pd.Constitution.ToString(); pd.Constitution = (int)value; break;
-                default:
-                    terminal.SetColor("gray");
-                    terminal.WriteLine($"  Unknown field: '{field}'");
-                    terminal.WriteLine("  Fields: level, gold, hp, mana, xp, str, def, sta, agi, cha, dex, wis, int, con");
-                    return true;
+                terminal.SetColor("gray");
+                terminal.WriteLine($"  Unknown field: '{field}'");
+                terminal.WriteLine("  Fields: level, gold, hp, mana, xp, str, def, sta, agi, cha, dex, wis, int, con");
+                return true;
             }
 
             var backend = GetSqlBackend();
