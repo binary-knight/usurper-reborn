@@ -1,0 +1,13 @@
+[h1]Usurper Reborn 1.2.0 "Devotion"[/h1]
+
+[list]
+[*]Mental Health is a real part of the game. Dungeon depth, hard fights, loss and drugs wear your mind down; rest, friends, prayer, learning and the Healer restore it. At 0 you collapse: carried to the Healer on floors 1 to 25 and in town, a death deeper down.
+[*]The Sage is rebuilt as the party's mind: new crowd control spells, wards that cover the whole party, and marks that make every ally hit harder.
+[*]The gods matter. Earn Favor with your god through prayer, offerings and deeds that fit the god. Favor unlocks the god's boon, a shield for your mind and, at Chosen, a daily Miracle. Leaving your god costs all your Favor and brings its wrath.
+[*]Canon gods and player-gods share one list and compete for followers. The strongest god each week gives its followers 5% more experience, and the townsfolk worship the gods too.
+[*]The Temple is rebuilt as rooms: the Nave of the Gods, the Undercroft, the Faith, the Old Stones and the Halls of Memory. Aurelion waits in the Deep Temple.
+[*]Many permanent stat rewards that used to vanish at the next fight, level-up or login now last. Rewards lost from old saves cannot be restored, except artifacts and the NG+ cycle bonus, which are restored once at your next login.
+[*]Yes/no questions ask again on a stray key, and single-player menus take Enter after a key (one setting switches it back).
+[/list]
+
+Full notes: DOCS/release-notes/RELEASE_NOTES_1.2.0.md
