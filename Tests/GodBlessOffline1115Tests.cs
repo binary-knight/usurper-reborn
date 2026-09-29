@@ -127,10 +127,23 @@ public class GodBlessOffline1115Tests : IDisposable
         Bless(p, DayN).FavorGained.Should().Be(2);
         var (c, gods) = GodMiracles1115Tests.Worshipper("GboReset", God, p.GodFavor);
         c.GodFavorDayGains = new Dictionary<string, int>(p.GodFavorDayGains);
-        FavorSystem.ApplyDailyReset(c, gods);
+        FavorSystem.ApplyDailyReset(c, gods, DayN1);
         c.GodFavorDayGains.Should().BeEmpty();
         FavorSystem.GainCapped(c, FavorSource.ImmortalBlessing, GameConfig.GodBlessFavorGain, GameConfig.GodBlessFavorDailyCap, gods)
             .Should().Be(2);
+    }
+
+    [Fact]
+    public void LoginOnTheSameWorldDay_KeepsTheOfflineBless_SoNoSecondAllowance()
+    {
+        var p = Saved("GboSameDay");
+        Bless(p, DayN).FavorGained.Should().Be(2);
+        var (c, gods) = GodMiracles1115Tests.Worshipper("GboSameDay", God, p.GodFavor);
+        c.GodFavorDayGains = new Dictionary<string, int>(p.GodFavorDayGains);
+        FavorSystem.ApplyDailyReset(c, gods, DayN.AddHours(1));
+        FavorSystem.GainCapped(c, FavorSource.ImmortalBlessing, GameConfig.GodBlessFavorGain, GameConfig.GodBlessFavorDailyCap, gods)
+            .Should().Be(0, "the offline bless already used today's allowance");
+        FavorSystem.Prayer(c, gods).Should().Be(GameConfig.GodFavorPrayerGain, "other sources start the day fresh");
     }
 
     // ---------------- Through the SQL write ----------------

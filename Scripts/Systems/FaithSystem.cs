@@ -441,12 +441,23 @@ public static class FavorSystem
     /// Daily reset: clears today's per-source gains, counts one more day without devotion, and past
     /// GodNeglectGraceDays takes GodNeglectDailyLoss Favor. NPCs are skipped; a character with no
     /// god only has the counters cleared. Returns the Favor change applied. Called once per day from
-    /// DailySystemManager.RunBasicDailyReset, after MentalSystem.ApplyDailyReset.
+    /// DailySystemManager.RunBasicDailyReset, after MentalSystem.ApplyDailyReset. A bless counted
+    /// while the character was offline on the current world day (ImmortalDeedSystem
+    /// .OfflineBlessWorldDayKey) is kept, so logging in cannot open a second bless allowance that day.
     /// </summary>
-    public static int ApplyDailyReset(Character c, GodSystem? gods = null)
+    public static int ApplyDailyReset(Character c, GodSystem? gods = null, DateTime? utcNow = null)
     {
         if (c == null || c.IsNPC) return 0;
+        string blessKey = FavorSource.ImmortalBlessing.ToString();
+        bool keepBless = c.GodFavorDayGains.TryGetValue(ImmortalDeedSystem.OfflineBlessWorldDayKey, out int blessDay)
+            && blessDay == DailySystemManager.WorldDayAt(utcNow ?? DateTime.UtcNow);
+        int blessCount = keepBless && c.GodFavorDayGains.TryGetValue(blessKey, out int bc) ? bc : 0;
         c.GodFavorDayGains.Clear();
+        if (keepBless && blessCount > 0)
+        {
+            c.GodFavorDayGains[blessKey] = blessCount;
+            c.GodFavorDayGains[ImmortalDeedSystem.OfflineBlessWorldDayKey] = blessDay;
+        }
         Bind(c, gods);
         if (string.IsNullOrEmpty(c.GodFavorGod)) return 0;
         if (c.DaysSinceDevotion < int.MaxValue) c.DaysSinceDevotion++;
