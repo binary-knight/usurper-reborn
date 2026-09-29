@@ -9179,7 +9179,9 @@ namespace UsurperRemake.Systems
 
         /// <summary>
         /// 1.2.0 Temple gods piece 4: adds a desecration penalty to a god's standing for a week (one
-        /// atomic upsert), and drops the rows of earlier weeks, which no longer count.
+        /// atomic upsert), and drops the rows older than the week before, which no longer count. The
+        /// week before is kept: the weekly god pick for a new week counts the ending week's penalties
+        /// (WeeklyGodSystem.OnlinePick), and a desecration can come before that pick is recorded.
         /// </summary>
         public void AddGodStandingPenalty(string god, int week, int points)
         {
@@ -9191,7 +9193,7 @@ namespace UsurperRemake.Systems
                 cmd.CommandText = @"
                     INSERT INTO god_standing_penalties (god, week, points) VALUES (@god, @week, @points)
                     ON CONFLICT(god, week) DO UPDATE SET points = points + excluded.points;
-                    DELETE FROM god_standing_penalties WHERE week < @week;";
+                    DELETE FROM god_standing_penalties WHERE week < @week - 1;";
                 cmd.Parameters.AddWithValue("@god", god.Trim());
                 cmd.Parameters.AddWithValue("@week", week);
                 cmd.Parameters.AddWithValue("@points", points);

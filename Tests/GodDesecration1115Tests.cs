@@ -235,15 +235,23 @@ public class GodDesecration1115Tests : IDisposable
     }
 
     [Fact]
-    public void Online_AWriteInANewWeek_DropsEarlierWeeks()
+    public void Online_AWriteInANewWeek_KeepsTheWeekBefore_AndDropsOlderWeeks()
     {
+        int Rows(int week)
+        {
+            using var conn = new SqliteConnection($"Data Source={_path}");
+            conn.Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT COUNT(*) FROM god_standing_penalties WHERE week = @w;";
+            cmd.Parameters.AddWithValue("@w", week);
+            return Convert.ToInt32(cmd.ExecuteScalar());
+        }
         _db.AddGodStandingPenalty("Amara", 10, 5);
         _db.AddGodStandingPenalty("Amara", 11, 5);
-        using var conn = new SqliteConnection($"Data Source={_path}");
-        conn.Open();
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT COUNT(*) FROM god_standing_penalties WHERE week = 10;";
-        Convert.ToInt32(cmd.ExecuteScalar()).Should().Be(0);
+        Rows(10).Should().Be(1, "the ending week's penalties are kept for the new week's weekly god pick");
+        _db.AddGodStandingPenalty("Amara", 12, 5);
+        Rows(10).Should().Be(0);
+        Rows(11).Should().Be(1);
     }
 
     [Fact]

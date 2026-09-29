@@ -9,7 +9,9 @@ namespace UsurperRemake.Systems;
 /// Mortis and Sylvana echo none. A player-god echoes through the canon god of its domain. A Zealot
 /// or Chosen follower facing the echoed Old God hears one extra line as the encounter opens
 /// (OldGodBossSystem.StartBossEncounter) and deals GodEchoDamagePct more damage to it
-/// (DivineBlessingSystem.CalculateBonusDamage, the weapon attack path of the canon damage boons);
+/// (DivineBlessingSystem.CalculateBonusDamage, the weapon attack path of the canon damage boons, and
+/// the player's damage spells in CombatEngine.ExecuteSpellMultiMonster: a single-target spell on its
+/// damage, an area spell per target in ApplyAoEDamage);
 /// a Chosen follower's god speaks once when that Old God falls (OldGodBossSystem.HandleBossDefeated).
 /// </summary>
 public static class OldGodEchoSystem

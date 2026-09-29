@@ -687,6 +687,18 @@ public static class GodStandingPenalty
         if (UsurperRemake.BBS.DoorMode.IsOnlineMode && SaveSystem.Instance?.Backend is SqlSaveBackend backend)
             backend.AddGodStandingPenalty(GodRegistry.CanonName(god) ?? god.Trim(), week, GameConfig.GodDesecrationStandingPenalty);
         else
-            AddLocal(c, god, week);
+            RecordLocal(c, god, week);
+    }
+
+    /// <summary>
+    /// Single-player desecration: when the save has no weekly god pick for this week yet, the pick is
+    /// recorded first (WeeklyGodSystem.LocalPick), so it counts the ending week's penalties before
+    /// AddLocal drops them for the new week's.
+    /// </summary>
+    public static void RecordLocal(Character c, string god, int week, GodSystem? gods = null, IEnumerable<NPC>? npcs = null)
+    {
+        if (c == null || string.IsNullOrWhiteSpace(god)) return;
+        if (c.WeeklyGodWeek < week) WeeklyGodSystem.LocalPick(c, week, gods, npcs);
+        AddLocal(c, god, week);
     }
 }

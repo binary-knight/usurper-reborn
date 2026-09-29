@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text.Json;
 using System.Threading.Tasks;
 using FluentAssertions;
@@ -205,5 +206,141 @@ public class GodFaithFixes1115Tests : IDisposable
         var src = Source("Locations", "TempleLocation.cs");
         src.Should().Contain("GodBoonSystem.StandingOf(standings, god.DivineName), strongestCanon,");
         src.Should().NotContain("out var st) ? st.Standing : 0, strongestCanon");
+    }
+
+    // ---------------- The Old God echo on spells ----------------
+
+    private static readonly BindingFlags F = BindingFlags.NonPublic | BindingFlags.Instance;
+
+    private static Monster Target(OldGodType? oldGod) => new Monster
+    {
+        Name = oldGod?.ToString() ?? "Stone Dummy", Level = 1, HP = 1_000_000, MaxHP = 1_000_000, ArmPow = 0, IsActive = true, OldGod = oldGod
+    };
+
+    private static async Task<long> AoE(Character caster, Monster target, bool isSpell, Character? attacker)
+    {
+        var engine = new CombatEngine(new TerminalEmulator(new MemoryStream(), new MemoryStream()));
+        typeof(CombatEngine).GetField("currentPlayer", F)!.SetValue(engine, caster);
+        long before = target.HP;
+        await (Task)typeof(CombatEngine).GetMethod("ApplyAoEDamage", F)!
+            .Invoke(engine, new object?[] { new List<Monster> { target }, 1000L, new CombatResult(), "spell", isSpell, attacker })!;
+        return before - target.HP;
+    }
+
+    [Fact]
+    public async Task AreaSpell_AZealotDealsTenPercentMore_ToTheEchoedOldGodOnly()
+    {
+        var gods = UsurperRemake.GodSystemSingleton.Instance;
+        var zealot = new Character { Name1 = "FfSpellZ", Name2 = "FfSpellZ", AI = CharacterAI.Human, Class = CharacterClass.Magician, Level = 10, HP = 500, MaxHP = 500 };
+        GodRegistry.SetWorshippedGod(zealot, "Solarius", gods);
+        FavorSystem.Change(zealot, GameConfig.GodFavorTierZealotMin, gods);
+        try
+        {
+            long plain = await AoE(zealot, Target(null), true, null);
+            plain.Should().Be(1000);
+            (await AoE(zealot, Target(OldGodType.Aurelion), true, null)).Should().Be(plain + plain * GameConfig.GodEchoDamagePct / 100, "the echoed Old God");
+            (await AoE(zealot, Target(OldGodType.Noctura), true, null)).Should().Be(plain, "another Old God");
+            (await AoE(zealot, Target(OldGodType.Aurelion), false, null)).Should().Be(plain, "not a spell");
+
+            FavorSystem.Change(zealot, -1, gods);   // Devout, below Zealot
+            (await AoE(zealot, Target(OldGodType.Aurelion), true, null)).Should().Be(plain);
+        }
+        finally { GodRegistry.SetWorshippedGod(zealot, "", gods); }
+    }
+
+    [Fact]
+    public void SingleTargetSpell_AddsTheEchoOnce_BeforeTheHit()
+    {
+        var src = Source("Systems", "CombatEngine.cs");
+        int start = src.IndexOf("private async Task ExecuteSpellMultiMonster(", StringComparison.Ordinal);
+        var body = src.Substring(start, src.IndexOf("private void HandleSpecialSpellEffectOnMonster(", start, StringComparison.Ordinal) - start);
+        const string echo = "damage += OldGodEchoSystem.BonusDamage(player, target, damage);";
+        int at = body.IndexOf(echo, StringComparison.Ordinal);
+        at.Should().BeGreaterThan(0);
+        body.IndexOf("await ApplySingleMonsterDamage(target, damage, result, spellInfo.Name, player, isSpellDamage: true);", at, StringComparison.Ordinal)
+            .Should().BeGreaterThan(at);
+        body.Split("OldGodEchoSystem.").Length.Should().Be(2, "one echo in the spell handler; the area spell's is per target in ApplyAoEDamage");
+        body.Should().NotContain("CalculateBonusDamage", "the weapon path's echo is not also applied to spells");
+
+        int single = src.IndexOf("private async Task<bool> ApplySingleMonsterDamage(", StringComparison.Ordinal);
+        var singleBody = src.Substring(single, src.IndexOf("\n    }\n", single, StringComparison.Ordinal) - single);
+        singleBody.Should().NotContain("OldGodEchoSystem", "the single-target helper adds nothing, so the spell's echo is not doubled");
+    }
+
+    // ---------------- Desecration penalties and the weekly pick ----------------
+
+    [Fact]
+    public async Task Online_ADesecrationBeforeTheNewWeeksPick_KeepsTheEndingWeeksPenalties()
+    {
+        await Save("acct_wa", Canon("FfWkAna", "Amara", 30), new Dictionary<string, string> { ["FfWkAna"] = "Amara" });
+        await Save("acct_wb", Canon("FfWkUmb", "Umbrath", 28), new Dictionary<string, string> { ["FfWkUmb"] = "Umbrath" });
+        Db.AddGodStandingPenalty("Amara", 69, 5);    // the ending week
+        Db.AddGodStandingPenalty("Umbrath", 70, 1);  // the new week, before its pick
+        WeeklyGodSystem.ResetForTests();
+        try
+        {
+            WeeklyGodSystem.OnlinePick(Db, 70)!.Value.God.Should().Be("Umbrath", "Amara stood at 25 when week 69 ended");
+        }
+        finally { WeeklyGodSystem.ResetForTests(); }
+    }
+
+    private static PlayerData Canon(string name, string god, int favor) =>
+        new PlayerData { Name1 = name, Name2 = name, Level = 5, GodFavor = favor, GodFavorGod = god, GodFavorSchema = GameConfig.GodFavorSchemaCurrent };
+
+    [Fact]
+    public void SinglePlayer_ADesecrationBeforeTheNewWeeksPick_RecordsThePickFirst()
+    {
+        var gods = new GodSystem();
+        var c = new Character { Name1 = "FfSpWk", Name2 = "FfSpWk", AI = CharacterAI.Human, Level = 5 };
+        GodRegistry.SetWorshippedGod(c, "Sylvana", gods);
+        FavorSystem.Change(c, 20, gods);
+        var npcs = Enumerable.Range(0, 5).Select(i => new NPC { Name1 = $"FfSpM{i}", Name2 = $"FfSpM{i}", HP = 10, WorshippedGod = "Mortis" }).ToList();
+        WeeklyGodSystem.LocalPick(c, 12, gods, npcs);
+        GodStandingPenalty.AddLocal(c, "Mortis", 12, 10);   // Mortis 25 less 10 in week 12
+
+        GodStandingPenalty.RecordLocal(c, "Sylvana", 13, gods, npcs);   // the new week, before its pick
+        c.WeeklyGodWeek.Should().Be(13);
+        c.WeeklyGod.Should().Be("Sylvana", "Mortis stood at 15 against Sylvana's 20 when week 12 ended");
+        WeeklyGodSystem.LocalPick(c, 13, gods, npcs).God.Should().Be("Sylvana");
+        c.GodStandingPenaltyWeek.Should().Be(13);
+        c.GodStandingPenalties.Keys.Should().BeEquivalentTo(new[] { "Sylvana" });
+
+        Source("Systems", "FaithSystem.cs").Should().Contain("            RecordLocal(c, god, week);");
+    }
+
+    // ---------------- The weekly XP bonus is for players only ----------------
+
+    [Fact]
+    public void Online_AnNpcFollowerOfTheWeeksGod_GetsNoXpBonus()
+    {
+        var isOnline = WeeklyGodSystem.IsOnline;
+        var backend = WeeklyGodSystem.Backend;
+        var now = WeeklyGodSystem.UtcNow;
+        var gods = UsurperRemake.GodSystemSingleton.Instance;
+        var player = new Character { Name1 = "FfXpP", Name2 = "FfXpP", AI = CharacterAI.Human, Level = 5 };
+        try
+        {
+            var t = new DateTime(2026, 9, 22, 12, 0, 0, DateTimeKind.Utc);
+            WeeklyGodSystem.IsOnline = () => true;
+            WeeklyGodSystem.Backend = () => Db;
+            WeeklyGodSystem.UtcNow = () => t;
+            WeeklyGodSystem.ResetForTests();
+            Db.RecordWeeklyGod(new WeeklyGodPick(DailySystemManager.WorldWeekAt(t), "Mortis", 50));
+
+            GodRegistry.SetWorshippedGod(player, "Mortis", gods);
+            WeeklyGodSystem.XpMultiplier(player).Should().Be(1.05, "a player follower gets the bonus");
+
+            var npc = new NPC { Name1 = "FfXpNpc", Name2 = "FfXpNpc", Level = 5, HP = 10, WorshippedGod = "Mortis" };
+            WeeklyGodSystem.XpMultiplier(npc).Should().Be(1.0, "an NPC teammate of the week's god gets none");
+            TeamHQBonus.ApplyXP(npc, 1000).Should().Be(1000);
+        }
+        finally
+        {
+            GodRegistry.SetWorshippedGod(player, "", gods);
+            WeeklyGodSystem.IsOnline = isOnline;
+            WeeklyGodSystem.Backend = backend;
+            WeeklyGodSystem.UtcNow = now;
+            WeeklyGodSystem.ResetForTests();
+        }
     }
 }
