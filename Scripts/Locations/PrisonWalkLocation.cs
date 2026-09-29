@@ -56,7 +56,7 @@ public partial class PrisonWalkLocation : BaseLocation
         {
             await terminal.WriteLineAsync(Loc.Get("prison_walk.cannot_visit"));
             await terminal.WriteLineAsync(Loc.Get("prison_walk.serve_sentence"));
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return false;
         }
         
@@ -308,7 +308,7 @@ public partial class PrisonWalkLocation : BaseLocation
             await terminal.WriteLineAsync();
             await terminal.WriteColorLineAsync(Loc.Get("prison_walk.infiltrated"), TerminalEmulator.ColorRed);
             await terminal.WriteColorLineAsync(Loc.Get("prison_walk.too_risky"), TerminalEmulator.ColorRed);
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
         
@@ -533,7 +533,7 @@ public partial class PrisonWalkLocation : BaseLocation
                     }
                 }
 
-                await Task.Delay(300);
+                await Pacing.Wait(300);
             }
 
             if (player.HP <= 0 || playerFled)
@@ -541,7 +541,7 @@ public partial class PrisonWalkLocation : BaseLocation
                 break;
             }
 
-            await Task.Delay(500);
+            await Pacing.Wait(500);
         }
 
         await terminal.WriteLineAsync();
@@ -632,7 +632,7 @@ public partial class PrisonWalkLocation : BaseLocation
         // Add to player's known allies (if applicable)
         // This could trigger future events where the freed prisoner helps the player
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
     
     private async Task HandlePrisonBreakFailure(Character player, Character prisoner)
@@ -676,7 +676,7 @@ public partial class PrisonWalkLocation : BaseLocation
         await terminal.WriteLineAsync(Loc.Get("prison_walk.wake_tomorrow"));
         await terminal.WriteLineAsync(Loc.Get("prison_walk.plan_better"));
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
     
     private string GetRaceDisplay(CharacterRace race)

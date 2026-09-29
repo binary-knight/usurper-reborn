@@ -682,7 +682,7 @@ public class HomeLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("home.rest_comfort"), "gray");
                 break;
         }
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         currentPlayer.OnRest();   // 1.2.0: a rest ends the rest buffs
 
@@ -778,12 +778,12 @@ public class HomeLocation : BaseLocation
         var dream = DreamSystem.Instance.GetDreamForRest(currentPlayer, 0);
         if (dream != null)
         {
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             terminal.WriteLine("");
             terminal.SetColor("dark_magenta");
             terminal.WriteLine(Loc.Get("home.sleep_dreams"));
             terminal.WriteLine("");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             terminal.SetColor("bright_magenta");
             terminal.WriteLine($"=== {dream.LocTitle()} ===");
@@ -793,7 +793,7 @@ public class HomeLocation : BaseLocation
             foreach (var line in dream.LocContentLines())
             {
                 terminal.WriteLine($"  {line}");
-                await Task.Delay(1200);
+                await Pacing.Wait(1200);
             }
 
             if (!string.IsNullOrEmpty(dream.PhilosophicalHint))
@@ -870,7 +870,7 @@ public class HomeLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("home.sleep_comfort"), "gray");
                 break;
         }
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         // Full HP/Mana/Stamina recovery with Blood Price penalty
         float restEfficiency = 1.0f;
@@ -919,12 +919,12 @@ public class HomeLocation : BaseLocation
         var dream = DreamSystem.Instance.GetDreamForRest(currentPlayer, 0);
         if (dream != null)
         {
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             terminal.WriteLine("");
             terminal.SetColor("dark_magenta");
             terminal.WriteLine(Loc.Get("home.sleep_dreams"));
             terminal.WriteLine("");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             terminal.SetColor("bright_magenta");
             terminal.WriteLine($"=== {dream.LocTitle()} ===");
@@ -934,7 +934,7 @@ public class HomeLocation : BaseLocation
             foreach (var line in dream.LocContentLines())
             {
                 terminal.WriteLine($"  {line}");
-                await Task.Delay(1200);
+                await Pacing.Wait(1200);
             }
 
             if (!string.IsNullOrEmpty(dream.PhilosophicalHint))
@@ -956,11 +956,11 @@ public class HomeLocation : BaseLocation
         terminal.WriteLine("");
         terminal.SetColor("gray");
         terminal.WriteLine(Loc.Get("home.sleep_drift"));
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
         await DailySystemManager.Instance.RestAndAdvanceToMorning(currentPlayer);
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("home.sleep_new_day", DailySystemManager.Instance.CurrentDay));
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         await terminal.WaitForKey();
     }
@@ -1047,7 +1047,7 @@ public class HomeLocation : BaseLocation
 
                 terminal.SetColor(HerbData.GetColor(herbType));
                 terminal.WriteLine(Loc.Get("home.herb_gathered", HerbData.LocName(herbType), currentPlayer.GetHerbCount(herbType), max));
-                await Task.Delay(500);
+                await Pacing.Wait(500);
             }
         }
 
@@ -2488,14 +2488,14 @@ public class HomeLocation : BaseLocation
         terminal.WriteLine(Loc.Get("home.love_take_hands", spouse.Name));
         terminal.WriteLine();
 
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("home.love_line1"));
         terminal.WriteLine(Loc.Get("home.love_line2"));
         terminal.WriteLine();
 
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         var personality = spouse.Brain?.Personality;
         float romanticism = personality?.Romanticism ?? 0.5f;
@@ -2537,7 +2537,7 @@ public class HomeLocation : BaseLocation
             terminal.WriteLine(Loc.Get("home.poly_broach", spouse.Name));
             terminal.WriteLine();
 
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             terminal.SetColor("white");
             terminal.WriteLine(Loc.Get("home.poly_line1"));
@@ -2546,7 +2546,7 @@ public class HomeLocation : BaseLocation
             terminal.WriteLine(Loc.Get("home.poly_line4"));
             terminal.WriteLine();
 
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
 
             var personality = spouse.Brain?.Personality;
             // Use Adventurousness as proxy for openness to new relationship structures
@@ -2570,7 +2570,7 @@ public class HomeLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("home.poly_accept_diminish"));
                 terminal.WriteLine();
 
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
 
                 terminal.SetColor("bright_magenta");
                 terminal.WriteLine(Loc.Get("home.poly_accept_willing"));
@@ -2628,14 +2628,14 @@ public class HomeLocation : BaseLocation
             terminal.WriteLine(Loc.Get("home.poly_close_approach", spouse.Name));
             terminal.WriteLine();
 
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             terminal.SetColor("white");
             terminal.WriteLine(Loc.Get("home.mono_line1"));
             terminal.WriteLine(Loc.Get("home.mono_line2"));
             terminal.WriteLine();
 
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             terminal.SetColor("bright_cyan");
             terminal.WriteLine(Loc.Get("home.mono_nods", spouse.Name));
@@ -2671,21 +2671,21 @@ public class HomeLocation : BaseLocation
         terminal.WriteLine(Loc.Get("home.divorce_breath", spouse.Name));
         terminal.WriteLine();
 
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("home.divorce_talk_line1"));
         terminal.WriteLine(Loc.Get("home.divorce_talk_line2"));
         terminal.WriteLine();
 
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("bright_cyan");
         terminal.WriteLine(Loc.Get("home.divorce_concern", spouse.Name));
         terminal.WriteLine(Loc.Get("home.divorce_scaring"));
         terminal.WriteLine();
 
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         terminal.SetColor("red");
         terminal.WriteLine(Loc.Get("ui.confirm_divorce_ask"));
@@ -2727,7 +2727,7 @@ public class HomeLocation : BaseLocation
         terminal.WriteLine(Loc.Get("home.divorce_end_line2"));
         terminal.WriteLine();
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         var personality = spouse.Brain?.Personality;
         // Use Impulsiveness as proxy for emotional volatility
@@ -2748,7 +2748,7 @@ public class HomeLocation : BaseLocation
         }
 
         terminal.WriteLine();
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         // Process divorce - try RelationshipSystem first, but don't fail if it doesn't have a record
         // (RomanceTracker may have the marriage without RelationshipSystem knowing about it)
@@ -2802,7 +2802,7 @@ public class HomeLocation : BaseLocation
         terminal.WriteLine(Loc.Get("home.fantasies_talk"));
         terminal.WriteLine();
 
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         var personality = spouse.Brain?.Personality;
         float adventurousness = personality?.Adventurousness ?? 0.5f;
@@ -2873,7 +2873,7 @@ public class HomeLocation : BaseLocation
         terminal.WriteLine(Loc.Get("home.group_line2"));
         terminal.WriteLine();
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         var personality = spouse.Brain?.Personality;
         float jealousy = personality?.Jealousy ?? 0.5f;
@@ -2943,7 +2943,7 @@ public class HomeLocation : BaseLocation
         terminal.WriteLine(Loc.Get("home.voyeur_share_line2"));
         terminal.WriteLine();
 
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         var personality = spouse.Brain?.Personality;
         float adventurousness = personality?.Adventurousness ?? 0.5f;
@@ -2992,7 +2992,7 @@ public class HomeLocation : BaseLocation
         terminal.WriteLine(Loc.Get("home.exhibit_confess_line2"));
         terminal.WriteLine();
 
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         var personality = spouse.Brain?.Personality;
         float adventurousness = personality?.Adventurousness ?? 0.5f;
@@ -3047,7 +3047,7 @@ public class HomeLocation : BaseLocation
         terminal.WriteLine(Loc.Get("home.alt_unconventional"));
         terminal.WriteLine();
 
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         var personality = spouse.Brain?.Personality;
         float adventurousness = personality?.Adventurousness ?? 0.5f;
@@ -3117,7 +3117,7 @@ public class HomeLocation : BaseLocation
         terminal.WriteLine(Loc.Get("home.hw_called"));
         terminal.WriteLine();
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         var personality = spouse.Brain?.Personality;
         float adventurousness = personality?.Adventurousness ?? 0.5f;
@@ -3136,7 +3136,7 @@ public class HomeLocation : BaseLocation
             terminal.WriteLine(Loc.Get("home.hw_enjoy_knowing"));
             terminal.WriteLine();
 
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             terminal.WriteLine(Loc.Get("home.alt_slow_smile"));
             terminal.WriteLine(Loc.Get("home.hw_never_thought"));
@@ -3151,7 +3151,7 @@ public class HomeLocation : BaseLocation
             spouseData.KnowsAboutOthers = true;
             RomanceTracker.Instance.AgreedStructures[spouse.ID] = RelationshipStructure.OpenRelationship;
 
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             // Offer to try it now
             terminal.WriteLine();
@@ -3234,7 +3234,7 @@ public class HomeLocation : BaseLocation
         terminal.WriteLine(Loc.Get("home.hw_prepares", spouseGender));
         terminal.WriteLine();
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("home.hw_asked_out", thirdName, spouseGender));
@@ -3242,39 +3242,39 @@ public class HomeLocation : BaseLocation
         terminal.WriteLine(Loc.Get("home.hw_permission", GameConfig.CapitalizeFirst(spouseGender)));
         terminal.WriteLine();
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         WriteSectionHeader(Loc.Get("home.hw_leaves_date", spouse.Name, spousePossessive), "gray");
         terminal.WriteLine();
 
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("home.hw_hours_pass"));
         terminal.WriteLine(Loc.Get("home.hw_anticipation"));
         terminal.WriteLine();
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         // The date scene (described, not shown)
         WriteSectionHeader(Loc.Get("home.later_that_night"), "bright_magenta");
         terminal.WriteLine();
 
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("home.hw_returns", spouse.Name));
         terminal.WriteLine(Loc.Get("home.hw_smoldering", GameConfig.CapitalizeFirst(spouseGender)));
         terminal.WriteLine();
 
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("home.hw_attentive", thirdName, spouseGender));
         terminal.WriteLine(Loc.Get("home.hw_dinner_drinks"));
         terminal.WriteLine();
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         // Spouse describes the encounter
         terminal.SetColor("bright_magenta");
@@ -3283,20 +3283,20 @@ public class HomeLocation : BaseLocation
         terminal.WriteLine(Loc.Get("home.hw_whispered", spouseGender));
         terminal.WriteLine();
 
-        await Task.Delay(2500);
+        await Pacing.Wait(2500);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("home.hw_came_home", spouseGender));
         terminal.WriteLine(Loc.Get("home.hw_always_home"));
         terminal.WriteLine();
 
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         // The reclamation
         WriteSectionHeader(Loc.Get("home.reclamation"), "bright_red");
         terminal.WriteLine();
 
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("home.hw_the_fire"));
@@ -3304,7 +3304,7 @@ public class HomeLocation : BaseLocation
         terminal.WriteLine(Loc.Get("home.hw_claim_yours", spouseGender));
         terminal.WriteLine();
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         terminal.SetColor("bright_magenta");
         terminal.WriteLine(Loc.Get("home.hw_night_unlike"));
@@ -3312,7 +3312,7 @@ public class HomeLocation : BaseLocation
         terminal.WriteLine(Loc.Get("home.hw_morning_exhausted"));
         terminal.WriteLine();
 
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         // Record the encounter and set up arrangement
         RomanceTracker.Instance.SetupCuckoldArrangement(spouse.ID, thirdParty.ID, true);
@@ -3337,7 +3337,7 @@ public class HomeLocation : BaseLocation
         terminal.WriteLine(Loc.Get("home.cuck_line4"));
         terminal.WriteLine();
 
-        await Task.Delay(2500);
+        await Pacing.Wait(2500);
 
         var personality = spouse.Brain?.Personality;
         float adventurousness = personality?.Adventurousness ?? 0.5f;
@@ -3354,7 +3354,7 @@ public class HomeLocation : BaseLocation
             terminal.WriteLine(Loc.Get("home.cuck_other_lovers"));
             terminal.WriteLine();
 
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             terminal.WriteLine(Loc.Get("home.cuck_shift"));
             terminal.WriteLine(Loc.Get("home.cuck_power_intriguing"));
@@ -3368,7 +3368,7 @@ public class HomeLocation : BaseLocation
             spouseData.AcceptsPolyamory = true;
             RomanceTracker.Instance.AgreedStructures[spouse.ID] = RelationshipStructure.OpenRelationship;
 
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             // Offer to try it now
             terminal.WriteLine();
@@ -3455,12 +3455,12 @@ public class HomeLocation : BaseLocation
         terminal.WriteLine(Loc.Get("home.cuck_come_over"));
         terminal.WriteLine();
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         WriteSectionHeader(Loc.Get("home.knock_at_door"), "gray");
         terminal.WriteLine();
 
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("home.cuck_enters", thirdName));
@@ -3469,7 +3469,7 @@ public class HomeLocation : BaseLocation
         terminal.WriteLine(Loc.Get("home.cuck_wants_this", currentPlayer?.Sex == CharacterSex.Female ? "She" : "He"));
         terminal.WriteLine();
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("home.cuck_intensity", spouse.Name, spousePossessive));
@@ -3477,12 +3477,12 @@ public class HomeLocation : BaseLocation
         terminal.WriteLine(Loc.Get("home.cuck_and_watch"));
         terminal.WriteLine();
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         WriteSectionHeader(Loc.Get("home.take_your_place"), "bright_magenta");
         terminal.WriteLine();
 
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("home.cuck_move_toward", spouse.Name, thirdName));
@@ -3490,7 +3490,7 @@ public class HomeLocation : BaseLocation
         terminal.WriteLine(Loc.Get("home.cuck_watch_chair"));
         terminal.WriteLine();
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         terminal.SetColor("bright_magenta");
         terminal.WriteLine(Loc.Get("home.cuck_glances", spouse.Name));
@@ -3498,7 +3498,7 @@ public class HomeLocation : BaseLocation
         terminal.WriteLine(Loc.Get("home.cuck_owns_it", spouseGender));
         terminal.WriteLine();
 
-        await Task.Delay(2500);
+        await Pacing.Wait(2500);
 
         // The scene progresses
         terminal.SetColor("cyan");
@@ -3508,7 +3508,7 @@ public class HomeLocation : BaseLocation
         terminal.WriteLine(Loc.Get("home.cuck_both_intense"));
         terminal.WriteLine();
 
-        await Task.Delay(2500);
+        await Pacing.Wait(2500);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("home.cuck_sounds"));
@@ -3516,19 +3516,19 @@ public class HomeLocation : BaseLocation
         terminal.WriteLine(Loc.Get("home.cuck_watching"));
         terminal.WriteLine();
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         WriteSectionHeader(Loc.Get("home.later"), "bright_magenta");
         terminal.WriteLine();
 
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("home.cuck_gathers_leaves", thirdName, thirdPossessive));
         terminal.WriteLine(Loc.Get("home.cuck_nod_out"));
         terminal.WriteLine();
 
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("home.cuck_lies_back", spouse.Name));
@@ -3536,7 +3536,7 @@ public class HomeLocation : BaseLocation
         terminal.WriteLine(Loc.Get("home.cuck_approach"));
         terminal.WriteLine();
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("home.cuck_dynamic_shifted"));
@@ -3544,7 +3544,7 @@ public class HomeLocation : BaseLocation
         terminal.WriteLine(Loc.Get("home.cuck_gave_power"));
         terminal.WriteLine();
 
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         // Record the encounter
         RomanceTracker.Instance.SetupCuckoldArrangement(spouse.ID, thirdParty.ID, true);
@@ -3569,7 +3569,7 @@ public class HomeLocation : BaseLocation
         terminal.WriteLine(Loc.Get("home.stag_line4"));
         terminal.WriteLine();
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         var personality = spouse.Brain?.Personality;
         float adventurousness = personality?.Adventurousness ?? 0.5f;
@@ -3588,7 +3588,7 @@ public class HomeLocation : BaseLocation
             terminal.WriteLine(Loc.Get("home.stag_kind_hot"));
             terminal.WriteLine();
 
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             terminal.WriteLine(Loc.Get("home.stag_mischievous"));
             terminal.WriteLine(Loc.Get("home.stag_admired"));
@@ -3667,12 +3667,12 @@ public class HomeLocation : BaseLocation
         if (spouseWantsDivorce && spouseData.LoveLevel > 40)
         {
             terminal.WriteLine();
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
 
             WriteSectionHeader(Loc.Get("home.terrible_silence"), "red");
             terminal.WriteLine();
 
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             string spouseGender = spouse.Sex == CharacterSex.Female ? "she" : "he";
             string spousePossessive = spouse.Sex == CharacterSex.Female ? "her" : "his";
@@ -3682,7 +3682,7 @@ public class HomeLocation : BaseLocation
             terminal.WriteLine(Loc.Get("home.reject_cold_voice", spouseGender, spousePossessive));
             terminal.WriteLine();
 
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
 
             terminal.SetColor("bright_red");
             terminal.WriteLine(Loc.Get("home.reject_trying"));
@@ -3690,13 +3690,13 @@ public class HomeLocation : BaseLocation
             terminal.WriteLine(Loc.Get("home.reject_different_things"));
             terminal.WriteLine();
 
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
 
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("home.reject_want_divorce"));
             terminal.WriteLine();
 
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("home.reject_divorce_ask"));
@@ -3719,7 +3719,7 @@ public class HomeLocation : BaseLocation
                 float pleadSuccess = 0.3f - (spouseData.LoveLevel / 300f); // Harder if relationship worse
                 if (jealousy > 0.6f) pleadSuccess -= 0.1f;
 
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
 
                 terminal.SetColor("white");
                 terminal.WriteLine();
@@ -3727,7 +3727,7 @@ public class HomeLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("home.reject_plead_love"));
                 terminal.WriteLine();
 
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
 
                 if (random.NextDouble() < pleadSuccess)
                 {
@@ -3783,7 +3783,7 @@ public class HomeLocation : BaseLocation
         WriteSectionHeader(Loc.Get("home.marriage_ended"), "red");
         terminal.WriteLine();
 
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         // Process divorce - try RelationshipSystem first, but don't fail if it doesn't have a record
         bool relationshipSystemSuccess = RelationshipSystem.ProcessDivorce(currentPlayer, spouse, out string message);
@@ -3817,7 +3817,7 @@ public class HomeLocation : BaseLocation
         // Generate news
         NewsSystem.Instance?.WriteDivorceNews(spouse.Name, currentPlayer.Name);
 
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
     }
 
     private async Task VisitBedroom()
@@ -4280,7 +4280,7 @@ public class HomeLocation : BaseLocation
             terminal.SetColor("bright_green");
             terminal.WriteLine($"\n{Loc.Get("home.upgrade_success", name.ToUpper())}");
             terminal.WriteLine(Loc.Get("home.upgrade_craftsmen"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             terminal.WriteLine(Loc.Get("home.upgrade_home_done"));
 
             // Save immediately after upgrade to prevent data loss on disconnect
@@ -4411,7 +4411,7 @@ public class HomeLocation : BaseLocation
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("home.no_lovers"));
             terminal.WriteLine("");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -4452,7 +4452,7 @@ public class HomeLocation : BaseLocation
             terminal.SetColor("bright_green");
             terminal.WriteLine(Loc.Get("home.all_alive"));
             terminal.WriteLine("");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -4601,7 +4601,7 @@ public class HomeLocation : BaseLocation
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("home.no_spouse_equip"));
             terminal.WriteLine(Loc.Get("home.no_spouse_find_love"));
-            await Task.Delay(2500);
+            await Pacing.Wait(2500);
             return;
         }
 
@@ -4637,7 +4637,7 @@ public class HomeLocation : BaseLocation
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("ui.cancelled"));
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
@@ -4789,7 +4789,7 @@ public class HomeLocation : BaseLocation
                 terminal.WriteLine("");
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  {Loc.Get("home.no_items_slot")}");
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 continue;
             }
 
@@ -4828,7 +4828,7 @@ public class HomeLocation : BaseLocation
             {
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("ui.cancelled"));
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
                 continue;
             }
 
@@ -4839,7 +4839,7 @@ public class HomeLocation : BaseLocation
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  {Loc.Get("home.must_identify")}");
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 continue;
             }
 
@@ -4848,7 +4848,7 @@ public class HomeLocation : BaseLocation
             {
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("home.cannot_use_item", target.DisplayName, equipReason));
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 continue;
             }
 
@@ -4860,7 +4860,7 @@ public class HomeLocation : BaseLocation
             {
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("team.equip_item_gone", selectedItem.Name));
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 continue;
             }
 
@@ -4905,7 +4905,7 @@ public class HomeLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("home.equip_failed", message));
             }
 
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
         }
     }
 
@@ -4934,7 +4934,7 @@ public class HomeLocation : BaseLocation
         {
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("home.equip_no_equipment", target.DisplayName));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -4969,7 +4969,7 @@ public class HomeLocation : BaseLocation
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("ui.cancelled"));
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
@@ -4980,7 +4980,7 @@ public class HomeLocation : BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("home.cursed_no_remove", selectedItem.Name));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -5008,7 +5008,7 @@ public class HomeLocation : BaseLocation
             terminal.WriteLine(Loc.Get("home.unequip_failed"));
         }
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
 
     /// <summary>
@@ -5026,7 +5026,7 @@ public class HomeLocation : BaseLocation
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("ui.cancelled"));
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
@@ -5080,7 +5080,7 @@ public class HomeLocation : BaseLocation
             terminal.WriteLine(Loc.Get("home.cursed_not_removed", string.Join(", ", cursedItems)));
         }
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
 
     /// <summary>

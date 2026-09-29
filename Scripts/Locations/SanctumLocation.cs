@@ -234,7 +234,7 @@ namespace UsurperRemake.Locations
                     {
                         terminal.SetColor("red");
                         terminal.WriteLine(Loc.Get("sanctum.invalid_choice"));
-                        await Task.Delay(900);
+                        await Pacing.Wait(900);
                     }
                     return false;
                 case 'R':
@@ -245,7 +245,7 @@ namespace UsurperRemake.Locations
                 default:
                     terminal.SetColor("red");
                     terminal.WriteLine(Loc.Get("sanctum.invalid_choice"));
-                    await Task.Delay(900);
+                    await Pacing.Wait(900);
                     return false;
             }
         }
@@ -313,7 +313,7 @@ namespace UsurperRemake.Locations
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  {Loc.Get("sanctum.alms_cap_reached", GameConfig.MaxAlmsPerDay)}");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return;
             }
 
@@ -324,7 +324,7 @@ namespace UsurperRemake.Locations
             {
                 terminal.SetColor("red");
                 terminal.WriteLine($"  {Loc.Get("sanctum.cannot_afford", cost)}");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return;
             }
 
@@ -342,7 +342,7 @@ namespace UsurperRemake.Locations
             terminal.WriteLine($"  {Loc.Get("sanctum.alms_flavor")}");
             terminal.SetColor("gray");
             terminal.WriteLine($"  {Loc.Get("sanctum.alms_reward", GameConfig.AlmsChivalryReward, GameConfig.AlmsFaithStandingReward)}");
-            await Task.Delay(1800);
+            await Pacing.Wait(1800);
         }
 
         private async Task FundOrphanage()
@@ -353,7 +353,7 @@ namespace UsurperRemake.Locations
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  {Loc.Get("sanctum.orphanage_cap_reached", GameConfig.MaxOrphanageGiftsPerDay)}");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return;
             }
 
@@ -364,7 +364,7 @@ namespace UsurperRemake.Locations
             {
                 terminal.SetColor("red");
                 terminal.WriteLine($"  {Loc.Get("sanctum.cannot_afford", cost)}");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return;
             }
 
@@ -381,7 +381,7 @@ namespace UsurperRemake.Locations
             terminal.WriteLine($"  {Loc.Get("sanctum.orphanage_flavor")}");
             terminal.SetColor("gray");
             terminal.WriteLine($"  {Loc.Get("sanctum.orphanage_reward", GameConfig.OrphanageChivalryReward, GameConfig.OrphanageFaithStandingReward)}");
-            await Task.Delay(1800);
+            await Pacing.Wait(1800);
         }
 
         private async Task TitheHospice()
@@ -392,7 +392,7 @@ namespace UsurperRemake.Locations
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  {Loc.Get("sanctum.hospice_cap_reached", GameConfig.MaxHospiceTithesPerDay)}");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return;
             }
 
@@ -403,7 +403,7 @@ namespace UsurperRemake.Locations
             {
                 terminal.SetColor("red");
                 terminal.WriteLine($"  {Loc.Get("sanctum.cannot_afford", cost)}");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return;
             }
 
@@ -420,7 +420,7 @@ namespace UsurperRemake.Locations
             terminal.WriteLine($"  {Loc.Get("sanctum.hospice_flavor")}");
             terminal.SetColor("gray");
             terminal.WriteLine($"  {Loc.Get("sanctum.hospice_reward", GameConfig.HospiceChivalryReward, GameConfig.HospiceFaithStandingReward)}");
-            await Task.Delay(1800);
+            await Pacing.Wait(1800);
         }
 
         // ════════════════════════════════════════════════════════════════════════
@@ -561,7 +561,7 @@ namespace UsurperRemake.Locations
             {
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("tournament.cancelled"));
-                await Task.Delay(900);
+                await Pacing.Wait(900);
                 return;
             }
 
@@ -604,7 +604,7 @@ namespace UsurperRemake.Locations
                 terminal.SetColor("dark_gray");
                 terminal.WriteLine($"  {championData.LocCrowd()}");
                 terminal.WriteLine("");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
 
                 // Spawn the champion as a boss-tagged Monster with the role-specific stat multipliers
                 // and the themed ability kit. Matches the Gauntlet's SpawnChampionMonster pattern at
@@ -616,7 +616,7 @@ namespace UsurperRemake.Locations
                 terminal.SetColor(currentPlayer.HP > currentPlayer.MaxHP / 2 ? "bright_green" : "red");
                 terminal.WriteLine($"{currentPlayer.HP}/{currentPlayer.MaxHP}");
                 terminal.WriteLine("");
-                await Task.Delay(800);
+                await Pacing.Wait(800);
 
                 // Mirror the Gauntlet's death-roll-per-wave model: 25% chance a wave loss is a REAL
                 // death (resurrection consumed, permadeath possible online); 75% it's a drag-out
@@ -754,7 +754,7 @@ namespace UsurperRemake.Locations
                     terminal.WriteLine("");
                 }
 
-                await Task.Delay(1800);
+                await Pacing.Wait(1800);
             }
 
             // Full clear (all 3 waves). Award tier title via the shared ArenaChampionTier counter

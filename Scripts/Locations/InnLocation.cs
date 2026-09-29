@@ -142,53 +142,53 @@ public class InnLocation : BaseLocation
         WriteBoxHeader(Loc.Get("inn.trouble"), "red");
         terminal.WriteLine("");
 
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("inn.bandit.sitting_at_bar"));
         terminal.WriteLine(Loc.Get("inn.bandit.bandits_enter"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("red");
         terminal.WriteLine(Loc.Get("inn.bandit.leader_threat1"));
         terminal.WriteLine(Loc.Get("inn.bandit.leader_threat2"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("inn.bandit.draw_weapons"));
         terminal.WriteLine(Loc.Get("inn.bandit.patrons_scatter"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         // Aldric intervenes
         terminal.SetColor("bright_yellow");
         terminal.WriteLine(Loc.Get("inn.bandit.chair_scrapes"));
         terminal.WriteLine("");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("inn.bandit.stranger_rises"));
         terminal.WriteLine(Loc.Get("inn.bandit.tattered_armor"));
         terminal.WriteLine(Loc.Get("inn.bandit.battered_shield"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("bright_cyan");
         terminal.WriteLine(Loc.Get("inn.bandit.aldric_sporting"));
         terminal.WriteLine("");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         terminal.SetColor("red");
         terminal.WriteLine(Loc.Get("inn.bandit.leader_stay_out"));
         terminal.WriteLine("");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         terminal.SetColor("bright_cyan");
         terminal.WriteLine(Loc.Get("inn.bandit.aldric_i_am_trouble"));
         terminal.WriteLine("");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         // Battle description
         terminal.SetColor("bright_yellow");
@@ -197,18 +197,18 @@ public class InnLocation : BaseLocation
         terminal.WriteLine(Loc.Get("inn.bandit.strike_sprawling"));
         terminal.WriteLine(Loc.Get("inn.bandit.leader_flees"));
         terminal.WriteLine("");
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("inn.bandit.wipes_blood"));
         terminal.WriteLine("");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         terminal.SetColor("bright_cyan");
         terminal.WriteLine(Loc.Get("inn.bandit.aldric_you_alright", currentPlayer.Name2 ?? currentPlayer.Name1));
         terminal.WriteLine(Loc.Get("inn.bandit.aldric_reputation"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("inn.bandit.extends_hand"));
@@ -217,7 +217,7 @@ public class InnLocation : BaseLocation
         terminal.WriteLine(Loc.Get("inn.bandit.aldric_name"));
         terminal.WriteLine(Loc.Get("inn.bandit.aldric_purpose"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("inn.bandit.glances_appraisingly"));
@@ -227,7 +227,7 @@ public class InnLocation : BaseLocation
         terminal.WriteLine(Loc.Get("inn.bandit.aldric_protecting"));
         terminal.WriteLine("");
 
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         // Recruitment choice
         terminal.SetColor("bright_yellow");
@@ -751,7 +751,7 @@ public class InnLocation : BaseLocation
 
             default:
                 terminal.WriteLine(Loc.Get("inn.invalid_choice"), "red");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return false;
         }
     }
@@ -770,7 +770,7 @@ public class InnLocation : BaseLocation
         if (currentPlayer.Gold < drinkTotalWithTax)
         {
             terminal.WriteLine(Loc.Get("ui.not_enough_gold_drink"), "red");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -807,7 +807,7 @@ public class InnLocation : BaseLocation
                 break;
         }
         
-        await Task.Delay(2500);
+        await Pacing.Wait(2500);
     }
     
     /// <summary>
@@ -819,7 +819,7 @@ public class InnLocation : BaseLocation
         if (!sethAbleAvailable)
         {
             terminal.WriteLine(Loc.Get("inn.seth_passed_out"), "gray");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -840,7 +840,7 @@ public class InnLocation : BaseLocation
             terminal.WriteLine(Loc.Get("inn.seth_waves_off"));
             terminal.WriteLine(Loc.Get("inn.seth_enough"), "yellow");
             terminal.WriteLine(Loc.Get("inn.seth_come_back"), "yellow");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -883,7 +883,7 @@ public class InnLocation : BaseLocation
         else
         {
             terminal.WriteLine(Loc.Get("inn.seth_coward"), "yellow");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
         }
     }
 
@@ -914,7 +914,7 @@ public class InnLocation : BaseLocation
     private async Task FightSethAble()
     {
         terminal.WriteLine(Loc.Get("inn.seth_inn_falls_silent"), "red");
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         int sethLevel = GetSethLevel();
         long sethHP = GetSethHP(sethLevel);
@@ -963,7 +963,7 @@ public class InnLocation : BaseLocation
         {
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("inn.awaken_temple"));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             await NavigateToLocation(GameLocation.Temple);
             return;
         }
@@ -1054,7 +1054,7 @@ public class InnLocation : BaseLocation
                 break;
         }
 
-        await Task.Delay(3000);
+        await Pacing.Wait(3000);
     }
     
     /// <summary>
@@ -1316,7 +1316,7 @@ public class InnLocation : BaseLocation
         if (!await terminal.AskYesNoAsync(Loc.Get("inn.fight_now_prompt"), enterDefault: false))
         {
             terminal.WriteLine(Loc.Get("inn.npc_changed_mind", npc.Name2), "gray");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -1352,7 +1352,7 @@ public class InnLocation : BaseLocation
         {
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("inn.awaken_temple"));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             await NavigateToLocation(GameLocation.Temple);
             return;
         }
@@ -1400,7 +1400,7 @@ public class InnLocation : BaseLocation
             currentPlayer.PDefeats++;
         }
 
-        await Task.Delay(3000);
+        await Pacing.Wait(3000);
     }
 
     /// <summary>
@@ -1411,7 +1411,7 @@ public class InnLocation : BaseLocation
         if (currentPlayer.Gold < 50)
         {
             terminal.WriteLine(Loc.Get("ui.not_enough_gold_gift"), "red");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -1494,14 +1494,14 @@ public class InnLocation : BaseLocation
         {
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("inn.drinking_daily_cap", GameConfig.MaxDrinkingGamesPerDay));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
         if (currentPlayer.Gold < 20)
         {
             terminal.WriteLine(Loc.Get("inn.drinking_need_gold"), "red");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -1516,7 +1516,7 @@ public class InnLocation : BaseLocation
         if (allNPCs.Count < 2)
         {
             terminal.WriteLine(Loc.Get("inn.drinking_not_enough_patrons"), "red");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -1540,11 +1540,11 @@ public class InnLocation : BaseLocation
         terminal.WriteLine("");
         terminal.SetColor("gray");
         terminal.Write(Loc.Get("inn.drinking_silence"));
-        await Task.Delay(600);
+        await Pacing.Wait(600);
         terminal.Write("...");
-        await Task.Delay(600);
+        await Pacing.Wait(600);
         terminal.WriteLine("...");
-        await Task.Delay(400);
+        await Pacing.Wait(400);
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("inn.drinking_rowdy_approach"));
         terminal.WriteLine("");
@@ -1572,7 +1572,7 @@ public class InnLocation : BaseLocation
             terminal.Write($"  {npc.Name2}");
             terminal.SetColor("white");
             terminal.WriteLine(line);
-            await Task.Delay(400);
+            await Pacing.Wait(400);
         }
 
         terminal.WriteLine("");
@@ -1735,7 +1735,7 @@ public class InnLocation : BaseLocation
                         terminal.SetColor("gray");
                         terminal.WriteLine(Loc.Get("inn.drinking_bow_fail3"));
                         terminal.WriteLine("");
-                        await Task.Delay(800);
+                        await Pacing.Wait(800);
                         // Falls through to drinking
                     }
                 }
@@ -1743,11 +1743,11 @@ public class InnLocation : BaseLocation
                 // Drink!
                 terminal.SetColor("bright_cyan");
                 terminal.Write(Loc.Get("inn.drinking_take_beer"));
-                await Task.Delay(300);
+                await Pacing.Wait(300);
                 terminal.Write(Loc.Get("inn.drinking_glugg"));
-                await Task.Delay(200);
+                await Pacing.Wait(200);
                 terminal.Write(Loc.Get("inn.drinking_glugg"));
-                await Task.Delay(200);
+                await Pacing.Wait(200);
                 terminal.WriteLine(Loc.Get("inn.drinking_glugg_end"));
 
                 // Reduce soberness: random(23 + drinkStrength)
@@ -1771,7 +1771,7 @@ public class InnLocation : BaseLocation
                 }
                 else
                 {
-                    await Task.Delay(300);
+                    await Pacing.Wait(300);
                 }
             }
 
@@ -1790,11 +1790,11 @@ public class InnLocation : BaseLocation
                     terminal.Write($"  {opp.Name}");
                     terminal.SetColor("white");
                     terminal.Write(opp.Male ? Loc.Get("inn.drinking_takes_his") : Loc.Get("inn.drinking_takes_her"));
-                    await Task.Delay(200);
+                    await Pacing.Wait(200);
                     terminal.Write(Loc.Get("inn.drinking_glugg"));
-                    await Task.Delay(150);
+                    await Pacing.Wait(150);
                     terminal.Write(Loc.Get("inn.drinking_glugg"));
-                    await Task.Delay(150);
+                    await Pacing.Wait(150);
                     terminal.WriteLine(Loc.Get("inn.drinking_glugg_end"));
 
                     if (newSob <= 0)
@@ -1808,7 +1808,7 @@ public class InnLocation : BaseLocation
                         terminal.SetColor("bright_yellow");
                         terminal.WriteLine(Loc.Get("inn.drinking_bites_dust"));
                         terminal.WriteLine("");
-                        await Task.Delay(500);
+                        await Pacing.Wait(500);
                     }
                 }
 
@@ -1879,11 +1879,11 @@ public class InnLocation : BaseLocation
             terminal.WriteLine(Loc.Get("inn.contest_stayed_sober"));
             terminal.SetColor("bright_yellow");
             terminal.Write(Loc.Get("inn.contest_three_cheers"));
-            await Task.Delay(400);
+            await Pacing.Wait(400);
             terminal.Write(Loc.Get("inn.drinking_hooray"));
-            await Task.Delay(400);
+            await Pacing.Wait(400);
             terminal.Write(Loc.Get("inn.drinking_hooray"));
-            await Task.Delay(400);
+            await Pacing.Wait(400);
             terminal.WriteLine(Loc.Get("inn.drinking_hooray_end"));
             terminal.WriteLine("");
 
@@ -2369,7 +2369,7 @@ public class InnLocation : BaseLocation
     private async Task RestAtTable()
     {
         terminal.WriteLine(Loc.Get("inn.rest_quiet_corner"), "green");
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         // Groggo's Shadow Blessing fades on rest (v0.41.0); 1.2.0: OnRest clears it and recalculates
         if (currentPlayer.GroggoShadowBlessingDex > 0)
@@ -2427,12 +2427,12 @@ public class InnLocation : BaseLocation
         var dream = DreamSystem.Instance.GetDreamForRest(currentPlayer, 0);
         if (dream != null)
         {
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             terminal.WriteLine("");
             terminal.SetColor("dark_magenta");
             terminal.WriteLine(Loc.Get("inn.rest_dream_begins"));
             terminal.WriteLine("");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             terminal.SetColor("bright_magenta");
             terminal.WriteLine($"=== {dream.LocTitle()} ===");
@@ -2442,7 +2442,7 @@ public class InnLocation : BaseLocation
             foreach (var line in dream.LocContentLines())
             {
                 terminal.WriteLine($"  {line}");
-                await Task.Delay(1200);
+                await Pacing.Wait(1200);
             }
 
             if (!string.IsNullOrEmpty(dream.PhilosophicalHint))
@@ -2458,7 +2458,7 @@ public class InnLocation : BaseLocation
         }
         else
         {
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             await terminal.PressAnyKey();
         }
     }
@@ -2482,9 +2482,9 @@ public class InnLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("inn.sleep_room_shown"), "gray");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
         terminal.WriteLine(Loc.Get("inn.sleep_settle_in"), "gray");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         // Full HP/Mana/Stamina recovery with Blood Price penalty
         float restEfficiency = 1.0f;
@@ -2537,12 +2537,12 @@ public class InnLocation : BaseLocation
         var dream = DreamSystem.Instance.GetDreamForRest(currentPlayer, 0);
         if (dream != null)
         {
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             terminal.WriteLine("");
             terminal.SetColor("dark_magenta");
             terminal.WriteLine(Loc.Get("inn.sleep_dreams_unfold"));
             terminal.WriteLine("");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             terminal.SetColor("bright_magenta");
             terminal.WriteLine($"=== {dream.LocTitle()} ===");
@@ -2552,7 +2552,7 @@ public class InnLocation : BaseLocation
             foreach (var line in dream.LocContentLines())
             {
                 terminal.WriteLine($"  {line}");
-                await Task.Delay(1200);
+                await Pacing.Wait(1200);
             }
 
             if (!string.IsNullOrEmpty(dream.PhilosophicalHint))
@@ -2574,11 +2574,11 @@ public class InnLocation : BaseLocation
         terminal.WriteLine("");
         terminal.SetColor("gray");
         terminal.WriteLine(Loc.Get("inn.sleep_drift_off"));
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
         await DailySystemManager.Instance.RestAndAdvanceToMorning(currentPlayer);
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("inn.sleep_new_day", DailySystemManager.Instance.CurrentDay));
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         await terminal.WaitForKey();
     }
@@ -2710,7 +2710,7 @@ public class InnLocation : BaseLocation
         if (currentPlayer.Gold < totalWithTax)
         {
             terminal.WriteLine(Loc.Get("ui.not_enough_gold_meal"), "red");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -2986,7 +2986,7 @@ public class InnLocation : BaseLocation
         TeammateStances.Set(currentPlayer, TeammateStances.KeyForCompanion(c.Id), chosen.Value);
         terminal.WriteLine(Loc.Get("dungeon.stance_set", c.Name, Loc.Get(TeammateStances.NameKey(chosen.Value))), "bright_green");
         try { await SaveSystem.Instance.AutoSave(currentPlayer); } catch { /* best-effort */ }
-        await Task.Delay(1200);
+        await Pacing.Wait(1200);
     }
 
     private async Task ManageParty()
@@ -3246,7 +3246,7 @@ public class InnLocation : BaseLocation
         if (string.IsNullOrWhiteSpace(input))
         {
             terminal.WriteLine(Loc.Get("inn.no_changes"), "gray");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
@@ -3268,7 +3268,7 @@ public class InnLocation : BaseLocation
         if (selectedIds.Count == 0)
         {
             terminal.WriteLine(Loc.Get("inn.no_valid_selected"), "yellow");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -3290,7 +3290,7 @@ public class InnLocation : BaseLocation
             terminal.WriteLine(Loc.Get("inn.update_failed"), "red");
         }
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
 
     /// <summary>
@@ -4075,7 +4075,7 @@ public class InnLocation : BaseLocation
                 terminal.WriteLine("");
                 terminal.SetColor("yellow");
                 terminal.WriteLine("  No items available for this slot.");
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 continue;
             }
 
@@ -4122,7 +4122,7 @@ public class InnLocation : BaseLocation
             {
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("ui.cancelled"));
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
                 continue;
             }
 
@@ -4133,7 +4133,7 @@ public class InnLocation : BaseLocation
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine(Loc.Get("inn.must_identify"));
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 continue;
             }
 
@@ -4142,7 +4142,7 @@ public class InnLocation : BaseLocation
             {
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("inn.cannot_use", target.DisplayName, equipReason));
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 continue;
             }
 
@@ -4154,7 +4154,7 @@ public class InnLocation : BaseLocation
             {
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("team.equip_item_gone", selectedItem.Name));
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 continue;
             }
 
@@ -4198,7 +4198,7 @@ public class InnLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("inn.failed_equip", message));
             }
 
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
         }
     }
 
@@ -4224,7 +4224,7 @@ public class InnLocation : BaseLocation
         {
             terminal.SetColor("yellow");
             terminal.WriteLine($"{target.DisplayName} has no equipment to unequip.");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -4259,7 +4259,7 @@ public class InnLocation : BaseLocation
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("ui.cancelled"));
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
@@ -4270,7 +4270,7 @@ public class InnLocation : BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("inn.cursed_cannot_remove", selectedItem.Name));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -4298,7 +4298,7 @@ public class InnLocation : BaseLocation
             terminal.WriteLine(Loc.Get("inn.failed_unequip"));
         }
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
 
     private async Task CompanionTakeAllEquipment(Character target)
@@ -4313,7 +4313,7 @@ public class InnLocation : BaseLocation
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("ui.cancelled"));
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
@@ -4366,7 +4366,7 @@ public class InnLocation : BaseLocation
             terminal.WriteLine(Loc.Get("inn.cursed_not_removed", string.Join(", ", cursedItems)));
         }
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
 
 
@@ -4551,7 +4551,7 @@ public class InnLocation : BaseLocation
                 companion.DisabledSpells.Clear();
                 terminal.SetColor("bright_green");
                 terminal.WriteLine(Loc.Get("inn.all_abilities_enabled"));
-                await Task.Delay(800);
+                await Pacing.Wait(800);
                 continue;
             }
 
@@ -4590,7 +4590,7 @@ public class InnLocation : BaseLocation
                         terminal.WriteLine($"  Disabled: {spell.DisplayName}");
                     }
                 }
-                await Task.Delay(600);
+                await Pacing.Wait(600);
             }
         }
 
@@ -4744,7 +4744,7 @@ public class InnLocation : BaseLocation
                     terminal.SetColor(mat?.Color ?? "white");
                     terminal.WriteLine($"  The {mat?.Name ?? req.materialId} dissolves into your body, fueling the transformation...");
                 }
-                await Task.Delay(500);
+                await Pacing.Wait(500);
             }
 
             // Apply the +1 stat bonus
@@ -4796,7 +4796,7 @@ public class InnLocation : BaseLocation
                     break;
             }
 
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             terminal.WriteLine("");
             terminal.SetColor("bright_green");
             long newVal = GetStatValue(statKey);
@@ -5024,7 +5024,7 @@ public class InnLocation : BaseLocation
             int secondRoll = rng.Next(1, 7);
             terminal.SetColor("bright_yellow");
             terminal.WriteLine(Loc.Get("inn.next_roll", secondRoll));
-            await Task.Delay(800);
+            await Pacing.Wait(800);
 
             if (secondRoll == firstRoll)
             {
@@ -5211,7 +5211,7 @@ public class InnLocation : BaseLocation
         terminal.WriteLine("");
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("inn.sb_dealer_turn"));
-        await Task.Delay(800);
+        await Pacing.Wait(800);
 
         int dealerTotal = 0;
         int dealerCards = 0;
@@ -5225,7 +5225,7 @@ public class InnLocation : BaseLocation
         bool dealerBlackjack = dealerTotal == 21 && dealerCards == 2;
         terminal.SetColor("bright_yellow");
         terminal.WriteLine(Loc.Get("inn.sb_dealer_total", dealerTotal));
-        await Task.Delay(500);
+        await Pacing.Wait(500);
 
         // Determine winner
         terminal.WriteLine("");
@@ -5351,9 +5351,9 @@ public class InnLocation : BaseLocation
         terminal.WriteLine("");
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("inn.aw_clasp_hands"));
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
         terminal.WriteLine(Loc.Get("inn.aw_three_two_one"));
-        await Task.Delay(800);
+        await Pacing.Wait(800);
 
         // STR contest with randomness
         double playerScore = currentPlayer.Strength * (0.7 + rng.NextDouble() * 0.6);
@@ -5427,7 +5427,7 @@ public class InnLocation : BaseLocation
         if (totalAvailable < roomCost)
         {
             terminal.WriteLine(Loc.Get("inn.rent_need_gold", roomCost.ToString("N0"), currentPlayer.Gold.ToString("N0"), currentPlayer.BankGold.ToString("N0")), "red");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -5487,14 +5487,14 @@ public class InnLocation : BaseLocation
                 if (currentPlayer.Gold + currentPlayer.BankGold - roomCost - totalGuardCost < cost)
                 {
                     terminal.WriteLine(Loc.Get("inn.rent_cant_afford_guard"), "red");
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                     continue;
                 }
 
                 totalGuardCost += cost;
                 hiredGuards.Add((chosen.type, chosen.name, hp));
                 terminal.WriteLine(Loc.Get("inn.rent_hired_guard", chosen.name, hp), "green");
-                await Task.Delay(500);
+                await Pacing.Wait(500);
             }
             terminal.ClearScreen();
             WriteBoxHeader(Loc.Get("inn.rent_room"), "bright_cyan");
@@ -5512,14 +5512,14 @@ public class InnLocation : BaseLocation
         if (!await terminal.AskYesNoAsync(Loc.Get("inn.rent_confirm"), enterDefault: false))
         {
             terminal.WriteLine(Loc.Get("inn.rent_cancelled"), "gray");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
         if (currentPlayer.Gold + currentPlayer.BankGold < totalCost)
         {
             terminal.WriteLine(Loc.Get("inn.rent_cant_afford"), "red");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -5584,7 +5584,7 @@ public class InnLocation : BaseLocation
         }
         terminal.SetColor("gray");
         terminal.WriteLine(Loc.Get("inn.rent_deep_sleep"));
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         throw new LocationExitException(GameLocation.NoWhere);
     }
@@ -5600,7 +5600,7 @@ public class InnLocation : BaseLocation
         if (backend == null)
         {
             terminal.WriteLine(Loc.Get("inn.atk_not_available"), "gray");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
@@ -5615,7 +5615,7 @@ public class InnLocation : BaseLocation
         if (sleepingNPCNames.Count == 0 && innPlayerSleepers.Count == 0)
         {
             terminal.WriteLine(Loc.Get("inn.atk_no_sleepers"), "gray");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -5677,7 +5677,7 @@ public class InnLocation : BaseLocation
         if (chosen.name == null)
         {
             terminal.WriteLine(Loc.Get("inn.atk_no_such_sleeper"), "red");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
@@ -5693,14 +5693,14 @@ public class InnLocation : BaseLocation
         if (npc == null || !npc.IsAlive || npc.IsDead)
         {
             terminal.WriteLine(Loc.Get("inn.atk_no_longer_here"), "gray");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
         terminal.ClearScreen();
         terminal.SetColor("bright_red");
         terminal.WriteLine(Loc.Get("inn.atk_pick_lock", npcName));
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         AlignmentSystem.Instance.ChangeAlignment(currentPlayer, 30, isGood: false, "inn.invade_room"); // v0.57.12: paired movement
 
@@ -5782,21 +5782,21 @@ public class InnLocation : BaseLocation
 
             try { OnlineStateManager.Instance?.AddNews(Loc.Get("inn.news_murdered_sleep", currentPlayer.Name2, npcName), "combat"); } catch { }
 
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
         }
         else if (result.Outcome == CombatOutcome.OpponentSpared)
         {
             // v0.64.1: mercy granted; spare narration already shown by the
             // combat engine. Skip the contradictory "fought you off" line.
             WorldSimulator.WakeUpNPC(npcName);
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
         }
         else
         {
             terminal.SetColor("cyan");
             terminal.WriteLine(Loc.Get("inn.atk_fought_off", npcName));
             WorldSimulator.WakeUpNPC(npcName);
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
         }
         await terminal.WaitForKeyPress();
     }
@@ -5812,14 +5812,14 @@ public class InnLocation : BaseLocation
         if (victimSave?.Player == null)
         {
             terminal.WriteLine(Loc.Get("inn.atk_cant_load"), "red");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
         terminal.ClearScreen();
         terminal.SetColor("bright_red");
         terminal.WriteLine(Loc.Get("inn.atk_sneak_toward", target.Username));
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         // Fight through guards
         bool guardsRepelled = false;
@@ -5850,7 +5850,7 @@ public class InnLocation : BaseLocation
             terminal.SetColor("yellow");
             // v0.62.1 article fix.
             terminal.WriteLine(Loc.Get("inn.atk_guard_blocks", GameConfig.ArticulateForLanguage(gName)));
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             var guardChar = HeadlessCombatResolver.CreateGuardCharacter(gType, gHp, victimLevel, rng);
             var guardCombat = new CombatEngine(terminal);
@@ -5862,7 +5862,7 @@ public class InnLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("inn.atk_cut_down_guard", gName));
                 guards.RemoveAt(gi);
                 gi--;
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
             }
             else
             {
@@ -5871,7 +5871,7 @@ public class InnLocation : BaseLocation
                 int remainingHp = (int)Math.Max(1, guardChar.HP);
                 guards[gi] = (gType, gName, remainingHp, gMaxHp);
                 guardsRepelled = true;
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 break;
             }
         }
@@ -5906,7 +5906,7 @@ public class InnLocation : BaseLocation
 
         terminal.SetColor("bright_red");
         terminal.WriteLine(Loc.Get("inn.atk_reach_target", target.Username));
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         AlignmentSystem.Instance.ChangeAlignment(currentPlayer, 30, isGood: false, "inn.attack_online_player"); // v0.57.12: paired movement
 
@@ -5953,7 +5953,7 @@ public class InnLocation : BaseLocation
 
             terminal.SetColor("dark_red");
             terminal.WriteLine(Loc.Get("inn.atk_leave_body", target.Username));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
         }
         else
         {
@@ -5961,7 +5961,7 @@ public class InnLocation : BaseLocation
             terminal.WriteLine(Loc.Get("inn.atk_player_fought_off", target.Username));
             // Don't leave the attacker walking around at 0 HP (see pit-fight fix).
             if (currentPlayer.HP <= 0) currentPlayer.HP = 1;
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
         }
         await terminal.WaitForKeyPress();
     }

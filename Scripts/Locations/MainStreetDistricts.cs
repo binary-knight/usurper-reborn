@@ -192,7 +192,7 @@ public partial class MainStreetLocation
             {
                 terminal.WriteLine(Loc.Get(walk), place == StreetPlace.LoveStreet ? "magenta" : place == StreetPlace.Temple ? "cyan"
                     : place == StreetPlace.Sanctum ? "bright_yellow" : "gray");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 throw new LocationExitException(destination.Value);
             }
             await NavigateToLocation(destination.Value);
@@ -229,7 +229,7 @@ public partial class MainStreetLocation
     private async Task OnlineUnavailable()
     {
         terminal.WriteLine($"  {Loc.Get("main_street.online_unavailable")}", "gray");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
     }
 
     private async Task ChatOnce()
@@ -243,7 +243,7 @@ public partial class MainStreetLocation
             await OnlineChatSystem.Instance!.Say(chatMsg);
             terminal.SetColor("cyan");
             terminal.WriteLine(Loc.Get("main_street.say_you", chatMsg));
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
         }
     }
 

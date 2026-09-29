@@ -270,7 +270,7 @@ public class HealerLocation : BaseLocation
                 return false; // Stay in location
             default:
                 terminal.WriteLine(Loc.Get("healer.invalid_choice"), "red");
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
                 return false; // Stay in location
         }
     }
@@ -576,7 +576,7 @@ public class HealerLocation : BaseLocation
         if (!long.TryParse(input, out long hpToHeal) || hpToHeal <= 0)
         {
             terminal.WriteLine(Loc.Get("healer.come_back_healing"), "cyan");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
@@ -616,7 +616,7 @@ public class HealerLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("healer.hands_on_wounds", Manager), "gray");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
         terminal.WriteLine(Loc.Get("healer.warm_light"), "bright_green");
         terminal.WriteLine(Loc.Get("healer.healed_hp", hpToHeal), "green");
         if (manaRestored > 0)
@@ -655,7 +655,7 @@ public class HealerLocation : BaseLocation
         if (!await terminal.AskYesNoAsync(Loc.Get("healer.proceed_full_heal")))
         {
             terminal.WriteLine(Loc.Get("healer.as_you_wish"), "cyan");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
@@ -675,11 +675,11 @@ public class HealerLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("healer.begins_ritual", Manager), "gray");
-        await Task.Delay(500);
+        await Pacing.Wait(500);
         terminal.Write("...", "gray");
-        await Task.Delay(500);
+        await Pacing.Wait(500);
         terminal.Write("...", "gray");
-        await Task.Delay(500);
+        await Pacing.Wait(500);
         terminal.WriteLine("...", "gray");
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("healer.divine_light"), "bright_yellow");
@@ -730,7 +730,7 @@ public class HealerLocation : BaseLocation
         if (!int.TryParse(input, out int quantity) || quantity <= 0)
         {
             terminal.WriteLine(Loc.Get("healer.come_back_supplies"), "cyan");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
@@ -801,7 +801,7 @@ public class HealerLocation : BaseLocation
         if (!int.TryParse(input, out int quantity) || quantity <= 0)
         {
             terminal.WriteLine(Loc.Get("healer.come_back_supplies"), "cyan");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
@@ -867,7 +867,7 @@ public class HealerLocation : BaseLocation
         if (!int.TryParse(input, out int quantity) || quantity <= 0)
         {
             terminal.WriteLine(Loc.Get("healer.come_back_supplies"), "cyan");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
@@ -911,7 +911,7 @@ public class HealerLocation : BaseLocation
         terminal.WriteLine(Loc.Get("healer.check_poison", Manager), "cyan");
         terminal.WriteLine("");
 
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         if (!player.Poisoned && !player.HasStatus(StatusEffect.Poisoned))
         {
@@ -933,7 +933,7 @@ public class HealerLocation : BaseLocation
         if (!await terminal.AskYesNoAsync(Loc.Get("healer.cure_poison_prompt")))
         {
             terminal.WriteLine(Loc.Get("healer.careful_poison"), "yellow");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -954,9 +954,9 @@ public class HealerLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("healer.mixing_antidote", Manager), "gray");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
         terminal.WriteLine(Loc.Get("healer.drink_mixture"), "gray");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
         terminal.WriteLine(Loc.Get("healer.poison_purged"), "bright_green");
         terminal.WriteLine(Loc.Get("healer.no_longer_poisoned"), "green");
 
@@ -1023,7 +1023,7 @@ public class HealerLocation : BaseLocation
         if (choice == "R" || string.IsNullOrEmpty(choice))
         {
             terminal.WriteLine(Loc.Get("healer.come_back_treatment"), "cyan");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
@@ -1096,7 +1096,7 @@ public class HealerLocation : BaseLocation
         else
         {
             terminal.WriteLine(Loc.Get("healer.invalid_choice_short"), "red");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
         }
     }
 
@@ -1113,7 +1113,7 @@ public class HealerLocation : BaseLocation
 
         for (int i = 0; i < 4; i++)
         {
-            await Task.Delay(800);
+            await Pacing.Wait(800);
             terminal.Write("...");
         }
 
@@ -1233,11 +1233,11 @@ public class HealerLocation : BaseLocation
 
                 terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("healer.strange_spells", Manager), "gray");
-                await Task.Delay(500);
+                await Pacing.Wait(500);
                 terminal.Write("...", "gray");
-                await Task.Delay(500);
+                await Pacing.Wait(500);
                 terminal.Write("...", "gray");
-                await Task.Delay(500);
+                await Pacing.Wait(500);
                 terminal.WriteLine("...", "gray");
                 terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("healer.suddenly"), "bright_yellow");
@@ -1406,7 +1406,7 @@ public class HealerLocation : BaseLocation
         if (!await terminal.AskYesNoAsync(Loc.Get("healer.therapy_confirm")))
         {
             terminal.WriteLine(Loc.Get("healer.door_open", player.Name2), "cyan");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
@@ -1528,7 +1528,7 @@ public class HealerLocation : BaseLocation
         if (!await terminal.AskYesNoAsync(Loc.Get("healer.proceed_rehab")))
         {
             terminal.WriteLine(Loc.Get("healer.door_open", player.Name2), "cyan");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
@@ -1562,20 +1562,20 @@ public class HealerLocation : BaseLocation
         terminal.WriteLine("");
         terminal.SetColor("gray");
         terminal.WriteLine(Loc.Get("healer.private_room", Manager));
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
         terminal.WriteLine(Loc.Get("healer.purifying_herbs"));
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
         terminal.Write(Loc.Get("healer.treatment_begins"));
         for (int i = 0; i < 4; i++)
         {
-            await Task.Delay(800);
+            await Pacing.Wait(800);
             terminal.Write("...");
         }
         terminal.WriteLine("");
         terminal.WriteLine("");
         terminal.SetColor("bright_green");
         terminal.WriteLine(Loc.Get("healer.painful_treatment"));
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
         terminal.WriteLine(Loc.Get("healer.body_cleansed"), "green");
         terminal.WriteLine(Loc.Get("healer.addiction_cured"), "green");
         terminal.WriteLine(Loc.Get("healer.tolerances_reset"), "green");

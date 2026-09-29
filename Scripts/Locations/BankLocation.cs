@@ -1351,7 +1351,7 @@ public class BankLocation : BaseLocation
         terminal.WriteLine(Loc.Get("bank.rob_alarms"));
         terminal.WriteLine("");
 
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         // Create monsters for guards — scaled to be tougher than same-level dungeon monsters.
         // Bank guards are elite professionals; robbing a bank should be a serious challenge.
@@ -1422,7 +1422,7 @@ public class BankLocation : BaseLocation
         terminal.WriteLine(Loc.Get("bank.rob_enemies_rush", monsters.Count));
         terminal.WriteLine("");
 
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         // Real interactive combat against the guards
         var combatEngine = new CombatEngine(terminal);

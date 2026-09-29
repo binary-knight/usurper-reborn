@@ -826,11 +826,11 @@ public partial class MagicShopLocation : BaseLocation
             DisplayMessage("");
             DisplayMessage(Loc.Get("magic_shop.curse_scene_1", _ownerName, targetItem.Name), "gray");
             DisplayMessage(Loc.Get("magic_shop.curse_scene_2"), "gray");
-            await Task.Delay(500);
+            await Pacing.Wait(500);
             DisplayMessage(Loc.Get("magic_shop.curse_scene_3"), "magenta");
-            await Task.Delay(500);
+            await Pacing.Wait(500);
             DisplayMessage(Loc.Get("magic_shop.curse_scene_4"), "white");
-            await Task.Delay(300);
+            await Pacing.Wait(300);
             DisplayMessage(Loc.Get("magic_shop.curse_scene_5"), "dark_yellow");
             DisplayMessage("");
 
@@ -928,11 +928,11 @@ public partial class MagicShopLocation : BaseLocation
             DisplayMessage("");
             DisplayMessage($"{_ownerName} places {ownerName}'s {targetEquip.Name} on the altar...", "gray");
             DisplayMessage(Loc.Get("magic_shop.curse_scene_2"), "gray");
-            await Task.Delay(500);
+            await Pacing.Wait(500);
             DisplayMessage(Loc.Get("magic_shop.curse_scene_3"), "magenta");
-            await Task.Delay(500);
+            await Pacing.Wait(500);
             DisplayMessage(Loc.Get("magic_shop.curse_scene_4"), "white");
-            await Task.Delay(300);
+            await Pacing.Wait(300);
             DisplayMessage(Loc.Get("magic_shop.curse_scene_5"), "dark_yellow");
             DisplayMessage("");
 
@@ -1159,7 +1159,7 @@ public partial class MagicShopLocation : BaseLocation
 
         DisplayMessage("");
         DisplayMessage($"{_ownerName} begins the enchantment ritual...", "gray");
-        await Task.Delay(500);
+        await Pacing.Wait(500);
 
         switch (enchantChoice)
         {
@@ -2071,7 +2071,7 @@ public partial class MagicShopLocation : BaseLocation
                 terminal.SetColor(mat?.Color ?? "white");
                 terminal.WriteLine($"  The {mat?.Name ?? req.materialId} dissolves into the enchantment...");
             }
-            await Task.Delay(500);
+            await Pacing.Wait(500);
         }
 
         // Check for failure on 4th/5th enchantment
@@ -2085,11 +2085,11 @@ public partial class MagicShopLocation : BaseLocation
                 // FAILURE — gold consumed, random existing enchant destroyed
                 DisplayMessage("");
                 DisplayMessage($"{_ownerName} places the item on the anvil...", "gray");
-                await Task.Delay(500);
+                await Pacing.Wait(500);
                 DisplayMessage("The runes flare wildly! Unstable energies crackle!", "bright_red");
-                await Task.Delay(500);
+                await Pacing.Wait(500);
                 DisplayMessage("CRACK! The enchantment backfires!", "bright_red");
-                await Task.Delay(500);
+                await Pacing.Wait(500);
 
                 // Destroy one random existing enchant by decrementing count
                 var damaged = selectedEquip.Clone();
@@ -2202,9 +2202,9 @@ public partial class MagicShopLocation : BaseLocation
         // Dramatic enchantment scene
         DisplayMessage("");
         DisplayMessage($"{_ownerName} places the {selectedEquip.Name} on an anvil carved with ancient runes...", "gray");
-        await Task.Delay(500);
+        await Pacing.Wait(500);
         DisplayMessage("Sparks fly as magical energy courses through the item!", "magenta");
-        await Task.Delay(500);
+        await Pacing.Wait(500);
         DisplayMessage("");
         DisplayMessage($"Your {selectedEquip.Name} is now {enchanted.Name}!", "bright_green");
 
@@ -3399,7 +3399,7 @@ public partial class MagicShopLocation : BaseLocation
             terminal.WriteLine("");
             terminal.SetColor("gray");
             terminal.WriteLine($"  {_ownerName} whispers ancient words over a rose-colored crystal...");
-            await Task.Delay(500);
+            await Pacing.Wait(500);
             terminal.SetColor("yellow");
             terminal.WriteLine("  The magic dissipates harmlessly.");
             terminal.SetColor("red");
@@ -3432,7 +3432,7 @@ public partial class MagicShopLocation : BaseLocation
         terminal.WriteLine("");
         terminal.SetColor("gray");
         terminal.WriteLine($"  {_ownerName} whispers ancient words over a rose-colored crystal...");
-        await Task.Delay(500);
+        await Pacing.Wait(500);
         terminal.SetColor("magenta");
         terminal.WriteLine("  The crystal pulses with warmth and then shatters softly.");
         terminal.SetColor("white");
@@ -3675,16 +3675,16 @@ public partial class MagicShopLocation : BaseLocation
         terminal.WriteLine("");
         terminal.SetColor("gray");
         terminal.WriteLine($"  {_ownerName} draws a circle of black salt on the floor...");
-        await Task.Delay(800);
+        await Pacing.Wait(800);
         terminal.SetColor("darkred");
         terminal.WriteLine("  Dark energy gathers, spiraling toward an unseen target...");
-        await Task.Delay(800);
+        await Pacing.Wait(800);
 
         if (success)
         {
             terminal.SetColor("gray");
             terminal.WriteLine("  The candles flicker and die.");
-            await Task.Delay(500);
+            await Pacing.Wait(500);
             terminal.WriteLine("");
             terminal.SetColor("cyan");
             terminal.WriteLine($"  'It is done. {targetNPC.Name1} has passed beyond the veil.'");
@@ -3861,7 +3861,7 @@ public partial class MagicShopLocation : BaseLocation
 
         DisplayMessage("");
         DisplayMessage("The mists part to reveal...", "magenta");
-        await Task.Delay(500);
+        await Pacing.Wait(500);
         DisplayMessage("");
         WriteSectionHeader(target.Name1, "cyan");
         DisplayMessage($"  {Loc.Get("magic_shop.scry_class")} {target.ClassName}    {Loc.Get("magic_shop.dark_level")}: {target.Level}", "white");
@@ -4008,24 +4008,24 @@ public partial class MagicShopLocation : BaseLocation
         terminal.ClearScreen();
         DisplayMessage("");
         DisplayMessage(Loc.Get("magic_shop.corrupt_grave", _ownerName), "gray");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
         DisplayMessage("");
         DisplayMessage(Loc.Get("magic_shop.corrupt_1"), "cyan");
         DisplayMessage(Loc.Get("magic_shop.corrupt_2"), "cyan");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
         DisplayMessage("");
         DisplayMessage(Loc.Get("magic_shop.corrupt_3"), "gray");
         DisplayMessage(Loc.Get("magic_shop.corrupt_4"), "magenta");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
         DisplayMessage("");
         DisplayMessage(Loc.Get("magic_shop.corrupt_5"), "magenta");
         DisplayMessage(Loc.Get("magic_shop.corrupt_6"), "magenta");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
         DisplayMessage("");
         DisplayMessage(Loc.Get("magic_shop.corrupt_7"), "cyan");
         DisplayMessage(Loc.Get("magic_shop.corrupt_8"), "cyan");
         DisplayMessage(Loc.Get("magic_shop.corrupt_9"), "cyan");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
         DisplayMessage("");
 
         // Award the fragment

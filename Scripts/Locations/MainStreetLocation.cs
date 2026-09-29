@@ -745,7 +745,7 @@ public partial class MainStreetLocation : BaseLocation
 
             default:
                 terminal.WriteLine(Loc.Get("main_street.invalid_choice"), "red");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return false;
         }
     }
@@ -786,7 +786,7 @@ public partial class MainStreetLocation : BaseLocation
     private async Task NavigateToTeamCorner()
     {
         terminal.WriteLine(Loc.Get("main_street.nav_team_corner"), "yellow");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
         
         // Navigate to TeamCornerLocation
         await NavigateToLocation(GameLocation.TeamCorner);
@@ -1365,7 +1365,7 @@ public partial class MainStreetLocation : BaseLocation
 
             terminal.SetColor("red");
             terminal.WriteLine($"\n  {Loc.Get("main_street.attack_approach", target.Name)}");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             // Warn about consequences
             terminal.SetColor("yellow");
@@ -1406,7 +1406,7 @@ public partial class MainStreetLocation : BaseLocation
             terminal.WriteLine($"\n  {Loc.Get("main_street.attack_change_mind")}");
         }
 
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
     }
 
     private async Task<bool> QuitGame()
@@ -1741,7 +1741,7 @@ public partial class MainStreetLocation : BaseLocation
             };
 
             terminal.WriteLine(Loc.Get("main_street.deed_chivalry_gain", deedName), "green");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
         }
     }
     
@@ -1792,7 +1792,7 @@ public partial class MainStreetLocation : BaseLocation
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine(Loc.Get("main_street.combat_test_temple"));
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 await NavigateToLocation(GameLocation.Temple);
                 return;
             }

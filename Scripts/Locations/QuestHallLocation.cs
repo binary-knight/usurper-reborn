@@ -36,7 +36,7 @@ public class QuestHallLocation : BaseLocation
         }
 
         terminal.WriteLine(Loc.Get("quest_hall.leave"), "gray");
-        await Task.Delay(500);
+        await Pacing.Wait(500);
 
         // Return to Main Street via exception (standard navigation pattern)
         throw new LocationExitException(GameLocation.MainStreet);
@@ -252,7 +252,7 @@ public class QuestHallLocation : BaseLocation
             {
                 terminal.WriteLine(Loc.Get("quest_hall.no_quests_claim"), "yellow");
             }
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
@@ -354,7 +354,7 @@ public class QuestHallLocation : BaseLocation
             }
         }
 
-        await Task.Delay(500);
+        await Pacing.Wait(500);
     }
 
     private async Task TurnInQuest()
@@ -365,7 +365,7 @@ public class QuestHallLocation : BaseLocation
         {
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("ui.no_active_quests_turn_in"), "yellow");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
@@ -430,7 +430,7 @@ public class QuestHallLocation : BaseLocation
         {
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("ui.no_active_quests_abandon"), "yellow");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 

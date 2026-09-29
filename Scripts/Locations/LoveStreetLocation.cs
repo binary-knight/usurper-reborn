@@ -737,7 +737,7 @@ public class LoveStreetLocation : BaseLocation
         };
         terminal.WriteLine(openings[random.Next(openings.Length)]);
         terminal.WriteLine("");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         terminal.SetColor("bright_magenta");
         var tensions = new[]
@@ -749,7 +749,7 @@ public class LoveStreetLocation : BaseLocation
         };
         terminal.WriteLine(tensions[random.Next(tensions.Length)]);
         terminal.WriteLine("");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         // v0.60.10: scene-quality tiers re-tiered to match the doubled prices so the same
         // partners still get their original-quality flavor (Loretta/Banco -> premium,
@@ -773,7 +773,7 @@ public class LoveStreetLocation : BaseLocation
             Loc.Get("love_street.scene_aftermath4", partnerName)
         };
         terminal.WriteLine(aftermaths[random.Next(aftermaths.Length)]);
-        await Task.Delay(500);
+        await Pacing.Wait(500);
     }
 
     private async Task ShowBasicEncounter(string name, string race)
@@ -792,7 +792,7 @@ public class LoveStreetLocation : BaseLocation
         terminal.SetColor("bright_magenta");
         terminal.WriteLine(Loc.Get("love_street.basic_climax1", name));
         terminal.WriteLine(Loc.Get("love_street.basic_climax2"));
-        await Task.Delay(500);
+        await Pacing.Wait(500);
     }
 
     private async Task ShowStandardEncounter(string name, string race)
@@ -800,24 +800,24 @@ public class LoveStreetLocation : BaseLocation
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("love_street.standard_scene1", name));
         terminal.WriteLine("");
-        await Task.Delay(500);
+        await Pacing.Wait(500);
 
         terminal.SetColor("bright_magenta");
         terminal.WriteLine(Loc.Get("love_street.standard_scene2", name));
         terminal.WriteLine(Loc.Get("love_street.standard_scene3", name));
         terminal.WriteLine("");
-        await Task.Delay(500);
+        await Pacing.Wait(500);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("love_street.standard_scene4", name));
         terminal.WriteLine(Loc.Get("love_street.standard_scene5"));
         terminal.WriteLine("");
-        await Task.Delay(500);
+        await Pacing.Wait(500);
 
         terminal.SetColor("bright_magenta");
         terminal.WriteLine(Loc.Get("love_street.standard_scene6", name));
         terminal.WriteLine(Loc.Get("love_street.standard_scene7"));
-        await Task.Delay(500);
+        await Pacing.Wait(500);
     }
 
     private async Task ShowHighEndEncounter(string name, string race)
@@ -826,30 +826,30 @@ public class LoveStreetLocation : BaseLocation
         terminal.WriteLine(Loc.Get("love_street.highend_scene1", name));
         terminal.WriteLine(Loc.Get("love_street.highend_scene2"));
         terminal.WriteLine("");
-        await Task.Delay(500);
+        await Pacing.Wait(500);
 
         terminal.SetColor("bright_magenta");
         terminal.WriteLine(Loc.Get("love_street.highend_scene3", name));
         terminal.WriteLine(Loc.Get("love_street.highend_scene4"));
         terminal.WriteLine("");
-        await Task.Delay(500);
+        await Pacing.Wait(500);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("love_street.highend_scene5", name));
         terminal.WriteLine(Loc.Get("love_street.highend_scene6"));
         terminal.WriteLine("");
-        await Task.Delay(500);
+        await Pacing.Wait(500);
 
         terminal.SetColor("bright_magenta");
         terminal.WriteLine(Loc.Get("love_street.highend_scene7", name));
         terminal.WriteLine(Loc.Get("love_street.highend_scene8"));
         terminal.WriteLine("");
-        await Task.Delay(500);
+        await Pacing.Wait(500);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("love_street.highend_scene9", name));
         terminal.WriteLine(Loc.Get("love_street.highend_scene10"));
-        await Task.Delay(500);
+        await Pacing.Wait(500);
     }
 
     private async Task ShowPremiumEncounter(string name, string race)
@@ -858,42 +858,42 @@ public class LoveStreetLocation : BaseLocation
         terminal.WriteLine(Loc.Get("love_street.premium_scene1", name));
         terminal.WriteLine(Loc.Get("love_street.premium_scene2"));
         terminal.WriteLine("");
-        await Task.Delay(500);
+        await Pacing.Wait(500);
 
         terminal.SetColor("bright_magenta");
         terminal.WriteLine(Loc.Get("love_street.premium_scene3", name));
         terminal.WriteLine(Loc.Get("love_street.premium_scene4"));
         terminal.WriteLine("");
-        await Task.Delay(500);
+        await Pacing.Wait(500);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("love_street.premium_scene5"));
         terminal.WriteLine(Loc.Get("love_street.premium_scene6", name));
         terminal.WriteLine("");
-        await Task.Delay(500);
+        await Pacing.Wait(500);
 
         terminal.SetColor("bright_magenta");
         terminal.WriteLine(Loc.Get("love_street.premium_scene7"));
         terminal.WriteLine(Loc.Get("love_street.premium_scene8", name));
         terminal.WriteLine("");
-        await Task.Delay(500);
+        await Pacing.Wait(500);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("love_street.premium_scene9", name));
         terminal.WriteLine(Loc.Get("love_street.premium_scene10"));
         terminal.WriteLine("");
-        await Task.Delay(500);
+        await Pacing.Wait(500);
 
         terminal.SetColor("bright_magenta");
         terminal.WriteLine(Loc.Get("love_street.premium_scene11", name));
         terminal.WriteLine(Loc.Get("love_street.premium_scene12"));
         terminal.WriteLine("");
-        await Task.Delay(500);
+        await Pacing.Wait(500);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("love_street.premium_scene13"));
         terminal.WriteLine(Loc.Get("love_street.premium_scene14", name));
-        await Task.Delay(500);
+        await Pacing.Wait(500);
     }
 
     private async Task CheckForDisease(string partnerName, float diseaseChance)
@@ -930,7 +930,7 @@ public class LoveStreetLocation : BaseLocation
                 Loc.Get("love_street.mail_disease_body", partnerName),
                 Loc.Get("love_street.mail_disease_urgent"));
 
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
         }
     }
 

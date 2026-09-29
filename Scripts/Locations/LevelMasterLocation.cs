@@ -469,7 +469,7 @@ public class LevelMasterLocation : BaseLocation
         {
             // Pure ability user — ability menu only
             terminal.WriteLine(Loc.Get("level_master.ability_intro", currentPlayer.DisplayName, currentPlayer.Class.ToString().ToLower()));
-            await Task.Delay(800);
+            await Pacing.Wait(800);
             await ClassAbilitySystem.ShowAbilityLearningMenu(currentPlayer, terminal);
         }
     }
@@ -481,7 +481,7 @@ public class LevelMasterLocation : BaseLocation
     {
         terminal.SetColor(currentMaster.Color);
         terminal.WriteLine(Loc.Get("level_master.training_intro", currentPlayer.DisplayName));
-        await Task.Delay(800);
+        await Pacing.Wait(800);
         await TrainingSystem.ShowTrainingMenu(currentPlayer, terminal);
     }
 
@@ -511,7 +511,7 @@ public class LevelMasterLocation : BaseLocation
             long needed = GetExperienceForLevel(currentPlayer.Level + 1) - currentPlayer.Experience;
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("level_master.need_xp_remaining", $"{needed:N0}", currentPlayer.Level + 1));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -839,7 +839,7 @@ public class LevelMasterLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("level_master.milestone_potions", potionBonus));
                 terminal.WriteLine("");
 
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
             }
         }
     }
@@ -1698,7 +1698,7 @@ public class LevelMasterLocation : BaseLocation
 
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("level_master.crystal_invalid"));
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
         }
     }
 
@@ -1711,7 +1711,7 @@ public class LevelMasterLocation : BaseLocation
         WriteBoxHeader(Loc.Get("level_master.visions"), "bright_magenta");
         terminal.WriteLine("");
 
-        await Task.Delay(500);
+        await Pacing.Wait(500);
 
         terminal.SetColor("bright_cyan");
         terminal.WriteLine(Loc.Get("level_master.crystal_reveal", target.Name));

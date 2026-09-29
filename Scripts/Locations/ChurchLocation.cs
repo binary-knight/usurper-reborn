@@ -74,7 +74,7 @@ namespace UsurperRemake.Locations
             {
                 term.SetColor("yellow");
                 term.WriteLine(reason);
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
             }
 
             await base.EnterLocation(player, term);
@@ -382,21 +382,21 @@ namespace UsurperRemake.Locations
             if (!long.TryParse(input, out long amount))
             {
                 terminal.WriteLine(Loc.Get("church.donate_invalid"), "red");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return;
             }
 
             if (amount <= 0)
             {
                 terminal.WriteLine(Loc.Get("church.donate_zero"), "yellow");
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 return;
             }
 
             if (amount > currentPlayer.Gold)
             {
                 terminal.WriteLine(Loc.Get("church.donate_no_gold"), "red");
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 return;
             }
 
@@ -404,7 +404,7 @@ namespace UsurperRemake.Locations
             if (!await terminal.AskYesNoAsync(Loc.Get("church.donate_confirm", amount.ToString("N0"), GameConfig.MoneyType)))
             {
                 terminal.WriteLine(Loc.Get("church.donate_cancelled"), "gray");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return;
             }
             
@@ -472,7 +472,7 @@ namespace UsurperRemake.Locations
             // Create news entry
             await CreateNewsEntry("Good-Doer", $"{currentPlayer.DisplayName} donated money to the Church.", "");
 
-            await Task.Delay(3000);
+            await Pacing.Wait(3000);
         }
         
         /// <summary>
@@ -505,14 +505,14 @@ namespace UsurperRemake.Locations
                     terminal.WriteLine("");
                     terminal.SetColor("white");
                     terminal.WriteLine(Loc.Get("renown.free_blessing_granted"));
-                    await Task.Delay(2500);
+                    await Pacing.Wait(2500);
                     return;
                 }
 
                 // Either not eligible, or already claimed today. Original "your soul is pure"
                 // dead-end stays so a player can't loop the blessing by pressing it twice.
                 terminal.WriteLine(Loc.Get("church.blessing_pure"), "bright_green");
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 return;
             }
 
@@ -524,21 +524,21 @@ namespace UsurperRemake.Locations
             if (!long.TryParse(input, out long amount))
             {
                 terminal.WriteLine(Loc.Get("church.donate_invalid"), "red");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return;
             }
 
             if (amount <= 0)
             {
                 terminal.WriteLine(Loc.Get("church.blessing_no_offering"), "yellow");
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 return;
             }
 
             if (amount > currentPlayer.Gold)
             {
                 terminal.WriteLine(Loc.Get("church.blessing_no_gold"), "red");
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 return;
             }
 
@@ -546,7 +546,7 @@ namespace UsurperRemake.Locations
             if (!await terminal.AskYesNoAsync(Loc.Get("church.blessing_confirm", amount.ToString("N0"), GameConfig.MoneyType)))
             {
                 terminal.WriteLine(Loc.Get("church.blessing_cancelled"), "gray");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return;
             }
             
@@ -608,7 +608,7 @@ namespace UsurperRemake.Locations
             // Create news entry
             await CreateNewsEntry("Blessed", $"{currentPlayer.DisplayName} purchased a blessing.", "");
 
-            await Task.Delay(4000);
+            await Pacing.Wait(4000);
         }
         
         /// <summary>
@@ -629,7 +629,7 @@ namespace UsurperRemake.Locations
             {
                 terminal.WriteLine(Loc.Get("church.heal_perfect"), "bright_green");
                 terminal.WriteLine(Loc.Get("church.heal_blessed", priestName));
-                await Task.Delay(2500);
+                await Pacing.Wait(2500);
                 return;
             }
 
@@ -637,7 +637,7 @@ namespace UsurperRemake.Locations
             long healingCost = CalculateHealingCost(currentPlayer);
 
             terminal.WriteLine(Loc.Get("church.heal_examines", priestName), "white");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("church.heal_available"), "yellow");
@@ -753,14 +753,14 @@ namespace UsurperRemake.Locations
                     
                 case "N":
                     terminal.WriteLine(Loc.Get("church.heal_gods_watch"), "yellow");
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                     return;
             }
 
             if (!canHeal)
             {
                 terminal.WriteLine(Loc.Get("church.heal_not_needed"), "yellow");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return;
             }
 
@@ -768,14 +768,14 @@ namespace UsurperRemake.Locations
             {
                 terminal.WriteLine(Loc.Get("church.heal_need_gold", cost.ToString("N0"), GameConfig.MoneyType, service), "red");
                 terminal.WriteLine(Loc.Get("church.heal_return_funds"), "gray");
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 return;
             }
 
             if (!await terminal.AskYesNoAsync(Loc.Get("church.heal_pay_confirm", cost.ToString("N0"), GameConfig.MoneyType, service)))
             {
                 terminal.WriteLine(Loc.Get("church.heal_cancelled"), "gray");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return;
             }
             
@@ -785,7 +785,7 @@ namespace UsurperRemake.Locations
             
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("church.heal_ritual", priestName), "bright_yellow");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
 
             // Apply healing based on choice
             switch (choice)
@@ -837,7 +837,7 @@ namespace UsurperRemake.Locations
             AlignmentSystem.Instance.ChangeAlignment(currentPlayer, chivGain, isGood: true, "church.healing");
             terminal.WriteLine(Loc.Get("church.heal_faith_wisdom", chivGain), "cyan");
             
-            await Task.Delay(3000);
+            await Pacing.Wait(3000);
         }
         
         /// <summary>
@@ -853,7 +853,7 @@ namespace UsurperRemake.Locations
             {
                 terminal.WriteLine(Loc.Get("church.marriage_already", currentPlayer.SpouseName), "yellow");
                 terminal.WriteLine(Loc.Get("church.marriage_no_perform"), "white");
-                await Task.Delay(2500);
+                await Pacing.Wait(2500);
                 return;
             }
 
@@ -971,7 +971,7 @@ namespace UsurperRemake.Locations
             if (string.IsNullOrWhiteSpace(partnerInput) || partnerInput.ToUpper() == "Q")
             {
                 terminal.WriteLine(Loc.Get("church.marriage_come_back"), "gray");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return;
             }
 
@@ -991,7 +991,7 @@ namespace UsurperRemake.Locations
             {
                 terminal.WriteLine(Loc.Get("church.marriage_not_among", partnerInput), "red");
                 terminal.WriteLine(Loc.Get("church.marriage_only_love"), "gray");
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 return;
             }
 
@@ -1007,14 +1007,14 @@ namespace UsurperRemake.Locations
             if (currentPlayer.Gold < ceremonyCost)
             {
                 terminal.WriteLine(Loc.Get("church.marriage_need_gold", ceremonyCost.ToString("N0"), GameConfig.MoneyType), "red");
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 return;
             }
 
             if (!await terminal.AskYesNoAsync(Loc.Get("church.marriage_proceed", targetNPC.Name2, ceremonyCost.ToString("N0"), GameConfig.MoneyType)))
             {
                 terminal.WriteLine(Loc.Get("church.marriage_more_certain"), "gray");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return;
             }
 
@@ -1041,22 +1041,22 @@ namespace UsurperRemake.Locations
                 terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("church.marriage_bishop_frowns", bishopName), "yellow");
                 terminal.WriteLine($"\"{marriageMessage}\"", "bright_yellow");
-                await Task.Delay(2500);
+                await Pacing.Wait(2500);
                 return;
             }
 
             // Marriage ceremony display
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("church.wedding_title"), "bright_white");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             terminal.WriteLine(Loc.Get("church.wedding_begins", bishopName), "bright_yellow");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
 
             terminal.WriteLine("");
             var weddingMsgs = GameConfig.GetWeddingCeremonyMessages(); var ceremonyMsg = weddingMsgs[Random.Shared.Next(0, weddingMsgs.Length)];
             terminal.WriteLine($"\"{ceremonyMsg}\"", "bright_magenta");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
 
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("church.wedding_married", targetNPC.Name2), "bright_green");
@@ -1083,7 +1083,7 @@ namespace UsurperRemake.Locations
             // Create news entry
             await CreateNewsEntry(Loc.Get("church.wedding_news_title"), Loc.Get("church.wedding_news_body", currentPlayer.DisplayName, targetNPC.Name2), Loc.Get("church.wedding_news_footer"));
 
-            await Task.Delay(4000);
+            await Pacing.Wait(4000);
         }
 
         /// <summary>
@@ -1151,7 +1151,7 @@ namespace UsurperRemake.Locations
             {
                 terminal.WriteLine(Loc.Get("church.confess_pure"), "bright_green");
                 terminal.WriteLine(Loc.Get("church.confess_righteous"), "bright_green");
-                await Task.Delay(2500);
+                await Pacing.Wait(2500);
                 return;
             }
 
@@ -1174,7 +1174,7 @@ namespace UsurperRemake.Locations
             if (!await terminal.AskYesNoAsync(Loc.Get("church.confess_prompt")))
             {
                 terminal.WriteLine(Loc.Get("church.confess_return"), "gray");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return;
             }
 
@@ -1182,14 +1182,14 @@ namespace UsurperRemake.Locations
             {
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("church.confess_no_gold", penanceCost.ToString("N0"), currentPlayer.Gold.ToString("N0")));
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 return;
             }
 
             // Confession process
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("church.confess_begin"), "white");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
 
             currentPlayer.Gold -= penanceCost;
             currentPlayer.Statistics?.RecordGoldSpent(penanceCost);
@@ -1213,7 +1213,7 @@ namespace UsurperRemake.Locations
             MentalUi.ReportGain(terminal, currentPlayer, mentalBeforeConfession, MentalSystem.TryDailyGain(currentPlayer, MentalDailySource.Confession, GameConfig.MentalConfessionGain));
             GodDeedSystem.Record(currentPlayer, GodAct.Confession, terminal);   // 1.2.0 Temple gods: Shadow taboo
 
-            await Task.Delay(3000);
+            await Pacing.Wait(3000);
 
             // Blood absolution — if the player carries murder weight, the priest detects it
             if (currentPlayer.MurderWeight > 0)
@@ -1221,12 +1221,12 @@ namespace UsurperRemake.Locations
                 terminal.WriteLine("");
                 terminal.SetColor("dark_red");
                 terminal.WriteLine(Loc.Get("church.blood_pauses", priestName));
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine(Loc.Get("church.blood_something_else"));
                 terminal.WriteLine(Loc.Get("church.blood_sense_blood"));
                 terminal.WriteLine("");
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
 
                 long absolveCost = GameConfig.BloodConfessionBaseCost + (long)(currentPlayer.MurderWeight * GameConfig.BloodConfessionCostPerWeight);
                 terminal.SetColor("white");
@@ -1252,7 +1252,7 @@ namespace UsurperRemake.Locations
                         terminal.WriteLine("");
                         terminal.SetColor("bright_white");
                         terminal.WriteLine(Loc.Get("church.blood_hands", priestName));
-                        await Task.Delay(1500);
+                        await Pacing.Wait(1500);
                         terminal.SetColor("bright_cyan");
                         terminal.WriteLine(Loc.Get("church.blood_shared"));
                         terminal.WriteLine("");
@@ -1272,7 +1272,7 @@ namespace UsurperRemake.Locations
                     terminal.SetColor("gray");
                     terminal.WriteLine(Loc.Get("church.blood_remains"));
                 }
-                await Task.Delay(2500);
+                await Pacing.Wait(2500);
             }
         }
         
