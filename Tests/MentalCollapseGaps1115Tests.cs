@@ -195,7 +195,7 @@ public class MentalCollapseGaps1115Tests
         gate.Should().BeLessThan(At(fight, "bool isGodMode"));
         At(fight, "MentalCollapsePending = true,").Should().BeGreaterThan(gate);
         At(fight, "result.MentalCollapsePending = MentalSystem.CollapseDue(player);")
-            .Should().BeGreaterThan(At(fight, "ApplyMentalFightEnd(result, mentalFloor, globalEscape, BossContext != null, terminal, mentalAtFightStart);"));
+            .Should().BeGreaterThan(At(fight, "ApplyMentalFightEnd(result, mentalFloor, fledThisFight, BossContext != null, terminal, mentalAtFightStart);"));
     }
 
     [Fact]
