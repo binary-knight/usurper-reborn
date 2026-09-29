@@ -76,7 +76,7 @@ namespace UsurperRemake.Data
             foreach (var line in riddle.LocText())
             {
                 terminal.WriteLine($"  \"{line}\"", "bright_cyan");
-                await Task.Delay(100);
+                await Pacing.Wait(100);
             }
 
             terminal.WriteLine("");
@@ -247,7 +247,7 @@ namespace UsurperRemake.Data
                 player.HP = Math.Max(1, player.HP - damage);
                 terminal.WriteLine(Loc.Get("riddle.flee_damage", damage), "red");
             }
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
         }
 
         #region Riddle Initialization

@@ -180,34 +180,34 @@ namespace UsurperRemake.Systems
 
             // The god remembers the player's promise
             terminal.WriteLine("");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             terminal.SetColor("bright_magenta");
             terminal.WriteLine($"{godName} appears before you again.");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             terminal.WriteLine("");
             terminal.SetColor("bright_cyan");
             terminal.WriteLine(Loc.Get("old_god.save_came_back"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             terminal.WriteLine(Loc.Get("old_god.save_brought_it"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             terminal.WriteLine("");
 
             terminal.SetColor("bright_white");
             terminal.WriteLine(Loc.Get("old_god.save_artifact_works"));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             terminal.SetColor("bright_magenta");
             terminal.WriteLine(Loc.Get("old_god.save_corruption_peels"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             terminal.WriteLine(Loc.Get("old_god.save_something_clean"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             terminal.WriteLine("");
 
             terminal.SetColor("bright_cyan");
             terminal.WriteLine(Loc.Get("old_god.save_staggers", godName));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             terminal.SetColor("bright_yellow");
             terminal.WriteLine(Loc.Get("old_god.save_i_remember"));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             terminal.WriteLine("");
 
             terminal.SetColor("bright_white");
@@ -334,7 +334,7 @@ namespace UsurperRemake.Systems
                 {
                     terminal.WriteLine("");
                     PrintDialogueLine(terminal, echoLine, boss.ThemeColor);
-                    await Task.Delay(2000);
+                    await Pacing.Wait(2000);
                 }
 
                 // Run dialogue
@@ -373,7 +373,7 @@ namespace UsurperRemake.Systems
                     terminal.WriteLine($"\"{(type == OldGodType.Maelketh ? Loc.Get("old_god.maelketh_silence_rage") : Loc.Get("old_god.god_have_it_your_way"))}\"", boss.ThemeColor);
                     terminal.WriteLine("");
                     terminal.WriteLine(Loc.Get("old_god.god_attacks"), "bright_red");
-                    await Task.Delay(2000);
+                    await Pacing.Wait(2000);
                 }
 
                 var combatResult = await RunBossCombat(player, boss, terminal);
@@ -395,13 +395,13 @@ namespace UsurperRemake.Systems
 
             // Build dramatic entrance
             terminal.WriteLine(Loc.Get("old_god.ground_trembles"), "red");
-            await Task.Delay(800);
+            await Pacing.Wait(800);
 
             terminal.WriteLine(Loc.Get("old_god.ancient_power_stirs"), "bright_red");
-            await Task.Delay(800);
+            await Pacing.Wait(800);
 
             terminal.WriteLine(Loc.Get("old_god.seal_shatters", boss.Name), "bright_magenta");
-            await Task.Delay(1200);
+            await Pacing.Wait(1200);
 
             terminal.WriteLine("");
             if (!GameConfig.ScreenReaderMode)
@@ -430,7 +430,7 @@ namespace UsurperRemake.Systems
                 }
             }
 
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
 
             // Show boss stats
             terminal.WriteLine($"  {Loc.Get("ui.level")}: {boss.Level}", "gray");
@@ -537,22 +537,22 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine(Loc.Get("old_god.mira_steps_forward"), "white");
                 terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("old_god.mira_veloura"), "bright_cyan");
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("old_god.mira_prayed"), "bright_cyan");
                 terminal.WriteLine(Loc.Get("old_god.mira_believed"), "bright_cyan");
-                await Task.Delay(2500);
+                await Pacing.Wait(2500);
                 terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("old_god.mira_temple_burned"), "bright_cyan");
                 terminal.WriteLine(Loc.Get("old_god.mira_sister_aldara"), "bright_cyan");
                 terminal.WriteLine(Loc.Get("old_god.mira_corruption"), "bright_cyan");
-                await Task.Delay(3000);
+                await Pacing.Wait(3000);
                 terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("old_god.mira_turns_to_you"), "white");
                 terminal.WriteLine(Loc.Get("old_god.mira_follow_you"), "bright_cyan");
                 terminal.WriteLine(Loc.Get("old_god.mira_not_always_this"), "bright_cyan");
                 terminal.WriteLine("");
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
             }
         }
 
@@ -818,7 +818,7 @@ namespace UsurperRemake.Systems
             // Apply combat modifiers based on dialogue choices
             ApplyDialogueModifiers(boss.Type, terminal);
             terminal.WriteLine("");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             // Create a Monster from boss data
             var bossMonster = CreateBossMonster(boss);
@@ -826,7 +826,7 @@ namespace UsurperRemake.Systems
             // Apply dialogue-based stat adjustments to the monster
             ApplyModifiersToMonster(bossMonster, player);
             if (AnnounceFightHP(bossMonster, boss, terminal))
-                await Task.Delay(1500);   // the fight clears the screen as it starts
+                await Pacing.Wait(1500);   // the fight clears the screen as it starts
 
             // v1.1.10: the player's dialogue bonuses are applied by the combat engine after its
             // fight-start reset (BossCombatContext.ApplyPlayerModifiers). Applied here, before the
@@ -1150,7 +1150,7 @@ namespace UsurperRemake.Systems
             UIHelper.WriteBoxHeader(terminal, Loc.Get("old_god.header_saved", boss.Name.ToUpper()), "bright_green", 63);
             terminal.WriteLine("");
 
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             terminal.WriteLine(Loc.Get("old_god.saved_darkness_lifts", boss.Name), "white");
             terminal.WriteLine($"  {Loc.Get("old_god.saved_seeing_world")}", "white");
@@ -1159,7 +1159,7 @@ namespace UsurperRemake.Systems
             foreach (var line in boss.LocSave())
             {
                 PrintDialogueLine(terminal, line,"bright_cyan");
-                await Task.Delay(300);
+                await Pacing.Wait(300);
             }
 
             terminal.WriteLine("");
@@ -1235,12 +1235,12 @@ namespace UsurperRemake.Systems
             UIHelper.WriteBoxHeader(terminal, Loc.Get("old_god.header_defeated", boss.Name.ToUpper()), "bright_yellow", 63);
             terminal.WriteLine("");
 
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             foreach (var line in boss.LocDefeat())
             {
                 PrintDialogueLine(terminal, line,boss.ThemeColor);
-                await Task.Delay(1500); // Give players time to read each line
+                await Pacing.Wait(1500); // Give players time to read each line
             }
 
             terminal.WriteLine("");
@@ -1255,7 +1255,7 @@ namespace UsurperRemake.Systems
             {
                 terminal.WriteLine(echoFall, "bright_yellow");
                 terminal.WriteLine("");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
             }
 
             // Update story state
@@ -1389,7 +1389,7 @@ namespace UsurperRemake.Systems
                 if (string.IsNullOrEmpty(line)) { terminal.WriteLine(""); continue; }
                 terminal.SetColor(line.StartsWith("NOCTURA:") ? "dark_magenta" : "gray");
                 terminal.WriteLine($"  {line}");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
             }
 
             await terminal.PressAnyKey();
@@ -1403,7 +1403,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine($"\n  Shadow energy courses through you, restoring {healAmount} HP...");
                 terminal.SetColor("gray");
                 terminal.WriteLine("  NOCTURA: \"I want you at your best. It's no fun otherwise.\"");
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
             }
 
             // v1.1.10: built by CreateBossMonster itself. It used to repeat that method's arithmetic
@@ -1452,7 +1452,7 @@ namespace UsurperRemake.Systems
                     if (string.IsNullOrEmpty(line)) { terminal.WriteLine(""); continue; }
                     terminal.SetColor(line.StartsWith("NOCTURA:") ? "dark_magenta" : "white");
                     terminal.WriteLine($"  {line}");
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                 }
 
                 // Rewards
@@ -1482,7 +1482,7 @@ namespace UsurperRemake.Systems
                     if (string.IsNullOrEmpty(line)) { terminal.WriteLine(""); continue; }
                     terminal.SetColor(line.StartsWith("NOCTURA:") ? "dark_magenta" : "gray");
                     terminal.WriteLine($"  {line}");
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                 }
 
                 player.HP = Math.Max(1, player.HP);
@@ -1503,7 +1503,7 @@ namespace UsurperRemake.Systems
             UIHelper.WriteBoxHeader(terminal, Loc.Get("old_god.header_defeat"), "dark_red", 63);
             terminal.WriteLine("");
 
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             terminal.WriteLine(Loc.Get("old_god.defeat_hit_ground", boss.Name), "red");
             terminal.WriteLine("");
@@ -1511,7 +1511,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine(Loc.Get("old_god.defeat_not_good_enough"), boss.ThemeColor);
             terminal.WriteLine("");
 
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
 
             // v0.61.0 hotfix (issue #106): if CombatEngine.HandlePlayerDeath already ran
             // permadeath in this same fight (player was out of resurrections and got

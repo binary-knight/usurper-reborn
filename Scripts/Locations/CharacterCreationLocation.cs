@@ -220,11 +220,11 @@ public class CharacterCreationLocation : BaseLocation
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("creation.step_through_portal"), "cyan");
         terminal.WriteLine("");
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         terminal.WriteLine(Loc.Get("creation.main_street_greets"), "green");
         terminal.WriteLine(Loc.Get("creation.adventure_begins_now"), "bright_green");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
         
         // Exit to main street location
         await locationManager.ChangeLocation(player, GameLocation.MainStreet);
@@ -237,7 +237,7 @@ public class CharacterCreationLocation : BaseLocation
     {
         terminal.Clear();
         terminal.WriteLine(Loc.Get("creation.returning_menu"), "cyan");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         // This would typically return to the main game menu
         // For now, we'll just clear and show a message

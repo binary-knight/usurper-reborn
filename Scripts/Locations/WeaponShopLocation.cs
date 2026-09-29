@@ -665,7 +665,7 @@ public class WeaponShopLocation : BaseLocation
 
             default:
                 terminal.WriteLine(Loc.Get("weapon_shop.invalid_choice"), "red");
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
                 return false;
         }
     }
@@ -721,7 +721,7 @@ public class WeaponShopLocation : BaseLocation
         if (actualIndex < 0 || actualIndex >= items.Count)
         {
             terminal.WriteLine(Loc.Get("weapon_shop.invalid_item"), "red");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
@@ -1245,7 +1245,7 @@ public class WeaponShopLocation : BaseLocation
         terminal.WriteLine("");
         terminal.SetColor("bright_magenta");
         terminal.WriteLine(Loc.Get("weapon_shop.reforge_working", shopkeeperName));
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         if (rarityUpgraded)
         {

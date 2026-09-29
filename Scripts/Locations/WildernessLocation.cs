@@ -165,7 +165,7 @@ public class WildernessLocation : BaseLocation
             case "R":
             case "Q":
                 terminal.WriteLine(Loc.Get("wilderness.return_city"), "gray");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 throw new LocationExitException(GameLocation.MainStreet);
 
             default:
@@ -185,7 +185,7 @@ public class WildernessLocation : BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("wilderness.region_too_dangerous", WildernessData.GetRegionName(region), region.MinLevel));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -194,7 +194,7 @@ public class WildernessLocation : BaseLocation
         {
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("wilderness.too_tired"));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -226,7 +226,7 @@ public class WildernessLocation : BaseLocation
         int mentalBeforeTrip = currentPlayer.Mental;
         MentalUi.ReportGain(terminal, currentPlayer, mentalBeforeTrip, MentalSystem.ApplyWilderness(currentPlayer));
         GodDeedSystem.Record(currentPlayer, GodAct.WildernessExplored, terminal);   // 1.2.0 Temple gods: Nature deed
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         // Roll encounter type: 40% combat, 25% foraging, 15% ruins, 10% traveler, 10% shrine
         int roll = Random.Shared.Next(100);
@@ -314,7 +314,7 @@ public class WildernessLocation : BaseLocation
             terminal.WriteLine(Loc.Get("wilderness.beast_attempt_header", attempt, UsurperRemake.Data.BeastData.TameAttempts));
             terminal.SetColor("dark_gray");
             terminal.WriteLine(Loc.Get("wilderness.beast_attempt_calc", chaBonus, dexBonus, beast.TameDifficulty));
-            await Task.Delay(1200);
+            await Pacing.Wait(1200);
 
             int roll = Random.Shared.Next(1, 21); // d20
             int total = roll + chaBonus + dexBonus;
@@ -375,7 +375,7 @@ public class WildernessLocation : BaseLocation
         // v0.62.1 article fix: "An Owl-Bear" / "An Elemental" instead of "A".
         terminal.WriteLine(Loc.Get("wilderness.monster_emerges", GameConfig.ArticulateForLanguage(monsterName), WildernessData.GetRegionName(region).ToLower()));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         // Generate monster scaled to player level (capped by region difficulty)
         int monsterLevel = Math.Max(region.MinLevel, currentPlayer.Level - 2 + Random.Shared.Next(5));
@@ -455,7 +455,7 @@ public class WildernessLocation : BaseLocation
         terminal.SetColor("green");
         terminal.WriteLine(Loc.Get("wilderness.search_area"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("white");
         terminal.WriteLine(WildernessData.GetForagingText(region, fi));
@@ -614,7 +614,7 @@ public class WildernessLocation : BaseLocation
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("wilderness.discover_ruins"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("white");
         terminal.WriteLine(WildernessData.GetRuinsEncounter(region, ri));
@@ -741,7 +741,7 @@ public class WildernessLocation : BaseLocation
         terminal.WriteLine(Loc.Get("wilderness.shrine_discover"));
         terminal.WriteLine(Loc.Get("wilderness.shrine_symbols"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("bright_yellow");
         terminal.WriteLine(Loc.Get("wilderness.shrine_pray_or_leave"));
@@ -837,7 +837,7 @@ public class WildernessLocation : BaseLocation
 
         NewsSystem.Instance?.Newsy($"☆ {currentPlayer.Name} discovered {discovery.Name} in the {region.Name}!");
 
-        await Task.Delay(3000);
+        await Pacing.Wait(3000);
     }
 
     /// <summary>
@@ -1017,7 +1017,7 @@ public class WildernessLocation : BaseLocation
                 break;
         }
         currentPlayer.RecalculateStats();
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
 
     private async Task ShowDiscoveries()
@@ -1071,7 +1071,7 @@ public class WildernessLocation : BaseLocation
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine(Loc.Get("wilderness.revisits_exhausted"));
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 return;
             }
 
@@ -1086,7 +1086,7 @@ public class WildernessLocation : BaseLocation
             terminal.SetColor("gray");
             terminal.WriteLine(discovery.Description);
             terminal.WriteLine("");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             // Run encounter based on discovery type
             switch (discovery.EncounterType)

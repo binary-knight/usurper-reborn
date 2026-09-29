@@ -347,7 +347,7 @@ public class MarketplaceLocation : BaseLocation
         if (listings.Count == 0)
         {
             terminal.WriteLine(Loc.Get("marketplace.nothing_available"), "yellow");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -357,7 +357,7 @@ public class MarketplaceLocation : BaseLocation
         if (!int.TryParse(input, out int choice) || choice < 1 || choice > listings.Count)
         {
             terminal.WriteLine(Loc.Get("ui.invalid_selection"), "red");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -367,14 +367,14 @@ public class MarketplaceLocation : BaseLocation
         if (listing.Seller == currentPlayer.DisplayName && !listing.IsNPCSeller)
         {
             terminal.WriteLine(Loc.Get("marketplace.cant_buy_own"), "red");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
         if (currentPlayer.Gold < listing.Price)
         {
             terminal.WriteLine(Loc.Get("marketplace.cant_afford"), "red");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -383,7 +383,7 @@ public class MarketplaceLocation : BaseLocation
         if (actualIndex < 0)
         {
             terminal.WriteLine(Loc.Get("marketplace.no_longer_available"), "red");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -410,7 +410,7 @@ public class MarketplaceLocation : BaseLocation
             terminal.WriteLine(Loc.Get("marketplace.transaction_failed"), "red");
         }
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
 
     private async Task ListItem()
@@ -420,7 +420,7 @@ public class MarketplaceLocation : BaseLocation
         if (sellable.Count == 0)
         {
             terminal.WriteLine(Loc.Get("marketplace.nothing_to_sell"), "yellow");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -437,7 +437,7 @@ public class MarketplaceLocation : BaseLocation
         if (!int.TryParse(input, out int choice) || choice < 1 || choice > sellable.Count)
         {
             terminal.WriteLine(Loc.Get("ui.invalid_selection"), "red");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -456,7 +456,7 @@ public class MarketplaceLocation : BaseLocation
         else if (!long.TryParse(priceInput, out price) || price < 0)
         {
             terminal.WriteLine(Loc.Get("marketplace.invalid_price"), "red");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -464,7 +464,7 @@ public class MarketplaceLocation : BaseLocation
         MarketplaceSystem.Instance.ListItem(currentPlayer.DisplayName, item.Clone(), price);
         currentPlayer.Inventory.Remove(item);
         terminal.WriteLine(Loc.Get("marketplace.item_listed"), "bright_green");
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
 
     private new async Task ShowStatus()

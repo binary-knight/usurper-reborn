@@ -974,10 +974,10 @@ public class MusicShopLocation : BaseLocation
         terminal.WriteLine("");
         terminal.SetColor("gray");
         terminal.WriteLine(introText);
-        await Task.Delay(600);
+        await Pacing.Wait(600);
         terminal.SetColor("bright_cyan");
         terminal.WriteLine($"\n  \"{LocOr($"{keyPre}.title", song.Title)}\"");
-        await Task.Delay(400);
+        await Pacing.Wait(400);
         terminal.WriteLine("");
 
         // Sing the verses with atmospheric pacing
@@ -988,20 +988,20 @@ public class MusicShopLocation : BaseLocation
             if (string.IsNullOrEmpty(verse))
             {
                 terminal.WriteLine("");
-                await Task.Delay(300);
+                await Pacing.Wait(300);
             }
             else
             {
                 terminal.WriteLine($"  {LocOr($"{keyPre}.verse.{vi}", verse)}");
-                await Task.Delay(350);
+                await Pacing.Wait(350);
             }
         }
 
-        await Task.Delay(400);
+        await Pacing.Wait(400);
         terminal.SetColor("gray");
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("music_shop.notes_fade"));
-        await Task.Delay(300);
+        await Pacing.Wait(300);
         terminal.SetColor("bright_green");
         terminal.WriteLine(Loc.Get("music_shop.buff_gained", songName, (int)(value1 * 100), GameConfig.SongBuffDuration, songEffect));
         await terminal.PressAnyKey();
@@ -1038,13 +1038,13 @@ public class MusicShopLocation : BaseLocation
             terminal.SetColor("white");
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("music_shop.recruit_curious_smile"));
-            await Task.Delay(300);
+            await Pacing.Wait(300);
             terminal.SetColor("cyan");
             if (currentPlayer.Level < 5)
             {
                 terminal.WriteLine(Loc.Get("music_shop.recruit_new1"));
                 terminal.WriteLine(Loc.Get("music_shop.recruit_new2"));
-                await Task.Delay(300);
+                await Pacing.Wait(300);
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("music_shop.recruit_new3"));
                 terminal.SetColor("cyan");
@@ -1055,7 +1055,7 @@ public class MusicShopLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("music_shop.recruit_mid1"));
                 terminal.WriteLine(Loc.Get("music_shop.recruit_mid2"));
                 terminal.WriteLine(Loc.Get("music_shop.recruit_mid3"));
-                await Task.Delay(300);
+                await Pacing.Wait(300);
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("music_shop.recruit_mid4"));
                 terminal.SetColor("cyan");
@@ -1066,12 +1066,12 @@ public class MusicShopLocation : BaseLocation
             {
                 terminal.WriteLine(Loc.Get("music_shop.recruit_high1"));
                 terminal.WriteLine(Loc.Get("music_shop.recruit_high2"));
-                await Task.Delay(300);
+                await Pacing.Wait(300);
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("music_shop.recruit_high3"));
                 terminal.SetColor("cyan");
                 terminal.WriteLine(Loc.Get("music_shop.recruit_high4"));
-                await Task.Delay(300);
+                await Pacing.Wait(300);
                 terminal.WriteLine(Loc.Get("music_shop.recruit_high5"));
             }
             await terminal.PressAnyKey();
@@ -1081,25 +1081,25 @@ public class MusicShopLocation : BaseLocation
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("music_shop.recruit_ready1"));
-        await Task.Delay(500);
+        await Pacing.Wait(500);
 
         terminal.SetColor("cyan");
         terminal.WriteLine($"\n{Loc.Get("music_shop.recruit_ready2")}");
-        await Task.Delay(300);
+        await Pacing.Wait(300);
         terminal.WriteLine(Loc.Get("music_shop.recruit_ready3"));
-        await Task.Delay(500);
+        await Pacing.Wait(500);
         terminal.WriteLine($"\n{Loc.Get("music_shop.recruit_ready4")}");
-        await Task.Delay(300);
+        await Pacing.Wait(300);
         terminal.WriteLine(Loc.Get("music_shop.recruit_ready5"));
-        await Task.Delay(300);
+        await Pacing.Wait(300);
         terminal.WriteLine(Loc.Get("music_shop.recruit_ready6"));
-        await Task.Delay(500);
+        await Pacing.Wait(500);
 
         terminal.SetColor("bright_yellow");
         terminal.WriteLine($"\n{Loc.Get("music_shop.recruit_ready7")}");
         terminal.WriteLine(Loc.Get("music_shop.recruit_ready8"));
         terminal.WriteLine(Loc.Get("music_shop.recruit_ready9"));
-        await Task.Delay(300);
+        await Pacing.Wait(300);
 
         terminal.SetColor("gray");
         terminal.WriteLine($"\n{Loc.Get("music_shop.recruit_ready10")}");
@@ -1108,7 +1108,7 @@ public class MusicShopLocation : BaseLocation
         terminal.WriteLine(Loc.Get("music_shop.recruit_ready12"));
         terminal.SetColor("gray");
         terminal.WriteLine(Loc.Get("music_shop.recruit_ready13"));
-        await Task.Delay(300);
+        await Pacing.Wait(300);
 
         terminal.SetColor("white");
         terminal.WriteLine($"\n{Loc.Get("music_shop.recruit_join_prompt")}");
@@ -1240,7 +1240,7 @@ public class MusicShopLocation : BaseLocation
         {
             terminal.SetColor(color);
             terminal.WriteLine($"  {LocOr($"{lkey}.verse.{vi}", verses[vi])}");
-            await Task.Delay(600);
+            await Pacing.Wait(600);
         }
 
         terminal.SetColor("gray");

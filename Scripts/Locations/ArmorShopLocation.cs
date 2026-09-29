@@ -584,7 +584,7 @@ public class ArmorShopLocation : BaseLocation
                 }
 
                 terminal.WriteLine(Loc.Get("ui.invalid_selection"), "red");
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
                 return false;
         }
     }
@@ -639,7 +639,7 @@ public class ArmorShopLocation : BaseLocation
         if (actualIndex < 0 || actualIndex >= items.Count)
         {
             terminal.WriteLine(Loc.Get("ui.invalid_selection"), "red");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 

@@ -315,7 +315,7 @@ public class SettlementLocation : BaseLocation
             case "R":
             case "Q":
                 terminal.WriteLine(Loc.Get("settlement.return_to_main"), "gray");
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
                 throw new LocationExitException(GameLocation.MainStreet);
 
             default:

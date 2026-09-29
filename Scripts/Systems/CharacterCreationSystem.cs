@@ -197,7 +197,7 @@ public class CharacterCreationSystem
                 terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("creation.created"), "green");
                 terminal.WriteLine(Loc.Get("creation.entering"), "cyan");
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 return character;
             }
 
@@ -266,7 +266,7 @@ public class CharacterCreationSystem
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("creation.created"), "green");
             terminal.WriteLine(Loc.Get("creation.entering"), "cyan");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             
             return character;
         }
@@ -771,19 +771,19 @@ public class CharacterCreationSystem
                 case "E":
                     terminal.WriteLine("");
                     terminal.WriteLine(Loc.Get("creation.difficulty.easy_selected"), DifficultySystem.GetColor(DifficultyMode.Easy));
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                     return DifficultyMode.Easy;
 
                 case "N":
                     terminal.WriteLine("");
                     terminal.WriteLine(Loc.Get("creation.difficulty.normal_selected"), DifficultySystem.GetColor(DifficultyMode.Normal));
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                     return DifficultyMode.Normal;
 
                 case "H":
                     terminal.WriteLine("");
                     terminal.WriteLine(Loc.Get("creation.difficulty.hard_selected"), DifficultySystem.GetColor(DifficultyMode.Hard));
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                     return DifficultyMode.Hard;
 
                 case "!":
@@ -802,7 +802,7 @@ public class CharacterCreationSystem
                     if (await terminal.AskYesNoAsync(Loc.Get("creation.difficulty.nightmare_confirm"), enterDefault: false))
                     {
                         terminal.WriteLine(Loc.Get("creation.difficulty.nightmare_sealed"), "bright_red");
-                        await Task.Delay(1500);
+                        await Pacing.Wait(1500);
                         return DifficultyMode.Nightmare;
                     }
                     terminal.WriteLine(Loc.Get("creation.difficulty.nightmare_wise"), "yellow");
@@ -2286,7 +2286,7 @@ public class CharacterCreationSystem
                     {
                         terminal.WriteLine(GameConfig.RaceRestrictionReasons[race], "yellow");
                     }
-                    await Task.Delay(2000);
+                    await Pacing.Wait(2000);
                     choice = "?";
                     continue;
                 }
@@ -2568,7 +2568,7 @@ public class CharacterCreationSystem
                 {
                     terminal.WriteLine("");
                     terminal.WriteLine(Loc.Get("character_creation.stats_accepted"), "bright_green");
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                     break;
                 }
                 else if (choice.ToUpper() == "R")
@@ -2578,13 +2578,13 @@ public class CharacterCreationSystem
                     {
                         terminal.WriteLine("");
                         terminal.WriteLine(Loc.Get("character_creation.final_roll"), "bright_red");
-                        await Task.Delay(1500);
+                        await Pacing.Wait(1500);
                     }
                     else
                     {
                         terminal.WriteLine("");
                         terminal.WriteLine(Loc.Get("character_creation.rerolling"), "cyan");
-                        await Task.Delay(800);
+                        await Pacing.Wait(800);
                     }
                     shouldRoll = true; // legitimate reroll consumes a counter
                     continue;
@@ -2592,7 +2592,7 @@ public class CharacterCreationSystem
                 else
                 {
                     terminal.WriteLine(Loc.Get("character_creation.choose_accept_reroll"), "red");
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                     // shouldRoll stays false — invalid input does not reroll
                     continue;
                 }

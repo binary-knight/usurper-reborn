@@ -1340,11 +1340,11 @@ namespace UsurperRemake.Systems
         private async Task DisplayDeathScene(Companion companion, DeathType type, string circumstance, TerminalEmulator terminal)
         {
             terminal.Clear();
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             // Slow, solemn header
             terminal.WriteLine("");
-            await Task.Delay(500);
+            await Pacing.Wait(500);
             if (GameConfig.ScreenReaderMode)
             {
                 terminal.WriteLine(Loc.Get("companion.fallen_header"), "dark_red");
@@ -1359,19 +1359,19 @@ namespace UsurperRemake.Systems
             }
             terminal.WriteLine("");
 
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
 
             terminal.WriteLine($"  {companion.Name}", "bright_white");
             terminal.WriteLine($"  \"{companion.Title}\"", "cyan");
             terminal.WriteLine("");
 
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             // The circumstance of death
             terminal.WriteLine($"  {circumstance}", "white");
             terminal.WriteLine("");
 
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             // Their final words
             string lastWords = GetLastWords(companion, type);
@@ -1379,21 +1379,21 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  \"{lastWords}\"");
             terminal.WriteLine("");
 
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
 
             // The moment of passing
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("companion.goes_still", companion.Name));
-            await Task.Delay(1200);
+            await Pacing.Wait(1200);
             terminal.WriteLine(Loc.Get("companion.gone"));
             terminal.WriteLine("");
 
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
 
             // Philosophical moment based on companion and death type
             await DisplayDeathPhilosophy(companion, type, terminal);
 
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             // Final message
             terminal.SetColor("gray");
@@ -1401,7 +1401,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine(Loc.Get("companion.no_coming_back"));
             terminal.WriteLine("");
 
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             // Memory persists - varied by companion
             terminal.SetColor("bright_cyan");
@@ -1435,12 +1435,12 @@ namespace UsurperRemake.Systems
                     terminal.WriteLine("  She knew things she shouldnt have known.");
                     terminal.WriteLine("  About you. About the gods. About all of it.");
                     terminal.WriteLine("");
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                     terminal.SetColor("cyan");
                     terminal.WriteLine("  You never found out how much she really knew.");
                     terminal.WriteLine("  Now you never will.");
                     terminal.WriteLine("");
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                     terminal.SetColor("bright_white");
                     terminal.WriteLine("  Funny how much you miss someone");
                     terminal.WriteLine("  who never told you the whole truth.");
@@ -1450,13 +1450,13 @@ namespace UsurperRemake.Systems
                     terminal.SetColor("bright_yellow");
                     terminal.WriteLine("  He lost his whole unit once. Every single one of them.");
                     terminal.WriteLine("  Carried that around for years.");
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                     terminal.SetColor("white");
                     terminal.WriteLine("");
                     terminal.WriteLine("  This time he didnt lose anyone.");
                     terminal.WriteLine("  Just himself.");
                     terminal.WriteLine("");
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                     terminal.SetColor("bright_green");
                     terminal.WriteLine("  Maybe thats what he wanted all along.");
                     terminal.WriteLine("  One fight where he didnt have to watch someone else die.");
@@ -1467,12 +1467,12 @@ namespace UsurperRemake.Systems
                     terminal.WriteLine("  She lost her faith when the temple fell.");
                     terminal.WriteLine("  Kept healing people anyway. Said she didnt know why.");
                     terminal.WriteLine("");
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                     terminal.SetColor("white");
                     terminal.WriteLine("  Maybe she did know why.");
                     terminal.WriteLine("  Maybe she just didnt want to admit it.");
                     terminal.WriteLine("");
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                     terminal.SetColor("bright_cyan");
                     terminal.WriteLine("  She healed you because she cared.");
                     terminal.WriteLine("  Thats it. Thats the whole reason.");
@@ -1484,12 +1484,12 @@ namespace UsurperRemake.Systems
                     terminal.WriteLine("  Never shut up about it either. Made jokes.");
                     terminal.WriteLine("  Drove you crazy sometimes.");
                     terminal.WriteLine("");
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                     terminal.SetColor("white");
                     terminal.WriteLine("  Turns out thats how he dealt with it.");
                     terminal.WriteLine("  If you cant beat it, laugh at it.");
                     terminal.WriteLine("");
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                     terminal.SetColor("cyan");
                     terminal.WriteLine("  The dungeon is quieter now.");
                     terminal.WriteLine("  You keep expecting to hear a bad joke around the next corner.");

@@ -298,7 +298,7 @@ namespace UsurperRemake.Systems
             if (await terminal.AskYesNoAsync(""))
             {
                 player.Gold -= bet;
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
 
                 int playerCard = random.Next(1, 14);
                 int dealerCard = random.Next(1, 14);
@@ -631,11 +631,11 @@ namespace UsurperRemake.Systems
                 case "D":
                     terminal.SetColor("bright_magenta");
                     terminal.WriteLine(Loc.Get("encounter.fairy.dance_join"));
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                     terminal.WriteLine(Loc.Get("encounter.fairy.dance_spin"));
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                     terminal.WriteLine(Loc.Get("encounter.fairy.dance_blur"));
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
 
                     // Weird effects
                     var effect = random.Next(5);
@@ -736,7 +736,7 @@ namespace UsurperRemake.Systems
                     {
                         terminal.SetColor("yellow");
                         terminal.WriteLine(Loc.Get("encounter.damsel.rescue_charge"));
-                        await Task.Delay(1000);
+                        await Pacing.Wait(1000);
 
                         // Auto-win the fight for dramatic effect
                         terminal.SetColor("green");
@@ -766,7 +766,7 @@ namespace UsurperRemake.Systems
                     {
                         terminal.SetColor("gray");
                         terminal.WriteLine(Loc.Get("encounter.damsel.watch_hide"));
-                        await Task.Delay(1500);
+                        await Pacing.Wait(1500);
                         terminal.SetColor("cyan");
                         terminal.WriteLine(Loc.Get("encounter.damsel.watch_kick"));
                         terminal.WriteLine(Loc.Get("encounter.damsel.watch_dispatch"));
@@ -827,7 +827,7 @@ namespace UsurperRemake.Systems
                         terminal.WriteLine(Loc.Get("encounter.damsel.trap_grab"));
                         terminal.WriteLine(Loc.Get("encounter.damsel.trap_grin"));
                         terminal.WriteLine(Loc.Get("encounter.damsel.trap_fool"));
-                        await Task.Delay(1000);
+                        await Pacing.Wait(1000);
 
                         int damage = (int)(player.MaxHP / 3);
                         player.HP -= damage;
@@ -892,7 +892,7 @@ namespace UsurperRemake.Systems
                     {
                         terminal.SetColor("green");
                         terminal.WriteLine(Loc.Get("encounter.damsel.princess_escort_1"));
-                        await Task.Delay(1000);
+                        await Pacing.Wait(1000);
                         terminal.WriteLine(Loc.Get("encounter.damsel.princess_escort_2"));
                         terminal.WriteLine("");
                         terminal.SetColor("bright_yellow");
@@ -962,7 +962,7 @@ namespace UsurperRemake.Systems
                     {
                         terminal.SetColor("yellow");
                         terminal.WriteLine(Loc.Get("encounter.damsel.warrior_join_1"));
-                        await Task.Delay(1000);
+                        await Pacing.Wait(1000);
                         terminal.WriteLine(Loc.Get("encounter.damsel.warrior_join_2"));
                         terminal.WriteLine("");
 
@@ -1014,7 +1014,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine(Loc.Get("encounter.ghost.desc_2"));
             terminal.WriteLine("");
 
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             terminal.SetColor("bright_yellow");
             terminal.WriteLine(Loc.Get("encounter.ghost.greet_1"));
@@ -1023,7 +1023,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine(Loc.Get("encounter.ghost.greet_4"));
             terminal.WriteLine("");
 
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
 
             terminal.SetColor("darkgray");
             terminal.Write("[");
@@ -1199,7 +1199,7 @@ namespace UsurperRemake.Systems
                 int demonRoll = random.Next(1, 7) + random.Next(1, 7) + random.Next(1, 7);
                 int playerRoll = random.Next(1, 7) + random.Next(1, 7) + random.Next(1, 7);
 
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
                 terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("encounter.demons.roll_demons", demonRoll), "red");
                 terminal.WriteLine(Loc.Get("encounter.demons.roll_player", playerRoll), "cyan");
@@ -1331,11 +1331,11 @@ namespace UsurperRemake.Systems
                 case "S":
                     terminal.SetColor("yellow");
                     terminal.WriteLine(Loc.Get("encounter.hermit.sit_1"));
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                     terminal.WriteLine(Loc.Get("encounter.hermit.sit_2"));
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                     terminal.WriteLine(Loc.Get("encounter.hermit.sit_3"));
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                     terminal.SetColor("green");
                     terminal.WriteLine(Loc.Get("encounter.hermit.sit_peace"));
                     player.HP = player.MaxHP;
@@ -1527,7 +1527,7 @@ namespace UsurperRemake.Systems
                         player.Gold -= secretPrice;
                         terminal.SetColor("bright_magenta");
                         terminal.WriteLine(Loc.Get("encounter.merchant.mystery_open"));
-                        await Task.Delay(1500);
+                        await Pacing.Wait(1500);
 
                         var mystery = random.Next(5);
                         switch (mystery)
@@ -1600,7 +1600,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine(Loc.Get("encounter.timewarp.desc_2"));
             terminal.WriteLine("");
 
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
 
             var warp = random.Next(5);
             switch (warp)
@@ -1826,7 +1826,7 @@ namespace UsurperRemake.Systems
                             player.Gold -= 100;
                             terminal.SetColor("cyan");
                             terminal.WriteLine(Loc.Get("encounter.well.throw_coin"));
-                            await Task.Delay(1500);
+                            await Pacing.Wait(1500);
 
                             var wish = random.Next(6);
                             switch (wish)
@@ -1878,7 +1878,7 @@ namespace UsurperRemake.Systems
                         validChoice = true;
                         terminal.SetColor("yellow");
                         terminal.WriteLine(Loc.Get("encounter.well.dive"));
-                        await Task.Delay(1000);
+                        await Pacing.Wait(1000);
 
                         if (random.NextDouble() < 0.4)
                         {
@@ -1954,7 +1954,7 @@ namespace UsurperRemake.Systems
             {
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("encounter.arena.enter_portal"));
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
                 terminal.WriteLine(Loc.Get("encounter.arena.crowd_roars"));
                 terminal.WriteLine("");
 
@@ -1970,7 +1970,7 @@ namespace UsurperRemake.Systems
                     terminal.SetColor("bright_yellow");
                     terminal.WriteLine(Loc.Get("encounter.arena.opponent", champion.Name));
                     terminal.WriteLine("");
-                    await Task.Delay(500);
+                    await Pacing.Wait(500);
 
                     // Save team XP distribution — arena combat runs solo (no teammates),
                     // and HandleVictory resets all teammate XP slots to 0 when fighting alone.
@@ -2338,7 +2338,7 @@ namespace UsurperRemake.Systems
             {
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("encounter.tomb.open_push"));
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
 
                 if (random.NextDouble() < 0.5)
                 {
@@ -2577,7 +2577,7 @@ namespace UsurperRemake.Systems
             {
                 terminal.SetColor("bright_magenta");
                 terminal.WriteLine(Loc.Get("encounter.alchemy.drink_gulp"));
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
 
                 var effect = random.Next(5);
                 switch (effect)

@@ -259,7 +259,7 @@ namespace UsurperRemake.Systems
             // personality, abstracted flirt receptiveness) is now surfaced
             // through the Level Master's Crystal Ball scry instead, gated
             // behind a small in-game cost so it feels earned.
-            await Task.Delay(100);
+            await Pacing.Wait(100);
         }
 
         /// <summary>
@@ -357,7 +357,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  \"{greeting}\"");
             terminal.WriteLine("");
 
-            await Task.Delay(500);
+            await Pacing.Wait(500);
         }
         /// <summary>
         /// 1.2.0 Temple gods piece 6: on the first talk of the game day with this NPC, a shared god
@@ -511,7 +511,7 @@ namespace UsurperRemake.Systems
                 terminal.SetColor("gray");
                 terminal.WriteLine($"  {Loc.Get("dialogue.not_understood")}");
             }
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return true;
         }
 
@@ -1199,7 +1199,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  {Loc.Get("dialogue.narr_considers", npc.Name2)}");
             terminal.WriteLine("");
 
-            await Task.Delay(500);
+            await Pacing.Wait(500);
 
             // Phase 1.5 dialogue enhancer: layer contextual flavor on the NPC's
             // topic reply. Language-gated inside Enhance().
@@ -1210,7 +1210,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  \"{response}\"");
 
             // Emotional reaction based on sociability and topic relevance
-            await Task.Delay(300);
+            await Pacing.Wait(300);
 
             if (sociability > 0.7f)
             {
@@ -1377,7 +1377,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  {Loc.Get("dialogue.narr_ask_personal", npc.Name2)}");
             terminal.WriteLine("");
 
-            await Task.Delay(500);
+            await Pacing.Wait(500);
 
             var profile = npc.Brain?.Personality;
 
@@ -1459,7 +1459,7 @@ namespace UsurperRemake.Systems
                 else
                     terminal.WriteLine($"  {Loc.Get("dialogue.narr_lean_closer", npc.Name2)}");
                 terminal.WriteLine("");
-                await Task.Delay(500);
+                await Pacing.Wait(500);
 
                 terminal.SetColor("yellow");
                 int loverIdx = random.Next(5) + 1;
@@ -1543,7 +1543,7 @@ namespace UsurperRemake.Systems
 
                 terminal.WriteLine($"  {Loc.Get("dialogue.narr_catch_eye", npc.Name2)}");
                 terminal.WriteLine("");
-                await Task.Delay(500);
+                await Pacing.Wait(500);
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  {Loc.Get("dialogue.narr_stops_you", npc.Name2)}");
                 terminal.SetColor("red");
@@ -1567,7 +1567,7 @@ namespace UsurperRemake.Systems
 
                 terminal.WriteLine($"  {Loc.Get("dialogue.narr_catch_eye", npc.Name2)}");
                 terminal.WriteLine("");
-                await Task.Delay(500);
+                await Pacing.Wait(500);
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  {Loc.Get("dialogue.narr_shakes_head", npc.Name2)}");
                 terminal.SetColor("dark_red");
@@ -1587,7 +1587,7 @@ namespace UsurperRemake.Systems
 
                 terminal.WriteLine($"  {Loc.Get("dialogue.narr_catch_eye_married", npc.Name2)}");
                 terminal.WriteLine("");
-                await Task.Delay(500);
+                await Pacing.Wait(500);
 
                 if (affairResult.Success)
                 {
@@ -1717,7 +1717,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine($"  {Loc.Get("dialogue.narr_make_interest_clear")}");
 
             terminal.WriteLine("");
-            await Task.Delay(500);
+            await Pacing.Wait(500);
 
             float roll = (float)random.NextDouble();
 
@@ -1844,7 +1844,7 @@ namespace UsurperRemake.Systems
             // the same in-character thanks. Cheap-tier (Haiku).
             string templatedReply = Loc.Get("dialogue.compliment_reply");
 
-            await Task.Delay(500);
+            await Pacing.Wait(500);
 
             // Compliments almost always work positively
             terminal.SetColor("yellow");
@@ -1878,7 +1878,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  {Loc.Get("dialogue.narr_confess_speech_2")}");
             terminal.WriteLine("");
 
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             float successChance = isAttracted ? 0.5f + (0.7f - relationLevel / 100f) : 0.1f;
             if (profile != null)
@@ -1994,7 +1994,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  {Loc.Get("dialogue.narr_lean_kiss", npc.Name2)}");
             terminal.WriteLine("");
 
-            await Task.Delay(500);
+            await Pacing.Wait(500);
 
             var romanceType = RomanceTracker.Instance.GetRelationType(npc.ID);
 
@@ -2046,7 +2046,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  {Loc.Get("dialogue.narr_proposition_line")}");
             terminal.WriteLine("");
 
-            await Task.Delay(500);
+            await Pacing.Wait(500);
 
             var romanceType = RomanceTracker.Instance.GetRelationType(npc.ID);
 
@@ -2081,7 +2081,7 @@ namespace UsurperRemake.Systems
                     terminal.SetColor("gray");
                     terminal.WriteLine("");
                     terminal.WriteLine($"  {Loc.Get("dialogue.narr_intimate_aftermath")}");
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                 }
             }
             else
@@ -2128,7 +2128,7 @@ namespace UsurperRemake.Systems
                   $"low ({aggression:F2}). Brush it off with cold disdain, a cutting jest, or weary " +
                   $"contempt. They're beneath your reaction.";
 
-            await Task.Delay(500);
+            await Pacing.Wait(500);
 
             string reply = templatedReply;
 
@@ -2160,12 +2160,12 @@ namespace UsurperRemake.Systems
             terminal!.SetColor("bright_yellow");
             terminal.WriteLine($"  {Loc.Get("dialogue.narr_take_hand", npc.Name2)}");
             terminal.WriteLine("");
-            await Task.Delay(800);
+            await Pacing.Wait(800);
 
             terminal.SetColor("white");
             terminal.WriteLine($"  {Loc.Get("dialogue.narr_tired_sneaking", npc.SpouseName)}");
             terminal.WriteLine("");
-            await Task.Delay(600);
+            await Pacing.Wait(600);
 
             var affair = NPCMarriageRegistry.Instance.GetAffair(npc.ID, player!.ID);
             var profile = npc.Brain?.Personality;
@@ -2236,7 +2236,7 @@ namespace UsurperRemake.Systems
                 else
                     terminal.WriteLine($"  {Loc.Get("dialogue.narr_decision_made")}");
                 terminal.WriteLine("");
-                await Task.Delay(500);
+                await Pacing.Wait(500);
 
                 terminal.SetColor("yellow");
                 if (affair.SpouseSuspicion >= 60)
@@ -2244,7 +2244,7 @@ namespace UsurperRemake.Systems
                 else
                     terminal.WriteLine($"  {Loc.Get("dialogue.affair_squeeze_hand", npc.Name2)}");
                 terminal.WriteLine("");
-                await Task.Delay(800);
+                await Pacing.Wait(800);
 
                 // Offer player a choice - become spouse or just lovers
                 terminal.SetColor("cyan");
@@ -2384,7 +2384,7 @@ namespace UsurperRemake.Systems
             terminal.SetColor("white");
             terminal.WriteLine($"  {Loc.Get("dialogue.narr_take_hands", npc.Name2)}");
             terminal.WriteLine("");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             terminal.SetColor("bright_magenta");
             terminal.WriteLine($"  {Loc.Get("dialogue.narr_proposal_speech_1")}");
@@ -2392,7 +2392,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  {Loc.Get("dialogue.narr_proposal_speech_3", npc.Name2)}");
             terminal.WriteLine("");
 
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             // Calculate acceptance chance based on relationship and personality.
             // returns an unparseable response.
@@ -2445,7 +2445,7 @@ namespace UsurperRemake.Systems
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  {Loc.Get("dialogue.narr_tears_joy", npc.Name2)}");
                 terminal.WriteLine("");
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
 
                 terminal.SetColor("bright_magenta");
                 terminal.WriteLine($"  {Loc.Get("dialogue.propose_arms_around", npc.Name2)}");
@@ -2453,7 +2453,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine($"  \"{Loc.Get("dialogue.propose_yes")}\"");
                 terminal.WriteLine("");
 
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
 
                 // Wedding ceremony
                 await PerformWeddingCeremony(npc);
@@ -2464,7 +2464,7 @@ namespace UsurperRemake.Systems
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  {Loc.Get("dialogue.narr_torn", npc.Name2)}");
                 terminal.WriteLine("");
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
 
                 terminal.SetColor("white");
                 terminal.WriteLine($"  \"{Loc.Get("dialogue.propose_maybe_1")}");
@@ -2479,7 +2479,7 @@ namespace UsurperRemake.Systems
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  {Loc.Get("dialogue.narr_pulls_away", npc.Name2)}");
                 terminal.WriteLine("");
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
 
                 terminal.SetColor("gray");
                 terminal.WriteLine($"  \"{Loc.Get("dialogue.propose_no_1")}");
@@ -2560,7 +2560,7 @@ namespace UsurperRemake.Systems
             terminal!.SetColor("yellow");
             terminal.WriteLine($"  {Loc.Get("dialogue.narr_considers", npc.Name2)}");
             terminal.WriteLine("");
-            await Task.Delay(500);
+            await Pacing.Wait(500);
 
             string ask = templatedAsk;
             terminal.SetColor("white");
@@ -2676,7 +2676,7 @@ namespace UsurperRemake.Systems
             UIHelper.WriteBoxHeader(terminal, Loc.Get("dialogue.wedding_ceremony"), "bright_yellow");
             terminal.WriteLine("");
 
-            await Task.Delay(500);
+            await Pacing.Wait(500);
 
             // Pay for wedding
             player!.Gold -= GameConfig.WeddingCostBase;
@@ -2684,32 +2684,32 @@ namespace UsurperRemake.Systems
             terminal.SetColor("white");
             terminal.WriteLine($"  {Loc.Get("dialogue.narr_rush_temple")}");
             terminal.WriteLine("");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             terminal.SetColor("bright_cyan");
             terminal.WriteLine($"  {Loc.Get("dialogue.narr_priest_rites")}");
             terminal.WriteLine("");
-            await Task.Delay(500);
+            await Pacing.Wait(500);
 
             terminal.SetColor("yellow");
             terminal.WriteLine($"  {Loc.Get("dialogue.narr_dearly_beloved_1")}");
             terminal.WriteLine($"  {Loc.Get("dialogue.narr_dearly_beloved_2", player.Name, npc.Name2)}");
             terminal.WriteLine("");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             terminal.SetColor("white");
             terminal.WriteLine($"  {Loc.Get("dialogue.narr_vow_player", player.Name, npc.Name2)}");
             terminal.SetColor("gray");
             terminal.WriteLine($"  {Loc.Get("dialogue.narr_i_do")}");
             terminal.WriteLine("");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             terminal.SetColor("white");
             terminal.WriteLine($"  {Loc.Get("dialogue.narr_vow_npc", npc.Name2, player.Name)}");
             terminal.SetColor("gray");
             terminal.WriteLine($"  {Loc.Get("dialogue.narr_npc_i_do", npc.Name2)}");
             terminal.WriteLine("");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             // Random ceremony message
             var ceremonyMessages = GameConfig.GetWeddingCeremonyMessages();
@@ -2718,7 +2718,7 @@ namespace UsurperRemake.Systems
             terminal.SetColor("yellow");
             terminal.WriteLine($"  {ceremonyMessage}");
             terminal.WriteLine("");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             terminal.SetColor("bright_magenta");
             if (!GameConfig.ScreenReaderMode)
@@ -2726,7 +2726,7 @@ namespace UsurperRemake.Systems
             else
                 terminal.WriteLine($"  {Loc.Get("dialogue.narr_kiss_spouse_sr")}");
             terminal.WriteLine("");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             // Update relationship to married
             RelationshipSystem.UpdateRelationship(player, npc, 1, 10, true, true);
@@ -2823,7 +2823,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  {npc.Name2}: {prefix}\"{spoken}\"");
             terminal.WriteLine("");
 
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
         }
 
         /// <summary>

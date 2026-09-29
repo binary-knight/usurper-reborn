@@ -323,7 +323,7 @@ public class DormitoryLocation : BaseLocation
         if (sleepers.Count == 0)
         {
             terminal.WriteLine(Loc.Get("dormitory.nobody_examine"), "gray");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
         var input = await terminal.GetInput(Loc.Get("dormitory.enter_sleeper"));
@@ -336,7 +336,7 @@ public class DormitoryLocation : BaseLocation
         if (npc == null)
         {
             terminal.WriteLine(Loc.Get("dormitory.no_such_sleeper"), "red");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -370,7 +370,7 @@ public class DormitoryLocation : BaseLocation
         terminal.ClearScreen();
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("dormitory.claim_bunk"));
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         currentPlayer.OnRest();   // 1.2.0: a rest ends the rest buffs
         currentPlayer.HP = currentPlayer.MaxHP;
@@ -415,14 +415,14 @@ public class DormitoryLocation : BaseLocation
         {
             terminal.WriteLine(Loc.Get("dormitory.cant_afford"), "red");
             terminal.WriteLine(Loc.Get("dormitory.checked_gold", currentPlayer.Gold.ToString("N0"), currentPlayer.BankGold.ToString("N0")), "gray");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
         terminal.ClearScreen();
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("dormitory.claim_thin_blanket"));
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         // Restore HP/Mana/Stamina
         currentPlayer.OnRest();   // 1.2.0: a rest ends the rest buffs
@@ -449,7 +449,7 @@ public class DormitoryLocation : BaseLocation
         terminal.WriteLine(Loc.Get("dormitory.drift_uneasy"));
         terminal.SetColor("red");
         terminal.WriteLine(Loc.Get("dormitory.slit_throat"));
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         throw new LocationExitException(GameLocation.NoWhere);
     }
@@ -460,7 +460,7 @@ public class DormitoryLocation : BaseLocation
         if (backend == null)
         {
             terminal.WriteLine(Loc.Get("dormitory.not_available"), "gray");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
@@ -475,7 +475,7 @@ public class DormitoryLocation : BaseLocation
         if (sleepingNPCNames.Count == 0 && dormPlayerSleepers.Count == 0)
         {
             terminal.WriteLine(Loc.Get("dormitory.no_vulnerable"), "gray");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -540,7 +540,7 @@ public class DormitoryLocation : BaseLocation
         if (chosen.name == null)
         {
             terminal.WriteLine(Loc.Get("dormitory.no_such_sleeper"), "red");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
@@ -560,14 +560,14 @@ public class DormitoryLocation : BaseLocation
         if (npc == null || !npc.IsAlive || npc.IsDead)
         {
             terminal.WriteLine(Loc.Get("dormitory.no_longer_here"), "gray");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
         terminal.ClearScreen();
         terminal.SetColor("bright_red");
         terminal.WriteLine($"\n  {Loc.Get("dormitory.creep_toward_npc", npcName)}\n");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         // Darkness penalty for attacking a sleeping NPC.
         // v0.57.2 — route through ChangeAlignment for paired chivalry loss + news (matches
@@ -655,7 +655,7 @@ public class DormitoryLocation : BaseLocation
             // Post news
             try { OnlineStateManager.Instance?.AddNews($"{currentPlayer.Name2} murdered {npcName} in their sleep at the Dormitory!", "combat"); } catch { }
 
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
         }
         else if (result.Outcome == CombatOutcome.OpponentSpared)
         {
@@ -664,14 +664,14 @@ public class DormitoryLocation : BaseLocation
             // relationship rewards; don't print the contradictory "fought you
             // off" line.
             WorldSimulator.WakeUpNPC(npcName);
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
         }
         else
         {
             terminal.SetColor("cyan");
             terminal.WriteLine(Loc.Get("dormitory.fought_off_npc", npcName));
             WorldSimulator.WakeUpNPC(npcName);
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
         }
         await terminal.WaitForKeyPress();
     }
@@ -687,14 +687,14 @@ public class DormitoryLocation : BaseLocation
         if (victimSave?.Player == null)
         {
             terminal.WriteLine(Loc.Get("dormitory.could_not_load"), "red");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
         terminal.ClearScreen();
         terminal.SetColor("bright_red");
         terminal.WriteLine($"\n  {Loc.Get("dormitory.creep_toward_player", target.Username)}\n");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         // No guards in dormitory — fight the sleeper directly
         var victim = PlayerCharacterLoader.CreateFromSaveData(victimSave.Player, target.Username, story: victimSave.StorySystems);
@@ -762,7 +762,7 @@ public class DormitoryLocation : BaseLocation
 
             terminal.SetColor("dark_red");
             terminal.WriteLine($"\n{Loc.Get("dormitory.leave_lifeless", target.Username)}");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
         }
         else
         {
@@ -772,7 +772,7 @@ public class DormitoryLocation : BaseLocation
             // 0 HP with no death handling -- their next encounter or DoT tick became
             // a "real" death attributed to the wrong cause (same fix as the pit fight).
             if (currentPlayer.HP <= 0) currentPlayer.HP = 1;
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
         }
         await terminal.WaitForKeyPress();
     }
@@ -876,7 +876,7 @@ public class DormitoryLocation : BaseLocation
         if (currentPlayer.DarkNr <= 0)
         {
             terminal.WriteLine(Loc.Get("dormitory.too_righteous"), "yellow");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -884,12 +884,12 @@ public class DormitoryLocation : BaseLocation
         if (sleepers.Count == 0)
         {
             terminal.WriteLine(Loc.Get("dormitory.no_one_disturb"), "gray");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
         terminal.WriteLine(Loc.Get("dormitory.thunderous_shout"), "yellow");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
         // v0.57.2 — route darkness gain through paired alignment movement. DarkNr is a
         // separate god-favor counter (unrelated to the Chivalry/Darkness scales) and stays.
         UsurperRemake.Systems.AlignmentSystem.Instance.ChangeAlignment(
@@ -903,7 +903,7 @@ public class DormitoryLocation : BaseLocation
         {
             if (!currentPlayer.IsAlive) break;
             terminal.WriteLine(Loc.Get("dormitory.wakes_furious", npc.Name2), "red");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             var result = await combatEngine.PlayerVsPlayer(currentPlayer, npc, lethal: false);   // v1.1.11: the guest is brought back below
             if (!currentPlayer.IsAlive)

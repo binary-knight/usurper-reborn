@@ -488,7 +488,7 @@ public class TeamCornerLocation : BaseLocation
 
             default:
                 terminal.WriteLine(Loc.Get("team.invalid_choice"), "red");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return false;
         }
     }
@@ -647,7 +647,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine("");
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("team.no_teams_yet"));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
         var picked = await PickFromList(teams, TeamPickRow, t => t.TeamName, "team.pick_team_info_title",
@@ -677,7 +677,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.not_in_team"));
             terminal.WriteLine("");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -1049,7 +1049,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.king_cannot_join"));
             terminal.WriteLine("");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -1060,7 +1060,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine(Loc.Get("team.already_in_team", currentPlayer.Team));
             terminal.WriteLine(Loc.Get("team.quit_current_first"));
             terminal.WriteLine("");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -1073,7 +1073,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine(Loc.Get("team.creation_cost", $"{creationCost:N0}"));
             terminal.WriteLine(Loc.Get("team.you_only_have", $"{currentPlayer.Gold:N0}"));
             terminal.WriteLine("");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -1093,7 +1093,7 @@ public class TeamCornerLocation : BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.invalid_team_name"));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -1103,7 +1103,7 @@ public class TeamCornerLocation : BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.team_name_exists"));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -1112,7 +1112,7 @@ public class TeamCornerLocation : BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.player_team_exists"));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -1124,7 +1124,7 @@ public class TeamCornerLocation : BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.invalid_password"));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -1133,7 +1133,7 @@ public class TeamCornerLocation : BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.you_only_have", $"{currentPlayer.Gold:N0}"));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -1153,7 +1153,7 @@ public class TeamCornerLocation : BaseLocation
             {
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("team.player_team_exists"));
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 return;
             }
         }
@@ -1274,7 +1274,7 @@ public class TeamCornerLocation : BaseLocation
         terminal.SetColor("red");
         terminal.WriteLine(Loc.Get("team.join_team_full", teamName, MaxTeamSize));
         terminal.WriteLine("");
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
 
     /// <summary>
@@ -1289,7 +1289,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.king_cannot_join"));
             terminal.WriteLine("");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -1299,7 +1299,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.already_in_team", currentPlayer.Team));
             terminal.WriteLine("");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -1310,7 +1310,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine("");
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("team.no_teams_yet"));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
         var picked = await PickFromList(teams, TeamPickRow, t => t.TeamName, "team.pick_team_join_title",
@@ -1368,7 +1368,7 @@ public class TeamCornerLocation : BaseLocation
                     terminal.SetColor("red");
                     terminal.WriteLine(Loc.Get("team.wrong_password"));
                     terminal.WriteLine("");
-                    await Task.Delay(2000);
+                    await Pacing.Wait(2000);
                     return;
                 }
                 // If not found in player_teams, fall through to NPC team search
@@ -1383,7 +1383,7 @@ public class TeamCornerLocation : BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.no_active_team"));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -1422,7 +1422,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.wrong_password"));
             terminal.WriteLine("");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
         }
     }
 
@@ -1437,7 +1437,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.not_in_team_excl"));
             terminal.WriteLine("");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -1534,7 +1534,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine(Loc.Get("team.must_be_in_team_recruit"));
             terminal.WriteLine(Loc.Get("team.create_first_hint"));
             terminal.WriteLine("");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -1549,7 +1549,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.team_full", MaxTeamSize));
             terminal.WriteLine("");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -1646,7 +1646,7 @@ public class TeamCornerLocation : BaseLocation
 
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.invalid_choice_generic"));
-            await Task.Delay(1200);
+            await Pacing.Wait(1200);
         }
     }
 
@@ -1985,7 +1985,7 @@ public class TeamCornerLocation : BaseLocation
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("team.recruit_cancelled"));
-            await Task.Delay(800);
+            await Pacing.Wait(800);
             return;
         }
 
@@ -2158,7 +2158,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.not_in_team"));
             terminal.WriteLine("");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -2398,7 +2398,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.not_in_team"));
             terminal.WriteLine("");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -2415,7 +2415,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine("");
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.failed_generic"));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
         bool npcTeam = hasRow == false;
@@ -2426,7 +2426,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.password_leader_only"));
             terminal.WriteLine("");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -2447,7 +2447,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.wrong_password_short"));
             terminal.WriteLine("");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -2464,7 +2464,7 @@ public class TeamCornerLocation : BaseLocation
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("team.wrong_password_short"));
                 terminal.WriteLine("");
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 return;
             }
 
@@ -2499,7 +2499,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine(Loc.Get("team.invalid_password"));
         }
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
 
     /// <summary>
@@ -2513,7 +2513,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.not_in_team"));
             terminal.WriteLine("");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -2569,7 +2569,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine("");
         }
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
 
     /// <summary>
@@ -2583,7 +2583,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.not_in_team"));
             terminal.WriteLine("");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -2596,7 +2596,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine("");
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("team.only_member"));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
         var picked = await PickFromList(entries, MemberPickRow, e => e.Name, "team.pick_sack_title", MemberPickColor);
@@ -2606,7 +2606,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine("");
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("team.sack_player_refused", picked.Name));
-            await Task.Delay(2500);
+            await Pacing.Wait(2500);
             return;
         }
         var member = picked.Npc;
@@ -2635,7 +2635,7 @@ public class TeamCornerLocation : BaseLocation
                 {
                     terminal.SetColor("red");
                     terminal.WriteLine(Loc.Get("team.sack_gear_gone", member.DisplayName));
-                    await Task.Delay(2000);
+                    await Pacing.Wait(2000);
                     return;
                 }
                 member = liveForGear;
@@ -2659,7 +2659,7 @@ public class TeamCornerLocation : BaseLocation
             if (stripped) await SaveRecoveredGear();
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.member_gone_now", member.DisplayName));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
         live.Team = "";
@@ -2735,7 +2735,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.not_in_team"));
             terminal.WriteLine("");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -2770,7 +2770,7 @@ public class TeamCornerLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("team.all_alive"));
             }
             terminal.WriteLine("");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -2786,7 +2786,7 @@ public class TeamCornerLocation : BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.need_gold_resurrect", $"{cost:N0}", toResurrect.DisplayName));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
         terminal.SetColor("yellow");
@@ -2802,7 +2802,7 @@ public class TeamCornerLocation : BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.team_full", MaxTeamSize));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -2813,7 +2813,7 @@ public class TeamCornerLocation : BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.member_gone_now", toResurrect.DisplayName));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -2822,7 +2822,7 @@ public class TeamCornerLocation : BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.need_gold_resurrect", $"{cost:N0}", live.DisplayName));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -2866,7 +2866,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine(Loc.Get("team.must_be_in_team_allies"));
             terminal.WriteLine(Loc.Get("team.create_join_first"));
             terminal.WriteLine("");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -2886,7 +2886,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine(Loc.Get("team.no_other_players"));
             terminal.WriteLine(Loc.Get("team.recruit_players_first"));
             terminal.WriteLine("");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -2971,7 +2971,7 @@ public class TeamCornerLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("team.echo_already_in_party", selected.DisplayName));
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("team.echo_already_in_party_hint"));
-                await Task.Delay(2500);
+                await Pacing.Wait(2500);
                 return;
             }
 
@@ -3035,7 +3035,7 @@ public class TeamCornerLocation : BaseLocation
         {
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("team.echo_unrecruit_none"));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -3060,7 +3060,7 @@ public class TeamCornerLocation : BaseLocation
             GameEngine.Instance?.SetDungeonPartyPlayers(cleaned);
             terminal.SetColor("bright_yellow");
             terminal.WriteLine(Loc.Get("team.echo_unrecruit_done", label(toRemove)));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
         }
     }
 
@@ -3079,7 +3079,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.not_in_team"));
             terminal.WriteLine("");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -3094,7 +3094,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine("");
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("team.no_living_members"));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -3228,7 +3228,7 @@ public class TeamCornerLocation : BaseLocation
                 terminal.WriteLine("");
                 terminal.SetColor("yellow");
                 terminal.WriteLine(Loc.Get("team.equip_no_items_for_slot"));
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 continue;
             }
 
@@ -3267,7 +3267,7 @@ public class TeamCornerLocation : BaseLocation
             {
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("ui.cancelled"));
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
                 continue;
             }
 
@@ -3278,7 +3278,7 @@ public class TeamCornerLocation : BaseLocation
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine(Loc.Get("team.equip_identify_first"));
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 continue;
             }
 
@@ -3287,7 +3287,7 @@ public class TeamCornerLocation : BaseLocation
             {
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("team.cannot_use_item", target.DisplayName, equipReason));
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 continue;
             }
 
@@ -3300,7 +3300,7 @@ public class TeamCornerLocation : BaseLocation
             {
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("team.equip_item_gone", selectedItem.Name));
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 continue;
             }
 
@@ -3353,7 +3353,7 @@ public class TeamCornerLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("team.equip_failed", message));
             }
 
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
         }
     }
 
@@ -3382,7 +3382,7 @@ public class TeamCornerLocation : BaseLocation
         {
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("team.no_equipment_unequip", target.DisplayName));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -3417,7 +3417,7 @@ public class TeamCornerLocation : BaseLocation
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("ui.cancelled"));
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
@@ -3428,7 +3428,7 @@ public class TeamCornerLocation : BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.cursed_cannot_remove", selectedItem.Name));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -3456,7 +3456,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine(Loc.Get("team.unequip_failed"));
         }
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
 
     /// <summary>
@@ -3475,7 +3475,7 @@ public class TeamCornerLocation : BaseLocation
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("ui.cancelled"));
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
@@ -3543,7 +3543,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine(Loc.Get("team.cursed_not_removed", string.Join(", ", cursedItems)));
         }
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
 
     /// <summary>
@@ -3593,7 +3593,7 @@ public class TeamCornerLocation : BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine($"\n  {Loc.Get("team.war_must_be_in_team")}");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -3645,7 +3645,7 @@ public class TeamCornerLocation : BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine($"\n  {Loc.Get("team.active_war_exists")}");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -3657,7 +3657,7 @@ public class TeamCornerLocation : BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine($"\n  {Loc.Get("team.war_daily_cap", GameConfig.MaxTeamWarsPerDay)}");
-            await Task.Delay(2500);
+            await Pacing.Wait(2500);
             return;
         }
 
@@ -3668,7 +3668,7 @@ public class TeamCornerLocation : BaseLocation
         {
             terminal.SetColor("gray");
             terminal.WriteLine($"\n  {Loc.Get("team.no_other_teams")}");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -3708,7 +3708,7 @@ public class TeamCornerLocation : BaseLocation
             var hoursLeft = Math.Max(1, (int)Math.Ceiling((recentVsThisOpponent.StartedAt - cooldownCutoff).TotalHours));
             terminal.SetColor("red");
             terminal.WriteLine($"\n  {Loc.Get("team.war_opponent_cooldown", enemyTeam.TeamName, hoursLeft)}");
-            await Task.Delay(2500);
+            await Pacing.Wait(2500);
             return;
         }
 
@@ -3727,7 +3727,7 @@ public class TeamCornerLocation : BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.not_enough_gold_wager"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -3739,7 +3739,7 @@ public class TeamCornerLocation : BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.no_members_war"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -3752,7 +3752,7 @@ public class TeamCornerLocation : BaseLocation
             currentPlayer.Gold += wager;
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.failed_generic"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -3763,7 +3763,7 @@ public class TeamCornerLocation : BaseLocation
             await ForcePlayerSave();
             terminal.SetColor("red");
             terminal.WriteLine($"  {Loc.Get("team.active_war_exists")}");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -3808,7 +3808,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine(myWin ? Loc.Get("team.fighter_wins", mySummary.DisplayName) : Loc.Get("team.fighter_wins", enemySummary.DisplayName));
 
             await backend.UpdateTeamWarScore(warId, myWin);
-            await Task.Delay(800);
+            await Pacing.Wait(800);
         }
 
         terminal.WriteLine("");
@@ -3958,7 +3958,7 @@ public class TeamCornerLocation : BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine($"\n  {Loc.Get("team.hq_must_be_in_team")}");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -4041,7 +4041,7 @@ public class TeamCornerLocation : BaseLocation
         {
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("team.max_level_reached"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -4075,7 +4075,7 @@ public class TeamCornerLocation : BaseLocation
             {
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("team.vault_not_enough"));
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return;
             }
             landed = backend.TryUpgradeTeamFacility(teamName, key, currentLevel, cost, payFromVault: true);
@@ -4086,7 +4086,7 @@ public class TeamCornerLocation : BaseLocation
             {
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("team.personal_not_enough"));
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return;
             }
             currentPlayer.Gold -= cost;
@@ -4111,7 +4111,7 @@ public class TeamCornerLocation : BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.upgrade_not_landed"));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -4121,7 +4121,7 @@ public class TeamCornerLocation : BaseLocation
         // Refresh cached HQ upgrade levels on the player
         TeamHQBonus.RefreshLevels(currentPlayer, backend);
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
 
     private async Task DepositToVault(SqlSaveBackend backend, string teamName)
@@ -4135,7 +4135,7 @@ public class TeamCornerLocation : BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.vault_full"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -4158,12 +4158,12 @@ public class TeamCornerLocation : BaseLocation
             currentPlayer.Gold += amount;
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.vault_full"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
         terminal.SetColor("bright_green");
         terminal.WriteLine(Loc.Get("team.deposited", $"{amount:N0}"));
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
     }
 
     private async Task WithdrawFromVault(SqlSaveBackend backend, string teamName)
@@ -4173,7 +4173,7 @@ public class TeamCornerLocation : BaseLocation
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("team.vault_empty"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -4205,7 +4205,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.withdrawal_failed"));
         }
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
     }
 
     /// <summary>
@@ -4249,7 +4249,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.not_in_team"));
             terminal.WriteLine("");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -4373,7 +4373,7 @@ public class TeamCornerLocation : BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("spec.invalid_choice"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -4390,7 +4390,7 @@ public class TeamCornerLocation : BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("spec.invalid_choice"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -4401,7 +4401,7 @@ public class TeamCornerLocation : BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.member_gone_now", npc.DisplayName));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
         npc = live;

@@ -298,7 +298,7 @@ public class ArenaLocation : BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine($"  {Loc.Get("arena.invalid_selection")}");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
@@ -316,7 +316,7 @@ public class ArenaLocation : BaseLocation
         {
             terminal.SetColor("gray");
             terminal.WriteLine($"  {Loc.Get("arena.step_back")}");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
@@ -354,7 +354,7 @@ public class ArenaLocation : BaseLocation
         terminal.WriteLine("");
         terminal.WriteLine($"  {Loc.Get("arena.challenges", myName, target.DisplayName)}");
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         var combatEngine = new CombatEngine(terminal);
         var result = await combatEngine.PlayerVsPlayer(currentPlayer, opponent);

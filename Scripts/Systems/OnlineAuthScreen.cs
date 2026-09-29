@@ -164,7 +164,7 @@ namespace UsurperRemake.Systems
                 terminal.SetColor("bright_green");
                 terminal.WriteLine($"  {Loc.Get("auth.welcome_back", displayName)}");
                 terminal.WriteLine("");
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
                 return displayName;
             }
             else
@@ -172,7 +172,7 @@ namespace UsurperRemake.Systems
                 terminal.SetColor("bright_red");
                 terminal.WriteLine($"  {message}");
                 terminal.WriteLine("");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return null;
             }
         }
@@ -210,7 +210,7 @@ namespace UsurperRemake.Systems
                 terminal.SetColor("bright_red");
                 terminal.WriteLine("");
                 terminal.WriteLine($"  {Loc.Get("auth.passwords_no_match")}");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return null;
             }
 
@@ -229,7 +229,7 @@ namespace UsurperRemake.Systems
                 terminal.SetColor("white");
                 terminal.WriteLine($"  {Loc.Get("auth.logged_in_as", username.Trim())}");
                 terminal.WriteLine("");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return username.Trim();
             }
             else
@@ -237,7 +237,7 @@ namespace UsurperRemake.Systems
                 terminal.SetColor("bright_red");
                 terminal.WriteLine($"  {message}");
                 terminal.WriteLine("");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return null;
             }
         }

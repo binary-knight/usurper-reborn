@@ -154,7 +154,7 @@ public partial class OwnerProcessConflictTests
         // the refusal comes before the treasury's court change, and says so in the player's language
         var src = File.ReadAllText(Path.Combine(RepoRoot(), "Scripts", "Locations", "CastleLocation.cs"));
         int at = src.IndexOf("private async Task PlaceBounty()", StringComparison.Ordinal);
-        var body = src.Substring(at, src.IndexOf("await Task.Delay(2500);", at, StringComparison.Ordinal) - at);
+        var body = src.Substring(at, src.IndexOf("await Pacing.Wait(2500);", at, StringComparison.Ordinal) - at);
         int wait = body.IndexOf("else if (DecreeMustWaitForRoster())", StringComparison.Ordinal);
         wait.Should().BeGreaterThan(0);
         wait.Should().BeLessThan(body.IndexOf("CourtChangeAsync(", StringComparison.Ordinal));

@@ -103,7 +103,7 @@ namespace UsurperRemake.Systems
                     if (!string.IsNullOrEmpty(currentNode.NextNodeId))
                     {
                         currentNode = FindNode(currentNode.NextNodeId);
-                        await Task.Delay(1500);
+                        await Pacing.Wait(1500);
                     }
                     else
                     {
@@ -123,7 +123,7 @@ namespace UsurperRemake.Systems
                     }
                     ApplyChoiceEffects(availableChoices[0]);
                     currentNode = FindNode(availableChoices[0].NextNodeId);
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                 }
                 else
                 {

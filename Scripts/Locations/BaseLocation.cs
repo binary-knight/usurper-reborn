@@ -1078,7 +1078,7 @@ public abstract class BaseLocation
         terminal.WriteLine($"  {Loc.Get($"stranger.disguise.{encounter.Disguise}.desc")}");
         terminal.WriteLine("");
 
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         // Display dialogue lines with pacing
         var dialogueLines = encounter.Dialogue.Split('\n');
@@ -1086,11 +1086,11 @@ public abstract class BaseLocation
         {
             terminal.SetColor("bright_magenta");
             terminal.WriteLine($"  {line}");
-            await Task.Delay(800);
+            await Pacing.Wait(800);
         }
         terminal.WriteLine("");
 
-        await Task.Delay(500);
+        await Pacing.Wait(500);
 
         // Display response options from the encounter's ResponseOptions
         var responseType = StrangerResponseType.Silent;
@@ -1137,7 +1137,7 @@ public abstract class BaseLocation
                 {
                     terminal.SetColor("magenta");
                     terminal.WriteLine($"  {replyLine}");
-                    await Task.Delay(800);
+                    await Pacing.Wait(800);
                 }
                 terminal.WriteLine("");
             }
@@ -1209,10 +1209,10 @@ public abstract class BaseLocation
         {
             terminal.SetColor("gray");
             terminal.WriteLine($"  {SLoc($"intro.{i + 1}", encounter.IntroNarration[i])}");
-            await Task.Delay(1200);
+            await Pacing.Wait(1200);
         }
         terminal.WriteLine("");
-        await Task.Delay(500);
+        await Pacing.Wait(500);
 
         // Disguise name (reuses the existing stranger.disguise.{enum}.* keys, fallback to data)
         var disguiseData = StrangerEncounterSystem.Disguises.GetValueOrDefault(encounter.Disguise);
@@ -1225,7 +1225,7 @@ public abstract class BaseLocation
             terminal.SetColor("darkgray");
             terminal.WriteLine($"  {(Loc.Has(ddKey) ? Loc.Get(ddKey) : disguiseData.Description)}");
             terminal.WriteLine("");
-            await Task.Delay(800);
+            await Pacing.Wait(800);
         }
 
         // Main dialogue (bright magenta, spoken lines)
@@ -1235,15 +1235,15 @@ public abstract class BaseLocation
             if (string.IsNullOrEmpty(line))
             {
                 terminal.WriteLine("");
-                await Task.Delay(400);
+                await Pacing.Wait(400);
                 continue;
             }
             terminal.SetColor("bright_magenta");
             terminal.WriteLine($"  {SLoc($"dialogue.{i + 1}", line)}");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
         }
         terminal.WriteLine("");
-        await Task.Delay(500);
+        await Pacing.Wait(500);
 
         // Response choices
         var responseType = StrangerResponseType.Silent;
@@ -1283,10 +1283,10 @@ public abstract class BaseLocation
                 {
                     terminal.SetColor("magenta");
                     terminal.WriteLine($"  {SLoc($"response.{selectedOpt.Key}.reply.{i + 1}", selectedOpt.StrangerReply[i])}");
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                 }
                 terminal.WriteLine("");
-                await Task.Delay(500);
+                await Pacing.Wait(500);
             }
         }
 
@@ -1298,7 +1298,7 @@ public abstract class BaseLocation
             {
                 terminal.SetColor("gray");
                 terminal.WriteLine($"  {SLoc($"closing.{i + 1}", encounter.ClosingNarration[i])}");
-                await Task.Delay(1200);
+                await Pacing.Wait(1200);
             }
             terminal.WriteLine("");
         }
@@ -1325,14 +1325,14 @@ public abstract class BaseLocation
         terminal.WriteLine($"  {TownNPCStorySystem.GetLocalizedDescription(npcKey, npc)}");
         terminal.WriteLine("");
 
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         // Display dialogue
         terminal.SetColor("white");
         foreach (var line in TownNPCStorySystem.GetLocalizedDialogue(npcKey, stage))
         {
             terminal.WriteLine($"  {line}");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
         }
         terminal.WriteLine("");
 
@@ -1551,7 +1551,7 @@ public abstract class BaseLocation
             currentPlayer.HP = 0;
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("base.poison_death"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
         }
         else if (currentPlayer.PoisonTurns <= 0)
         {
@@ -1559,11 +1559,11 @@ public abstract class BaseLocation
             currentPlayer.Poison = 0;
             terminal.SetColor("green");
             terminal.WriteLine(Loc.Get("base.poison_cleared"));
-            await Task.Delay(800);
+            await Pacing.Wait(800);
         }
         else
         {
-            await Task.Delay(500);
+            await Pacing.Wait(500);
         }
     }
 
@@ -2826,7 +2826,7 @@ public abstract class BaseLocation
         if (LocationId == GameLocation.Master)
         {
             terminal.WriteLine($"  {Loc.Get("base.train_already_here")}", "yellow");
-            await Task.Delay(800);
+            await Pacing.Wait(800);
             return;
         }
         if (CanTravelToLevelMaster(LocationId))
@@ -2835,7 +2835,7 @@ public abstract class BaseLocation
             return;
         }
         terminal.WriteLine($"  {Loc.Get("base.train_how")}", "yellow");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
     }
 
     /// <summary>v1.1.13: true when a level-up took the player to level 10 (or past it) with points to spend.</summary>
@@ -2953,19 +2953,19 @@ public abstract class BaseLocation
                     terminal.WriteLine(Loc.Get("base.antidote_used"));
                     terminal.SetColor("gray");
                     terminal.WriteLine(Loc.Get("base.antidotes_remaining", currentPlayer.Antidotes, currentPlayer.MaxAntidotes));
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                 }
                 else if (currentPlayer.Antidotes > 0)
                 {
                     terminal.SetColor("yellow");
                     terminal.WriteLine(Loc.Get("base.not_poisoned"));
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                 }
                 else
                 {
                     terminal.SetColor("red");
                     terminal.WriteLine(Loc.Get("base.no_antidotes"));
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                 }
                 return (true, false);
 
@@ -2983,7 +2983,7 @@ public abstract class BaseLocation
                 {
                     terminal.SetColor("yellow");
                     terminal.WriteLine($"  {Loc.Get("base.online_only_mail")}");
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                 }
                 return (true, false);
 
@@ -2997,7 +2997,7 @@ public abstract class BaseLocation
                 {
                     terminal.SetColor("yellow");
                     terminal.WriteLine($"  {Loc.Get("base.online_only_trade")}");
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                 }
                 return (true, false);
 
@@ -3009,7 +3009,7 @@ public abstract class BaseLocation
                 {
                     terminal.SetColor("yellow");
                     terminal.WriteLine($"  {Loc.Get("base.online_only_bounties")}");
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                 }
                 return (true, false);
 
@@ -3022,7 +3022,7 @@ public abstract class BaseLocation
                 {
                     terminal.SetColor("yellow");
                     terminal.WriteLine($"  {Loc.Get("base.online_only_auction")}");
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                 }
                 return (true, false);
 
@@ -3041,7 +3041,7 @@ public abstract class BaseLocation
                 {
                     terminal.SetColor("yellow");
                     terminal.WriteLine($"  {Loc.Get("base.online_only_boss")}");
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                 }
                 return (true, false);
 
@@ -3059,7 +3059,7 @@ public abstract class BaseLocation
                     ? $"  {Loc.Get("base.compact_enabled")}"
                     : $"  {Loc.Get("base.compact_disabled")}", "green");
                 await GameEngine.Instance.SaveCurrentGame();
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
                 return (true, false);
 
             case "autolook":
@@ -3073,7 +3073,7 @@ public abstract class BaseLocation
                         ? $"  {Loc.Get("base.autolook_enabled")}"
                         : $"  {Loc.Get("base.autolook_disabled")}", "green");
                     await GameEngine.Instance.SaveCurrentGame();
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                 }
                 return (true, false);
 
@@ -4213,7 +4213,7 @@ public abstract class BaseLocation
                 terminal.Write("?");
                 terminal.SetColor("gray");
                 terminal.WriteLine($"] {Loc.Get("base.for_help")}");
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 break;
         }
 
@@ -4227,7 +4227,7 @@ public abstract class BaseLocation
     {
         // Override in derived classes
         terminal.WriteLine(Loc.Get("base.nothing_happens"), "gray");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
     }
 
     /// <summary>
@@ -4236,7 +4236,7 @@ public abstract class BaseLocation
     protected virtual async Task NavigateToLocation(GameLocation destination)
     {
         terminal.WriteLine(Loc.Get("base.heading_to", GetLocationName(destination)), "yellow");
-        await Task.Delay(500);
+        await Pacing.Wait(500);
 
         // Throw exception to signal location change
         throw new LocationExitException(destination);
@@ -4260,7 +4260,7 @@ public abstract class BaseLocation
         {
             terminal.SetColor("bright_red");
             terminal.WriteLine(Loc.Get("mental.collapse_death"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             var result = await new CombatEngine(terminal).HandleMentalCollapseDeath(player);
             if (result.IsPermadeath || GameEngine.Instance.IsPermadeath) return;
             MentalSystem.ApplyCollapseDeathAftermath(player);
@@ -4485,14 +4485,14 @@ public abstract class BaseLocation
                     };
                     terminal.WriteLine(Loc.Get("base.combat_speed_set", newSpeed), "green");
                     await GameEngine.Instance.SaveCurrentGame();
-                    await Task.Delay(800);
+                    await Pacing.Wait(800);
                     break;
 
                 case "2":
                     currentPlayer.AutoHeal = !currentPlayer.AutoHeal;
                     terminal.WriteLine(Loc.Get("base.pref_auto_heal_toggled", currentPlayer.AutoHeal ? Loc.Get("prefs.enabled") : Loc.Get("prefs.disabled")), "green");
                     await GameEngine.Instance.SaveCurrentGame();
-                    await Task.Delay(800);
+                    await Pacing.Wait(800);
                     break;
 
                 case "3":
@@ -4506,7 +4506,7 @@ public abstract class BaseLocation
                         terminal.WriteLine(Loc.Get("base.pref_intimate_full"), "green");
                     }
                     await GameEngine.Instance.SaveCurrentGame();
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                     break;
 
                 case "4":
@@ -4523,7 +4523,7 @@ public abstract class BaseLocation
                         terminal.WriteLine(Loc.Get("base.pref_sr_disabled_desc"), "white");
                     }
                     await GameEngine.Instance.SaveCurrentGame();
-                    await Task.Delay(1200);
+                    await Pacing.Wait(1200);
                     break;
 
                 case "5" when !UsurperRemake.BBS.DoorMode.IsOnlineMode:
@@ -4541,7 +4541,7 @@ public abstract class BaseLocation
                     terminal.WriteLine(Loc.Get("base.pref_theme_set", ColorTheme.GetThemeName(nextTheme)), "green");
                     terminal.WriteLine($"  {ColorTheme.GetThemeDescription(nextTheme)}", "white");
                     await GameEngine.Instance.SaveCurrentGame();
-                    await Task.Delay(800);
+                    await Pacing.Wait(800);
                     break;
 
                 case "7":
@@ -4555,7 +4555,7 @@ public abstract class BaseLocation
                         WriteTerminalFont(fonts[next]);
                         terminal.WriteLine(Loc.Get("base.pref_font_set", fonts[next]), "green");
                         terminal.WriteLine(Loc.Get("base.pref_font_update"), "white");
-                        await Task.Delay(800);
+                        await Pacing.Wait(800);
                     }
                     break;
 
@@ -4572,7 +4572,7 @@ public abstract class BaseLocation
                         terminal.WriteLine(Loc.Get("base.pref_autolevel_disabled_desc"), "white");
                     }
                     await GameEngine.Instance.SaveCurrentGame();
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                     break;
 
                 case "9":
@@ -4590,7 +4590,7 @@ public abstract class BaseLocation
                         terminal.WriteLine(Loc.Get("base.pref_compact_disabled_desc"), "white");
                     }
                     await GameEngine.Instance.SaveCurrentGame();
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                     break;
 
                 case "S":
@@ -4598,7 +4598,7 @@ public abstract class BaseLocation
                     currentPlayer.ClassicMainStreet = !currentPlayer.ClassicMainStreet;
                     terminal.WriteLine(Loc.Get("base.pref_main_street_layout_set", MainStreetLayoutName(currentPlayer.ClassicMainStreet)), "green");
                     await GameEngine.Instance.SaveCurrentGame();
-                    await Task.Delay(800);
+                    await Pacing.Wait(800);
                     break;
 
                 case "E" when MenuKeysSettingShown:
@@ -4607,7 +4607,7 @@ public abstract class BaseLocation
                     GameConfig.MenuKeysNeedEnter = currentPlayer.MenuKeysNeedEnter;
                     terminal.WriteLine(Loc.Get("base.pref_menu_keys_need_enter_set", Loc.Get(currentPlayer.MenuKeysNeedEnter ? "prefs.on" : "prefs.off")), "green");
                     await GameEngine.Instance.SaveCurrentGame();
-                    await Task.Delay(800);
+                    await Pacing.Wait(800);
                     break;
 
                 case "H":
@@ -4615,7 +4615,7 @@ public abstract class BaseLocation
                     currentPlayer.AutoCombatHealPercent = GameConfig.NextAutoCombatHealPercent(currentPlayer.AutoCombatHealPercent);
                     terminal.WriteLine(Loc.Get("base.pref_auto_combat_heal_set", currentPlayer.AutoCombatHealPercent), "green");
                     await GameEngine.Instance.SaveCurrentGame();
-                    await Task.Delay(800);
+                    await Pacing.Wait(800);
                     break;
 
                 case "A":
@@ -4631,7 +4631,7 @@ public abstract class BaseLocation
                         terminal.WriteLine(Loc.Get("base.pref_autoequip_enabled_desc"), "white");
                     }
                     await GameEngine.Instance.SaveCurrentGame();
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                     break;
 
                 case "P":
@@ -4648,7 +4648,7 @@ public abstract class BaseLocation
                         terminal.WriteLine(Loc.Get("base.pref_char_monster_art_enabled_desc"), "white");
                     }
                     await GameEngine.Instance.SaveCurrentGame();
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                     break;
 
                 case "L":
@@ -4668,7 +4668,7 @@ public abstract class BaseLocation
                             terminal.WriteLine(Loc.Get("base.pref_autolook_disabled_desc"), "white");
                         }
                         await GameEngine.Instance.SaveCurrentGame();
-                        await Task.Delay(1000);
+                        await Pacing.Wait(1000);
                     }
                     break;
 
@@ -4684,7 +4684,7 @@ public abstract class BaseLocation
                         terminal.WriteLine(Loc.Get("dungeon.automap_disabled"), "green");
                     }
                     await GameEngine.Instance.SaveCurrentGame();
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                     break;
 
                 case "D":
@@ -4700,7 +4700,7 @@ public abstract class BaseLocation
                     terminal.WriteLine(Loc.Get("base.date_format_set", newDateFormat), "green");
                     terminal.WriteLine($"  {Loc.Get("base.date_format_example")}: {GameConfig.FormatDate(DateTime.Now, currentPlayer.DateFormatPreference)}", "gray");
                     await GameEngine.Instance.SaveCurrentGame();
-                    await Task.Delay(800);
+                    await Pacing.Wait(800);
                     break;
 
                 case "B":
@@ -4725,7 +4725,7 @@ public abstract class BaseLocation
                         var dungeonLoc = LocationManager.Instance?.GetLocation(GameLocation.Dungeons) as DungeonLocation;
                         dungeonLoc?.InvalidateFloorCache();
                         await GameEngine.Instance.SaveCurrentGame();
-                        await Task.Delay(800);
+                        await Pacing.Wait(800);
                     }
                     break;
 
@@ -4768,7 +4768,7 @@ public abstract class BaseLocation
                         terminal.SetColor("gray");
                         terminal.WriteLine($"  {Loc.Get("base.no_titles")}");
                         terminal.WriteLine($"  {Loc.Get("base.titles_hint")}");
-                        await Task.Delay(2000);
+                        await Pacing.Wait(2000);
                     }
                     else
                     {
@@ -4787,7 +4787,7 @@ public abstract class BaseLocation
                             terminal.SetColor("green");
                             terminal.WriteLine($"  {Loc.Get("base.title_removed")}");
                             await GameEngine.Instance.SaveCurrentGame();
-                            await Task.Delay(1000);
+                            await Pacing.Wait(1000);
                         }
                         else if (int.TryParse(titleChoice.Trim(), out int titleIdx) && titleIdx >= 1 && titleIdx <= availableTitles.Count)
                         {
@@ -4795,7 +4795,7 @@ public abstract class BaseLocation
                             terminal.SetColor("green");
                             terminal.WriteLine($"  {Loc.Get("base.title_set", currentPlayer.NobleTitle, currentPlayer.DisplayName)}");
                             await GameEngine.Instance.SaveCurrentGame();
-                            await Task.Delay(1000);
+                            await Pacing.Wait(1000);
                         }
                     }
                     break;
@@ -4830,7 +4830,7 @@ public abstract class BaseLocation
                     terminal.SetColor("green");
                     terminal.WriteLine($"  {Loc.Get("base.orientation_set", GetOrientationLabel(currentPlayer.Orientation))}");
                     await GameEngine.Instance.SaveCurrentGame();
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                     break;
 
                 case "0":
@@ -4845,7 +4845,7 @@ public abstract class BaseLocation
 
                 default:
                     terminal.WriteLine(Loc.Get("base.invalid_choice_simple"), "red");
-                    await Task.Delay(500);
+                    await Pacing.Wait(500);
                     break;
             }
         }
@@ -4927,7 +4927,7 @@ public abstract class BaseLocation
         if (selected == null || selected == currentPlayer.Difficulty)
         {
             terminal.WriteLine(Loc.Get("prefs.difficulty_unchanged"), "gray");
-            await Task.Delay(800);
+            await Pacing.Wait(800);
             return;
         }
 
@@ -4945,7 +4945,7 @@ public abstract class BaseLocation
             if (!await terminal.AskYesNoAsync(Loc.Get("creation.difficulty.nightmare_confirm"), enterDefault: false))
             {
                 terminal.WriteLine(Loc.Get("creation.difficulty.nightmare_wise"), "green");
-                await Task.Delay(1200);
+                await Pacing.Wait(1200);
                 return;
             }
         }
@@ -4962,7 +4962,7 @@ public abstract class BaseLocation
         terminal.WriteLine("");
         terminal.SetColor(DifficultySystem.GetColor(selected.Value));
         terminal.WriteLine(Loc.Get("prefs.difficulty_set", DifficultySystem.GetLocalizedName(selected.Value)));
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -5048,7 +5048,7 @@ public abstract class BaseLocation
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine(Loc.Get("ui.invalid_choice"));
-                await Task.Delay(900);
+                await Pacing.Wait(900);
                 continue;
             }
 
@@ -5114,7 +5114,7 @@ public abstract class BaseLocation
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine(Loc.Get("ui.invalid_choice"));
-                await Task.Delay(900);
+                await Pacing.Wait(900);
                 continue;
             }
 
@@ -5124,7 +5124,7 @@ public abstract class BaseLocation
             {
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("party_inv.player_inventory_full"));
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 continue;
             }
 
@@ -5156,7 +5156,7 @@ public abstract class BaseLocation
                 catch (Exception ex) { DebugLogger.Instance.LogError("PARTYINV", $"SaveAllSharedState failed after take-back: {ex.Message}"); }
             }
 
-            await Task.Delay(1200);
+            await Pacing.Wait(1200);
         }
     }
 
@@ -5388,7 +5388,7 @@ public abstract class BaseLocation
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("base.no_one_to_talk"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -5457,7 +5457,7 @@ public abstract class BaseLocation
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("base.decide_not_talk"));
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
         }
     }
 
@@ -5519,7 +5519,7 @@ public abstract class BaseLocation
                 terminal.WriteLine("");
                 terminal.SetColor("gray");
                 terminal.WriteLine($"  {Loc.Get("family.grudge_refuse_talk_sub")}");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return;
             }
 
@@ -5537,7 +5537,7 @@ public abstract class BaseLocation
                 terminal.WriteLine("");
                 terminal.SetColor("gray");
                 terminal.WriteLine($"  {Loc.Get("dread.npc_flees_sub")}");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return;
             }
 
@@ -5766,7 +5766,7 @@ public abstract class BaseLocation
                         terminal.WriteLine("");
                         terminal.SetColor("gray");
                         terminal.WriteLine($"  {Loc.Get("base.nod_walk_away")}");
-                        await Task.Delay(1500);
+                        await Pacing.Wait(1500);
                         stayInConversation = false;
                         break;
                 }
@@ -5812,13 +5812,13 @@ public abstract class BaseLocation
         terminal.SetColor("gray");
         terminal.WriteLine($"  {Loc.Get($"family.recognition_narrative_{toneSlot}", adultChild.Name2, sexWord)}");
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         // The adult child's spoken line.
         terminal.SetColor(toneColor);
         terminal.WriteLine($"  {Loc.Get($"family.recognition_line_{toneSlot}", currentPlayer.Name)}");
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         // Seed the relationship at a high-baseline parental band. The integer
         // scale runs lower-is-better (Love ~20, Friendship ~40, Neutral ~70).
@@ -5863,17 +5863,17 @@ public abstract class BaseLocation
             terminal.WriteLine($"  {Loc.Get("base.npc_says", npc.Name2)}");
             terminal.SetColor("white");
             terminal.WriteLine($"  \"{smallTalk}\"");
-            await Task.Delay(800);
+            await Pacing.Wait(800);
 
             // Sometimes add a second line of dialogue for variety
             if (Random.Shared.NextDouble() < 0.5)
             {
-                await Task.Delay(600);
+                await Pacing.Wait(600);
                 string moreTalk = npc.GetSmallTalk(player);
                 if (moreTalk != smallTalk) // Avoid repetition
                 {
                     terminal.WriteLine($"  \"{moreTalk}\"");
-                    await Task.Delay(600);
+                    await Pacing.Wait(600);
                 }
             }
 
@@ -6059,7 +6059,7 @@ public abstract class BaseLocation
                 terminal.WriteLine(Loc.Get("base.duel_decline_busy"));
             }
 
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -6071,7 +6071,7 @@ public abstract class BaseLocation
         terminal.WriteLine(Loc.Get("base.duel_honorably"));
         terminal.WriteLine("");
 
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         // Initiate combat through StreetEncounterSystem.
         // v0.61.2: pass isHonorDuel: true so the murder-cap counter / over-cap
@@ -6095,7 +6095,7 @@ public abstract class BaseLocation
             currentPlayer.PDefeats++;
         }
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
 
     /// <summary>
@@ -6114,14 +6114,14 @@ public abstract class BaseLocation
         {
             terminal.SetColor("bright_red");
             terminal.WriteLine($"  {Loc.Get("dread.tribute_cap_reached", GameConfig.MaxTributeDemandsPerDay)}");
-            await Task.Delay(1800);
+            await Pacing.Wait(1800);
             return;
         }
 
         // Approach line first (the player threatens).
         terminal.SetColor("dark_red");
         terminal.WriteLine($"  {Loc.Get("dread.tribute_demand", npc.Name2)}");
-        await Task.Delay(800);
+        await Pacing.Wait(800);
 
         // Success chance scales with Dread tier. At Cutthroat (T1): 45%; Marauder (T2): 60%;
         // Terror (T3): 75%; Nightmare (T4): 90%. The deeper your standing, the harder it is
@@ -6163,7 +6163,7 @@ public abstract class BaseLocation
             terminal.WriteLine($"  {Loc.Get("dread.tribute_remaining", currentPlayer.TributeDemandsToday, GameConfig.MaxTributeDemandsPerDay)}");
         }
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
 
     /// <summary>
@@ -6181,7 +6181,7 @@ public abstract class BaseLocation
         {
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("base.attack_teammate"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -6203,7 +6203,7 @@ public abstract class BaseLocation
             terminal.SetColor("gray");
             terminal.WriteLine($"  {Loc.Get("base.murder_daily_cap_hint")}");
             terminal.WriteLine("");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -6235,7 +6235,7 @@ public abstract class BaseLocation
             {
                 terminal.SetColor("green");
                 terminal.WriteLine($"  {Loc.Get("base.murder_walk_away")}");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return;
             }
 
@@ -6247,7 +6247,7 @@ public abstract class BaseLocation
             {
                 terminal.SetColor("green");
                 terminal.WriteLine($"  {Loc.Get("base.murder_step_back")}");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return;
             }
         }
@@ -6262,7 +6262,7 @@ public abstract class BaseLocation
             {
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("base.attack_reconsider"));
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
                 return;
             }
         }
@@ -6272,7 +6272,7 @@ public abstract class BaseLocation
         terminal.SetColor("red");
         terminal.WriteLine(Loc.Get("base.attack_treacherous"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         // Initiate murder combat through StreetEncounterSystem
         var result = await StreetEncounterSystem.Instance.MurderNPC(currentPlayer, npc, terminal, LocationId);
@@ -6350,7 +6350,7 @@ public abstract class BaseLocation
         // prison exit can end the session.
         GodDeedSystem.Record(player, GodAct.Murder, terminal);
 
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("bright_red");
         terminal.WriteLine("");
@@ -6363,7 +6363,7 @@ public abstract class BaseLocation
         terminal.SetColor("red");
         terminal.WriteLine($"  \"{Loc.Get("base.arrest_for_murder", victim.Name2 ?? victim.Name)}\"");
         terminal.WriteLine("");
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         terminal.SetColor("red");
         terminal.WriteLine(Loc.Get("street_encounter.guard.halt"));
@@ -6507,7 +6507,7 @@ public abstract class BaseLocation
             terminal.SetColor("dark_red");
             terminal.WriteLine($"  {Loc.Get("base.executioner_axe")}");
             terminal.WriteLine("");
-            await Task.Delay(3000);
+            await Pacing.Wait(3000);
 
             // Broadcast the execution
             if (DoorMode.IsOnlineMode)
@@ -6573,7 +6573,7 @@ public abstract class BaseLocation
             terminal.SetColor("red");
             terminal.WriteLine($"  \"{Loc.Get("base.possessions_confiscated")}\"");
             terminal.WriteLine("");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
 
             if (player is Player p)
             {
@@ -8900,7 +8900,7 @@ public abstract class BaseLocation
                     await backend.DeleteMessage(inbox[delIdx - 1].Id, username);
                     terminal.SetColor("bright_green");
                     terminal.WriteLine(Loc.Get("base.mail_deleted"));
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                 }
             }
             else if (int.TryParse(cmd, out int directRead) && directRead >= 1 && directRead <= inbox.Count)
@@ -8947,7 +8947,7 @@ public abstract class BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("base.mail_daily_limit"));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -8965,7 +8965,7 @@ public abstract class BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("base.mail_player_not_found", recipient));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
         recipient = resolvedMailName;
@@ -8991,7 +8991,7 @@ public abstract class BaseLocation
 
         terminal.SetColor("bright_green");
         terminal.WriteLine(Loc.Get("base.mail_sent", recipient));
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
     }
 
     // ========== Player Trading System ==========
@@ -9185,7 +9185,7 @@ public abstract class BaseLocation
         {
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("base.trade_already_resolved"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -9227,7 +9227,7 @@ public abstract class BaseLocation
         if (offer.Gold > 0)
             terminal.WriteLine(Loc.Get("base.trade_received_gold", $"{offer.Gold:N0}"));
         terminal.WriteLine(Loc.Get("base.trade_accepted"));
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
     }
 
     private async Task DeclineTradeOffer(SqlSaveBackend backend, TradeOffer offer)
@@ -9239,7 +9239,7 @@ public abstract class BaseLocation
         {
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("base.trade_already_resolved"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -9266,7 +9266,7 @@ public abstract class BaseLocation
 
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("base.trade_declined"));
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
     }
 
     private async Task CancelTradeOffer(SqlSaveBackend backend, TradeOffer offer)
@@ -9280,7 +9280,7 @@ public abstract class BaseLocation
         {
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("base.trade_already_resolved"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -9317,7 +9317,7 @@ public abstract class BaseLocation
 
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("base.trade_cancelled"));
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
     }
 
     private async Task SendTradePackage(SqlSaveBackend backend, string senderUsername)
@@ -9328,7 +9328,7 @@ public abstract class BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("base.trade_too_many"));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -9346,7 +9346,7 @@ public abstract class BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("base.player_not_found", recipient));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
         recipient = resolvedName;
@@ -9356,7 +9356,7 @@ public abstract class BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("base.trade_no_self"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -9415,7 +9415,7 @@ public abstract class BaseLocation
         {
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("base.trade_empty"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -9440,7 +9440,7 @@ public abstract class BaseLocation
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("ui.cancelled"));
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
@@ -9477,7 +9477,7 @@ public abstract class BaseLocation
 
         terminal.SetColor("bright_green");
         terminal.WriteLine(Loc.Get("base.trade_package_sent", recipient));
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
     }
 
     // ========== Player Bounty System ==========
@@ -9562,7 +9562,7 @@ public abstract class BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("base.bounty_max"));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -9575,7 +9575,7 @@ public abstract class BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("base.bounty_no_self"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -9586,7 +9586,7 @@ public abstract class BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("base.bounty_not_found"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -9598,7 +9598,7 @@ public abstract class BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("base.bounty_min_amount", minBounty.ToString("N0")));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -9606,7 +9606,7 @@ public abstract class BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("base.bounty_not_enough"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -9622,7 +9622,7 @@ public abstract class BaseLocation
 
         terminal.SetColor("bright_green");
         terminal.WriteLine(Loc.Get("base.bounty_placed", amount.ToString("N0"), targetPlayer.DisplayName));
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
 
     private async Task ShowMyBounties(SqlSaveBackend backend)
@@ -9882,7 +9882,7 @@ public abstract class BaseLocation
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("base.no_one_to_talk"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -9941,7 +9941,7 @@ public abstract class BaseLocation
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("base.auction_no_items"));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -10189,7 +10189,7 @@ public abstract class BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("base.auction_already_sold"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -10212,7 +10212,7 @@ public abstract class BaseLocation
             await backend.RefundAuctionListing(listing.Id);
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("base.auction_purchased_error"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -10235,7 +10235,7 @@ public abstract class BaseLocation
         UsurperRemake.Server.MudServer.Instance?.SendToPlayer(listing.Seller,
             $"\u001b[93m  [Auction] Your {listing.ItemName} sold for {listing.Price:N0} gold! Visit the Auction House to collect.\u001b[0m");
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
 
     private static (long fee, int basePct, int taxPct) CalculateAuctionFee(long price, int durationHours)
@@ -10269,7 +10269,7 @@ public abstract class BaseLocation
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("base.auction_no_items_sell"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -10280,7 +10280,7 @@ public abstract class BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("base.auction_max_listings"));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -10311,7 +10311,7 @@ public abstract class BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("base.auction_invalid_price"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -10350,7 +10350,7 @@ public abstract class BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("base.auction_need_fee", listingFee.ToString("N0"), currentPlayer.Gold.ToString("N0")));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -10382,7 +10382,7 @@ public abstract class BaseLocation
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("base.auction_failed"));
         }
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
 
     private async Task ShowMyAuctions(SqlSaveBackend backend)
@@ -10521,7 +10521,7 @@ public abstract class BaseLocation
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("base.auction_no_gold"));
             }
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -10553,7 +10553,7 @@ public abstract class BaseLocation
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("base.auction_no_expired"));
             }
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -10582,7 +10582,7 @@ public abstract class BaseLocation
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("base.auction_collect_failed"));
             }
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -10590,7 +10590,7 @@ public abstract class BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("base.auction_only_active"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -10608,7 +10608,7 @@ public abstract class BaseLocation
             terminal.SetColor("bright_green");
             terminal.WriteLine(Loc.Get("base.auction_listing_cancelled"));
         }
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
     }
 
     /// <summary>
@@ -10913,7 +10913,7 @@ public abstract class BaseLocation
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("ui.cancelled"));
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
@@ -11047,7 +11047,7 @@ public abstract class BaseLocation
             terminal.WriteLine(Loc.Get("inn.equip_best_none", target.DisplayName));
         }
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
 
     /// <summary>

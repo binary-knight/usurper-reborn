@@ -486,7 +486,7 @@ namespace UsurperRemake.Data
                 {
                     terminal.WriteLine(line, "white");
                 }
-                await Task.Delay(150);
+                await Pacing.Wait(150);
             }
 
             // Grant rewards
@@ -544,7 +544,7 @@ namespace UsurperRemake.Data
                 {
                     terminal.WriteLine("  " + line, "white");
                 }
-                await Task.Delay(100);
+                await Pacing.Wait(100);
             }
 
             terminal.WriteLine("");
@@ -571,7 +571,7 @@ namespace UsurperRemake.Data
                 {
                     terminal.WriteLine("  \"" + line + "\"", "cyan");
                 }
-                await Task.Delay(100);
+                await Pacing.Wait(100);
             }
 
             terminal.WriteLine("");

@@ -893,7 +893,7 @@ namespace UsurperRemake.Systems
                     else
                     {
                         terminal.WriteLine(Loc.Get("inventory.invalid_choice"), "red");
-                        await Task.Delay(500);
+                        await Pacing.Wait(500);
                     }
                     break;
             }
@@ -906,7 +906,7 @@ namespace UsurperRemake.Systems
             if (player.Inventory == null || index < 1 || index > player.Inventory.Count)
             {
                 terminal.WriteLine(Loc.Get("inventory.invalid_item"), "red");
-                await Task.Delay(500);
+                await Pacing.Wait(500);
                 return;
             }
 
@@ -995,7 +995,7 @@ namespace UsurperRemake.Systems
                         terminal.WriteLine(Loc.Get("inventory.cant_equip_unidentified"));
                         terminal.SetColor("gray");
                         terminal.WriteLine(Loc.Get("inventory.visit_magic_shop"));
-                        await Task.Delay(2000);
+                        await Pacing.Wait(2000);
                         break;
                     }
                     await EquipFromBackpack(index - 1, slot);
@@ -1007,7 +1007,7 @@ namespace UsurperRemake.Systems
                         terminal.WriteLine(Loc.Get("inventory.cursed_cant_drop", item.Name));
                         terminal.SetColor("gray");
                         terminal.WriteLine(Loc.Get("inventory.visit_healer_curse"));
-                        await Task.Delay(2000);
+                        await Pacing.Wait(2000);
                     }
                     else
                     {
@@ -1015,7 +1015,7 @@ namespace UsurperRemake.Systems
                         player.Inventory.Remove(item);
                         terminal.SetColor("yellow");
                         terminal.WriteLine(Loc.Get("inventory.dropped_item", dropName));
-                        await Task.Delay(1000);
+                        await Pacing.Wait(1000);
                     }
                     break;
             }
@@ -1029,7 +1029,7 @@ namespace UsurperRemake.Systems
             if (player.Inventory == null || itemIndex < 0 || itemIndex >= player.Inventory.Count)
             {
                 terminal.WriteLine(Loc.Get("inventory.invalid_item"), "red");
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
                 return;
             }
 
@@ -1082,7 +1082,7 @@ namespace UsurperRemake.Systems
                 item.Type == ObjType.Potion || (item.Type == ObjType.Magic && !isMagicEquipment))
             {
                 terminal.WriteLine(Loc.Get("inventory.cant_equip"), "red");
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
                 return;
             }
 
@@ -1109,7 +1109,7 @@ namespace UsurperRemake.Systems
                 else
                 {
                     terminal.WriteLine(Loc.Get("ui.cancelled"), "gray");
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                     return;
                 }
             }
@@ -1138,7 +1138,7 @@ namespace UsurperRemake.Systems
                 if (finalSlot == null)
                 {
                     terminal.WriteLine(Loc.Get("ui.cancelled"), "gray");
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                     return;
                 }
             }
@@ -1265,7 +1265,7 @@ namespace UsurperRemake.Systems
                 {
                     terminal.SetColor("gray");
                     terminal.WriteLine(Loc.Get("ui.cancelled"));
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                     return;
                 }
             }
@@ -1279,7 +1279,7 @@ namespace UsurperRemake.Systems
                 {
                     terminal.SetColor("gray");
                     terminal.WriteLine(Loc.Get("ui.cancelled"));
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                     return;
                 }
             }
@@ -1305,7 +1305,7 @@ namespace UsurperRemake.Systems
             }
 
             player.RecalculateStats();
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
         }
 
         private static void GetHandedness(Item item, out WeaponHandedness handedness, out WeaponType weaponType)
@@ -1434,7 +1434,7 @@ namespace UsurperRemake.Systems
             if (player.Inventory == null || player.Inventory.Count == 0)
             {
                 terminal.WriteLine(Loc.Get("inventory.backpack_empty"), "gray");
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
                 return;
             }
 
@@ -1450,17 +1450,17 @@ namespace UsurperRemake.Systems
                     {
                         terminal.WriteLine(Loc.Get("inventory.cursed_cant_drop", item.Name), "red");
                         terminal.WriteLine(Loc.Get("inventory.visit_healer_curse"), "gray");
-                        await Task.Delay(2000);
+                        await Pacing.Wait(2000);
                         return;
                     }
                     player.Inventory.RemoveAt(index - 1);
                     terminal.WriteLine(Loc.Get("inventory.dropped_item", item.Name), "yellow");
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                 }
                 else
                 {
                     terminal.WriteLine(Loc.Get("inventory.invalid_item"), "red");
-                    await Task.Delay(500);
+                    await Pacing.Wait(500);
                 }
             }
         }
@@ -1480,7 +1480,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine(Loc.Get("inventory.cursed_cant_unequip", currentItem.Name));
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("inventory.visit_healer_curse"));
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 return;
             }
             var unequipped = player.UnequipSlot(slot);
@@ -1499,7 +1499,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine(Loc.Get("inventory.unequipped", unequipped.Name));
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("inventory.returned_backpack"));
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
             }
         }
 
@@ -1543,7 +1543,7 @@ namespace UsurperRemake.Systems
                     else
                     {
                         terminal.WriteLine(Loc.Get("inventory.invalid_choice"), "red");
-                        await Task.Delay(500);
+                        await Pacing.Wait(500);
                     }
                     break;
             }
@@ -1719,7 +1719,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine(Loc.Get("inventory.no_items_unequip"));
             }
 
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
         }
     }
 }

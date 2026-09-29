@@ -155,7 +155,7 @@ public partial class TempleLocation : BaseLocation
             terminal.WriteLine(Loc.Get("temple.not_believer"), "gray");
         }
 
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
     }
     
     /// <summary>
@@ -306,7 +306,7 @@ public partial class TempleLocation : BaseLocation
                 for (int i = 0; i < 15; i++)
                 {
                     terminal.Write(".", "white");
-                    await Task.Delay(300);
+                    await Pacing.Wait(300);
                 }
                 terminal.WriteLine("");
 
@@ -323,7 +323,7 @@ public partial class TempleLocation : BaseLocation
             }
         }
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
     
     /// <summary>
@@ -338,14 +338,14 @@ public partial class TempleLocation : BaseLocation
         {
             terminal.WriteLine(Loc.Get("temple.desecration_limit"), "red");
             terminal.WriteLine(Loc.Get("temple.wait_tomorrow"), "gray");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
         if (currentPlayer.DarkNr < 1)
         {
             terminal.WriteLine(Loc.Get("temple.no_evil_deeds"), "red");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -353,7 +353,7 @@ public partial class TempleLocation : BaseLocation
         if (!await terminal.AskYesNoAsync(Loc.Get("temple.upset_gods")))
         {
             terminal.WriteLine(Loc.Get("temple.good_for_you"), "green");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
         
@@ -365,7 +365,7 @@ public partial class TempleLocation : BaseLocation
         {
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("temple.not_allowed_abuse_own"), "red");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -465,7 +465,7 @@ public partial class TempleLocation : BaseLocation
         if (!DoorMode.IsOnlineMode || !GameConfig.OnlinePermadeathEnabled)
         {
             terminal.WriteLine(Loc.Get("temple.invalid_choice"), "red");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
@@ -545,7 +545,7 @@ public partial class TempleLocation : BaseLocation
         if (currentPlayer.ChivNr < 1)
         {
             terminal.WriteLine(Loc.Get("temple.no_good_deeds"), "red");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -576,7 +576,7 @@ public partial class TempleLocation : BaseLocation
             await ProcessGoldSacrifice(selectedGod, wrongGod);
         }
 
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
     }
     
     /// <summary>
@@ -658,7 +658,7 @@ public partial class TempleLocation : BaseLocation
         if (activeGods.Count == 0)
         {
             terminal.WriteLine(Loc.Get("temple.no_gods_available"), "red");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return null;
         }
 
@@ -862,13 +862,13 @@ public partial class TempleLocation : BaseLocation
                 terminal.Write(Loc.Get("temple.desecrate_hack_word"), "red");
                 for (int i = 0; i < 4; i++)
                 {
-                    await Task.Delay(500);
+                    await Pacing.Wait(500);
                     terminal.Write(".", "red");
                 }
                 terminal.Write(Loc.Get("temple.desecrate_hack_word_lower"), "red");
                 for (int i = 0; i < 4; i++)
                 {
-                    await Task.Delay(500);
+                    await Pacing.Wait(500);
                     terminal.Write(".", "red");
                 }
                 terminal.WriteLine(Loc.Get("temple.desecrate_hack_final"), "red");
@@ -891,7 +891,7 @@ public partial class TempleLocation : BaseLocation
         // Use evil deed
         currentPlayer.DarkNr--;
         
-        await Task.Delay(3000);
+        await Pacing.Wait(3000);
     }
     
     /// <summary>
@@ -915,14 +915,14 @@ public partial class TempleLocation : BaseLocation
         if (!long.TryParse(goldStr, out long goldAmount) || goldAmount <= 0)
         {
             terminal.WriteLine(Loc.Get("temple.invalid_amount"), "red");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
         if (goldAmount > currentPlayer.Gold)
         {
             terminal.WriteLine(Loc.Get("temple.not_enough_gold"), "red");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
@@ -1026,7 +1026,7 @@ public partial class TempleLocation : BaseLocation
             }
         }
 
-        await Task.Delay(3000);
+        await Pacing.Wait(3000);
     }
 
     /// <summary>
@@ -1096,7 +1096,7 @@ public partial class TempleLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("temple.god_no_longer_exists", playerGod), "red");
                 terminal.WriteLine(Loc.Get("temple.faith_shaken"), "gray");
                 GodSwitchSystem.Switch(currentPlayer, null, GodChangeBy.Other);   // 1.2.0: the game's change, no wrath
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
             }
         }
     }
@@ -1158,7 +1158,7 @@ public partial class TempleLocation : BaseLocation
 
         // Random divine whisper intro
         terminal.WriteLine(Loc.Get(DivineWhisperKeys[random.Next(DivineWhisperKeys.Length)]), "gray");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
         terminal.WriteLine("");
 
         // Show prophecies based on story progression
@@ -1305,7 +1305,7 @@ public partial class TempleLocation : BaseLocation
         terminal.WriteLine("");
         WriteBoxHeader(Loc.Get("temple.vision"), "bright_cyan", 63);
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         var story = StoryProgressionSystem.Instance;
         int godsFaced = story.OldGodStates.Count(s => s.Value.Status != GodStatus.Imprisoned);
@@ -1314,11 +1314,11 @@ public partial class TempleLocation : BaseLocation
         {
             terminal.WriteLine(Loc.Get("temple.vision_seven_figures"), "white");
             terminal.WriteLine(Loc.Get("temple.vision_faces_beautiful"), "white");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             terminal.WriteLine("", "white");
             terminal.WriteLine(Loc.Get("temple.vision_darkness_creeps"), "gray");
             terminal.WriteLine(Loc.Get("temple.vision_beauty_twists"), "gray");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             terminal.WriteLine("", "white");
             terminal.WriteLine(Loc.Get("temple.vision_meant_to_guide"), "bright_magenta");
             terminal.WriteLine(Loc.Get("temple.vision_broke_hearts"), "bright_magenta");
@@ -1327,11 +1327,11 @@ public partial class TempleLocation : BaseLocation
         {
             terminal.WriteLine(Loc.Get("temple.vision_endless_halls"), "white");
             terminal.WriteLine(Loc.Get("temple.vision_faint_light"), "white");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             terminal.WriteLine("", "white");
             terminal.WriteLine(Loc.Get("temple.vision_light_fades"), "bright_yellow");
             terminal.WriteLine(Loc.Get("temple.vision_find_me"), "bright_yellow");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             terminal.WriteLine("", "white");
             terminal.WriteLine(Loc.Get("temple.vision_from_temple"), "bright_cyan");
         }
@@ -1339,17 +1339,17 @@ public partial class TempleLocation : BaseLocation
         {
             terminal.WriteLine(Loc.Get("temple.vision_throne_stars"), "white");
             terminal.WriteLine(Loc.Get("temple.vision_figure_older"), "white");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             terminal.WriteLine("", "white");
             terminal.WriteLine(Loc.Get("temple.vision_come_far"), "bright_white");
             terminal.WriteLine(Loc.Get("temple.vision_final_question"), "bright_white");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             terminal.WriteLine("", "white");
             terminal.WriteLine(Loc.Get("temple.vision_worth_cost"), "bright_magenta");
         }
 
         terminal.WriteLine("");
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         // Record divine vision in story
         story.SetStoryFlag("had_divine_vision", true);
@@ -1379,7 +1379,7 @@ public partial class TempleLocation : BaseLocation
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("temple.deep_temple_sealed"), "red");
             terminal.WriteLine(Loc.Get("temple.deep_temple_prove"), "gray");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -1389,11 +1389,11 @@ public partial class TempleLocation : BaseLocation
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("temple.deep_temple_descend"), "white");
         terminal.WriteLine(Loc.Get("temple.deep_temple_torches"), "white");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("temple.deep_temple_air_thick"), "gray");
         terminal.WriteLine(Loc.Get("temple.deep_temple_watches"), "gray");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         var story = StoryProgressionSystem.Instance;
         var bossSystem = OldGodBossSystem.Instance;
@@ -1521,7 +1521,7 @@ public partial class TempleLocation : BaseLocation
         {
             terminal.WriteLine(Loc.Get("temple.must_worship_first"), "red");
             terminal.WriteLine(Loc.Get("temple.visit_worship"), "gray");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
         string currentGod = worshipped.Value.Name;
@@ -1568,13 +1568,13 @@ public partial class TempleLocation : BaseLocation
         if (item == null)
         {
             terminal.WriteLine(Loc.Get(weapon ? "temple.no_weapon" : "temple.no_armor"), "red");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
         if (item.IsCursed || item.IsUnique)
         {
             terminal.WriteLine(Loc.Get("temple.sacrifice_refused_item", item.Name, godName), "red");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -1586,7 +1586,7 @@ public partial class TempleLocation : BaseLocation
         if (outcome != ItemSacrificeOutcome.Done)
         {
             terminal.WriteLine(Loc.Get("temple.sacrifice_refused_item", item.Name, godName), "red");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -1617,7 +1617,7 @@ public partial class TempleLocation : BaseLocation
             ? $"{currentPlayer.Name2} sacrificed their weapon to {godName} at the Temple."
             : $"{currentPlayer.Name2} sacrificed their armor to {godName} at the Temple.");
 
-        await Task.Delay(2500);
+        await Pacing.Wait(2500);
     }
 
     /// <summary>
@@ -1628,7 +1628,7 @@ public partial class TempleLocation : BaseLocation
         if (currentPlayer.Healing <= 0)
         {
             terminal.WriteLine(Loc.Get("temple.no_potions"), "red");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -1638,14 +1638,14 @@ public partial class TempleLocation : BaseLocation
         if (!int.TryParse(amountStr, out int amount) || amount <= 0)
         {
             terminal.WriteLine(Loc.Get("temple.invalid_amount"), "red");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
         if (amount > currentPlayer.Healing)
         {
             terminal.WriteLine(Loc.Get("temple.not_enough_potions"), "red");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
@@ -1677,7 +1677,7 @@ public partial class TempleLocation : BaseLocation
         // Apply faction effects based on god alignment
         ApplyFactionEffectForSacrifice(godName, Math.Max(1, amount / 2));
 
-        await Task.Delay(2500);
+        await Pacing.Wait(2500);
     }
 
     /// <summary>
@@ -1733,7 +1733,7 @@ public partial class TempleLocation : BaseLocation
         };
 
         terminal.WriteLine(Loc.Get(desecrationKeys[random.Next(desecrationKeys.Length)]), "red");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("temple.desecrated_altar", god.Name), "bright_red");
@@ -1795,7 +1795,7 @@ public partial class TempleLocation : BaseLocation
         // Generate news
         NewsSystem.Instance.Newsy(true, $"{currentPlayer.Name2} desecrated the altar of {god.Name}! The gods are furious!");
 
-        await Task.Delay(3000);
+        await Pacing.Wait(3000);
     }
 
     /// <summary>
@@ -1812,7 +1812,7 @@ public partial class TempleLocation : BaseLocation
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("temple.ancient_stones_revealed"), "gray");
             terminal.WriteLine(Loc.Get("temple.remember_truth"), "gray");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -1823,13 +1823,13 @@ public partial class TempleLocation : BaseLocation
         terminal.WriteLine(Loc.Get("temple.far_corner"));
         terminal.SetColor("white");
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.WriteLine(Loc.Get("temple.massive_stones"));
         terminal.WriteLine(Loc.Get("temple.older_than_temple"));
         terminal.WriteLine(Loc.Get("temple.whose_altar"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("gray");
         terminal.WriteLine(Loc.Get("temple.monks_say"));
@@ -1837,7 +1837,7 @@ public partial class TempleLocation : BaseLocation
         terminal.WriteLine(Loc.Get("temple.before_gods"));
         terminal.SetColor("white");
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         // v1.1.15: yesno-convert-a, strict (Y/N)
         if (!await terminal.AskYesNoAsync(Loc.Get("temple.touch_stone")))
@@ -1845,7 +1845,7 @@ public partial class TempleLocation : BaseLocation
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("temple.step_back_stones"), "gray");
             terminal.WriteLine(Loc.Get("temple.perhaps_another_time"), "gray");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
@@ -1854,16 +1854,16 @@ public partial class TempleLocation : BaseLocation
         terminal.SetColor("bright_yellow");
         terminal.WriteLine(Loc.Get("temple.hand_touches"));
         terminal.WriteLine("");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("temple.at_first_nothing"));
         terminal.WriteLine("");
-        await Task.Delay(800);
+        await Pacing.Wait(800);
 
         terminal.WriteLine(Loc.Get("temple.warmth_pulse"));
         terminal.WriteLine("");
-        await Task.Delay(800);
+        await Pacing.Wait(800);
 
         terminal.SetColor("bright_cyan");
         terminal.WriteLine(Loc.Get("temple.stone_glows"));
@@ -1871,7 +1871,7 @@ public partial class TempleLocation : BaseLocation
         terminal.WriteLine(Loc.Get("temple.older_language"));
         terminal.SetColor("white");
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("bright_magenta");
         terminal.WriteLine(Loc.Get("temple.voice_speaks"));
@@ -1882,7 +1882,7 @@ public partial class TempleLocation : BaseLocation
         terminal.WriteLine(Loc.Get("temple.remember_well"));
         terminal.SetColor("white");
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("gray");
         await terminal.PressAnyKey(Loc.Get("temple.press_enter_continue"));
@@ -1910,7 +1910,7 @@ public partial class TempleLocation : BaseLocation
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("temple.must_worship_to_pray"), "yellow");
             terminal.WriteLine(Loc.Get("temple.visit_worship_first"), "gray");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -1919,7 +1919,7 @@ public partial class TempleLocation : BaseLocation
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("temple.already_prayed"), "gray");
             terminal.WriteLine(Loc.Get("temple.return_tomorrow"), "gray");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -1935,11 +1935,11 @@ public partial class TempleLocation : BaseLocation
             terminal.WriteLine("");
             terminal.SetColor("bright_cyan");
             terminal.WriteLine(Loc.Get("temple.kneel_altar", worshippedImmortal));
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             terminal.SetColor("white");
             terminal.WriteLine(Loc.Get("temple.prayers_rise_immortal"));
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             // v1.1.15: prayer eases the mind once a day.
             int mentalBeforeImmortal = currentPlayer.Mental;
@@ -2032,7 +2032,7 @@ public partial class TempleLocation : BaseLocation
             }
 
             terminal.WriteLine("");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             refreshMenu = true;
             return;
         }
@@ -2042,7 +2042,7 @@ public partial class TempleLocation : BaseLocation
         if (god == null)
         {
             terminal.WriteLine(Loc.Get("temple.god_no_longer_exists_short"), "red");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -2050,11 +2050,11 @@ public partial class TempleLocation : BaseLocation
         terminal.WriteLine("");
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("temple.kneel_altar", playerGod));
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("temple.prayers_rise_incense"));
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         // v1.1.15: prayer eases the mind once a day.
         int mentalBeforePrayer = currentPlayer.Mental;
@@ -2079,7 +2079,7 @@ public partial class TempleLocation : BaseLocation
             terminal.SetColor("bright_cyan");
             terminal.WriteLine(Loc.Get("temple.balance_clarity"));
         }
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         // Grant the daily prayer blessing
         var blessing = UsurperRemake.Systems.DivineBlessingSystem.Instance.GrantPrayerBlessing(currentPlayer);
@@ -2129,7 +2129,7 @@ public partial class TempleLocation : BaseLocation
             terminal.WriteLine(Loc.Get("temple.shadows_standing_gain"));
         }
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
         refreshMenu = true;
     }
 
@@ -2174,7 +2174,7 @@ public partial class TempleLocation : BaseLocation
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("temple.meditation_chapel_empty"), "gray");
             terminal.WriteLine(Loc.Get("temple.only_silence"), "gray");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             refreshMenu = true;
             return;
         }
@@ -2182,20 +2182,20 @@ public partial class TempleLocation : BaseLocation
         terminal.ClearScreen();
         WriteBoxHeader(Loc.Get("temple.meditation"), "bright_green", 66);
         terminal.WriteLine("");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("temple.step_into_chapel"));
         terminal.WriteLine(Loc.Get("temple.candle_illuminates"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("gray");
         terminal.WriteLine(Loc.Get("temple.faded_robes"));
         terminal.WriteLine(Loc.Get("temple.hands_clasped"));
         terminal.WriteLine(Loc.Get("temple.prays_to_nothing"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         // First dialogue
         terminal.SetColor("cyan");
@@ -2204,7 +2204,7 @@ public partial class TempleLocation : BaseLocation
         terminal.SetColor("bright_cyan");
         terminal.WriteLine($"\"{mira.DialogueHints[0]}\"");
         terminal.WriteLine("");
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("temple.turns_back"));
@@ -2212,7 +2212,7 @@ public partial class TempleLocation : BaseLocation
         terminal.SetColor("cyan");
         terminal.WriteLine($"\"{mira.DialogueHints[1]}\"");
         terminal.WriteLine("");
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         // Show her details
         terminal.SetColor("yellow");
@@ -2224,7 +2224,7 @@ public partial class TempleLocation : BaseLocation
         terminal.SetColor("gray");
         terminal.WriteLine(mira.BackstoryBrief);
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("bright_yellow");
         if (IsScreenReader)
@@ -2280,21 +2280,21 @@ public partial class TempleLocation : BaseLocation
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("temple.dungeons_dangerous"));
         terminal.WriteLine("");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("temple.looks_long_moment", mira.Name));
         terminal.WriteLine(Loc.Get("temple.flickers_in_eyes"));
         terminal.WriteLine(Loc.Get("temple.a_question"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("bright_cyan");
         terminal.WriteLine(Loc.Get("temple.want_me_to_heal"));
         terminal.WriteLine(Loc.Get("temple.always_been_able"));
         terminal.WriteLine(Loc.Get("temple.will_it_matter"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("temple.doesnt_wait"));
@@ -2302,7 +2302,7 @@ public partial class TempleLocation : BaseLocation
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("temple.perhaps_help"));
         terminal.WriteLine("");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         bool success = await companionSystem.RecruitCompanion(
             UsurperRemake.Systems.CompanionId.Mira, currentPlayer, terminal);
@@ -2331,19 +2331,19 @@ public partial class TempleLocation : BaseLocation
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("temple.sit_beside"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("white");
         terminal.WriteLine(mira.Description);
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("temple.was_healer_veloura"));
         terminal.WriteLine(Loc.Get("temple.corruption_came"));
         terminal.WriteLine(Loc.Get("temple.escaped_left_faith"));
         terminal.WriteLine("");
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         if (!string.IsNullOrEmpty(mira.PersonalQuestDescription))
         {
@@ -2358,7 +2358,7 @@ public partial class TempleLocation : BaseLocation
         terminal.WriteLine(Loc.Get("temple.to_empty_altar"));
         terminal.WriteLine(Loc.Get("temple.if_i_stop"));
         terminal.WriteLine("");
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         // v1.1.15: yesno-convert-a, strict (Y/N)
         if (await terminal.AskYesNoAsync(Loc.Get("temple.ask_join_prompt")))
@@ -2394,13 +2394,13 @@ public partial class TempleLocation : BaseLocation
         terminal.WriteLine(Loc.Get("temple.faith_approach"));
         terminal.WriteLine(Loc.Get("temple.faith_devoted"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("bright_cyan");
         terminal.WriteLine(Loc.Get("temple.mirael_intro"));
         terminal.WriteLine(Loc.Get("temple.mirael_watched"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         // Check if already in a faction
         if (factionSystem.PlayerFaction != null)
@@ -2427,14 +2427,14 @@ public partial class TempleLocation : BaseLocation
         terminal.WriteLine(Loc.Get("temple.faith_corrupted"));
         terminal.WriteLine(Loc.Get("temple.faith_absorbed"));
         terminal.WriteLine("");
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("temple.faith_healed"));
         terminal.WriteLine(Loc.Get("temple.faith_devotion"));
         terminal.WriteLine(Loc.Get("temple.faith_restore"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         // Show faction benefits
         WriteSectionHeader(Loc.Get("temple.faith_benefits"), "bright_yellow");
@@ -2514,29 +2514,29 @@ public partial class TempleLocation : BaseLocation
         terminal.WriteLine(Loc.Get("temple.kneel_sacred_flames"));
         terminal.WriteLine(Loc.Get("temple.mirael_stands"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("bright_cyan");
         terminal.WriteLine(Loc.Get("temple.repeat_after_me"));
         terminal.WriteLine("");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("temple.oath_line1"));
-        await Task.Delay(1200);
+        await Pacing.Wait(1200);
         terminal.WriteLine(Loc.Get("temple.oath_line2"));
-        await Task.Delay(1200);
+        await Pacing.Wait(1200);
         terminal.WriteLine(Loc.Get("temple.oath_line3"));
-        await Task.Delay(1200);
+        await Pacing.Wait(1200);
         terminal.WriteLine(Loc.Get("temple.oath_line4"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("temple.flames_flare"));
         terminal.WriteLine(Loc.Get("temple.profound_peace"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         // Actually join the faction
         factionSystem.JoinFaction(UsurperRemake.Systems.Faction.TheFaith, currentPlayer);
@@ -2575,7 +2575,7 @@ public partial class TempleLocation : BaseLocation
             terminal.SetColor("red");
             terminal.WriteLine("\n" + Loc.Get("temple.sanctum_sealed"));
             terminal.WriteLine(Loc.Get("temple.sanctum_faith_only"));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -2595,7 +2595,7 @@ public partial class TempleLocation : BaseLocation
             terminal.SetColor("gray");
             terminal.WriteLine("\n" + Loc.Get("temple.sanctum_already_meditated"));
             terminal.WriteLine(Loc.Get("temple.sanctum_ready_tomorrow"));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -2623,7 +2623,7 @@ public partial class TempleLocation : BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("temple.sanctum_cant_afford"));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -2636,10 +2636,10 @@ public partial class TempleLocation : BaseLocation
 
         terminal.SetColor("gray");
         terminal.WriteLine("\n" + Loc.Get("temple.sanctum_kneel"));
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
         terminal.SetColor("bright_cyan");
         terminal.WriteLine(Loc.Get("temple.sanctum_warmth"));
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         // Grant +1 to a random stat
         var rng = Random.Shared;
@@ -3108,7 +3108,7 @@ public partial class TempleLocation : BaseLocation
         else
         {
             terminal.WriteLine(Loc.Get("temple.invalid_choice"), "red");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
         }
         return false;
     }
@@ -3220,7 +3220,7 @@ public partial class TempleLocation : BaseLocation
             if (action == null)
             {
                 terminal.WriteLine(Loc.Get("temple.invalid_choice"), "red");
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
                 continue;
             }
             await action();
@@ -3398,7 +3398,7 @@ public partial class TempleLocation : BaseLocation
         if (altars.Count == 0)
         {
             terminal.WriteLine(Loc.Get("temple.no_gods_available"), "red");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return null;
         }
 
@@ -3502,7 +3502,7 @@ public partial class TempleLocation : BaseLocation
         else if (kind != "R" && kind.Length > 0)
         {
             terminal.WriteLine(Loc.Get("temple.invalid_choice"), "red");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
         }
     }
 

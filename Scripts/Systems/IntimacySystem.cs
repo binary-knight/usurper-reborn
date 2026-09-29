@@ -270,13 +270,13 @@ namespace UsurperRemake.Systems
             }
             terminal.WriteLine("");
 
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             terminal.SetColor("dark_magenta");
             terminal.WriteLine("  . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .");
             terminal.WriteLine("");
 
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             terminal.SetColor("white");
             terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.fade_later"))}");
@@ -307,7 +307,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("");
                 terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.daily_cap_reached"))}");
                 terminal.WriteLine("");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
             }
             return false;
         }
@@ -372,7 +372,7 @@ namespace UsurperRemake.Systems
             UIHelper.WriteBoxHeader(terminal, GameConfig.CleanFormat(Get("intimacy.blessed_news")), "bright_yellow");
             terminal.WriteLine("");
 
-            await Task.Delay(500);
+            await Pacing.Wait(500);
 
             string gender = GameConfig.GetLocalizedSubjectPronoun(partner.Sex).ToLowerInvariant();
             string their = GameConfig.GetLocalizedPossessivePronoun(partner.Sex);
@@ -381,7 +381,7 @@ namespace UsurperRemake.Systems
             terminal.SetColor("white");
             terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.weeks_later"))}");
             terminal.WriteLine("");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             if (partnerIsPregnant)
             {
@@ -389,7 +389,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.pregnancy_partner_tells", partner.Name2, their))}");
                 terminal.WriteLine($"  \"{GameConfig.CleanFormat(Get("intimacy.pregnancy_partner_tells2", player!.Name))}\"");
                 terminal.WriteLine("");
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
                 terminal.SetColor("white");
                 terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.pregnancy_partner_belly", their))}");
                 terminal.SetColor("bright_yellow");
@@ -401,7 +401,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.pregnancy_player_feeling"))}");
                 terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.pregnancy_player_sickness", partner.Name2, gender))}");
                 terminal.WriteLine("");
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine($"  \"{GameConfig.CleanFormat(Get("intimacy.pregnancy_partner_asks"))}\"");
                 terminal.SetColor("white");
@@ -409,7 +409,7 @@ namespace UsurperRemake.Systems
             }
 
             terminal.WriteLine("");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             // Create the child
             Character mother = partnerIsPregnant ? partner : player!;
@@ -622,7 +622,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  {moodDesc}");
             terminal.WriteLine("");
 
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
         }
 
         /// <summary>
@@ -645,7 +645,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.anticipation_turns", genderCap))}");
             terminal.WriteLine("");
 
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             // Player choice for pacing
             terminal.SetColor("cyan");
@@ -760,7 +760,7 @@ namespace UsurperRemake.Systems
             }
             terminal.WriteLine("");
 
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             // Undressing
             terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.exploration.undress_intro"))}");
@@ -783,7 +783,7 @@ namespace UsurperRemake.Systems
             }
             terminal.WriteLine("");
 
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             // Physical description based on NPC
             terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.exploration.skin_meet"))}");
@@ -846,7 +846,7 @@ namespace UsurperRemake.Systems
             }
             terminal.WriteLine("");
 
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             // Verbal intimacy
             terminal.SetColor("cyan");
@@ -940,7 +940,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.climax.intertwine_l3"))}");
             terminal.WriteLine("");
 
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.climax.tension_l1"))}");
             terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.climax.tension_l2"))}");
@@ -960,7 +960,7 @@ namespace UsurperRemake.Systems
             }
             terminal.WriteLine("");
 
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.climax.crest_l1", partner.Name2))}");
             terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.climax.crest_l2", them))}");
@@ -997,7 +997,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.afterglow.tangled_l2", partner.Name2))}");
             terminal.WriteLine("");
 
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             float romanticism = profile?.Romanticism ?? 0.5f;
             var romanceType = RomanceTracker.Instance.GetRelationType(partner.ID);
@@ -1020,7 +1020,7 @@ namespace UsurperRemake.Systems
             }
             terminal.WriteLine("");
 
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             // Pillow talk options
             terminal.SetColor("cyan");

@@ -260,13 +260,13 @@ namespace UsurperRemake.Systems
         private async Task PlayUsurperEnding(Character player, TerminalEmulator terminal)
         {
             terminal.Clear();
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             terminal.WriteLine("");
             UIHelper.WriteBoxHeader(terminal, Loc.Get("ending.usurper_header"), "dark_red", 67);
             terminal.WriteLine("");
 
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
 
             var lines = new[]
             {
@@ -304,7 +304,7 @@ namespace UsurperRemake.Systems
             foreach (var (line, color) in lines)
             {
                 terminal.WriteLine($"  {line}", color);
-                await Task.Delay(200);
+                await Pacing.Wait(200);
             }
 
             terminal.WriteLine("");
@@ -318,13 +318,13 @@ namespace UsurperRemake.Systems
         private async Task PlaySaviorEnding(Character player, TerminalEmulator terminal)
         {
             terminal.Clear();
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             terminal.WriteLine("");
             UIHelper.WriteBoxHeader(terminal, Loc.Get("ending.savior_header"), "bright_green", 67);
             terminal.WriteLine("");
 
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
 
             var lines = new[]
             {
@@ -366,7 +366,7 @@ namespace UsurperRemake.Systems
             foreach (var (line, color) in lines)
             {
                 terminal.WriteLine($"  {line}", color);
-                await Task.Delay(200);
+                await Pacing.Wait(200);
             }
 
             terminal.WriteLine("");
@@ -380,13 +380,13 @@ namespace UsurperRemake.Systems
         private async Task PlayDefiantEnding(Character player, TerminalEmulator terminal)
         {
             terminal.Clear();
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             terminal.WriteLine("");
             UIHelper.WriteBoxHeader(terminal, Loc.Get("ending.defiant_header"), "bright_yellow", 67);
             terminal.WriteLine("");
 
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
 
             var lines = new[]
             {
@@ -429,7 +429,7 @@ namespace UsurperRemake.Systems
             foreach (var (line, color) in lines)
             {
                 terminal.WriteLine($"  {line}", color);
-                await Task.Delay(200);
+                await Pacing.Wait(200);
             }
 
             terminal.WriteLine("");
@@ -443,7 +443,7 @@ namespace UsurperRemake.Systems
         private async Task PlayTrueEnding(Character player, TerminalEmulator terminal)
         {
             terminal.Clear();
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             terminal.WriteLine("");
             if (!GameConfig.ScreenReaderMode)
@@ -459,7 +459,7 @@ namespace UsurperRemake.Systems
             }
             terminal.WriteLine("");
 
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
 
             var lines = new[]
             {
@@ -503,7 +503,7 @@ namespace UsurperRemake.Systems
             foreach (var (line, color) in lines)
             {
                 terminal.WriteLine($"  {line}", color);
-                await Task.Delay(200);
+                await Pacing.Wait(200);
             }
 
             terminal.WriteLine("");
@@ -521,7 +521,7 @@ namespace UsurperRemake.Systems
         private async Task PlayEnhancedTrueEnding(Character player, TerminalEmulator terminal)
         {
             terminal.Clear();
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             terminal.WriteLine("");
             if (!GameConfig.ScreenReaderMode)
@@ -538,7 +538,7 @@ namespace UsurperRemake.Systems
             }
             terminal.WriteLine("");
 
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
 
             var lines = new[]
             {
@@ -601,7 +601,7 @@ namespace UsurperRemake.Systems
             foreach (var (line, color) in lines)
             {
                 terminal.WriteLine($"  {line}", color);
-                await Task.Delay(150);
+                await Pacing.Wait(150);
             }
 
             terminal.WriteLine("");
@@ -625,7 +625,7 @@ namespace UsurperRemake.Systems
         private async Task PlayDissolutionEnding(Character player, TerminalEmulator terminal)
         {
             terminal.Clear();
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
 
             terminal.WriteLine("");
             if (!GameConfig.ScreenReaderMode)
@@ -642,7 +642,7 @@ namespace UsurperRemake.Systems
             }
             terminal.WriteLine("");
 
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
 
             var lines = new[]
             {
@@ -694,14 +694,14 @@ namespace UsurperRemake.Systems
             foreach (var (line, color) in lines)
             {
                 terminal.WriteLine($"  {line}", color);
-                await Task.Delay(200);
+                await Pacing.Wait(200);
             }
 
             terminal.WriteLine("");
             terminal.WriteLine($"  {Loc.Get("ending.dissolution_dots")}", "gray");
             terminal.WriteLine("");
 
-            await Task.Delay(3000);
+            await Pacing.Wait(3000);
 
             terminal.Clear();
             terminal.WriteLine("");
@@ -728,7 +728,7 @@ namespace UsurperRemake.Systems
                 string playerName = !string.IsNullOrEmpty(player.Name1) ? player.Name1 : player.Name2;
                 SaveSystem.Instance.DeleteSave(playerName);
 
-                await Task.Delay(3000);
+                await Pacing.Wait(3000);
 
                 // Moment of silence — complete dissolution
                 await UIHelper.MomentOfSilence(terminal, 8000);
@@ -762,7 +762,7 @@ namespace UsurperRemake.Systems
         private async Task PlayCredits(Character player, EndingType ending, TerminalEmulator terminal)
         {
             terminal.Clear();
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
 
             terminal.WriteLine("");
             if (!GameConfig.ScreenReaderMode)
@@ -775,7 +775,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("═══════════════════════════════════════════════════════════════════", "bright_cyan");
             terminal.WriteLine("");
 
-            await Task.Delay(3000);
+            await Pacing.Wait(3000);
 
             var credits = new[]
             {
@@ -831,12 +831,12 @@ namespace UsurperRemake.Systems
                 if (string.IsNullOrEmpty(line))
                 {
                     terminal.WriteLine("");
-                    await Task.Delay(500);
+                    await Pacing.Wait(500);
                 }
                 else
                 {
                     terminal.WriteLine($"  {line}", color);
-                    await Task.Delay(800);
+                    await Pacing.Wait(800);
                 }
             }
 
@@ -845,7 +845,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("═══════════════════════════════════════════════════════════════════", "bright_cyan");
             terminal.WriteLine("");
 
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
 
             // Show stats
             await ShowFinalStats(player, ending, terminal);
@@ -905,13 +905,13 @@ namespace UsurperRemake.Systems
         private async Task ShowEpilogue(Character player, EndingType ending, TerminalEmulator terminal)
         {
             terminal.Clear();
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             terminal.WriteLine("");
             UIHelper.WriteBoxHeader(terminal, Loc.Get("ending.legacy_header"), "bright_cyan", 67);
             terminal.WriteLine("");
 
-            await Task.Delay(500);
+            await Pacing.Wait(500);
 
             var story = StoryProgressionSystem.Instance;
             var companions = CompanionSystem.Instance;
@@ -923,7 +923,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  {Loc.Get("ending.legacy_hero_stats", player.Level, player.MKills)}", "gray");
             terminal.WriteLine("");
 
-            await Task.Delay(300);
+            await Pacing.Wait(300);
 
             // Alignment-based description
             long alignment = player.Chivalry - player.Darkness;
@@ -936,7 +936,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  {Loc.Get("ending.legacy_known_as", alignDesc)}", "white");
             terminal.WriteLine("");
 
-            await Task.Delay(300);
+            await Pacing.Wait(300);
 
             // Companions
             terminal.WriteLine($"  {Loc.Get("ending.legacy_companions_section")}", "bright_yellow");
@@ -966,7 +966,7 @@ namespace UsurperRemake.Systems
             }
             terminal.WriteLine("");
 
-            await Task.Delay(300);
+            await Pacing.Wait(300);
 
             // Romance
             terminal.WriteLine($"  {Loc.Get("ending.legacy_love_section")}", "bright_yellow");
@@ -995,21 +995,21 @@ namespace UsurperRemake.Systems
             }
             terminal.WriteLine("");
 
-            await Task.Delay(300);
+            await Pacing.Wait(300);
 
             // World impact
             terminal.WriteLine($"  {Loc.Get("ending.legacy_world_section")}", "bright_yellow");
             await ShowWorldImpact(player, ending, story, terminal);
             terminal.WriteLine("");
 
-            await Task.Delay(300);
+            await Pacing.Wait(300);
 
             // Achievements unlocked
             terminal.WriteLine($"  {Loc.Get("ending.legacy_achievements_section")}", "bright_yellow");
             await ShowNotableAchievements(player, terminal);
             terminal.WriteLine("");
 
-            await Task.Delay(300);
+            await Pacing.Wait(300);
 
             // Jungian Archetype reveal
             terminal.WriteLine($"  {Loc.Get("ending.legacy_archetype_section")}", "bright_yellow");
@@ -1041,7 +1041,7 @@ namespace UsurperRemake.Systems
         /// </summary>
         private async Task ShowWorldImpact(Character player, EndingType ending, StoryProgressionSystem story, TerminalEmulator terminal)
         {
-            await Task.Delay(100);
+            await Pacing.Wait(100);
 
             // Count gods saved vs destroyed
             int savedGods = 0;
@@ -1119,7 +1119,7 @@ namespace UsurperRemake.Systems
         /// </summary>
         private async Task ShowNotableAchievements(Character player, TerminalEmulator terminal)
         {
-            await Task.Delay(100);
+            await Pacing.Wait(100);
 
             var achievementCount = player.Achievements?.UnlockedCount ?? 0;
             var notableAchievements = new List<string>();
@@ -1155,7 +1155,7 @@ namespace UsurperRemake.Systems
         /// </summary>
         private async Task ShowArchetypeReveal(Character player, TerminalEmulator terminal)
         {
-            await Task.Delay(500);
+            await Pacing.Wait(500);
 
             var tracker = ArchetypeTracker.Instance;
             var dominant = tracker.GetDominantArchetype();
@@ -1167,13 +1167,13 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  {Loc.Get("ending.archetype_intro")}", "white");
             terminal.WriteLine("");
 
-            await Task.Delay(500);
+            await Pacing.Wait(500);
 
             terminal.WriteLine($"  *** {name.ToUpper()} ***", color);
             terminal.WriteLine($"  \"{title}\"", color);
             terminal.WriteLine("");
 
-            await Task.Delay(500);
+            await Pacing.Wait(500);
 
             // Word wrap the description
             var words = description.Split(' ');
@@ -1196,14 +1196,14 @@ namespace UsurperRemake.Systems
             }
             terminal.WriteLine("");
 
-            await Task.Delay(300);
+            await Pacing.Wait(300);
 
             // Show secondary archetype
             var (secName, secTitle, _, secColor) = ArchetypeTracker.GetArchetypeInfo(secondary);
             terminal.WriteLine($"  {Loc.Get("ending.archetype_secondary", secName, secTitle)}", "gray");
             terminal.WriteLine("");
 
-            await Task.Delay(300);
+            await Pacing.Wait(300);
 
             // Show the archetype quote
             terminal.WriteLine($"  {quote}", "bright_cyan");
@@ -1230,7 +1230,7 @@ namespace UsurperRemake.Systems
         private async Task ShowUnlocksEarned(Character player, EndingType ending, TerminalEmulator terminal)
         {
             terminal.Clear();
-            await Task.Delay(500);
+            await Pacing.Wait(500);
 
             terminal.WriteLine("");
             UIHelper.WriteBoxHeader(terminal, Loc.Get("ending.unlocks_header"), "bright_green", 67);
@@ -1296,7 +1296,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine($"  [{name}]", color);
                 terminal.WriteLine($"    {description}", "gray");
                 terminal.WriteLine("");
-                await Task.Delay(300);
+                await Pacing.Wait(300);
             }
 
             // Track unlocks
@@ -1365,20 +1365,20 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("═══════════════════════════════════════════════════════════════════", "bright_yellow");
             terminal.WriteLine("");
 
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             terminal.WriteLine($"  {Loc.Get("ending.immortal_power")}", "white");
             terminal.WriteLine($"  {Loc.Get("ending.immortal_coil")}", "white");
             terminal.WriteLine("");
 
-            await Task.Delay(800);
+            await Pacing.Wait(800);
 
             terminal.WriteLine($"  {Loc.Get("ending.immortal_manwe_1")}", "bright_magenta");
             terminal.WriteLine($"  {Loc.Get("ending.immortal_manwe_2")}", "bright_magenta");
             terminal.WriteLine($"  {Loc.Get("ending.immortal_manwe_3")}", "bright_magenta");
             terminal.WriteLine("");
 
-            await Task.Delay(800);
+            await Pacing.Wait(800);
 
             terminal.WriteLine($"  {Loc.Get("ending.immortal_as_god")}", "bright_cyan");
             terminal.WriteLine($"  {Loc.Get("ending.immortal_benefit_1")}", "white");
@@ -1421,13 +1421,13 @@ namespace UsurperRemake.Systems
                 {
                     terminal.SetColor("red");
                     terminal.WriteLine($"  {Loc.Get("castle.court_change_failed")}");
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                     return false;
                 }
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine($"  {Loc.Get("ending.immortal_abdicated")}", "bright_yellow");
                 terminal.WriteLine("");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
             }
 
             // v0.60.0: Auto-quit any current team. A god on a mortal's roster
@@ -1443,7 +1443,7 @@ namespace UsurperRemake.Systems
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine($"  Your mortal team bonds dissolve in the divine ascension.");
                 terminal.WriteLine("");
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
             }
 
             // v0.60.0: Auto-leave any current guild for the same reason. Gods don't
@@ -1462,7 +1462,7 @@ namespace UsurperRemake.Systems
                     terminal.SetColor("bright_yellow");
                     terminal.WriteLine($"  Your guild crest tarnishes and falls away. The faithful have no guild.");
                     terminal.WriteLine("");
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                 }
             }
 
@@ -1472,7 +1472,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("");
                 terminal.WriteLine($"  {Loc.Get("ending.immortal_alt_blocked")}", "red");
                 terminal.WriteLine($"  {Loc.Get("ending.immortal_alt_main_only")}", "gray");
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 return false;
             }
 
@@ -1489,7 +1489,7 @@ namespace UsurperRemake.Systems
             player.AscensionDate = DateTime.UtcNow;
 
             terminal.WriteLine("");
-            await Task.Delay(500);
+            await Pacing.Wait(500);
 
             terminal.SetColor("bright_yellow");
             if (!GameConfig.ScreenReaderMode)
@@ -1501,7 +1501,7 @@ namespace UsurperRemake.Systems
             if (!GameConfig.ScreenReaderMode)
                 terminal.WriteLine("  ════════════════════════════════════════════════════════════");
 
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             // 1.2.0 Temple gods piece 2: the new god picks its domain (Enter leaves it for the Pantheon)
             await GodDomainPicker.PickAsync(player, terminal);
@@ -1585,20 +1585,20 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("═══════════════════════════════════════════════════════════════════", "bright_magenta");
             terminal.WriteLine("");
 
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             terminal.WriteLine($"  {Loc.Get("ending.ngplus_stirs")}", "white");
             terminal.WriteLine($"  {Loc.Get("ending.ngplus_voice")}", "white");
             terminal.WriteLine("");
 
-            await Task.Delay(800);
+            await Pacing.Wait(800);
 
             terminal.WriteLine($"  {Loc.Get("ending.ngplus_again_1")}", "bright_magenta");
             terminal.WriteLine($"  {Loc.Get("ending.ngplus_again_2")}", "bright_magenta");
             terminal.WriteLine($"  {Loc.Get("ending.ngplus_again_3")}", "bright_magenta");
             terminal.WriteLine("");
 
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             terminal.WriteLine($"  {Loc.Get("ending.ngplus_wheel")}", "bright_cyan");
             terminal.WriteLine("");

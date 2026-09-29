@@ -455,7 +455,7 @@ public class PantheonLocation : BaseLocation
 
                 terminal.SetColor("bright_red");
                 terminal.WriteLine(Loc.Get("pantheon.boon_removed"));
-                await Task.Delay(500);
+                await Pacing.Wait(500);
                 continue;
             }
 
@@ -483,7 +483,7 @@ public class PantheonLocation : BaseLocation
                 var boon = DivineBoonRegistry.GetBoon(boonId);
                 terminal.SetColor("bright_green");
                 terminal.WriteLine(Loc.Get("pantheon.boon_configured", boon?.Name ?? boonId));
-                await Task.Delay(500);
+                await Pacing.Wait(500);
             }
         }
 
@@ -515,7 +515,7 @@ public class PantheonLocation : BaseLocation
 
         terminal.SetColor("bright_yellow");
         terminal.WriteLine(Loc.Get("pantheon.favors_updated"));
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
     }
 
     /// <summary>Notify online followers that their god changed boon config</summary>
@@ -1206,7 +1206,7 @@ public class PantheonLocation : BaseLocation
         terminal.WriteLine(Loc.Get("pantheon.manwe_approach"));
         terminal.WriteLine("");
 
-        await Task.Delay(500);
+        await Pacing.Wait(500);
 
         if (currentPlayer.GodLevel >= GameConfig.GodMaxLevel)
         {
@@ -1230,7 +1230,7 @@ public class PantheonLocation : BaseLocation
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine(Loc.Get("pantheon.manwe_approval"));
                 terminal.WriteLine("");
-                await Task.Delay(500);
+                await Pacing.Wait(500);
 
                 terminal.SetColor("white");
                 terminal.WriteLine(Loc.Get("pantheon.manwe_power_grows", currentPlayer.DivineName));
@@ -1299,13 +1299,13 @@ public class PantheonLocation : BaseLocation
             {
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("castle.court_change_failed"));
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return false;
             }
             terminal.SetColor("bright_yellow");
             terminal.WriteLine(Loc.Get("pantheon.renounce_abdicate"));
             terminal.WriteLine("");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
         }
 
         // Clear all believers
@@ -1368,7 +1368,7 @@ public class PantheonLocation : BaseLocation
         terminal.WriteLine(Loc.Get("pantheon.renounce_mortal"));
         terminal.WriteLine("");
 
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         // Signal NG+ restart (preserves cycle bonuses)
         GameEngine.Instance.PendingNewGamePlus = true;
