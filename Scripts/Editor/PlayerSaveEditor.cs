@@ -301,6 +301,12 @@ internal static class PlayerSaveEditor
             p.GodStandingPenalties = new Dictionary<string, int>();
             p.GodStandingPenaltyWeek = -1;
         }
+        EditorIO.Info($"Single-player strongest god of the week: {(string.IsNullOrEmpty(p.WeeklyGod) ? "none" : p.WeeklyGod)} (week {p.WeeklyGodWeek})");
+        if (EditorIO.PromptBool("Clear the weekly god pick (picked again at the next check)", false))
+        {
+            p.WeeklyGodWeek = -1;
+            p.WeeklyGod = "";
+        }
 
         EditorIO.Info("— Difficulty —");
         p.Difficulty = EditorIO.PromptEnum("Difficulty", p.Difficulty);

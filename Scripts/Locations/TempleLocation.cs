@@ -1206,7 +1206,7 @@ public partial class TempleLocation : BaseLocation
             {
                 standings.TryGetValue(god.Name, out var standing);
                 terminal.WriteLine(Loc.Get("temple.altar_of", god.Name, god.GetTitle()), "yellow");
-                terminal.WriteLine(Loc.Get("temple.believers_count", standing.Followers + GodRegistry.CountNpcFollowers(god.Name)), "white");
+                terminal.WriteLine(Loc.Get("temple.believers_count", standing.AllFollowers), "white");
                 terminal.WriteLine(Loc.Get("temple.power_count", god.Experience), "cyan");
                 terminal.WriteLine("");
             }
@@ -1245,7 +1245,7 @@ public partial class TempleLocation : BaseLocation
                 title = GameConfig.GodTitles[Math.Clamp(level - 1, 0, GameConfig.GodTitles.Length - 1)];
             }
             standings.TryGetValue(entry.Name, out var standing);
-            ranking.Add((entry.Name, title, standing.Followers + GodRegistry.CountNpcFollowers(entry.Name), standing.Standing, !entry.IsCanon));
+            ranking.Add((entry.Name, title, standing.AllFollowers, standing.Standing, !entry.IsCanon));
         }
 
         ranking = ranking.OrderByDescending(r => r.Standing).ThenByDescending(r => r.Followers).ToList();
@@ -1266,6 +1266,18 @@ public partial class TempleLocation : BaseLocation
                 terminal.WriteLine(line, entry.IsPlayer ? "bright_cyan" : "yellow");
             }
         }
+
+        // 1.2.0 Temple gods piece 6: this week's strongest god, picked at the weekly reset, and its bonus
+        var weekPick = await Task.Run(() => WeeklyGodSystem.Current(currentPlayer));
+        terminal.WriteLine("");
+        if (weekPick is { } week && !string.IsNullOrEmpty(week.God))
+        {
+            terminal.WriteLine(Loc.Get("temple.week_god", week.God, GameConfig.GodWeeklyXpBonusPct), "bright_yellow");
+            if (WeeklyGodSystem.IsFollowerOfWeek(currentPlayer, week))
+                terminal.WriteLine(Loc.Get("temple.week_god_yours", week.God, GameConfig.GodWeeklyXpBonusPct), "bright_green");
+        }
+        else
+            terminal.WriteLine(Loc.Get("temple.week_god_none"), "gray");
 
         await terminal.PressAnyKey();
     }
@@ -1410,10 +1422,8 @@ public partial class TempleLocation : BaseLocation
 
         foreach (var god in gods)
         {
-            // Get domain/title from properties or use GetTitle()
-            string domain = god.Properties.ContainsKey("Domain")
-                ? god.Properties["Domain"]?.ToString() ?? god.GetTitle()
-                : god.GetTitle();
+            // 1.2.0 Temple gods: the epithet in the player's language (GodText)
+            string domain = GodText.Epithet(god);
 
             // Color based on alignment
             string color = "yellow";
@@ -1469,10 +1479,8 @@ public partial class TempleLocation : BaseLocation
 
         foreach (var god in activeGods)
         {
-            // Get domain/title from properties or use GetTitle()
-            string domain = god.Properties.ContainsKey("Domain")
-                ? god.Properties["Domain"]?.ToString() ?? god.GetTitle()
-                : god.GetTitle();
+            // 1.2.0 Temple gods: the epithet in the player's language (GodText)
+            string domain = GodText.Epithet(god);
 
             // Color based on alignment
             string color = "yellow";
@@ -1483,10 +1491,11 @@ public partial class TempleLocation : BaseLocation
 
             terminal.WriteLine($"  {god.Name}, {domain}", color);
 
-            // Show description if available
-            if (god.Properties.ContainsKey("Description"))
+            // Show description if available (1.2.0: in the player's language, GodText)
+            string description = GodText.Description(god);
+            if (description.Length > 0)
             {
-                terminal.WriteLine($"    {god.Properties["Description"]}", "gray");
+                terminal.WriteLine($"    {description}", "gray");
             }
 
             terminal.WriteLine(Loc.Get("temple.god_list_stats", god.Believers, god.Experience.ToString("N0")), "white");

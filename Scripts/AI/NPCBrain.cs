@@ -109,7 +109,7 @@ public class NPCBrain
     /// </summary>
     private void InitializeBelieverBehavior()
     {
-        if (string.IsNullOrEmpty(owner.God))
+        if (string.IsNullOrEmpty(owner.WorshippedGod))
         {
             // Potential for conversion based on personality
             if (personality.Sociability > 0.6f || random.NextDouble() < 0.1)
@@ -119,7 +119,7 @@ public class NPCBrain
         }
         else
         {
-            goals.AddGoal(new Goal($"Serve {owner.God}", GoalType.Social, 0.6f));
+            goals.AddGoal(new Goal($"Serve {owner.WorshippedGod}", GoalType.Social, 0.6f));
             goals.AddGoal(new Goal("Spread Faith", GoalType.Social, 0.5f));
         }
     }
@@ -372,7 +372,7 @@ public class NPCBrain
     
     private void ProcessBelieverBehavior()
     {
-        if (string.IsNullOrEmpty(owner.God))
+        if (string.IsNullOrEmpty(owner.WorshippedGod))
         {
             // Potential conversion based on personality and circumstances
             var conversionChance = CalculateConversionChance();
@@ -402,17 +402,18 @@ public class NPCBrain
     
     private void ConvertToFaith()
     {
-        var availableGods = new[] { "Nosferatu", "Darkcloak", "Druid", "Seth Able" };
-        owner.God = availableGods[random.Next(availableGods.Length)];
+        // 1.2.0 Temple gods: a god from the pantheon, the same pick the roster gives (NpcFaithSystem)
+        UsurperRemake.Systems.NpcFaithSystem.EnsureAssigned(owner);
+        if (string.IsNullOrEmpty(owner.WorshippedGod)) return;
         
-        memory.AddMemory($"I found faith in {owner.God}", "faith", DateTime.Now);
+        memory.AddMemory($"I found faith in {owner.WorshippedGod}", "faith", DateTime.Now);
         emotions.AddEmotion(EmotionType.Hope, 0.7f, 300); // 5 hours of hope
         
         // Add faith-based goals
-        goals.AddGoal(new Goal($"Serve {owner.God}", GoalType.Social, 0.7f));
+        goals.AddGoal(new Goal($"Serve {owner.WorshippedGod}", GoalType.Social, 0.7f));
         goals.AddGoal(new Goal("Live According to Faith", GoalType.Personal, 0.6f));
         
-        // GD.Print($"[Faith] {owner.Name} converted to {owner.God}");
+        // GD.Print($"[Faith] {owner.Name} converted to {owner.WorshippedGod}");
     }
     
     private void ProcessFaithActions()
@@ -420,7 +421,7 @@ public class NPCBrain
         var faithActions = new[] { "pray", "make offering", "seek guidance", "help others", "spread faith" };
         var action = faithActions[random.Next(faithActions.Length)];
         
-        memory.AddMemory($"I {action} in service of {owner.God}", "faith", DateTime.Now);
+        memory.AddMemory($"I {action} in service of {owner.WorshippedGod}", "faith", DateTime.Now);
         emotions.AddEmotion(EmotionType.Peace, 0.3f, 120); // 2 hours of peace
         
         // Faith actions can generate new goals
@@ -881,7 +882,7 @@ public class NPCBrain
         summary += $"Personality: {personality}\n";
         summary += $"Current Goal: {goals.GetPriorityGoal()?.Name ?? "None"}\n";
         summary += $"Active Emotions: {emotions.GetActiveEmotions().Count}\n";
-        summary += $"Faith: {owner.God ?? "None"}\n";
+        summary += $"Faith: {(string.IsNullOrEmpty(owner.WorshippedGod) ? "None" : owner.WorshippedGod)}\n";
         summary += $"Gang: {owner.Team ?? "None"}\n";
         summary += $"Married: {(owner.Married ? "Yes" : "No")}\n";
         summary += memory.GetMemorySummary();

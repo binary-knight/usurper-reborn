@@ -11908,6 +11908,7 @@ public partial class CombatEngine
             PostShareMultiplier *= m;
             if (TeamHQBonus.XPMultiplier(player) > 1.0 && !Sources.Contains("team_hq")) Sources.Add("team_hq");
             if (AwakeningBonus.XPMultiplier(player) != 1.0 && !Sources.Contains("awakening")) Sources.Add("awakening");
+            if (WeeklyGodSystem.XpMultiplier(player) > 1.0 && !Sources.Contains("god_week")) Sources.Add("god_week");
         }
     }
 

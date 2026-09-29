@@ -2203,7 +2203,7 @@ public class Character
     // New for version 0.14+
     public int Quests { get; set; }                 // completed missions/quests
     public bool Deleted { get; set; }               // is record deleted
-    public string God { get; set; } = "";           // worshipped god name
+    // 1.2.0 Temple gods: the Pascal "God" field is gone; an NPC's god is WorshippedGod (NpcFaithSystem)
     public long RoyQuests { get; set; }             // royal quests accomplished
     
     // New for version 0.17+
@@ -2361,6 +2361,10 @@ public class Character
     // (GodStandingPenalty). Kept for the week GodStandingPenaltyWeek only; online it is in SQL.
     public Dictionary<string, int> GodStandingPenalties { get; set; } = new();
     public int GodStandingPenaltyWeek { get; set; } = -1;
+    // 1.2.0 Temple gods piece 6, single-player: the week's strongest god (WeeklyGodSystem), picked once
+    // for WeeklyGodWeek ("" when no god had standing); online it is in world_state.
+    public int WeeklyGodWeek { get; set; } = -1;
+    public string WeeklyGod { get; set; } = "";
 
     // 1.2.0 Temple gods piece 2: an immortal's god domain (a GodDomain name, "" until chosen; saved).
     public string DivineDomain { get; set; } = "";

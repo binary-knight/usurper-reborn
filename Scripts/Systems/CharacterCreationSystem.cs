@@ -476,7 +476,6 @@ public class CharacterCreationSystem
             Punch = 0,
             Deleted = false,
             Quests = 0,
-            God = "",
             RoyQuests = 0,
             Resurrections = GameConfig.DefaultStartingResurrections, // v0.60.7: admin-tunable
             MaxResurrections = GameConfig.DefaultStartingResurrections, // v0.60.7: admin-tunable

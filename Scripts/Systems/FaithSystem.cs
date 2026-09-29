@@ -42,8 +42,19 @@ public readonly record struct WorshippedGod(string Name, bool IsCanon);
 /// <summary>One god in the unified list (canon ten plus ascended player-gods).</summary>
 public readonly record struct GodListEntry(string Name, bool IsCanon);
 
-/// <summary>A god's standing: the sum of its followers' Favor, and how many followers that is.</summary>
-public readonly record struct GodStanding(string God, long Standing, int Followers);
+/// <summary>
+/// A god's standing: the sum of its followers' Favor, and how many followers that is. Followers
+/// counts characters (players); NpcFollowers counts the living NPCs following the god, each adding
+/// GameConfig.GodNpcFollowerStanding to Standing (piece 6).
+/// </summary>
+public readonly record struct GodStanding(string God, long Standing, int Followers)
+{
+    /// <summary>Living NPC followers counted in Standing.</summary>
+    public int NpcFollowers { get; init; }
+
+    /// <summary>Every follower: characters and NPCs.</summary>
+    public int AllFollowers => Followers + NpcFollowers;
+}
 
 /// <summary>
 /// 1.2.0 Temple gods piece 1: one god system. Canon gods and player-gods are one list, and a
@@ -246,8 +257,29 @@ public static class GodRegistry
     }
 
     /// <summary>
-    /// Every god's standing. Online: the saved rows of every character (SqlSaveBackend.GetGodStandings).
-    /// Single-player: the current character (NPC worshippers join in a later piece).
+    /// Adds NPC followers to standings: each god's count times GodNpcFollowerStanding joins its
+    /// Standing and the count its NpcFollowers; a god with NPC followers only gets an entry. Blank
+    /// gods, Manwe and counts below 1 are skipped. Applied before the desecration penalties.
+    /// </summary>
+    public static Dictionary<string, GodStanding> AddNpcFollowers(Dictionary<string, GodStanding> standings, IEnumerable<KeyValuePair<string, int>>? npcCounts)
+    {
+        standings ??= new Dictionary<string, GodStanding>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (god, count) in npcCounts ?? Enumerable.Empty<KeyValuePair<string, int>>())
+        {
+            if (count <= 0 || string.IsNullOrWhiteSpace(god) || IsManwe(god)) continue;
+            string name = CanonName(god) ?? god.Trim();
+            standings.TryGetValue(name, out var s);
+            standings[name] = new GodStanding(name, s.Standing + (long)count * GameConfig.GodNpcFollowerStanding, s.Followers)
+            {
+                NpcFollowers = s.NpcFollowers + count
+            };
+        }
+        return standings;
+    }
+
+    /// <summary>
+    /// Every god's standing. Online: the saved rows of every character and the world's NPCs
+    /// (SqlSaveBackend.GetGodStandings). Single-player: the current character and the NPC roster.
     /// </summary>
     public static async Task<Dictionary<string, GodStanding>> GetStandingsAsync(Character? current)
     {
@@ -257,22 +289,29 @@ public static class GodRegistry
     }
 
     /// <summary>
-    /// Single-player standing: the character's own god and Favor, less this week's desecration
-    /// penalties kept in the save (GodStandingPenalty).
+    /// Single-player standing: the character's own god and Favor, plus the NPC followers of the
+    /// roster (npcs; null reads NPCSpawnSystem.ActiveNPCs), less this week's desecration penalties
+    /// kept in the save (GodStandingPenalty).
     /// </summary>
-    public static Dictionary<string, GodStanding> SinglePlayerStandings(Character? c, GodSystem? gods = null)
+    public static Dictionary<string, GodStanding> SinglePlayerStandings(Character? c, GodSystem? gods = null, IEnumerable<NPC>? npcs = null) =>
+        SinglePlayerStandings(c, GodStandingPenalty.CurrentWeek(), gods, npcs);
+
+    /// <summary>SinglePlayerStandings with the desecration penalties of a given week.</summary>
+    public static Dictionary<string, GodStanding> SinglePlayerStandings(Character? c, int penaltyWeek, GodSystem? gods, IEnumerable<NPC>? npcs)
     {
         var god = c == null ? null : GetWorshippedGod(c, gods);
         var entries = god == null ? Array.Empty<(string, int)>() : new[] { (god.Value.Name, FavorSystem.GetFavor(c!, gods)) };
-        return GodStandingPenalty.Apply(ComputeStandings(entries), GodStandingPenalty.LocalPenalties(c, GodStandingPenalty.CurrentWeek()));
+        var roster = npcs ?? (IEnumerable<NPC>?)NPCSpawnSystem.Instance?.ActiveNPCs ?? Enumerable.Empty<NPC>();
+        var standings = AddNpcFollowers(ComputeStandings(entries), NpcFaithSystem.CountFollowers(roster));
+        return GodStandingPenalty.Apply(standings, GodStandingPenalty.LocalPenalties(c, penaltyWeek));
     }
 
-    /// <summary>Living NPCs following a god (today only player-gods have NPC followers).</summary>
+    /// <summary>Living NPCs of the roster following a god (canon gods and player-gods).</summary>
     public static int CountNpcFollowers(string god)
     {
         if (string.IsNullOrWhiteSpace(god)) return 0;
         return NPCSpawnSystem.Instance?.ActiveNPCs?
-            .Count(n => !n.IsDead && string.Equals(n.WorshippedGod, god, StringComparison.OrdinalIgnoreCase)) ?? 0;
+            .Count(n => !n.IsDead && string.Equals(NpcFaithSystem.GodOf(n), god.Trim(), StringComparison.OrdinalIgnoreCase)) ?? 0;
     }
 }
 

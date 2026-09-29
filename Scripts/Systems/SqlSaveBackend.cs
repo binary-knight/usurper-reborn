@@ -9075,16 +9075,44 @@ namespace UsurperRemake.Systems
         public Dictionary<string, GodStanding> GetGodStandings() => GetGodStandings(GodStandingPenalty.CurrentWeek());
 
         /// <summary>
-        /// GetGodStandings for a week: the followers' Favor less that week's desecration penalties
-        /// (god_standing_penalties, read on the same connection), never below 0.
+        /// GetGodStandings for a week: the followers' Favor plus GodNpcFollowerStanding for each living
+        /// NPC follower in the world's NPC roster (world_state 'npcs'), less that week's desecration
+        /// penalties (god_standing_penalties), all read on the same connection, never below 0.
         /// </summary>
         public Dictionary<string, GodStanding> GetGodStandings(int week)
         {
             var entries = new List<(string God, int Favor)>();
             var penalties = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var npcCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             try
             {
                 using var connection = OpenConnection();
+                try
+                {
+                    // 1.2.0 Temple gods piece 6: the world's living NPC followers per god, from the NPC
+                    // roster in world_state (one grouped read on this connection, no per-god scan)
+                    using var npcCmd = connection.CreateCommand();
+                    npcCmd.CommandText = @"
+                        SELECT json_extract(j.value, '$.worshippedGod') AS god, COUNT(*)
+                        FROM world_state w, json_each(w.value) j
+                        WHERE w.key = 'npcs' AND json_valid(w.value) AND json_type(w.value) = 'array'
+                          AND COALESCE(json_extract(j.value, '$.isDead'), 0) = 0
+                          AND json_extract(j.value, '$.worshippedGod') IS NOT NULL
+                          AND json_extract(j.value, '$.worshippedGod') != ''
+                        GROUP BY god;";
+                    using var nr = npcCmd.ExecuteReader();
+                    while (nr.Read())
+                    {
+                        string god = ReadJsonText(nr, 0).Trim();
+                        int count = nr.IsDBNull(1) ? 0 : nr.GetInt32(1);
+                        if (god.Length > 0 && count > 0)
+                        {
+                            string name = GodRegistry.CanonName(god) ?? god;
+                            npcCounts[name] = (npcCounts.TryGetValue(name, out int v) ? v : 0) + count;
+                        }
+                    }
+                }
+                catch (Exception npcEx) { DebugLogger.Instance.LogWarning("SQL", $"God standing NPC followers unavailable: {npcEx.Message}"); }
                 try
                 {
                     using var pen = connection.CreateCommand();
@@ -9146,7 +9174,7 @@ namespace UsurperRemake.Systems
             {
                 DebugLogger.Instance.LogError("SQL", $"Failed to read god standings: {ex.Message}");
             }
-            return GodStandingPenalty.Apply(GodRegistry.ComputeStandings(entries), penalties);
+            return GodStandingPenalty.Apply(GodRegistry.AddNpcFollowers(GodRegistry.ComputeStandings(entries), npcCounts), penalties);
         }
 
         /// <summary>
@@ -9172,6 +9200,52 @@ namespace UsurperRemake.Systems
             catch (Exception ex)
             {
                 DebugLogger.Instance.LogError("SQL", $"Failed to add a god standing penalty for {god}: {ex.Message}");
+            }
+        }
+
+        /// <summary>1.2.0 Temple gods piece 6: this world's weekly god record (WeeklyGodSystem.WorldStateKey), or null.</summary>
+        public WeeklyGodPick? GetWeeklyGod()
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT value FROM world_state WHERE key = @key;";
+                cmd.Parameters.AddWithValue("@key", WeeklyGodSystem.WorldStateKey);
+                return WeeklyGodSystem.FromJson(cmd.ExecuteScalar() as string);
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to read the weekly god: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 1.2.0 Temple gods piece 6: records the weekly god in one conditional upsert that only a week
+        /// newer than the saved one passes, so of any number of sessions or processes crossing the
+        /// weekly reset the first decides the week and the rest leave it as it is.
+        /// </summary>
+        public void RecordWeeklyGod(WeeklyGodPick pick)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    INSERT INTO world_state (key, value, version, updated_at, updated_by)
+                    VALUES (@key, @value, 1, datetime('now'), 'weekly_god')
+                    ON CONFLICT(key) DO UPDATE SET value = excluded.value, version = world_state.version + 1,
+                        updated_at = datetime('now'), updated_by = 'weekly_god'
+                    WHERE COALESCE(CASE WHEN json_valid(world_state.value) THEN json_extract(world_state.value, '$.week') END, -1) < @week;";
+                cmd.Parameters.AddWithValue("@key", WeeklyGodSystem.WorldStateKey);
+                cmd.Parameters.AddWithValue("@value", WeeklyGodSystem.ToJson(pick));
+                cmd.Parameters.AddWithValue("@week", pick.Week);
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to record the weekly god: {ex.Message}");
             }
         }
 

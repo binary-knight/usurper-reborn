@@ -193,7 +193,7 @@ public class GodDesecration1115Tests : IDisposable
         GodStandingPenalty.AddLocal(c, "Umbrath", week);
         c.GodStandingPenalties.Should().HaveCount(1);
         GodStandingPenalty.LocalPenalties(c, week)["Umbrath"].Should().Be(2 * GameConfig.GodDesecrationStandingPenalty);
-        GodRegistry.SinglePlayerStandings(c, gods)["Umbrath"].Standing.Should().Be(2, "12 less 10");
+        GodRegistry.SinglePlayerStandings(c, gods, Array.Empty<NPC>())["Umbrath"].Standing.Should().Be(2, "12 less 10");
         c.GodFavor.Should().Be(12, "the follower's own Favor is untouched");
 
         GodStandingPenalty.LocalPenalties(c, week + 1).Should().BeEmpty("it lapses at the next week");
@@ -210,7 +210,7 @@ public class GodDesecration1115Tests : IDisposable
     {
         var (c, gods) = Worshipper("GdsSpFloor", "Discordia", 3);
         GodStandingPenalty.AddLocal(c, "Discordia", GodStandingPenalty.CurrentWeek());
-        GodRegistry.SinglePlayerStandings(c, gods)["Discordia"].Standing.Should().Be(0);
+        GodRegistry.SinglePlayerStandings(c, gods, Array.Empty<NPC>())["Discordia"].Standing.Should().Be(0);
     }
 
     // ---------------- Standing penalty: online (SQL) ----------------
@@ -254,7 +254,8 @@ public class GodDesecration1115Tests : IDisposable
         start.Should().BeGreaterThan(0);
         string body = sql.Substring(start, sql.IndexOf("public void AddGodStandingPenalty(", start, StringComparison.Ordinal) - start);
         Count(body, "OpenConnection()").Should().Be(1, "the penalties are read on the standings' own connection");
-        body.Should().Contain("GodStandingPenalty.Apply(GodRegistry.ComputeStandings(entries), penalties)");
+        body.Should().Contain("GodStandingPenalty.Apply(GodRegistry.AddNpcFollowers(GodRegistry.ComputeStandings(entries), npcCounts), penalties)",
+            "piece 6: NPC followers join before the penalties");
         sql.Should().Contain("DELETE FROM god_standing_penalties;");
     }
 

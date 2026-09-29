@@ -190,6 +190,10 @@ namespace UsurperRemake.Systems
             // Show NPC's greeting based on relationship — captured for Electron emit
             await ShowGreeting(npc, relationLevel, romanceType);
 
+            // 1.2.0 Temple gods: the NPC's faith meets the player's (first talk of the day only)
+            ShowFaithMeeting(npc);
+            relationLevel = RelationshipSystem.GetRelationshipStatus(player, npc);
+
             // Main conversation loop
             bool continueConversation = true;
             while (continueConversation)
@@ -355,6 +359,24 @@ namespace UsurperRemake.Systems
 
             await Task.Delay(500);
         }
+        /// <summary>
+        /// 1.2.0 Temple gods piece 6: on the first talk of the game day with this NPC, a shared god
+        /// warms the NPC to the player and opposed gods cool it (NpcFaithSystem.OnTalk), and the line
+        /// saying so is shown, with a remark on a Chosen player's mark.
+        /// </summary>
+        private void ShowFaithMeeting(NPC npc)
+        {
+            if (player == null) return;
+            var meeting = NpcFaithSystem.OnTalk(player, npc, DailySystemManager.Instance.CurrentDay);
+            if (GameConfig.ElectronMode) return;
+            var lines = NpcFaithSystem.Lines(meeting, npc.Name2);
+            if (lines.Count == 0) return;
+            terminal!.SetColor(meeting.Kind == FaithMeetingKind.Opposed ? "gray" : "bright_yellow");
+            foreach (var line in lines)
+                terminal.WriteLine($"  {line}");
+            terminal.WriteLine("");
+        }
+
         /// <summary>
         /// Generate a contextual greeting based on relationship
         /// </summary>
