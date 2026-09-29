@@ -247,4 +247,102 @@ public class TempleLeftovers1115Tests
         }
         throw new InvalidOperationException("Repo root not found above " + AppContext.BaseDirectory);
     }
+
+    // ---------------- (a) K and V: the memory pointer only while the Halls of Memory are open ----------------
+
+    /// <summary>
+    /// The permanent Founder statues at the Pantheon keep HallsOfMemoryOpen() true for every account
+    /// in practice, so this is a source guard, not a reachable runtime state; it protects the day the
+    /// seed data changes.
+    /// </summary>
+    [Fact]
+    public void MemoryPointer_ForKAndV_IsGatedOnHallsOpen()
+    {
+        string src = File.ReadAllText(Path.Combine(SourceRoot(), "Scripts/Locations/TempleLocation.cs"));
+        int marker = src.IndexOf("string? pointer = key == \"H\"", StringComparison.Ordinal);
+        marker.Should().BeGreaterThan(0);
+        string tail = src.Substring(marker, 300);
+        tail.Should().Contain("pointer == \"temple.moved.memory\"").And.Contain("HallsOfMemoryOpen()").And.Contain("pointer = null;");
+    }
+
+    // ---------------- (b) An offering's kind menu: an unhandled key is not silent ----------------
+
+    private static (TempleLocation Temple, TerminalEmulator Term, MemoryStream Output, Character Hero) OfferRig(string name, params string[] lines)
+    {
+        var output = new MemoryStream();
+        var term = new TerminalEmulator(new LineStream(lines.Concat(Enumerable.Repeat("", 20))), output);
+        var temple = new TempleLocation(term, null!, UsurperRemake.GodSystemSingleton.Instance);
+        var hero = StatRewards1115Tests.Fresh(name);
+        hero.Gold = 100_000;
+        typeof(BaseLocation).GetField("currentPlayer", F)!.SetValue(temple, hero);
+        return (temple, term, output, hero);
+    }
+
+    private static async Task RunOffering(TempleLocation temple, TempleLocation.TempleRoom room)
+    {
+        var m = typeof(TempleLocation).GetMethod("ProcessOffering", F);
+        m.Should().NotBeNull();
+        try { await (Task)m!.Invoke(temple, new object[] { room })!; }
+        catch (TargetInvocationException ex) when (ex.InnerException != null) { throw ex.InnerException; }
+    }
+
+    [Fact]
+    public async Task Offering_UnhandledKey_PrintsInvalidChoice()
+    {
+        var (temple, term, output, _) = OfferRig("TlOfferBadKind", "Solarius", "Z");
+        await RunOffering(temple, TempleLocation.TempleRoom.Nave);
+        term.StreamWriterInternal?.Flush();
+        Encoding.UTF8.GetString(output.ToArray()).Should().Contain(Loc.Get("temple.invalid_choice"));
+    }
+
+    [Fact]
+    public async Task Offering_R_LeavesQuietly()
+    {
+        var (temple, term, output, _) = OfferRig("TlOfferBack", "Solarius", "R");
+        await RunOffering(temple, TempleLocation.TempleRoom.Nave);
+        term.StreamWriterInternal?.Flush();
+        Encoding.UTF8.GetString(output.ToArray()).Should().NotContain(Loc.Get("temple.invalid_choice"));
+    }
+
+    // ---------------- (c) Floor 85: sealed until the player can actually enter the Deep Temple ----------------
+
+    [Fact]
+    public void Floor85_ExplainsTheSealedDoor_WhenNotReadyForAurelion()
+    {
+        string src = File.ReadAllText(Path.Combine(SourceRoot(), "Scripts/Locations/DungeonLocation.cs"));
+        int check = src.IndexOf("if (currentDungeonLevel == 85 && AurelionAwaitsAtTemple())", StringComparison.Ordinal);
+        int fight = src.IndexOf("await TryOldGodBossEncounter(player!, room);", StringComparison.Ordinal);
+        check.Should().BeGreaterThan(0);
+        fight.Should().BeGreaterThan(check);
+        string branch = src.Substring(check, fight - check);
+        branch.Should().Contain("CanEncounterBoss(player!, OldGodType.Aurelion)");
+        branch.Should().Contain("Loc.Get(\"dungeon.aurelion_at_temple_hint\")");
+        branch.Should().Contain("Loc.Get(\"temple.deep_temple_sealed\")");
+        branch.Should().Contain("Loc.Get(\"temple.deep_temple_prove\")");
+    }
+
+    // ---------------- (d) The Nave exempts an Evil player's own good god ----------------
+
+    private static bool NaveRefuses(Character hero, string ownGod, TempleLocation.AltarPick pick)
+    {
+        var temple = new TempleLocation(new TerminalEmulator(new LineStream(Enumerable.Repeat("", 5)), new MemoryStream()), null!, UsurperRemake.GodSystemSingleton.Instance);
+        typeof(BaseLocation).GetField("currentPlayer", F)!.SetValue(temple, hero);
+        if (!string.IsNullOrEmpty(ownGod)) GodRegistry.SetWorshippedGod(hero, ownGod, UsurperRemake.GodSystemSingleton.Instance);
+        var m = typeof(TempleLocation).GetMethod("NaveRefusesOffering", F);
+        try { return (bool)m!.Invoke(temple, new object[] { TempleLocation.TempleRoom.Nave, pick })!; }
+        finally { GodRegistry.SetWorshippedGod(hero, null, UsurperRemake.GodSystemSingleton.Instance); }
+    }
+
+    [Fact]
+    public void Nave_AcceptsAnEvilFollowers_OwnGoodGod_ButRefusesAnotherOne()
+    {
+        var hero = StatRewards1115Tests.Fresh("TlNaveEvil");
+        hero.Chivalry = 0;
+        hero.Darkness = 900;
+        var solarius = new TempleLocation.AltarPick("Solarius", new God { Name = "Solarius", Goodness = 10000, Darkness = 0 }, null);
+        var amara = new TempleLocation.AltarPick("Amara", new God { Name = "Amara", Goodness = 8000, Darkness = 1000 }, null);
+
+        NaveRefuses(hero, "Solarius", solarius).Should().BeFalse("an Evil follower may still offer to their own good god");
+        NaveRefuses(hero, "Solarius", amara).Should().BeTrue("another good god is still refused");
+    }
 }

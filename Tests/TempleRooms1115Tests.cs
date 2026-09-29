@@ -351,10 +351,13 @@ public class TempleRooms1115Tests
     [InlineData("Zephyrine", true)]
     public async Task Evil_TheNaveRefusesAnOfferingToAGoodGod(string god, bool playerGod)
     {
+        // 1.2.0 Temple gods piece 7 leftover: the Nave now exempts an Evil follower's own good
+        // god, so this worships a DIFFERENT good god than the one offered to, to keep testing
+        // the refusal for a god that is not the player's own.
         using var r = Make("TrEvilNave" + god, god, "G", "1000", "Y");
         r.Temple.ImmortalGodsForTests = new() { PlayerGod("Zephyrine", "Light") };
         MakeEvil(r.Hero);
-        GodRegistry.SetWorshippedGod(r.Hero, god, r.Gods).Should().BeTrue();
+        GodRegistry.SetWorshippedGod(r.Hero, "Amara", r.Gods).Should().BeTrue();
         await Run(r.Temple, "ProcessOffering", TempleLocation.TempleRoom.Nave);
         r.Hero.Gold.Should().Be(100_000, "nothing is taken");
         var flat = Regex.Replace(r.Text(), @"\s+", " ");
