@@ -1048,7 +1048,7 @@ public class PantheonLocation : BaseLocation
         currentPlayer.GodExperience += GameConfig.GodProclamationExp;
 
         // Broadcast via news system
-        string godTitle = GetGodTitle(currentPlayer.GodLevel);
+        string godTitle = GetGodTitleShared(currentPlayer.GodLevel);   // shared news and broadcast: English
         string newsEntry = $"[DIVINE] {currentPlayer.DivineName} the {godTitle} proclaims: \"{message}\"";
 
         // Broadcast to all online players
@@ -1179,7 +1179,7 @@ public class PantheonLocation : BaseLocation
 
         if (message.Length > 120) message = message.Substring(0, 120);
 
-        string godTitle = GetGodTitle(currentPlayer.GodLevel);
+        string godTitle = GetGodTitleShared(currentPlayer.GodLevel);   // shared news: English
         string newsEntry = $"{currentPlayer.DivineName} the {godTitle} speaks: \"{message}\"";
 
         NewsSystem.Instance?.Newsy(true,newsEntry);
@@ -1244,7 +1244,7 @@ public class PantheonLocation : BaseLocation
 
                 // News
                 NewsSystem.Instance?.Newsy(true,
-                    $"[DIVINE] {currentPlayer.DivineName} has ascended to {newTitle}!");
+                    $"[DIVINE] {currentPlayer.DivineName} has ascended to {GetGodTitleShared(currentPlayer.GodLevel)}!");
             }
             else
             {
@@ -1392,6 +1392,9 @@ public class PantheonLocation : BaseLocation
 
     /// <summary>Get the title for a god level (1-9)</summary>
     public static string GetGodTitle(int level) => GodText.Title(Math.Clamp(level, 1, GameConfig.GodMaxLevel));
+
+    /// <summary>The English title for a god level (1-9), for news and broadcasts every player shares.</summary>
+    public static string GetGodTitleShared(int level) => GameConfig.GodTitles[Math.Clamp(level, 1, GameConfig.GodMaxLevel) - 1];
 
     /// <summary>Get deeds per day for a god level</summary>
     public static int GetDeedsPerDay(int level)

@@ -402,4 +402,15 @@ public class GodFaithFixes1115Tests : IDisposable
         }
         fr.GetProperty("temple.week_god_yours").GetString().Should().StartWith("Vous suivez");
     }
+
+    [Fact]
+    public void SharedNewsAndBroadcasts_UseTheEnglishRankTitle()
+    {
+        for (int level = 1; level <= GameConfig.GodMaxLevel; level++)
+            PantheonLocation.GetGodTitleShared(level).Should().Be(GameConfig.GodTitles[level - 1]);
+        string src = Source("Locations", "PantheonLocation.cs");
+        src.Should().Contain("string godTitle = GetGodTitleShared(currentPlayer.GodLevel);   // shared news and broadcast: English");
+        src.Should().Contain("string godTitle = GetGodTitleShared(currentPlayer.GodLevel);   // shared news: English");
+        src.Should().Contain("has ascended to {GetGodTitleShared(currentPlayer.GodLevel)}!");
+    }
 }
