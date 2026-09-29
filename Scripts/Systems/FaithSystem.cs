@@ -54,6 +54,14 @@ public readonly record struct GodStanding(string God, long Standing, int Followe
 
     /// <summary>Every follower: characters and NPCs.</summary>
     public int AllFollowers => Followers + NpcFollowers;
+
+    /// <summary>
+    /// The standing from characters alone: Standing without the NPC followers' part, never below 0.
+    /// With desecration penalties applied this equals the followers' Favor less the penalties
+    /// (floored at 0), as the standing was before NPC followers counted. A player-god's boon scale
+    /// compares this (GodBoonSystem.PlayerGodScalePct); rankings, altars and the weekly god use Standing.
+    /// </summary>
+    public long PlayerStanding => Math.Max(0, Standing - (long)NpcFollowers * GameConfig.GodNpcFollowerStanding);
 }
 
 /// <summary>

@@ -3399,7 +3399,7 @@ public partial class TempleLocation : BaseLocation
                         DivineBoonConfig = god.DivineBoonConfig ?? "",
                         Domain = GodBoonSystem.ParseDomain(god.DivineDomain),
                         BoonScalePct = GodBoonSystem.PlayerGodScalePct(
-                            standings.TryGetValue(god.DivineName, out var st) ? st.Standing : 0, strongestCanon,
+                            GodBoonSystem.StandingOf(standings, god.DivineName), strongestCanon,
                             GodBoonSystem.DaysInactive(god.IsOnline, god.LastLogin, DateTime.UtcNow))
                     });
                 }

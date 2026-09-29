@@ -313,15 +313,11 @@ public static class EnhancedNPCBehaviors
     {
         if (believer.IsDead || !believer.IsAlive) return;
 
-        // Find non-believer NPCs at the same location
+        // Find the NPCs at the same location the believer can convert
         var allNPCs = NPCSpawnSystem.Instance?.ActiveNPCs;
         if (allNPCs == null || allNPCs.Count == 0) return;
 
-        var candidates = allNPCs.Where(n =>
-            n != believer &&
-            !n.IsDead && n.IsAlive &&
-            string.IsNullOrEmpty(n.WorshippedGod) &&
-            n.CurrentLocation == believer.CurrentLocation).ToList();
+        var candidates = ProselytizeCandidates(believer, allNPCs);
 
         if (candidates.Count == 0) return;
 
@@ -339,6 +335,23 @@ public static class EnhancedNPCBehaviors
                 $"{GameConfig.NewsColorPlayer}{target.Name2}{GameConfig.NewsColorDefault} was converted to the faith of {believer.WorshippedGod} by {GameConfig.NewsColorPlayer}{believer.Name2}{GameConfig.NewsColorDefault}",
                 true, GameConfig.NewsCategory.General);
         }
+    }
+
+    /// <summary>
+    /// 1.2.0 Temple gods: the NPCs a believer can convert: living NPCs at the believer's location
+    /// with no god or loosely devout to theirs (NpcFaithSystem.IsLooselyDevout, the recruit deed's
+    /// rule), and never one who already follows the believer's god. A strong fit is never converted.
+    /// </summary>
+    internal static List<NPC> ProselytizeCandidates(NPC believer, IEnumerable<NPC> allNPCs)
+    {
+        string faith = NpcFaithSystem.GodOf(believer);
+        if (faith.Length == 0 || allNPCs == null) return new List<NPC>();
+        return allNPCs.Where(n =>
+            n != null && n != believer &&
+            !n.IsDead && n.IsAlive &&
+            n.CurrentLocation == believer.CurrentLocation &&
+            !NpcFaithSystem.GodOf(n).Equals(faith, StringComparison.OrdinalIgnoreCase) &&
+            (NpcFaithSystem.GodOf(n).Length == 0 || NpcFaithSystem.IsLooselyDevout(n))).ToList();
     }
 
     /// <summary>

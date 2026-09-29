@@ -135,6 +135,21 @@ public static class NpcFaithSystem
     }
 
     /// <summary>
+    /// True when an NPC follows a canon god that is a weak fit for it: the god's pick weight for the
+    /// NPC's alignment and class (Weight) is below NpcFaithAlignedWeight, so it is neither a god of
+    /// the NPC's own side nor the god of its class (a god now opposed after the NPC's alignment
+    /// moved counts too, at weight 0). False with no god and for a follower of a player-god. A
+    /// player-god recruits such an NPC as it recruits a pagan (PantheonLocation).
+    /// </summary>
+    public static bool IsLooselyDevout(Character npc)
+    {
+        if (npc == null) return false;
+        string god = GodOf(npc);
+        if (god.Length == 0 || !GodRegistry.IsCanon(god)) return false;
+        return Weight(npc, god) < GameConfig.NpcFaithAlignedWeight;
+    }
+
+    /// <summary>
     /// An NPC with no god is given PickGod; an NPC with a god keeps it (a player-god follower stays
     /// one). Manwe is cleared first. Returns true when a god was given.
     /// </summary>
