@@ -5507,13 +5507,23 @@ public class DungeonLocation : BaseLocation
             UsurperRemake.UI.UIHelper.WriteWrapped(terminal, room.Description); // v1.1.14
 
             // 1.2.0 Temple gods piece 7: Aurelion's one site is the Temple's Deep Temple; his floor
-            // points the player there (no fight here, the room stays as it is)
+            // points the player there (no fight here, the room stays as it is). The Temple's own T
+            // needs OldGodBossSystem.CanEncounterBoss (level 75 and three Old Gods faced), so a player
+            // who is not ready yet hears the path is sealed, not a pointer to a door they cannot open.
             if (currentDungeonLevel == 85 && AurelionAwaitsAtTemple())
             {
                 terminal.SetColor("bright_yellow");
                 UsurperRemake.UI.UIHelper.WriteWrapped(terminal, Loc.Get("dungeon.aurelion_at_temple"));
                 terminal.SetColor("gray");
-                UsurperRemake.UI.UIHelper.WriteWrapped(terminal, Loc.Get("dungeon.aurelion_at_temple_hint"));
+                if (OldGodBossSystem.Instance.CanEncounterBoss(player!, OldGodType.Aurelion))
+                {
+                    UsurperRemake.UI.UIHelper.WriteWrapped(terminal, Loc.Get("dungeon.aurelion_at_temple_hint"));
+                }
+                else
+                {
+                    UsurperRemake.UI.UIHelper.WriteWrapped(terminal, Loc.Get("temple.deep_temple_sealed"));
+                    UsurperRemake.UI.UIHelper.WriteWrapped(terminal, Loc.Get("temple.deep_temple_prove"));
+                }
                 terminal.WriteLine("");
                 await terminal.PressAnyKey();
                 return;

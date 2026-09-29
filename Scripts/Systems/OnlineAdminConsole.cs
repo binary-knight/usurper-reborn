@@ -978,7 +978,7 @@ namespace UsurperRemake.Systems
             "Veloura (Love, Floor 40)",
             "Thorgrim (Law, Floor 55)",
             "Noctura (Shadow, Floor 70)",
-            "Aurelion (Light, Floor 85)",
+            "Aurelion (Light, Temple)",
             "Terravok (Earth, Floor 95)",
             "Manwe (Creation, Floor 100)"
         };

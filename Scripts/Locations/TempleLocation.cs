@@ -3097,6 +3097,8 @@ public partial class TempleLocation : BaseLocation
 
         // H while no hall applies: the old H (holy news) became the Nave's Altars screen
         string? pointer = key == "H" ? "temple.moved.altars" : MovedKeys.TryGetValue(key, out var k) ? k : null;
+        // K and V moved into the Halls of Memory: the pointer only makes sense while that hall is open
+        if (pointer == "temple.moved.memory" && !HallsOfMemoryOpen()) pointer = null;
         if (pointer != null)
         {
             terminal.WriteLine("");
@@ -3367,9 +3369,17 @@ public partial class TempleLocation : BaseLocation
     private bool IsEvilPlayer() =>
         AlignmentSystem.Instance.GetAlignment(currentPlayer) == AlignmentSystem.AlignmentType.Evil;
 
-    /// <summary>Evil players are unwelcome in the Nave: its priests refuse their offerings to a good god.</summary>
-    private bool NaveRefusesOffering(TempleRoom room, AltarPick pick) =>
-        room == TempleRoom.Nave && IsEvilPlayer() && IsGoodAltar(pick);
+    /// <summary>
+    /// Evil players are unwelcome in the Nave: its priests refuse their offerings to a good god,
+    /// except their own: an Evil follower of a good god may still offer to the god they worship.
+    /// </summary>
+    private bool NaveRefusesOffering(TempleRoom room, AltarPick pick)
+    {
+        if (room != TempleRoom.Nave || !IsEvilPlayer() || !IsGoodAltar(pick)) return false;
+        var own = GodRegistry.GetWorshippedGod(currentPlayer, godSystem);
+        bool isOwn = own is { } o && o.Name.Equals(pick.Name, StringComparison.OrdinalIgnoreCase);
+        return !isOwn;
+    }
 
     /// <summary>True when the character's own god has an altar in the Undercroft.</summary>
     private async Task<bool> OwnGodIsDark()
@@ -3488,6 +3498,11 @@ public partial class TempleLocation : BaseLocation
         else if (kind == "I" && isOwn)
         {
             await ProcessItemSacrifice();
+        }
+        else if (kind != "R" && kind.Length > 0)
+        {
+            terminal.WriteLine(Loc.Get("temple.invalid_choice"), "red");
+            await Task.Delay(1000);
         }
     }
 

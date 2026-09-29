@@ -460,7 +460,7 @@ namespace UsurperRemake.Data
                 Wisdom = 280,         // High magic damage
                 AttacksPerRound = 3,  // Relentless divine strikes
 
-                EncounterLocation = "Dungeon Floor 85",
+                EncounterLocation = "The Deep Temple",
                 DungeonFloor = 85,
 
                 Description = "The god of truth speaks only in whispers now. His light dims with every lie.",
