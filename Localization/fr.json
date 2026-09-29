@@ -8675,7 +8675,7 @@
   "god.domain_pick_confirm": "Faire de {0} votre domaine pour de bon ? ",
   "god.domain_pick_done": "{0} répond désormais de {1}.",
   "god.domain_pick_later": "Le choix attendra votre prochaine visite au Panthéon.",
-  "god.player_domain_line": "Domaine : {0}, bienfait à {1} % de celui d'un dieu canonique",
+  "god.player_domain_line": "Domaine : {0}, bienfait à {1} % de celui d'un dieu du Temple",
   "god.player_domain_none": "Domaine : pas encore choisi",
   "god.switch_cost_favor": "Quitter {0} vous coûte toute votre Faveur auprès de ce dieu ({1}).",
   "god.switch_cost_no_favor": "Vous n'avez aucune Faveur auprès de {0} ; le quitter ne coûte aucune Faveur.",
