@@ -736,8 +736,7 @@ public static class MudChatSystem
                     title = " " + Systems.Loc.Get("chat.who_title_the", WizardConstants.GetTitle(wizLevel));
                 else if (isPlayerGod)
                 {
-                    int godIdx = Math.Clamp(player!.GodLevel - 1, 0, GameConfig.GodTitles.Length - 1);
-                    title = " " + Systems.Loc.Get("chat.who_title_the", GameConfig.GodTitles[godIdx]);
+                    title = " " + Systems.Loc.Get("chat.who_title_the", Systems.GodText.Title(player!.GodLevel));
                 }
 
                 // Extra tags

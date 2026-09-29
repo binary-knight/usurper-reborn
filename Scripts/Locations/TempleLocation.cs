@@ -1242,7 +1242,7 @@ public partial class TempleLocation : BaseLocation
             {
                 var ig = playerImmortals.FirstOrDefault(i => i.DivineName.Equals(entry.Name, StringComparison.OrdinalIgnoreCase));
                 int level = ig?.GodLevel ?? currentPlayer.GodLevel;
-                title = GameConfig.GodTitles[Math.Clamp(level - 1, 0, GameConfig.GodTitles.Length - 1)];
+                title = GodText.Title(level);
             }
             standings.TryGetValue(entry.Name, out var standing);
             ranking.Add((entry.Name, title, standing.AllFollowers, standing.Standing, !entry.IsCanon));

@@ -1391,11 +1391,7 @@ public class PantheonLocation : BaseLocation
         npc != null && (NpcFaithSystem.GodOf(npc).Length == 0 || NpcFaithSystem.IsLooselyDevout(npc));
 
     /// <summary>Get the title for a god level (1-9)</summary>
-    public static string GetGodTitle(int level)
-    {
-        int idx = Math.Clamp(level, 1, GameConfig.GodMaxLevel) - 1;
-        return GameConfig.GodTitles[idx];
-    }
+    public static string GetGodTitle(int level) => GodText.Title(Math.Clamp(level, 1, GameConfig.GodMaxLevel));
 
     /// <summary>Get deeds per day for a god level</summary>
     public static int GetDeedsPerDay(int level)

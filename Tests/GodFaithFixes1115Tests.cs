@@ -343,4 +343,63 @@ public class GodFaithFixes1115Tests : IDisposable
             WeeklyGodSystem.ResetForTests();
         }
     }
+
+    // ---------------- God rank titles in five languages ----------------
+
+    private static JsonElement Lang(string lang)
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "Localization"))) dir = dir.Parent;
+        return JsonDocument.Parse(File.ReadAllText(Path.Combine(dir!.FullName, "Localization", lang + ".json"))).RootElement;
+    }
+
+    [Fact]
+    public void GodTitles_ComeFromLoc_InThePlayersLanguage()
+    {
+        foreach (var lang in new[] { "en", "es", "fr", "hu", "it" })
+            for (int i = 1; i <= GameConfig.GodTitles.Length; i++)
+                Lang(lang).TryGetProperty("god.title." + i, out _).Should().BeTrue($"{lang} has god.title.{i}");
+        for (int i = 1; i <= GameConfig.GodTitles.Length; i++)
+            Lang("en").GetProperty("god.title." + i).GetString().Should().Be(GameConfig.GodTitles[i - 1], "English matches the shared news text");
+
+        string before = GameConfig.Language;
+        try
+        {
+            GameConfig.Language = "es";
+            GodText.Title(1).Should().Be("Espíritu Inferior");
+            GodText.Title(0).Should().Be("Espíritu Inferior", "clamped");
+            GodText.Title(99).Should().Be("Dios");
+            PantheonLocation.GetGodTitle(9).Should().Be("Dios");
+            GodSystem.GetGodTitle(5).Should().Be("Deidad Menor");
+            GameConfig.Language = "fr";
+            new God { Name = "FfTitleGod", Experience = 0 }.GetTitle().Should().Be(GodText.Title(1));
+        }
+        finally { GameConfig.Language = before; }
+
+        Source("Locations", "TempleLocation.cs").Should().Contain("title = GodText.Title(level);");
+        Source("Systems", "DailySystemManager.cs").Should().Contain("Loc.Get(\"daily.divine_power_grows\", GodText.Title(newLevel))");
+        Source("Server", "MudChatSystem.cs").Should().Contain("Loc.Get(\"chat.who_title_the\", Systems.GodText.Title(player!.GodLevel))");
+    }
+
+    // ---------------- French: vous, as the rest of the Temple ----------------
+
+    [Fact]
+    public void French_TheGodLines_UseVous()
+    {
+        var fr = Lang("fr");
+        var keys = new[]
+        {
+            "faith.npc_shared", "faith.npc_opposed", "faith.npc_mark_shared", "faith.npc_mark_other",
+            "temple.week_god", "temple.week_god_none", "temple.week_god_yours",
+            "old_god.echo.aurelion", "old_god.echo.maelketh", "old_god.echo.veloura", "old_god.echo.thorgrim",
+            "old_god.echo.noctura", "old_god.echo.terravok", "old_god.echo.manwe", "old_god.echo_fall",
+        };
+        var tu = new System.Text.RegularExpressions.Regex(@"\b(tu|toi|ton|ta|tes|te)\b|\b(Porte|Montre)-", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        foreach (var k in keys)
+        {
+            string text = fr.GetProperty(k).GetString()!;
+            tu.IsMatch(text).Should().BeFalse($"fr {k} uses vous: {text}");
+        }
+        fr.GetProperty("temple.week_god_yours").GetString().Should().StartWith("Vous suivez");
+    }
 }
