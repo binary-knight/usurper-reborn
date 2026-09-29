@@ -275,7 +275,7 @@ public class GodDeeds1115Tests
 
     [Theory]
     [InlineData("Scripts/Systems/CombatEngine.cs", "GodDeedSystem.RecordGroupVictory(result.Player, result.DefeatedMonsters, result.Teammates, terminal);", 1)]
-    [InlineData("Scripts/Systems/CombatEngine.cs", "if (globalEscape && !result.PlayerActuallyDied) GodDeedSystem.Record(player, GodAct.Fled, terminal);", 1)]
+    [InlineData("Scripts/Systems/CombatEngine.cs", "if (fledThisFight && !result.PlayerActuallyDied) GodDeedSystem.Record(player, GodAct.Fled, terminal);", 1)]
     [InlineData("Scripts/Systems/CombatEngine.cs", "if (totalHeal > 0) GodDeedSystem.Record(player, GodAct.AllyHealed, terminal);", 1)]
     [InlineData("Scripts/Systems/CombatEngine.cs", "if (actualHeal > 0) GodDeedSystem.Record(player, GodAct.AllyHealed, terminal);", 1)]
     [InlineData("Scripts/Systems/CombatEngine.cs", "if (!target.IsAlive) GodDeedSystem.Record(player, GodAct.StealthKill, terminal);", 1)]

@@ -43,6 +43,8 @@ public partial class CombatEngine
     // Combat state
     private bool globalBegged = false;
     private bool globalEscape = false;
+    // 1.2.0 Temple gods piece 5: the leader vanished with Umbrath's Miracle this fight (no flee penalty)
+    private bool _miracleVanished;
     private bool globalNoBeg = false;
 
     // Ability cooldowns - reset each combat
@@ -1144,6 +1146,7 @@ public partial class CombatEngine
         // Initialize combat state
         globalBegged = false;
         globalEscape = false;
+        _miracleVanished = false;   // 1.2.0 Temple gods piece 5
 
         // Combat start broadcast removed — too spammy with multiple players online.
 
@@ -2044,6 +2047,10 @@ public partial class CombatEngine
                 result.DefeatedMonsters.Add(m);
         }
 
+        // 1.2.0 Temple gods piece 5: Sylvana's beast was this fight's only; it leaves before the
+        // outcome, so it takes no XP share and never reaches the pet or party code after the fight
+        result.Teammates?.RemoveAll(t => t != null && t.IsMiracleAlly);
+
         // Determine combat outcome
         if (globalEscape)
         {
@@ -2051,8 +2058,8 @@ public partial class CombatEngine
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("combat.escaped"));
 
-            // Fame loss for fleeing
-            if (result.Player.Fame > 0)
+            // Fame loss for fleeing (none after Umbrath's Miracle)
+            if (result.Player.Fame > 0 && !_miracleVanished)
             {
                 result.Player.Fame = Math.Max(0, result.Player.Fame - 1);
             }
@@ -2324,8 +2331,10 @@ public partial class CombatEngine
         // v1.1.15: Mental fight-end losses (strain, flee, near death, boss, Old God), one net change and
         // one announcement per player. Strain only in the dungeon, on the leader's floor.
         int mentalFloor = MentalFightFloor(player);
-        ApplyMentalFightEnd(result, mentalFloor, globalEscape, BossContext != null, terminal, mentalAtFightStart);
-        if (globalEscape && !result.PlayerActuallyDied) GodDeedSystem.Record(player, GodAct.Fled, terminal);   // 1.2.0 Temple gods: War taboo
+        // 1.2.0 Temple gods piece 5: vanishing with Umbrath's Miracle is not fleeing (no Mental flee loss, no taboo)
+        bool fledThisFight = globalEscape && !_miracleVanished;
+        ApplyMentalFightEnd(result, mentalFloor, fledThisFight, BossContext != null, terminal, mentalAtFightStart);
+        if (fledThisFight && !result.PlayerActuallyDied) GodDeedSystem.Record(player, GodAct.Fled, terminal);   // 1.2.0 Temple gods: War taboo
         // v1.1.15: checked right after the fight; the next fight in a chain is not entered (see the top)
         result.MentalCollapsePending = MentalSystem.CollapseDue(player);
 
@@ -2842,7 +2851,7 @@ public partial class CombatEngine
     /// Compact dungeon combat action menu for BBS 80x25 terminals (multi-monster combat).
     /// Fits on 2-3 lines. Quickbar skills shown as "[1-9]Skills" shortcut.
     /// </summary>
-    private void ShowDungeonCombatMenuBBS(Character player, bool hasTeammatesNeedingAid, bool canHealAlly, List<(string key, string name, bool available)> classInfo, bool isFollower = false)
+    private void ShowDungeonCombatMenuBBS(Character player, bool hasTeammatesNeedingAid, bool canHealAlly, List<(string key, string name, bool available)> classInfo, bool isFollower = false, GodDomain miracle = GodDomain.None)
     {
         // Row 1: Core actions
         terminal.SetColor("bright_yellow");
@@ -2959,6 +2968,15 @@ public partial class CombatEngine
             terminal.Write(Loc.Get("combat.save_label"));
         }
         terminal.WriteLine("");
+
+        // 1.2.0 Temple gods piece 5: the day's Miracle, on a row of its own, only while it can be called
+        if (miracle != GodDomain.None)
+        {
+            terminal.SetColor("bright_yellow");
+            terminal.Write(" [M]");
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine(MiracleSystem.MenuLabel(miracle));
+        }
     }
 
     /// <summary>
@@ -3247,7 +3265,7 @@ public partial class CombatEngine
     /// <summary>
     /// Display dungeon combat menu in screen reader friendly format (no box-drawing characters)
     /// </summary>
-    private void ShowDungeonCombatMenuScreenReader(Character player, bool hasTeammatesNeedingAid, bool canHealAlly, List<(string key, string name, bool available)> classInfo, bool isFollower = false)
+    private void ShowDungeonCombatMenuScreenReader(Character player, bool hasTeammatesNeedingAid, bool canHealAlly, List<(string key, string name, bool available)> classInfo, bool isFollower = false, GodDomain miracle = GodDomain.None)
     {
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("combat.dungeon_menu"));
@@ -3304,6 +3322,10 @@ public partial class CombatEngine
         if (BossContext?.CanSave == true)
             terminal.WriteLine(Loc.Get("combat.menu_save_boss"));
 
+        // 1.2.0 Temple gods piece 5: the day's Miracle, only while it can be called
+        if (miracle != GodDomain.None)
+            terminal.WriteLine($"  M - {MiracleSystem.MenuLabel(miracle)}, {MiracleSystem.Describe(miracle)}");
+
         // Retreat and auto
         terminal.WriteLine(Loc.Get("combat.menu_retreat"));
         if (!isFollower)
@@ -3325,7 +3347,7 @@ public partial class CombatEngine
     /// <summary>
     /// Display dungeon combat menu with box-drawing characters (standard visual mode)
     /// </summary>
-    private void ShowDungeonCombatMenuStandard(Character player, bool hasTeammatesNeedingAid, bool canHealAlly, List<(string key, string name, bool available)> classInfo, bool isFollower = false)
+    private void ShowDungeonCombatMenuStandard(Character player, bool hasTeammatesNeedingAid, bool canHealAlly, List<(string key, string name, bool available)> classInfo, bool isFollower = false, GodDomain miracle = GodDomain.None)
     {
         terminal.SetColor("green");
         terminal.WriteLine("╔═══════════════════════════════════════╗");
@@ -3445,6 +3467,18 @@ public partial class CombatEngine
             terminal.SetColor("bright_green");
             string herbDesc = Loc.Get("combat.herb_pouch_short", player.TotalHerbCount);
             terminal.Write($"{herbDesc,-34}");
+            terminal.SetColor("green");
+            terminal.WriteLine("║");
+        }
+
+        // 1.2.0 Temple gods piece 5: the day's Miracle, only while it can be called
+        if (miracle != GodDomain.None)
+        {
+            terminal.Write("║ ");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("[M] ");
+            terminal.SetColor("bright_magenta");
+            terminal.Write($"{MiracleSystem.MenuLabel(miracle),-34}");
             terminal.SetColor("green");
             terminal.WriteLine("║");
         }
@@ -4388,6 +4422,122 @@ public partial class CombatEngine
         }
 
         await Task.Delay(GetCombatDelay(1000));
+    }
+
+    /// <summary>
+    /// 1.2.0 Temple gods piece 5: the Miracle the actor may call on now in this monster fight, or
+    /// None. The combat menus show [M] only for a Miracle offered here.
+    /// </summary>
+    private GodDomain MiracleOffered(Character actor, List<Monster> monsters, CombatResult result) =>
+        MiracleSystem.OfferedInFight(actor, monsters, MiracleParty(result), DifficultySystem.CanFlee());
+
+    /// <summary>1.2.0: everyone on the actor's side of this fight (the leader and every teammate).</summary>
+    private static List<Character> MiracleParty(CombatResult result)
+    {
+        var party = new List<Character>();
+        if (result?.Player != null) party.Add(result.Player);
+        if (result?.Teammates != null) party.AddRange(result.Teammates.Where(t => t != null && !party.Contains(t)));
+        return party;
+    }
+
+    /// <summary>
+    /// 1.2.0 Temple gods piece 5: calls on the actor's Miracle (the leader or a grouped follower).
+    /// The day's Miracle is spent only when it is offered here; then its effect follows. A
+    /// follower's Umbrath Miracle never reaches this (ProcessGroupedPlayerTurn handles it).
+    /// </summary>
+    private async Task ExecuteMiracle(Character actor, List<Monster> monsters, CombatAction action, CombatResult result)
+    {
+        var miracle = MiracleOffered(actor, monsters, result);
+        if (miracle == GodDomain.None || !MiracleSystem.TryConsume(actor))
+        {
+            terminal.WriteLine(Loc.Get("miracle.not_ready"), "yellow");
+            await Task.Delay(GetCombatDelay(800));
+            return;
+        }
+        string god = GodRegistry.GetWorshippedGod(actor)?.Name ?? "";
+        terminal.WriteLine("");
+        terminal.SetColor("bright_magenta");
+        terminal.WriteLine(Loc.Get("miracle.called", god, MiracleSystem.Name(miracle)));
+        result.CombatLog.Add($"{actor.DisplayName} calls on the Miracle {miracle}");
+
+        Monster? target = action.TargetIndex.HasValue && action.TargetIndex.Value >= 0 && action.TargetIndex.Value < monsters.Count
+            && monsters[action.TargetIndex.Value].IsAlive ? monsters[action.TargetIndex.Value] : null;
+
+        switch (miracle)
+        {
+            case GodDomain.Light:
+            {
+                if (target == null || !MiracleSystem.CanBanish(target))
+                    target = monsters.FirstOrDefault(MiracleSystem.CanBanish);
+                if (target == null) break;
+                if (MiracleSystem.BanishKillsOutright(target))
+                {
+                    target.HP = 0;
+                    terminal.WriteLine(Loc.Get("miracle.banish", target.Name), "bright_white");
+                    if (!result.DefeatedMonsters.Contains(target)) result.DefeatedMonsters.Add(target);
+                }
+                else
+                {
+                    terminal.WriteLine(Loc.Get("miracle.banish_resist", target.Name), "bright_yellow");
+                    await ApplySingleMonsterDamage(target, MiracleSystem.BanishBossDamage(target), result, "banish", actor, isSpellDamage: true);
+                }
+                break;
+            }
+
+            case GodDomain.War:
+                actor.MiracleCritPending = true;
+                await ProcessPlayerActionMultiMonster(new CombatAction { Type = CombatActionType.Attack, TargetIndex = target != null ? monsters.IndexOf(target) : null },
+                    actor, monsters, result);
+                actor.MiracleCritPending = false;   // an attack that found no foe keeps nothing for later
+                break;
+
+            case GodDomain.Love:
+                foreach (var healed in MiracleSystem.HealPartyToFull(MiracleParty(result)))
+                    terminal.WriteLine(Loc.Get("miracle.healed", healed.DisplayName, healed.HP, healed.MaxHP), "bright_green");
+                break;
+
+            case GodDomain.Law:
+                target ??= monsters.Where(m => m.IsAlive).OrderByDescending(m => m.HP).FirstOrDefault();
+                if (target == null) break;
+                if (TryHoldMonster(target, HoldKind.Bind, GameConfig.MiracleBindRounds))
+                    terminal.WriteLine(Loc.Get("miracle.bind", target.Name, target.StunDuration), "bright_cyan");
+                else
+                    terminal.WriteLine(Loc.Get("miracle.bind_resist", target.Name), "yellow");
+                break;
+
+            case GodDomain.Shadow:
+                terminal.WriteLine(Loc.Get("miracle.vanish"), "bright_magenta");
+                _miracleVanished = true;
+                globalEscape = true;
+                break;
+
+            case GodDomain.Earth:
+                MiracleSystem.HealToFull(actor);
+                terminal.WriteLine(Loc.Get("miracle.healed", actor.DisplayName, actor.HP, actor.MaxHP), "bright_green");
+                break;
+
+            case GodDomain.Magic:
+                MiracleSystem.RefillMana(actor);
+                terminal.WriteLine(Loc.Get("miracle.mana", actor.Mana, actor.MaxMana), "bright_cyan");
+                break;
+
+            case GodDomain.Nature:
+            {
+                var beast = MiracleSystem.SummonBeast(actor);
+                if (beast == null) break;
+                result.Teammates ??= new List<Character>();
+                result.Teammates.Add(beast);   // this fight's list (currentTeammates); it never joins the dungeon party
+                terminal.WriteLine(Loc.Get("miracle.beast", beast.DisplayName), "bright_green");
+                break;
+            }
+
+            case GodDomain.Chaos:
+                terminal.WriteLine(Loc.Get("miracle.confuse"), "magenta");
+                foreach (var m in monsters.Where(m => m.IsAlive).ToList())
+                    ApplySageControl(m, "mass_confusion", GameConfig.MiracleConfuseRounds, actor, result);
+                break;
+        }
+        await Task.Delay(GetCombatDelay(1200));
     }
 
     /// <summary>
@@ -8691,7 +8841,7 @@ public partial class CombatEngine
         return true;
     }
 
-    internal enum HoldKind { Freeze, Sleep }
+    internal enum HoldKind { Freeze, Sleep, Bind }
 
     /// <summary>
     /// v1.1.15: freeze and sleep on a monster, under the shared hold budget with stun and web.
@@ -8727,6 +8877,12 @@ public partial class CombatEngine
         {
             target.IsFrozen = true;
             target.FrozenDuration = duration;
+        }
+        else if (kind == HoldKind.Bind)
+        {
+            // 1.2.0 Temple gods piece 5: Judicar's Miracle, a hold that takes the monster's turns as a stun does
+            target.IsStunned = true;
+            target.StunDuration = duration;
         }
         else
         {
@@ -13595,15 +13751,23 @@ public partial class CombatEngine
                         // crit when followed by a plain swing. Mirror the Power-Strike
                         // pattern: stealth crit short-circuits the natural-20 / dex-crit
                         // rolls so we don't accidentally double-apply.
-                        bool stealthCrit = player.HasStatus(StatusEffect.Hidden);
+                        // 1.2.0 Temple gods piece 5: Valorian's Miracle, a certain critical hit on this swing
+                        bool miracleCrit = player.MiracleCritPending;
+                        if (miracleCrit)
+                        {
+                            player.MiracleCritPending = false;
+                            rollMult = GameConfig.MiracleCritMultiplier;
+                            terminal.WriteLine(Loc.Get("miracle.crit"), "bright_red");
+                        }
+                        bool stealthCrit = !miracleCrit && player.HasStatus(StatusEffect.Hidden);
                         if (stealthCrit)
                         {
                             player.RemoveStatus(StatusEffect.Hidden);
                             rollMult = StatEffectsSystem.GetCriticalDamageMultiplier(player.Dexterity, player.GetEquipmentCritDamageBonus());
                             terminal.WriteLine(Loc.Get("combat.stealth_crit"), "bright_yellow");
                         }
-                        bool isCrit = !stealthCrit && random.Next(1, 21) == 20; // natural 20
-                        bool dexCrit = !stealthCrit && !isCrit && StatEffectsSystem.RollCriticalHit(player, random);
+                        bool isCrit = !miracleCrit && !stealthCrit && random.Next(1, 21) == 20; // natural 20
+                        bool dexCrit = !miracleCrit && !stealthCrit && !isCrit && StatEffectsSystem.RollCriticalHit(player, random);
                         if (isCrit)
                         {
                             rollMult = 1.5f + (float)(random.NextDouble() * 0.5); // 1.5-2.0
@@ -13616,7 +13780,7 @@ public partial class CombatEngine
                         }
 
                         // Wavecaller Ocean's Voice: +20% bonus crit chance when buff active
-                        if (!stealthCrit && !isCrit && !dexCrit && player.Class == CharacterClass.Wavecaller
+                        if (!miracleCrit && !stealthCrit && !isCrit && !dexCrit && player.Class == CharacterClass.Wavecaller
                             && player.TempAttackBonus > 0 && player.TempAttackBonusDuration > 0)
                         {
                             if (random.Next(100) < (int)(GameConfig.WavecallerOceansVoiceCritBonus * 100))
@@ -13906,6 +14070,7 @@ public partial class CombatEngine
             bool hasTeammatesNeedingAid = hasInjuredTeammates || hasManaNeededTeammates;
             bool canHealAlly = hasTeammatesNeedingAid && (player.Healing > 0 || player.ManaPotions > 0 || (ClassAbilitySystem.IsSpellcaster(player.Class) && player.Mana > 0));
             var classInfo = GetClassSpecificActions(player);
+            var miracleOffered = MiracleOffered(player, monsters, result);   // 1.2.0 Temple gods piece 5
 
             // Phase 2: Electron mode emits the structured menu state for the
             // graphical client and skips the text menu entirely.
@@ -13915,15 +14080,15 @@ public partial class CombatEngine
             }
             else if (DoorMode.IsInDoorMode || GameConfig.CompactMode)
             {
-                ShowDungeonCombatMenuBBS(player, hasTeammatesNeedingAid, canHealAlly, classInfo);
+                ShowDungeonCombatMenuBBS(player, hasTeammatesNeedingAid, canHealAlly, classInfo, miracle: miracleOffered);
             }
             else if (player.ScreenReaderMode)
             {
-                ShowDungeonCombatMenuScreenReader(player, hasTeammatesNeedingAid, canHealAlly, classInfo);
+                ShowDungeonCombatMenuScreenReader(player, hasTeammatesNeedingAid, canHealAlly, classInfo, miracle: miracleOffered);
             }
             else
             {
-                ShowDungeonCombatMenuStandard(player, hasTeammatesNeedingAid, canHealAlly, classInfo);
+                ShowDungeonCombatMenuStandard(player, hasTeammatesNeedingAid, canHealAlly, classInfo, miracle: miracleOffered);
                 // Combat tip is visual-only.
                 ShowCombatTipIfNeeded(player);
             }
@@ -14005,6 +14170,33 @@ public partial class CombatEngine
                     terminal.WriteLine(Loc.Get("combat.herb_empty"), "yellow");
                     await Task.Delay(GetCombatDelay(1000));
                     continue;
+
+                case "M":
+                {
+                    // 1.2.0 Temple gods piece 5: the day's Miracle
+                    var miracle = MiracleOffered(player, monsters, result);
+                    if (miracle == GodDomain.None)
+                    {
+                        terminal.WriteLine(Loc.Get("miracle.not_ready"), "yellow");
+                        await Task.Delay(GetCombatDelay(1000));
+                        continue;
+                    }
+                    action.Type = CombatActionType.Miracle;
+                    if (MiracleSystem.NeedsTarget(miracle))
+                    {
+                        action.TargetIndex = await GetTargetSelection(monsters, allowRandom: true);
+                        if (action.TargetIndex == TargetCancelled) continue;
+                        if (miracle == GodDomain.Light && action.TargetIndex.HasValue
+                            && !MiracleSystem.CanBanish(monsters[action.TargetIndex.Value]))
+                        {
+                            terminal.WriteLine(Loc.Get("miracle.banish_pick"), "yellow");
+                            await Task.Delay(GetCombatDelay(1000));
+                            continue;
+                        }
+                    }
+                    action.FromAidMenu = miracle == GodDomain.Love;   // a party heal is aid to the allies
+                    return (action, false);
+                }
 
                 case "V":
                     if (BossContext?.CanSave == true)
@@ -14241,6 +14433,10 @@ public partial class CombatEngine
 
             case CombatActionType.UseHerb:
                 await ExecuteUseHerb(player, result);
+                break;
+
+            case CombatActionType.Miracle:
+                await ExecuteMiracle(player, monsters, action, result);   // 1.2.0 Temple gods piece 5
                 break;
 
             case CombatActionType.Retreat:
@@ -20864,6 +21060,8 @@ public partial class CombatEngine
         result.CombatLog.Add($"{monster.Name} attacks {companion.DisplayName} for {actualDamage} damage");
 
         CompanionDeathCheck:
+        // 1.2.0 Temple gods piece 5: a grouped follower of Mortis at Chosen cheats death once a day
+        if (!companion.IsAlive) TryMortisMiracleForFollower(companion, result);
         // Check if teammate died
         if (!companion.IsAlive)
         {
@@ -20966,6 +21164,7 @@ public partial class CombatEngine
     /// </summary>
     private async Task HandleTeammateDeathDispatch(Character tm, string killerName, CombatResult result)
     {
+        if (TryMortisMiracleForFollower(tm, result)) return;   // 1.2.0 Temple gods piece 5: Mortis's Miracle
         if (tm.IsEcho)
         {
             terminal.SetColor("bright_cyan");
@@ -22457,6 +22656,46 @@ public partial class CombatEngine
     private void ApplyMentalFollowerDeath(Character follower, CombatResult result) =>
         ApplyMentalFollowerDeath(result, follower, MentalFightFloor(result?.Player), BossContext != null);
 
+    /// <summary>
+    /// 1.2.0 Temple gods piece 5: Mortis's Miracle for the fight's leader, from HandlePlayerDeath.
+    /// When it fires the player is left at 1 HP, the day's Miracle is spent, the message is shown
+    /// (and broadcast to a group), and the outcome is rewritten as after Last Stand. Skipped for
+    /// arrest and exhibition fights and a Mental collapse death. True when it fired.
+    /// </summary>
+    private async Task<bool> TryMortisMiracle(CombatResult result)
+    {
+        var player = result.Player;
+        if (player == null || result.MentalCollapseDeath || player.IsArrestCombat || player.IsExhibitionCombat) return false;
+        if (!MiracleSystem.TryCheatDeath(player)) return false;
+        terminal.SetColor("bright_magenta");
+        terminal.WriteLine("");
+        terminal.WriteLine($"  {Loc.Get("miracle.mortis_fires")}");
+        terminal.WriteLine("");
+        if (result.Teammates?.Any(t => t.IsGroupedPlayer) == true)
+            BroadcastGroupCombatEvent(result, $"\u001b[1;35m  {Loc.Get("miracle.mortis_fires_other", player.DisplayName)}\u001b[0m");
+        await Task.Delay(GetCombatDelay(1500));
+        result.Outcome = result.Monsters != null && !result.Monsters.Any(m => m.IsAlive)
+            ? CombatOutcome.Victory : CombatOutcome.PlayerEscaped;
+        return true;
+    }
+
+    /// <summary>
+    /// 1.2.0 Temple gods piece 5: Mortis's Miracle for a grouped follower at a death site, before
+    /// the follower is removed from the fight or their death is handed to their session. When it
+    /// fires they stay in the fight at 1 HP; the message goes to their own terminal and the leader's.
+    /// Only grouped human followers; not in a fight with no real death. True when it fired.
+    /// </summary>
+    private bool TryMortisMiracleForFollower(Character follower, CombatResult result)
+    {
+        var leader = result?.Player;
+        if (follower == null || !follower.IsGroupedPlayer || leader == null) return false;
+        if (leader.IsArrestCombat || leader.IsExhibitionCombat || result!.Opponent != null) return false;
+        if (!MiracleSystem.TryCheatDeath(follower)) return false;
+        follower.RemoteTerminal?.WriteLine($"  {Loc.Get("miracle.mortis_fires")}", "bright_magenta");
+        terminal.WriteLine($"  {Loc.Get("miracle.mortis_fires_other", follower.DisplayName)}", "bright_magenta");
+        return true;
+    }
+
     private async Task HandlePlayerDeath(CombatResult result)
     {
         // v0.61.2 Last-Stand cap: every monster / boss / environmental damage
@@ -22504,6 +22743,12 @@ public partial class CombatEngine
                 result.Outcome = CombatOutcome.PlayerEscaped;
             return;
         }
+
+        // 1.2.0 Temple gods piece 5: Mortis's Miracle cheats death once that day, after the free
+        // rescues (Last Stand, Death's Door) and before anything death-related runs. Not for a
+        // fight with no real death (arrest, exhibition) or a Mental collapse.
+        if (await TryMortisMiracle(result))
+            return;
 
         // v0.61.2: Last-Stand rescue did NOT fire, so the player is genuinely
         // entering the death pipeline. Mark the result so the outer Char.Combat.End
@@ -30576,6 +30821,7 @@ public partial class CombatEngine
         {
             foreach (var tm in result.Teammates.Where(t => !t.IsAlive).ToList())
             {
+                if (TryMortisMiracleForFollower(tm, result)) continue;   // 1.2.0 Temple gods piece 5: Mortis's Miracle
                 string killerName = bossMonster.Name;
                 BroadcastGroupCombatEvent(result,
                     $"\u001b[1;31m  ═══ {tm.DisplayName} has fallen to {killerName}'s dark powers! ═══\u001b[0m");
@@ -30871,17 +31117,18 @@ public partial class CombatEngine
             bool canHealAlly = hasTeammatesNeedingAid && (teammate.Healing > 0 || teammate.ManaPotions > 0 ||
                 (ClassAbilitySystem.IsSpellcaster(teammate.Class) && teammate.Mana > 0));
             var classInfo = GetClassSpecificActions(teammate);
+            var miracleOffered = MiracleOffered(teammate, monsters, result);   // 1.2.0 Temple gods piece 5: each follower's own
             if (DoorMode.IsInDoorMode || GameConfig.CompactMode)
             {
-                ShowDungeonCombatMenuBBS(teammate, hasTeammatesNeedingAid, canHealAlly, classInfo, isFollower: true);
+                ShowDungeonCombatMenuBBS(teammate, hasTeammatesNeedingAid, canHealAlly, classInfo, isFollower: true, miracle: miracleOffered);
             }
             else if (teammate.ScreenReaderMode)
             {
-                ShowDungeonCombatMenuScreenReader(teammate, hasTeammatesNeedingAid, canHealAlly, classInfo, isFollower: true);
+                ShowDungeonCombatMenuScreenReader(teammate, hasTeammatesNeedingAid, canHealAlly, classInfo, isFollower: true, miracle: miracleOffered);
             }
             else
             {
-                ShowDungeonCombatMenuStandard(teammate, hasTeammatesNeedingAid, canHealAlly, classInfo, isFollower: true);
+                ShowDungeonCombatMenuStandard(teammate, hasTeammatesNeedingAid, canHealAlly, classInfo, isFollower: true, miracle: miracleOffered);
             }
 
             // Show available spells so followers know their C# options
@@ -30973,6 +31220,27 @@ public partial class CombatEngine
             finally
             {
                 teammate.IsAwaitingCombatInput = false;
+            }
+
+            // 1.2.0 Temple gods piece 5: a follower's Umbrath Miracle is their own vanish, never the
+            // party's escape: the individual retreat below, certain and without a flee penalty
+            if (action.Type == CombatActionType.Miracle && MiracleSystem.GetMiracle(teammate) == GodDomain.Shadow)
+            {
+                if (MiracleSystem.TryConsume(teammate))
+                {
+                    terminal.SetColor("bright_magenta");
+                    terminal.WriteLine($"  {Loc.Get("miracle.vanish")}");
+                    result.Teammates?.Remove(teammate);
+                    if (teammate.CombatInputChannel != null)
+                    {
+                        teammate.CombatInputChannel.Writer.TryComplete();
+                        teammate.CombatInputChannel = null;
+                    }
+                    teammate.IsAwaitingCombatInput = false;
+                    BroadcastGroupedPlayerAction(
+                        $"\u001b[35m  {Loc.Get("miracle.vanish_other", teammate.DisplayName)}\u001b[0m", teammate);
+                }
+                return;
             }
 
             // Individual retreat for followers — handle BEFORE ProcessPlayerActionMultiMonster
@@ -31361,6 +31629,29 @@ public partial class CombatEngine
         if (trimmed == "R")
         {
             action.Type = CombatActionType.Retreat;
+            return action;
+        }
+
+        // 1.2.0 Temple gods piece 5: the follower's own Miracle (M, or M# on a foe)
+        if (trimmed.StartsWith("M"))
+        {
+            var miracle = MiracleOffered(teammate, monsters, result);
+            if (miracle != GodDomain.None)
+            {
+                action.Type = CombatActionType.Miracle;
+                action.FromAidMenu = miracle == GodDomain.Love;
+                if (MiracleSystem.NeedsTarget(miracle))
+                {
+                    int idx = trimmed.Length > 1 && int.TryParse(trimmed.Substring(1), out int mTarget) ? mTarget - 1 : -1;
+                    if (idx >= 0 && idx < monsters.Count && monsters[idx].IsAlive
+                        && (miracle != GodDomain.Light || MiracleSystem.CanBanish(monsters[idx])))
+                        action.TargetIndex = idx;
+                    else
+                        action.TargetIndex = null;   // ExecuteMiracle picks a fitting foe
+                }
+                return action;
+            }
+            action.Type = CombatActionType.Attack;
             return action;
         }
 
@@ -31829,7 +32120,8 @@ public enum CombatActionType
     HealAlly,       // Heal a teammate with potion or spell
     BossSave,       // Attempt to save an Old God boss mid-combat
     CoatBlade,      // Coat weapon with poison from vial inventory
-    UseHerb         // Use an herb from herb pouch
+    UseHerb,        // Use an herb from herb pouch
+    Miracle         // 1.2.0 Temple gods: call on the day's Miracle (MiracleSystem)
 }
 
 /// <summary>

@@ -1437,6 +1437,8 @@ public partial class TempleLocation : BaseLocation
             {
                 terminal.WriteLine($"      {Loc.Get("god.boon_line", GodBoonSystem.DescribeBoon(boonDomain, 100), 100)}", "gray");
                 terminal.WriteLine($"      {Loc.Get("god.ward_line", GodBoonSystem.DescribeWard(boonDomain))}", "darkgray");
+                // 1.2.0 Temple gods piece 5: the god's Miracle, for its Chosen
+                terminal.WriteLine($"      {Loc.Get("miracle.altar_line", MiracleSystem.Name(boonDomain), MiracleSystem.Describe(boonDomain))}", "darkgray");
             }
         }
 
@@ -1827,6 +1829,11 @@ public partial class TempleLocation : BaseLocation
         {
             terminal.WriteLine(Loc.Get("temple.god_none"), "gray");
         }
+
+        // 1.2.0 Temple gods piece 5: the Miracle (at Chosen, ready or used today; below, the tier that unlocks it)
+        string miracleLine = MiracleSystem.TempleLine(currentPlayer, godSystem);
+        if (miracleLine.Length > 0)
+            terminal.WriteLine(miracleLine, MiracleSystem.IsReady(currentPlayer, godSystem) ? "bright_magenta" : "gray");
 
         await terminal.PressAnyKey();
     }

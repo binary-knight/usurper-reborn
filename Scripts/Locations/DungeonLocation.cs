@@ -1256,29 +1256,7 @@ public class DungeonLocation : BaseLocation
         // Stat scaling: pet level matters somewhat, player level matters more (the bond grows).
         // Effective level = max(pet.Level, player.Level / 2).
         int effLevel = Math.Max(pet.Level, (int)player.Level / 2);
-        long scaledHP = def.CombatBaseHP + (long)(def.CombatBaseHP * (effLevel - 1) * 0.10);
-        long scaledAtk = def.CombatBaseAttack + (long)(def.CombatBaseAttack * (effLevel - 1) * 0.08);
-        long scaledDef = def.CombatBaseDefence + (long)(def.CombatBaseDefence * (effLevel - 1) * 0.05);
-
-        var wrapper = new Character
-        {
-            Name1 = pet.Name,
-            Name2 = pet.Name,
-            Level = effLevel,
-            HP = scaledHP,
-            MaxHP = scaledHP,
-            Strength = scaledAtk,
-            WeapPow = scaledAtk / 2,
-            Defence = (long)scaledDef,
-            ArmPow = scaledDef / 2,
-            Mana = 0,
-            MaxMana = 0,
-            Class = CharacterClass.Warrior, // Marker class so the basic-attack AI path runs.
-            Race = CharacterRace.Troll,     // Beast-ish marker; no race bonuses apply since IsPet.
-            IsPet = true,
-            PetSpeciesId = pet.Id,          // v0.61.2: carry species id for per-beast combat behavior.
-            Allowed = true,
-        };
+        var wrapper = UsurperRemake.Data.BeastData.BuildCombatWrapper(def, effLevel, pet.Name);   // 1.2.0: shared with Sylvana's Miracle
 
         teammates.Add(wrapper);
         term.SetColor("bright_yellow");
