@@ -76,18 +76,54 @@ public class DailySystemManager
     /// Get the most recent 7 PM Eastern Time boundary as UTC.
     /// This is the authoritative daily reset point for online mode.
     /// </summary>
-    public static DateTime GetCurrentResetBoundary()
+    public static DateTime GetCurrentResetBoundary() => ResetBoundaryAt(DateTime.UtcNow);
+
+    /// <summary>The most recent 7 PM Eastern daily reset boundary at or before utcNow, as UTC.</summary>
+    public static DateTime ResetBoundaryAt(DateTime utcNow)
+    {
+        var eastern = EasternZone();
+        return TimeZoneInfo.ConvertTimeToUtc(ResetBoundaryEastern(utcNow, eastern), eastern);
+    }
+
+    private static TimeZoneInfo EasternZone()
     {
         // IANA ID for Linux/macOS, Windows ID for Windows
-        TimeZoneInfo eastern;
-        try { eastern = TimeZoneInfo.FindSystemTimeZoneById("America/New_York"); }
-        catch (TimeZoneNotFoundException) { eastern = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time"); }
-        var nowEastern = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, eastern);
+        try { return TimeZoneInfo.FindSystemTimeZoneById("America/New_York"); }
+        catch (TimeZoneNotFoundException) { return TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time"); }
+    }
+
+    private static DateTime ResetBoundaryEastern(DateTime utcNow, TimeZoneInfo eastern)
+    {
+        var nowEastern = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utcNow, DateTimeKind.Utc), eastern);
         var resetToday = nowEastern.Date.AddHours(GameConfig.DailyResetHourEastern);
         if (nowEastern < resetToday)
             resetToday = resetToday.AddDays(-1); // Haven't hit 7 PM yet, use yesterday's
-        return TimeZoneInfo.ConvertTimeToUtc(resetToday, eastern);
+        return resetToday;
     }
+
+    /// <summary>
+    /// 1.2.0: the Eastern date of world reset boundary 0 (Sunday 5 January 2025, 7 PM Eastern). Fixed;
+    /// the world calendar counts daily reset boundaries from it.
+    /// </summary>
+    public static readonly DateTime WorldCalendarEpochEastern = new DateTime(2025, 1, 5);
+
+    /// <summary>
+    /// 1.2.0: the world day at utcNow, the count of 7 PM Eastern daily reset boundaries since
+    /// WorldCalendarEpochEastern (never below 0). The same for every session on the server, unlike
+    /// CurrentDay, which online comes from whichever save loaded last. Counted on Eastern dates, so
+    /// the 23 and 25 hour days of a clock change still count as one day each.
+    /// </summary>
+    public static int WorldDayAt(DateTime utcNow)
+    {
+        var boundary = ResetBoundaryEastern(utcNow, EasternZone());
+        return Math.Max(0, (boundary.Date - WorldCalendarEpochEastern.Date).Days);
+    }
+
+    /// <summary>1.2.0: the world week at utcNow (WorldDayAt / GodStandingWeekDays); it turns at a 7 PM Eastern reset on Sunday.</summary>
+    public static int WorldWeekAt(DateTime utcNow) => WorldDayAt(utcNow) / GameConfig.GodStandingWeekDays;
+
+    /// <summary>1.2.0: this world week (WorldWeekAt now). The weekly clock for everyone online.</summary>
+    public static int WorldWeek() => WorldWeekAt(DateTime.UtcNow);
 
     /// <summary>
     /// Check if a daily reset should occur based on current mode

@@ -1756,7 +1756,7 @@ public static partial class GameConfig
     public const int GodDeedDesecration = 3;                  // Shadow, Death and Chaos: an altar desecrated (under the daily deed cap)
     // Temple gods piece 4: each desecration lowers that god's standing by this until the next weekly reset
     public const int GodDesecrationStandingPenalty = 5;
-    public const int GodStandingWeekDays = 7;                 // The weekly reset: week = game day / this
+    public const int GodStandingWeekDays = 7;                 // The weekly reset: week = day / this (online the world day, DailySystemManager.WorldDayAt)
     // Temple gods piece 4: leaving a god costs all Favor with it; its wrath follows by the Favor lost
     // (GodSwitchSystem). A canon god's wrath is a DivineWrath level: 1 for Favor lost below
     // GodFavorTierDevoutMin, 2 below GodFavorTierZealotMin, 3 from there. A player-god smites at
