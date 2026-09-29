@@ -8860,7 +8860,7 @@
   "god.domain_pick_confirm": "Make {0} your domain for good? ",
   "god.domain_pick_done": "{0} now answers for {1}.",
   "god.domain_pick_later": "The choice waits for your next visit to the Pantheon.",
-  "god.player_domain_line": "Domain: {0}, boon at {1}% of a canon god's",
+  "god.player_domain_line": "Domain: {0}, boon at {1}% of a Temple god's",
   "god.player_domain_none": "Domain: not yet chosen",
   "god.switch_cost_favor": "Leaving {0} costs all your Favor with them ({1}).",
   "god.switch_cost_no_favor": "You hold no Favor with {0}; leaving costs no Favor.",

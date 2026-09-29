@@ -8675,7 +8675,7 @@
   "god.domain_pick_confirm": "¿Hacer de {0} tu dominio para siempre? ",
   "god.domain_pick_done": "{0} responde ahora por {1}.",
   "god.domain_pick_later": "La elección espera tu próxima visita al Panteón.",
-  "god.player_domain_line": "Dominio: {0}, don al {1}% del de un dios canónico",
+  "god.player_domain_line": "Dominio: {0}, don al {1}% del de un dios del Templo",
   "god.player_domain_none": "Dominio: aún sin elegir",
   "god.switch_cost_favor": "Abandonar a {0} te cuesta todo tu Favor con este dios ({1}).",
   "god.switch_cost_no_favor": "No tienes Favor con {0}; abandonarlo no te cuesta Favor.",
