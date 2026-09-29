@@ -42,7 +42,7 @@ jobs:
           dotnet-version: '8.0.x'
       - uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: '22'
       - run: dotnet run --project usurper-reloaded.csproj -c Release -- --export-wiki wiki-data
       - run: npm ci --prefix tools/wiki-build
       - name: Prepare docs-only draft PR

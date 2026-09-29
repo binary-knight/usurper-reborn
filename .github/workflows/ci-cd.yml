@@ -44,7 +44,7 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
       - uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: '22'
           cache: npm
           cache-dependency-path: tools/wiki-build/package-lock.json
       - name: Export built-in wiki data

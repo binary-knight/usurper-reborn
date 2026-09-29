@@ -7,6 +7,10 @@ never edit or deploy the production wiki by hand.
 
 ## Build and preview
 
+Use Node.js 22 for the build/review tools and their SQLite tests. This keeps
+the tests on the existing web runtime's SQLite dependency generation. Newer
+Node versions can fail during native-addon cleanup even after compilation.
+
 ```sh
 dotnet run --project usurper-reloaded.csproj -c Release -- --export-wiki wiki-data
 npm ci --prefix tools/wiki-build

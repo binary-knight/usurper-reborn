@@ -11,7 +11,7 @@
     "markdown-it": "14.3.2"
   },
   "engines": {
-    "node": ">=20"
+    "node": "22.x"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
