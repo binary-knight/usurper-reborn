@@ -5216,6 +5216,7 @@
   "pantheon.bless_title": "HÍVŐ MEGÁLDÁSA",
   "pantheon.bless_prompt": "Áldás #",
   "pantheon.not_your_follower": "  {0} nem követ téged.",
+  "pantheon.deed_no_answer": "  Az egek nem feleltek. Próbáld újra.",
   "pantheon.bless_favor": "  {0} {1} kegyet nyer nálad (most {2}).",
   "pantheon.bless_favor_capped": "  {0} ma már megkapta az összes kegyet, amit áldásaid adhatnak.",
   "pantheon.bless_news": "[ISTENI] {0} megáldotta: {1}!",

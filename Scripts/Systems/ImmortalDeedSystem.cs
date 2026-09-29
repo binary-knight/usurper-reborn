@@ -5,21 +5,24 @@ namespace UsurperRemake.Systems;
 
 /// <summary>
 /// 1.2.0 Temple gods piece 5b: what a player-god's bless did. Refused is true when the target no
-/// longer follows the god (nothing changed). FavorGained is 0 when the day's cap is spent.
+/// longer follows the god (nothing changed). FavorGained is 0 when the day's cap is spent. Failed is
+/// true (with Refused) when the saved follower could not be read or written (nothing changed).
 /// </summary>
-public readonly record struct BlessOutcome(bool Refused, int FavorGained, int FavorNow, float Bonus, int Combats);
+public readonly record struct BlessOutcome(bool Refused, int FavorGained, int FavorNow, float Bonus, int Combats, bool Failed = false);
 
 /// <summary>
 /// 1.2.0 Temple gods piece 5b: what a chastise did. Refused is true when the target no longer
-/// follows the god (nothing changed). FavorLost is the Favor taken (0 at Favor 0).
+/// follows the god (nothing changed). FavorLost is the Favor taken (0 at Favor 0). Failed is true
+/// (with Refused) when the saved follower could not be read or written (nothing changed).
 /// </summary>
-public readonly record struct ChastiseOutcome(bool Refused, int FavorLost, int FavorNow);
+public readonly record struct ChastiseOutcome(bool Refused, int FavorLost, int FavorNow, bool Failed = false);
 
 /// <summary>
 /// 1.2.0 Temple gods piece 5b: the rules of an immortal's deeds on followers (Pantheon, Divine
 /// Deeds). Bless gives the follower GodBlessFavorGain Favor (FavorSource.ImmortalBlessing, at most
 /// GodBlessFavorDailyCap a day) and a combat blessing whose bonus follows the follower's Favor tier
-/// after that gain (BlessBonusFor). NPCs have no Favor, so an NPC follower is at the Follower tier.
+/// after that gain (BlessBonusFor). NPCs have no Favor; an NPC follower gets GodBlessBonusNpc (the full
+/// 10%, as before tiers existed; user ruling 2026-09-29).
 /// Smite never strikes the god's own follower (CanSmite). Three paths reach a follower: an NPC
 /// (Bless on the NPC), a player live in another session (Bless with otherSession: Favor is changed
 /// in memory and the tier's stat update is left to that session, GodBoonSystem.RequestRecalcForBoon;
@@ -129,7 +132,7 @@ public static class ImmortalDeedSystem
                 GameConfig.GodBlessFavorDailyCap, gods, deferBoonRecalc: otherSession);
         }
         int favor = FavorSystem.GetFavor(follower, gods);
-        float bonus = BlessBonusFor(FavorSystem.GetTier(favor));
+        float bonus = follower.IsNPC ? GameConfig.GodBlessBonusNpc : BlessBonusFor(FavorSystem.GetTier(favor));
         var (combats, merged) = MergeBlessing(follower.DivineBlessingCombats, follower.DivineBlessingBonus, bonus);
         follower.DivineBlessingCombats = combats;
         follower.DivineBlessingBonus = merged;
@@ -166,17 +169,39 @@ public static class ImmortalDeedSystem
     }
 
     /// <summary>
+    /// The GodFavorDayGains entry that holds the world day (DailySystemManager.WorldDayAt) the saved
+    /// ImmortalBlessing count belongs to, written by BlessSaved while the follower's own daily reset
+    /// is still due. It is not a FavorSource name, so GainedToday never reads it, and the follower's
+    /// daily reset clears it with the counts.
+    /// </summary>
+    public const string OfflineBlessWorldDayKey = "ImmortalBlessingWorldDay";
+
+    /// <summary>
     /// Bless a player who is not online, on their saved data: the same rule as Bless (Favor with the
     /// daily cap, the tier's bonus after it, a stronger blessing kept). Refused, with nothing changed,
-    /// when the save's god is not godName.
+    /// when the save's god is not godName. While the follower's own daily reset is still due (it runs
+    /// at their next login), the saved counts are from an earlier day: the ImmortalBlessing count is
+    /// then kept per world day (OfflineBlessWorldDayKey) and starts over when the world day changes,
+    /// so the cap is GodBlessFavorDailyCap each world day. LastDailyResetBoundary is never changed.
+    /// utcNow: the time of the bless (tests), else now.
     /// </summary>
-    public static BlessOutcome BlessSaved(PlayerData p, Dictionary<string, string>? playerGods, string godName)
+    public static BlessOutcome BlessSaved(PlayerData p, Dictionary<string, string>? playerGods, string godName, DateTime? utcNow = null)
     {
         if (p == null) return new BlessOutcome(true, 0, 0, 0f, 0);
         var (current, _) = GodRegistry.StandingEntryFrom(p, playerGods);
         if (!IsOwnFollower(godName, current)) return new BlessOutcome(true, 0, 0, 0f, 0);
         BindSaved(p, playerGods);
         string key = FavorSource.ImmortalBlessing.ToString();
+        DateTime now = utcNow ?? DateTime.UtcNow;
+        if (p.LastDailyResetBoundary < DailySystemManager.ResetBoundaryAt(now))
+        {
+            int worldDay = DailySystemManager.WorldDayAt(now);
+            if (!p.GodFavorDayGains.TryGetValue(OfflineBlessWorldDayKey, out int countedDay) || countedDay != worldDay)
+            {
+                p.GodFavorDayGains.Remove(key);
+                p.GodFavorDayGains[OfflineBlessWorldDayKey] = worldDay;
+            }
+        }
         int today = p.GodFavorDayGains.TryGetValue(key, out int v) ? v : 0;
         int room = Math.Max(0, GameConfig.GodBlessFavorDailyCap - today);
         int before = p.GodFavor;

@@ -1994,6 +1994,7 @@ public static partial class GameConfig
     public const float GodBlessBonusFollower = 0.05f;     // Follower tier: 5% damage/defense
     public const float GodBlessBonusDevout = 0.07f;       // Devout tier: 7%
     public const float GodBlessBonusZealot = 0.10f;       // Zealot and Chosen tiers: 10%
+    public const float GodBlessBonusNpc = 0.10f;          // An NPC follower (no Favor): 10%, as before tiers
     public const int GodBlessFavorGain = 2;               // Favor a bless gives the follower
     public const int GodBlessFavorDailyCap = 2;           // FavorSource.ImmortalBlessing: at most this much Favor a day
     public const int GodChastiseFavorLoss = 5;            // Chastise: Favor a player-god takes from its own follower, once a day each

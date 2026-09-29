@@ -142,9 +142,6 @@ namespace UsurperRemake.Systems
         /// <summary>Count mortal players who worship a specific god.</summary>
         Task<int> CountPlayerBelievers(string divineName);
 
-        /// <summary>Atomically apply a divine blessing to an offline player.</summary>
-        Task ApplyDivineBlessing(string username, int combats, float bonus);
-
         /// <summary>Atomically reduce an offline player's HP by a percentage (never kills).</summary>
         Task ApplyDivineSmite(string username, float damagePercent);
 

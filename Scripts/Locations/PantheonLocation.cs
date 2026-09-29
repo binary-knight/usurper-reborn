@@ -753,7 +753,7 @@ public class PantheonLocation : BaseLocation
         if (outcome.Refused)
         {
             terminal.WriteLine("");
-            terminal.WriteLine(Loc.Get("pantheon.not_your_follower", target.Name), "gray");
+            terminal.WriteLine(outcome.Failed ? Loc.Get("pantheon.deed_no_answer") : Loc.Get("pantheon.not_your_follower", target.Name), "gray");
             await terminal.PressAnyKey(Loc.Get("pantheon.press_enter_return"));
             return;
         }
@@ -924,7 +924,7 @@ public class PantheonLocation : BaseLocation
         if (outcome.Refused)
         {
             terminal.WriteLine("");
-            terminal.WriteLine(Loc.Get("pantheon.not_your_follower", target.Name), "gray");
+            terminal.WriteLine(outcome.Failed ? Loc.Get("pantheon.deed_no_answer") : Loc.Get("pantheon.not_your_follower", target.Name), "gray");
             await terminal.PressAnyKey(Loc.Get("pantheon.press_enter_return"));
             return;
         }
@@ -1696,7 +1696,8 @@ public class PantheonLocation : BaseLocation
     /// left to that session, which saves it), and the message and the Favor line are sent to that
     /// session in its language. Not online: ImmortalDeedSystem.BlessSaved on the save in one SQL
     /// transaction (only the Favor and blessing fields are written), and the message is mailed in
-    /// the save's language. Refused when the player no longer follows the god.
+    /// the save's language. Refused when the player no longer follows the god; Refused and Failed
+    /// when the save could not be read or written (the database busy or failing).
     /// </summary>
     private async Task<BlessOutcome> ApplyBlessToPlayer(DeedTarget target, string godName)
     {
@@ -1722,7 +1723,8 @@ public class PantheonLocation : BaseLocation
             var o = ImmortalDeedSystem.BlessSaved(p, gods, godName);
             return (!o.Refused, (o, string.IsNullOrEmpty(p.Language) ? "en" : p.Language));
         });
-        if (saved is not { } s || s.Outcome.Refused) return refused;
+        if (saved.Failed) return refused with { Failed = true };
+        if (saved.Result is not { } s || s.Outcome.Refused) return refused;
         string text = Loc.GetIn(s.Lang, "pantheon.bless_received", godName, (int)Math.Round(s.Outcome.Bonus * 100), s.Outcome.Combats);
         if (s.Outcome.FavorGained > 0)
             text += " " + Loc.GetIn(s.Lang, "favor.gain", godName, s.Outcome.FavorGained, s.Outcome.FavorNow);
@@ -1736,7 +1738,8 @@ public class PantheonLocation : BaseLocation
     /// to that session, which saves it), and the message and the Favor line are sent to that session
     /// in its language. Not online: ImmortalDeedSystem.ChastiseSaved on the save in one SQL transaction
     /// (only the Favor fields change), and the message is mailed in the save's language. Refused when
-    /// the player no longer follows the god.
+    /// the player no longer follows the god; Refused and Failed when the save could not be read or
+    /// written (the database busy or failing).
     /// </summary>
     private async Task<ChastiseOutcome> ApplyChastiseToPlayer(DeedTarget target, string godName)
     {
@@ -1762,7 +1765,8 @@ public class PantheonLocation : BaseLocation
             var o = ImmortalDeedSystem.ChastiseSaved(p, gods, godName);
             return (!o.Refused, (o, string.IsNullOrEmpty(p.Language) ? "en" : p.Language));
         });
-        if (saved is not { } s || s.Outcome.Refused) return refused;
+        if (saved.Failed) return refused with { Failed = true };
+        if (saved.Result is not { } s || s.Outcome.Refused) return refused;
         string text = Loc.GetIn(s.Lang, "pantheon.chastise_received", godName);
         if (s.Outcome.FavorLost > 0)
             text += " " + Loc.GetIn(s.Lang, "favor.loss", godName, s.Outcome.FavorLost, s.Outcome.FavorNow);

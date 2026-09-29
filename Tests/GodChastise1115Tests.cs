@@ -179,12 +179,12 @@ public class GodChastise1115Tests : IDisposable
             StorySystems = new StorySystemsData { PlayerGods = canon ?? new Dictionary<string, string>() }
         });
 
-    private Task<ChastiseOutcome?> ChastiseOffline(string key) =>
-        Db.UpdateFollowerSaveOffline<ChastiseOutcome?>(key, (p, gods) =>
+    private async Task<ChastiseOutcome?> ChastiseOffline(string key) =>
+        (await Db.UpdateFollowerSaveOffline<ChastiseOutcome?>(key, (p, gods) =>
         {
             var o = ImmortalDeedSystem.ChastiseSaved(p, gods, God);
             return (!o.Refused, o);
-        });
+        })).Result;
 
     [Fact]
     public async Task Offline_Chastise_TakesFiveFavorOnTheSave()

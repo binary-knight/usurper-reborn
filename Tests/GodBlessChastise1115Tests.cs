@@ -75,14 +75,15 @@ public class GodBlessChastise1115Tests : IDisposable
     }
 
     [Fact]
-    public void Bless_OfAnNpc_GivesNoFavor_AndTheFollowerTierBonus()
+    public void Bless_OfAnNpc_GivesNoFavor_AndTheFullNpcBonus()
     {
         var npc = new Character { Name1 = "GbNpc", Name2 = "GbNpc", AI = CharacterAI.Computer, WorshippedGod = God };
         var o = ImmortalDeedSystem.Bless(npc, God, otherSession: false, new GodSystem());
         o.Refused.Should().BeFalse();
         o.FavorGained.Should().Be(0);
         npc.GodFavor.Should().Be(0);
-        npc.DivineBlessingBonus.Should().BeApproximately(GameConfig.GodBlessBonusFollower, 0.0001f);
+        npc.DivineBlessingBonus.Should().BeApproximately(GameConfig.GodBlessBonusNpc, 0.0001f);
+        GameConfig.GodBlessBonusNpc.Should().BeApproximately(0.10f, 0.0001f, "an NPC bless keeps the 10% it gave before tiers");
     }
 
     [Fact]
@@ -150,6 +151,13 @@ public class GodBlessChastise1115Tests : IDisposable
     }
 
     [Fact]
+    public void TheOldOfflineBlessingWrite_IsGone()
+    {
+        Source("Scripts/Systems/IOnlineSaveBackend.cs").Should().NotContain("ApplyDivineBlessing");
+        Source("Scripts/Systems/SqlSaveBackend.cs").Should().NotContain("ApplyDivineBlessing");
+    }
+
+    [Fact]
     public void Online_TheBlessDeed_GoesToTheLiveCharacterBeforeTheSave()
     {
         string body = Body("Scripts/Locations/PantheonLocation.cs", "private async Task<BlessOutcome> ApplyBlessToPlayer(");
@@ -175,12 +183,12 @@ public class GodBlessChastise1115Tests : IDisposable
             StorySystems = new StorySystemsData { PlayerGods = canon ?? new Dictionary<string, string>() }
         });
 
-    private Task<(BlessOutcome Outcome, string Lang)?> BlessOffline(string key) =>
-        Db.UpdateFollowerSaveOffline<(BlessOutcome Outcome, string Lang)?>(key, (p, gods) =>
+    private async Task<(BlessOutcome Outcome, string Lang)?> BlessOffline(string key) =>
+        (await Db.UpdateFollowerSaveOffline<(BlessOutcome Outcome, string Lang)?>(key, (p, gods) =>
         {
             var o = ImmortalDeedSystem.BlessSaved(p, gods, God);
             return (!o.Refused, (o, p.Language));
-        });
+        })).Result;
 
     private object? Scalar(string sql)
     {
