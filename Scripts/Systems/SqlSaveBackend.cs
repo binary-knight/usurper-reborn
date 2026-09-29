@@ -3953,6 +3953,85 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
+        /// 1.2.0 Temple gods piece 5b: a player-god's deed on a follower who is not online. In one
+        /// transaction the save is read, change is given the player data and the save's canon worship
+        /// dictionary (it returns whether to write, and a result), and only the Favor and blessing
+        /// fields are written back: godFavor, godFavorGod, godFavorSchema, godFavorDayGains,
+        /// daysSinceDevotion, divineBlessingCombats, divineBlessingBonus. Every other part of the save
+        /// is left as it is. Returns default when there is no save (or the read fails).
+        /// </summary>
+        public async Task<T?> UpdateFollowerSaveOffline<T>(string username, Func<PlayerData, Dictionary<string, string>?, (bool Write, T Result)> change)
+        {
+            if (string.IsNullOrWhiteSpace(username) || change == null) return default;
+            try
+            {
+                using var connection = OpenConnection();
+                using var tx = connection.BeginTransaction(deferred: false);
+                string key;
+                string json;
+                using (var read = connection.CreateCommand())
+                {
+                    read.Transaction = tx;
+                    read.CommandText = @"
+                        SELECT username, player_data FROM players
+                        WHERE LOWER(username) = LOWER(@username) AND player_data != '{}' AND LENGTH(player_data) > 2
+                        ORDER BY (username = LOWER(@username)) DESC, LENGTH(player_data) DESC LIMIT 1;";
+                    read.Parameters.AddWithValue("@username", username);
+                    using var reader = await Task.Run(() => read.ExecuteReader());
+                    if (!reader.Read()) return default;
+                    key = reader.GetString(0);
+                    json = reader.GetString(1);
+                }
+                var save = JsonSerializer.Deserialize<SaveGameData>(json, jsonOptions);
+                if (save?.Player == null) return default;
+                var (write, result) = change(save.Player, save.StorySystems?.PlayerGods);
+                if (!write) return result;
+                var p = save.Player;
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.Transaction = tx;
+                    cmd.CommandText = @"
+                        UPDATE players SET player_data = json_set(player_data,
+                            '$.player.godFavor', @favor,
+                            '$.player.godFavorGod', @favorGod,
+                            '$.player.godFavorSchema', @schema,
+                            '$.player.godFavorDayGains', json(@gains),
+                            '$.player.daysSinceDevotion', @devotion,
+                            '$.player.divineBlessingCombats', @combats,
+                            '$.player.divineBlessingBonus', @bonus)
+                        WHERE username = @key;";
+                    cmd.Parameters.AddWithValue("@key", key);
+                    cmd.Parameters.AddWithValue("@favor", p.GodFavor);
+                    cmd.Parameters.AddWithValue("@favorGod", p.GodFavorGod ?? "");
+                    cmd.Parameters.AddWithValue("@schema", p.GodFavorSchema);
+                    cmd.Parameters.AddWithValue("@gains", JsonSerializer.Serialize(p.GodFavorDayGains ?? new Dictionary<string, int>()));
+                    cmd.Parameters.AddWithValue("@devotion", p.DaysSinceDevotion);
+                    cmd.Parameters.AddWithValue("@combats", p.DivineBlessingCombats);
+                    cmd.Parameters.AddWithValue("@bonus", (double)p.DivineBlessingBonus);
+                    await Task.Run(() => cmd.ExecuteNonQuery());
+                }
+                tx.Commit();
+                return result;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to update the saved follower {username}: {ex.Message}");
+                return default;
+            }
+        }
+
+        /// <summary>
+        /// 1.2.0 Temple gods piece 5b: the god a saved character follows (the canon entry wins over the
+        /// player-god, as on load), or "" with none or no save. Pantheon reads it before a smite of a
+        /// player who is not online.
+        /// </summary>
+        public async Task<string> GetSavedWorshippedGod(string username)
+        {
+            var save = await ReadGameData(username);
+            return save?.Player == null ? "" : GodRegistry.StandingEntryFrom(save.Player, save.StorySystems?.PlayerGods).God;
+        }
+
+        /// <summary>
         /// Writes a saved character's player-god straight to player_data (an offline recruit, or the
         /// Temple's own-session write). 1.2.0: a character worships one god, so worshipping a
         /// player-god also blanks the character's own canon entry in the saved worship dictionary;

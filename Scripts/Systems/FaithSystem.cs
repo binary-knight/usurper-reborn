@@ -25,6 +25,7 @@ public enum FavorSource
     GoldSacrifice,
     ItemSacrifice,
     Deed,
+    ImmortalBlessing,   // piece 5b: a player-god's bless (GodBlessFavorDailyCap)
 }
 
 /// <summary>Temple gods piece 3: how an item sacrifice went (FavorSystem.SacrificeEquipped).</summary>

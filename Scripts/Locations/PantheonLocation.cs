@@ -726,37 +726,53 @@ public class PantheonLocation : BaseLocation
             IsPlayer = b.IsPlayer, Username = b.Username, IsOnline = b.IsOnline
         }).ToList();
 
-        var picked = await PickTarget(targets, "BLESS FOLLOWER", "bright_yellow", "Bless #");
+        var picked = await PickTarget(targets, Loc.Get("pantheon.bless_title"), "bright_yellow", Loc.Get("pantheon.bless_prompt"));
         if (picked == null) return;
 
         var target = believers.First(b => b.Name == picked.Name && b.IsPlayer == picked.IsPlayer);
         int expGain = GameConfig.GodBlessExp;
         if (target.IsPlayer) expGain = (int)(expGain * GameConfig.GodBlessPlayerExpMultiplier);
 
-        currentPlayer.DeedsLeft--;
-        currentPlayer.GodExperience += expGain;
-
+        // 1.2.0 Temple gods piece 5b: the follower gains Favor and the bonus follows their tier
+        // (ImmortalDeedSystem). A target who no longer follows the god is refused: no deed, no XP.
+        BlessOutcome outcome;
         if (target.IsPlayer)
         {
             var dt = new DeedTarget { Name = target.Name, Username = target.Username, IsPlayer = true, IsOnline = target.IsOnline };
-            await ApplyBlessToPlayer(dt, currentPlayer.DivineName);
-            NewsSystem.Instance?.Newsy(true, $"[DIVINE] {currentPlayer.DivineName} blessed {target.Name}!");
+            outcome = await ApplyBlessToPlayer(dt, currentPlayer.DivineName);
         }
         else
         {
             var npc = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.DisplayName == target.Name);
-            if (npc != null)
-            {
-                npc.DivineBlessingCombats = GameConfig.GodBlessCombatDuration;
-                npc.DivineBlessingBonus = GameConfig.GodBlessBonusPercent;
-            }
+            outcome = npc != null && !npc.IsDead && ImmortalDeedSystem.IsOwnFollower(currentPlayer.DivineName, npc.WorshippedGod)
+                ? ImmortalDeedSystem.Bless(npc, currentPlayer.DivineName, otherSession: false)
+                : new BlessOutcome(true, 0, 0, 0f, 0);
         }
+        if (outcome.Refused)
+        {
+            terminal.WriteLine("");
+            terminal.WriteLine(Loc.Get("pantheon.not_your_follower", target.Name), "gray");
+            await terminal.PressAnyKey(Loc.Get("pantheon.press_enter_return"));
+            return;
+        }
+
+        currentPlayer.DeedsLeft--;
+        currentPlayer.GodExperience += expGain;
+        if (target.IsPlayer)
+            NewsSystem.Instance?.Newsy(true, Loc.Get("pantheon.bless_news", currentPlayer.DivineName, target.Name));
 
         terminal.WriteLine("");
         terminal.SetColor("bright_cyan");
         terminal.WriteLine(Loc.Get("pantheon.bless_success", target.Name));
         terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("pantheon.bless_effect", (int)(GameConfig.GodBlessBonusPercent * 100), GameConfig.GodBlessCombatDuration));
+        terminal.WriteLine(Loc.Get("pantheon.bless_effect", (int)Math.Round(outcome.Bonus * 100), outcome.Combats));
+        if (target.IsPlayer)
+        {
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine(outcome.FavorGained > 0
+                ? Loc.Get("pantheon.bless_favor", target.Name, outcome.FavorGained, outcome.FavorNow)
+                : Loc.Get("pantheon.bless_favor_capped", target.Name));
+        }
         terminal.SetColor("gray");
         terminal.WriteLine(Loc.Get("pantheon.exp_gain", expGain));
         RecalculateGodLevel();
@@ -770,7 +786,7 @@ public class PantheonLocation : BaseLocation
         var targets = new List<DeedTarget>();
 
         var npcs = NPCSpawnSystem.Instance?.ActiveNPCs?
-            .Where(n => !n.IsDead && n.WorshippedGod != currentPlayer.DivineName)
+            .Where(n => !n.IsDead && ImmortalDeedSystem.CanSmite(currentPlayer.DivineName, n.WorshippedGod))
             .OrderByDescending(n => n.Level)
             .ToList() ?? new();
 
@@ -792,7 +808,7 @@ public class PantheonLocation : BaseLocation
                 var mortals = await backend.GetMortalPlayers(100);
                 foreach (var m in mortals)
                 {
-                    if (m.WorshippedGod == currentPlayer.DivineName) continue;
+                    if (!ImmortalDeedSystem.CanSmite(currentPlayer.DivineName, m.WorshippedGod)) continue;
 
                     // Check smite cooldown
                     string cooldownKey = $"{currentPlayer.DivineName}>{m.Username}";
@@ -820,8 +836,18 @@ public class PantheonLocation : BaseLocation
             return;
         }
 
-        var target = await PickTarget(targets, "SMITE MORTAL", "bright_red", "Smite #");
+        var target = await PickTarget(targets, Loc.Get("pantheon.smite_title"), "bright_red", Loc.Get("pantheon.smite_prompt"));
         if (target == null) return;
+
+        // 1.2.0 Temple gods piece 5b: a god never smites its own follower (the target's god read again
+        // now, so one converted since the list was drawn is refused): no deed, no XP
+        if (!ImmortalDeedSystem.CanSmite(currentPlayer.DivineName, await CurrentGodOfAsync(target)))
+        {
+            terminal.WriteLine("");
+            terminal.WriteLine(Loc.Get("pantheon.smite_own_follower", target.Name), "gray");
+            await terminal.PressAnyKey(Loc.Get("pantheon.press_enter_return"));
+            return;
+        }
         var rng = Random.Shared;
         float smitePercent = GameConfig.GodSmiteMinPercent + (float)(rng.NextDouble() * (GameConfig.GodSmiteMaxPercent - GameConfig.GodSmiteMinPercent));
 
@@ -843,7 +869,7 @@ public class PantheonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("pantheon.smite_strike", target.Name));
             terminal.SetColor("white");
             terminal.WriteLine(Loc.Get("pantheon.smite_player_damage", estimatedDamage));
-            NewsSystem.Instance?.Newsy(true, $"[DIVINE] {currentPlayer.DivineName} struck {target.Name} with divine lightning!");
+            NewsSystem.Instance?.Newsy(true, Loc.Get("pantheon.smite_news", currentPlayer.DivineName, target.Name));
         }
         else if (target.NpcRef != null)
         {
@@ -1590,31 +1616,67 @@ public class PantheonLocation : BaseLocation
 
     #region Player Interaction Helpers
 
-    /// <summary>Apply a divine blessing to a player (online: in-memory; offline: DB atomic update)</summary>
-    private async Task ApplyBlessToPlayer(DeedTarget target, string godName)
+    /// <summary>
+    /// The live character of a player in the game in another session on this server, with its
+    /// session, or null.
+    /// </summary>
+    private static (PlayerSession Session, Character Player)? LiveSessionOf(string username)
     {
-        var backend = SaveSystem.Instance?.Backend as SqlSaveBackend;
-        if (backend == null) return;
+        if (string.IsNullOrEmpty(username) || MudServer.Instance == null) return null;
+        if (!MudServer.Instance.ActiveSessions.TryGetValue(username.ToLowerInvariant(), out var session)) return null;
+        var player = session.Context?.Engine?.CurrentPlayer;
+        return player == null ? null : (session, player);
+    }
 
-        // Try online first
-        if (target.IsOnline && MudServer.Instance != null &&
-            MudServer.Instance.ActiveSessions.TryGetValue(target.Username.ToLowerInvariant(), out var session))
+    /// <summary>The god a deed target follows now: the NPC's, the live player's, else the saved one.</summary>
+    private static async Task<string> CurrentGodOfAsync(DeedTarget target)
+    {
+        if (!target.IsPlayer) return target.NpcRef?.WorshippedGod ?? "";
+        if (LiveSessionOf(target.Username) is { } live)
+            return GodRegistry.GetWorshippedGod(live.Player)?.Name ?? "";
+        if (SaveSystem.Instance?.Backend is SqlSaveBackend backend)
+            return await backend.GetSavedWorshippedGod(target.Username);
+        return "";
+    }
+
+    /// <summary>
+    /// 1.2.0 Temple gods piece 5b: a divine blessing on a player follower. In the game in another
+    /// session: ImmortalDeedSystem.Bless on the live character (Favor in memory, the tier's stat update
+    /// left to that session, which saves it), and the message and the Favor line are sent to that
+    /// session in its language. Not online: ImmortalDeedSystem.BlessSaved on the save in one SQL
+    /// transaction (only the Favor and blessing fields are written), and the message is mailed in
+    /// the save's language. Refused when the player no longer follows the god.
+    /// </summary>
+    private async Task<BlessOutcome> ApplyBlessToPlayer(DeedTarget target, string godName)
+    {
+        var refused = new BlessOutcome(true, 0, 0, 0f, 0);
+        var backend = SaveSystem.Instance?.Backend as SqlSaveBackend;
+        if (backend == null) return refused;
+
+        if (LiveSessionOf(target.Username) is { } live)
         {
-            var player = session.Context?.Engine?.CurrentPlayer;
-            if (player != null)
+            var outcome = ImmortalDeedSystem.Bless(live.Player, godName, otherSession: true);
+            if (!outcome.Refused)
             {
-                player.DivineBlessingCombats = GameConfig.GodBlessCombatDuration;
-                player.DivineBlessingBonus = GameConfig.GodBlessBonusPercent;
-                session.EnqueueMessage(
-                    $"\u001b[1;36m  ✦ The god {godName} has blessed you! +{(int)(GameConfig.GodBlessBonusPercent * 100)}% damage/defense for {GameConfig.GodBlessCombatDuration} combats. ✦\u001b[0m");
-                return;
+                string lang = live.Session.Context?.Language ?? "en";
+                live.Session.EnqueueMessage($"\u001b[1;36m  {Loc.GetIn(lang, "pantheon.bless_received", godName, (int)Math.Round(outcome.Bonus * 100), outcome.Combats)}\u001b[0m");
+                if (outcome.FavorGained > 0)
+                    live.Session.EnqueueMessage($"\u001b[1;33m  {Loc.GetIn(lang, "favor.gain", godName, outcome.FavorGained, outcome.FavorNow)}\u001b[0m");
             }
+            return outcome;
         }
 
-        // Offline: atomic DB update + message
-        await backend.ApplyDivineBlessing(target.Username, GameConfig.GodBlessCombatDuration, GameConfig.GodBlessBonusPercent);
-        await backend.SendMessage(godName, target.Username, "divine",
-            $"The god {godName} blessed you! +{(int)(GameConfig.GodBlessBonusPercent * 100)}% damage/defense for {GameConfig.GodBlessCombatDuration} combats.");
+        var saved = await backend.UpdateFollowerSaveOffline<(BlessOutcome Outcome, string Lang)?>(target.Username, (p, gods) =>
+        {
+            var o = ImmortalDeedSystem.BlessSaved(p, gods, godName);
+            return (!o.Refused, (o, string.IsNullOrEmpty(p.Language) ? "en" : p.Language));
+        });
+        if (saved is not { } s || s.Outcome.Refused) return refused;
+        string text = Loc.GetIn(s.Lang, "pantheon.bless_received", godName, (int)Math.Round(s.Outcome.Bonus * 100), s.Outcome.Combats);
+        if (s.Outcome.FavorGained > 0)
+            text += " " + Loc.GetIn(s.Lang, "favor.gain", godName, s.Outcome.FavorGained, s.Outcome.FavorNow);
+        await backend.SendMessage(godName, target.Username, "divine", text);
+        return s.Outcome;
     }
 
     /// <summary>Apply a divine smite to a player (online: in-memory; offline: DB atomic update)</summary>
@@ -1632,16 +1694,17 @@ public class PantheonLocation : BaseLocation
             {
                 long damage = Math.Max(1, (long)(player.MaxHP * damagePercent));
                 player.HP = Math.Max(1, player.HP - damage);
-                session.EnqueueMessage(
-                    $"\u001b[1;31m  ⚡ The god {godName} has struck you with divine lightning! You take {damage} damage! ⚡\u001b[0m");
+                string lang = session.Context?.Language ?? "en";
+                session.EnqueueMessage($"\u001b[1;31m  {Loc.GetIn(lang, "pantheon.smite_received", godName, damage)}\u001b[0m");
                 return;
             }
         }
 
-        // Offline: atomic DB update + message
+        // Offline: atomic DB update + message (in the save's language)
         await backend.ApplyDivineSmite(target.Username, damagePercent);
+        string savedLang = (await backend.ReadGameData(target.Username))?.Player?.Language ?? "";
         await backend.SendMessage(godName, target.Username, "divine",
-            $"The god {godName} struck you with divine lightning while you were away!");
+            Loc.GetIn(savedLang.Length == 0 ? "en" : savedLang, "pantheon.smite_received_offline", godName));
     }
 
     /// <summary>Apply recruitment to a player (online: in-memory; offline: DB atomic update)</summary>

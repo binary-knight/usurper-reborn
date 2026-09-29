@@ -1979,8 +1979,14 @@ public static partial class GameConfig
     public const int GodFreePrisonerExp = 10;             // Exp for freeing a prisoner
     public const int GodProclamationExp = 5;              // Exp for divine proclamation
     public const float GodRecruitPaganChance = 0.33f;     // 33% chance to recruit a pagan
-    public const float GodBlessBonusPercent = 0.10f;      // 10% damage/defense buff
     public const int GodBlessCombatDuration = 10;         // Blessing lasts 10 combats
+    // 1.2.0 Temple gods piece 5b: a player-god's bless follows the follower's Favor tier
+    // (ImmortalDeedSystem.BlessBonusFor) and gives the follower Favor, at most the cap a day
+    public const float GodBlessBonusFollower = 0.05f;     // Follower tier: 5% damage/defense
+    public const float GodBlessBonusDevout = 0.07f;       // Devout tier: 7%
+    public const float GodBlessBonusZealot = 0.10f;       // Zealot and Chosen tiers: 10%
+    public const int GodBlessFavorGain = 2;               // Favor a bless gives the follower
+    public const int GodBlessFavorDailyCap = 2;           // FavorSource.ImmortalBlessing: at most this much Favor a day
     public const float GodSmiteMinPercent = 0.10f;        // Smite deals 10-25% of target MaxHP
     public const float GodSmiteMaxPercent = 0.25f;
     public const float GodRecruitPlayerMultiplier = 0.75f;     // Players are harder to recruit than NPCs
