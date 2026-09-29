@@ -5282,6 +5282,7 @@
   "pantheon.boon_choice_prompt": "\n  Choix : ",
   "pantheon.pagan": "Païen",
   "pantheon.follows": "Suit {0}",
+  "pantheon.follows_wavering": "Suit {0} (hésitant)",
   "dark_alley.access_denied": "ACCÈS REFUSÉ",
   "dark_alley.guards_block": "Les gardes bloquent l’entrée de la Ruelle Sombre.",
   "dark_alley.return_martial_law": "Vous devrez revenir lorsque la loi martiale sera levée.",

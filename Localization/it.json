@@ -5282,6 +5282,7 @@
   "pantheon.boon_choice_prompt": "\n  Scelta: ",
   "pantheon.pagan": "Pagano",
   "pantheon.follows": "Segue {0}",
+  "pantheon.follows_wavering": "Segue {0} (vacillante)",
   "dark_alley.access_denied": "ACCESSO NEGATO",
   "dark_alley.guards_block": "Le guardie bloccano l'ingresso al Vicolo Oscuro.",
   "dark_alley.return_martial_law": "Devi tornare quando la legge marziale sarà revocata.",

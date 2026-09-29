@@ -598,7 +598,10 @@ public class PantheonLocation : BaseLocation
 
         foreach (var npc in npcs)
         {
-            string status = string.IsNullOrEmpty(npc.WorshippedGod) ? Loc.Get("pantheon.pagan") : Loc.Get("pantheon.follows", npc.WorshippedGod);
+            // 1.2.0: a loosely devout NPC (recruits like a pagan) is marked wavering (user ruling 2026-09-29)
+            string status = string.IsNullOrEmpty(npc.WorshippedGod) ? Loc.Get("pantheon.pagan")
+                : RecruitsLikePagan(npc) ? Loc.Get("pantheon.follows_wavering", npc.WorshippedGod)
+                : Loc.Get("pantheon.follows", npc.WorshippedGod);
             targets.Add(new DeedTarget
             {
                 Name = npc.DisplayName, Level = npc.Level, Status = status, NpcRef = npc,

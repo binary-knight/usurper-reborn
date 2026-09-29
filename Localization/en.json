@@ -5473,6 +5473,7 @@
   "pantheon.boon_choice_prompt": "\n  Choice: ",
   "pantheon.pagan": "Pagan",
   "pantheon.follows": "Follows {0}",
+  "pantheon.follows_wavering": "Follows {0} (wavering)",
   "dark_alley.access_denied": "ACCESS DENIED",
   "dark_alley.guards_block": "Guards block the entrance to the Dark Alley.",
   "dark_alley.return_martial_law": "You must return when martial law is lifted.",

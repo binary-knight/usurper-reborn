@@ -5290,6 +5290,7 @@
   "pantheon.boon_choice_prompt": "\n  Választás: ",
   "pantheon.pagan": "Pogány",
   "pantheon.follows": "Követi őt: {0}",
+  "pantheon.follows_wavering": "Követi őt: {0} (ingadozó)",
   "dark_alley.access_denied": "HOZZÁFÉRÉS ELUTASÍTVA",
   "dark_alley.guards_block": "Őrök állják el a Sötét Sikátor bejáratát.",
   "dark_alley.return_martial_law": "Térj vissza, ha feloldják a statáriumot.",

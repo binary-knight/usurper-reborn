@@ -413,4 +413,19 @@ public class GodFaithFixes1115Tests : IDisposable
         src.Should().Contain("string godTitle = GetGodTitleShared(currentPlayer.GodLevel);   // shared news: English");
         src.Should().Contain("has ascended to {GetGodTitleShared(currentPlayer.GodLevel)}!");
     }
+
+    [Fact]
+    public void RecruitList_MarksALooselyDevoutNpc_AsWavering_InEveryLanguage()
+    {
+        string src = Source("Locations", "PantheonLocation.cs");
+        src.Should().Contain(": RecruitsLikePagan(npc) ? Loc.Get(\"pantheon.follows_wavering\", npc.WorshippedGod)");
+        foreach (var lang in new[] { "en", "es", "fr", "hu", "it" })
+        {
+            var dir = new DirectoryInfo(AppContext.BaseDirectory);
+            while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "Localization"))) dir = dir.Parent;
+            var root = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir!.FullName, "Localization", lang + ".json"))).RootElement;
+            root.TryGetProperty("pantheon.follows_wavering", out var v).Should().BeTrue(lang);
+            v.GetString().Should().Contain("{0}", lang);
+        }
+    }
 }

@@ -5282,6 +5282,7 @@
   "pantheon.boon_choice_prompt": "\n  Elección: ",
   "pantheon.pagan": "Pagano",
   "pantheon.follows": "Sigue a {0}",
+  "pantheon.follows_wavering": "Sigue a {0} (vacilante)",
   "dark_alley.access_denied": "ACCESO DENEGADO",
   "dark_alley.guards_block": "Los guardias bloquean la entrada al Callejón Oscuro.",
   "dark_alley.return_martial_law": "Debes regresar cuando se levante la ley marcial.",
