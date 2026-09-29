@@ -20,6 +20,7 @@ namespace UsurperReborn.Tests;
 public class PacingGuardTests
 {
     private static readonly Regex BareDelay = new(@"await (System\.Threading\.Tasks\.)?Task\.Delay\(\s*[0-9_]+\s*\)\s*;", RegexOptions.Compiled);
+    private static readonly Regex CombatDelayDirect = new(@"Task\.Delay\(\s*GetCombatDelay\(", RegexOptions.Compiled);
     private static readonly Regex DisabledAssign = new(@"Pacing\s*\.\s*Disabled\s*=(?!=)", RegexOptions.Compiled);
     private static readonly Regex DisabledAssignInside = new(@"(?<![\w.])Disabled\s*=(?![=>])", RegexOptions.Compiled);
 
@@ -90,5 +91,14 @@ public class PacingGuardTests
     public void PacingIsDisabledInTheTestRun()
     {
         Pacing.Disabled.Should().BeTrue("Tests/TestPacing.cs sets it in a module initializer");
+    }
+
+    [Fact]
+    public void NoCombatDelayIsAwaitedDirectly()
+    {
+        var offenders = new List<string>();
+        foreach (var (rel, text) in ScriptFiles())
+            if (CombatDelayDirect.IsMatch(text)) offenders.Add(rel);
+        offenders.Should().BeEmpty("a combat pause must be Pacing.Wait(GetCombatDelay(N))");
     }
 }
