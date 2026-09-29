@@ -717,3 +717,14 @@ NG+ cycle bonus, which are restored once at your next login.**
 - The time warp youth, crystal cave and aurora encounters leave HP and mana
   full at the new maximum.
 - The street romance Charisma cap of 30 counts base Charisma only, not gear.
+
+## For server operators
+
+Two new tables are created automatically the first time this version
+starts: `creation_rolls` (a character creation roll kept across a
+disconnect, cleared at the character's first save) and
+`god_standing_penalties` (desecration penalties to a god's standing, one row
+per god and week, older weeks removed as new ones are written). The god of
+the week is stored in the existing `world_state` table under the key
+`god_of_week`. Nothing else is required, and no configuration or
+`scripts-server/` file changed.
