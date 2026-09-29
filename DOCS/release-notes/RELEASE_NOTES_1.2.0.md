@@ -426,6 +426,8 @@ spells use the old slots and level requirements.
 
 ## Translations
 
+- **Prison activity results** (pushups, yoga, reading, meditation, prayer and
+  the rest) now appear in your language.
 - **Spell names and descriptions for every class** now appear in your chosen
   language (English, Spanish, French, Hungarian, Italian), in combat, spell
   menus, the quickbar, the spell library, training, the teammate skill
