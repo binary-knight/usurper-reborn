@@ -2422,7 +2422,8 @@ public partial class TempleLocation : BaseLocation
         currentPlayer.Experience += xpGain;
         currentPlayer.DarkNr--;
         currentPlayer.DesecrationsToday++;
-        GodDeedSystem.Record(currentPlayer, GodAct.Desecration, terminal);   // 1.2.0 Temple gods: Earth taboo
+        GodDeedSystem.Record(currentPlayer, GodAct.Desecration, terminal);   // 1.2.0 Temple gods: Earth taboo; Shadow, Death, Chaos deed
+        GodStandingPenalty.RecordDesecration(currentPlayer, god.Name);       // 1.2.0 Temple gods piece 4: that god's standing, until the weekly reset
 
         terminal.WriteLine("", "white");
         terminal.WriteLine(Loc.Get("temple.darkness_flows", darknessGain), "dark_red");

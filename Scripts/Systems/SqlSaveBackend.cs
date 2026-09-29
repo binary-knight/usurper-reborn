@@ -1031,6 +1031,15 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex) { DebugLogger.Instance.LogWarning("SQL", $"creation_rolls not ensured: {ex.Message}"); }
 
+            // 1.2.0 Temple gods piece 4: standing a god lost to desecration, per week (GodStandingPenalty)
+            try
+            {
+                using var migCmd = connection.CreateCommand();
+                migCmd.CommandText = "CREATE TABLE IF NOT EXISTS god_standing_penalties (god TEXT NOT NULL, week INTEGER NOT NULL, points INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (god, week));";
+                migCmd.ExecuteNonQuery();
+            }
+            catch (Exception ex) { DebugLogger.Instance.LogWarning("SQL", $"god_standing_penalties not ensured: {ex.Message}"); }
+
             // 1.2.0 Temple gods: god standing is read from player_data (GetGodStandings); the god_favor
             // table an earlier 1.2.0 build kept is no longer used and is dropped where it exists
             try
@@ -4515,6 +4524,7 @@ namespace UsurperRemake.Systems
                         DELETE FROM wizard_flags;
                         DELETE FROM sleeping_players;
                         DELETE FROM creation_rolls;
+                        DELETE FROM god_standing_penalties;
                     ";
                     await cmd.ExecuteNonQueryAsync();
                 }
@@ -8983,12 +8993,33 @@ namespace UsurperRemake.Systems
         /// writes (SetPlayerWorshippedGod) count as they stand. The Temple ranking, the altars and the
         /// Pantheon (CountPlayerBelievers) all read this. Canon names come back in their canon spelling.
         /// </summary>
-        public Dictionary<string, GodStanding> GetGodStandings()
+        public Dictionary<string, GodStanding> GetGodStandings() => GetGodStandings(GodStandingPenalty.CurrentWeek());
+
+        /// <summary>
+        /// GetGodStandings for a week: the followers' Favor less that week's desecration penalties
+        /// (god_standing_penalties, read on the same connection), never below 0.
+        /// </summary>
+        public Dictionary<string, GodStanding> GetGodStandings(int week)
         {
             var entries = new List<(string God, int Favor)>();
+            var penalties = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             try
             {
                 using var connection = OpenConnection();
+                try
+                {
+                    using var pen = connection.CreateCommand();
+                    pen.CommandText = "SELECT god, points FROM god_standing_penalties WHERE week = @week;";
+                    pen.Parameters.AddWithValue("@week", week);
+                    using var pr = pen.ExecuteReader();
+                    while (pr.Read())
+                    {
+                        string god = pr.IsDBNull(0) ? "" : pr.GetString(0);
+                        int points = pr.IsDBNull(1) ? 0 : pr.GetInt32(1);
+                        if (god.Length > 0) penalties[god] = (penalties.TryGetValue(god, out int v) ? v : 0) + points;
+                    }
+                }
+                catch (Exception penEx) { DebugLogger.Instance.LogWarning("SQL", $"God standing penalties unavailable: {penEx.Message}"); }
                 using var cmd = connection.CreateCommand();
                 cmd.CommandText = @"
                     SELECT json_extract(player_data, '$.player.name1'),
@@ -9036,7 +9067,33 @@ namespace UsurperRemake.Systems
             {
                 DebugLogger.Instance.LogError("SQL", $"Failed to read god standings: {ex.Message}");
             }
-            return GodRegistry.ComputeStandings(entries);
+            return GodStandingPenalty.Apply(GodRegistry.ComputeStandings(entries), penalties);
+        }
+
+        /// <summary>
+        /// 1.2.0 Temple gods piece 4: adds a desecration penalty to a god's standing for a week (one
+        /// atomic upsert), and drops the rows of earlier weeks, which no longer count.
+        /// </summary>
+        public void AddGodStandingPenalty(string god, int week, int points)
+        {
+            if (string.IsNullOrWhiteSpace(god) || points <= 0) return;
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    INSERT INTO god_standing_penalties (god, week, points) VALUES (@god, @week, @points)
+                    ON CONFLICT(god, week) DO UPDATE SET points = points + excluded.points;
+                    DELETE FROM god_standing_penalties WHERE week < @week;";
+                cmd.Parameters.AddWithValue("@god", god.Trim());
+                cmd.Parameters.AddWithValue("@week", week);
+                cmd.Parameters.AddWithValue("@points", points);
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to add a god standing penalty for {god}: {ex.Message}");
+            }
         }
 
         /// <summary>A json_extract column as text ("" for NULL).</summary>

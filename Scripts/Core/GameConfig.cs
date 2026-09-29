@@ -1753,6 +1753,10 @@ public static partial class GameConfig
     public const int GodTabooMajor = 5;                       // Prison, confession, raising undead, a week without casting, marriage for Chaos, murder for Law
     public const int GodTabooGrave = 10;                      // Murder for Love, desecration for Earth
     public const int GodTabooNoCastDays = 7;                  // Magic: daily resets without a spell cast before the taboo
+    public const int GodDeedDesecration = 3;                  // Shadow, Death and Chaos: an altar desecrated (under the daily deed cap)
+    // Temple gods piece 4: each desecration lowers that god's standing by this until the next weekly reset
+    public const int GodDesecrationStandingPenalty = 5;
+    public const int GodStandingWeekDays = 7;                 // The weekly reset: week = game day / this
     // Temple gods piece 4: leaving a god costs all Favor with it; its wrath follows by the Favor lost
     // (GodSwitchSystem). A canon god's wrath is a DivineWrath level: 1 for Favor lost below
     // GodFavorTierDevoutMin, 2 below GodFavorTierZealotMin, 3 from there. A player-god smites at

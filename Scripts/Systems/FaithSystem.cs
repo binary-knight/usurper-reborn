@@ -255,12 +255,15 @@ public static class GodRegistry
         return SinglePlayerStandings(current);
     }
 
-    /// <summary>Single-player standing: the character's own god and Favor.</summary>
+    /// <summary>
+    /// Single-player standing: the character's own god and Favor, less this week's desecration
+    /// penalties kept in the save (GodStandingPenalty).
+    /// </summary>
     public static Dictionary<string, GodStanding> SinglePlayerStandings(Character? c, GodSystem? gods = null)
     {
         var god = c == null ? null : GetWorshippedGod(c, gods);
         var entries = god == null ? Array.Empty<(string, int)>() : new[] { (god.Value.Name, FavorSystem.GetFavor(c!, gods)) };
-        return ComputeStandings(entries);
+        return GodStandingPenalty.Apply(ComputeStandings(entries), GodStandingPenalty.LocalPenalties(c, GodStandingPenalty.CurrentWeek()));
     }
 
     /// <summary>Living NPCs following a god (today only player-gods have NPC followers).</summary>
@@ -546,4 +549,70 @@ public static class GodSwitchSystem
 
     /// <summary>Today's game day (DailySystemManager).</summary>
     public static int Today() => DailySystemManager.Instance.CurrentDay;
+}
+
+/// <summary>
+/// Temple gods piece 4: a desecrated altar lowers that god's standing by
+/// GodDesecrationStandingPenalty until the next weekly reset (week = game day /
+/// GodStandingWeekDays, DailySystemManager.CurrentDay). The penalty is stored, not a change to any
+/// follower's Favor, and it is applied where the standing is read: online in SQL
+/// (SqlSaveBackend.AddGodStandingPenalty, read inside GetGodStandings), single-player in the save
+/// (Character.GodStandingPenalties). A penalty from an earlier week no longer counts. Standing
+/// never goes below 0.
+/// </summary>
+public static class GodStandingPenalty
+{
+    /// <summary>The week a game day belongs to.</summary>
+    public static int WeekOf(int day) => Math.Max(0, day) / GameConfig.GodStandingWeekDays;
+
+    /// <summary>This week (DailySystemManager.CurrentDay).</summary>
+    public static int CurrentWeek() => WeekOf(DailySystemManager.Instance.CurrentDay);
+
+    /// <summary>Standings less the penalties (any letter case), never below 0. Gods without standing stay out.</summary>
+    public static Dictionary<string, GodStanding> Apply(Dictionary<string, GodStanding> standings, IReadOnlyDictionary<string, int>? penalties)
+    {
+        if (standings == null) return new Dictionary<string, GodStanding>(StringComparer.OrdinalIgnoreCase);
+        if (penalties == null || penalties.Count == 0) return standings;
+        foreach (var (god, points) in penalties)
+        {
+            if (points <= 0 || string.IsNullOrWhiteSpace(god)) continue;
+            string name = GodRegistry.CanonName(god) ?? god.Trim();
+            if (standings.TryGetValue(name, out var s))
+                standings[name] = s with { Standing = Math.Max(0, s.Standing - points) };
+        }
+        return standings;
+    }
+
+    /// <summary>The single-player penalties for a week (empty when they belong to another week).</summary>
+    public static IReadOnlyDictionary<string, int> LocalPenalties(Character? c, int week)
+    {
+        if (c?.GodStandingPenalties == null || c.GodStandingPenaltyWeek != week)
+            return new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        return new Dictionary<string, int>(c.GodStandingPenalties, StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Single-player: adds a penalty to a god for a week; penalties of an earlier week are dropped first.</summary>
+    public static void AddLocal(Character c, string god, int week, int points = GameConfig.GodDesecrationStandingPenalty)
+    {
+        if (c == null || string.IsNullOrWhiteSpace(god) || points <= 0) return;
+        if (c.GodStandingPenaltyWeek != week || c.GodStandingPenalties == null)
+        {
+            c.GodStandingPenalties = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            c.GodStandingPenaltyWeek = week;
+        }
+        string name = GodRegistry.CanonName(god) ?? god.Trim();
+        string key = c.GodStandingPenalties.Keys.FirstOrDefault(k => k.Equals(name, StringComparison.OrdinalIgnoreCase)) ?? name;
+        c.GodStandingPenalties[key] = (c.GodStandingPenalties.TryGetValue(key, out int v) ? v : 0) + points;
+    }
+
+    /// <summary>An altar of god desecrated by c: the penalty for this week, online in SQL, else in c's save.</summary>
+    public static void RecordDesecration(Character c, string god)
+    {
+        if (c == null || string.IsNullOrWhiteSpace(god)) return;
+        int week = CurrentWeek();
+        if (UsurperRemake.BBS.DoorMode.IsOnlineMode && SaveSystem.Instance?.Backend is SqlSaveBackend backend)
+            backend.AddGodStandingPenalty(GodRegistry.CanonName(god) ?? god.Trim(), week, GameConfig.GodDesecrationStandingPenalty);
+        else
+            AddLocal(c, god, week);
+    }
 }

@@ -788,6 +788,8 @@ namespace UsurperRemake.Systems
         public int DaysSinceDevotion { get; set; }  // 1.2.0: daily resets since the last devotion
         public int DaysSinceSpellCast { get; set; }  // 1.2.0: daily resets since the last spell cast; old saves read 0
         public int LastGodSwitchDay { get; set; } = -1;  // 1.2.0: game day of the last god left by choice; old saves read -1 (never)
+        public Dictionary<string, int> GodStandingPenalties { get; set; } = new();  // 1.2.0 single-player: god -> standing lost to desecration this week
+        public int GodStandingPenaltyWeek { get; set; } = -1;  // 1.2.0: the week those penalties belong to; old saves read -1 (none)
         public string DivineDomain { get; set; } = "";  // 1.2.0: an immortal's god domain (GodDomain name); old saves read ""
         public int DivineBlessingCombats { get; set; }
         public float DivineBlessingBonus { get; set; }

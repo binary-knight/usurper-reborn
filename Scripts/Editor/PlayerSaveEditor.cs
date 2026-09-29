@@ -290,6 +290,13 @@ internal static class PlayerSaveEditor
             p.GodFavorDayGains = new Dictionary<string, int>();
         p.DaysSinceSpellCast = EditorIO.PromptInt("Daily resets since the last spell cast (Arcanus taboo at 7)", p.DaysSinceSpellCast, min: 0);
         p.LastGodSwitchDay = EditorIO.PromptInt("Game day the character last left a god by choice (-1 never)", p.LastGodSwitchDay, min: -1);
+        EditorIO.Info($"Single-player desecration standing penalties (week {p.GodStandingPenaltyWeek}): " +
+            (p.GodStandingPenalties == null || p.GodStandingPenalties.Count == 0 ? "none" : string.Join(", ", p.GodStandingPenalties.Select(kv => $"{kv.Key} -{kv.Value}"))));
+        if (EditorIO.PromptBool("Clear the desecration standing penalties", false))
+        {
+            p.GodStandingPenalties = new Dictionary<string, int>();
+            p.GodStandingPenaltyWeek = -1;
+        }
 
         EditorIO.Info("— Difficulty —");
         p.Difficulty = EditorIO.PromptEnum("Difficulty", p.Difficulty);
