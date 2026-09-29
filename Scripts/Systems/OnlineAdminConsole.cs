@@ -942,6 +942,18 @@ namespace UsurperRemake.Systems
             var livePlayer = session.Context?.Engine?.CurrentPlayer;
             if (livePlayer == null) return;
 
+            ApplyEditsToPlayer(livePlayer, edited);
+
+            terminal.SetColor("cyan");
+            terminal.WriteLine("  (Live session updated)");
+        }
+
+        /// <summary>
+        /// Copy the edited fields onto a live player. The stats go to the Base fields, which the
+        /// RecalculateStats at the end rebuilds the derived stats from.
+        /// </summary>
+        internal static void ApplyEditsToPlayer(Character livePlayer, PlayerData edited)
+        {
             livePlayer.Level = edited.Level;
             livePlayer.Experience = edited.Experience;
             livePlayer.Gold = edited.Gold;
@@ -952,18 +964,15 @@ namespace UsurperRemake.Systems
             livePlayer.Mana = edited.Mana;
             livePlayer.BaseStrength = edited.Strength;
             livePlayer.BaseDefence = edited.Defence;
-            livePlayer.Stamina = edited.Stamina;
+            livePlayer.BaseStamina = edited.Stamina;
             livePlayer.BaseAgility = edited.Agility;
-            livePlayer.Charisma = edited.Charisma;
+            livePlayer.BaseCharisma = edited.Charisma;
             livePlayer.BaseDexterity = edited.Dexterity;
-            livePlayer.Wisdom = edited.Wisdom;
-            livePlayer.Intelligence = edited.Intelligence;
-            livePlayer.Constitution = edited.Constitution;
+            livePlayer.BaseWisdom = edited.Wisdom;
+            livePlayer.BaseIntelligence = edited.Intelligence;
+            livePlayer.BaseConstitution = edited.Constitution;
             livePlayer.TrainingPoints = edited.TrainingPoints;
             livePlayer.RecalculateStats();
-
-            terminal.SetColor("cyan");
-            terminal.WriteLine("  (Live session updated)");
         }
 
         // ──────────────────────────────────────────────────────────────
