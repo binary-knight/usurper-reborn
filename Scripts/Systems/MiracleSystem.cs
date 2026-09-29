@@ -64,6 +64,97 @@ public static class MiracleSystem
         return true;
     }
 
+    // ---------------- In a monster fight ----------------
+
+    /// <summary>The nine Miracles a follower calls on, in Temple order (every domain but Death).</summary>
+    public static IReadOnlyList<GodDomain> AllCalled => GodBoonSystem.AllDomains.Where(IsCalled).ToList();
+
+    /// <summary>The Miracles aimed at one foe (the menu asks which): Light, War and Law.</summary>
+    public static bool NeedsTarget(GodDomain d) => d == GodDomain.Light || d == GodDomain.War || d == GodDomain.Law;
+
+    /// <summary>Solarius: a living undead or demon foe (DivineBlessingSystem's own test).</summary>
+    public static bool CanBanish(Monster m) => m != null && m.IsAlive && DivineBlessingSystem.IsUndeadOrDemon(m);
+
+    /// <summary>
+    /// Solarius: an ordinary foe is banished outright. A boss, mini-boss or Old God is never
+    /// removed at once (as every instant kill in combat spares bosses); it takes BanishBossDamage.
+    /// </summary>
+    public static bool BanishKillsOutright(Monster m) =>
+        m != null && !m.IsBoss && !m.IsMiniBoss && m.FamilyName != "OldGod";
+
+    /// <summary>Solarius on a boss, mini-boss or Old God: MiracleBanishBossDamagePct of its max HP (at least 1), as holy damage.</summary>
+    public static long BanishBossDamage(Monster m) =>
+        m == null ? 0 : Math.Max(1, m.MaxHP * GameConfig.MiracleBanishBossDamagePct / 100);
+
+    /// <summary>
+    /// The Miracle the actor can call on now in a monster fight, or None: it must be ready today,
+    /// one that is called (not Mortis), with a living foe, and of use here: Solarius needs a living
+    /// undead or demon foe, Amara someone on the actor's side below full HP, Umbrath a fight that
+    /// can be fled (canFlee: not Nightmare), Terran the actor below full HP, Arcanus the actor below
+    /// full mana. party is everyone on the actor's side (the actor counts even when left out).
+    /// </summary>
+    public static GodDomain OfferedInFight(Character actor, IEnumerable<Monster>? monsters, IEnumerable<Character>? party,
+        bool canFlee, GodSystem? gods = null)
+    {
+        if (!IsReady(actor, gods)) return GodDomain.None;
+        var d = GetMiracle(actor, gods);
+        if (!IsCalled(d)) return GodDomain.None;
+        var foes = monsters?.Where(m => m != null && m.IsAlive).ToList() ?? new List<Monster>();
+        if (foes.Count == 0) return GodDomain.None;
+        bool useful = d switch
+        {
+            GodDomain.Light => foes.Any(CanBanish),
+            GodDomain.Love => (party ?? Enumerable.Empty<Character>()).Append(actor).Any(p => p != null && p.IsAlive && p.HP < p.MaxHP),
+            GodDomain.Shadow => canFlee,
+            GodDomain.Earth => actor.HP < actor.MaxHP,
+            GodDomain.Magic => actor.MaxMana > 0 && actor.Mana < actor.MaxMana,
+            _ => true
+        };
+        return useful ? d : GodDomain.None;
+    }
+
+    /// <summary>Terran: the character back to full HP.</summary>
+    public static void HealToFull(Character c)
+    {
+        if (c != null && c.IsAlive) c.HP = c.MaxHP;
+    }
+
+    /// <summary>Amara: every living member below full HP back to full. Returns the ones healed, each once.</summary>
+    public static List<Character> HealPartyToFull(IEnumerable<Character>? party)
+    {
+        var healed = new List<Character>();
+        foreach (var p in party ?? Enumerable.Empty<Character>())
+        {
+            if (p == null || !p.IsAlive || p.HP >= p.MaxHP || healed.Contains(p)) continue;
+            p.HP = p.MaxHP;
+            healed.Add(p);
+        }
+        return healed;
+    }
+
+    /// <summary>Arcanus: the character's mana back to full.</summary>
+    public static void RefillMana(Character c)
+    {
+        if (c != null && c.MaxMana > 0) c.Mana = c.MaxMana;
+    }
+
+    /// <summary>
+    /// Sylvana: the beast that answers, a tamed-pet combat teammate (BeastData.BuildCombatWrapper,
+    /// GameConfig.MiracleBeastId) at the owner's level, for this fight only. Null if the beast is
+    /// not defined.
+    /// </summary>
+    public static Character? SummonBeast(Character owner)
+    {
+        var def = UsurperRemake.Data.BeastData.GetById(GameConfig.MiracleBeastId);
+        if (def == null || owner == null) return null;
+        var beast = UsurperRemake.Data.BeastData.BuildCombatWrapper(def, Math.Max(1, owner.Level), Loc.Get("miracle.beast_name"));
+        beast.IsMiracleAlly = true;
+        return beast;
+    }
+
+    /// <summary>The combat menu's label for a Miracle ("Miracle: name").</summary>
+    public static string MenuLabel(GodDomain d) => Loc.Get("miracle.menu", Name(d));
+
     // ---------------- Text ----------------
 
     /// <summary>The name of a domain's Miracle, in the player's language ("" for None).</summary>
