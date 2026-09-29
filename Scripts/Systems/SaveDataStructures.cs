@@ -791,6 +791,8 @@ namespace UsurperRemake.Systems
         public bool MiracleUsedToday { get; set; }  // 1.2.0: today's Miracle is spent; old saves read false (ready)
         public Dictionary<string, int> GodStandingPenalties { get; set; } = new();  // 1.2.0 single-player: god -> standing lost to desecration this week
         public int GodStandingPenaltyWeek { get; set; } = -1;  // 1.2.0: the week those penalties belong to; old saves read -1 (none)
+        public int WeeklyGodWeek { get; set; } = -1;  // 1.2.0 single-player: the week the strongest god was picked for; old saves read -1 (not yet)
+        public string WeeklyGod { get; set; } = "";  // 1.2.0 single-player: that week's strongest god ("" none)
         public string DivineDomain { get; set; } = "";  // 1.2.0: an immortal's god domain (GodDomain name); old saves read ""
         public int DivineBlessingCombats { get; set; }
         public float DivineBlessingBonus { get; set; }

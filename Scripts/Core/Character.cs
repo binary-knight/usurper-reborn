@@ -2360,6 +2360,10 @@ public class Character
     // (GodStandingPenalty). Kept for the week GodStandingPenaltyWeek only; online it is in SQL.
     public Dictionary<string, int> GodStandingPenalties { get; set; } = new();
     public int GodStandingPenaltyWeek { get; set; } = -1;
+    // 1.2.0 Temple gods piece 6, single-player: the week's strongest god (WeeklyGodSystem), picked once
+    // for WeeklyGodWeek ("" when no god had standing); online it is in world_state.
+    public int WeeklyGodWeek { get; set; } = -1;
+    public string WeeklyGod { get; set; } = "";
 
     // 1.2.0 Temple gods piece 2: an immortal's god domain (a GodDomain name, "" until chosen; saved).
     public string DivineDomain { get; set; } = "";

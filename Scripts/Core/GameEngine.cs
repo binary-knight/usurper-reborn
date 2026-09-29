@@ -5628,6 +5628,8 @@ public partial class GameEngine
                 ? new Dictionary<string, int>(playerData.GodStandingPenalties, StringComparer.OrdinalIgnoreCase)
                 : new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase),
             GodStandingPenaltyWeek = Math.Max(-1, playerData.GodStandingPenaltyWeek),
+            WeeklyGodWeek = Math.Max(-1, playerData.WeeklyGodWeek),
+            WeeklyGod = playerData.WeeklyGod ?? "",
             // 1.2.0 Temple gods piece 2 schema guard: a missing (old save) or unknown domain reads as
             // not chosen, and the Pantheon asks the immortal on the next visit
             DivineDomain = GodBoonSystem.StoredDomain(playerData.DivineDomain),

@@ -450,6 +450,7 @@ public class DailySystemManager
         FavorSystem.ApplyDailyReset(player);
         GodDeedSystem.ApplyDailyReset(player, terminal);   // 1.2.0 Temple gods: a spellcaster's week without casting (Magic taboo)
         MiracleSystem.ApplyDailyReset(player);   // 1.2.0 Temple gods: today's Miracle is ready again. The only production caller.
+        WeeklyGodSystem.Current(player);   // 1.2.0 Temple gods: a reset that starts a new week picks its strongest god (once per week)
 
         // Weekly rankings update (every Monday) — only in online mode
         // Must use Eastern time for day-of-week check since daily reset fires at 7 PM Eastern

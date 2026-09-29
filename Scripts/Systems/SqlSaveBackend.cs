@@ -9124,6 +9124,52 @@ namespace UsurperRemake.Systems
             }
         }
 
+        /// <summary>1.2.0 Temple gods piece 6: this world's weekly god record (WeeklyGodSystem.WorldStateKey), or null.</summary>
+        public WeeklyGodPick? GetWeeklyGod()
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT value FROM world_state WHERE key = @key;";
+                cmd.Parameters.AddWithValue("@key", WeeklyGodSystem.WorldStateKey);
+                return WeeklyGodSystem.FromJson(cmd.ExecuteScalar() as string);
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to read the weekly god: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 1.2.0 Temple gods piece 6: records the weekly god in one conditional upsert that only a week
+        /// newer than the saved one passes, so of any number of sessions or processes crossing the
+        /// weekly reset the first decides the week and the rest leave it as it is.
+        /// </summary>
+        public void RecordWeeklyGod(WeeklyGodPick pick)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    INSERT INTO world_state (key, value, version, updated_at, updated_by)
+                    VALUES (@key, @value, 1, datetime('now'), 'weekly_god')
+                    ON CONFLICT(key) DO UPDATE SET value = excluded.value, version = world_state.version + 1,
+                        updated_at = datetime('now'), updated_by = 'weekly_god'
+                    WHERE COALESCE(CASE WHEN json_valid(world_state.value) THEN json_extract(world_state.value, '$.week') END, -1) < @week;";
+                cmd.Parameters.AddWithValue("@key", WeeklyGodSystem.WorldStateKey);
+                cmd.Parameters.AddWithValue("@value", WeeklyGodSystem.ToJson(pick));
+                cmd.Parameters.AddWithValue("@week", pick.Week);
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to record the weekly god: {ex.Message}");
+            }
+        }
+
         /// <summary>A json_extract column as text ("" for NULL).</summary>
         private static string ReadJsonText(SqliteDataReader reader, int i) =>
             reader.IsDBNull(i) ? "" : Convert.ToString(reader.GetValue(i), System.Globalization.CultureInfo.InvariantCulture) ?? "";

@@ -1267,6 +1267,18 @@ public partial class TempleLocation : BaseLocation
             }
         }
 
+        // 1.2.0 Temple gods piece 6: this week's strongest god, picked at the weekly reset, and its bonus
+        var weekPick = await Task.Run(() => WeeklyGodSystem.Current(currentPlayer));
+        terminal.WriteLine("");
+        if (weekPick is { } week && !string.IsNullOrEmpty(week.God))
+        {
+            terminal.WriteLine(Loc.Get("temple.week_god", week.God, GameConfig.GodWeeklyXpBonusPct), "bright_yellow");
+            if (WeeklyGodSystem.IsFollowerOfWeek(currentPlayer, week))
+                terminal.WriteLine(Loc.Get("temple.week_god_yours", week.God, GameConfig.GodWeeklyXpBonusPct), "bright_green");
+        }
+        else
+            terminal.WriteLine(Loc.Get("temple.week_god_none"), "gray");
+
         await terminal.PressAnyKey();
     }
     
