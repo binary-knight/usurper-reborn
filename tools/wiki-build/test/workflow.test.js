@@ -1,0 +1,45 @@
+"use strict";
+const { test } = require("node:test");
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const YAML = require("yaml");
+const root = path.resolve(__dirname, "../../..");
+const load = (name) =>
+  YAML.parse(
+    fs.readFileSync(path.join(root, ".github/workflows", name), "utf8"),
+  );
+test("wiki runs on PRs and releases and its checked artifact gates deployment", () => {
+  const pipeline = load("ci-cd.yml");
+  assert.ok(pipeline.on.pull_request);
+  assert.ok(pipeline.on.release);
+  assert.ok(pipeline.jobs.wiki);
+  assert.ok(pipeline.jobs["deploy-server"].needs.includes("wiki"));
+  assert.ok(pipeline.jobs.wiki.steps.some((s) => s.with?.name === "wiki-site"));
+  assert.ok(
+    pipeline.jobs["deploy-server"].steps.some(
+      (s) => s.with?.name === "wiki-site" && s.with.path === "web/wiki/",
+    ),
+  );
+  const deploy = pipeline.jobs["deploy-server"].steps.find(
+    (s) => s.name === "Deploy to production",
+  ).run;
+  assert.ok(deploy.includes("test ! -L /opt/usurper/web/wiki"));
+  assert.ok(deploy.includes("sudo rm -rf -- /opt/usurper/web/wiki"));
+});
+test("suggestion workflow is manual, owner-verified, off-server and draft-only", () => {
+  const workflow = load("wiki-suggestion.yml");
+  assert.deepEqual(Object.keys(workflow.on), ["workflow_dispatch"]);
+  assert.equal(workflow.jobs.draft.environment, "wiki-review");
+  assert.match(workflow.jobs.draft.if, /evidence_verified/);
+  assert.equal(workflow.jobs.draft.steps[0].with.ref, "main");
+  assert.ok(
+    workflow.jobs.draft.steps.some(
+      (s) => s.run === "node tools/wiki-build/prepare-suggestion.js",
+    ),
+  );
+  const guard = load("wiki-suggestion-guard.yml");
+  assert.ok(guard.on.pull_request_target);
+  assert.equal(guard.permissions.contents, "read");
+  assert.ok(!guard.jobs["docs-only"].steps.some((s) => s.uses));
+});

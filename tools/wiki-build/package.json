@@ -1,0 +1,22 @@
+{
+  "name": "usurper-wiki-build",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "node build.js",
+    "test": "node --test test/*.test.js",
+    "test:browser": "playwright test"
+  },
+  "dependencies": {
+    "markdown-it": "14.3.2"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.63.0",
+    "better-sqlite3": "11.10.0",
+    "yaml": "2.9.1"
+  }
+}

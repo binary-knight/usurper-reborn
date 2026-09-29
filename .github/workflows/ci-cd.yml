@@ -4,7 +4,8 @@ on:
   push:
     branches: [main, develop]
   pull_request:
-    branches: [main]
+    branches: [main, 'wiki/**']
+    types: [opened, synchronize, reopened, ready_for_review]
   release:
     types: [published]
   workflow_dispatch:
@@ -32,6 +33,38 @@ env:
 # ═══════════════════════════════════════════════════════════════════
 
 jobs:
+
+  wiki:
+    name: Wiki build, links, bot and accessibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: tools/wiki-build/package-lock.json
+      - name: Export built-in wiki data
+        run: dotnet run --project usurper-reloaded.csproj -c Release -- --export-wiki wiki-data
+      - run: npm ci --prefix tools/wiki-build
+      - name: Build and validate wiki
+        run: |
+          npm run build --prefix tools/wiki-build
+          npm test --prefix tools/wiki-build
+          node --check web/ssh-proxy.js
+      - name: Install browser for accessibility checks
+        working-directory: tools/wiki-build
+        run: npx playwright install --with-deps chromium
+      - name: Phone-width, keyboard and accessibility checks
+        run: npm run test:browser --prefix tools/wiki-build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wiki-site
+          path: web/wiki/
+          if-no-files-found: error
 
   # ─── TEST ────────────────────────────────────────────────────────
   test:
@@ -729,7 +762,7 @@ jobs:
   deploy-server:
     name: Deploy to Server
     runs-on: ubuntu-latest
-    needs: [build, smoke-test]
+    needs: [build, smoke-test, wiki]
     if: >-
       (github.event_name == 'release') ||
       (github.event_name == 'workflow_dispatch' && inputs.deploy_server == 'true')
@@ -748,6 +781,12 @@ jobs:
         with:
           name: linux-x64-build
           path: build/
+
+      - name: Download checked wiki site
+        uses: actions/download-artifact@v4
+        with:
+          name: wiki-site
+          path: web/wiki/
 
       - name: Determine version
         id: version
@@ -833,6 +872,8 @@ jobs:
           # service holds the browser terminal, so restarting it at any other time would drop
           # anyone playing in a tab.
           $SSH "\
+            test ! -L /opt/usurper/web/wiki && \
+            sudo rm -rf -- /opt/usurper/web/wiki && \
             sudo tar -xzf /tmp/usurper-web.tar.gz -C /opt/usurper/web/ && \
             sudo chown -R usurper:usurper /opt/usurper/web && \
             sudo systemctl restart usurper-web && \

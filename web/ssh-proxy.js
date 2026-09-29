@@ -3940,11 +3940,12 @@ async function updateStatsChannel() {
 }
 
 function startDiscordBridge() {
-  if (!DISCORD_BOT_TOKEN || !DISCORD_GOSSIP_CHANNEL_ID) {
+  const wikiChannels = (process.env.DISCORD_WIKI_CHANNEL_IDS || '').split(',').map(id => id.trim()).filter(Boolean);
+  if (!DISCORD_BOT_TOKEN || (!DISCORD_GOSSIP_CHANNEL_ID && !wikiChannels.length)) {
     console.log('[Discord] Bridge not configured (missing DISCORD_BOT_TOKEN and/or DISCORD_GOSSIP_CHANNEL_ID) — skipping');
     return;
   }
-  if (!ensureDiscordBridgeSchema()) {
+  if (DISCORD_GOSSIP_CHANNEL_ID && !ensureDiscordBridgeSchema()) {
     console.error('[Discord] Bridge disabled: could not create schema');
     return;
   }
@@ -3958,6 +3959,17 @@ function startDiscordBridge() {
   }
 
   const { Client, GatewayIntentBits, Events } = discord;
+  let wikiBot;
+  try {
+    wikiBot = require('./wiki-bot').createWikiBot({
+      channels: wikiChannels,
+      roleId: process.env.DISCORD_WIKI_HELPER_ROLE_ID || '',
+      origin: process.env.WIKI_SITE_ORIGIN || 'https://usurper-reborn.net',
+      db: dbWrite
+    });
+  } catch (err) {
+    console.error('[Wiki] Configuration error:', err.message);
+  }
   discordClient = new Client({
     intents: [
       GatewayIntentBits.Guilds,
@@ -3968,16 +3980,15 @@ function startDiscordBridge() {
 
   discordClient.once(Events.ClientReady, async c => {
     console.log(`[Discord] Bridge logged in as ${c.user.tag}`);
-    const ch = c.channels.cache.get(DISCORD_GOSSIP_CHANNEL_ID);
-    if (!ch) {
-      console.error(`[Discord] Channel ${DISCORD_GOSSIP_CHANNEL_ID} not found — bot may not be in that server, or channel ID wrong`);
-      return;
+    const ch = DISCORD_GOSSIP_CHANNEL_ID && c.channels.cache.get(DISCORD_GOSSIP_CHANNEL_ID);
+    if (ch) {
+      discordGossipChannel = ch;
+      console.log(`[Discord] Watching channel #${ch.name} in ${ch.guild ? ch.guild.name : '?'}`);
+      setInterval(pollDiscordOutbound, DISCORD_POLL_INTERVAL_MS);
+      setInterval(cleanupDiscordBridge, DISCORD_CLEANUP_INTERVAL_MS);
+    } else if (DISCORD_GOSSIP_CHANNEL_ID) {
+      console.error('[Discord] Gossip channel not found; wiki routing remains independent');
     }
-    discordGossipChannel = ch;
-    console.log(`[Discord] Watching channel #${ch.name} in ${ch.guild ? ch.guild.name : '?'}`);
-
-    setInterval(pollDiscordOutbound, DISCORD_POLL_INTERVAL_MS);
-    setInterval(cleanupDiscordBridge, DISCORD_CLEANUP_INTERVAL_MS);
 
     // v0.57.13: optional live stats channel (separate from gossip)
     if (DISCORD_STATS_CHANNEL_ID) {
@@ -4016,6 +4027,9 @@ function startDiscordBridge() {
 
   discordClient.on(Events.MessageCreate, async message => {
     if (message.author.bot) return;
+    if (wikiBot && await wikiBot.handle(message, discordClient.user?.id)) return;
+    // A configuration failure must not leak a wiki question into game gossip.
+    if (discordClient.user && new RegExp(`<@!?${discordClient.user.id}>`).test(message.content || '')) return;
     if (message.channelId !== DISCORD_GOSSIP_CHANNEL_ID) return;
 
     // v0.57.13: intercept Discord-side commands (prefixed with `!`) BEFORE the

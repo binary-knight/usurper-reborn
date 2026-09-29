@@ -60,6 +60,9 @@ public class WikiDataExporterTests : IClassFixture<WikiDataFixture>
         Assert.Equal(3, warrior.GetProperty("growthPerLevel").GetProperty("strength").GetInt64());
         Assert.Equal(17, warrior.GetProperty("growthPerLevel").GetProperty("maxHP").GetInt64());
         Assert.NotEmpty(warrior.GetProperty("specializations").EnumerateArray());
+        var shaman = Assert.Single(classes.Where(c => c.GetProperty("id").GetString() == "MysticShaman"));
+        Assert.Equal(new[] { "Gnoll", "Orc", "Troll" }, shaman.GetProperty("allowedRaces").EnumerateArray()
+            .Select(r => r.GetString()).OrderBy(r => r).ToArray());
     }
 
     [Fact]
@@ -120,6 +123,7 @@ public class WikiDataExporterTests : IClassFixture<WikiDataFixture>
         var data = _export.Data("balance");
         Assert.Equal(GameConfig.CriticalHitChance, data.GetProperty("moddableDefaults").GetProperty("criticalHitChance").GetInt32());
         Assert.Equal(GameConfig.GodBoonTerranMaxHpPct, data.GetProperty("godConstants").GetProperty("GodBoonTerranMaxHpPct").GetInt32());
+        Assert.Equal(GameConfig.SpecializationUnlockLevel, data.GetProperty("characterConstants").GetProperty("SpecializationUnlockLevel").GetInt32());
     }
 
     [Fact]
