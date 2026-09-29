@@ -186,6 +186,21 @@ public class GodMiraclesCombat1115Tests
     }
 
     [Fact]
+    public void Valorian_TheCriticalOfAHiddenPlayer_EndsStealth()
+    {
+        var c = Chosen("GmcHidden", "Valorian");
+        var ogre = Foe();
+        var (engine, output) = Engine(c, new HighRandom());
+        c.ApplyStatus(StatusEffect.Hidden, 3);
+        c.HasStatus(StatusEffect.Hidden).Should().BeTrue();
+        c.MiracleCritPending = true;
+        typeof(CombatEngine).GetMethod("ComputePlayerSwingDamage", F)!.Invoke(engine, new object[] { c, ogre, false, 0, 1 });
+        c.MiracleCritPending.Should().BeFalse();
+        c.HasStatus(StatusEffect.Hidden).Should().BeFalse("the attack ends stealth, so no stealth critical follows");
+        Text(engine, output).Should().Contain(Loc.Get("miracle.crit")).And.NotContain(Loc.Get("combat.stealth_crit"));
+    }
+
+    [Fact]
     public void Valorian_CallsTheAttackWithTheCriticalSet()
     {
         string body = GodMiracles1115Tests.Body("Scripts/Systems/CombatEngine.cs", "private async Task ExecuteMiracle(");

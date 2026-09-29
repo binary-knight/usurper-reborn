@@ -13756,6 +13756,8 @@ public partial class CombatEngine
                         if (miracleCrit)
                         {
                             player.MiracleCritPending = false;
+                            // the attack ends stealth as every other attack does (the stealth branch below is skipped)
+                            if (player.HasStatus(StatusEffect.Hidden)) player.RemoveStatus(StatusEffect.Hidden);
                             rollMult = GameConfig.MiracleCritMultiplier;
                             terminal.WriteLine(Loc.Get("miracle.crit"), "bright_red");
                         }
