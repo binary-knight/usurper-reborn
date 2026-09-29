@@ -1359,29 +1359,18 @@ public partial class TempleLocation : BaseLocation
     }
 
     /// <summary>
-    /// Check if player can enter the Deep Temple (Aurelion encounter)
+    /// 1.2.0 Temple gods piece 7: the Deep Temple is Aurelion's one site, and it shows only when his
+    /// fight can actually start: the story's own gate (OldGodBossSystem.CanEncounterBoss: his level
+    /// and the three Old Gods faced before him, or the Sunforged Blade for an awakened save). A save
+    /// that already resolved him finds his memory in the Halls of Memory instead.
     /// </summary>
-    private bool CanEnterDeepTemple()
-    {
-        // Requires level 55+ and at least 3 Old Gods defeated
-        if (currentPlayer.Level < 55)
-            return false;
-
-        var story = StoryProgressionSystem.Instance;
-        int godsDefeated = story.OldGodStates.Count(s => s.Value.Status == GodStatus.Defeated || s.Value.Status == GodStatus.Saved);
-
-        // Can enter if defeated/saved 3+ gods, OR if already encountered Aurelion
-        if (godsDefeated >= 3)
-            return true;
-
-        if (story.HasStoryFlag("aurelion_encountered"))
-            return true;
-
-        return false;
-    }
+    private bool CanEnterDeepTemple() =>
+        currentPlayer != null && OldGodBossSystem.Instance.CanEncounterBoss(currentPlayer, OldGodType.Aurelion);
 
     /// <summary>
-    /// Enter the Deep Temple - Aurelion's domain
+    /// Enter the Deep Temple, Aurelion's domain, and face him. The result is resolved as the dungeon
+    /// resolves an Old God (DungeonLocation.ResolveOldGodAtTemple: the artifact, alignment, God Slayer
+    /// surge, forced save and the town's reaction), so the story advances the same from here.
     /// </summary>
     private async Task EnterDeepTemple()
     {
@@ -1407,30 +1396,15 @@ public partial class TempleLocation : BaseLocation
         await Task.Delay(1500);
 
         var story = StoryProgressionSystem.Instance;
+        var bossSystem = OldGodBossSystem.Instance;
 
-        // Check Aurelion's status
-        if (story.OldGodStates.TryGetValue(OldGodType.Aurelion, out var aurelionState))
+        // An awakened Aurelion (an older save's quest) and the Sunforged Blade: the save quest ends here
+        if (story.OldGodStates.TryGetValue(OldGodType.Aurelion, out var aurelionState) && aurelionState.Status == GodStatus.Awakened)
         {
-            if (aurelionState.Status == GodStatus.Defeated)
-            {
-                terminal.WriteLine("");
-                terminal.WriteLine(Loc.Get("temple.aurelion_altar_dark"), "gray");
-                terminal.WriteLine(Loc.Get("temple.aurelion_ash_remains"), "gray");
-                terminal.WriteLine(Loc.Get("temple.aurelion_sense_loss"), "white");
-                await terminal.PressAnyKey(Loc.Get("temple.press_enter_return"));
-                return;
-            }
-            else if (aurelionState.Status == GodStatus.Saved)
-            {
-                terminal.WriteLine("");
-                terminal.WriteLine(Loc.Get("temple.aurelion_warm_light"), "bright_yellow");
-                terminal.WriteLine(Loc.Get("temple.aurelion_presence"), "bright_white");
-                terminal.WriteLine("", "white");
-                terminal.WriteLine(Loc.Get("temple.aurelion_thank_you"), "bright_cyan");
-                terminal.WriteLine(Loc.Get("temple.aurelion_new_vessel"), "bright_cyan");
-                await terminal.PressAnyKey(Loc.Get("temple.press_enter_return"));
-                return;
-            }
+            var saveResult = await bossSystem.CompleteSaveQuest(currentPlayer, OldGodType.Aurelion, terminal);
+            await ResolveAurelionAtTemple(saveResult);
+            await terminal.PressAnyKey(Loc.Get("temple.press_enter_return"));
+            return;
         }
 
         // Aurelion encounter available
@@ -1447,39 +1421,28 @@ public partial class TempleLocation : BaseLocation
         {
             story.SetStoryFlag("aurelion_encountered", true);
 
-            // Start Aurelion boss encounter
-            var bossSystem = OldGodBossSystem.Instance;
-            if (bossSystem.CanEncounterBoss(currentPlayer, OldGodType.Aurelion))
-            {
-                var result = await bossSystem.StartBossEncounter(currentPlayer, OldGodType.Aurelion, terminal);
+            // Start Aurelion boss encounter (the gate above is the story's own)
+            var result = await bossSystem.StartBossEncounter(currentPlayer, OldGodType.Aurelion, terminal);
 
-                if (result.Success)
+            if (result.Success)
+            {
+                // Generate news
+                switch (result.Outcome)
                 {
-                    // Generate news
-                    switch (result.Outcome)
-                    {
-                        case BossOutcome.Defeated:
-                            NewsSystem.Instance.Newsy(true, $"{currentPlayer.Name2} destroyed Aurelion, the Fading Light! Truth dies in darkness.");
-                            break;
-                        case BossOutcome.Saved:
-                            NewsSystem.Instance.Newsy(true, $"{currentPlayer.Name2} saved Aurelion, the Fading Light! Truth lives on within them.");
-                            break;
-                        case BossOutcome.Allied:
-                            NewsSystem.Instance.Newsy(true, $"{currentPlayer.Name2} has allied with Aurelion, the Fading Light!");
-                            break;
-                        case BossOutcome.NotFought:
-                            break; // v1.1.15: not entered for a Mental collapse, no news
-                    }
+                    case BossOutcome.Defeated:
+                        NewsSystem.Instance.Newsy(true, $"{currentPlayer.Name2} destroyed Aurelion, the Fading Light! Truth dies in darkness.");
+                        break;
+                    case BossOutcome.Saved:
+                        NewsSystem.Instance.Newsy(true, $"{currentPlayer.Name2} saved Aurelion, the Fading Light! Truth lives on within them.");
+                        break;
+                    case BossOutcome.Allied:
+                        NewsSystem.Instance.Newsy(true, $"{currentPlayer.Name2} has allied with Aurelion, the Fading Light!");
+                        break;
+                    case BossOutcome.NotFought:
+                        break; // v1.1.15: not entered for a Mental collapse, no news
                 }
             }
-            else
-            {
-                terminal.WriteLine("");
-                terminal.WriteLine(Loc.Get("temple.aurelion_flickers"), "yellow");
-                terminal.WriteLine(Loc.Get("temple.aurelion_too_weak"), "bright_yellow");
-                terminal.WriteLine(Loc.Get("temple.aurelion_defeat_siblings"), "bright_yellow");
-                await Task.Delay(2000);
-            }
+            await ResolveAurelionAtTemple(result);
         }
         else
         {
@@ -1489,6 +1452,55 @@ public partial class TempleLocation : BaseLocation
             terminal.WriteLine(Loc.Get("temple.aurelion_not_ready"), "bright_yellow");
         }
 
+        await terminal.PressAnyKey(Loc.Get("temple.press_enter_return"));
+    }
+
+    /// <summary>
+    /// 1.2.0 Temple gods piece 7: Aurelion's result at the Deep Temple goes through the dungeon's own
+    /// Old God handling, so a Temple fight grants and saves what a floor fight did. A resolved
+    /// fight ends with the town's reaction and a return to Main Street (LocationExitException).
+    /// </summary>
+    private async Task ResolveAurelionAtTemple(BossEncounterResult result)
+    {
+        var dungeon = locationManager?.GetLocation(GameLocation.Dungeons) as DungeonLocation ?? new DungeonLocation();
+        await dungeon.ResolveOldGodAtTemple(result, currentPlayer, terminal);
+    }
+
+    /// <summary>True once Aurelion is resolved (defeated, saved, allied or consumed): the story is done with him.</summary>
+    internal static bool AurelionResolved()
+    {
+        var story = StoryProgressionSystem.Instance;
+        return story.OldGodStates.TryGetValue(OldGodType.Aurelion, out var s) &&
+               (s.Status == GodStatus.Defeated || s.Status == GodStatus.Saved ||
+                s.Status == GodStatus.Allied || s.Status == GodStatus.Consumed);
+    }
+
+    /// <summary>
+    /// Halls of Memory, A: the Deep Temple after Aurelion was resolved (the dark altar and its ash,
+    /// or his warm light in its new vessel). Memory only, never a fight.
+    /// </summary>
+    private async Task ShowAurelionMemory()
+    {
+        if (!AurelionResolved()) return;
+        terminal.ClearScreen();
+        terminal.WriteLine("");
+        WriteSectionHeader(Loc.Get("temple.deep_temple"), "bright_yellow");
+        var status = StoryProgressionSystem.Instance.OldGodStates[OldGodType.Aurelion].Status;
+        terminal.WriteLine("");
+        if (status == GodStatus.Saved || status == GodStatus.Allied)
+        {
+            terminal.WriteLine(Loc.Get("temple.aurelion_warm_light"), "bright_yellow");
+            terminal.WriteLine(Loc.Get("temple.aurelion_presence"), "bright_white");
+            terminal.WriteLine("");
+            terminal.WriteLine(Loc.Get("temple.aurelion_thank_you"), "bright_cyan");
+            terminal.WriteLine(Loc.Get("temple.aurelion_new_vessel"), "bright_cyan");
+        }
+        else
+        {
+            terminal.WriteLine(Loc.Get("temple.aurelion_altar_dark"), "gray");
+            terminal.WriteLine(Loc.Get("temple.aurelion_ash_remains"), "gray");
+            terminal.WriteLine(Loc.Get("temple.aurelion_sense_loss"), "white");
+        }
         await terminal.PressAnyKey(Loc.Get("temple.press_enter_return"));
     }
 
@@ -3067,6 +3079,14 @@ public partial class TempleLocation : BaseLocation
         string key = (choice ?? "").Trim().ToUpperInvariant();
         bool listed = TopMenuItems().Any(i => i.Key == key);
         if (key == "R" && listed) return true;
+        // T once Aurelion is resolved: his memory is in the Halls of Memory, never a fight
+        if (key == "T" && !listed && AurelionResolved())
+        {
+            terminal.WriteLine("");
+            Say(Loc.Get("temple.moved.aurelion"), "yellow");
+            await terminal.PressAnyKey();
+            return false;
+        }
         if (listed || key == "M" || key == "T")
         {
             var action = TopAction(key);
@@ -3133,6 +3153,7 @@ public partial class TempleLocation : BaseLocation
                     items.Add(new TempleMenuItem("U", rite, rite));
                 }
                 if (HasAscendedStatues()) items.Add(Item("V", "temple.memory.ascended", "temple.memory.ascended"));
+                if (AurelionResolved()) items.Add(Item("A", "temple.memory.aurelion", "temple.memory.aurelion"));
                 break;
         }
         items.Add(new TempleMenuItem("R", back, back));
@@ -3167,6 +3188,7 @@ public partial class TempleLocation : BaseLocation
         (TempleRoom.Memory, "K") => ShowHallOfTheFallen,
         (TempleRoom.Memory, "U") => ProcessRiteOfReturn,
         (TempleRoom.Memory, "V") => ShowAscendedStatues,
+        (TempleRoom.Memory, "A") => ShowAurelionMemory,
         _ => null
     };
 
@@ -3470,7 +3492,7 @@ public partial class TempleLocation : BaseLocation
     }
 
     /// <summary>The Halls of Memory open when one of its halls applies.</summary>
-    private bool HallsOfMemoryOpen() => CanShowHallOfTheFallen() || CanShowRiteOfReturn() || HasAscendedStatues();
+    private bool HallsOfMemoryOpen() => CanShowHallOfTheFallen() || CanShowRiteOfReturn() || HasAscendedStatues() || AurelionResolved();
 
     /// <summary>The Hall of the Ascended shows when founder statues stand at the Pantheon.</summary>
     private static bool HasAscendedStatues() =>

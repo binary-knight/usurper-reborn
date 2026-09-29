@@ -181,11 +181,12 @@ public class TempleRooms1115Tests
     [Fact]
     public async Task ARoom_IgnoresAKeyItDoesNotList()
     {
-        using var r = Make("TrRoomOnly", "D", "R");
-        int before = r.Hero.DesecrationsToday;
-        await Run(r.Temple, "RunRoom", TempleLocation.TempleRoom.Nave);
-        r.Hero.DesecrationsToday.Should().Be(before);
-        r.Text().Should().Contain(Loc.Get("temple.invalid_choice"));
+        // Y is the Undercroft's key only for a dark god's follower; with no god it is not listed
+        using var r = Make("TrRoomOnly", "Y", "R");
+        await Run(r.Temple, "RunRoom", TempleLocation.TempleRoom.Undercroft);
+        string text = r.Text();
+        text.Should().Contain(Loc.Get("temple.invalid_choice"));
+        text.Should().NotContain(Loc.Get("temple.must_worship_to_pray"), "the unlisted key does nothing");
     }
 
     // ---------------- Desecration: the Undercroft only ----------------
