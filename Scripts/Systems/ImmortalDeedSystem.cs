@@ -167,17 +167,39 @@ public static class ImmortalDeedSystem
     }
 
     /// <summary>
+    /// The GodFavorDayGains entry that holds the world day (DailySystemManager.WorldDayAt) the saved
+    /// ImmortalBlessing count belongs to, written by BlessSaved while the follower's own daily reset
+    /// is still due. It is not a FavorSource name, so GainedToday never reads it, and the follower's
+    /// daily reset clears it with the counts.
+    /// </summary>
+    public const string OfflineBlessWorldDayKey = "ImmortalBlessingWorldDay";
+
+    /// <summary>
     /// Bless a player who is not online, on their saved data: the same rule as Bless (Favor with the
     /// daily cap, the tier's bonus after it, a stronger blessing kept). Refused, with nothing changed,
-    /// when the save's god is not godName.
+    /// when the save's god is not godName. While the follower's own daily reset is still due (it runs
+    /// at their next login), the saved counts are from an earlier day: the ImmortalBlessing count is
+    /// then kept per world day (OfflineBlessWorldDayKey) and starts over when the world day changes,
+    /// so the cap is GodBlessFavorDailyCap each world day. LastDailyResetBoundary is never changed.
+    /// utcNow: the time of the bless (tests), else now.
     /// </summary>
-    public static BlessOutcome BlessSaved(PlayerData p, Dictionary<string, string>? playerGods, string godName)
+    public static BlessOutcome BlessSaved(PlayerData p, Dictionary<string, string>? playerGods, string godName, DateTime? utcNow = null)
     {
         if (p == null) return new BlessOutcome(true, 0, 0, 0f, 0);
         var (current, _) = GodRegistry.StandingEntryFrom(p, playerGods);
         if (!IsOwnFollower(godName, current)) return new BlessOutcome(true, 0, 0, 0f, 0);
         BindSaved(p, playerGods);
         string key = FavorSource.ImmortalBlessing.ToString();
+        DateTime now = utcNow ?? DateTime.UtcNow;
+        if (p.LastDailyResetBoundary < DailySystemManager.ResetBoundaryAt(now))
+        {
+            int worldDay = DailySystemManager.WorldDayAt(now);
+            if (!p.GodFavorDayGains.TryGetValue(OfflineBlessWorldDayKey, out int countedDay) || countedDay != worldDay)
+            {
+                p.GodFavorDayGains.Remove(key);
+                p.GodFavorDayGains[OfflineBlessWorldDayKey] = worldDay;
+            }
+        }
         int today = p.GodFavorDayGains.TryGetValue(key, out int v) ? v : 0;
         int room = Math.Max(0, GameConfig.GodBlessFavorDailyCap - today);
         int before = p.GodFavor;

@@ -17,7 +17,8 @@ public enum GodFavorTier
 /// <summary>
 /// 1.2.0 Temple gods: a source of Favor that has its own daily cap. The amount gained today from
 /// each source is saved on Character.GodFavorDayGains (keyed by the enum name) and cleared by
-/// FavorSystem.ApplyDailyReset. Later pieces add the call sites.
+/// FavorSystem.ApplyDailyReset. The dictionary also holds one entry that is not a source,
+/// ImmortalDeedSystem.OfflineBlessWorldDayKey (an offline bless's world day). Later pieces add the call sites.
 /// </summary>
 public enum FavorSource
 {
