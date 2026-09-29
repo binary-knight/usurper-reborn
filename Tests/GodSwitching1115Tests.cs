@@ -388,7 +388,7 @@ public class GodSwitching1115Tests
             s.Should().NotBeNullOrWhiteSpace();
             for (int i = 0; i < placeholders; i++) s.Should().Contain("{" + i + "}", $"{lang} {key}");
             s.Should().NotContain("{" + placeholders + "}", $"{lang} {key}");
-            s.Should().NotContain("—").And.NotContain("–");
+            s.Should().NotContain("\u2014").And.NotContain("\u2013");
         }
     }
 
