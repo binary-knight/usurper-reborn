@@ -9080,7 +9080,7 @@
   "temple.nave.header": "NAVATA DEGLI DEI",
   "temple.nave.desc1": "Dieci altari fiancheggiano la Navata, e accanto quelli degli Ascesi.",
   "temple.nave.desc2": "I sacerdoti curano le candele e ricevono le offerte dei fedeli.",
-  "temple.nave.evil_unwelcome": "I sacerdoti ti guardano gelidi. Non accettano offerte da te per un dio buono.",
+  "temple.nave.evil_unwelcome": "I sacerdoti ti guardano gelidi. Non accettano offerte da te per un dio buono che non sia il tuo.",
   "temple.nave.worship": "Adora un dio, o cambia il tuo dio",
   "temple.nave.pray": "Prega {0}",
   "temple.nave.prayed": "Prega {0} (hai già pregato oggi)",

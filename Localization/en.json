@@ -9265,7 +9265,7 @@
   "temple.nave.header": "NAVE OF THE GODS",
   "temple.nave.desc1": "Ten altars line the Nave, and beside them the altars of the Ascended.",
   "temple.nave.desc2": "Priests tend the candles and take the offerings of the faithful.",
-  "temple.nave.evil_unwelcome": "The priests eye you coldly. They take no offering from you for a good god.",
+  "temple.nave.evil_unwelcome": "The priests eye you coldly. They take no offering from you for a good god other than your own.",
   "temple.nave.worship": "Worship a god, or change your god",
   "temple.nave.pray": "Pray to {0}",
   "temple.nave.prayed": "Pray to {0} (you have prayed today)",
