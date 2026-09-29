@@ -35,7 +35,7 @@ public enum GodAct
     Murder,               // Love and Law
     Imprisoned,           // Law: sent to prison
     Confession,           // Shadow: confessing sins
-    Desecration,          // Earth: an altar desecrated
+    Desecration,          // Earth taboo; Shadow, Death and Chaos deed: an altar desecrated
     UndeadRaised,         // Death: raising the dead with a scroll
     NoCastWeek,           // Magic: a spellcaster who cast nothing for GodTabooNoCastDays daily resets
 }
@@ -74,7 +74,14 @@ public static class GodDeedSystem
         [GodAct.Murder] = new[] { (GodDomain.Love, -GameConfig.GodTabooGrave), (GodDomain.Law, -GameConfig.GodTabooMajor) },
         [GodAct.Imprisoned] = new[] { (GodDomain.Law, -GameConfig.GodTabooMajor) },
         [GodAct.Confession] = new[] { (GodDomain.Shadow, -GameConfig.GodTabooMajor) },
-        [GodAct.Desecration] = new[] { (GodDomain.Earth, -GameConfig.GodTabooGrave) },
+        [GodAct.Desecration] = new[]
+        {
+            (GodDomain.Earth, -GameConfig.GodTabooGrave),
+            // Temple gods piece 4: the dark gods welcome a desecration (a deed, under the daily deed cap)
+            (GodDomain.Shadow, GameConfig.GodDeedDesecration),
+            (GodDomain.Death, GameConfig.GodDeedDesecration),
+            (GodDomain.Chaos, GameConfig.GodDeedDesecration),
+        },
         [GodAct.UndeadRaised] = new[] { (GodDomain.Death, -GameConfig.GodTabooMajor) },
         [GodAct.NoCastWeek] = new[] { (GodDomain.Magic, -GameConfig.GodTabooMajor) },
     };

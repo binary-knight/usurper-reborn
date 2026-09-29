@@ -106,7 +106,7 @@ public class GodDeeds1115Tests
     [InlineData("Mortis", GodAct.UndeadSlain)]
     [InlineData("Arcanus", GodAct.Marriage)]
     [InlineData("Sylvana", GodAct.SpellLearned)]
-    [InlineData("Discordia", GodAct.Desecration)]
+    [InlineData("Discordia", GodAct.Confession)]
     [InlineData("Terran", GodAct.StreetBrawl)]
     public void Act_OfAnotherDomain_ChangesNothing(string god, GodAct act)
     {

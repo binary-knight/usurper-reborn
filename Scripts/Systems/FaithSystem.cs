@@ -255,12 +255,15 @@ public static class GodRegistry
         return SinglePlayerStandings(current);
     }
 
-    /// <summary>Single-player standing: the character's own god and Favor.</summary>
+    /// <summary>
+    /// Single-player standing: the character's own god and Favor, less this week's desecration
+    /// penalties kept in the save (GodStandingPenalty).
+    /// </summary>
     public static Dictionary<string, GodStanding> SinglePlayerStandings(Character? c, GodSystem? gods = null)
     {
         var god = c == null ? null : GetWorshippedGod(c, gods);
         var entries = god == null ? Array.Empty<(string, int)>() : new[] { (god.Value.Name, FavorSystem.GetFavor(c!, gods)) };
-        return ComputeStandings(entries);
+        return GodStandingPenalty.Apply(ComputeStandings(entries), GodStandingPenalty.LocalPenalties(c, GodStandingPenalty.CurrentWeek()));
     }
 
     /// <summary>Living NPCs following a god (today only player-gods have NPC followers).</summary>
@@ -447,5 +450,169 @@ public static class FavorSystem
         if (c.DaysSinceDevotion < int.MaxValue) c.DaysSinceDevotion++;
         int loss = NeglectLoss(c.DaysSinceDevotion);
         return loss > 0 ? Change(c, -loss, gods) : 0;
+    }
+}
+
+/// <summary>Temple gods piece 4: who changed a character's god.</summary>
+public enum GodChangeBy
+{
+    /// <summary>The worshipper chose it at the Temple (W, J, L): leaving costs Favor and brings wrath.</summary>
+    Player,
+    /// <summary>The game or another player did it (a god gone, a player-god's recruit): Favor goes with the god, no wrath.</summary>
+    Other,
+}
+
+/// <summary>
+/// Temple gods piece 4: what leaving the current god costs. FavorLost is all Favor with it.
+/// WrathLevel is the DivineWrath level a canon god records (0 none); SmiteDamage is the HP a
+/// player-god strikes at once (0 none). OldGod is "" when there is no god to leave.
+/// </summary>
+public readonly record struct GodSwitchCost(string OldGod, bool OldIsCanon, int FavorLost, int WrathLevel, long SmiteDamage)
+{
+    public bool LeavesAGod => OldGod.Length > 0;
+}
+
+/// <summary>
+/// Temple gods piece 4: the one switching rule. Every change of the god a character worships goes
+/// through Switch (a source test holds the game to it). Leaving a god costs all Favor with it and
+/// the new god starts at 0 (FavorSystem.Bind); when the worshipper chose it (GodChangeBy.Player)
+/// the left god's wrath follows at once, by the Favor lost: a canon god records Divine Wrath
+/// (Character.RecordDivineWrath, delivered in the dungeon), a player-god strikes with its smite.
+/// A change made by the game or another player (GodChangeBy.Other) brings no wrath. The wrath is
+/// applied once, in memory, with the switch; the Temple saves the character at once after it, so
+/// the god, the Favor, the wrath and LastGodSwitchDay reach the save together.
+/// </summary>
+public static class GodSwitchSystem
+{
+    /// <summary>The DivineWrath level for the Favor lost: 0 none, 1 below Devout, 2 below Zealot, 3 from Zealot.</summary>
+    public static int WrathLevelFor(int favorLost)
+    {
+        if (favorLost <= 0) return 0;
+        if (favorLost >= GameConfig.GodFavorTierZealotMin) return 3;
+        if (favorLost >= GameConfig.GodFavorTierDevoutMin) return 2;
+        return 1;
+    }
+
+    /// <summary>The share of max HP a left player-god smites for the Favor lost: 0 at none, the smite range scaled by Favor lost / 100.</summary>
+    public static float SmitePercentFor(int favorLost)
+    {
+        if (favorLost <= 0) return 0f;
+        float scale = Math.Clamp(favorLost, GameConfig.GodFavorMin, GameConfig.GodFavorMax) / (float)GameConfig.GodFavorMax;
+        return GameConfig.GodSmiteMinPercent + (GameConfig.GodSmiteMaxPercent - GameConfig.GodSmiteMinPercent) * scale;
+    }
+
+    /// <summary>The smite damage for the Favor lost against a max HP (at least 1 when there is a smite).</summary>
+    public static long SmiteDamageFor(int favorLost, long maxHp)
+    {
+        float pct = SmitePercentFor(favorLost);
+        return pct <= 0f ? 0 : Math.Max(1, (long)(Math.Max(0, maxHp) * pct));
+    }
+
+    /// <summary>
+    /// What switching to newGod (null or blank for none) would cost, read-only. Nothing when there
+    /// is no god to leave or newGod is the current god.
+    /// </summary>
+    public static GodSwitchCost Preview(Character c, string? newGod, GodSystem? gods = null)
+    {
+        var old = c == null ? null : GodRegistry.GetWorshippedGod(c, gods);
+        if (c == null || old == null) return new GodSwitchCost("", false, 0, 0, 0);
+        string name = old.Value.Name;
+        if (!string.IsNullOrWhiteSpace(newGod) && name.Equals(newGod.Trim(), StringComparison.OrdinalIgnoreCase))
+            return new GodSwitchCost(name, old.Value.IsCanon, 0, 0, 0);
+        int lost = FavorSystem.GetFavor(c, gods);
+        return old.Value.IsCanon
+            ? new GodSwitchCost(name, true, lost, WrathLevelFor(lost), 0)
+            : new GodSwitchCost(name, false, lost, 0, SmiteDamageFor(lost, c.MaxHP));
+    }
+
+    /// <summary>
+    /// Switches the character to newGod (null or blank for none) through GodRegistry.SetWorshippedGod.
+    /// By the player: the Preview cost is applied (the wrath recorded or the smite struck, HP never
+    /// below 1) and LastGodSwitchDay is set to today. By another: Favor goes with the god, nothing
+    /// else. otherSession as in SetWorshippedGod. Returns the cost applied, or null when refused (Manwe).
+    /// </summary>
+    public static GodSwitchCost? Switch(Character c, string? newGod, GodChangeBy by, GodSystem? gods = null, bool otherSession = false)
+    {
+        if (c == null) return null;
+        var cost = Preview(c, newGod, gods);
+        if (!GodRegistry.SetWorshippedGod(c, newGod, gods, otherSession)) return null;
+        if (by != GodChangeBy.Player) return cost with { WrathLevel = 0, SmiteDamage = 0 };
+        bool left = cost.LeavesAGod && !cost.OldGod.Equals(newGod?.Trim() ?? "", StringComparison.OrdinalIgnoreCase);
+        if (!left) return cost;
+        c.LastGodSwitchDay = Today();
+        if (cost.WrathLevel > 0)
+            c.RecordDivineWrath(cost.OldGod, string.IsNullOrWhiteSpace(newGod) ? "" : newGod.Trim(), cost.WrathLevel);
+        if (cost.SmiteDamage > 0)
+            c.HP = Math.Max(1, c.HP - cost.SmiteDamage);
+        return cost;
+    }
+
+    /// <summary>Today's game day (DailySystemManager).</summary>
+    public static int Today() => DailySystemManager.Instance.CurrentDay;
+}
+
+/// <summary>
+/// Temple gods piece 4: a desecrated altar lowers that god's standing by
+/// GodDesecrationStandingPenalty until the next weekly reset (week = game day /
+/// GodStandingWeekDays, DailySystemManager.CurrentDay). The penalty is stored, not a change to any
+/// follower's Favor, and it is applied where the standing is read: online in SQL
+/// (SqlSaveBackend.AddGodStandingPenalty, read inside GetGodStandings), single-player in the save
+/// (Character.GodStandingPenalties). A penalty from an earlier week no longer counts. Standing
+/// never goes below 0.
+/// </summary>
+public static class GodStandingPenalty
+{
+    /// <summary>The week a game day belongs to.</summary>
+    public static int WeekOf(int day) => Math.Max(0, day) / GameConfig.GodStandingWeekDays;
+
+    /// <summary>This week (DailySystemManager.CurrentDay).</summary>
+    public static int CurrentWeek() => WeekOf(DailySystemManager.Instance.CurrentDay);
+
+    /// <summary>Standings less the penalties (any letter case), never below 0. Gods without standing stay out.</summary>
+    public static Dictionary<string, GodStanding> Apply(Dictionary<string, GodStanding> standings, IReadOnlyDictionary<string, int>? penalties)
+    {
+        if (standings == null) return new Dictionary<string, GodStanding>(StringComparer.OrdinalIgnoreCase);
+        if (penalties == null || penalties.Count == 0) return standings;
+        foreach (var (god, points) in penalties)
+        {
+            if (points <= 0 || string.IsNullOrWhiteSpace(god)) continue;
+            string name = GodRegistry.CanonName(god) ?? god.Trim();
+            if (standings.TryGetValue(name, out var s))
+                standings[name] = s with { Standing = Math.Max(0, s.Standing - points) };
+        }
+        return standings;
+    }
+
+    /// <summary>The single-player penalties for a week (empty when they belong to another week).</summary>
+    public static IReadOnlyDictionary<string, int> LocalPenalties(Character? c, int week)
+    {
+        if (c?.GodStandingPenalties == null || c.GodStandingPenaltyWeek != week)
+            return new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        return new Dictionary<string, int>(c.GodStandingPenalties, StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Single-player: adds a penalty to a god for a week; penalties of an earlier week are dropped first.</summary>
+    public static void AddLocal(Character c, string god, int week, int points = GameConfig.GodDesecrationStandingPenalty)
+    {
+        if (c == null || string.IsNullOrWhiteSpace(god) || points <= 0) return;
+        if (c.GodStandingPenaltyWeek != week || c.GodStandingPenalties == null)
+        {
+            c.GodStandingPenalties = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            c.GodStandingPenaltyWeek = week;
+        }
+        string name = GodRegistry.CanonName(god) ?? god.Trim();
+        string key = c.GodStandingPenalties.Keys.FirstOrDefault(k => k.Equals(name, StringComparison.OrdinalIgnoreCase)) ?? name;
+        c.GodStandingPenalties[key] = (c.GodStandingPenalties.TryGetValue(key, out int v) ? v : 0) + points;
+    }
+
+    /// <summary>An altar of god desecrated by c: the penalty for this week, online in SQL, else in c's save.</summary>
+    public static void RecordDesecration(Character c, string god)
+    {
+        if (c == null || string.IsNullOrWhiteSpace(god)) return;
+        int week = CurrentWeek();
+        if (UsurperRemake.BBS.DoorMode.IsOnlineMode && SaveSystem.Instance?.Backend is SqlSaveBackend backend)
+            backend.AddGodStandingPenalty(GodRegistry.CanonName(god) ?? god.Trim(), week, GameConfig.GodDesecrationStandingPenalty);
+        else
+            AddLocal(c, god, week);
     }
 }

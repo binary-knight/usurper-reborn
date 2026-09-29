@@ -1657,7 +1657,9 @@ public class PantheonLocation : BaseLocation
             var player = session.Context?.Engine?.CurrentPlayer;
             if (player != null)
             {
-                GodRegistry.SetWorshippedGod(player, godName, otherSession: true); // 1.2.0: one god, so a canon choice is cleared
+                // 1.2.0: one god, so a canon choice is cleared. Temple gods piece 4: another player's act, not
+                // the worshipper's, so Favor goes with the old god and no wrath follows
+                GodSwitchSystem.Switch(player, godName, GodChangeBy.Other, otherSession: true);
                 await GodBoonSystem.ApplyRecruitAsync(currentPlayer, player);   // 1.2.0: the god's boons and domain at once
                 session.EnqueueMessage(
                     $"\u001b[1;33m  ✦ A divine presence fills your soul... You now worship {godName}! ✦\u001b[0m");

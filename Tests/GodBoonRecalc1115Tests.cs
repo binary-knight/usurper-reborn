@@ -161,27 +161,20 @@ public class GodBoonRecalc1115Tests
 
     // ---------------- The Temple's own worship writes ----------------
 
+    // Temple gods piece 4: every Temple god change goes through GodSwitchSystem.Switch, which writes
+    // the god with GodRegistry.SetWorshippedGod, and that recalculates (Worship_AGodChange_* above).
     [Fact]
-    public void Temple_EveryCanonWorshipWrite_GoesThroughTheRecalculatingHelper()
+    public void Temple_EveryWorshipWrite_GoesThroughTheRecalculatingSwitch()
     {
         string temple = Source("Scripts/Locations/TempleLocation.cs");
-        Body("Scripts/Locations/TempleLocation.cs", "private void SetCanonWorship(")
-            .Should().Contain("godSystem.SetPlayerGod(currentPlayer.Name2, god);")
-            .And.Contain("GodBoonSystem.RecalculateForBoon(currentPlayer);");
-        Count(temple, "godSystem.SetPlayerGod(currentPlayer.Name2").Should().Be(1, "only the helper writes the canon god");
+        Count(temple, "SetPlayerGod(").Should().Be(0, "no direct canon write at the Temple");
+        Regex.IsMatch(temple, @"currentPlayer\.WorshippedGod\s*=[^=]").Should().BeFalse("no direct player-god write at the Temple");
         var worship = Body("Scripts/Locations/TempleLocation.cs", "private async Task ProcessWorship(");
-        Count(worship, "SetCanonWorship(\"\");").Should().Be(1, "leaving a canon god");
-        Count(worship, "SetCanonWorship(selectedGod.Name);").Should().Be(1, "choosing a canon god");
-        Count(Body("Scripts/Locations/TempleLocation.cs", "private async Task VerifyPlayerGodExists("), "SetCanonWorship(\"\");").Should().Be(1);
-        Count(Body("Scripts/Locations/TempleLocation.cs", "private async Task WorshipImmortalGod("), "SetCanonWorship(\"\");").Should().Be(1);
-    }
-
-    [Fact]
-    public void Temple_LeavingAPlayerGod_Recalculates()
-    {
-        var leave = new Regex(@"currentPlayer\.WorshippedGod = """";\s*GodBoonSystem\.RecalculateForBoon\(currentPlayer\);");
-        leave.IsMatch(Body("Scripts/Locations/TempleLocation.cs", "private async Task ProcessWorship(")).Should().BeTrue("abandoning a player-god for the canon gods");
-        leave.IsMatch(Body("Scripts/Locations/TempleLocation.cs", "private async Task LeaveImmortalFaith(")).Should().BeTrue("leaving a player-god's faith");
+        Count(worship, "await SwitchGodAsync(null);").Should().Be(2, "leaving a player-god, leaving a canon god");
+        Count(worship, "await SwitchGodAsync(selectedGod.Name);").Should().Be(1, "choosing a canon god");
+        Count(Body("Scripts/Locations/TempleLocation.cs", "private async Task WorshipImmortalGod("), "await SwitchGodAsync(chosen.DivineName);").Should().Be(1);
+        Count(Body("Scripts/Locations/TempleLocation.cs", "private async Task LeaveImmortalFaith("), "await SwitchGodAsync(null);").Should().Be(1);
+        Count(Body("Scripts/Locations/TempleLocation.cs", "private async Task VerifyPlayerGodExists("), "GodSwitchSystem.Switch(currentPlayer, null, GodChangeBy.Other);").Should().Be(1);
     }
 
     // ---------------- A player-god's domain ----------------
@@ -329,7 +322,7 @@ public class GodBoonRecalc1115Tests
         finally { GodRegistry.SetWorshippedGod(f, null); }
 
         Regex.IsMatch(Body("Scripts/Locations/PantheonLocation.cs", "private async Task ApplyRecruitToPlayer("),
-                @"GodRegistry\.SetWorshippedGod\(player, godName, otherSession: true\);[^\n]*\n\s*await GodBoonSystem\.ApplyRecruitAsync\(currentPlayer, player\);")
+                @"GodSwitchSystem\.Switch\(player, godName, GodChangeBy\.Other, otherSession: true\);[^\n]*\n\s*await GodBoonSystem\.ApplyRecruitAsync\(currentPlayer, player\);")
             .Should().BeTrue();
     }
 
@@ -360,10 +353,20 @@ public class GodBoonRecalc1115Tests
     }
 
     [Fact]
-    public void Temple_TheCanonChoice_RecalculatesAfterItClearsThePlayerGod()
+    public void Worship_TheCanonChoice_ClearsThePlayerGod_AndItsBoons()
     {
-        Regex.IsMatch(Body("Scripts/Locations/TempleLocation.cs", "private async Task ProcessWorship("),
-                @"temple\.bond_severed""[^\n]*\n\s*currentPlayer\.WorshippedGod = """";\s*GodBoonSystem\.RecalculateForBoon\(currentPlayer\);")
-            .Should().BeTrue("choosing a canon god clears the player-god and its boons after SetCanonWorship ran");
+        var gods = new GodSystem();
+        var c = Hero("GbrCanonChoice");
+        long plain = PlainMaxHp(c);
+        try
+        {
+            GodRegistry.SetWorshippedGod(c, "Zephyrine", gods).Should().BeTrue();
+            GodSwitchSystem.Switch(c, "Terran", GodChangeBy.Player, gods).Should().NotBeNull();
+            c.WorshippedGod.Should().BeEmpty("one god: the canon choice clears the player-god");
+            gods.GetPlayerGod(c.Name2).Should().Be("Terran");
+            GodRegistry.SetWorshippedGod(c, null, gods);
+            c.MaxHP.Should().Be(plain);
+        }
+        finally { GodRegistry.SetWorshippedGod(c, null, gods); }
     }
 }
