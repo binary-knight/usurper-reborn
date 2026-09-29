@@ -1291,6 +1291,7 @@ public class DailySystemManager
 
         // Reset daily deeds
         god.DeedsLeft = GameConfig.GodDeedsPerDay[godIdx];
+        ImmortalDeedSystem.ClearChastised(god);   // 1.2.0 piece 5b: each follower can be chastised again, on the deeds' day
 
         // Count believers and grant passive exp
         int believers = PantheonLocation.CountBelievers(god.DivineName);

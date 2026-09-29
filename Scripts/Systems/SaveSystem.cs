@@ -787,6 +787,7 @@ namespace UsurperRemake.Systems
                 DaysSinceSpellCast = player.DaysSinceSpellCast,
                 LastGodSwitchDay = player.LastGodSwitchDay,
                 MiracleUsedToday = player.MiracleUsedToday,
+                ChastisedToday = player.ChastisedToday?.ToList() ?? new List<string>(),
                 GodStandingPenalties = new Dictionary<string, int>(player.GodStandingPenalties ?? new Dictionary<string, int>()),
                 GodStandingPenaltyWeek = player.GodStandingPenaltyWeek,
                 DivineDomain = player.DivineDomain ?? "",

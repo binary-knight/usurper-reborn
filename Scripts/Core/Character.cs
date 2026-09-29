@@ -2354,6 +2354,7 @@ public class Character
     public int DaysSinceSpellCast { get; set; }                                  // 1.2.0 Temple gods: daily resets since the last spell cast (Arcanus taboo)
     public int LastGodSwitchDay { get; set; } = -1;                              // 1.2.0 Temple gods piece 4: game day the character last left a god by choice (-1 never)
     public bool MiracleUsedToday { get; set; }                                   // 1.2.0 Temple gods piece 5: today's Miracle is spent (MiracleSystem); cleared by the daily reset
+    public List<string> ChastisedToday { get; set; } = new();                    // 1.2.0 piece 5b, an immortal: followers chastised today (ImmortalDeedSystem.ChastiseKey); cleared with the deeds
     [System.Text.Json.Serialization.JsonIgnore] public bool MiracleCritPending { get; set; }   // 1.2.0: Valorian's Miracle, the next swing is a critical hit (transient)
     [System.Text.Json.Serialization.JsonIgnore] public bool IsMiracleAlly { get; set; }        // 1.2.0: Sylvana's beast, a teammate for one fight only (transient)
     // 1.2.0 Temple gods piece 4, single-player: standing lost by each god to desecration this week
