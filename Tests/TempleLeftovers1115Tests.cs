@@ -185,4 +185,66 @@ public class TempleLeftovers1115Tests
         rumor.Should().Contain("Aurelion");
         rumor.Should().Be(Loc.Get("inn.bartender_rumor_next_god_temple"));
     }
+
+    // ---------------- Removed keys: the confession, old flat menu and status keys piece 7 left behind ----------------
+
+    /// <summary>
+    /// The Temple Confession, the flat pre-rooms menu and its screen reader labels, and the old
+    /// status counters no code reads any more. Kept: temple.sr_ask_join, temple.sr_leave_prayers and
+    /// temple.sr_talk_past, still read by the Faith room's Cloister prompt.
+    /// </summary>
+    private static readonly string[] RemovedKeys =
+    {
+        "temple.believers_count", "temple.confess_cancelled", "temple.confess_cap", "temple.confess_current",
+        "temple.confess_daily_limit", "temple.confess_flavor", "temple.confess_header", "temple.confess_intro",
+        "temple.confess_no_sins", "temple.confess_prompt", "temple.confess_rate", "temple.confess_success",
+        "temple.confess_too_poor", "temple.menu_altars", "temple.menu_confess", "temple.menu_contribute",
+        "temple.menu_deep_temple", "temple.menu_desecrate", "temple.menu_examine_stones", "temple.menu_faith_member",
+        "temple.menu_faith_seek", "temple.menu_faith_serve_another", "temple.menu_following", "temple.menu_god_ranking",
+        "temple.menu_hall_fallen", "temple.menu_holy_news", "temple.menu_inner_sanctum", "temple.menu_inner_sanctum_cost",
+        "temple.menu_item_sacrifice", "temple.menu_join_flock", "temple.menu_leave_faith", "temple.menu_meditated_today",
+        "temple.menu_meditation_chapel", "temple.menu_meditation_hint", "temple.menu_pray", "temple.menu_prayed_today",
+        "temple.menu_prophecies", "temple.menu_return", "temple.menu_rite", "temple.menu_sacrifice_gold",
+        "temple.menu_sacrifice_gold_hint", "temple.menu_status", "temple.menu_the_faith", "temple.menu_unaffiliated",
+        "temple.menu_worship", "temple.sr_altars", "temple.sr_ascended_gods", "temple.sr_confess",
+        "temple.sr_contribute", "temple.sr_deep_temple", "temple.sr_desecrate", "temple.sr_examine_stones",
+        "temple.sr_faith_member", "temple.sr_faith_seek", "temple.sr_faith_serve_another", "temple.sr_god_ranking",
+        "temple.sr_hall_fallen", "temple.sr_holy_news", "temple.sr_inner_sanctum_cost", "temple.sr_inner_sanctum_meditated",
+        "temple.sr_item_sacrifice", "temple.sr_join_immortal_following", "temple.sr_join_immortal_unaffiliated", "temple.sr_leave_immortal",
+        "temple.sr_meditation_chapel", "temple.sr_pray", "temple.sr_prayed_today", "temple.sr_prophecies",
+        "temple.sr_return", "temple.sr_rite", "temple.sr_sacrifice_gold", "temple.sr_status",
+        "temple.sr_worship", "temple.your_status",
+    };
+
+    private static readonly string[] KeptSrKeys = { "temple.sr_ask_join", "temple.sr_leave_prayers", "temple.sr_talk_past" };
+
+    [Fact]
+    public void RemovedTempleKeys_AreGone_FromEveryLanguage()
+    {
+        foreach (var lang in Langs)
+        {
+            var d = LoadLang(lang);
+            var stillThere = RemovedKeys.Where(k => d.ContainsKey(k)).ToList();
+            stillThere.Should().BeEmpty($"{lang}.json still has keys no code reads: {string.Join(", ", stillThere)}");
+        }
+    }
+
+    [Fact]
+    public void KeptScreenReaderKeys_StillRead_ByTheFaithRoom()
+    {
+        string src = File.ReadAllText(Path.Combine(SourceRoot(), "Scripts/Locations/TempleLocation.cs"));
+        foreach (var key in KeptSrKeys)
+            src.Should().Contain($"\"{key}\"", $"{key} is still read and must not be removed");
+    }
+
+    private static string SourceRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null)
+        {
+            if (File.Exists(Path.Combine(dir.FullName, "Scripts/Locations/TempleLocation.cs"))) return dir.FullName;
+            dir = dir.Parent;
+        }
+        throw new InvalidOperationException("Repo root not found above " + AppContext.BaseDirectory);
+    }
 }
