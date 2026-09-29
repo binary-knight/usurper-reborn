@@ -785,6 +785,7 @@ namespace UsurperRemake.Systems
                 GodFavorDayGains = new Dictionary<string, int>(player.GodFavorDayGains ?? new Dictionary<string, int>()),
                 DaysSinceDevotion = player.DaysSinceDevotion,
                 DaysSinceSpellCast = player.DaysSinceSpellCast,
+                LastGodSwitchDay = player.LastGodSwitchDay,
                 DivineDomain = player.DivineDomain ?? "",
                 DivineBlessingCombats = player.DivineBlessingCombats,
                 DivineBlessingBonus = player.DivineBlessingBonus,

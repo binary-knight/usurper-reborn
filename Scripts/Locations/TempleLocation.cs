@@ -758,25 +758,12 @@ public partial class TempleLocation : BaseLocation
         if (string.IsNullOrEmpty(currentGod) && !string.IsNullOrEmpty(currentPlayer.WorshippedGod))
         {
             terminal.WriteLine(Loc.Get("temple.follow_immortal_currently", currentPlayer.WorshippedGod), "bright_yellow");
+            ShowSwitchCost(null);   // 1.2.0 Temple gods piece 4: the cost before the choice
             // v1.1.15: yesno-convert-a, strict (Y/N)
             if (await terminal.AskYesNoAsync(Loc.Get("temple.abandon_for_elder", currentPlayer.WorshippedGod)))
             {
                 string oldGod = currentPlayer.WorshippedGod;
-                currentPlayer.WorshippedGod = "";
-                GodBoonSystem.RecalculateForBoon(currentPlayer);   // 1.2.0: a god boon on max HP goes with the god
-
-                // Persist to DB
-                if (DoorMode.IsOnlineMode)
-                {
-                    try
-                    {
-                        var backend = SaveSystem.Instance?.Backend as SqlSaveBackend;
-                        var sessionUsername = UsurperRemake.Server.SessionContext.Current?.Username;
-                        if (backend != null && !string.IsNullOrEmpty(sessionUsername))
-                            await backend.SetPlayerWorshippedGod(sessionUsername, "");
-                    }
-                    catch { }
-                }
+                await SwitchGodAsync(null);
 
                 terminal.WriteLine("");
                 terminal.SetColor("yellow");
@@ -791,6 +778,7 @@ public partial class TempleLocation : BaseLocation
         else if (!string.IsNullOrEmpty(currentGod))
         {
             terminal.WriteLine(Loc.Get("temple.currently_worship", currentGod), "white");
+            ShowSwitchCost(null);   // 1.2.0 Temple gods piece 4: the cost before the choice
 
             // v1.1.15: yesno-convert-a, strict (Y/N)
             if (await terminal.AskYesNoAsync(Loc.Get("temple.lost_faith", currentGod)))
@@ -819,8 +807,8 @@ public partial class TempleLocation : BaseLocation
                     note = randomNotes[Random.Shared.Next(randomNotes.Length)];
                 }
 
-                // Remove from god system
-                SetCanonWorship("");
+                // Remove from god system (1.2.0: all Favor and the god's wrath go with it)
+                await SwitchGodAsync(null);
 
                 // In Pascal, this would send mail to the god and news
                 terminal.WriteLine("");
@@ -853,28 +841,9 @@ public partial class TempleLocation : BaseLocation
 
                 terminal.WriteLine(Loc.Get("temple.now_believer", selectedGod.Name), "yellow");
 
-                // Set in god system
-                SetCanonWorship(selectedGod.Name);
-
-                // Clear any immortal player-god worship (can only follow one type)
-                if (!string.IsNullOrEmpty(currentPlayer.WorshippedGod))
-                {
-                    terminal.SetColor("yellow");
-                    terminal.WriteLine(Loc.Get("temple.bond_severed", currentPlayer.WorshippedGod));
-                    currentPlayer.WorshippedGod = "";
-                    GodBoonSystem.RecalculateForBoon(currentPlayer);   // 1.2.0: the player-god's boons go with the god
-                    if (DoorMode.IsOnlineMode)
-                    {
-                        try
-                        {
-                            var backend2 = SaveSystem.Instance?.Backend as SqlSaveBackend;
-                            var sessionUsername2 = UsurperRemake.Server.SessionContext.Current?.Username;
-                            if (backend2 != null && !string.IsNullOrEmpty(sessionUsername2))
-                                await backend2.SetPlayerWorshippedGod(sessionUsername2, "");
-                        }
-                        catch { }
-                    }
-                }
+                // Set in god system (1.2.0: one god, and the new god starts at Favor 0; a god
+                // left above was already left, so this costs nothing more)
+                await SwitchGodAsync(selectedGod.Name);
 
                 // In Pascal, this would send mail to god and news
                 terminal.WriteLine("");
@@ -1750,14 +1719,58 @@ public partial class TempleLocation : BaseLocation
     }
 
     /// <summary>
-    /// 1.2.0: sets or clears the player's canon god, then recalculates the stats so a god boon on
-    /// max HP follows the change (HP is only clamped, never raised).
+    /// 1.2.0 Temple gods piece 4: shows what leaving the current god for newGod (null for none)
+    /// costs, before the player is asked: all Favor with it, and its wrath by the Favor lost.
+    /// Read-only (GodSwitchSystem.Preview).
     /// </summary>
-    private void SetCanonWorship(string god)
+    private void ShowSwitchCost(string? newGod)
     {
-        godSystem.SetPlayerGod(currentPlayer.Name2, god);
-        GodBoonSystem.RecalculateForBoon(currentPlayer);
+        var cost = GodSwitchSystem.Preview(currentPlayer, newGod);
+        if (!cost.LeavesAGod || cost.OldGod.Equals(newGod ?? "", StringComparison.OrdinalIgnoreCase)) return;
+        terminal.WriteLine("");
+        if (cost.FavorLost > 0)
+            terminal.WriteLine(Loc.Get("god.switch_cost_favor", cost.OldGod, cost.FavorLost), "yellow");
+        else
+            terminal.WriteLine(Loc.Get("god.switch_cost_no_favor", cost.OldGod), "gray");
+        if (cost.WrathLevel > 0)
+            terminal.WriteLine(Loc.Get("god.switch_cost_wrath", cost.OldGod, WrathSeverityName(cost.WrathLevel)), "red");
+        if (cost.SmiteDamage > 0)
+            terminal.WriteLine(Loc.Get("god.switch_cost_smite", cost.OldGod, cost.SmiteDamage), "red");
+        terminal.WriteLine(Loc.Get("god.switch_cost_new_zero"), "gray");
     }
+
+    /// <summary>
+    /// 1.2.0 Temple gods piece 4: the player's own god change at the Temple (W, J, L), through the
+    /// one switching rule (GodSwitchSystem.Switch, by the player): all Favor with the left god is
+    /// lost and its wrath follows. Online, the character is then saved at once (forced past the
+    /// autosave throttle), so the god, the Favor, the wrath and LastGodSwitchDay land in one write
+    /// and a dropped session cannot keep the new god without its cost.
+    /// </summary>
+    private async Task<GodSwitchCost?> SwitchGodAsync(string? newGod)
+    {
+        var cost = GodSwitchSystem.Switch(currentPlayer, newGod, GodChangeBy.Player);
+        if (cost is { } c)
+        {
+            if (c.WrathLevel > 0)
+                terminal.WriteLine(Loc.Get("god.switch_wrath_now", c.OldGod, WrathSeverityName(c.WrathLevel)), "bright_red");
+            if (c.SmiteDamage > 0)
+                terminal.WriteLine(Loc.Get("god.switch_smite_now", c.OldGod, c.SmiteDamage, currentPlayer.HP, currentPlayer.MaxHP), "bright_red");
+        }
+        if (DoorMode.IsOnlineMode)
+        {
+            try { await SaveSystem.Instance.AutoSave(currentPlayer, force: true); }
+            catch (Exception ex) { DebugLogger.Instance.LogError("FAITH", $"Save after a god switch failed: {ex.Message}"); }
+        }
+        return cost;
+    }
+
+    /// <summary>The name of a Divine Wrath level (base.wrath_minor, moderate, severe).</summary>
+    private static string WrathSeverityName(int level) => level switch
+    {
+        1 => Loc.Get("base.wrath_minor"),
+        2 => Loc.Get("base.wrath_moderate"),
+        _ => Loc.Get("base.wrath_severe"),
+    };
 
     /// <summary>
     /// Verify player's god still exists (Pascal TEMPLE.PAS)
@@ -1771,7 +1784,7 @@ public partial class TempleLocation : BaseLocation
             {
                 terminal.WriteLine(Loc.Get("temple.god_no_longer_exists", playerGod), "red");
                 terminal.WriteLine(Loc.Get("temple.faith_shaken"), "gray");
-                SetCanonWorship("");
+                GodSwitchSystem.Switch(currentPlayer, null, GodChangeBy.Other);   // 1.2.0: the game's change, no wrath
                 await Task.Delay(2000);
             }
         }
@@ -3466,48 +3479,31 @@ public partial class TempleLocation : BaseLocation
             return;
         }
 
-        // If already following another player god, warn
+        // If already following another player god, show the cost and ask
         if (!string.IsNullOrEmpty(currentPlayer.WorshippedGod))
         {
             terminal.WriteLine(Loc.Get("temple.currently_follow", currentPlayer.WorshippedGod), "yellow");
+            ShowSwitchCost(chosen.DivineName);   // 1.2.0 Temple gods piece 4: the cost before the choice
             // v1.1.15: yesno-convert-a, strict (Y/N)
             if (!await terminal.AskYesNoAsync(Loc.Get("temple.abandon_prompt"))) return;
         }
 
-        // If following an NPC god, renounce them — the elder god may punish apostasy
+        // If following a canon god, show the cost and ask. 1.2.0 Temple gods piece 4: its wrath is
+        // the one switching rule (Divine Wrath by the Favor lost), no longer a random smite here.
         string oldNpcGod = godSystem.GetPlayerGod(currentPlayer.Name2);
         if (!string.IsNullOrEmpty(oldNpcGod))
         {
             terminal.WriteLine(Loc.Get("temple.currently_worship_elder", oldNpcGod), "yellow");
+            ShowSwitchCost(chosen.DivineName);
             // v1.1.15: yesno-convert-a, strict (Y/N)
             if (!await terminal.AskYesNoAsync(Loc.Get("temple.abandon_elder_prompt", oldNpcGod))) return;
 
-            SetCanonWorship("");
             terminal.WriteLine("");
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("temple.renounce_elder", oldNpcGod));
-
-            // Divine retribution — the elder god may smite the apostate
-            var rng = Random.Shared;
-            if (rng.NextDouble() < 0.6) // 60% chance of punishment
-            {
-                long smiteDamage = Math.Max(1, (long)(currentPlayer.MaxHP * (0.1 + rng.NextDouble() * 0.2)));
-                currentPlayer.HP = Math.Max(1, currentPlayer.HP - smiteDamage);
-                terminal.SetColor("bright_red");
-                terminal.WriteLine(Loc.Get("temple.elder_strikes", oldNpcGod));
-                terminal.SetColor("white");
-                terminal.WriteLine(Loc.Get("temple.elder_damage", smiteDamage, currentPlayer.HP, currentPlayer.MaxHP));
-                await Task.Delay(1500);
-            }
-            else
-            {
-                terminal.SetColor("gray");
-                terminal.WriteLine(Loc.Get("temple.elder_watches", oldNpcGod));
-                await Task.Delay(1000);
-            }
         }
 
-        currentPlayer.WorshippedGod = chosen.DivineName;
+        await SwitchGodAsync(chosen.DivineName);
 
         // Cache boon effects from the chosen god
         currentPlayer.CachedBoonEffects = DivineBoonRegistry.CalculateEffects(chosen.DivineBoonConfig);
@@ -3537,19 +3533,6 @@ public partial class TempleLocation : BaseLocation
         {
             UsurperRemake.Server.MudServer.Instance.SendToPlayer(chosen.Username,
                 $"\u001b[1;33m  ✦ A mortal named {currentPlayer.Name2} now worships you! ✦\u001b[0m");
-        }
-
-        // Persist worship atomically to DB so believer counts update immediately
-        if (DoorMode.IsOnlineMode)
-        {
-            try
-            {
-                var backend = SaveSystem.Instance?.Backend as SqlSaveBackend;
-                var sessionUsername = UsurperRemake.Server.SessionContext.Current?.Username;
-                if (backend != null && !string.IsNullOrEmpty(sessionUsername))
-                    await backend.SetPlayerWorshippedGod(sessionUsername, chosen.DivineName);
-            }
-            catch { }
         }
 
         terminal.WriteLine("");
@@ -3692,29 +3675,16 @@ public partial class TempleLocation : BaseLocation
         }
 
         string godName = currentPlayer.WorshippedGod;
+        ShowSwitchCost(null);   // 1.2.0 Temple gods piece 4: the cost before the choice
         // v1.1.15: yesno-convert-a, strict (Y/N)
         if (!await terminal.AskYesNoAsync(Loc.Get("temple.abandon_faith_prompt", godName))) return;
 
-        currentPlayer.WorshippedGod = "";
-        GodBoonSystem.RecalculateForBoon(currentPlayer);   // 1.2.0: a god boon on max HP goes with the god
+        await SwitchGodAsync(null);
         terminal.WriteLine("");
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("temple.turn_away", godName));
         terminal.SetColor("gray");
         terminal.WriteLine(Loc.Get("temple.without_patronage"));
-
-        // Persist atomically to DB so believer counts update immediately
-        if (DoorMode.IsOnlineMode)
-        {
-            try
-            {
-                var backend = SaveSystem.Instance?.Backend as SqlSaveBackend;
-                var sessionUsername = UsurperRemake.Server.SessionContext.Current?.Username;
-                if (backend != null && !string.IsNullOrEmpty(sessionUsername))
-                    await backend.SetPlayerWorshippedGod(sessionUsername, "");
-            }
-            catch { }
-        }
 
         terminal.WriteLine("");
         await terminal.PressAnyKey();

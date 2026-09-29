@@ -449,3 +449,101 @@ public static class FavorSystem
         return loss > 0 ? Change(c, -loss, gods) : 0;
     }
 }
+
+/// <summary>Temple gods piece 4: who changed a character's god.</summary>
+public enum GodChangeBy
+{
+    /// <summary>The worshipper chose it at the Temple (W, J, L): leaving costs Favor and brings wrath.</summary>
+    Player,
+    /// <summary>The game or another player did it (a god gone, a player-god's recruit): Favor goes with the god, no wrath.</summary>
+    Other,
+}
+
+/// <summary>
+/// Temple gods piece 4: what leaving the current god costs. FavorLost is all Favor with it.
+/// WrathLevel is the DivineWrath level a canon god records (0 none); SmiteDamage is the HP a
+/// player-god strikes at once (0 none). OldGod is "" when there is no god to leave.
+/// </summary>
+public readonly record struct GodSwitchCost(string OldGod, bool OldIsCanon, int FavorLost, int WrathLevel, long SmiteDamage)
+{
+    public bool LeavesAGod => OldGod.Length > 0;
+}
+
+/// <summary>
+/// Temple gods piece 4: the one switching rule. Every change of the god a character worships goes
+/// through Switch (a source test holds the game to it). Leaving a god costs all Favor with it and
+/// the new god starts at 0 (FavorSystem.Bind); when the worshipper chose it (GodChangeBy.Player)
+/// the left god's wrath follows at once, by the Favor lost: a canon god records Divine Wrath
+/// (Character.RecordDivineWrath, delivered in the dungeon), a player-god strikes with its smite.
+/// A change made by the game or another player (GodChangeBy.Other) brings no wrath. The wrath is
+/// applied once, in memory, with the switch; the Temple saves the character at once after it, so
+/// the god, the Favor, the wrath and LastGodSwitchDay reach the save together.
+/// </summary>
+public static class GodSwitchSystem
+{
+    /// <summary>The DivineWrath level for the Favor lost: 0 none, 1 below Devout, 2 below Zealot, 3 from Zealot.</summary>
+    public static int WrathLevelFor(int favorLost)
+    {
+        if (favorLost <= 0) return 0;
+        if (favorLost >= GameConfig.GodFavorTierZealotMin) return 3;
+        if (favorLost >= GameConfig.GodFavorTierDevoutMin) return 2;
+        return 1;
+    }
+
+    /// <summary>The share of max HP a left player-god smites for the Favor lost: 0 at none, the smite range scaled by Favor lost / 100.</summary>
+    public static float SmitePercentFor(int favorLost)
+    {
+        if (favorLost <= 0) return 0f;
+        float scale = Math.Clamp(favorLost, GameConfig.GodFavorMin, GameConfig.GodFavorMax) / (float)GameConfig.GodFavorMax;
+        return GameConfig.GodSmiteMinPercent + (GameConfig.GodSmiteMaxPercent - GameConfig.GodSmiteMinPercent) * scale;
+    }
+
+    /// <summary>The smite damage for the Favor lost against a max HP (at least 1 when there is a smite).</summary>
+    public static long SmiteDamageFor(int favorLost, long maxHp)
+    {
+        float pct = SmitePercentFor(favorLost);
+        return pct <= 0f ? 0 : Math.Max(1, (long)(Math.Max(0, maxHp) * pct));
+    }
+
+    /// <summary>
+    /// What switching to newGod (null or blank for none) would cost, read-only. Nothing when there
+    /// is no god to leave or newGod is the current god.
+    /// </summary>
+    public static GodSwitchCost Preview(Character c, string? newGod, GodSystem? gods = null)
+    {
+        var old = c == null ? null : GodRegistry.GetWorshippedGod(c, gods);
+        if (c == null || old == null) return new GodSwitchCost("", false, 0, 0, 0);
+        string name = old.Value.Name;
+        if (!string.IsNullOrWhiteSpace(newGod) && name.Equals(newGod.Trim(), StringComparison.OrdinalIgnoreCase))
+            return new GodSwitchCost(name, old.Value.IsCanon, 0, 0, 0);
+        int lost = FavorSystem.GetFavor(c, gods);
+        return old.Value.IsCanon
+            ? new GodSwitchCost(name, true, lost, WrathLevelFor(lost), 0)
+            : new GodSwitchCost(name, false, lost, 0, SmiteDamageFor(lost, c.MaxHP));
+    }
+
+    /// <summary>
+    /// Switches the character to newGod (null or blank for none) through GodRegistry.SetWorshippedGod.
+    /// By the player: the Preview cost is applied (the wrath recorded or the smite struck, HP never
+    /// below 1) and LastGodSwitchDay is set to today. By another: Favor goes with the god, nothing
+    /// else. otherSession as in SetWorshippedGod. Returns the cost applied, or null when refused (Manwe).
+    /// </summary>
+    public static GodSwitchCost? Switch(Character c, string? newGod, GodChangeBy by, GodSystem? gods = null, bool otherSession = false)
+    {
+        if (c == null) return null;
+        var cost = Preview(c, newGod, gods);
+        if (!GodRegistry.SetWorshippedGod(c, newGod, gods, otherSession)) return null;
+        if (by != GodChangeBy.Player) return cost with { WrathLevel = 0, SmiteDamage = 0 };
+        bool left = cost.LeavesAGod && !cost.OldGod.Equals(newGod?.Trim() ?? "", StringComparison.OrdinalIgnoreCase);
+        if (!left) return cost;
+        c.LastGodSwitchDay = Today();
+        if (cost.WrathLevel > 0)
+            c.RecordDivineWrath(cost.OldGod, string.IsNullOrWhiteSpace(newGod) ? "" : newGod.Trim(), cost.WrathLevel);
+        if (cost.SmiteDamage > 0)
+            c.HP = Math.Max(1, c.HP - cost.SmiteDamage);
+        return cost;
+    }
+
+    /// <summary>Today's game day (DailySystemManager).</summary>
+    public static int Today() => DailySystemManager.Instance.CurrentDay;
+}

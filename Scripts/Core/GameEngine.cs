@@ -5622,6 +5622,7 @@ public partial class GameEngine
             GodFavorDayGains = playerData.GodFavorDayGains != null ? new Dictionary<string, int>(playerData.GodFavorDayGains) : new Dictionary<string, int>(),
             DaysSinceDevotion = Math.Max(0, playerData.DaysSinceDevotion),
             DaysSinceSpellCast = Math.Max(0, playerData.DaysSinceSpellCast),
+            LastGodSwitchDay = Math.Max(-1, playerData.LastGodSwitchDay),
             // 1.2.0 Temple gods piece 2 schema guard: a missing (old save) or unknown domain reads as
             // not chosen, and the Pantheon asks the immortal on the next visit
             DivineDomain = GodBoonSystem.StoredDomain(playerData.DivineDomain),

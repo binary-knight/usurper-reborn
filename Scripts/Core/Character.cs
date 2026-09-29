@@ -2352,6 +2352,7 @@ public class Character
     public Dictionary<string, int> GodFavorDayGains { get; set; } = new();       // FavorSource name -> Favor gained today; cleared at the daily reset
     public int DaysSinceDevotion { get; set; }                                   // Daily resets since the last prayer or fitting deed (neglect)
     public int DaysSinceSpellCast { get; set; }                                  // 1.2.0 Temple gods: daily resets since the last spell cast (Arcanus taboo)
+    public int LastGodSwitchDay { get; set; } = -1;                              // 1.2.0 Temple gods piece 4: game day the character last left a god by choice (-1 never)
 
     // 1.2.0 Temple gods piece 2: an immortal's god domain (a GodDomain name, "" until chosen; saved).
     public string DivineDomain { get; set; } = "";

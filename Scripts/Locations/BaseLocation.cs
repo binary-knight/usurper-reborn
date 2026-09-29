@@ -7877,7 +7877,10 @@ public abstract class BaseLocation
             terminal.WriteLine(Loc.Get("base.wrath_active"));
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("base.wrath_angered", currentPlayer.AngeredGodName));
-            terminal.WriteLine(Loc.Get("base.wrath_by_worshipping", currentPlayer.BetrayedForGodName));
+            // 1.2.0 Temple gods piece 4: a god left for no god records no god it was betrayed for
+            terminal.WriteLine(string.IsNullOrEmpty(currentPlayer.BetrayedForGodName)
+                ? Loc.Get("base.wrath_by_leaving")
+                : Loc.Get("base.wrath_by_worshipping", currentPlayer.BetrayedForGodName));
             terminal.SetColor("yellow");
             string severity = currentPlayer.DivineWrathLevel switch
             {
