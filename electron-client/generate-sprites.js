@@ -2,13 +2,17 @@
 // Usurper Reborn — Sprite Generator
 // Generates all combat sprites via PixelLab Pixflux API at 256x256 with transparent backgrounds.
 // Run: node generate-sprites.js
-// Requires: API key in PIXELLAB_API_KEY env var or hardcoded below.
+// Requires: API key in the PIXELLAB_API_KEY environment variable.
 
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
 
-const API_KEY = process.env.PIXELLAB_API_KEY || 'd2042722-a791-4ae6-9c31-745a74c49e6f';
+const API_KEY = process.env.PIXELLAB_API_KEY;
+if (!API_KEY) {
+  console.error('Set the PIXELLAB_API_KEY environment variable to run the sprite generator.');
+  process.exit(1);
+}
 const BASE = 'https://api.pixellab.ai/v2';
 const ASSETS = path.join(__dirname, 'assets');
 // 192px is the sweet spot: transparent backgrounds work reliably, good detail
