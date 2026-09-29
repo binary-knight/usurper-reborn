@@ -236,7 +236,7 @@ public class GodWeeklyBonus1115Tests : IDisposable
     {
         var src = Source("Locations", "TempleLocation.cs");
         int start = src.IndexOf("private async Task DisplayGodRanking()", StringComparison.Ordinal);
-        var body = src.Substring(start, src.IndexOf("private async Task DisplayHolyNews()", start, StringComparison.Ordinal) - start);
+        var body = src.Substring(start, src.IndexOf("private async Task<God?> SelectGod(", start, StringComparison.Ordinal) - start);
         body.Should().Contain("WeeklyGodSystem.Current(currentPlayer)");
         body.Should().Contain("Loc.Get(\"temple.week_god\", week.God, GameConfig.GodWeeklyXpBonusPct)");
         body.Should().Contain("Loc.Get(\"temple.week_god_none\")");

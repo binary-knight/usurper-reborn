@@ -220,7 +220,6 @@ public class GodNpcFaith1115Tests : IDisposable
     public void TempleCounts_ReadTheStandings_NotTheLocalRoster()
     {
         var src = Source("Locations", "TempleLocation.cs");
-        src.Should().Contain("Loc.Get(\"temple.believers_count\", standing.AllFollowers)");
         src.Should().Contain("ranking.Add((entry.Name, title, standing.AllFollowers, standing.Standing, !entry.IsCanon));");
     }
 

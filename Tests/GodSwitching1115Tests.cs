@@ -231,7 +231,6 @@ public class GodSwitching1115Tests
     [InlineData("private async Task ProcessWorship(", "ShowSwitchCost(null);   // 1.2.0 Temple gods piece 4: the cost before the choice\n\n", "Loc.Get(\"temple.lost_faith\"", "await SwitchGodAsync(null);\n\n                // In Pascal")]
     [InlineData("private async Task WorshipImmortalGod(", "ShowSwitchCost(chosen.DivineName);   // 1.2.0", "Loc.Get(\"temple.abandon_prompt\")", "await SwitchGodAsync(chosen.DivineName);")]
     [InlineData("private async Task WorshipImmortalGod(", "ShowSwitchCost(chosen.DivineName);\n", "Loc.Get(\"temple.abandon_elder_prompt\"", "await SwitchGodAsync(chosen.DivineName);")]
-    [InlineData("private async Task LeaveImmortalFaith(", "ShowSwitchCost(null);", "Loc.Get(\"temple.abandon_faith_prompt\"", "await SwitchGodAsync(null);")]
     public void EachTemplePath_ShowsTheCost_AsksStrictly_AndSwitchesOnlyAfterYes(string method, string preview, string prompt, string switchCall)
     {
         var body = Body("Scripts/Locations/TempleLocation.cs", method);

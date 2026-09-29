@@ -1976,6 +1976,34 @@ public class DungeonLocation : BaseLocation
     /// <summary>
     /// Handle the result of an Old God boss encounter
     /// </summary>
+    /// <summary>1.2.0 Temple gods piece 7: set while an Old God fought at the Temple is resolved here.</summary>
+    private bool _resolvingAtTemple;
+
+    /// <summary>
+    /// 1.2.0 Temple gods piece 7: Aurelion is fought in the Temple's Deep Temple; his result is resolved
+    /// by the same handling as a floor fight (artifact, alignment, God Slayer surge, forced save, the
+    /// town's reaction), with the online news naming the Deep Temple instead of a floor.
+    /// </summary>
+    internal async Task ResolveOldGodAtTemple(BossEncounterResult result, Character player, TerminalEmulator term)
+    {
+        _resolvingAtTemple = true;
+        try { await HandleGodEncounterResult(result, player, term); }
+        finally { _resolvingAtTemple = false; }
+    }
+
+    /// <summary>
+    /// 1.2.0 Temple gods piece 7: true while Aurelion waits at the Temple, so his floor points the
+    /// player there: not yet resolved (defeated, saved, allied, consumed) and not awakened (an older
+    /// save's quest, which still ends on his floor with the Sunforged Blade).
+    /// </summary>
+    internal static bool AurelionAwaitsAtTemple()
+    {
+        var story = StoryProgressionSystem.Instance;
+        if (!story.OldGodStates.TryGetValue(OldGodType.Aurelion, out var s)) return true;
+        return s.Status != GodStatus.Defeated && s.Status != GodStatus.Saved && s.Status != GodStatus.Allied &&
+               s.Status != GodStatus.Consumed && s.Status != GodStatus.Awakened;
+    }
+
     private async Task HandleGodEncounterResult(BossEncounterResult result, Character player, TerminalEmulator term)
     {
         if (result == null || !result.Success) return;
@@ -2011,7 +2039,9 @@ public class DungeonLocation : BaseLocation
                 {
                     var godDisplayName = player.Name2 ?? player.Name1;
                     _ = UsurperRemake.Systems.OnlineStateManager.Instance!.AddNews(
-                        $"{godDisplayName} has slain the Old God {result.God} on floor {currentDungeonLevel}!", "combat");
+                        _resolvingAtTemple
+                            ? $"{godDisplayName} has slain the Old God {result.God} in the Deep Temple!"
+                            : $"{godDisplayName} has slain the Old God {result.God} on floor {currentDungeonLevel}!", "combat");
                 }
                 break;
 
@@ -5475,6 +5505,19 @@ public class DungeonLocation : BaseLocation
             WriteBoxHeader(Loc.Get("dungeon.boss_encounter"), "red", 51);
             terminal.WriteLine("");
             UsurperRemake.UI.UIHelper.WriteWrapped(terminal, room.Description); // v1.1.14
+
+            // 1.2.0 Temple gods piece 7: Aurelion's one site is the Temple's Deep Temple; his floor
+            // points the player there (no fight here, the room stays as it is)
+            if (currentDungeonLevel == 85 && AurelionAwaitsAtTemple())
+            {
+                terminal.SetColor("bright_yellow");
+                UsurperRemake.UI.UIHelper.WriteWrapped(terminal, Loc.Get("dungeon.aurelion_at_temple"));
+                terminal.SetColor("gray");
+                UsurperRemake.UI.UIHelper.WriteWrapped(terminal, Loc.Get("dungeon.aurelion_at_temple_hint"));
+                terminal.WriteLine("");
+                await terminal.PressAnyKey();
+                return;
+            }
 
             // Check for Old God boss encounters on specific floors
             bool hadOldGodEncounter = await TryOldGodBossEncounter(player!, room);

@@ -291,7 +291,7 @@ public class GodStanding1115Tests : IDisposable
     [Fact]
     public void TempleImmortalsLoop_ReadsStandingsOnce_NotPerGod()
     {
-        var body = SourceBody("TempleLocation.cs", "private async Task<List<ImmortalGodInfo>> GetImmortalGodsAsync()", "private async Task WorshipImmortalGod()");
+        var body = SourceBody("TempleLocation.cs", "private async Task<List<ImmortalGodInfo>> GetImmortalGodsAsync()", "private void DisplayPlayerGodAltars(");
         int readIdx = body.IndexOf("backend.GetGodStandings()", StringComparison.Ordinal);
         int loopIdx = body.IndexOf("foreach (var god in immortals)", StringComparison.Ordinal);
         readIdx.Should().BeGreaterThan(-1, "the immortals listing reads standings once");
@@ -360,7 +360,7 @@ public class GodStanding1115Tests : IDisposable
             dir = dir.Parent;
         var src = File.ReadAllText(Path.Combine(dir!.FullName, "Scripts", "Locations", "TempleLocation.cs"));
         int start = src.IndexOf("private async Task DisplayGodRanking()", StringComparison.Ordinal);
-        int end = src.IndexOf("private async Task DisplayHolyNews()", StringComparison.Ordinal);
+        int end = src.IndexOf("private async Task<God?> SelectGod(", StringComparison.Ordinal);   // 1.2.0 piece 7: holy news is gone
         var body = src.Substring(start, end - start);
         body.Should().Contain("GodRegistry.AllGods(godNames)");
         body.Should().Contain("await GodRegistry.GetStandingsAsync(currentPlayer)");
